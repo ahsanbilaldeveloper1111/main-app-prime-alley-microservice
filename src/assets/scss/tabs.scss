@@ -1,0 +1,107 @@
+$primary-color: #2585f8;
+#system-tabs {
+      border-bottom: 3px #d5d5d5 solid;
+      margin-bottom:20px !important;
+      .nav-item {
+        margin-right: 20px;
+
+
+      }
+
+      .nav-link {
+            color: #000;
+            position: relative;
+            border: 0px !important;
+            margin: 0px !important;
+            padding:10px 0px;
+            font-weight: 500;
+
+      
+
+            &:hover, &:focus, &:active, &.active {
+                color:$primary-color !important;
+            }
+        }
+        .nav-link.active::after {
+            content: "";
+            position: absolute;
+            bottom: -3px;
+            left: 0;
+            right: 0;
+            border-bottom: 5px solid $primary-color;
+        }
+
+        &.tab-style-two{
+            background-color: #6b8daf;
+            border: 0;
+            .nav-item{
+                  margin:0;
+                  .nav-link{
+                        padding: 10px;
+                        border-radius: 0 !important;
+                        color: #fff !important;
+                        border-right: 1px solid #607183 !important;
+                        &.active, &:hover, &:focus, &:active{
+                              background-color:#4285f4;
+                              color:#fff !important;
+                        }
+                  }
+            }
+            .nav-link.active::after{
+                  border:0px;
+                  margin: 0;
+            }
+        }
+        
+
+}
+
+.overview-card {
+      background: linear-gradient(to bottom, #00269f, #003cfa);
+      border-radius: 10px;
+      padding:  20px;
+
+      .user-avatar {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            background-color: #cbd8ff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: #fff;
+            border: 5px solid #677ee7;
+      }
+
+      .text-opacity {
+            opacity: 0.5;
+      }
+}
+
+.theme-hr {
+      border-color:rgb(255 255 255 / 60%);
+      margin: 10px 0px;
+}
+
+.recent-activity {
+     
+      padding: 10px 0;
+      border-bottom: 1px solid #e0e0e0;
+      .ico {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background-color: #f0f0f0;
+            text-align: center;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: $primary-color;
+            font-size: 20px;
+            
+      }
+}
+
+.no-shadow {
+      box-shadow: none !important;
+}

@@ -1,0 +1,51 @@
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animated-row {
+  animation: fadeInUp 0.3s ease-in-out;
+}
+
+.rdt_TableHeadRow {
+  background: #e7edf4 !important;
+  font-weight: bold;
+  text-transform: uppercase;
+}
+
+.rdt_Table {
+  display: table !important;
+  caption-side: bottom;
+  border-collapse: collapse;
+}
+.rdt_TableHead {
+  display: table-header-group !important;
+}
+.rdt_TableHeadRow {
+  display: table-row !important;
+}
+.rdt_TableCol {
+  display: table-cell !important;
+  padding: .9rem .75rem;
+}
+.rdt_TableBody {
+  display: table-row-group !important;
+}
+.rdt_TableRow {
+  display: table-row !important;
+  border-top: 1px solid #dbe0e5;
+  border-bottom: none;
+  white-space: nowrap;
+  padding: .7rem .75rem;
+  vertical-align: middle;
+}
+.rdt_TableCell {
+  display: table-cell !important;
+  padding: 10px;
+}

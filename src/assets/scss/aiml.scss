@@ -1,0 +1,294 @@
+.call-analysis-details{
+
+}
+
+
+.ic_box{
+      width:20px;
+      height: 20px;
+      min-width: 20px;
+      min-height: 20px;
+      border-radius: 50%;
+      text-align: center;
+      line-height: 20px;
+      font-size: 12px;
+      i{
+            font-size: 12px;
+      }
+
+      &.small{
+            width: 20px;
+            height: 20px;
+            line-height: 20px;
+            font-size: 12px;
+
+            i{
+                 
+                  font-size: 12px;
+            }
+      }
+
+      
+
+      &.bg-light-gray{
+        background-color: #d9f1fc;
+        font-weight: 600;
+        color: #000;
+      }
+
+      color: #fff;
+      i{
+          line-height: normal;
+          vertical-align: middle;
+          background-color: #fff;
+      }
+  }
+
+  .smbox{
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      .ic_box{
+            width: 20px;
+            height: 20px;
+            min-width: 20px;
+            min-height: 20px;
+            line-height: 20px;
+            font-size: 12px;
+      }
+      h5{
+            font-size: 12px;
+      }
+}
+
+
+.callType{
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    
+
+    .desc{
+        h5{
+            margin-bottom: 0;
+           font-size: 14px;
+        }
+        
+    }
+}
+
+#call-analysis-tabs li.nav-item button{
+      color: #000;
+      background: #d5d5d5;
+      margin-right: 5px;
+    
+    &.active{
+      border-color: #04a9f5;
+      background: #04a9f5;
+      color: #fff;
+    }
+}
+
+
+.boxTypeTwo{
+      min-height: 150px;
+      display: flex;
+      flex-direction: column;
+      justify-content:space-between;
+      align-items: start;
+    h6{
+      //   margin-bottom: 50px;
+    }
+    h5{
+      font-size: 14px;
+    }
+    
+    
+}
+
+.transcript{
+      .transcript-item{
+
+            width: 40%;
+            margin-bottom: 10px;
+            clear: both;
+            border-radius: 10px;
+            padding: 10px;
+
+            &.leftBox{
+                  float: left;
+            }
+            &.rightBox{
+                  float: right;
+            }
+      }
+
+      
+      h5{
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 0;
+      }
+
+      // .leftBox{
+      //       float: left;
+      //       background-color: #e6e5e5;
+      // }
+
+      // .rightBox{
+      //       background-color: #bce8dd;
+           
+      // }
+
+      .box{
+            padding: 10px;
+            border-radius: 10px;
+
+            &.bxLeft{
+                  background-color: #e6e5e5;
+                  float: left;
+            }
+            &.bxRight{
+                  background-color: #bce8dd;
+                  float: right;
+            }
+      }
+      .leftIcon {
+            float: left;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            line-height: normal;
+            background-color: #cc0000;
+            text-align: center;
+      }
+      .rightIcon {
+            float: right;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            line-height: normal;
+            background-color: #008000;
+            text-align: center;
+      }
+      
+}
+
+
+.analysis-container{
+
+      .nav-item{
+            margin-right: 0px;
+           button{
+            
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border-radius: 0;
+           }
+      }
+
+      .card{
+      
+      
+            background-repeat: no-repeat;
+            background-position: right top;
+      }
+      .gbox{
+            display: flex;
+            flex-direction: column;
+            justify-content:space-between;
+            align-items: start;
+            min-height: 160px;
+            gap: 10px;
+
+            &.vboxStyleTwo{
+                  justify-content: start;
+            }
+      }
+      .box1{
+            min-height: 350px;
+      }
+      .vbox{
+           
+      }
+      .card-text{
+
+            &.size1{
+                  font-size: 18px;
+            }
+            &.size2{
+                  font-size: 20px;
+            }
+      }
+}
+
+
+.text-bold{
+      font-weight: 600;
+}
+
+.tags{
+
+      .tagVal{
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding-left: 20px;
+      }
+      .ic_box{
+            font-size: 12px;
+      }
+
+      .tboxIn{
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 14px;
+
+            h6{
+                  font-weight: normal;
+            }
+            
+      }
+}
+
+.card-body{
+    
+      h6{
+           
+            font-weight: normal;
+      }
+}
+
+.gbox3{
+      
+      min-height: 205px !important;
+}
+
+.tagOuter{
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px;
+      border: 1px solid #d3d3d3;
+    border-radius: 10px;
+      margin-bottom: 10px;
+
+      .tagIcon{
+            width: 20px;
+            height: 20px;
+            text-align: center;
+            line-height: 20px;
+            border-radius: 50%;
+            background-color: #fff;
+            font-size: 12px;
+            i{
+                  font-size: 12px;
+                  background-color: #fff !important;
+            }
+      }
+      
+      
+      
+}
