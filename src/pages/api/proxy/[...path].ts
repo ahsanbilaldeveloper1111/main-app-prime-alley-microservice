@@ -1,5 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import axios from 'axios';
+import formidable from 'formidable';
+import { promises as fs } from 'fs';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000/';
 
@@ -11,17 +13,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   
   // Construct the full backend URL
   const targetUrl = `${BACKEND_URL}${targetPath}`;
-  
-  // Debug logging
-//   console.log('=== PROXY DEBUG ===');
-//   console.log('Request method:', req.method);
-//   console.log('Request path:', path);
-//   console.log('Target path:', targetPath);
-//   console.log('Backend URL:', BACKEND_URL);
-//   console.log('Full target URL:', targetUrl);
-//   console.log('Request headers:', req.headers);
-//   console.log('Request body:', req.body);
-//   console.log('==================');
   
   try {
     // Prepare headers for the backend request
@@ -51,6 +42,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Special handling for FormData (file uploads) - preserve original Content-Type
     const isFormData = req.headers['content-type']?.includes('multipart/form-data');
     
+    let requestData: any = req.body;
+    
     if (isFormData) {
       // For FormData requests, preserve the original Content-Type header with boundary
       headers['Content-Type'] = req.headers['content-type'] as string;
@@ -58,19 +51,59 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       console.log('Original Content-Type:', req.headers['content-type']);
       console.log('Preserved Content-Type:', headers['Content-Type']);
       console.log('Request body type:', typeof req.body);
+      
+      // Parse FormData manually to preserve file information
+      const form = formidable({});
+      const [fields, files] = await form.parse(req);
+      
+      // Reconstruct FormData with proper file handling
+      const formData = new FormData();
+      
+      // Add fields
+      Object.entries(fields).forEach(([key, values]) => {
+        if (values && Array.isArray(values) && values.length > 0) {
+          formData.append(key, values[0]);
+        }
+      });
+      
+      // Add files with proper MIME type preservation
+      for (const [key, fileArray] of Object.entries(files)) {
+        if (fileArray && Array.isArray(fileArray) && fileArray.length > 0) {
+          const file = fileArray[0];
+          if (file.filepath && file.mimetype) {
+            // Read file buffer and append with proper MIME type
+            const fileBuffer = await fs.readFile(file.filepath);
+            const blob = new Blob([fileBuffer], { type: file.mimetype });
+            formData.append(key, blob, file.originalFilename || 'file');
+            
+            // Clean up temporary file
+            await fs.unlink(file.filepath);
+          }
+        }
+      }
+      
+      requestData = formData;
+      console.log('FormData reconstructed with proper MIME types');
       console.log('==========================');
     } else {
       // For regular JSON requests, set default headers
       headers['Content-Type'] = 'application/json';
       headers['Accept'] = 'application/json';
+      
+      // For non-FormData requests, the bodyParser should have already parsed the JSON
+      // If it's a string, try to parse it as JSON
+      if (typeof requestData === 'string' && requestData.trim()) {
+        try {
+          requestData = JSON.parse(requestData);
+        } catch (e) {
+          // If parsing fails, keep it as is
+          console.log('Failed to parse request body as JSON, keeping as string');
+        }
+      }
     }
 
-    // Use the parsed body from bodyParser (this will work for both JSON and FormData)
-    const requestData = req.body;
     console.log('Proxy request data:', requestData);
     console.log('Proxy request data type:', typeof requestData);
-
-    //console.log('Making request to backend with headers:', headers);
 
     // Make the request to the backend
     const response = await axios({
@@ -84,10 +117,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       responseType: req.headers['accept']?.includes('blob') ? 'blob' : 'json',
     });
 
-//     console.log('Backend response status:', response.status);
-//     console.log('Backend response headers:', response.headers);
-//     console.log('Response type:', typeof response.data);
-
     // Forward the response status
     res.status(response.status);
     
@@ -100,28 +129,28 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
 
     // Handle different response types
-    if (response.data instanceof Buffer || response.data instanceof Blob) {
-      // For binary data (blobs, files, etc.)
-      //console.log('Sending binary response');
+    if (response.data instanceof Buffer) {
+      // For Buffer data
       res.send(response.data);
+    } else if (response.data instanceof ArrayBuffer) {
+      // For ArrayBuffer data
+      res.send(Buffer.from(new Uint8Array(response.data)));
     } else if (typeof response.data === 'string') {
       // For text responses
-      //console.log('Sending text response');
       res.send(response.data);
     } else {
       // For JSON responses
-      //console.log('Sending JSON response');
       res.json(response.data);
     }
     
   } catch (error: any) {
-//     console.error('=== PROXY ERROR ===');
-//     console.error('Error type:', error.constructor.name);
-//     console.error('Error message:', error.message);
-//     console.error('Error code:', error.code);
-//     console.error('Error response:', error.response?.data);
-//     console.error('Error status:', error.response?.status);
-//     console.error('==================');
+    console.error('=== PROXY ERROR ===');
+    console.error('Error type:', error.constructor.name);
+    console.error('Error message:', error.message);
+    console.error('Error code:', error.code);
+    console.error('Error response:', error.response?.data);
+    console.error('Error status:', error.response?.status);
+    console.error('==================');
     
     // Handle different types of errors
     if (error.response) {
@@ -131,8 +160,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       res.status(error.response.status);
       
       // Handle error response data
-      if (error.response.data instanceof Buffer || error.response.data instanceof Blob) {
+      if (error.response.data instanceof Buffer) {
         res.send(error.response.data);
+      } else if (error.response.data instanceof ArrayBuffer) {
+        res.send(Buffer.from(new Uint8Array(error.response.data)));
       } else if (typeof error.response.data === 'string') {
         res.send(error.response.data);
       } else {
