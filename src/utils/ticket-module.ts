@@ -108,8 +108,13 @@ export const UpdateModule = async (id: string, name: string, description: string
       if(response.data){
         const responseData = response.data;
         if(responseData.code == 200){
-          toast.success('Module deleted successfully');
-          return true;
+          if(responseData?.data?.success == true){
+            toast.success('Module deleted successfully');
+            return true;
+          }else{
+            toast.error(responseData?.data?.message);
+            return false;
+          }
         }else{
           toast.error(responseData.message);
           return false;
@@ -138,8 +143,13 @@ export const UpdateModule = async (id: string, name: string, description: string
       if(response.data){
         const responseData = response.data;
         if(responseData.code == 200){
-          toast.success('Module created successfully');
-          return true;
+          if(responseData?.data?.success == true){
+            toast.success('Module created successfully');
+            return true;
+          }else{
+            toast.error(responseData?.data?.message);
+            return false;
+          }
         }else{
           toast.error(responseData.message);
           return false;

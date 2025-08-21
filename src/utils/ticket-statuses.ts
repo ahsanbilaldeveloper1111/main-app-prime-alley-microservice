@@ -107,8 +107,13 @@ export const UpdateStatus = async (id: string, name: string, color: string) => {
       if(response.data){
         const responseData = response.data;
         if(responseData.code == 200){
-          toast.success('Status deleted successfully');
-          return true;
+          if(responseData?.data?.success == true){
+            toast.success('Status deleted successfully');
+            return true;
+          }else{
+            toast.error(responseData?.data?.message);
+            return false;
+          }
         }else{
           toast.error(responseData.message);
           return false;

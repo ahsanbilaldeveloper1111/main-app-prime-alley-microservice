@@ -16,6 +16,7 @@ import moment from 'moment';
 import { CreateStatus } from '@utils/ticket-statuses';
 import { GetAllModules } from '@utils/ticket-module';
 import Select from 'react-select';
+import TicketsFilters from '@components/filters/TicketFilters';
 
 interface SelectOption {
       value: number;
@@ -248,6 +249,8 @@ const TicketList = () => {
     const handleSubmitCreateTicket = useCallback(async () => {
         console.log('=== COMPONENT DEBUG ===');
         console.log('newTicketImage type:', typeof newTicketImage, newTicketImage instanceof File);
+        console.log('newTicketImage MIME type:', newTicketImage?.type);
+        console.log('newTicketImage size:', newTicketImage?.size);
         
         const formData = new FormData();
         formData.append('title', newTicketTitle);
@@ -258,6 +261,15 @@ const TicketList = () => {
         formData.append('user_extension', newTicketUserExtension);
         if (newTicketImage) {
             formData.append('image', newTicketImage);
+        }
+        
+        // Debug FormData contents
+        console.log('FormData created successfully');
+        console.log('FormData has image:', newTicketImage ? 'Yes' : 'No');
+        if (newTicketImage) {
+            console.log('Image name:', newTicketImage.name);
+            console.log('Image type:', newTicketImage.type);
+            console.log('Image size:', newTicketImage.size);
         }
         
         console.log('FormData created type:', typeof formData, formData instanceof FormData);
@@ -327,6 +339,7 @@ const TicketList = () => {
                     {session?.user?.permissions?.includes('create-ticket-tickets') && (
                         <Button variant="outline-primary" size="sm" className="ms-3" onClick={openCreateTicketModal}>New Ticket</Button>
                     )}
+                    <TicketsFilters onFiltersChange={handleFiltersChange}  />
                     
                 </h2>
                 </div>

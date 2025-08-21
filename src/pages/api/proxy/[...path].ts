@@ -25,10 +25,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   
   try {
     // Prepare headers for the backend request
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-    };
+    const headers: Record<string, string> = {};
 
     // Forward authorization header if present
     if (req.headers.authorization) {
@@ -51,6 +48,28 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     });
 
+    // Special handling for FormData (file uploads) - preserve original Content-Type
+    const isFormData = req.headers['content-type']?.includes('multipart/form-data');
+    
+    if (isFormData) {
+      // For FormData requests, preserve the original Content-Type header with boundary
+      headers['Content-Type'] = req.headers['content-type'] as string;
+      console.log('=== PROXY FORMDATA DEBUG ===');
+      console.log('Original Content-Type:', req.headers['content-type']);
+      console.log('Preserved Content-Type:', headers['Content-Type']);
+      console.log('Request body type:', typeof req.body);
+      console.log('==========================');
+    } else {
+      // For regular JSON requests, set default headers
+      headers['Content-Type'] = 'application/json';
+      headers['Accept'] = 'application/json';
+    }
+
+    // Use the parsed body from bodyParser (this will work for both JSON and FormData)
+    const requestData = req.body;
+    console.log('Proxy request data:', requestData);
+    console.log('Proxy request data type:', typeof requestData);
+
     //console.log('Making request to backend with headers:', headers);
 
     // Make the request to the backend
@@ -58,7 +77,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       method: req.method,
       url: targetUrl,
       headers,
-      data: req.body,
+      data: requestData,
       params: req.query,
       timeout: 30000, // 30 second timeout
       validateStatus: () => true, // Don't throw on HTTP error status

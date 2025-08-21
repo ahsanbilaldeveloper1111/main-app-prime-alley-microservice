@@ -14,6 +14,15 @@ interface PaginationParams {
   exportType?: string;
 }
 
+export const DashboardData = async () => {
+  try {
+    const response = await axiosInstance.get('tickets/dashboard');
+    return response;
+  } catch (error) {
+    throw error;
+  }
+};
+
 export const ListTickets = async (params: PaginationParams = {}) => {
   try {
     const { page = 1, perPage = 15, search = "", draw = 1, filters = {}, isExport = false, exportType = '' } = params;
@@ -148,8 +157,13 @@ export const UpdateTicketDetails = async (
       if(response.data){
         const responseData = response.data;
         if(responseData.code == 200){
-          toast.success('Ticket deleted successfully');
-          return true;
+          if(responseData?.data?.success == true){
+            toast.success('Ticket deleted successfully');
+            return true;
+          }else{
+            toast.error(responseData?.data?.message);
+            return false;
+          }
         }else{
           toast.error(responseData.message);
           return false;

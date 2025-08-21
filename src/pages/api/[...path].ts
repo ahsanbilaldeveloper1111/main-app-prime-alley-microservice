@@ -8,41 +8,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   
   // Validate path parameter
   if (!path) {
-    console.error('No path provided in request');
-    return res.status(400).json({ error: 'No path provided' });
+    return res.status(400).json({ error: 'Path parameter is required' });
   }
-  
+
   // Reconstruct the path from the catch-all parameter
-  const targetPath = Array.isArray(path) ? path.join('/') : path || '';
-  
-  // Validate backend URL
-  if (!BACKEND_URL) {
-    console.error('BACKEND_URL not configured');
-    return res.status(500).json({ error: 'Backend URL not configured' });
-  }
-  
-  // Construct the full backend URL
+  const targetPath = Array.isArray(path) ? path.join('/') : path;
   const targetUrl = `${BACKEND_URL}${targetPath}`;
-  
-  // Debug logging for audio downloads
-  if (targetPath.includes('recordings/download')) {
-    // console.log('=== AUDIO DOWNLOAD DEBUG ===');
-    // console.log('Request method:', req.method);
-    // console.log('Request path:', path);
-    // console.log('Target path:', targetPath);
-    // console.log('Backend URL:', BACKEND_URL);
-    // console.log('Full target URL:', targetUrl);
-    // console.log('Request headers:', req.headers);
-    // console.log('Authorization header present:', !!req.headers.authorization);
-    // console.log('==================');
-  }
+
+  // Special handling for audio downloads
+  const isAudioDownload = targetPath.includes('recordings/download');
   
   try {
     // Prepare headers for the backend request
-    const headers: Record<string, string> = {
-      // 'Content-Type': 'application/json',
-      // 'Accept': 'application/json',
-    };
+    const headers: Record<string, string> = {};
 
     // Forward authorization header if present
     if (req.headers.authorization) {
@@ -56,11 +34,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       'x-forwarded-proto',
       'user-agent',
       'referer',
-      'origin',
-      'Content-Type',
-      'Accept',
-      'content-type',
-      'accept'
+      'origin'
     ];
 
     headersToForward.forEach(header => {
@@ -69,12 +43,31 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     });
 
-    // Special handling for audio downloads
-    const isAudioDownload = targetPath.includes('recordings/download');
-    if (isAudioDownload) {
+    // Special handling for FormData (file uploads) - preserve original Content-Type
+    const isFormData = req.headers['content-type']?.includes('multipart/form-data');
+    
+    if (isFormData) {
+      // For FormData requests, preserve the original Content-Type header with boundary
+      headers['Content-Type'] = req.headers['content-type'] as string;
+      console.log('=== FORMDATA DEBUG ===');
+      console.log('Original Content-Type:', req.headers['content-type']);
+      console.log('Preserved Content-Type:', headers['Content-Type']);
+      console.log('Request body type:', typeof req.body);
+      console.log('=====================');
+    } else if (isAudioDownload) {
+      // Special handling for audio downloads
       headers['Accept'] = 'audio/*, application/octet-stream, */*';
       headers['Content-Type'] = 'application/octet-stream';
+    } else {
+      // For regular JSON requests, set default headers
+      headers['Content-Type'] = 'application/json';
+      headers['Accept'] = 'application/json';
     }
+
+    // Use the parsed body from bodyParser (this will work for both JSON and FormData)
+    const requestData = req.body;
+    console.log('Request data:', requestData);
+    console.log('Request data type:', typeof requestData);
 
     //console.log('Making request to backend with headers:', headers);
 
@@ -83,9 +76,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       method: req.method,
       url: targetUrl,
       headers,
-      data: req.body,
+      data: requestData,
       params: req.query,
-      timeout: 60000, // 60 second timeout for audio files
+      timeout: isAudioDownload ? 60000 : 30000, // 60 second timeout for audio files, 30 for others
       validateStatus: () => true, // Don't throw on HTTP error status
       responseType: isAudioDownload ? 'arraybuffer' : (req.headers['accept']?.includes('blob') ? 'arraybuffer' : 'json'),
     });

@@ -468,6 +468,64 @@ export const callRecordingsFiltersConfig: FilterTab[] = createCallRecordingsFilt
 
 
 
+// Call Logs Filters Configuration
+export const createTicketFiltersConfig = (hierarchyData?: any): FilterTab[] => {
+  const filters: FilterTab[] = [];
+
+  // Add other filters
+  filters.push(
+    
+    {
+      id: 'call-extensions',
+      title: 'Extension',
+      icon: 'ti ti-users',
+      fields: [
+        {
+          type: 'select',
+          isMulti: true,
+          name: 'extension',
+          label: 'Extensions',
+          options: hierarchyData?.extensions?.map((ext: { id: string; name: string,display_name: string }) => ({
+            value: ext.id,
+            label: ext.display_name+ ' ('+ext.name+')'
+          })) || []
+        },
+        
+      ]
+    },
+    
+   
+    {
+      id: 'date-range',
+      title: 'Date Range',
+      icon: 'ti ti-calendar',
+      fields: [
+        {
+          type: 'date',
+          name: 'start_date',
+          label: 'Start Date',
+          placeholder: 'Select start date',
+          //value: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0] + ' 00:00:00'
+        },
+        {
+          type: 'date',
+          name: 'end_date',
+          label: 'End Date ',
+          placeholder: 'Select end date (must be after start date)',
+          //value: new Date().toISOString().split('T')[0] + ' 23:59:59'
+        }
+      ]
+    }
+  );
+
+  return filters;
+};
+
+export const ticketFiltersConfig: FilterTab[] = createTicketFiltersConfig();
+
+
+
+
 
 ////////////////////////==================== GSM Filters Configuration ====================////////////////////////
 
