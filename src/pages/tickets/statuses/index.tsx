@@ -76,7 +76,9 @@ const TicketStatuses = () => {
     const memoizedFilters = useMemo(() => currentFilters, [currentFilters]);
 
     const fetchStatuses = useCallback(async (page = 1, perPage = 15, search = "") => {
-        return await ListStatuses({ page, perPage, search, filters: memoizedFilters });
+        const response = await ListStatuses({ page, perPage, search, filters: memoizedFilters });
+        console.log('Response:', response);
+        return response;
     }, [memoizedFilters]);
 
     const handleFiltersChange = useCallback((filters: any) => {

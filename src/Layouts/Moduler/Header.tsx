@@ -1109,14 +1109,14 @@ const Header = ({ themeMode }: any) => {
                                 <div className="pc-submenu-title">Tickets</div>
                                 <ul className="pc-navbar">
                                     
-                                    {permissions.includes('dashboard-tickets') && (
+                                    {/* {permissions.includes('dashboard-tickets') && (
                                     <li className="pc-item">
                                         <Link className="pc-link" href={`${baseUrl}/tickets/dashboard`} >
                                             <span className="pc-micon"><i className="ph-duotone ph-link"></i></span>
                                             <span className="pc-mtext">Dashboard</span>
                                         </Link>
                                     </li>
-                                    )}
+                                    )} */}
                                     
                                     {permissions.includes('tickets-tickets') && (
                                     <li className="pc-item">

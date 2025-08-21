@@ -1,9 +1,11 @@
 import '@assets/scss/datatable-style.scss';
-import React, { ReactElement, useState, useCallback, useMemo } from 'react';
+import React, { ReactElement, useState, useCallback, useMemo, useEffect } from 'react';
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
 import GenericListPage from '@components/GenericListPage';
-import { ListTickets,CreateTicket,UpdateTicket,DeleteTicket } from '@utils/tickets';
+import { ListTickets,CreateTicket,UpdateTicket,UpdateTicketDetails,DeleteTicket } from '@utils/tickets';
+import {GetHierarchyData} from '@utils/users';
+import { GetAllStatuses } from '@utils/ticket-statuses';
 import { Column } from '@components/CustomDataTable';
 import { Button, Modal, Row } from 'react-bootstrap';
 import { Col } from 'react-bootstrap';
@@ -12,10 +14,26 @@ import { useTokenService } from 'src/hooks/useTokenService';
 import { useSession } from 'next-auth/react';
 import moment from 'moment';
 import { CreateStatus } from '@utils/ticket-statuses';
+import { GetAllModules } from '@utils/ticket-module';
+import Select from 'react-select';
+
+interface SelectOption {
+      value: number;
+      label: string;
+  }
 
 const TicketList = () => {
     const { data:session, status } = useSession();
    
+    const [refreshKey, setRefreshKey] = useState<number>(0);
+    const [currentFilters, setCurrentFilters] = useState({});
+
+    const [statuses, setStatuses] = useState<any>([]);
+    const [modules, setModules] = useState<any>([]);
+
+    const [hierarchyData, setHierarchyData] = useState<any>([]);
+    const [extensions, setExtensions] = useState<any>([]);
+
     const columns: Column[] = useMemo(() => [
         { key: 'title', name: 'Title', selector: (row: any) => row.title, sortable: true },
         { key: 'type', name: 'Type', selector: (row: any) => row.type, sortable: true,
@@ -29,7 +47,7 @@ const TicketList = () => {
         { key: 'user_extension', name: 'User Extension', selector: (row: any) => row.user_extension, sortable: true,
             cell: (props: any) => (
                 <span className="badge bg-info">
-                    {props.user_extension}
+                    {extensions.find((extension: any) => extension.id.toString() === props.user_extension?.toString())?.display_name || props.user_extension}
                 </span>
             )
          },
@@ -92,11 +110,38 @@ const TicketList = () => {
                 </div>
             ),
         },
-    ], [session?.user?.permissions]);
+    ], [session?.user?.permissions, extensions]);
 
-    const [refreshKey, setRefreshKey] = useState<number>(0);
-    const [currentFilters, setCurrentFilters] = useState({});
+    useEffect(() => {
+        const fetchStatuses = async () => {
+            const statuses = await GetAllStatuses();
+            setStatuses(statuses);
+            console.log('Statuses:', statuses);
+        };
+        fetchStatuses();
+    }, []);
+    
 
+    useEffect(() => {
+        const fetchModules = async () => {
+            const modules = await GetAllModules();
+            setModules(modules);
+            console.log('Modules:', modules);
+        };
+        fetchModules();
+    }, []);
+
+    useEffect(() => {
+        const fetchHierarchyData = async () => {
+            const hierarchyData = await GetHierarchyData();
+            setHierarchyData(hierarchyData);
+            console.log('Hierarchy Data:', hierarchyData);
+            setExtensions(hierarchyData?.extensions);
+            console.log('Extensions:', extensions);
+        };
+        fetchHierarchyData();
+    }, []);
+    
     const memoizedFilters = useMemo(() => currentFilters, [currentFilters]);
 
     const fetchTickets = useCallback(async (page = 1, perPage = 15, search = "") => {
@@ -128,15 +173,32 @@ const TicketList = () => {
     const [showEditTicketModal, setShowEditTicketModal] = useState<boolean>(false);
     const [showDeleteTicketModal, setShowDeleteTicketModal] = useState<boolean>(false);
     const handleEditTicket = useCallback((props: any) => {
-        setSelectedTicket(props.id);
+        console.log('Edit ticket props:', props);
+        console.log('User extension from props:', props.user_extension);
+        console.log('Available extensions:', extensions);
+        
+        if (extensions.length === 0) {
+            console.log('Extensions not loaded yet, waiting...');
+            return;
+        }
+        
+        setSelectedTicket(props);
         setSelectedTicketTitle(props.title);
         setSelectedTicketDescription(props.description);
         setShowEditTicketModal(true);
-    }, []);
+    }, [extensions]);
 
     const handleSubmitEditTicket = useCallback(async () => {
         //console.log('Submit edit group:', selectedGroup, selectedGroupName);
-        const response = await UpdateTicket(selectedTicket, selectedTicketTitle, selectedTicketDescription);
+        const response = await UpdateTicketDetails(
+            selectedTicket.id, 
+            selectedTicketTitle, 
+            selectedTicketDescription,
+            selectedTicket.type,
+            selectedTicket.ticket_status_id,
+            selectedTicket.module_id,
+            selectedTicket.user_extension
+        );
         if(response){
             setSelectedTicket(null);
             setSelectedTicketTitle(null);
@@ -175,28 +237,76 @@ const TicketList = () => {
     const [showCreateTicketModal, setShowCreateTicketModal] = useState<boolean>(false);
     const [newTicketTitle, setNewTicketTitle] = useState<string>("");
     const [newTicketDescription, setNewTicketDescription] = useState<string>("");
+    const [newTicketType, setNewTicketType] = useState<string>("");
+    const [newTicketStatus, setNewTicketStatus] = useState<string>("");
+    const [newTicketModule, setNewTicketModule] = useState<string>("");
+    const [newTicketUserExtension, setNewTicketUserExtension] = useState<string>("");
+    const [newTicketUserExtensionName, setNewTicketUserExtensionName] = useState<string>("");
+
+    const [newTicketImage, setNewTicketImage] = useState<File | null>(null);
 
     const handleSubmitCreateTicket = useCallback(async () => {
-        const response = await CreateTicket(newTicketTitle, newTicketDescription);
+        console.log('=== COMPONENT DEBUG ===');
+        console.log('newTicketImage type:', typeof newTicketImage, newTicketImage instanceof File);
+        
+        const formData = new FormData();
+        formData.append('title', newTicketTitle);
+        formData.append('description', newTicketDescription);
+        formData.append('type', newTicketType);
+        formData.append('ticket_status_id', newTicketStatus);
+        formData.append('module_id', newTicketModule);
+        formData.append('user_extension', newTicketUserExtension);
+        if (newTicketImage) {
+            formData.append('image', newTicketImage);
+        }
+        
+        console.log('FormData created type:', typeof formData, formData instanceof FormData);
+        console.log('FormData constructor:', formData?.constructor?.name);
+        console.log('=== END COMPONENT DEBUG ===');
+        
+        const response = await CreateTicket(formData);
         if(response){
             setNewTicketTitle("");
             setNewTicketDescription("");
+            setNewTicketType("");
+            setNewTicketStatus("");
+            setNewTicketModule("");
+            setNewTicketUserExtension("");
+            setNewTicketUserExtensionName("");
+            setNewTicketImage(null);
             setShowCreateTicketModal(false);
             setRefreshKey(prev => prev + 1); // Trigger refresh
         }
-    }, [newTicketTitle, newTicketDescription]);
+    }, [newTicketTitle, newTicketDescription, newTicketType, newTicketStatus, newTicketModule, newTicketUserExtension, newTicketImage]);
 
     const openCreateTicketModal = useCallback(() => setShowCreateTicketModal(true), []);
-    const closeCreateTicketModal = useCallback(() => setShowCreateTicketModal(false), []);
+    const closeCreateTicketModal = useCallback(() => {
+        setShowCreateTicketModal(false);
+        // Reset all form fields including the file input
+        setNewTicketTitle("");
+        setNewTicketDescription("");
+        setNewTicketType("");
+        setNewTicketStatus("");
+        setNewTicketModule("");
+        setNewTicketUserExtension("");
+        setNewTicketUserExtensionName("");
+        setNewTicketImage(null);
+        
+        // Reset the file input element
+        const fileInput = document.getElementById('newTicketImage') as HTMLInputElement;
+        if (fileInput) {
+            fileInput.value = '';
+        }
+    }, []);
     const openEditTicketModal = useCallback(() => setShowEditTicketModal(true), []);
     const closeEditTicketModal = useCallback(() => setShowEditTicketModal(false), []);
     const openDeleteTicketModal = useCallback(() => setShowDeleteTicketModal(true), []);
     const closeDeleteTicketModal = useCallback(() => setShowDeleteTicketModal(false), []);
 
     const handleNewTicketTitleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => setNewTicketTitle(e.target.value), []);
-    const handleNewTicketDescriptionChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => setNewTicketDescription(e.target.value), []);
+    const handleNewTicketDescriptionChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => setNewTicketDescription(e.target.value), []);
     const handleEditTicketTitleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => setSelectedTicketTitle(e.target.value), []);
-    const handleEditTicketDescriptionChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => setSelectedTicketDescription(e.target.value), []);
+    const handleEditTicketDescriptionChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => setSelectedTicketDescription(e.target.value), []);
     const handleConfirmDeleteChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => setConfirmDelete(e.target.value), []);
 
     const handleImageClick = useCallback((imageUrl: string) => {
@@ -239,22 +349,112 @@ const TicketList = () => {
                 <Modal
                     show={showEditTicketModal}
                     onHide={closeEditTicketModal}
+                    size="lg"
                 >
                     <Modal.Header closeButton>
                         <Modal.Title>Edit Ticket</Modal.Title>
                     </Modal.Header>
                     <Modal.Body>
-                        <div className="form-group mb-3">
-                            <label htmlFor="editTicketTitle">Ticket Title</label>
-                            <input type="text" className="form-control" id="editTicketTitle" value={selectedTicketTitle} onChange={handleEditTicketTitleChange} placeholder="Ticket Title" />
+                        <div className="row">
+                            <div className="col-md-6">
+                                <div className="form-group mb-3">
+                                    <label htmlFor="editTicketTitle">Ticket Title</label>
+                                    <input 
+                                        type="text" 
+                                        className="form-control" 
+                                        id="editTicketTitle" 
+                                        value={selectedTicketTitle} 
+                                        onChange={handleEditTicketTitleChange} 
+                                        placeholder="Ticket Title" 
+                                    />
+                                </div>
+                            </div>
+                            <div className="col-md-6">
+                                <div className="form-group mb-3">
+                                    <label htmlFor="editTicketType">Ticket Type</label>
+                                    <select 
+                                        className="form-control" 
+                                        id="editTicketType" 
+                                        value={selectedTicket?.type || ''} 
+                                        onChange={(e) => setSelectedTicket({...selectedTicket, type: e.target.value})}
+                                    >
+                                        <option value="">Select Type</option>
+                                        <option value="bug" selected={selectedTicket?.type === 'bug'}>Bug</option>
+                                        <option value="feature" selected={selectedTicket?.type === 'feature'}>Feature</option>
+                                        
+                                    </select>
+                                </div>
+                            </div>
                         </div>
 
                         <div className="form-group mb-3">
                             <label htmlFor="editTicketDescription">Ticket Description</label>
-                            <textarea className="form-control" id="editTicketDescription" value={selectedTicketDescription} onChange={handleEditTicketDescriptionChange} placeholder="Ticket Description"></textarea>
+                            <textarea 
+                                className="form-control" 
+                                id="editTicketDescription" 
+                                value={selectedTicketDescription} 
+                                onChange={handleEditTicketDescriptionChange} 
+                                placeholder="Ticket Description"
+                                rows={4}
+                            ></textarea>
                         </div>
 
+                        <div className="row">
+                            <div className="col-md-6">
+                                <div className="form-group mb-3">
+                                    <label htmlFor="editTicketStatus">Status</label>
+                                    <select 
+                                        className="form-control" 
+                                        id="editTicketStatus" 
+                                        value={selectedTicket?.ticket_status_id || ''} 
+                                        onChange={(e) => setSelectedTicket({...selectedTicket, ticket_status_id: e.target.value})}
+                                    >
+                                        <option value="">Select Status</option>
+                                        {statuses.map((status: any) => (
+                                            <option value={status.id} selected={selectedTicket?.ticket_status_id === status.id}>{status.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+                            <div className="col-md-6">
+                                <div className="form-group mb-3">
+                                    <label htmlFor="editTicketModule">Module</label>
+                                    <select 
+                                        className="form-control" 
+                                        id="editTicketModule" 
+                                        value={selectedTicket?.module_id || ''} 
+                                        onChange={(e) => setSelectedTicket({...selectedTicket, module_id: e.target.value})}
+                                    >
+                                        <option value="">Select Module</option>
+                                        {modules.length > 0 && modules.map((module: any) => (
+                                            <option value={module.id} selected={selectedTicket?.module_id === module.id}>{module.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
 
+                        <div className="form-group mb-3">
+                            <label htmlFor="editTicketUserExtension">User Extension</label>
+                            <Select 
+                              //   className="form-control"
+                                id="editTicketUserExtension" 
+                                value={selectedTicket?.user_extension ? { 
+                                    value: selectedTicket.user_extension, 
+                                    label: extensions.find((ext: any) => ext.id.toString() === selectedTicket.user_extension.toString())?.display_name || '' 
+                                } : null}
+                                onChange={(selectedOption: any) => {
+                                    setSelectedTicket({...selectedTicket, user_extension: selectedOption?.value || ''});
+                                }}
+                                options={extensions.map((extension: any) => ({
+                                    value: extension.id,
+                                    label: extension.display_name
+                                }))}
+                                placeholder="Select User Extension"
+                                isClearable
+                                isSearchable
+                            />
+                        </div>
                     </Modal.Body>
                     <Modal.Footer>
                         <Button variant="secondary" onClick={closeEditTicketModal}>Close</Button>
@@ -293,22 +493,139 @@ const TicketList = () => {
                 <Modal
                     show={showCreateTicketModal}
                     onHide={closeCreateTicketModal}
+                    size="lg"
                 >
                     <Modal.Header closeButton>
                         <Modal.Title>New Ticket</Modal.Title>
                     </Modal.Header>
                     <Modal.Body>
+                        <div className="row">
+                            <div className="col-md-6">
+                                <div className="form-group mb-3">
+                                    <label htmlFor="newTicketTitle">Ticket Title</label>
+                                    <input 
+                                        type="text" 
+                                        className="form-control" 
+                                        id="newTicketTitle"  
+                                        value={newTicketTitle} 
+                                        onChange={handleNewTicketTitleChange} 
+                                        placeholder="Ticket Title" 
+                                    />
+                                </div>
+                            </div>
+                            <div className="col-md-6">
+                                <div className="form-group mb-3">
+                                    <label htmlFor="newTicketType">Ticket Type</label>
+                                    <select 
+                                        className="form-control" 
+                                        id="newTicketType" 
+                                        value={newTicketType || ''} 
+                                        onChange={(e) => setNewTicketType(e.target.value)}
+                                    >
+                                        <option value="">Select Type</option>
+                                        <option value="bug">Bug</option>
+                                        <option value="feature">Feature</option>
+                                        <option value="improvement">Improvement</option>
+                                        <option value="task">Task</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
                         
                         <div className="form-group mb-3">
-                            <label htmlFor="newTicketTitle">Ticket Title</label>
-                            <input type="text" className="form-control" id="newTicketTitle"  value={newTicketTitle} onChange={handleNewTicketTitleChange} placeholder="Ticket Title" />
+                            <label htmlFor="newTicketDescription">Ticket Description</label>
+                            <textarea 
+                                className="form-control" 
+                                id="newTicketDescription" 
+                                value={newTicketDescription} 
+                                onChange={handleNewTicketDescriptionChange} 
+                                placeholder="Ticket Description"
+                                rows={4}
+                            ></textarea>
+                        </div>
+
+                        <div className="row">
+                            <div className="col-md-6">
+                                <div className="form-group mb-3">
+                                    <label htmlFor="newTicketStatus">Status</label>
+                                    <select 
+                                        className="form-control" 
+                                        id="newTicketStatus" 
+                                        value={newTicketStatus || ''} 
+                                        onChange={(e) => setNewTicketStatus(e.target.value)}
+                                    >
+                                        <option value="">Select Status</option>
+                                        {statuses.map((status: any) => (
+                                            <option key={status.id} value={status.id}>{status.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+                            <div className="col-md-6">
+                                <div className="form-group mb-3">
+                                    <label htmlFor="newTicketModule">Module</label>
+                                    <select 
+                                        className="form-control" 
+                                        id="newTicketModule" 
+                                        value={newTicketModule || ''} 
+                                        onChange={(e) => setNewTicketModule(e.target.value)}
+                                    >
+                                        <option value="">Select Module</option>
+                                        {modules.length > 0 && modules.map((module: any) => (
+                                            <option key={module.id} value={module.id}>{module.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
                         </div>
 
                         <div className="form-group mb-3">
-                            <label htmlFor="newTicketDescription">Ticket Description</label>
-                            <textarea className="form-control" id="newTicketDescription" value={newTicketDescription} onChange={handleNewTicketDescriptionChange} placeholder="Ticket Description"></textarea>
+                            <label htmlFor="newTicketUserExtension">User Extension</label>
+                            <Select 
+                              //   className="form-control"
+                                id="newTicketUserExtension" 
+                                value={newTicketUserExtension ? { value: newTicketUserExtension, label: newTicketUserExtensionName } : null}
+                                onChange={(selectedOption: any) => {
+                                    setNewTicketUserExtension(selectedOption?.value || '');
+                                    setNewTicketUserExtensionName(selectedOption?.label || '');
+                                }}
+                                options={extensions.map((extension: any) => ({
+                                    value: extension.id,
+                                    label: extension.display_name
+                                }))}
+                                placeholder="Select User Extension"
+                                isClearable
+                                isSearchable
+                            />
                         </div>
 
+                        <div className="form-group mb-3">
+                            <label htmlFor="newTicketImage">Ticket Image</label>
+                            <input 
+                                type="file" 
+                                className="form-control" 
+                                id="newTicketImage" 
+                                accept="image/*"
+                                onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    console.log('File input onChange triggered');
+                                    console.log('Selected file:', file);
+                                    console.log('File type:', file?.type);
+                                    console.log('File size:', file?.size);
+                                    setNewTicketImage(file || null);
+                                    console.log('newTicketImage state updated to:', file || null);
+                                }} 
+                            />
+                            <small className="text-muted">Supported formats: JPG, PNG, GIF. Max size: 5MB</small>
+                            {newTicketImage && (
+                                <div className="mt-2">
+                                    <small className="text-success">Selected: {newTicketImage.name} ({(newTicketImage.size / 1024 / 1024).toFixed(2)} MB)</small>
+                                </div>
+                            )}
+                            <div className="mt-2">
+                                <small className="text-info">Current image state: {newTicketImage ? `File: ${newTicketImage.name}` : 'No image selected'}</small>
+                            </div>
+                        </div>
                     </Modal.Body>
                     <Modal.Footer>
                         <Button variant="secondary" onClick={closeCreateTicketModal}>Close</Button>
@@ -370,7 +687,8 @@ const TicketList = () => {
                                     <td><strong>User Extension</strong></td>
                                     <td>
                                         <span className="badge bg-info">
-                                            {viewTicketData?.user_extension}
+                                            {/* {viewTicketData?.user_extension} */}
+                                            {extensions.find((extension: any) => extension.id === viewTicketData?.user_extension)?.display_name || viewTicketData?.user_extension}
                                         </span>
                                     </td>
                                 </tr>

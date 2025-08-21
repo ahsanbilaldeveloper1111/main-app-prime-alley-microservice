@@ -1,5 +1,7 @@
 import { toast } from "react-toastify";
 import axiosInstance from "./axios";
+import tokenService from "./tokenService";
+import axios from "axios";
 
 
 interface PaginationParams {
@@ -93,6 +95,47 @@ export const UpdateTicket = async (id: string, name: string, color: string) => {
     }
   };
 
+export const UpdateTicketDetails = async (
+  id: string, 
+  title: string, 
+  description: string,
+  type: string,
+  ticket_status_id: string,
+  module_id: string,
+  user_extension: string
+) => {
+  try {
+    const response = await axiosInstance.post(
+      `tickets/update-ticket`,
+      {
+        id: id,
+        title: title,
+        description: description,
+        type: type,
+        ticket_status_id: ticket_status_id,
+        module_id: module_id,
+        user_extension: user_extension
+      }
+    );
+    if(response.data){
+      const responseData = response.data;
+      if(responseData.code == 200){
+        toast.success('Ticket details updated successfully');
+        return true;
+      }else{
+        toast.error(responseData.message);
+        return false;
+      } 
+    }else{
+      toast.error('Failed to update ticket details');
+      return false;
+    }
+    
+  } catch (error) {
+    throw error;
+  }
+};
+
   export const DeleteTicket = async (id: string) => {
     try {
         
@@ -121,17 +164,11 @@ export const UpdateTicket = async (id: string, name: string, color: string) => {
     }
   };
 
-  export const CreateTicket = async (name: string, color: string) => {
+  export const CreateTicket = async (formData: FormData) => {
     try {
-        
-      const response = await axiosInstance.post(
-        `tickets/create-ticket`,
-        {
-          name: name,
-          color: color
-        }
-      );
-      if(response.data){
+      const response = await axiosInstance.post('tickets/create-ticket', formData);
+
+      if(response){
         const responseData = response.data;
         if(responseData.code == 200){
           toast.success('Ticket created successfully');
@@ -139,13 +176,14 @@ export const UpdateTicket = async (id: string, name: string, color: string) => {
         }else{
           toast.error(responseData.message);
           return false;
-        } 
+            } 
       }else{
         toast.error('Failed to create ticket');
         return false;
       }
       
     } catch (error) {
+      console.error('Error creating ticket:', error);
       throw error;
     }
   };

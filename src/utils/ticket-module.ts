@@ -39,7 +39,7 @@ export const ListModules = async (params: PaginationParams = {}) => {
     );
   
     
-    return response?.data?.data;
+    return response?.data;
   } catch (error) {
     console.error('API Error:', error);
     throw error;
@@ -49,13 +49,15 @@ export const ListModules = async (params: PaginationParams = {}) => {
 export const GetAllModules = async () => {
     try {
         
-      const response = await axiosInstance.get(
-        `groups/get`
+      const response = await axiosInstance.post(
+        `tickets/modules`,{
+          all: true
+        }
       );
       if(response.data){
         return response.data?.data;
       }else{
-        toast.error('Failed to fetch groups');
+        toast.error('Failed to fetch modules');
       }
       
     } catch (error) {
@@ -136,14 +138,14 @@ export const UpdateModule = async (id: string, name: string, description: string
       if(response.data){
         const responseData = response.data;
         if(responseData.code == 200){
-          toast.success('Group created successfully');
+          toast.success('Module created successfully');
           return true;
         }else{
           toast.error(responseData.message);
           return false;
         } 
       }else{
-        toast.error('Failed to create group');
+        toast.error('Failed to create module');
         return false;
       }
       

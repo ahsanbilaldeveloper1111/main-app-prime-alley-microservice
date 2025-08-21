@@ -36,13 +36,13 @@ const TicketModules = () => {
                 );
             }
          },
-        { key: 'tickets_count', name: 'Tickets Using', selector: (row: any) => row.tickets_count, sortable: true,
-            cell: (props: any) => (
-                <span className="badge bg-info">
-                    {props.tickets_count}
-                </span>
-            )
-         },
+        // { key: 'tickets_count', name: 'Tickets Using', selector: (row: any) => row.tickets_count, sortable: true,
+        //     cell: (props: any) => (
+        //         <span className="badge bg-info">
+        //             {props.tickets_count}
+        //         </span>
+        //     )
+        //  },
         { key: 'created_at', name: 'Created At', selector: (row: any) => row.created_at, sortable: true,
             cell: (props: any) => (
                 <span className="text-muted">
@@ -68,7 +68,7 @@ const TicketModules = () => {
                         </button>
                     )}  
 
-                    {session?.user?.permissions?.includes('delete-ticket-module-tickets')  && props.tickets_count == 0 && (
+                    {/* {session?.user?.permissions?.includes('delete-ticket-module-tickets')  && props.tickets_count == 0 && ( */}
                         <button 
                             className="btn btn-sm btn-outline-danger" 
                             onClick={() => handleDeleteModule(props)}
@@ -76,7 +76,7 @@ const TicketModules = () => {
                         >
                             Delete
                         </button>
-                    )}
+                    {/* )} */}
 
                     
                 </div>

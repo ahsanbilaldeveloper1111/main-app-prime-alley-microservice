@@ -40,8 +40,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     // Prepare headers for the backend request
     const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
+      // 'Content-Type': 'application/json',
+      // 'Accept': 'application/json',
     };
 
     // Forward authorization header if present
@@ -56,7 +56,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       'x-forwarded-proto',
       'user-agent',
       'referer',
-      'origin'
+      'origin',
+      'Content-Type',
+      'Accept',
+      'content-type',
+      'accept'
     ];
 
     headersToForward.forEach(header => {

@@ -7,10 +7,10 @@ const axiosInstance: import('axios').AxiosInstance = axios.create({
   //baseURL: process.env.NEXT_PUBLIC_BACKEND_URL,
   baseURL: '/api',
   timeout: 100000,
-  headers: {
-    'Content-Type': 'application/json',
-    'Accept': 'application/json',
-  },
+  // headers: {
+  //   'Content-Type': 'application/json',
+  //   'Accept': 'application/json',
+  // },
 });
 
 // get new token
@@ -101,14 +101,19 @@ axiosInstance.interceptors.request.use(
       return retryFetchingToken();
     }
 
+    // Only set content type to application/json if it's not already set
+    // This allows FormData to set its own content type with boundary
+    // if (!config.headers['Content-Type']) {
+    //   config.headers['Content-Type'] = 'application/json';
+    //   config.headers['Accept'] = 'application/json';
+    // }
+
     return config;
   },
   (error) => {
     return Promise.reject(error);
   }
 );
-
-
 
 axiosInstance.interceptors.response.use(
   (response) => {
@@ -157,8 +162,5 @@ axiosInstance.interceptors.response.use(
     return Promise.reject(error);
   }
 );
-
-
-
 
 export default axiosInstance;

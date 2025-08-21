@@ -47,8 +47,18 @@ const Users = () => {
         ...(session?.user?.permissions?.includes('show-ou-users') ? [
             { key: 'OU', name: 'ou', selector: (row: any) => row.ou, sortable: true }
         ] : []),
-        { key: 'Department', name: 'department', selector: (row: any) => row.department, sortable: true },
-        { key: 'Company', name: 'company', selector: (row: any) => row.company, sortable: true },
+        { key: 'Department', name: 'department', selector: (row: any) => row.department, sortable: true,
+            cell: (props: any) => {
+                console.log('Department:', props.department);
+                return props.department?.name ||'';
+            }
+         },
+        { key: 'Company', name: 'company', selector: (row: any) => row.company, sortable: true,
+            cell: (props: any) => {
+                console.log('Company:', props.company);
+                return props.company?.name ||'';
+            }
+         },
         { key: 'Role', name: 'role', selector: (row: any) => row.role, sortable: true },
         { key: 'Group', name: 'group', selector: (row: any) => row.group, sortable: true },
         { key: 'Status', name: 'status', selector: (row: any) => row.status, sortable: true },
@@ -128,7 +138,7 @@ const Users = () => {
                     });
 
                     console.log('Setting custom field columns:', dynamicCols);
-                    setCustomFieldColumns(dynamicCols);
+                   // setCustomFieldColumns(dynamicCols);
                 } else {
                     setCustomFieldColumns([]);
                 }

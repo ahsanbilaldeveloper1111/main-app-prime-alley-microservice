@@ -39,7 +39,7 @@ export const ListStatuses = async (params: PaginationParams = {}) => {
     );
   
     
-    return response?.data?.data;
+    return response?.data;
   } catch (error) {
     console.error('API Error:', error);
     throw error;
@@ -49,8 +49,10 @@ export const ListStatuses = async (params: PaginationParams = {}) => {
 export const GetAllStatuses = async () => {
     try {
         
-      const response = await axiosInstance.get(
-        `tickets/statuses/get`
+      const response = await axiosInstance.post(
+        `tickets/statuses`,{
+          all: true
+        }
       );
       if(response.data){
         return response.data?.data;
