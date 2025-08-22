@@ -474,16 +474,66 @@ export const createTicketFiltersConfig = (hierarchyData?: any): FilterTab[] => {
 
   // Add other filters
   filters.push(
-    
+    {
+      id: 'modules',
+      title: 'Modules',
+      icon: 'ti ti-package',
+      fields: [
+        {
+          type: 'select',
+          isMulti: false,
+          name: 'module_id',
+          label: 'Modules',
+          options: hierarchyData?.modules?.map((module: { id: string; name: string }) => ({
+            value: module.id,
+            label: module.name
+          })) || []
+        }
+      ]
+    },
+    {
+      id: 'status',
+      title: 'Status',
+      icon: 'ti ti-toggle-right',
+      fields: [
+        {
+          type: 'select',
+          isMulti: false,
+          name: 'status_id',
+          label: 'Status',
+          options: hierarchyData?.statuses?.map((status: { id: string; name: string }) => ({
+            value: status.id,
+            label: status.name
+          })) || []
+        }
+      ]
+    },
+    {
+      id: 'types',
+      title: 'Types',
+      icon: 'ti ti-tag',
+      fields: [
+        {
+          type: 'select',
+          isMulti: false,
+          name: 'type_id',
+          label: 'Types',
+          options: hierarchyData?.types?.map((type: { id: string; name: string }) => ({
+            value: type.id,
+            label: type.name
+          })) || []
+        }
+      ]
+    },
     {
       id: 'call-extensions',
-      title: 'Extension',
+      title: 'Extensions',
       icon: 'ti ti-users',
       fields: [
         {
           type: 'select',
           isMulti: true,
-          name: 'extension',
+          name: 'extensions',
           label: 'Extensions',
           options: hierarchyData?.extensions?.map((ext: { id: string; name: string,display_name: string }) => ({
             value: ext.id,

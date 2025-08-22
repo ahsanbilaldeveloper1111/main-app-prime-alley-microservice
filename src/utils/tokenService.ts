@@ -1,5 +1,6 @@
-import { signOut } from "next-auth/react";
-import { toast } from "react-toastify";
+import { signOut } from 'next-auth/react';
+import { toast } from 'react-toastify';
+import { clearAllLocalStorage } from './localStorageUtils';
 
 interface TokenData {
   accessToken: string;
@@ -137,6 +138,10 @@ class TokenService {
     if (typeof window !== 'undefined' && window.sessionStorage) {
       sessionStorage.clear();
     }
+    
+    // Clear all localStorage data
+    clearAllLocalStorage();
+    
     signOut();
     // Simple redirect to login page
     if (typeof window !== 'undefined') {
@@ -287,6 +292,9 @@ class TokenService {
       sessionStorage.removeItem('accessTokenExpires');
       sessionStorage.removeItem('refreshTokenExpires');
     }
+    
+    // Clear all localStorage data
+    clearAllLocalStorage();
   }
 }
 

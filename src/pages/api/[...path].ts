@@ -5,6 +5,80 @@ import { promises as fs } from 'fs';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000/';
 
+// Custom body parser function for FormData
+const parseFormData = async (req: NextApiRequest) => {
+  const form = formidable({
+    keepExtensions: true,
+    maxFileSize: 10 * 1024 * 1024, // 10MB
+  });
+  
+  const [fields, files] = await form.parse(req);
+  
+  // Reconstruct FormData with proper file handling
+  const formData = new FormData();
+  
+  // Add fields
+  Object.entries(fields).forEach(([key, values]) => {
+    if (values && Array.isArray(values) && values.length > 0) {
+      formData.append(key, values[0]);
+    }
+  });
+  
+  // Add files with proper MIME type preservation
+  for (const [key, fileArray] of Object.entries(files)) {
+    if (fileArray && Array.isArray(fileArray) && fileArray.length > 0) {
+      const file = fileArray[0];
+      if (file.filepath && file.mimetype) {
+        console.log(`Processing file: ${key}, MIME: ${file.mimetype}, Size: ${file.size}`);
+        
+        // Read file buffer and append with proper MIME type
+        const fileBuffer = await fs.readFile(file.filepath);
+        
+        // Create a Blob with the correct MIME type
+        const blob = new Blob([fileBuffer], { type: file.mimetype });
+        
+        // Append to FormData with filename and proper MIME type
+        formData.append(key, blob, file.originalFilename || 'file');
+        
+        // Clean up temporary file
+        await fs.unlink(file.filepath);
+        
+        console.log(`File ${key} added with MIME type: ${file.mimetype}`);
+      }
+    }
+  }
+  
+  return formData;
+};
+
+// Custom body parser function for JSON
+const parseJSON = async (req: NextApiRequest) => {
+  return new Promise((resolve, reject) => {
+    let data = '';
+    
+    req.on('data', (chunk) => {
+      data += chunk;
+    });
+    
+    req.on('end', () => {
+      try {
+        if (data.trim()) {
+          const parsed = JSON.parse(data);
+          resolve(parsed);
+        } else {
+          resolve({});
+        }
+      } catch (error) {
+        reject(new Error('Invalid JSON'));
+      }
+    });
+    
+    req.on('error', (error) => {
+      reject(error);
+    });
+  });
+};
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { path } = req.query;
   
@@ -45,75 +119,65 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     });
 
-    // Special handling for FormData (file uploads) - preserve original Content-Type
-    const isFormData = req.headers['content-type']?.includes('multipart/form-data');
+    // Check content type and handle accordingly
+    const contentType = req.headers['content-type'] || '';
+    const isFormData = contentType.includes('multipart/form-data');
+    const isJSON = contentType.includes('application/json');
     
-    let requestData: any = req.body;
+    let requestData: any;
     
     if (isFormData) {
       // For FormData requests, preserve the original Content-Type header with boundary
-      headers['Content-Type'] = req.headers['content-type'] as string;
+      headers['Content-Type'] = contentType;
       console.log('=== FORMDATA DEBUG ===');
-      console.log('Original Content-Type:', req.headers['content-type']);
-      console.log('Preserved Content-Type:', headers['Content-Type']);
-      console.log('Request body type:', typeof req.body);
+      console.log('Original Content-Type:', contentType);
+      console.log('Target URL:', targetUrl);
+      console.log('Request method:', req.method);
       
-      // Parse FormData manually to preserve file information
-      const form = formidable({});
-      const [fields, files] = await form.parse(req);
-      
-      // Reconstruct FormData with proper file handling
-      const formData = new FormData();
-      
-      // Add fields
-      Object.entries(fields).forEach(([key, values]) => {
-        if (values && Array.isArray(values) && values.length > 0) {
-          formData.append(key, values[0]);
-        }
-      });
-      
-      // Add files with proper MIME type preservation
-      for (const [key, fileArray] of Object.entries(files)) {
-        if (fileArray && Array.isArray(fileArray) && fileArray.length > 0) {
-          const file = fileArray[0];
-          if (file.filepath && file.mimetype) {
-            // Read file buffer and append with proper MIME type
-            const fileBuffer = await fs.readFile(file.filepath);
-            const blob = new Blob([fileBuffer], { type: file.mimetype });
-            formData.append(key, blob, file.originalFilename || 'file');
-            
-            // Clean up temporary file
-            await fs.unlink(file.filepath);
-          }
-        }
+      try {
+        // Parse FormData manually since bodyParser is disabled for this route
+        requestData = await parseFormData(req);
+        console.log('FormData parsed successfully');
+        console.log('FormData entries count:', Array.from(requestData.entries()).length);
+      } catch (parseError) {
+        console.error('Error parsing FormData:', parseError);
+        throw new Error('Failed to parse FormData');
       }
       
-      requestData = formData;
-      console.log('FormData reconstructed with proper MIME types');
+      console.log('=====================');
+    } else if (isJSON) {
+      // For JSON requests, parse manually
+      console.log('=== JSON DEBUG ===');
+      console.log('Content-Type:', contentType);
+      console.log('Target URL:', targetUrl);
+      console.log('Request method:', req.method);
+      
+      try {
+        requestData = await parseJSON(req);
+        console.log('JSON parsed successfully:', requestData);
+      } catch (parseError) {
+        console.error('Error parsing JSON:', parseError);
+        throw new Error('Failed to parse JSON');
+      }
+      
+      // Set JSON headers
+      headers['Content-Type'] = 'application/json';
+      headers['Accept'] = 'application/json';
+      
       console.log('=====================');
     } else if (isAudioDownload) {
       // Special handling for audio downloads
       headers['Accept'] = 'audio/*, application/octet-stream, */*';
       headers['Content-Type'] = 'application/octet-stream';
+      requestData = req.body;
     } else {
-      // For regular JSON requests, set default headers
-      headers['Content-Type'] = 'application/json';
-      headers['Accept'] = 'application/json';
-      
-      // For non-FormData requests, the bodyParser should have already parsed the JSON
-      // If it's a string, try to parse it as JSON
-      if (typeof requestData === 'string' && requestData.trim()) {
-        try {
-          requestData = JSON.parse(requestData);
-        } catch (e) {
-          // If parsing fails, keep it as is
-          console.log('Failed to parse request body as JSON, keeping as string');
-        }
-      }
+      // For other content types, try to get body if available
+      headers['Content-Type'] = contentType || 'application/octet-stream';
+      requestData = req.body || {};
     }
 
-    console.log('Request data:', requestData);
-    console.log('Request data type:', typeof requestData);
+    console.log('Final request data type:', typeof requestData);
+    console.log('Making request to backend:', targetUrl);
 
     // Make the request to the backend
     const response = await axios({
@@ -126,6 +190,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       validateStatus: () => true, // Don't throw on HTTP error status
       responseType: isAudioDownload ? 'arraybuffer' : (req.headers['accept']?.includes('blob') ? 'arraybuffer' : 'json'),
     });
+
+    console.log('Backend response status:', response.status);
+    console.log('Backend response headers:', response.headers);
 
     // Forward the response status
     res.status(response.status);
@@ -206,10 +273,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 }
 
 // Configure the API route to handle all HTTP methods
+// We need to disable bodyParser for FormData requests to work properly
 export const config = {
   api: {
-    bodyParser: {
-      sizeLimit: '10mb',
-    },
+    bodyParser: false,
   },
 }; 

@@ -25,9 +25,17 @@ import TicketsFilters from '@components/filters/TicketFilters';
 
 interface Summary {
     tickets: number;
-    resolved: number;
-    pending: number;
-    completed: number;
+}
+
+interface StatusSummary {
+    name: string;
+    count: number;
+}
+
+interface ModuleSummary {
+    module_name: string;
+    total_tickets: number;
+    statuses: StatusSummary[];
 }
 
 const TicketDashboard = () => {
@@ -38,16 +46,15 @@ const TicketDashboard = () => {
 
    const [dashboardData, setDashboardData] = useState<any>([]);
    const [summary, setSummary] = useState<Summary>({
-    tickets: 0,
-    resolved: 0,
-    pending: 0,
-    completed: 0
+    tickets: 0
    });
-
+   const [statusSummary, setStatusSummary] = useState<StatusSummary[]>([]);
+   const [moduleSummary, setModuleSummary] = useState<ModuleSummary[]>([]);
    useEffect(() => {
     const fetchDashboardData = async () => {
         try {
             const data = await DashboardData(currentFilters);
+            console.log('Dashboard data:', data);
             setDashboardData(data);
             
             // Update summary based on dashboard data
@@ -56,6 +63,12 @@ const TicketDashboard = () => {
                     ...prev,
                     tickets: data.total_tickets || 0
                 }));
+            }
+            if (data && data.statuses !== undefined) {
+                setStatusSummary(data.statuses);
+            }
+            if (data && data.modules !== undefined) {
+                setModuleSummary(data.modules);
             }
             
             console.log('Dashboard data:', data);
@@ -117,76 +130,83 @@ const TicketDashboard = () => {
                         </div>
                   </div>
                </Col>
-
-               <Col md={3}>
-                  <div className="card statistics-card-1">
-                        <div className="card-body">
-                              <img src={imgStatus1.src} alt="img" className="img-fluid img-bg" />
-                              <div className="d-flex align-items-center">
-                                    <div className="avtar bg-brand-color-1 text-white me-3">
-                                          <i className="ph-duotone ph-check f-26"></i>
-                                    </div>
-                                    <div>
-                                          <p className="text-muted mb-0">Resolved</p>
-                                          <div className="d-flex align-items-end">
-                                            {summary?.resolved > 0 ? (
-                                                <AnimatedNumber value={summary?.resolved} duration={1000} />
-                                            ) : (
-                                                <h2 className="mb-0 f-w-500">0</h2>
-                                            )}
-                                          </div>
-                                    </div>
-                              </div>
-                        </div>
-                  </div>
-               </Col>
-
-               <Col md={3}>
-                  <div className="card statistics-card-1">
-                        <div className="card-body">
-                              <img src={imgStatus1.src} alt="img" className="img-fluid img-bg" />
-                              <div className="d-flex align-items-center">
-                                    <div className="avtar bg-brand-color-2 text-white me-3">
-                                          <i className="ph-duotone ph-clock f-26"></i>
-                                    </div>
-                                    <div>
-                                          <p className="text-muted mb-0">Pending</p>
-                                          <div className="d-flex align-items-end">
-                                            {summary?.pending > 0 ? (
-                                                <AnimatedNumber value={summary?.pending} duration={1000} />
-                                            ) : (
-                                                <h2 className="mb-0 f-w-500">0</h2>
-                                            )}
-                                          </div>
-                                    </div>
-                              </div>
-                        </div>
-                  </div>
-               </Col>
-
-               <Col md={3}>
-                  <div className="card statistics-card-1">
-                        <div className="card-body">
-                              <img src={imgStatus2.src} alt="img" className="img-fluid img-bg" />
-                              <div className="d-flex align-items-center">
-                                    <div className="avtar bg-brand-color-1 text-white me-3">
-                                          <i className="ph-duotone ph-check f-26"></i>
-                                    </div>
-                                    <div>
-                                          <p className="text-muted mb-0">Completed</p>
-                                          <div className="d-flex align-items-end">
-                                            {summary?.completed > 0 ? (
-                                                <AnimatedNumber value={summary?.completed} duration={1000} />
-                                            ) : (
-                                                <h2 className="mb-0 f-w-500">0</h2>
-                                            )}
-                                          </div>
-                                    </div>
-                              </div>
-                        </div>
-                  </div>
-               </Col>
+               
             </Row>
+
+            <Row>
+                <Col md={12}>
+                    <h4>Ticket Statuses Summary</h4>
+                </Col>
+            {statusSummary.map((status) => (
+                <Col md={3}>
+                    <div className="card statistics-card-1">
+                        <div className="card-body">
+                              <img src={imgStatus1.src} alt="img" className="img-fluid img-bg" />
+                              <div className="d-flex align-items-center">
+                                    <div className="avtar bg-brand-color-1 text-white me-3">
+                                          <i className="ph-duotone ph-ticket f-26"></i>
+                                    </div>
+                                    <div>
+                                          <p className="text-muted mb-0">{status.name}</p>
+                                          <div className="d-flex align-items-end">
+                                            {summary?.tickets > 0 ? (
+                                                <AnimatedNumber value={status.count} duration={1000} />
+                                            ) : (
+                                                <h2 className="mb-0 f-w-500">0</h2>
+                                            )}
+                                          </div>
+                                    </div>  
+                              </div>
+                        </div>
+                  </div>
+                </Col>
+               ))}
+            </Row>
+            
+
+            <Row>
+                <Col md={12}>
+                    <h4>Module Summary</h4>
+                </Col>
+                {moduleSummary.map((module) => (
+                    <Col md={4}>
+                        <div className="card">
+                            <div className="card-header">
+                                <h5 className="card-title mb-0 d-flex align-items-center justify-content-between">
+                                    <span className="text-muted">
+                                        {module.module_name}
+                                    </span>
+
+                                    <span className="badge bg-primary">
+                                        Tickets: {module.total_tickets}
+                                    </span>
+                                </h5>
+                            </div>
+                            <div className="card-body">
+                                <div className="">
+                                    <table className="table table-bordered">
+                                        <thead>
+                                            <tr>
+                                                <th>Status Name</th>
+                                                <th>Ticket Count</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {module.statuses.map((status) => (
+                                                <tr key={status.name}>
+                                                    <td>{status.name}</td>
+                                                    <td>{status.count}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </Col>
+                ))}
+            </Row>
+            
         
         </React.Fragment>
     );

@@ -15,6 +15,7 @@ import dynamic from 'next/dynamic'
 import { ApexOptions } from 'apexcharts'
 import { set } from 'nprogress'
 import Link from 'next/link'
+import { clearAllLocalStorage, getLocalStorageInfo } from '../../utils/localStorageUtils'
 
 const baseUrl = ''
 const ReactApexChart = dynamic(() => import('react-apexcharts'), { ssr: false })
@@ -69,8 +70,7 @@ const CtiDashboard = () => {
   // Helper function to clear localStorage call states
   const clearLocalStorageCallStates = () => {
     try {
-      localStorage.removeItem('cti_call_states')
-      localStorage.removeItem('cti_call_states_timestamp')
+      clearAllLocalStorage()
       setNotification({ type: 'success', message: 'LocalStorage call states cleared successfully' })
       // Force a page reload to see the effect
       setTimeout(() => window.location.reload(), 1000)
@@ -849,14 +849,25 @@ const CtiDashboard = () => {
                 <i className="material-icons-two-tone me-2">bug_report</i>
                 {showDebugInfo ? 'Hide Debug' : 'Show Debug'}
               </Button>
-              <Button
+              
+              {/* <Button
                 variant="primary"
                 onClick={() => setShowDialer(true)}
                 className="d-flex align-items-center"
               >
                 <i className="material-icons-two-tone me-2">dialpad</i>
                 Dialer
-              </Button>
+              </Button> */}
+
+              <Link 
+                href="/cti/dialer" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="btn btn-outline-primary d-flex align-items-center"
+              >
+                <i className="material-icons-two-tone me-2">open_in_new</i>
+                Dialer
+              </Link>
             </div>
           </div>
         </Col>
@@ -878,12 +889,13 @@ const CtiDashboard = () => {
                   <Col md={6}>
                     <h6>LocalStorage Call States</h6>
                     {(() => {
-                      const info = getLocalStorageCallStatesInfo()
+                      const info = getLocalStorageInfo()
                       return (
                         <div>
-                          <p><strong>Count:</strong> {info.count}</p>
-                          <p><strong>Last Updated:</strong> {info.timestamp || 'Never'}</p>
-                          {info.error && <p className="text-danger"><strong>Error:</strong> {info.error}</p>}
+                          <p><strong>Total Keys:</strong> {info.totalKeys}</p>
+                          <p><strong>CTI Keys:</strong> {info.ctiKeys}</p>
+                          <p><strong>App Keys:</strong> {info.appKeys}</p>
+                          <p><strong>Total Size:</strong> {info.totalSize}</p>
                           <Button
                             variant="outline-danger"
                             size="sm"
@@ -891,7 +903,7 @@ const CtiDashboard = () => {
                             className="mt-2"
                           >
                             <i className="material-icons-two-tone me-2">clear</i>
-                            Clear LocalStorage
+                            Clear All LocalStorage
                           </Button>
                           <Button
                             variant="outline-primary"

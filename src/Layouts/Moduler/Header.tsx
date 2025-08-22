@@ -779,22 +779,22 @@ const Header = ({ themeMode }: any) => {
                                             </Link>
                                         </li>
 
-                                        {/* <li className="pc-item">
+                                        <li className="pc-item">
                                             <Link href={`${baseUrl}/gsm/list`} className="pc-link">
                                             <span className="pc-micon">
                                                 <i className="ph-duotone ph-list"></i>
                                             </span>
                                             <span className="pc-mtext" data-i18n="Dashboard">Gsm List</span>
                                             </Link>
-                                        </li> */}
-                                        {/* <li className="pc-item">
+                                        </li>
+                                        <li className="pc-item">
                                             <Link href={`${baseUrl}/gsm/assign`} className="pc-link">
                                             <span className="pc-micon">
                                                 <i className="ph-duotone ph-list"></i>
                                             </span>
                                             <span className="pc-mtext" data-i18n="Dashboard">Company Assign</span>
                                             </Link>
-                                        </li> */}
+                                        </li>
                                         <li className="pc-item">
                                             <Link href={`${baseUrl}/gsm/ports`} className="pc-link">
                                             <span className="pc-micon">
