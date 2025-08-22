@@ -205,12 +205,17 @@ export const UpdateTicketDetails = async (
       if(response){
         const responseData = response.data;
         if(responseData.code == 200){
-          toast.success('Ticket created successfully');
-          return true;
+          if(responseData?.data?.success == true){
+            toast.success('Ticket created successfully');
+            return true;
+          }else{
+            toast.error(responseData?.data?.message);
+            return false;
+          }
         }else{
           toast.error(responseData.message);
           return false;
-            } 
+        } 
       }else{
         toast.error('Failed to create ticket');
         return false;
