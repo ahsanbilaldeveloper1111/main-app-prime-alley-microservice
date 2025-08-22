@@ -1145,6 +1145,13 @@ const Header = ({ themeMode }: any) => {
                                     </li>
                                     )}
 
+                                    <li className="pc-item">
+                                        <Link className="pc-link" href={`${baseUrl}/tickets/types`} >
+                                            <span className="pc-micon"><i className="ph-duotone ph-link"></i></span>
+                                            <span className="pc-mtext">Types</span>
+                                        </Link>
+                                    </li>
+
                                 </ul>
                             </div>
                             {/* tab pane end */}
