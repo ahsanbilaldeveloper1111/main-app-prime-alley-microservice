@@ -2,6 +2,7 @@ import axios from "axios";
 import { signOut } from "next-auth/react";
 import { toast } from "react-toastify";
 import tokenService from "./tokenService";
+import { clearAllLocalStorage } from "./localStorageUtils";
 
 const axiosInstance: import('axios').AxiosInstance = axios.create({
   //baseURL: process.env.NEXT_PUBLIC_BACKEND_URL,
@@ -36,6 +37,7 @@ const refreshToken = async () => {
         }
       }else{
         sessionStorage.clear();
+        clearAllLocalStorage();
         signOut();
         // Simple redirect to login page
         if (typeof window !== 'undefined') {

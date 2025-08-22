@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { getCurrentAccessToken, isTokenExpired } from './tokenUtils';
+import { clearAllLocalStorage } from './localStorageUtils';
 
 // Create axios instance with default configuration
 const apiClient = axios.create({
@@ -31,6 +32,7 @@ apiClient.interceptors.request.use(
           // Clear tokens and redirect to login
           if (typeof window !== 'undefined') {
             sessionStorage.clear();
+            clearAllLocalStorage();
             window.location.href = '/auth/signin';
           }
         }
@@ -74,6 +76,7 @@ apiClient.interceptors.response.use(
         // Refresh failed, redirect to login
         if (typeof window !== 'undefined') {
           sessionStorage.clear();
+          clearAllLocalStorage();
           window.location.href = '/auth/signin';
         }
       }
@@ -127,6 +130,7 @@ export const authAPI = {
       // Clear tokens from sessionStorage
       if (typeof window !== 'undefined') {
         sessionStorage.clear();
+        clearAllLocalStorage();
        // console.log('Tokens cleared on logout');
       }
     }

@@ -90,6 +90,7 @@ export default function useCtiStomp(wsPath = '/ws') {
   const [eventLog, setEventLog] = useState<any[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [userAddress, setUserAddress] = useState<string>('');
   const [summaryData, setSummaryData] = useState<SummaryData>({
     extensions: 0,
     online: 0,
@@ -310,7 +311,7 @@ export default function useCtiStomp(wsPath = '/ws') {
         if (response.ok) {
           const data = await response.json();
           const token = data.token || data.accessToken || data.bearerToken;
-          const userAddress = data.userAddress || data.user_address || '101'; // Get from response, fallback to '101'
+          const userAddress = data.userAddress || data.user_address || '108'; // Get from response, fallback to '101'
           
           if (token && userAddress) {
             return { token, userAddress };
@@ -330,6 +331,9 @@ export default function useCtiStomp(wsPath = '/ws') {
 
     const connectWithToken = async (token: string, userAddress: string) => {
       const brokerURL = 'ws://crmstaging.sipzon.com:7515/ws'; // Updated to use the correct endpoint
+      
+      // Set userAddress in state
+      setUserAddress(userAddress);
       
       const client = new Client({
         brokerURL,
@@ -601,6 +605,7 @@ export default function useCtiStomp(wsPath = '/ws') {
     eventLog,
     error,
     isInitialized,
+    userAddress, // Return userAddress
     summaryData,
     getDevicesForDn,
     getCallStatesForDn,
