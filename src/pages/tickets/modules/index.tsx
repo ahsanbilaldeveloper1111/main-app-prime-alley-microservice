@@ -81,15 +81,15 @@ const TicketModules = () => {
                         </button>
                     )}  
 
-                    {/* {session?.user?.permissions?.includes('delete-ticket-module-tickets')  && props.tickets_count == 0 && ( */}
+                    {session?.user?.permissions?.includes('delete-ticket-module-tickets')  && props.tickets_count == 0 && (
                         <button 
                             className="btn btn-sm btn-outline-danger" 
                             onClick={() => handleDeleteModule(props)}
-                            //disabled={props.tickets_count > 0}
+                            disabled={props?.tickets_count > 0}
                         >
                             Delete
                         </button>
-                    {/* )} */}
+                    )}
 
                     
                 </div>

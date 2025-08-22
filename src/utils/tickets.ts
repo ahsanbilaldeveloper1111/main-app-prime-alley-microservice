@@ -122,28 +122,27 @@ export const UpdateTicketDetails = async (
   due_date?: string
 ) => {
   try {
-    const updateData: any = {
-      id: id,
-      title: title,
-      description: description,
-      type: type,
-      ticket_status_id: ticket_status_id,
-      module_id: module_id,
-      user_extension: user_extension
-    };
-    
+
+    const formData = new FormData();
+    formData.append('id', id);
+    formData.append('title', title);
+    formData.append('description', description);
+    formData.append('ticket_type_id', type);
+    formData.append('ticket_status_id', ticket_status_id);
+    formData.append('module_id', module_id);
+    formData.append('user_extension', user_extension);
     if (priority !== undefined) {
-      updateData.priority = priority;
+      formData.append('priority', priority);
     }
-    
     if (due_date !== undefined) {
-      updateData.due_date = due_date;
+      formData.append('due_date', due_date);
     }
-    
+
     const response = await axiosInstance.post(
       `/tickets/update-ticket`,
-      updateData
+      formData
     );
+ 
     if(response.data){
       const responseData = response.data;
       if(responseData.code == 200){

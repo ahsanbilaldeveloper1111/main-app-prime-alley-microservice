@@ -75,19 +75,27 @@ const TicketTypes = () => {
         sortable: false,
         cell: (props: any) => (
           <div className="action-buttons-container">
-            <button
-              className="btn btn-sm btn-outline-primary"
-              onClick={() => handleEditType(props)}
-            >
-              Edit
-            </button>
-
-            <button
-              className="btn btn-sm btn-outline-danger"
-              onClick={() => handleDeleteType(props)}
-            >
-              Delete
-            </button>
+            {session?.user?.permissions?.includes(
+              "update-ticket-types-tickets"
+            ) && (
+              <button
+                className="btn btn-sm btn-outline-primary"
+                onClick={() => handleEditType(props)}
+              >
+                Edit
+              </button>
+            )}
+            {session?.user?.permissions?.includes(
+              "update-ticket-types-tickets"
+            ) && (
+              <button
+                className="btn btn-sm btn-outline-danger"
+                onClick={() => handleDeleteType(props)}
+                disabled={props?.tickets_count > 0}
+              >
+                Delete
+              </button>
+            )}
           </div>
         ),
       },
@@ -241,28 +249,34 @@ const TicketTypes = () => {
           <div className="page-header-title">
             <h2 className="mb-0 d-flex align-items-center">
               Ticket Types
-              <Button
-                variant="outline-primary"
-                size="sm"
-                className="ms-3"
-                onClick={openCreateTypeModal}
-              >
-                New Type
-              </Button>
+              {session?.user?.permissions?.includes(
+                "update-ticket-types-tickets"
+              ) && (
+                <Button
+                  variant="outline-primary"
+                  size="sm"
+                  className="ms-3"
+                  onClick={openCreateTypeModal}
+                >
+                  New Type
+                </Button>
+              )}
             </h2>
           </div>
         </Col>
       </Row>
 
-      <GenericListPage
-        columns={columns}
-        fetchData={fetchTypes}
-        title="Types"
-        searchPlaceholder="Search types..."
-        defaultPageSize={15}
-        filters={memoizedFilters}
-        refreshKey={refreshKey}
-      />
+      {session?.user?.permissions?.includes("view-ticket-types-tickets") && (
+        <GenericListPage
+          columns={columns}
+          fetchData={fetchTypes}
+          title="Types"
+          searchPlaceholder="Search types..."
+          defaultPageSize={15}
+          filters={memoizedFilters}
+          refreshKey={refreshKey}
+        />
+      )}
 
       {showEditTypeModal && (
         <Modal show={showEditTypeModal} onHide={closeEditTypeModal}>

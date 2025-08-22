@@ -58,7 +58,7 @@ const TicketStatuses = () => {
                         <button 
                             className="btn btn-sm btn-outline-danger" 
                             onClick={() => handleDeleteStatus(props)}
-                            //disabled={props.tickets_count > 0}
+                            disabled={props?.tickets_count > 0}
                         >
                             Delete
                         </button>

@@ -12,7 +12,6 @@ import GenericListPage from "@components/GenericListPage";
 import {
   ListTickets,
   CreateTicket,
-  UpdateTicket,
   UpdateTicketDetails,
   DeleteTicket,
   GetComments,
@@ -643,6 +642,7 @@ const TicketList = () => {
           defaultPageSize={15}
           filters={memoizedFilters}
           refreshKey={refreshKey}
+          search={session?.user?.permissions?.includes("search-tickets-tickets")}
         />
       )}
 
@@ -804,6 +804,7 @@ const TicketList = () => {
                     ? moment(selectedTicket.due_date).format("YYYY-MM-DD")
                     : ""
                 }
+                min={moment().format("YYYY-MM-DD")}
                 onChange={(e) =>
                   setSelectedTicket({
                     ...selectedTicket,
@@ -1010,6 +1011,7 @@ const TicketList = () => {
                 id="newTicketDueDate"
                 value={newTicketDueDate || ""}
                 onChange={(e) => setNewTicketDueDate(e.target.value)}
+                min={moment().format("YYYY-MM-DD")}
               />
             </div>
 
