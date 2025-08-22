@@ -83,6 +83,18 @@ axiosInstance.interceptors.request.use(
     const MAX_RETRY = 3;
     let retryCount = 0;
 
+    // Debug logging for FormData requests
+    if (config.data instanceof FormData) {
+      console.log('=== AXIOS INTERCEPTOR DEBUG ===');
+      console.log('FormData request detected');
+      console.log('URL:', config.url);
+      console.log('Method:', config.method);
+      console.log('Base URL:', config.baseURL);
+      console.log('Full URL:', `${config.baseURL}${config.url}`);
+      console.log('Headers before interceptor:', config.headers);
+      console.log('FormData entries count:', Array.from(config.data.entries()).length);
+    }
+
     // Function to retry fetching token and setting Authorization header
     const retryFetchingToken = async () => {
       while (retryCount < MAX_RETRY) {
@@ -103,12 +115,17 @@ axiosInstance.interceptors.request.use(
       return retryFetchingToken();
     }
 
-    // Only set content type to application/json if it's not already set
-    // This allows FormData to set its own content type with boundary
-    // if (!config.headers['Content-Type']) {
-    //   config.headers['Content-Type'] = 'application/json';
-    //   config.headers['Accept'] = 'application/json';
-    // }
+    // Only set content type to application/json if it's not already set AND if it's not FormData
+    // FormData needs to set its own content type with boundary
+    if (!config.headers['Content-Type'] && !(config.data instanceof FormData)) {
+      config.headers['Content-Type'] = 'application/json';
+      config.headers['Accept'] = 'application/json';
+    }
+
+    if (config.data instanceof FormData) {
+      console.log('Headers after interceptor:', config.headers);
+      console.log('=====================');
+    }
 
     return config;
   },

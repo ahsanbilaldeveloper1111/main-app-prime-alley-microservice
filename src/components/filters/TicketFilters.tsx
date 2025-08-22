@@ -3,6 +3,9 @@ import GenericFilter from './GenericFilter';
 import { createCallRecordingsFiltersConfig, createTicketFiltersConfig } from './filterConfigs';
 import { useHierarchyData } from './useHierarchyData';
 import { useSession } from "next-auth/react";
+import { GetAllModules } from "@utils/ticket-module";
+import { GetAllStatuses } from "@utils/ticket-statuses";
+import { GetAllTypes } from "@utils/ticket-types";
 
 interface GroupsFiltersProps {
   onFiltersChange?: (filters: Record<string, any>) => void;
@@ -14,6 +17,9 @@ export default function GroupsFilters({ onFiltersChange, onExport, isVisibleCall
   const { data: session, status } = useSession();
   const [showExport, setShowExport] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
+  const [modules, setModules] = useState([]);
+  const [statuses, setStatuses] = useState([]);
+  const [types, setTypes] = useState([]);
   
   // Use the hierarchy data hook
   const { 
@@ -23,12 +29,71 @@ export default function GroupsFilters({ onFiltersChange, onExport, isVisibleCall
     loading: hierarchyLoading, 
     error: hierarchyError 
   } = useHierarchyData();
-  // Create dynamic filter config with hierarchy data
+
+  // Fetch modules data
+  useEffect(() => {
+    const fetchModules = async () => {
+      try {
+        const modulesData = await GetAllModules();
+        if (modulesData) {
+          setModules(modulesData);
+        }
+      } catch (error) {
+        console.error('Failed to fetch modules:', error);
+      }
+    };
+
+    if (status === 'authenticated') {
+      fetchModules();
+    }
+  }, [status]);
+
+  // Fetch statuses data
+  useEffect(() => {
+    const fetchStatuses = async () => {
+      try {
+        const statusesData = await GetAllStatuses();
+        if (statusesData) {
+          setStatuses(statusesData);
+        }
+      } catch (error) {
+        console.error('Failed to fetch statuses:', error);
+      }
+    };
+
+    if (status === 'authenticated') {
+      fetchStatuses();
+    }
+  }, [status]);
+
+  // Fetch types data
+  useEffect(() => {
+    const fetchTypes = async () => {
+      try {
+        const typesData = await GetAllTypes();
+        if (typesData) {
+          setTypes(typesData);
+        }
+      } catch (error) {
+        console.error('Failed to fetch types:', error);
+      }
+    };
+
+    if (status === 'authenticated') {
+      fetchTypes();
+    }
+  }, [status]);
+
+  // Create dynamic filter config with hierarchy data, modules, statuses, and types
   const ticketConfig = createTicketFiltersConfig({
     departments: hierarchyDataDepartments,
     extensions: hierarchyDataExtensions,
-    users: hierarchyDataUsers
+    users: hierarchyDataUsers,
+    modules: modules,
+    statuses: statuses,
+    types: types
   });
+
   
   useEffect(() => {
     if (status === 'authenticated') {

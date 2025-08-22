@@ -200,7 +200,21 @@ export const UpdateTicketDetails = async (
         formData.append('created_by', 'system'); // Default value, should be replaced with actual user
       }
       
+      // Debug: Log FormData contents
+      console.log('FormData contents:');
+      Array.from(formData.entries()).forEach(([key, value]) => {
+        console.log(`${key}:`, value);
+      });
+      
+      console.log('About to make request to /tickets/create-ticket');
+      console.log('FormData instanceof FormData:', formData instanceof FormData);
+      console.log('FormData entries count:', Array.from(formData.entries()).length);
+      
+      // For FormData, we need to let the browser set the Content-Type header automatically
+      // Don't override it as it needs to include the boundary parameter
       const response = await axiosInstance.post('/tickets/create-ticket', formData);
+
+      console.log('Response received:', response);
 
       if(response){
         const responseData = response.data;
@@ -221,8 +235,19 @@ export const UpdateTicketDetails = async (
         return false;
       }
       
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating ticket:', error);
+      // Log more details about the error
+      if (error.response) {
+        console.error('Response status:', error.response.status);
+        console.error('Response data:', error.response.data);
+        console.error('Response headers:', error.response.headers);
+      } else if (error.request) {
+        console.error('Request was made but no response received:', error.request);
+        console.error('Request config:', error.config);
+      } else {
+        console.error('Error setting up request:', error.message);
+      }
       throw error;
     }
   };
