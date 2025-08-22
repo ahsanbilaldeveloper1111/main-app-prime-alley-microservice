@@ -47,8 +47,17 @@ const TicketDashboard = () => {
    useEffect(() => {
     const fetchDashboardData = async () => {
         try {
-            const data = await DashboardData();
+            const data = await DashboardData(currentFilters);
             setDashboardData(data);
+            
+            // Update summary based on dashboard data
+            if (data && data.total_tickets !== undefined) {
+                setSummary(prev => ({
+                    ...prev,
+                    tickets: data.total_tickets || 0
+                }));
+            }
+            
             console.log('Dashboard data:', data);
         } catch (error) {
             console.error('Error fetching dashboard data:', error);
@@ -56,7 +65,7 @@ const TicketDashboard = () => {
     };
 
     fetchDashboardData();
-    }, []);
+    }, [currentFilters]);
    
 
 

@@ -73,7 +73,6 @@ export const authOptions: NextAuthOptions = {
           const formData = new URLSearchParams();
           formData.append("email", credentials.email);
           formData.append("password", credentials.password);
-
           const res = await fetch(
             process.env.NEXT_PUBLIC_BACKEND_URL + "auth/login",
             {
@@ -95,7 +94,7 @@ export const authOptions: NextAuthOptions = {
           if (jsonData.code === 400) { 
             return null;
           }
-          
+          console.log("jsonData", jsonData)
           if (!jsonData?.data?.token?.access_token) {
             return null;
           }

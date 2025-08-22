@@ -1,5 +1,5 @@
 import '@assets/scss/datatable-style.scss';
-import React, { ReactElement, useState, useCallback, useMemo } from 'react';
+import React, { ReactElement, useState, useCallback, useMemo, useEffect } from 'react';
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
 import GenericListPage from '@components/GenericListPage';
@@ -11,9 +11,12 @@ import { toast } from 'react-toastify';
 import { useTokenService } from 'src/hooks/useTokenService';
 import { useSession } from 'next-auth/react';
 import moment from 'moment';
+import { GetHierarchyData } from '@utils/users';
+import Select from 'react-select';
 
 const TicketModules = () => {
     const { data:session, status } = useSession();
+    const [extensions, setExtensions] = useState<any>([]);
    
     const columns: Column[] = useMemo(() => [
         { key: 'name', name: 'Name', selector: (row: any) => row.name, sortable: true },
@@ -35,6 +38,16 @@ const TicketModules = () => {
                     </span>
                 );
             }
+         },
+        { key: 'user_extension', name: 'User Extension', selector: (row: any) => row.user_extension, sortable: true,
+            cell: (props: any) => (
+                <span className="badge bg-info">
+                    {extensions.find(
+                        (extension: any) =>
+                            extension.id.toString() === props.user_extension?.toString()
+                    )?.display_name || props.user_extension || 'Not assigned'}
+                </span>
+            )
          },
         // { key: 'tickets_count', name: 'Tickets Using', selector: (row: any) => row.tickets_count, sortable: true,
         //     cell: (props: any) => (
@@ -82,12 +95,27 @@ const TicketModules = () => {
                 </div>
             ),
         },
-    ], [session?.user?.permissions]);
+    ], [session?.user?.permissions, extensions]);
 
     const [refreshKey, setRefreshKey] = useState<number>(0);
     const [currentFilters, setCurrentFilters] = useState({});
 
+    // Extension-related states
+    const [hierarchyData, setHierarchyData] = useState<any>([]);
+
     const memoizedFilters = useMemo(() => currentFilters, [currentFilters]);
+
+    // Fetch extensions data
+    useEffect(() => {
+        const fetchHierarchyData = async () => {
+            const hierarchyData = await GetHierarchyData();
+            setHierarchyData(hierarchyData);
+            console.log('Hierarchy Data:', hierarchyData);
+            setExtensions(hierarchyData?.extensions);
+            console.log('Extensions:', extensions);
+        };
+        fetchHierarchyData();
+    }, []);
 
     const fetchModules = useCallback(async (page = 1, perPage = 15, search = "") => {
         return await ListModules({ page, perPage, search, filters: memoizedFilters });
@@ -102,6 +130,7 @@ const TicketModules = () => {
     const [selectedModuleName, setSelectedModuleName] = useState<any>(null);
     const [selectedModuleDescription, setSelectedModuleDescription] = useState<any>(null);
     const [selectedModuleColor, setSelectedModuleColor] = useState<any>(null);
+    const [selectedModuleUserExtension, setSelectedModuleUserExtension] = useState<any>(null);
     const [showEditModuleModal, setShowEditModuleModal] = useState<boolean>(false);
 
     const handleEditModule = useCallback((props: any) => {
@@ -109,23 +138,25 @@ const TicketModules = () => {
         setSelectedModuleName(props.name);
         setSelectedModuleDescription(props.description);
         setSelectedModuleColor(props.color);
+        setSelectedModuleUserExtension(props.user_extension || null);
         setShowEditModuleModal(true);
     }, []);
 
     const handleSubmitEditModule = useCallback(async () => {
         //console.log('Submit edit group:', selectedGroup, selectedGroupName);
-        const response = await UpdateModule(selectedModule, selectedModuleName, selectedModuleDescription, selectedModuleColor);
+        const response = await UpdateModule(selectedModule, selectedModuleName, selectedModuleDescription, selectedModuleColor, selectedModuleUserExtension);
         if(response){
             setSelectedModule(null);
             setSelectedModuleName(null);
             setSelectedModuleDescription(null);
             setSelectedModuleColor(null);
+            setSelectedModuleUserExtension(null);
             setShowEditModuleModal(false);
             setRefreshKey(prev => prev + 1); // Trigger refresh
         }
 
         
-    }, [selectedModule, selectedModuleName, selectedModuleDescription, selectedModuleColor]);
+    }, [selectedModule, selectedModuleName, selectedModuleDescription, selectedModuleColor, selectedModuleUserExtension]);
 
     const [showDeleteModuleModal, setShowDeleteModuleModal] = useState<boolean>(false);
     const [confirmDelete, setConfirmDelete] = useState<string>("");
@@ -156,22 +187,37 @@ const TicketModules = () => {
     const [newModuleName, setNewModuleName] = useState<string>("");
     const [newModuleDescription, setNewModuleDescription] = useState<string>("");
     const [newModuleColor, setNewModuleColor] = useState<string>("");
+    const [newModuleUserExtension, setNewModuleUserExtension] = useState<any>(null);
 
     const handleSubmitCreateModule = useCallback(async () => {
-        const response = await CreateModule(newModuleName, newModuleDescription, newModuleColor);
+        const response = await CreateModule(newModuleName, newModuleDescription, newModuleColor, newModuleUserExtension);
         if(response){
             setNewModuleName("");
             setNewModuleDescription("");
             setNewModuleColor("");
+            setNewModuleUserExtension(null);
             setShowCreateModuleModal(false);
             setRefreshKey(prev => prev + 1); // Trigger refresh
         }
-    }, [newModuleName, newModuleDescription, newModuleColor]);
+    }, [newModuleName, newModuleDescription, newModuleColor, newModuleUserExtension]);
 
     const openCreateModuleModal = useCallback(() => setShowCreateModuleModal(true), []);
-    const closeCreateModuleModal = useCallback(() => setShowCreateModuleModal(false), []);
+    const closeCreateModuleModal = useCallback(() => {
+        setShowCreateModuleModal(false);
+        setNewModuleName("");
+        setNewModuleDescription("");
+        setNewModuleColor("");
+        setNewModuleUserExtension(null);
+    }, []);
     const openEditModuleModal = useCallback(() => setShowEditModuleModal(true), []);
-    const closeEditModuleModal = useCallback(() => setShowEditModuleModal(false), []);
+    const closeEditModuleModal = useCallback(() => {
+        setShowEditModuleModal(false);
+        setSelectedModule(null);
+        setSelectedModuleName(null);
+        setSelectedModuleDescription(null);
+        setSelectedModuleColor(null);
+        setSelectedModuleUserExtension(null);
+    }, []);
     const openDeleteModuleModal = useCallback(() => setShowDeleteModuleModal(true), []);
     const closeDeleteModuleModal = useCallback(() => setShowDeleteModuleModal(false), []);
 
@@ -239,6 +285,33 @@ const TicketModules = () => {
                             </div>
                         </div>
 
+                        <div className="form-group mb-3">
+                            <label htmlFor="editModuleUserExtension">User Extension (Optional)</label>
+                            <Select
+                                id="editModuleUserExtension"
+                                value={
+                                    selectedModuleUserExtension
+                                        ? {
+                                            value: selectedModuleUserExtension,
+                                            label: extensions.find(
+                                                (ext: any) =>
+                                                    ext.id.toString() === selectedModuleUserExtension?.toString()
+                                            )?.display_name || "",
+                                        }
+                                        : null
+                                }
+                                onChange={(selectedOption: any) => {
+                                    setSelectedModuleUserExtension(selectedOption?.value || null);
+                                }}
+                                options={extensions.map((extension: any) => ({
+                                    value: extension.id,
+                                    label: extension.display_name,
+                                }))}
+                                placeholder="Select User Extension (Optional)"
+                                isClearable
+                                isSearchable
+                            />
+                        </div>
 
                         
                     </Modal.Body>
@@ -315,6 +388,24 @@ const TicketModules = () => {
                                     placeholder="e.g., #FF5733 or rgb(255, 87, 51)"
                                 />
                             </div>
+                        </div>
+
+                        <div className="form-group mb-3">
+                            <label htmlFor="newModuleUserExtension">User Extension (Optional)</label>
+                            <Select
+                                id="newModuleUserExtension"
+                                value={newModuleUserExtension}
+                                onChange={(selectedOption: any) => {
+                                    setNewModuleUserExtension(selectedOption?.value || null);
+                                }}
+                                options={extensions.map((extension: any) => ({
+                                    value: extension.id,
+                                    label: extension.display_name,
+                                }))}
+                                placeholder="Select User Extension (Optional)"
+                                isClearable
+                                isSearchable
+                            />
                         </div>
 
 
