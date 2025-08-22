@@ -19,7 +19,7 @@ export const DashboardData = async (filters: any = {}) => {
     const response = await axiosInstance.get('/tickets/dashboard', {
       params: filters
     });
-    return response.data;
+    return response.data?.data;
   } catch (error) {
     throw error;
   }
