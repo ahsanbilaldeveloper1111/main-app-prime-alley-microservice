@@ -38,7 +38,7 @@ export const ListGsmManagement = async (params: PaginationParams = {}) => {
       }
     );
     
-    return response.data;
+    return response.data?.data;
   } catch (error) {
     console.error('API Error:', error);
     throw error;

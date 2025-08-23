@@ -131,7 +131,17 @@ const Dashboard = () => {
             icon: <i className="ph-duotone ph-brain"></i>,
             gradient: 'from-pink-500 to-rose-600',
             link: '/coming-soon'
-        }
+        },
+        {
+            id: 'accounts-services',
+            title: 'Accounts',
+            subtitle: 'Accounts',
+            description: 'Manage your accounts, payroll, and benefits with ease.',
+            icon: <i className="ph-duotone ph-brain"></i>,
+            gradient: 'from-pink-500 to-rose-600',
+            link: '/coming-soon'
+        },
+        
         
     ];
 

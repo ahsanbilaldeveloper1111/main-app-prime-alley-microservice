@@ -289,36 +289,20 @@ export default function GenericFilter({
   };
 
   const clearFilters = () => {
-    // Get default values from field definitions
-    const defaultFilters = getDefaultValues();
+    console.log('Clearing all filters completely');
     
-    //console.log('Clearing filters, preserving defaults:', defaultFilters);
-    
-    // Only clear non-default filters, preserve default values
-    setSelectedFilters(defaultFilters);
+    // Completely clear all filters instead of preserving defaults
+    setSelectedFilters({});
     setMultiSelectValues({});
-    
-    // Reset dateValues but preserve default date values
-    const defaultDateValues: Record<string, Date | undefined> = {};
-    tabs.forEach(tab => {
-      tab.fields.forEach(field => {
-        if (field.type === 'date' && field.value) {
-          const dateString = field.value;
-          if (dateString) {
-            defaultDateValues[field.name] = new Date(dateString);
-          }
-        }
-      });
-    });
-    setDateValues(defaultDateValues);
+    setDateValues({});
     
     setResetKey(prev => prev + 1); // Force re-render of all form components
     setHasBeenCleared(true); // Set flag to true after clearing
-    isInitialized.current = false; // Reset initialization flag to allow re-initialization with new defaults
+    isInitialized.current = false; // Reset initialization flag
     
-    // Only call onFiltersChange if there are actual default filters to apply
-    if (onFiltersChange && Object.keys(defaultFilters).length > 0) {
-      onFiltersChange(defaultFilters);
+    // Call onFiltersChange with empty filters to truly clear everything
+    if (onFiltersChange) {
+      onFiltersChange({});
     }
     
     // Force a re-render of form fields to show cleared state

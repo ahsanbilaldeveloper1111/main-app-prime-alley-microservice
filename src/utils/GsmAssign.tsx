@@ -39,7 +39,7 @@ export const ListGsmAssign = async (params: PaginationParams = {}): Promise<any>
       }
     );
     
-    return response?.data;
+    return response?.data?.data;
   } catch (error) {
     console.error('API Error:', error);
     throw error;

@@ -729,7 +729,7 @@ const Header = ({ themeMode }: any) => {
                                             <span className="pc-micon">
                                                 <i className="ph-duotone ph-users"></i>
                                             </span>
-                                            <span className="pc-mtext" data-i18n="Users">Users</span>
+                                            <span className="pc-mtext" data-i18n="Users">User Directory</span>
                                             </Link>
                                         </li>
                                     )}
@@ -760,6 +760,28 @@ const Header = ({ themeMode }: any) => {
                                         </li>
                                     )}
 
+{permissions.includes('view-gsm-management') && (
+                                        <li className="pc-item">
+                                            <Link href={`${baseUrl}/gsm/list`} className="pc-link">
+                                            <span className="pc-micon">
+                                                <i className="ph-duotone ph-list"></i>
+                                            </span>
+                                            <span className="pc-mtext" data-i18n="Dashboard">Gsm List</span>
+                                            </Link>
+                                        </li>
+                                    )}
+
+                                    {permissions.includes('view-gsm-assignment') && (
+                                        <li className="pc-item">
+                                            <Link href={`${baseUrl}/gsm/assign`} className="pc-link">
+                                            <span className="pc-micon">
+                                                <i className="ph-duotone ph-list"></i>
+                                            </span>
+                                            <span className="pc-mtext" data-i18n="Dashboard">Company Assign</span>
+                                            </Link>
+                                        </li>
+                                    )}
+
                                     </ul>
                             </div>
                             {/* tab pane end */}
@@ -770,6 +792,7 @@ const Header = ({ themeMode }: any) => {
                                 <div className="pc-submenu-title">Gsm</div>
                                 <ul className="pc-navbar">
                                     
+                                    {permissions.includes('dashboard-gsm-management') && (
                                         <li className="pc-item">
                                             <Link href={`${baseUrl}/gsm/dashboard`} className="pc-link">
                                             <span className="pc-micon">
@@ -778,7 +801,9 @@ const Header = ({ themeMode }: any) => {
                                             <span className="pc-mtext" data-i18n="Dashboard">Dashboard</span>
                                             </Link>
                                         </li>
+                                    )}
 
+                                    {permissions.includes('view-gsm-management') && (
                                         <li className="pc-item">
                                             <Link href={`${baseUrl}/gsm/list`} className="pc-link">
                                             <span className="pc-micon">
@@ -787,6 +812,9 @@ const Header = ({ themeMode }: any) => {
                                             <span className="pc-mtext" data-i18n="Dashboard">Gsm List</span>
                                             </Link>
                                         </li>
+                                    )}
+
+                                    {permissions.includes('view-gsm-assignment') && (
                                         <li className="pc-item">
                                             <Link href={`${baseUrl}/gsm/assign`} className="pc-link">
                                             <span className="pc-micon">
@@ -795,6 +823,9 @@ const Header = ({ themeMode }: any) => {
                                             <span className="pc-mtext" data-i18n="Dashboard">Company Assign</span>
                                             </Link>
                                         </li>
+                                    )}
+
+                                    {permissions.includes('view-gsm-ports') && (
                                         <li className="pc-item">
                                             <Link href={`${baseUrl}/gsm/ports`} className="pc-link">
                                             <span className="pc-micon">
@@ -803,6 +834,9 @@ const Header = ({ themeMode }: any) => {
                                             <span className="pc-mtext" data-i18n="Dashboard">Ports</span>
                                             </Link>
                                         </li>
+                                    )}
+
+                                    {permissions.includes('view-gsm-inbox') && (
                                         <li className="pc-item">
                                             <Link href={`${baseUrl}/gsm/inbox`} className="pc-link">
                                             <span className="pc-micon">
@@ -811,7 +845,7 @@ const Header = ({ themeMode }: any) => {
                                             <span className="pc-mtext" data-i18n="Dashboard">Inbox</span>
                                             </Link>
                                         </li>
-                                        
+                                    )}
 
                                 </ul>
                             </div>
@@ -1038,12 +1072,25 @@ const Header = ({ themeMode }: any) => {
                             <div className="tab-pane" id="pc-tab-9" role="tabpanel" aria-labelledby="pc-tab-link-9" tabIndex={9}>
                                 <div className="pc-submenu-title">CTI</div>
                                 <ul className="pc-navbar">
+                                  
+                                   {permissions.includes('view-cti') && (
                                     <li className="pc-item">
                                         <Link className="pc-link" href={`${baseUrl}/cti`}>
                                             <span className="pc-micon"><i className="ph-duotone ph-link"></i></span>
                                             <span className="pc-mtext">CTI</span>
                                         </Link>
                                     </li>
+                                    )}
+
+{permissions.includes('dial-call-cti') && (
+                                    <li className="pc-item">
+                                        <Link className="pc-link" href={`${baseUrl}/cti/dialer`}>
+                                            <span className="pc-micon"><i className="ph-duotone ph-link"></i></span>
+                                            <span className="pc-mtext">Dialer</span>
+                                        </Link>
+                                    </li>
+                                    )}
+
                                 </ul>
                             </div>
                             {/* tab pane end */}

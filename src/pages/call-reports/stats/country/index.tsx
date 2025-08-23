@@ -4,6 +4,15 @@ import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
 import GenericListPage from '@components/GenericListPage';
 import { ListCallLogs, ExportCallLogs, DownloadStreamingExport } from '@utils/calls';
+
+// Debug: check if API functions are available
+if (typeof window !== 'undefined') {
+    console.log('API functions available:', { 
+        ListCallLogs: typeof ListCallLogs, 
+        ExportCallLogs: typeof ExportCallLogs, 
+        DownloadStreamingExport: typeof DownloadStreamingExport 
+    });
+}
 import { GetHierarchyData } from '@utils/users';
 import { Column } from '@components/CustomDataTable';
 import { Button, Modal, Row, Tab, Tabs } from 'react-bootstrap';
@@ -64,6 +73,33 @@ const CallStatsCountry = () => {
     const { data:session, status } = useSession();
     const [loading, setLoading] = useState(false);
     const [activeTab, setActiveTab] = useState('calls_chart');
+    
+    // Debug session state
+    useEffect(() => {
+        console.log('Session state:', { session, status });
+        if (status === 'authenticated' && session) {
+            console.log('Session authenticated successfully');
+        } else if (status === 'loading') {
+            console.log('Session still loading...');
+        } else if (status === 'unauthenticated') {
+            console.log('User not authenticated');
+        }
+    }, [session, status]);
+    
+    // Debug component mounting
+    useEffect(() => {
+        console.log('CallStatsCountry component mounted');
+        console.log('Initial props and state:', { 
+            session, 
+            status, 
+            filtersReady, 
+            dataLoaded, 
+            loading 
+        });
+        return () => {
+            console.log('CallStatsCountry component unmounting');
+        };
+    }, []);
 
     // Animation variants for tab transitions
     const tabVariants = {
@@ -109,8 +145,13 @@ const CallStatsCountry = () => {
 
     const [refreshKey, setRefreshKey] = useState<number>(0);
     const [currentFilters, setCurrentFilters] = useState({
-      is_incoming_only:'false'
+      is_incoming_only: 'false'
     });
+    
+    // Debug current filters state
+    useEffect(() => {
+        console.log('Current filters state changed:', currentFilters);
+    }, [currentFilters]);
     const [dataLoaded, setDataLoaded] = useState(false);
     const [filtersReady, setFiltersReady] = useState(false);
     const [summary, setSummary] = useState<Summary>({
@@ -126,17 +167,58 @@ const CallStatsCountry = () => {
     const fetchCallLogs = useCallback(async (page = 1, perPage = 15, search = "") => {
         // Only fetch if filters are ready
         if (!filtersReady) {
+            console.log('Filters not ready yet, skipping fetch');
             return;
         }
         
+        console.log('Fetching call logs with filters:', currentFilters);
         setLoading(true);
-        const response = await ListCallLogs({ page, perPage, search, filters: currentFilters,reportType: 'statsCountry' }, 'call-logs/statsByCountry');
-        if(response?.summary  ) {
-            setSummary(response.summary);
-            setDataLoaded(true);
+        
+        try {
+            console.log('About to call ListCallLogs with params:', { page, perPage, search, filters: currentFilters, reportType: 'statsCountry' });
+            const response = await ListCallLogs({ page, perPage, search, filters: currentFilters, reportType: 'statsCountry' }, 'call-logs/statsByCountry');
+            console.log('API response:', response);
+            console.log('API response type:', typeof response);
+            console.log('API response keys:', response ? Object.keys(response) : 'null/undefined');
+            
+            if (response?.summary) {
+                setSummary(response.summary);
+                setDataLoaded(true);
+                console.log('Summary data set:', response.summary);
+                console.log('DataLoaded set to true');
+            } else if (response?.data) {
+                // Fallback: check if data exists but no summary
+                console.log('Response has data but no summary:', response.data);
+                setDataLoaded(true);
+                console.log('DataLoaded set to true (fallback 1)');
+            } else if (response && typeof response === 'object') {
+                // Check if response is an object but doesn't have expected properties
+                console.log('Response is object but missing expected properties:', response);
+                setDataLoaded(true);
+                console.log('DataLoaded set to true (fallback 2)');
+            } else {
+                console.warn('No summary or data in response:', response);
+                setDataLoaded(true); // Mark as loaded even if no data
+                console.log('DataLoaded set to true (fallback 3)');
+            }
+            
             setLoading(false);
+            return response;
+        } catch (error: unknown) {
+            console.error('Error fetching call logs:', error);
+            if (error instanceof Error) {
+                console.error('Error details:', {
+                    message: error.message,
+                    stack: error.stack,
+                    name: error.name
+                });
+            }
+            setLoading(false);
+            setDataLoaded(true); // Mark as loaded even on error
+            console.log('DataLoaded set to true (error case)');
+            toast.error('Failed to fetch call data');
+            return null;
         }
-        return response;
     }, [currentFilters, filtersReady]);
 
     const [simpleDonut, setSimpleDonut] = React.useState<{ series: number[]; labels: string[] } | null>(null);
@@ -147,27 +229,125 @@ const CallStatsCountry = () => {
           const answeredCalls = Number(summary.answered_calls) || 0;
           const unansweredCalls = Number(summary.unanswered_calls) || 0;
           
-          // Set chart data only when all data is loaded
-          setSimpleDonut({
-            series: [answeredCalls, unansweredCalls],
-            labels: ['Answered Calls', 'Unanswered Calls']
-          });
+          // Check if both values are 0, if so don't set chart data (will show empty state)
+          if (answeredCalls === 0 && unansweredCalls === 0) {
+            console.log('Both answered and unanswered calls are 0, not setting chart data');
+            setSimpleDonut(null);
+          } else {
+            // Set chart data only when there's actual data
+            setSimpleDonut({
+              series: [answeredCalls, unansweredCalls],
+              labels: ['Answered Calls', 'Unanswered Calls']
+            });
+          }
         }
     }, [summary, dataLoaded]);
 
     // Trigger initial data fetch when filters become ready
     useEffect(() => {
-        if (filtersReady) {
+        console.log('Initial data fetch useEffect triggered:', { filtersReady, status, session });
+        if (filtersReady && status === 'authenticated' && session) {
+            console.log('Filters ready and session authenticated, triggering initial fetch');
+            console.log('DataLoaded before fetch:', dataLoaded);
             fetchCallLogs(1, 15, "");
+        } else if (status === 'loading') {
+            console.log('Session still loading, waiting...');
+        } else if (status === 'unauthenticated') {
+            console.log('User not authenticated');
+        } else {
+            console.log('Not ready for data fetch:', { filtersReady, status, hasSession: !!session });
         }
-    }, [filtersReady, fetchCallLogs]);
+    }, [filtersReady, fetchCallLogs, status, session]);
+    
+    // Fallback: if filters haven't been marked as ready after 1 second, mark them as ready
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            if (!filtersReady) {
+                console.log('Fallback: marking filters as ready');
+                setFiltersReady(true);
+            }
+        }, 1000);
+        
+        return () => clearTimeout(timer);
+    }, [filtersReady]);
+    
+    // Additional fallback: if session is authenticated but filters still not ready after 2 seconds
+    useEffect(() => {
+        if (status === 'authenticated' && session) {
+            const timer = setTimeout(() => {
+                if (!filtersReady) {
+                    console.log('Session-based fallback: marking filters as ready');
+                    setFiltersReady(true);
+                }
+            }, 2000);
+            
+            return () => clearTimeout(timer);
+        }
+    }, [status, session, filtersReady]);
+    
+    // Debug initial state
+    useEffect(() => {
+        console.log('Initial state:', { 
+            filtersReady, 
+            dataLoaded, 
+            loading, 
+            currentFilters, 
+            session: !!session, 
+            status 
+        });
+        
+        // Log the actual API functions to make sure they're available
+        console.log('API functions check:', {
+            ListCallLogs: typeof ListCallLogs,
+            ExportCallLogs: typeof ExportCallLogs,
+            DownloadStreamingExport: typeof DownloadStreamingExport
+        });
+    }, [filtersReady, dataLoaded, loading, currentFilters, session, status]);
 
     
     const handleFiltersChange = (filters: any) => {
+        console.log('Filters changed:', filters);
+        console.log('Previous filters:', currentFilters);
+        console.log('New filters:', filters);
+        
+        // Check if filters actually changed
+        const filtersChanged = JSON.stringify(currentFilters) !== JSON.stringify(filters);
+        console.log('Filters actually changed:', filtersChanged);
+        
+        // Check if this is a complete clear (empty object or only has default values)
+        const isCompletelyCleared = Object.keys(filters).length === 0 || 
+            (Object.keys(filters).length === 1 && filters.hasOwnProperty('is_incoming_only'));
+        
+        console.log('Is completely cleared:', isCompletelyCleared);
+        
         setCurrentFilters(filters);
+        
         // Mark filters as ready when they are first set
         if (!filtersReady) {
+            console.log('Marking filters as ready for the first time');
             setFiltersReady(true);
+        }
+        
+        // Reset data loaded state when filters actually change or when cleared
+        if ((filtersChanged && filtersReady) || isCompletelyCleared) {
+            console.log('Resetting data loaded state due to filter change or clear');
+            setDataLoaded(false);
+            console.log('DataLoaded set to false due to filter change');
+            setSummary({
+                total_calls: 0,
+                answered_calls: 0,
+                unanswered_calls: 0,
+                total_cost: 0,
+                total_duration: 0,
+                avg_duration: 0,
+                avg_ring_time: 0
+            });
+            
+            // Trigger refresh
+            setRefreshKey(prev => prev + 1);
+            console.log('Refresh key updated, new value:', refreshKey + 1);
+        } else if (!filtersChanged) {
+            console.log('Filters did not change, keeping dataLoaded state:', dataLoaded);
         }
     };
 
@@ -179,8 +359,15 @@ const CallStatsCountry = () => {
             { filters: currentFilters, isExport: true, exportType ,reportType:'statsCountry' }, 'call-logs/statsByCountry'
           );
         }
-      } catch (error) {
+      } catch (error: unknown) {
         console.error('Export error:', error);
+        if (error instanceof Error) {
+            console.error('Export error details:', {
+                message: error.message,
+                stack: error.stack,
+                name: error.name
+            });
+        }
         toast.error('Export failed');
       }
     };
@@ -196,16 +383,25 @@ const CallStatsCountry = () => {
     const [currentChartTitle, setCurrentChartTitle] = useState('');
 
     useEffect(() => {
-      // Only fetch charts when filters are ready and not empty
-      const areFiltersReady = filtersReady && currentFilters && Object.keys(currentFilters).length > 0;
+      // Only fetch charts when filters are ready and not empty and session is authenticated
+      const areFiltersReady = filtersReady && currentFilters && Object.keys(currentFilters).length > 0 && status === 'authenticated' && session;
+      
+      console.log('Chart useEffect triggered:', { filtersReady, currentFilters, areFiltersReady, status, hasSession: !!session });
       
       if (areFiltersReady) {
+        console.log('All conditions met, proceeding with chart data fetch');
         const fetchCharts = async () => {
           setChartLoading(true);
           try {
-            const response = await ListCallLogs({ page: 1, perPage: 15, search: "", filters: currentFilters,reportType: 'chartCountry' }, 'call-logs/stats/country/chart');
+            console.log('Fetching chart data with filters:', currentFilters);
+            console.log('About to call ListCallLogs for chart with params:', { page: 1, perPage: 15, search: "", filters: currentFilters, reportType: 'chartCountry' });
+            const response = await ListCallLogs({ page: 1, perPage: 15, search: "", filters: currentFilters, reportType: 'chartCountry' }, 'call-logs/stats/country/chart');
+            console.log('Chart API response:', response);
+            console.log('Chart API response type:', typeof response);
+            console.log('Chart API response keys:', response ? Object.keys(response) : 'null/undefined');
            
             const chartData = response?.chart_data;
+            console.log('Chart data extracted:', chartData);
             
             if(chartData && Array.isArray(chartData) && chartData.length > 0) {
              
@@ -313,8 +509,15 @@ const CallStatsCountry = () => {
               setChartCost(null);
               setChartDuration(null);
             }
-          } catch (error) {
+          } catch (error: unknown) {
             console.error('Error fetching chart data:', error);
+            if (error instanceof Error) {
+                console.error('Chart error details:', {
+                    message: error.message,
+                    stack: error.stack,
+                    name: error.name
+                });
+            }
             setChartCalls(null);
             setChartRingTime(null);
             setChartCost(null);
@@ -327,24 +530,56 @@ const CallStatsCountry = () => {
         fetchCharts();
       } else {
         // Reset chart when filters are not ready
+        console.log('Conditions not met for chart fetch:', { 
+          filtersReady, 
+          hasCurrentFilters: !!currentFilters, 
+          filtersKeys: currentFilters ? Object.keys(currentFilters) : [], 
+          status, 
+          hasSession: !!session 
+        });
         setChartCalls(null);
         setChartRingTime(null);
         setChartCost(null);
         setChartDuration(null);
         setChartLoading(false);
       }
-    }, [currentFilters, filtersReady]);
+    }, [currentFilters, filtersReady, fetchCallLogs, status, session]);
 
     const handleOpenChartModal = (chartData: { series: any[]; categories: string[] } | null, title: string, dataType: 'calls' | 'time' | 'cost' | 'custom') => {
+        console.log('Opening chart modal:', { title, dataType, hasChartData: !!chartData });
         if (chartData) {
             setCurrentChartData(chartData);
             setCurrentChartTitle(title);
             setShowChartModal(true);
         }
     };
+    
+    // Debug: log when chart data changes
+    useEffect(() => {
+        console.log('Chart data state updated:', {
+            hasChartCalls: !!chartCalls,
+            hasChartRingTime: !!chartRingTime,
+            hasChartCost: !!chartCost,
+            hasChartDuration: !!chartDuration,
+            chartLoading
+        });
+    }, [chartCalls, chartRingTime, chartCost, chartDuration, chartLoading]);
+    
+    // Debug: log when summary data changes
+    useEffect(() => {
+        console.log('Summary data updated:', summary);
+    }, [summary]);
+    
+    // Debug: log when dataLoaded state changes
+    useEffect(() => {
+        console.log('DataLoaded state changed:', dataLoaded);
+        console.log('Loading state:', loading);
+        console.log('FiltersReady state:', filtersReady);
+    }, [dataLoaded, loading, filtersReady]);
 
     const handleTabChange = (key: string | null) => {
         if (key) {
+            console.log('Tab changed to:', key);
             setActiveTab(key);
         }
     };
@@ -360,6 +595,16 @@ const CallStatsCountry = () => {
     return (
         <React.Fragment>
             <BreadcrumbItem mainTitle="" mainLink="" subTitle="Call Stats By Country" />
+            
+            {/* Debug info - remove in production */}
+            {/* {process.env.NODE_ENV === 'development' && (
+                <div className="alert alert-info mb-3">
+                    <strong>Debug Info:</strong> Filters Ready: {filtersReady.toString()}, 
+                    Data Loaded: {dataLoaded.toString()}, 
+                    Loading: {loading.toString()}, 
+                    Session Status: {status}
+                </div>
+            )} */}
 
 
             <Row className="mb-3">
@@ -374,6 +619,24 @@ const CallStatsCountry = () => {
                     <Col md={8} className="d-flex justify-content-end">
                       <CallLogsFilters
                        onFiltersChange={handleFiltersChange} onExport={handleExport} isVisibleCallDirection={false} />
+                       
+                       {/* Debug button - remove in production */}
+                       {/* {process.env.NODE_ENV === 'development' && (
+                         <Button 
+                           variant="outline-secondary" 
+                           size="sm" 
+                           className="ms-2"
+                           onClick={() => {
+                             console.log('Manual refresh triggered');
+                             setRefreshKey(prev => prev + 1);
+                             if (filtersReady) {
+                               fetchCallLogs(1, 15, "");
+                             }
+                           }}
+                         >
+                           Refresh Data
+                         </Button>
+                       )} */}
                     </Col>
                   </Row>
                
@@ -386,42 +649,101 @@ const CallStatsCountry = () => {
             <Row>
                 <Col md={6}>
                     <Row>
-                        <StatCard
-                           
-                            title="Total Calls"
-                            value={summary.total_calls}
-                            valueType="number"
-                            icon="phone"
-                            bgImage={imgStatus1.src}
-                            delay={0}
-                        />
+                        {!dataLoaded ? (
+                            // Loading state for stat cards
+                            <>
+                                <Col md={6} className="mb-3">
+                                    <div className="card report-shadow h-100">
+                                        <div className="card-body d-flex flex-column align-items-center justify-content-center text-center" style={{ minHeight: '120px' }}>
+                                            <div className="spinner-border text-primary mb-2" role="status">
+                                                <span className="visually-hidden">Loading...</span>
+                                            </div>
+                                            <p className="text-muted mb-0">Loading...</p>
+                                        </div>
+                                    </div>
+                                </Col>
+                                <Col md={6} className="mb-3">
+                                    <div className="card report-shadow h-100">
+                                        <div className="card-body d-flex flex-column align-items-center justify-content-center text-center" style={{ minHeight: '120px' }}>
+                                            <div className="spinner-border text-primary mb-2" role="status">
+                                                <span className="visually-hidden">Loading...</span>
+                                            </div>
+                                            <p className="text-muted mb-0">Loading...</p>
+                                        </div>
+                                    </div>
+                                </Col>
+                                <Col md={6} className="mb-3">
+                                    <div className="card report-shadow h-100">
+                                        <div className="card-body d-flex flex-column align-items-center justify-content-center text-center" style={{ minHeight: '120px' }}>
+                                            <div className="spinner-border text-primary mb-2" role="status">
+                                                <span className="visually-hidden">Loading...</span>
+                                            </div>
+                                            <p className="text-muted mb-0">Loading...</p>
+                                        </div>
+                                    </div>
+                                </Col>
+                                <Col md={6} className="mb-3">
+                                    <div className="card report-shadow h-100">
+                                        <div className="card-body d-flex flex-column align-items-center justify-content-center text-center" style={{ minHeight: '120px' }}>
+                                            <div className="spinner-border text-primary mb-2" role="status">
+                                                <span className="visually-hidden">Loading...</span>
+                                            </div>
+                                            <p className="text-muted mb-0">Loading...</p>
+                                        </div>
+                                    </div>
+                                </Col>
+                            </>
+                        ) : dataLoaded && summary.total_calls === 0 && summary.total_cost === 0 && summary.answered_calls === 0 && summary.unanswered_calls === 0 ? (
+                            // Empty state when no data is available
+                            <Col md={12}>
+                                <div className="card report-shadow">
+                                    <div className="card-body d-flex flex-column align-items-center justify-content-center text-center" style={{ minHeight: '120px' }}>
+                                        <i className="fa fa-database fa-3x text-muted mb-3"></i>
+                                        <h5 className="text-muted mb-2">No Data Available</h5>
+                                        <p className="text-muted mb-0">No call statistics found for the selected filters and date range.</p>
+                                    </div>
+                                </div>
+                            </Col>
+                        ) : (
+                            // Normal stat cards when data is available
+                            <>
+                                <StatCard
+                                    title="Total Calls"
+                                    value={summary.total_calls}
+                                    valueType="number"
+                                    icon="phone"
+                                    bgImage={imgStatus1.src}
+                                    delay={0}
+                                />
 
-                        <StatCard
-                            title="Avg Ring Time"
-                            value={summary.avg_ring_time}
-                            valueType="seconds"
-                            icon="phone_in_talk"
-                            bgImage={imgStatus1.src}
-                            delay={1}
-                        />
+                                <StatCard
+                                    title="Avg Ring Time"
+                                    value={summary.avg_ring_time}
+                                    valueType="seconds"
+                                    icon="phone_in_talk"
+                                    bgImage={imgStatus1.src}
+                                    delay={1}
+                                />
 
-                        <StatCard
-                            title="Avg Duration"
-                            value={summary.avg_duration}
-                            valueType="seconds"
-                            icon="info"
-                            bgImage={imgStatus1.src}
-                            delay={2}
-                        />
+                                <StatCard
+                                    title="Avg Duration"
+                                    value={summary.avg_duration}
+                                    valueType="seconds"
+                                    icon="info"
+                                    bgImage={imgStatus1.src}
+                                    delay={2}
+                                />
 
-                        <StatCard
-                            title="Cost"
-                            value={summary.total_cost}
-                            valueType="cost"
-                            icon="payment"
-                            bgImage={imgStatus1.src}
-                            delay={3}
-                        />
+                                <StatCard
+                                    title="Cost"
+                                    value={summary.total_cost}
+                                    valueType="cost"
+                                    icon="payment"
+                                    bgImage={imgStatus1.src}
+                                    delay={3}
+                                />
+                            </>
+                        )}
                     </Row>
                 </Col>
 
@@ -434,15 +756,24 @@ const CallStatsCountry = () => {
                     <div className="report-grid ">
                     <p className="text-muted mb-0">Total Calls</p>
                         <div className="chart-one " >
-                            {loading || !dataLoaded || !filtersReady ? (
-                                <div className="d-flex align-items-center justify-content-center" style={{ height: '180px' }}>
-                                    <div className="spinner-border text-primary" role="status">
+                            {!dataLoaded ? (
+                                <div className="d-flex flex-column align-items-center justify-content-center text-center" style={{ height: '180px' }}>
+                                    <div className="spinner-border text-primary mb-2" role="status">
                                         <span className="visually-hidden">Loading...</span>
                                     </div>
+                                    <p className="text-muted mb-0">Loading chart data...</p>
                                 </div>
                             ) : (summary.answered_calls === 0 && summary.unanswered_calls === 0 && summary.total_duration === 0) ? (
-                                <div className="d-flex align-items-center justify-content-center" style={{ height: '180px' }}>
-                                    <p className="text-muted mb-0">No data available</p>
+                                <div className="d-flex flex-column align-items-center justify-content-center text-center" style={{ height: '180px' }}>
+                                    <i className="fa fa-chart-pie fa-2x text-muted mb-2"></i>
+                                    <h6 className="text-muted mb-1">No Call Data Available</h6>
+                                    <p className="text-muted mb-0">No call statistics found for the selected filters</p>
+                                </div>
+                            ) : !simpleDonut ? (
+                                <div className="d-flex flex-column align-items-center justify-content-center text-center" style={{ height: '180px' }}>
+                                    <i className="fa fa-chart-pie fa-2x text-muted mb-2"></i>
+                                    <h6 className="text-muted mb-1">No Call Data Available</h6>
+                                    <p className="text-muted mb-0">No call statistics found for the selected filters</p>
                                 </div>
                             ) : simpleDonut ? (
                                 <ChartDonut 
@@ -455,8 +786,11 @@ const CallStatsCountry = () => {
                                     dataLabelsFormatter={(value) => `${value.toFixed(0)}%`}
                                 />
                             ) : (
-                                <div className="d-flex align-items-center justify-content-center" style={{ height: '180px' }}>
-                                    <p className="text-muted mb-0">Loading chart...</p>
+                                <div className="d-flex flex-column align-items-center justify-content-center text-center" style={{ height: '180px' }}>
+                                    <div className="spinner-border text-primary mb-2" role="status">
+                                        <span className="visually-hidden">Loading...</span>
+                                    </div>
+                                    <p className="text-muted mb-0">Preparing chart visualization...</p>
                                 </div>
                             )}
                         </div>
@@ -494,7 +828,7 @@ const CallStatsCountry = () => {
                                       <div className="card report-shadow">
                                           <div className="card-body">
                                           
-                                          {chartLoading || !filtersReady ? (
+                                          {chartLoading ? (
                                               <div className="d-flex align-items-center justify-content-center" style={{ height: '300px' }}>
                                                   <div className="spinner-border text-primary" role="status">
                                                       <span className="visually-hidden">Loading chart...</span>
@@ -514,7 +848,11 @@ const CallStatsCountry = () => {
                                                   onFullScreenClick={() => handleOpenChartModal(chartCalls, 'Calls by Country', 'calls')}
                                               />
                                           ) : (
-                                            <div className=""></div>
+                                              <div className="d-flex flex-column align-items-center justify-content-center text-center" style={{ height: '300px' }}>
+                                                  <i className="fa fa-chart-bar fa-3x text-muted mb-3"></i>
+                                                  <h5 className="text-muted mb-2">No Call Data Available</h5>
+                                                  <p className="text-muted mb-0">No call statistics found for the selected filters and date range.</p>
+                                              </div>
                                           )}
                                           </div>
                                       </div>
@@ -541,7 +879,7 @@ const CallStatsCountry = () => {
                                       <div className="card report-shadow">
                                           <div className="card-body">
                                           
-                                          {chartLoading || !filtersReady ? (
+                                          {chartLoading ? (
                                               <div className="d-flex align-items-center justify-content-center" style={{ height: '300px' }}>
                                                   <div className="spinner-border text-primary" role="status">
                                                       <span className="visually-hidden">Loading chart...</span>
@@ -560,7 +898,11 @@ const CallStatsCountry = () => {
                                                   onFullScreenClick={() => handleOpenChartModal(chartDuration, 'Duration by Country', 'time')}
                                               />
                                           ) : (
-                                            <div className=""></div>
+                                            <div className="d-flex flex-column align-items-center justify-content-center text-center" style={{ height: '300px' }}>
+                                                <i className="fa fa-clock fa-3x text-muted mb-3"></i>
+                                                <h5 className="text-muted mb-2">No Duration Data Available</h5>
+                                                <p className="text-muted mb-0">No duration statistics found for the selected filters and date range.</p>
+                                            </div>
                                           )}
                                           </div>
                                       </div>
@@ -586,7 +928,7 @@ const CallStatsCountry = () => {
                                       <div className="card report-shadow">
                                           <div className="card-body">
                                           
-                                          {chartLoading || !filtersReady ? (
+                                          {chartLoading ? (
                                               <div className="d-flex align-items-center justify-content-center" style={{ height: '300px' }}>
                                                   <div className="spinner-border text-primary" role="status">
                                                       <span className="visually-hidden">Loading chart...</span>
@@ -605,7 +947,11 @@ const CallStatsCountry = () => {
                                                   onFullScreenClick={() => handleOpenChartModal(chartRingTime, 'Ring Time by Country', 'time')}
                                               />
                                           ) : (
-                                              <div className=""></div>
+                                              <div className="d-flex flex-column align-items-center justify-content-center text-center" style={{ height: '300px' }}>
+                                                  <i className="fa fa-phone fa-3x text-muted mb-3"></i>
+                                                  <h5 className="text-muted mb-2">No Ring Time Data Available</h5>
+                                                  <p className="text-muted mb-0">No ring time statistics found for the selected filters and date range.</p>
+                                              </div>
                                           )}
                                           </div>
                                       </div>
@@ -631,7 +977,7 @@ const CallStatsCountry = () => {
                                       <div className="card report-shadow">
                                           <div className="card-body">
                                           
-                                          {chartLoading || !filtersReady ? (
+                                          {chartLoading ? (
                                               <div className="d-flex align-items-center justify-content-center" style={{ height: '300px' }}>
                                                   <div className="spinner-border text-primary" role="status">
                                                       <span className="visually-hidden">Loading chart...</span>
@@ -650,7 +996,11 @@ const CallStatsCountry = () => {
                                                   onFullScreenClick={() => handleOpenChartModal(chartCost, 'Cost by Country', 'cost')}
                                               />
                                           ) : (
-                                            <div className=""></div>
+                                            <div className="d-flex flex-column align-items-center justify-content-center text-center" style={{ height: '300px' }}>
+                                                <i className="fa fa-dollar-sign fa-3x text-muted mb-3"></i>
+                                                <h5 className="text-muted mb-2">No Cost Data Available</h5>
+                                                <p className="text-muted mb-0">No cost statistics found for the selected filters and date range.</p>
+                                            </div>
                                           )}
                                           </div>
                                       </div>
@@ -666,15 +1016,54 @@ const CallStatsCountry = () => {
             </Row>
 
             {session?.user?.permissions?.includes('list-call-logs') && (
-                 <GenericListPage
-                 columns={columns}
-                 fetchData={fetchCallLogs}
-                 title="Call Logs"
-                 searchPlaceholder="Search call stats..."
-                 defaultPageSize={15}
-                 filters={currentFilters}
-                 refreshKey={refreshKey}
-             />
+                <>
+                    {!dataLoaded ? (
+                        // Loading state for the list
+                        <Row>
+                            <Col md={12}>
+                                <div className="card report-shadow">
+                                    <div className="card-body">
+                                        <h5 className="card-title">Call Logs</h5>
+                                        <div className="d-flex align-items-center justify-content-center" style={{ height: '200px' }}>
+                                            <div className="spinner-border text-primary" role="status">
+                                                <span className="visually-hidden">Loading...</span>
+                                            </div>
+                                            <span className="ms-2">Loading call logs...</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </Col>
+                        </Row>
+                    ) : dataLoaded && summary.total_calls === 0 ? (
+                        // Empty state when no data is available
+                        <Row>
+                            <Col md={12}>
+                                <div className="card report-shadow">
+                                    <div className="card-body">
+                                        <h5 className="card-title">Call Logs</h5>
+                                        <div className="d-flex flex-column align-items-center justify-content-center text-center" style={{ height: '200px' }}>
+                                            <i className="fa fa-list fa-3x text-muted mb-3"></i>
+                                            <h6 className="text-muted mb-2">No Call Logs Available</h6>
+                                            <p className="text-muted mb-0">No call logs found for the selected filters and date range.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </Col>
+                        </Row>
+                    ) : (
+                        // Normal GenericListPage when data is available
+                        <GenericListPage
+                            columns={columns}
+                            fetchData={fetchCallLogs}
+                            title="Call Logs"
+                            searchPlaceholder="Search call stats..."
+                            defaultPageSize={15}
+                            filters={currentFilters}
+                            refreshKey={refreshKey}
+                            key={refreshKey} // Force re-render when refresh key changes
+                        />
+                    )}
+                </>
             )}
 
             {/* Chart Modal */}
@@ -700,8 +1089,10 @@ const CallStatsCountry = () => {
                             />
                         </div>
                     ) : (
-                        <div className="d-flex align-items-center justify-content-center" style={{ height: '500px' }}>
-                            <p className="text-muted mb-0">No chart data available</p>
+                        <div className="d-flex flex-column align-items-center justify-content-center text-center" style={{ height: '500px' }}>
+                            <i className="fa fa-chart-area fa-4x text-muted mb-3"></i>
+                            <h5 className="text-muted mb-2">No Chart Data Available</h5>
+                            <p className="text-muted mb-0">The selected chart data is not available or has been cleared.</p>
                         </div>
                     )}
                 </Modal.Body>

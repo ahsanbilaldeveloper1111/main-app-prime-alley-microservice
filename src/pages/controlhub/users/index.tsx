@@ -39,11 +39,12 @@ const Users = () => {
     const baseColumns: Column[] = useMemo(() => [
         //{ key: 'ID', name: 'id', selector: (row: any) => row.id, sortable: true },
         ...(session?.user?.permissions?.includes('show-ldap-uuid-users') ? [
-            { key: 'LDAP UID', name: 'ldap_uid', selector: (row: any) => row.ldap_uid, sortable: true }
+            { key: 'User ID', name: 'ldap_uid', selector: (row: any) => row.ldap_uid, sortable: true }
         ] : []),
-        { key: 'Name', name: 'name', selector: (row: any) => row.name, sortable: true },
+        { key: 'DisplayName', name: 'name', selector: (row: any) => row.name, sortable: true },
         { key: 'Email', name: 'email', selector: (row: any) => row.email, sortable: true },
-        { key: 'Phone', name: 'phone', selector: (row: any) => row.phone, sortable: true },
+        { key: 'Username', name: 'username', selector: (row: any) => row.username, sortable: true },
+        { key: 'Ext', name: 'phone', selector: (row: any) => row.phone, sortable: true },
         ...(session?.user?.permissions?.includes('show-ou-users') ? [
             { key: 'OU', name: 'ou', selector: (row: any) => row.ou, sortable: true }
         ] : []),
@@ -62,7 +63,7 @@ const Users = () => {
         { key: 'Role', name: 'role', selector: (row: any) => row.role, sortable: true },
         { key: 'Group', name: 'group', selector: (row: any) => row.group, sortable: true },
         { key: 'Status', name: 'status', selector: (row: any) => row.status, sortable: true },
-        { key: 'Last Synced At', name: 'last_synced_at', selector: (row: any) => row.last_synced_at, sortable: true },
+        { key: 'Last Synced', name: 'last_synced_at', selector: (row: any) => row.last_synced_at, sortable: true },
     ], [session?.user?.permissions]);
 
     // Action column kept last
@@ -190,7 +191,7 @@ const Users = () => {
                         <div className="page-header-title">
                             <div className="align-items-center row">
                                 <div className="col-md-4">
-                                    <h3 className="mb-0 d-flex align-items-center">Users</h3>
+                                    <h3 className="mb-0 d-flex align-items-center">User Directory</h3>
                                 </div>
                                 <div className="d-flex justify-content-end col-md-8">
                                     <UsersFilters onFiltersChange={handleFiltersChange} onExport={handleExport} />
