@@ -76,7 +76,7 @@ const Dashboard = () => {
             description: 'Customer details, history and touchpoints, always at hand.',
             icon: <i className="ph-duotone ph-brain"></i>,
             gradient: 'from-pink-500 to-rose-600',
-            link: '/coming-soon'
+            link: '/crm'
         },
         {
             id: 'sales-services',
