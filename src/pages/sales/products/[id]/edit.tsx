@@ -17,7 +17,7 @@ import { FiArrowLeft, FiSave, FiPackage } from "react-icons/fi";
 import { getProduct, updateProduct, ProductData } from "@utils/sales";
 import { toast } from "react-toastify";
 
-const EditProduct: React.FC = () => {
+const EditProduct = () => {
   const router = useRouter();
   const { id } = router.query;
   const [loading, setLoading] = useState(true);
@@ -150,8 +150,6 @@ const EditProduct: React.FC = () => {
         mainTitle="Sales"
         mainLink="/sales"
         subTitle="Products"
-        subLink="/sales/products"
-        currentTitle="Edit"
       />
       <Row className="mb-3">
         <Col md={12}>

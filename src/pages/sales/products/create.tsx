@@ -16,7 +16,7 @@ import { FiArrowLeft, FiSave, FiPackage } from "react-icons/fi";
 import { createProduct, ProductData } from "@utils/sales";
 import { toast } from "react-toastify";
 
-const CreateProduct: React.FC = () => {
+const CreateProduct = () => {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -90,8 +90,6 @@ const CreateProduct: React.FC = () => {
         mainTitle="Sales"
         mainLink="/sales"
         subTitle="Products"
-        subLink="/sales/products"
-        currentTitle="Create"
       />
       <Row className="mb-3">
         <Col md={12}>

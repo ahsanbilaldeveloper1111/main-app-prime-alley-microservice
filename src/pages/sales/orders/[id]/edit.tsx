@@ -1,19 +1,19 @@
-import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/router';
-import { 
-  Card, 
-  CardBody, 
-  Col, 
-  Row, 
-  Form, 
-  Button, 
+import React, { useState, useEffect } from "react";
+import { useRouter } from "next/router";
+import {
+  Card,
+  CardBody,
+  Col,
+  Row,
+  Form,
+  Button,
   Table,
   Badge,
   Alert,
-  Spinner
-} from 'react-bootstrap';
-import Select from 'react-select';
-import { 
+  Spinner,
+} from "react-bootstrap";
+import Select from "react-select";
+import {
   getOrder,
   updateOrder,
   listOrderStages,
@@ -22,19 +22,19 @@ import {
   OrderStageData,
   ProductData,
   ProductVariantData,
-  UpdateOrderRequest
-} from '../../../../utils/sales';
-import { toast } from 'react-toastify';
-import Link from 'next/link';
-import { 
-  FiPackage, 
-  FiPlus, 
-  FiCalendar, 
+  UpdateOrderRequest,
+} from "../../../../utils/sales";
+import { toast } from "react-toastify";
+import Link from "next/link";
+import {
+  FiPackage,
+  FiPlus,
+  FiCalendar,
   FiUser,
   FiArrowLeft,
   FiSave,
-  FiTrash2
-} from 'react-icons/fi';
+  FiTrash2,
+} from "react-icons/fi";
 
 interface OrderItem {
   product_id: number;
@@ -53,27 +53,27 @@ const EditOrder: React.FC = () => {
   const [order, setOrder] = useState<OrderData | null>(null);
   const [stages, setStages] = useState<OrderStageData[]>([]);
   const [products, setProducts] = useState<ProductData[]>([]);
-  
+
   // Form data
   const [formData, setFormData] = useState({
-    customer_name: '',
-    customer_email: '',
-    customer_phone: '',
-    customer_address: '',
-    order_date: '',
-    expected_delivery_date: '',
-    order_stage_id: '',
-    notes: '',
+    customer_name: "",
+    customer_email: "",
+    customer_phone: "",
+    customer_address: "",
+    order_date: "",
+    expected_delivery_date: "",
+    order_stage_id: "",
+    notes: "",
     tax_amount: 0,
-    discount_amount: 0
+    discount_amount: 0,
   });
-  
+
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   // Add item form
-  const [selectedProduct, setSelectedProduct] = useState<number | ''>('');
-  const [selectedVariant, setSelectedVariant] = useState<number | ''>('');
+  const [selectedProduct, setSelectedProduct] = useState<number | "">("");
+  const [selectedVariant, setSelectedVariant] = useState<number | "">("");
   const [quantity, setQuantity] = useState<number>(1);
   const [unitPrice, setUnitPrice] = useState<number>(0);
 
@@ -90,37 +90,41 @@ const EditOrder: React.FC = () => {
       setLoading(true);
       const orderData = await getOrder(Number(id));
       setOrder(orderData);
-      
+
       // Populate form data
       setFormData({
         customer_name: orderData.customer_name,
-        customer_email: orderData.customer_email || '',
-        customer_phone: orderData.customer_phone || '',
-        customer_address: orderData.customer_address || '',
-        order_date: orderData.order_date.split('T')[0],
-        expected_delivery_date: orderData.expected_delivery_date ? orderData.expected_delivery_date.split('T')[0] : '',
-        order_stage_id: orderData.order_stage_id?.toString() || '',
-        notes: orderData.notes || '',
+        customer_email: orderData.customer_email || "",
+        customer_phone: orderData.customer_phone || "",
+        customer_address: orderData.customer_address || "",
+        order_date: orderData.order_date.split("T")[0],
+        expected_delivery_date: orderData.expected_delivery_date
+          ? orderData.expected_delivery_date.split("T")[0]
+          : "",
+        order_stage_id: orderData.order_stage_id?.toString() || "",
+        notes: orderData.notes || "",
         tax_amount: orderData.tax_amount,
-        discount_amount: orderData.discount_amount
+        discount_amount: orderData.discount_amount,
       });
 
       // Populate order items
       if (orderData.items) {
-        setOrderItems(orderData.items.map((item: any) => ({
-          product_id: item.product_id,
-          product_variant_id: item.product_variant_id || undefined,
-          quantity: item.quantity,
-          unit_price: item.unit_price,
-          product: item.product,
-          variant: item.variant,
-          product_name: item.product_name,
-          ...item
-        })));
+        setOrderItems(
+          orderData.items.map((item: any) => ({
+            product_id: item.product_id,
+            product_variant_id: item.product_variant_id || undefined,
+            quantity: item.quantity,
+            unit_price: item.unit_price,
+            product: item.product,
+            variant: item.variant,
+            product_name: item.product_name,
+            ...item,
+          }))
+        );
       }
     } catch (error) {
-      console.error('Failed to load order:', error);
-      toast.error('Failed to load order');
+      console.error("Failed to load order:", error);
+      toast.error("Failed to load order");
     } finally {
       setLoading(false);
     }
@@ -131,7 +135,7 @@ const EditOrder: React.FC = () => {
       const stagesData = await listOrderStages();
       setStages(stagesData);
     } catch (error) {
-      console.error('Failed to load stages:', error);
+      console.error("Failed to load stages:", error);
     }
   };
 
@@ -140,23 +144,23 @@ const EditOrder: React.FC = () => {
       const response = await listProducts({ active: true });
       setProducts(response.data);
     } catch (error) {
-      console.error('Failed to load products:', error);
+      console.error("Failed to load products:", error);
     }
   };
 
   const handleInputChange = (field: string, value: string | number) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    setFormData((prev) => ({ ...prev, [field]: value }));
     if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: '' }));
+      setErrors((prev) => ({ ...prev, [field]: "" }));
     }
   };
 
   const handleProductChange = (productId: number) => {
     setSelectedProduct(productId);
-    setSelectedVariant('');
+    setSelectedVariant("");
     setUnitPrice(0);
-    
-    const product = products.find(p => p.id === productId);
+
+    const product = products.find((p) => p.id === productId);
     if (product) {
       setUnitPrice(product.price);
     }
@@ -164,26 +168,32 @@ const EditOrder: React.FC = () => {
 
   const handleVariantChange = (variantId: number) => {
     setSelectedVariant(variantId);
-    
-    const product = products.find(p => p.id === selectedProduct);
+
+    const product = products.find((p) => p.id === selectedProduct);
     if (product) {
-      const variant = product.variants?.find(v => v.id === variantId);
+      const variant = product.variants?.find((v) => v.id === variantId);
       if (variant) {
-        setUnitPrice(variant.price);
+        setUnitPrice(
+          (typeof variant?.price_adjustment === "string"
+            ? parseFloat(variant?.price_adjustment)
+            : variant?.price_adjustment) || 0
+        );
       }
     }
   };
 
   const addOrderItem = () => {
     if (!selectedProduct || quantity <= 0 || unitPrice <= 0) {
-      toast.error('Please fill in all required fields for the order item');
+      toast.error("Please fill in all required fields for the order item");
       return;
     }
 
-    const product = products.find(p => p.id === selectedProduct);
+    const product = products.find((p) => p.id === selectedProduct);
     if (!product) return;
 
-    const variant = selectedVariant ? product.variants?.find(v => v.id === selectedVariant) : undefined;
+    const variant = selectedVariant
+      ? product.variants?.find((v) => v.id === selectedVariant)
+      : undefined;
 
     const newItem: OrderItem = {
       product_id: selectedProduct,
@@ -191,30 +201,37 @@ const EditOrder: React.FC = () => {
       quantity,
       unit_price: unitPrice,
       product,
-      variant
+      variant,
     };
 
-    setOrderItems(prev => [...prev, newItem]);
-    
+    setOrderItems((prev) => [...prev, newItem]);
+
     // Reset form
-    setSelectedProduct('');
-    setSelectedVariant('');
+    setSelectedProduct("");
+    setSelectedVariant("");
     setQuantity(1);
     setUnitPrice(0);
   };
 
   const removeOrderItem = (index: number) => {
-    setOrderItems(prev => prev.filter((_, i) => i !== index));
+    setOrderItems((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const updateOrderItem = (index: number, field: keyof OrderItem, value: any) => {
-    setOrderItems(prev => prev.map((item, i) => 
-      i === index ? { ...item, [field]: value } : item
-    ));
+  const updateOrderItem = (
+    index: number,
+    field: keyof OrderItem,
+    value: any
+  ) => {
+    setOrderItems((prev) =>
+      prev.map((item, i) => (i === index ? { ...item, [field]: value } : item))
+    );
   };
 
   const calculateSubtotal = () => {
-    return orderItems.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
+    return orderItems.reduce(
+      (sum, item) => sum + item.quantity * item.unit_price,
+      0
+    );
   };
 
   const calculateTotal = () => {
@@ -228,19 +245,22 @@ const EditOrder: React.FC = () => {
     const newErrors: Record<string, string> = {};
 
     if (!formData.customer_name.trim()) {
-      newErrors.customer_name = 'Customer name is required';
+      newErrors.customer_name = "Customer name is required";
     }
 
     if (!formData.order_stage_id) {
-      newErrors.order_stage_id = 'Order stage is required';
+      newErrors.order_stage_id = "Order stage is required";
     }
 
     if (orderItems.length === 0) {
-      newErrors.items = 'At least one order item is required';
+      newErrors.items = "At least one order item is required";
     }
 
-    if (formData.customer_email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.customer_email)) {
-      newErrors.customer_email = 'Invalid email format';
+    if (
+      formData.customer_email &&
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.customer_email)
+    ) {
+      newErrors.customer_email = "Invalid email format";
     }
 
     setErrors(newErrors);
@@ -249,7 +269,7 @@ const EditOrder: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!validateForm()) {
       return;
     }
@@ -267,24 +287,24 @@ const EditOrder: React.FC = () => {
         expected_delivery_date: formData.expected_delivery_date || undefined,
         order_stage_id: parseInt(formData.order_stage_id),
         notes: formData.notes || undefined,
-        items: orderItems.map(item => ({
+        items: orderItems.map((item) => ({
           product_variant_id: item.product_variant_id,
-          ...item
-        }))
+          ...item,
+        })),
       };
 
       await updateOrder(Number(id), orderData);
-      toast.success('Order updated successfully!');
+      toast.success("Order updated successfully!");
       router.push(`/sales/orders/${id}`);
     } catch (error) {
-      console.error('Failed to update order:', error);
+      console.error("Failed to update order:", error);
     } finally {
       setSaving(false);
     }
   };
 
   const getSelectedProduct = () => {
-    return products.find(p => p.id === selectedProduct);
+    return products.find((p) => p.id === selectedProduct);
   };
 
   const getSelectedProductVariants = () => {
@@ -296,7 +316,10 @@ const EditOrder: React.FC = () => {
     return (
       <div className="page-content">
         <div className="container-fluid">
-          <div className="d-flex justify-content-center align-items-center" style={{ minHeight: '400px' }}>
+          <div
+            className="d-flex justify-content-center align-items-center"
+            style={{ minHeight: "400px" }}
+          >
             <Spinner color="primary" />
           </div>
         </div>
@@ -308,9 +331,7 @@ const EditOrder: React.FC = () => {
     return (
       <div className="page-content">
         <div className="container-fluid">
-          <Alert color="danger">
-            Order not found
-          </Alert>
+          <Alert color="danger">Order not found</Alert>
         </div>
       </div>
     );
@@ -324,15 +345,15 @@ const EditOrder: React.FC = () => {
             <div className="d-flex align-items-center">
               <div>
                 <h5 className="mb-1">Order Cannot Be Edited</h5>
-                <p className="mb-0">This order has been completed and cannot be modified.</p>
+                <p className="mb-0">
+                  This order has been completed and cannot be modified.
+                </p>
               </div>
             </div>
           </Alert>
           <div className="mt-3">
             <Link href={`/sales/orders/${order.id}`}>
-              <Button color="secondary">
-                Back to Order
-              </Button>
+              <Button color="secondary">Back to Order</Button>
             </Link>
           </div>
         </div>
@@ -359,7 +380,9 @@ const EditOrder: React.FC = () => {
                     <Link href="/sales/orders">Orders</Link>
                   </li>
                   <li className="breadcrumb-item">
-                    <Link href={`/sales/orders/${order.id}`}>{order.order_number}</Link>
+                    <Link href={`/sales/orders/${order.id}`}>
+                      {order.order_number}
+                    </Link>
                   </li>
                   <li className="breadcrumb-item active">Edit</li>
                 </ol>
@@ -378,16 +401,22 @@ const EditOrder: React.FC = () => {
                     <FiUser size={20} className="me-2 text-primary" />
                     <h5 className="mb-0">Customer Information</h5>
                   </div>
-                  
+
                   <Form.Group>
                     <Form.Label>Customer Name *</Form.Label>
                     <Form.Control
                       type="text"
                       value={formData.customer_name}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('customer_name', e.target.value)}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                        handleInputChange("customer_name", e.target.value)
+                      }
                       isInvalid={!!errors.customer_name}
                     />
-                    {errors.customer_name && <Form.Control.Feedback type="invalid">{errors.customer_name}</Form.Control.Feedback>}
+                    {errors.customer_name && (
+                      <Form.Control.Feedback type="invalid">
+                        {errors.customer_name}
+                      </Form.Control.Feedback>
+                    )}
                   </Form.Group>
 
                   <Row>
@@ -397,10 +426,16 @@ const EditOrder: React.FC = () => {
                         <Form.Control
                           type="email"
                           value={formData.customer_email}
-                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('customer_email', e.target.value)}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                            handleInputChange("customer_email", e.target.value)
+                          }
                           isInvalid={!!errors.customer_email}
                         />
-                        {errors.customer_email && <Form.Control.Feedback type="invalid">{errors.customer_email}</Form.Control.Feedback>}
+                        {errors.customer_email && (
+                          <Form.Control.Feedback type="invalid">
+                            {errors.customer_email}
+                          </Form.Control.Feedback>
+                        )}
                       </Form.Group>
                     </Col>
                     <Col md={6}>
@@ -409,10 +444,16 @@ const EditOrder: React.FC = () => {
                         <Form.Control
                           type="tel"
                           value={formData.customer_phone}
-                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('customer_phone', e.target.value)}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                            handleInputChange("customer_phone", e.target.value)
+                          }
                           isInvalid={!!errors.customer_phone}
                         />
-                        {errors.customer_phone && <Form.Control.Feedback type="invalid">{errors.customer_phone}</Form.Control.Feedback>}
+                        {errors.customer_phone && (
+                          <Form.Control.Feedback type="invalid">
+                            {errors.customer_phone}
+                          </Form.Control.Feedback>
+                        )}
                       </Form.Group>
                     </Col>
                   </Row>
@@ -423,10 +464,16 @@ const EditOrder: React.FC = () => {
                       as="textarea"
                       rows={3}
                       value={formData.customer_address}
-                      onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => handleInputChange('customer_address', e.target.value)}
+                      onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
+                        handleInputChange("customer_address", e.target.value)
+                      }
                       isInvalid={!!errors.customer_address}
                     />
-                    {errors.customer_address && <Form.Control.Feedback type="invalid">{errors.customer_address}</Form.Control.Feedback>}
+                    {errors.customer_address && (
+                      <Form.Control.Feedback type="invalid">
+                        {errors.customer_address}
+                      </Form.Control.Feedback>
+                    )}
                   </Form.Group>
                 </CardBody>
               </Card>
@@ -440,7 +487,7 @@ const EditOrder: React.FC = () => {
                     <FiCalendar size={20} className="me-2 text-primary" />
                     <h5 className="mb-0">Order Details</h5>
                   </div>
-                  
+
                   <Row>
                     <Col md={6}>
                       <Form.Group>
@@ -448,7 +495,9 @@ const EditOrder: React.FC = () => {
                         <Form.Control
                           type="date"
                           value={formData.order_date}
-                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('order_date', e.target.value)}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                            handleInputChange("order_date", e.target.value)
+                          }
                         />
                       </Form.Group>
                     </Col>
@@ -458,7 +507,12 @@ const EditOrder: React.FC = () => {
                         <Form.Control
                           type="date"
                           value={formData.expected_delivery_date}
-                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('expected_delivery_date', e.target.value)}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                            handleInputChange(
+                              "expected_delivery_date",
+                              e.target.value
+                            )
+                          }
                         />
                       </Form.Group>
                     </Col>
@@ -467,15 +521,38 @@ const EditOrder: React.FC = () => {
                   <Form.Group>
                     <Form.Label>Order Stage *</Form.Label>
                     <Select
-                      options={stages.map(stage => ({ value: stage.id.toString(), label: stage.name }))}
-                      value={formData.order_stage_id ? { value: formData.order_stage_id, label: stages.find(s => s.id.toString() === formData.order_stage_id)?.name || '' } : null}
-                      onChange={(selectedOption) => handleInputChange('order_stage_id', selectedOption?.value || '')}
+                      options={stages.map((stage) => ({
+                        value: stage.id.toString(),
+                        label: stage.name,
+                      }))}
+                      value={
+                        formData.order_stage_id
+                          ? {
+                              value: formData.order_stage_id,
+                              label:
+                                stages.find(
+                                  (s) =>
+                                    s.id.toString() === formData.order_stage_id
+                                )?.name || "",
+                            }
+                          : null
+                      }
+                      onChange={(selectedOption) =>
+                        handleInputChange(
+                          "order_stage_id",
+                          selectedOption?.value || ""
+                        )
+                      }
                       placeholder="Select Stage"
                       isClearable
-                      className={errors.order_stage_id ? 'is-invalid' : ''}
+                      className={errors.order_stage_id ? "is-invalid" : ""}
                       classNamePrefix="react-select"
                     />
-                    {errors.order_stage_id && <div className="invalid-feedback d-block">{errors.order_stage_id}</div>}
+                    {errors.order_stage_id && (
+                      <div className="invalid-feedback d-block">
+                        {errors.order_stage_id}
+                      </div>
+                    )}
                   </Form.Group>
 
                   <Form.Group>
@@ -484,7 +561,9 @@ const EditOrder: React.FC = () => {
                       as="textarea"
                       rows={3}
                       value={formData.notes}
-                      onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => handleInputChange('notes', e.target.value)}
+                      onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
+                        handleInputChange("notes", e.target.value)
+                      }
                     />
                   </Form.Group>
                 </CardBody>
@@ -502,7 +581,11 @@ const EditOrder: React.FC = () => {
                       <FiPackage size={20} className="me-2 text-primary" />
                       <h5 className="mb-0">Order Items</h5>
                     </div>
-                    {errors.items && <Alert color="danger" className="mb-0">{errors.items}</Alert>}
+                    {errors.items && (
+                      <Alert color="danger" className="mb-0">
+                        {errors.items}
+                      </Alert>
+                    )}
                   </div>
 
                   {/* Add Item Form */}
@@ -511,9 +594,23 @@ const EditOrder: React.FC = () => {
                       <Form.Group>
                         <Form.Label>Product *</Form.Label>
                         <Select
-                          options={products.map(product => ({ value: product.id, label: `${product.name} - $${product.price}` }))}
-                          value={selectedProduct ? { value: selectedProduct, label: getSelectedProduct()?.name || '' } : null}
-                          onChange={(selectedOption) => handleProductChange(Number(selectedOption?.value || ''))}
+                          options={products.map((product) => ({
+                            value: product.id,
+                            label: `${product.name} - $${product.price}`,
+                          }))}
+                          value={
+                            selectedProduct
+                              ? {
+                                  value: selectedProduct,
+                                  label: getSelectedProduct()?.name || "",
+                                }
+                              : null
+                          }
+                          onChange={(selectedOption) =>
+                            handleProductChange(
+                              Number(selectedOption?.value || "")
+                            )
+                          }
                           placeholder="Select Product"
                           isClearable
                           classNamePrefix="react-select"
@@ -524,9 +621,32 @@ const EditOrder: React.FC = () => {
                       <Form.Group>
                         <Form.Label>Variant</Form.Label>
                         <Select
-                          options={getSelectedProductVariants().map(variant => ({ value: variant.id, label: `${variant.variant_name}: ${variant.variant_value}` }))}
-                          value={selectedVariant ? { value: selectedVariant, label: getSelectedProductVariants().find(v => v.id === selectedVariant)?.variant_name + ': ' + getSelectedProductVariants().find(v => v.id === selectedVariant)?.variant_value || '' } : null}
-                          onChange={(selectedOption) => handleVariantChange(Number(selectedOption?.value || ''))}
+                          options={getSelectedProductVariants().map(
+                            (variant) => ({
+                              value: variant.id,
+                              label: `${variant.variant_name}: ${variant.variant_value}`,
+                            })
+                          )}
+                          value={
+                            selectedVariant
+                              ? {
+                                  value: selectedVariant,
+                                  label:
+                                    getSelectedProductVariants().find(
+                                      (v) => v.id === selectedVariant
+                                    )?.variant_name +
+                                      ": " +
+                                      getSelectedProductVariants().find(
+                                        (v) => v.id === selectedVariant
+                                      )?.variant_value || "",
+                                }
+                              : null
+                          }
+                          onChange={(selectedOption) =>
+                            handleVariantChange(
+                              Number(selectedOption?.value || "")
+                            )
+                          }
                           placeholder="No Variant"
                           isClearable
                           isDisabled={!selectedProduct}
@@ -541,7 +661,9 @@ const EditOrder: React.FC = () => {
                           type="number"
                           min="1"
                           value={quantity}
-                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setQuantity(Number(e.target.value))}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                            setQuantity(Number(e.target.value))
+                          }
                         />
                       </Form.Group>
                     </Col>
@@ -553,7 +675,9 @@ const EditOrder: React.FC = () => {
                           min="0"
                           step="0.01"
                           value={unitPrice}
-                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setUnitPrice(Number(e.target.value))}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                            setUnitPrice(Number(e.target.value))
+                          }
                         />
                       </Form.Group>
                     </Col>
@@ -561,10 +685,14 @@ const EditOrder: React.FC = () => {
                       <Form.Group>
                         <Form.Label>&nbsp;</Form.Label>
                         <div className="d-grid">
-                          <Button 
-                            color="success" 
+                          <Button
+                            color="success"
                             onClick={addOrderItem}
-                            disabled={!selectedProduct || quantity <= 0 || unitPrice <= 0}
+                            disabled={
+                              !selectedProduct ||
+                              quantity <= 0 ||
+                              unitPrice <= 0
+                            }
                           >
                             <FiPlus size={16} className="me-2" />
                             Add Item
@@ -592,13 +720,18 @@ const EditOrder: React.FC = () => {
                           {orderItems.map((item, index) => (
                             <tr key={index}>
                               <td>
-                                <div className="fw-medium">{item.product?.name}</div>
-                                <small className="text-muted">SKU: {item.product?.sku}</small>
+                                <div className="fw-medium">
+                                  {item.product?.name}
+                                </div>
+                                <small className="text-muted">
+                                  SKU: {item.product?.sku}
+                                </small>
                               </td>
                               <td>
                                 {item.variant ? (
                                   <Badge color="info">
-                                    {item.variant.variant_name}: {item.variant.variant_value}
+                                    {item.variant.variant_name}:{" "}
+                                    {item.variant.variant_value}
                                   </Badge>
                                 ) : (
                                   <span className="text-muted">No variant</span>
@@ -609,8 +742,16 @@ const EditOrder: React.FC = () => {
                                   type="number"
                                   min="1"
                                   value={item.quantity}
-                                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateOrderItem(index, 'quantity', Number(e.target.value))}
-                                  style={{ width: '80px' }}
+                                  onChange={(
+                                    e: React.ChangeEvent<HTMLInputElement>
+                                  ) =>
+                                    updateOrderItem(
+                                      index,
+                                      "quantity",
+                                      Number(e.target.value)
+                                    )
+                                  }
+                                  style={{ width: "80px" }}
                                 />
                               </td>
                               <td>
@@ -619,13 +760,22 @@ const EditOrder: React.FC = () => {
                                   min="0"
                                   step="0.01"
                                   value={item.unit_price}
-                                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateOrderItem(index, 'unit_price', Number(e.target.value))}
-                                  style={{ width: '100px' }}
+                                  onChange={(
+                                    e: React.ChangeEvent<HTMLInputElement>
+                                  ) =>
+                                    updateOrderItem(
+                                      index,
+                                      "unit_price",
+                                      Number(e.target.value)
+                                    )
+                                  }
+                                  style={{ width: "100px" }}
                                 />
                               </td>
                               <td>
                                 <span className="fw-medium">
-                                  ${(item.quantity * item.unit_price).toFixed(2)}
+                                  $
+                                  {(item.quantity * item.unit_price).toFixed(2)}
                                 </span>
                               </td>
                               <td>
@@ -662,8 +812,15 @@ const EditOrder: React.FC = () => {
                                 min="0"
                                 step="0.01"
                                 value={formData.tax_amount}
-                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('tax_amount', Number(e.target.value))}
-                                style={{ width: '100px' }}
+                                onChange={(
+                                  e: React.ChangeEvent<HTMLInputElement>
+                                ) =>
+                                  handleInputChange(
+                                    "tax_amount",
+                                    Number(e.target.value)
+                                  )
+                                }
+                                style={{ width: "100px" }}
                               />
                             </div>
                             <div className="d-flex justify-content-between mb-2">
@@ -673,8 +830,15 @@ const EditOrder: React.FC = () => {
                                 min="0"
                                 step="0.01"
                                 value={formData.discount_amount}
-                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('discount_amount', Number(e.target.value))}
-                                style={{ width: '100px' }}
+                                onChange={(
+                                  e: React.ChangeEvent<HTMLInputElement>
+                                ) =>
+                                  handleInputChange(
+                                    "discount_amount",
+                                    Number(e.target.value)
+                                  )
+                                }
+                                style={{ width: "100px" }}
                               />
                             </div>
                             <hr />

@@ -91,7 +91,6 @@ const CreateOrder = () => {
   useEffect(() => {
     loadStages();
     loadProducts();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const loadStages = async () => {
@@ -151,7 +150,10 @@ const CreateOrder = () => {
       const variant = product.variants?.find((v) => v.id === variantId);
       if (variant) {
         const basePrice = product.price;
-        const adjustment = variant.price || 0;
+        const adjustment =
+          (typeof variant?.price_adjustment === "string"
+            ? parseFloat(variant?.price_adjustment)
+            : variant?.price_adjustment) || 0;
         setUnitPrice(basePrice + adjustment);
       }
     }
@@ -294,16 +296,14 @@ const CreateOrder = () => {
 
   return (
     <React.Fragment>
-      <BreadcrumbItem
-        mainTitle="Sales"
-        mainLink="/sales"
-        subTitle="Orders"
-      />
+      <BreadcrumbItem mainTitle="Sales" mainLink="/sales" subTitle="Orders" />
       <Row className="mb-3">
         <Col md={12}>
           <div className="page-header-title">
             <h2 className="mb-0">Create New Order</h2>
-            <p className="text-muted mb-0">Add a new customer order to the system</p>
+            <p className="text-muted mb-0">
+              Add a new customer order to the system
+            </p>
           </div>
         </Col>
       </Row>
@@ -478,9 +478,7 @@ const CreateOrder = () => {
                     as="textarea"
                     rows={3}
                     value={formData.notes}
-                    onChange={(e) =>
-                      handleInputChange("notes", e.target.value)
-                    }
+                    onChange={(e) => handleInputChange("notes", e.target.value)}
                   />
                 </Form.Group>
               </CardBody>
@@ -612,9 +610,7 @@ const CreateOrder = () => {
                           color="success"
                           onClick={addOrderItem}
                           disabled={
-                            !selectedProduct ||
-                            quantity <= 0 ||
-                            unitPrice <= 0
+                            !selectedProduct || quantity <= 0 || unitPrice <= 0
                           }
                         >
                           <Plus size={16} className="me-2" />
@@ -653,7 +649,8 @@ const CreateOrder = () => {
                             <td>
                               {item.variant ? (
                                 <Badge color="info">
-                                  {item.variant.variant_name} - {item.variant.variant_value}
+                                  {item.variant.variant_name} -{" "}
+                                  {item.variant.variant_value}
                                 </Badge>
                               ) : (
                                 <span className="text-muted">No variant</span>
@@ -692,8 +689,7 @@ const CreateOrder = () => {
                             </td>
                             <td>
                               <span className="fw-medium">
-                                $
-                                {(item.quantity * item.unit_price).toFixed(2)}
+                                ${(item.quantity * item.unit_price).toFixed(2)}
                               </span>
                             </td>
                             <td>

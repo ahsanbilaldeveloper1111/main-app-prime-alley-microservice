@@ -28,7 +28,7 @@ import {
 } from "@utils/sales";
 import { toast } from "react-toastify";
 
-const ProductView: React.FC = () => {
+const ProductView = () => {
   const router = useRouter();
   const { id } = router.query;
   const [product, setProduct] = useState<ProductData | null>(null);
@@ -107,8 +107,8 @@ const ProductView: React.FC = () => {
     setVariantFormData({
       variant_name: variant.variant_name,
       variant_value: variant.variant_value,
-      price_adjustment: variant.price_adjustment || 0,
-      buy_cost_adjustment: variant.buy_cost_adjustment || 0,
+      price_adjustment: typeof variant.price_adjustment === "string" ? parseFloat(variant.price_adjustment) : variant.price_adjustment || 0,
+      buy_cost_adjustment: typeof variant.buy_cost_adjustment === "string" ? parseFloat(variant.buy_cost_adjustment) : variant.buy_cost_adjustment || 0,
       available_quantity: variant.available_quantity,
       sku: variant.sku,
       active: variant.active,
@@ -175,8 +175,6 @@ const ProductView: React.FC = () => {
         mainTitle="Sales"
         mainLink="/sales"
         subTitle="Products"
-        subLink="/sales/products"
-        currentTitle={product.name}
       />
       <Row className="mb-3">
         <Col md={12}>
@@ -269,11 +267,6 @@ const ProductView: React.FC = () => {
                 <Badge bg={product.active ? "success" : "danger"}>
                   {product.active ? "Active" : "Inactive"}
                 </Badge>
-                {product.profit_margin && (
-                  <Badge bg="info">
-                    Profit: {product.profit_margin.toFixed(1)}%
-                  </Badge>
-                )}
               </div>
             </CardBody>
           </Card>
@@ -322,9 +315,9 @@ const ProductView: React.FC = () => {
                             <small className="text-muted">{variant.sku}</small>
                           </td>
                           <td>
-                            <span className={variant.price_adjustment >= 0 ? "text-success" : "text-danger"}>
-                              {variant.price_adjustment >= 0 ? "+" : ""}
-                              {formatCurrency(variant.price_adjustment)}
+                            <span className={typeof variant.price_adjustment === "number" && variant.price_adjustment >= 0 ? "text-success" : "text-danger"}>
+                              {typeof variant.price_adjustment === "number" && variant.price_adjustment >= 0 ? "+" : ""}
+                              {formatCurrency(typeof variant.price_adjustment === "number" ? variant.price_adjustment : 0)}
                             </span>
                           </td>
                           <td>
@@ -412,7 +405,7 @@ const ProductView: React.FC = () => {
                 <div>
                   <div className="fw-medium">Total Quantity</div>
                   <div className="text-muted">
-                    {product.total_available_quantity || product.available_quantity}
+                    {product.available_quantity}
                   </div>
                 </div>
               </div>

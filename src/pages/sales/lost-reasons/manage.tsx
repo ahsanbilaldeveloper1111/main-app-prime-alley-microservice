@@ -115,8 +115,6 @@ const ManageLostReason: React.FC = () => {
         mainTitle="Sales"
         mainLink="/sales"
         subTitle="Lost Reasons"
-        subLink="/sales/lost-reasons"
-        currentTitle={isEditMode ? "Edit" : "Create"}
       />
       <Row className="mb-3">
         <Col md={12}>
