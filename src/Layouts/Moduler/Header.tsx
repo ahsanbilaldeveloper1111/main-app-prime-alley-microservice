@@ -1040,12 +1040,36 @@ const Header = ({ themeMode }: any) => {
 
                             {/* tab pane start */}
                             <div className="tab-pane" id="pc-tab-7" role="tabpanel" aria-labelledby="pc-tab-link-7" tabIndex={7}>
-                                <div className="pc-submenu-title">Crm</div>
+                                <div className="pc-submenu-title">CRM</div>
                                 <ul className="pc-navbar">
                                     <li className="pc-item">
-                                        <Link className="pc-link" href={`${baseUrl}/coming-soon`}>
-                                            <span className="pc-micon"><i className="ph-duotone ph-link"></i></span>
-                                            <span className="pc-mtext">Crm</span>
+                                        <Link className="pc-link" href={`${baseUrl}/crm`}>
+                                            <span className="pc-micon"><i className="ph-duotone ph-gauge"></i></span>
+                                            <span className="pc-mtext">Dashboard</span>
+                                        </Link>
+                                    </li>
+                                    <li className="pc-item">
+                                        <Link className="pc-link" href={`${baseUrl}/crm/leads`}>
+                                            <span className="pc-micon"><i className="ph-duotone ph-users"></i></span>
+                                            <span className="pc-mtext">Leads</span>
+                                        </Link>
+                                    </li>
+                                    <li className="pc-item">
+                                        <Link className="pc-link" href={`${baseUrl}/crm/opportunities`}>
+                                            <span className="pc-micon"><i className="ph-duotone ph-target"></i></span>
+                                            <span className="pc-mtext">Opportunities</span>
+                                        </Link>
+                                    </li>
+                                    <li className="pc-item">
+                                        <Link className="pc-link" href={`${baseUrl}/crm/stages`}>
+                                            <span className="pc-micon"><i className="ph-duotone ph-trending-up"></i></span>
+                                            <span className="pc-mtext">Stages</span>
+                                        </Link>
+                                    </li>
+                                    <li className="pc-item">
+                                        <Link className="pc-link" href={`${baseUrl}/crm/lost-reasons`}>
+                                            <span className="pc-micon"><i className="ph-duotone ph-x-circle"></i></span>
+                                            <span className="pc-mtext">Lost Reasons</span>
                                         </Link>
                                     </li>
                                 </ul>
