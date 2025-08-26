@@ -229,8 +229,6 @@ const EditLead = () => {
         mainTitle="CRM"
         mainLink="/crm/dashboard"
         subTitle="Leads"
-        subLink="/crm/leads"
-        currentTitle="Edit Lead"
       />
 
       <div className="container-fluid">

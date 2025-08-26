@@ -62,7 +62,7 @@ const ViewLead = () => {
 
   const fetchMeetings = async () => {
     try {
-      const meetingsData = await getMeetings({ lead_id: Number(id) });
+      const meetingsData: any = await getMeetings({ lead_id: Number(id) });
       console.log("Meetings API response:", meetingsData);
       
       // Handle different response structures

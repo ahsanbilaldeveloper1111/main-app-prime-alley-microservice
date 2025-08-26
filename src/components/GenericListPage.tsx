@@ -75,6 +75,7 @@ const GenericListPage: React.FC<GenericListPageProps> = ({
                 perPage: defaultPageSize,
             });
         } finally {
+            console.log("HERE???? REDASDA")
             setLoading(false);
         }
     }, [fetchData, defaultPageSize]);

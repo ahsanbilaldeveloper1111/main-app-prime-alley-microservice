@@ -61,7 +61,7 @@ const LostReasonsManagement = () => {
       setLoading(true);
       const reasonsData = await getLostReasons();
       console.log("ZE LOST REASONS DATA", reasonsData);
-      setLostReasons(reasonsData || []);
+      setLostReasons(reasonsData as any || []);
     } catch (error) {
       console.error("Failed to fetch lost reasons:", error);
       toast.error("Failed to fetch lost reasons");
@@ -178,7 +178,6 @@ const LostReasonsManagement = () => {
         mainTitle="CRM"
         mainLink="/crm/dashboard"
         subTitle="Lost Reasons"
-        currentTitle="Lost Reasons Management"
       />
 
       <div className="container-fluid">

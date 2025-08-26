@@ -611,7 +611,7 @@ const Header = ({ themeMode }: any) => {
                                                 className={`pc-link nav-link${router.asPath.includes('sales') ? ' active' : ''}`} 
                                                 href="#!"  id="pc-tab-link-8" data-bs-target="#pc-tab-8" role="tab" data-bs-toggle="tab" aria-selected="false">
                                                 <span className="pc-micon">
-                                                    <i className="ph-duotone ph-link"></i>
+                                                    <i className="ph-duotone ph-shopping-cart"></i>
                                                 </span>
                                                 <span className="pc-mtext">Sales</span>
                                                 </Link>
@@ -1077,13 +1077,37 @@ const Header = ({ themeMode }: any) => {
                             {/* tab pane end */}
 
                             {/* tab pane start */}
-                            <div className="tab-pane" id="pc-tab-8" role="tabpanel" aria-labelledby="pc-tab-link-7" tabIndex={7}>
+                            <div className="tab-pane" id="pc-tab-8" role="tabpanel" aria-labelledby="pc-tab-link-8" tabIndex={8}>
                                 <div className="pc-submenu-title">Sales</div>
                                 <ul className="pc-navbar">
                                     <li className="pc-item">
-                                        <Link className="pc-link" href={`${baseUrl}/coming-soon`}>
-                                            <span className="pc-micon"><i className="ph-duotone ph-link"></i></span>
-                                            <span className="pc-mtext">Sales</span>
+                                        <Link className="pc-link" href={`${baseUrl}/sales`}>
+                                            <span className="pc-micon"><i className="ph-duotone ph-gauge"></i></span>
+                                            <span className="pc-mtext">Dashboard</span>
+                                        </Link>
+                                    </li>
+                                    <li className="pc-item">
+                                        <Link className="pc-link" href={`${baseUrl}/sales/orders`}>
+                                            <span className="pc-micon"><i className="ph-duotone ph-shopping-cart"></i></span>
+                                            <span className="pc-mtext">Orders</span>
+                                        </Link>
+                                    </li>
+                                    <li className="pc-item">
+                                        <Link className="pc-link" href={`${baseUrl}/sales/products`}>
+                                            <span className="pc-micon"><i className="ph-duotone ph-package"></i></span>
+                                            <span className="pc-mtext">Products</span>
+                                        </Link>
+                                    </li>
+                                    <li className="pc-item">
+                                        <Link className="pc-link" href={`${baseUrl}/sales/stages`}>
+                                            <span className="pc-micon"><i className="ph-duotone ph-trending-up"></i></span>
+                                            <span className="pc-mtext">Order Stages</span>
+                                        </Link>
+                                    </li>
+                                    <li className="pc-item">
+                                        <Link className="pc-link" href={`${baseUrl}/sales/lost-reasons`}>
+                                            <span className="pc-micon"><i className="ph-duotone ph-x-circle"></i></span>
+                                            <span className="pc-mtext">Lost Reasons</span>
                                         </Link>
                                     </li>
                                 </ul>

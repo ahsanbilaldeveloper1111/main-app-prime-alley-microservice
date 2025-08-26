@@ -67,7 +67,7 @@ const StagesManagement = () => {
       setLoading(true);
       const stagesData = await getStages();
       console.log("ZE STAGES DATA", stagesData);
-      setStages(stagesData || []);
+      setStages(stagesData as any || []);
     } catch (error) {
       console.error("Failed to fetch stages:", error);
       toast.error("Failed to fetch stages");
@@ -155,7 +155,6 @@ const StagesManagement = () => {
         mainTitle="CRM"
         mainLink="/crm/dashboard"
         subTitle="Stages"
-        currentTitle="Stages Management"
       />
 
       <div className="container-fluid">
