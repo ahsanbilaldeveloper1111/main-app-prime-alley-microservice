@@ -1,51 +1,6 @@
 import { Client } from '@stomp/stompjs';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-/**
- * CTI STOMP Hook with Call State Persistence
- * 
- * This hook provides WebSocket connectivity to a CTI server and automatically
- * persists call states to localStorage to maintain call information across
- * page refreshes and browser sessions.
- * 
- * Key Features:
- * - Automatic persistence of incoming and connected call states
- * - Call state restoration on page refresh/reload
- * - Automatic cleanup of expired call states (24-hour expiry)
- * - Synchronization with server state on reconnection
- * - Debug information and manual control functions
- * 
- * Call States Persisted:
- * - CONNECTED: Active calls that are connected
- * - RETRIEVED: Calls that have been retrieved/answered
- * 
- * Call States NOT Persisted:
- * - RINGING: Incoming calls that are ringing
- * - ON_HOLD: Calls that are on hold
- * - ANSWERED: Calls that have been answered (but not yet connected)
- * - DROPPED: Terminated calls
- * - DISCONNECTED: Disconnected calls
- * - Any call marked as isTerminating: true
- * 
- * Usage:
- * ```tsx
- * const {
- *   callStateMap,
- *   hasActiveCalls,
- *   getDnCallState,
- *   syncPersistedCallStates,
- *   clearExpiredCallStates
- * } = useCtiStomp();
- * 
- * // Call states are automatically persisted and restored
- * // Manual sync with server (optional)
- * syncPersistedCallStates();
- * 
- * // Manual cleanup (optional)
- * clearExpiredCallStates();
- * ```
- */
-
 interface CtiDevice {
   dn: string;
   deviceName: string;
@@ -311,7 +266,7 @@ export default function useCtiStomp(wsPath = '/ws') {
         if (response.ok) {
           const data = await response.json();
           const token = data.token || data.accessToken || data.bearerToken;
-          const userAddress = data.userAddress || data.user_address || '108'; // Get from response, fallback to '101'
+          const userAddress = data.userAddress || data.user_address
           
           if (token && userAddress) {
             return { token, userAddress };
@@ -345,7 +300,7 @@ export default function useCtiStomp(wsPath = '/ws') {
         heartbeatIncoming: 4000,
         heartbeatOutgoing: 4000,
         debug: function (str) {
-          console.log('STOMP Debug:', str);
+          //console.log('STOMP Debug:', str);
         }
       });
 
@@ -360,11 +315,11 @@ export default function useCtiStomp(wsPath = '/ws') {
           
           client.subscribe('/user/topic/complete-state', ({ body }) => {
             try {
-              console.log('complete-state received:', body);
+              //console.log('complete-state received:', body);
               const payload = JSON.parse(body);
               console.log('Parsed payload:', payload);
-              console.log('Payload type:', typeof payload);
-              console.log('Is array?', Array.isArray(payload));
+              //console.log('Payload type:', typeof payload);
+              //console.log('Is array?', Array.isArray(payload));
               
               // Process the payload and update state
               const grouped = groupDevicesByDnAndDeviceName(payload);
@@ -373,7 +328,9 @@ export default function useCtiStomp(wsPath = '/ws') {
               
               setDnsMap(grouped);
               updateSummaryData(grouped);
-              console.log('Initial state processed successfully');
+              //console.log('Initial state processed successfully');
+              console.log('');
+              
               
               // Force a re-render by updating a state
               setEventLog(prev => [...prev, { type: 'initial-state', data: grouped, timestamp: new Date().toISOString() }]);
@@ -418,7 +375,7 @@ export default function useCtiStomp(wsPath = '/ws') {
             }
           }, { receipt: 'sub-1' });
           
-          console.log('All STOMP subscriptions set up successfully');
+          //console.log('All STOMP subscriptions set up successfully');
         } catch (err) {
           console.error('Error setting up subscriptions:', err);
           setError('Failed to setup subscriptions');
@@ -443,7 +400,7 @@ export default function useCtiStomp(wsPath = '/ws') {
       console.log('Initializing CTI STOMP connection...');
       const token = await getBearerToken();
       if (token) {
-        console.log('Bearer token received, connecting to STOMP...');
+        //console.log('Bearer token received, connecting to STOMP...');
         await connectWithToken(token.token, token.userAddress);
       } else {
         console.error('Failed to get bearer token from /api/cti/connect');

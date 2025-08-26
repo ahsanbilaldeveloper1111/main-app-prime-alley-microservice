@@ -203,6 +203,50 @@ export const mergeCalls = async (params: MergeCallsParams): Promise<DialResponse
   }
 }
 
+interface TransferCallParams {
+  callId: string
+  transferInitiatorAddress: string
+  transferInitiatorDeviceType: string
+  transferInitiatorDeviceName: string
+  transferAddress: string
+  targetAddress: string
+  mode: string
+}
+
+export const transferCalls = async (params: TransferCallParams): Promise<DialResponse> => {
+  try {
+    const response = await fetch('/api/cti/transferCall', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(params)
+    })
+
+    if (response.ok) {
+      const result = await response.json()
+      return {
+        success: true,
+        data: result,
+        message: 'Call transferred successfully'
+      }
+    } else {
+      const errorData = await response.json()
+      return {
+        success: false,
+        error: errorData.message || 'Failed to transfer call',
+        data: errorData
+      }
+    }
+  } catch (error) {
+    console.error('Error calling transfer-call API:', error)
+    return {
+      success: false,
+      error: 'Network error occurred while transferring call'
+    }
+  }
+}
+
 
 
 

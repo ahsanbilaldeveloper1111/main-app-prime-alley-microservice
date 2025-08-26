@@ -16,6 +16,7 @@ import { ApexOptions } from 'apexcharts'
 import { set } from 'nprogress'
 import Link from 'next/link'
 import { clearAllLocalStorage, getLocalStorageInfo } from '../../utils/localStorageUtils'
+import { useSession } from 'next-auth/react';
 
 const baseUrl = ''
 const ReactApexChart = dynamic(() => import('react-apexcharts'), { ssr: false })
@@ -34,6 +35,7 @@ interface DnData {
 }
 
 const CtiDashboard = () => {
+  const { data:session, status } = useSession();
   const {
     summaryData,
     dnsMap,
@@ -759,7 +761,7 @@ const CtiDashboard = () => {
           <div className="page-header-title d-flex justify-content-between">
             <h2 className="mb-0">CTI</h2>
             <div className="d-flex gap-2">
-              <Button
+              {/* <Button
                 variant="outline-info"
                 size="sm"
                 onClick={() => setShowDebugInfo(!showDebugInfo)}
@@ -767,7 +769,7 @@ const CtiDashboard = () => {
               >
                 <i className="material-icons-two-tone me-2">bug_report</i>
                 {showDebugInfo ? 'Hide Debug' : 'Show Debug'}
-              </Button>
+              </Button> */}
               
               {/* <Button
                 variant="primary"
@@ -778,6 +780,7 @@ const CtiDashboard = () => {
                 Dialer
               </Button> */}
 
+              {session?.user?.permissions?.includes('dial-call-cti') && (
               <Link 
                 href="/cti/dialer" 
                 target="_blank" 
@@ -787,7 +790,7 @@ const CtiDashboard = () => {
                 <i className="material-icons-two-tone me-2">open_in_new</i>
                 Dialer
               </Link>
-              
+              )}
 
             </div>
           </div>
