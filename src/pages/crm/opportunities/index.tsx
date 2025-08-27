@@ -3,7 +3,7 @@ import React, { ReactElement, useState, useCallback, useMemo } from 'react';
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
 import GenericListPage from '@components/GenericListPage';
-import { getOpportunities, deleteOpportunity } from '@utils/crm';
+import { getOpportunities, deleteOpportunity, deleteLead } from '@utils/crm';
 import { Column } from '@components/CustomDataTable';
 import { Button, Modal, Row, Col, Badge, Dropdown } from 'react-bootstrap';
 import { toast } from 'react-toastify';
@@ -177,13 +177,7 @@ const CrmOpportunities = () => {
     const confirmDeleteValue = confirmDelete.trim().toLowerCase();
     if (confirmDeleteValue === "delete") {
       try {
-        const response = await deleteOpportunity(selectedOpportunity.id);
-        if (response) {
-          setSelectedOpportunity(null);
-          setShowDeleteModal(false);
-          setConfirmDelete("");
-          setRefreshKey(prev => prev + 1);
-        }
+        const response = await deleteLead(selectedOpportunity.id);
       } catch (error) {
         console.error('Delete failed:', error);
       }
@@ -214,7 +208,6 @@ const CrmOpportunities = () => {
             <div>
               <Button 
                 variant="success" 
-                as={Link} 
                 href="/crm/leads/create"
                 className="d-flex align-items-center"
               >
@@ -225,7 +218,6 @@ const CrmOpportunities = () => {
             <div className="d-flex gap-2">
               <Button 
                 variant="outline-secondary" 
-                as={Link} 
                 href="/crm/opportunities/import"
                 size="sm"
               >
@@ -233,7 +225,6 @@ const CrmOpportunities = () => {
               </Button>
               <Button 
                 variant="outline-secondary" 
-                as={Link} 
                 href="/crm/opportunities/export"
                 size="sm"
               >
@@ -252,7 +243,6 @@ const CrmOpportunities = () => {
         defaultPageSize={15}
         filters={memoizedFilters}
         refreshKey={refreshKey}
-        onFiltersChange={handleFiltersChange}
       />
 
       {/* Delete Confirmation Modal */}
