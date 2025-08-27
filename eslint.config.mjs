@@ -25,7 +25,8 @@ const eslintConfig = [
       "react/display-name": "off",
       "@typescript-eslint/no-unused-expressions": "off",
       "@typescript-eslint/no-implicit-any-catch": "off",
-      "@typescript-eslint/no-implicit-any": "off"
+      "@typescript-eslint/no-implicit-any": "off",
+      "@typescript-eslint/no-empty-object-type": "off"
     }
   }
 ];

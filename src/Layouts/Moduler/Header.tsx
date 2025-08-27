@@ -1029,7 +1029,7 @@ const Header = ({ themeMode }: any) => {
                                 <div className="pc-submenu-title">TMS</div>
                                 <ul className="pc-navbar">
                                     <li className="pc-item">
-                                        <Link className="pc-link" href="https://crmstaging.sipzon.com:7529" target="_blank">
+                                        <Link className="pc-link" href={`${baseUrl}/coming-soon`}>
                                             <span className="pc-micon"><i className="ph-duotone ph-link"></i></span>
                                             <span className="pc-mtext">TMS</span>
                                         </Link>
@@ -1148,10 +1148,12 @@ const Header = ({ themeMode }: any) => {
                                 <div className="pc-submenu-title">DNCR</div>
                                 <ul className="pc-navbar">
                                     <li className="pc-item">
-                                        <Link className="pc-link" href={`${baseUrl}/coming-soon`}>
-                                            <span className="pc-micon"><i className="ph-duotone ph-link"></i></span>
-                                            <span className="pc-mtext">DNCR</span>
-                                        </Link>
+                                        {permissions.includes('check-numbers-dncr') && (
+                                            <Link className="pc-link" href={`${baseUrl}/dncr/check-number`}>
+                                                <span className="pc-micon"><i className="ph-duotone ph-phone-call"></i></span>
+                                                <span className="pc-mtext">Check Number</span>
+                                            </Link>
+                                        )}
                                     </li>
                                 </ul>
                             </div>
