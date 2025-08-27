@@ -134,10 +134,10 @@ export const getCrmDashboard = async (): Promise<DashboardData> => {
     const [leads, opportunities, meetings, stages] = await Promise.all([
       getLeads({ per_page: 1000 }),
       getOpportunities({ per_page: 1000 }),
-      getMeetings(),
+      getMeetings().then(meetings => meetings.data),
       getStages()
     ]);
-    
+    console.log("ZE MEETINGS", meetings);
     // Calculate dashboard data
     const totalLeads = leads?.total || 0;
     const totalOpportunities = opportunities?.total || 0;
@@ -146,9 +146,10 @@ export const getCrmDashboard = async (): Promise<DashboardData> => {
     // Group leads by stage
     const leadsByStage = stages.map((stage: StageData) => ({
       stage_name: stage.name,
-      count: leads.data.filter((lead: LeadData) => lead.stage_id === stage.id).length,
+      count: leads.data.filter((lead: LeadData) => lead.stage_id == stage.id).length,
       color: stage.color
     }));
+    console.log("ZE LEADS BY STAGE", leadsByStage, leads.data);
     
     // Get recent data
     const recentLeads = leads.data.slice(0, 5);
@@ -462,10 +463,12 @@ export const getLostLeads = async (
 // Meeting Management
 export const getMeetings = async (
   params: { lead_id?: number; extension?: string } = {}
-): Promise<MeetingData[]> => {
+): Promise<{
+  data: MeetingData[];
+}> => {
   try {
     const response = await axiosInstance.get("/crm/meetings", { params });
-    return extractData<MeetingData[]>(response.data);
+    return extractData<{data: MeetingData[]}>(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to fetch meetings");
     throw error;

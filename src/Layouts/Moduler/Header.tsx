@@ -1043,7 +1043,7 @@ const Header = ({ themeMode }: any) => {
                                 <div className="pc-submenu-title">CRM</div>
                                 <ul className="pc-navbar">
                                     <li className="pc-item">
-                                        <Link className="pc-link" href={`${baseUrl}/crm`}>
+                                        <Link className="pc-link" href={`${baseUrl}/crm/dashboard`}>
                                             <span className="pc-micon"><i className="ph-duotone ph-gauge"></i></span>
                                             <span className="pc-mtext">Dashboard</span>
                                         </Link>
