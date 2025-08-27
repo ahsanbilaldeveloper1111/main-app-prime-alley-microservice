@@ -2916,8 +2916,10 @@ const CtiDialer = () => {
                   
                   
                   <div className="popExtension">
-                    <input type="text" className="form-control" placeholder="Search extensions" onChange={(e) => setSearchFromPopExtensions(e.target.value)} />
-                    {getAvailableExtensionsForTransfer().map((extension) => (
+                    <input type="text" className="form-control" placeholder="Search extensions" onChange={(e) => setExtensionSearch(e.target.value)} />
+                    {getAvailableExtensionsForTransfer().filter(extension => 
+                      extension.toLowerCase().includes(extensionSearch.toLowerCase())
+                    ).map((extension) => (
                       <div key={extension} className="col-4 popExtensioList">
                         <button
                           type="button"
