@@ -69,6 +69,32 @@ const Ranks = () => {
             return;
         }
         
+        // Additional file validation
+        if (!(bulkFile instanceof File)) {
+            toast.error('Invalid file object');
+            return;
+        }
+        
+        if (bulkFile.size === 0) {
+            toast.error('The selected file is empty');
+            return;
+        }
+        
+        // Check file size (limit to 10MB)
+        const maxSize = 10 * 1024 * 1024; // 10MB
+        if (bulkFile.size > maxSize) {
+            toast.error('File size must be less than 10MB');
+            return;
+        }
+        
+        // Validate file extension
+        const fileExtension = bulkFile.name.toLowerCase().substring(bulkFile.name.lastIndexOf('.'));
+        const allowedExtensions = ['.csv'];
+        if (!allowedExtensions.includes(fileExtension)) {
+            toast.error(`Invalid file type. Please use: ${allowedExtensions.join(', ')}`);
+            return;
+        }
+        
         setIsUploading(true);
         setBulkResults(null);
         
@@ -86,13 +112,23 @@ const Ranks = () => {
             console.log(response);
             if(response){
                 setBulkResults(response);
+
+                
                 setShowBulkUploadModal(false);
-                toast.success('Bulk upload completed successfully!');
             }
             
              
-        } catch (error) {
-            toast.error('Error during bulk upload');
+        } catch (error: any) {
+            console.error('Bulk upload error:', error);
+            
+            // Show more specific error messages
+            if (error.response?.data?.message) {
+                toast.error(error.response.data.message);
+            } else if (error.message) {
+                toast.error(`Upload failed: ${error.message}`);
+            } else {
+                toast.error('Error during bulk upload');
+            }
         } finally {
             setIsUploading(false);
         }
@@ -106,9 +142,15 @@ const Ranks = () => {
 0556960535
 0556930017
 0557067850
-0509380627`;
+0509380627
+0551234567
+0559876543`;
         
-        const blob = new Blob([sampleData], { type: 'text/csv' });
+        // Ensure proper CSV formatting with BOM for Excel compatibility
+        const BOM = '\uFEFF';
+        const csvContent = BOM + sampleData;
+        
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8' });
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
@@ -124,7 +166,37 @@ const Ranks = () => {
         e.preventDefault();
         const files = e.dataTransfer.files;
         if (files.length > 0) {
-            setBulkFile(files[0]);
+            const file = files[0];
+            
+            // Validate file object
+            if (!(file instanceof File)) {
+                toast.error('Invalid file object');
+                return;
+            }
+            
+            const allowedExtensions = ['.csv'];
+            
+            // Check file extension
+            const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
+            if (!allowedExtensions.includes(fileExtension)) {
+                toast.error('Please select a valid file type (CSV, XLSX, or XLS)');
+                return;
+            }
+            
+            // Additional validation
+            if (file.size === 0) {
+                toast.error('The selected file is empty');
+                return;
+            }
+            
+            const maxSize = 10 * 1024 * 1024; // 10MB
+            if (file.size > maxSize) {
+                toast.error('File size must be less than 10MB');
+                return;
+            }
+            
+            setBulkFile(file);
+            toast.success(`File "${file.name}" selected successfully`);
         }
     };
 
@@ -132,7 +204,35 @@ const Ranks = () => {
     const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = e.target.files;
         if (files && files.length > 0) {
-            setBulkFile(files[0]);
+            const file = files[0];
+            
+            // Validate file object
+            if (!(file instanceof File)) {
+                toast.error('Invalid file object');
+                return;
+            }
+            
+            const allowedTypes = [
+                'text/csv',
+                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
+                'application/vnd.ms-excel' // .xls
+            ];
+            const allowedExtensions = ['.csv'];
+            
+            // Check file extension
+            const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
+            if (!allowedExtensions.includes(fileExtension)) {
+                toast.error('Please select a valid file type (CSV)');
+                return;
+            }
+            
+            // Check MIME type (optional, as some systems may not report MIME types correctly)
+            if (file.type && !allowedTypes.includes(file.type)) {
+                console.warn('File MIME type validation failed, but proceeding with extension validation');
+            }
+            
+            setBulkFile(file);
+            //toast.success(`File "${file.name}" selected successfully`);
         }
     };
 
@@ -145,6 +245,16 @@ const Ranks = () => {
     const isValidPhoneNumber = (value: string): boolean => {
         const phoneRegex = /^[\d\s\-\+\(\)]+$/;
         return phoneRegex.test(value);
+    };
+
+    // Clear all form data and results
+    const handleClearAll = () => {
+        setPhoneNumber('');
+        setCheckResult(null);
+        setBulkFile(null);
+        setBulkResults(null);
+        setIsChecking(false);
+        setIsUploading(false);
     };
 
     return (
@@ -204,8 +314,8 @@ const Ranks = () => {
                                             
                                         </div>
                                     </Col>
-                                    <Col md={3}>
-                                        <div className="form-group">
+                                    <Col md={6}>
+                                        <div className="form-group d-flex gap-2">
                                             <Button 
                                                 type="submit" 
                                                 variant="primary" 
@@ -214,7 +324,7 @@ const Ranks = () => {
                                             >
                                                 {isChecking ? 'Checking...' : 'Check Number Status'}
                                             </Button>
-                                            <Button variant="outline-primary" size="lg" className="ms-2" onClick={() => setPhoneNumber('')}>Clear</Button>
+                                            <Button variant="outline-primary" size="lg" className="ms-2" onClick={handleClearAll}>Clear All</Button>
                                         </div>
                                     </Col>
                                 </div>
@@ -265,12 +375,6 @@ const Ranks = () => {
                             {/* Bulk Results Table */}
                             {bulkResults && (
                                 <div className="mt-4">
-                                    <div className="alert alert-info">
-                                        <h6 className="alert-heading">Bulk Upload Results</h6>
-                                        <p className="mb-0">
-                                            Processed <strong>{Object.keys(bulkResults).length}</strong> phone number(s) from bulk upload
-                                        </p>
-                                    </div>
                                     
                                     <div className="table-responsive">
                                         <table className="table table-bordered table-striped">
@@ -292,13 +396,13 @@ const Ranks = () => {
                                                                 {data.status === "TRUE" ? "Registered" : "Not Registered"}
                                                             </span>
                                                         </td>
-                                                        <td>{data.details.accountNumber}</td>
+                                                        <td>{data.accountNumber}</td>
                                                         <td>
-                                                            <span className={`badge ${data.details.dncrStatus === "TRUE" ? "bg-success" : "bg-danger"}`}>
-                                                                {data.details.dncrStatus === "TRUE" ? "Active" : "Inactive"}
+                                                            <span className={`badge ${data.dncrStatus === "TRUE" ? "bg-success" : "bg-danger"}`}>
+                                                                {data.dncrStatus === "TRUE" ? "Active" : "Inactive"}
                                                             </span>
                                                         </td>
-                                                        <td>{data.details.transactionStatus || "N/A"}</td>
+                                                        <td>{data.transactionStatus || "N/A"}</td>
                                                     </tr>
                                                 ))}
                                             </tbody>
@@ -357,6 +461,8 @@ const Ranks = () => {
                                 <div>
                                     <i className="fas fa-cloud-upload-alt text-muted fa-2x mb-2"></i>
                                     <p className="mb-1">Drag and drop your CSV file here</p>
+
+                                    
                                     <p className="text-muted mb-2">or</p>
                                     <Form.Control
                                         type="file"
@@ -370,7 +476,7 @@ const Ranks = () => {
                                         size="sm"
                                         onClick={() => document.getElementById('bulk-file-input')?.click()}
                                     >
-                                        Browse Files
+                                        Browse File
                                     </Button>
                                 </div>
                             )}
@@ -386,7 +492,7 @@ const Ranks = () => {
                                 onClick={downloadSampleFile}
                             >
                                 <i className="fas fa-download me-2"></i>
-                                Download Sample CSV
+                                Download Sample File
                             </Button>
                         </div>
                         <div>
