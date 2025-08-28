@@ -31,8 +31,6 @@ const TmsRankPermissions = () => {
   const [refreshKey, setRefreshKey] = useState<number>(0);
   const [currentFilters, setCurrentFilters] = useState({});
 
-  ;
-
   const columns: Column[] = useMemo(
     () => [
       {key: "id",name: "ID",selector: (row: any) => row.id,sortable: true},

@@ -31,7 +31,6 @@ const TmsAuditLogs = () => {
   const [refreshKey, setRefreshKey] = useState<number>(0);
   const [currentFilters, setCurrentFilters] = useState({});
 
-  ;
 
   const columns: Column[] = useMemo(
     () => [

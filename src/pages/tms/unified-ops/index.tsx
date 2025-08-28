@@ -31,8 +31,6 @@ const UnifiedOpsList = () => {
   const [refreshKey, setRefreshKey] = useState<number>(0);
   const [currentFilters, setCurrentFilters] = useState({});
 
-  ;
-
   const columns: Column[] = useMemo(
     () => [
       {key: "UserID",name: "User ID",selector: (row: any) => row.UserID,sortable: true},

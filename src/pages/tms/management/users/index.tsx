@@ -31,8 +31,6 @@ const TmsUserManagement = () => {
   const [refreshKey, setRefreshKey] = useState<number>(0);
   const [currentFilters, setCurrentFilters] = useState({});
 
-  ;
-
   const columns: Column[] = useMemo(
     () => [
       {key: "name",name: "Name",selector: (row: any) => row.name,sortable: true},

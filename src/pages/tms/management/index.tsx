@@ -29,10 +29,6 @@ const UnifiedOpsList = () => {
   const [refreshKey, setRefreshKey] = useState<number>(0);
   const [currentFilters, setCurrentFilters] = useState({});
 
-  ;
-
-
-
   return (
     <React.Fragment>
       <BreadcrumbItem

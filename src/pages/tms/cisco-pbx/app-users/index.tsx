@@ -44,8 +44,6 @@ const CiscoPbxAppUsers = () => {
   const [refreshKey, setRefreshKey] = useState<number>(0);
   const [currentFilters, setCurrentFilters] = useState({});
 
-  ;
-
   const columns: Column[] = useMemo(
     () => [
       {key: "ClusterName",name: "Cluster Name",selector: (row: any) => row.ClusterName,sortable: true},
