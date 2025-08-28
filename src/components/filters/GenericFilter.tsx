@@ -463,7 +463,7 @@ export default function GenericFilter({
       
       case 'number':
         return (
-          <div key={field.name} className="d-flex gap-2">
+          <div key={field.name} className="d-flex gap-2 ">
             <div className="w-100">
               <label className="form-label mb-1">{field.label}</label>
               <input

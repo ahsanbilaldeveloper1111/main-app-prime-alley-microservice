@@ -4,18 +4,9 @@ import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import { createLead, getStages, StageData } from "@utils/crm";
 import { GetHierarchyData } from "@utils/users";
-import {
-  Button,
-  Row,
-  Col,
-  Form,
-  Card,
-} from "react-bootstrap";
-import Select from 'react-select';
-import {
-  FiSave,
-  FiArrowLeft,
-} from "react-icons/fi";
+import { Button, Row, Col, Form, Card } from "react-bootstrap";
+import Select from "react-select";
+import { FiSave, FiArrowLeft } from "react-icons/fi";
 import Link from "next/link";
 import { toast } from "react-toastify";
 import { useRouter } from "next/router";
@@ -67,7 +58,11 @@ const CreateLead = () => {
     try {
       await createLead(formData);
       toast.success("Lead created successfully!");
-      router.push("/crm/leads");
+      if (formData.type === "lead") {
+        router.push("/crm/leads");
+      } else {
+        router.push("/crm/opportunities");
+      }
     } catch (error) {
       toast.error("Failed to create lead");
       console.error("Create lead error:", error);
@@ -77,9 +72,9 @@ const CreateLead = () => {
   };
 
   const handleInputChange = (field: string, value: any) => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [field]: value
+      [field]: value,
     }));
   };
 
@@ -98,7 +93,9 @@ const CreateLead = () => {
             <div className="d-flex justify-content-between align-items-center">
               <div>
                 <h1 className="h3 mb-0">Create New Lead</h1>
-                <p className="text-muted">Add a new lead to your CRM pipeline</p>
+                <p className="text-muted">
+                  Add a new lead to your CRM pipeline
+                </p>
               </div>
               <div>
                 <Link href="/crm/leads" className="btn btn-outline-secondary">
@@ -126,7 +123,9 @@ const CreateLead = () => {
                         <Form.Control
                           type="text"
                           value={formData.name}
-                          onChange={(e) => handleInputChange("name", e.target.value)}
+                          onChange={(e) =>
+                            handleInputChange("name", e.target.value)
+                          }
                           placeholder="Enter lead name"
                           required
                         />
@@ -140,15 +139,20 @@ const CreateLead = () => {
                             formData.user_extension
                               ? {
                                   value: formData.user_extension,
-                                  label: extensions.find(
-                                    (ext: any) =>
-                                      ext.id.toString() === formData.user_extension?.toString()
-                                  )?.display_name || "",
+                                  label:
+                                    extensions.find(
+                                      (ext: any) =>
+                                        ext.id.toString() ===
+                                        formData.user_extension?.toString()
+                                    )?.display_name || "",
                                 }
                               : null
                           }
                           onChange={(selectedOption: any) => {
-                            handleInputChange("user_extension", selectedOption?.value || null);
+                            handleInputChange(
+                              "user_extension",
+                              selectedOption?.value || null
+                            );
                           }}
                           options={extensions.map((extension: any) => ({
                             value: extension.id,
@@ -168,7 +172,9 @@ const CreateLead = () => {
                         <Form.Label>Type *</Form.Label>
                         <Form.Select
                           value={formData.type}
-                          onChange={(e) => handleInputChange("type", e.target.value)}
+                          onChange={(e) =>
+                            handleInputChange("type", e.target.value)
+                          }
                           required
                         >
                           <option value="lead">Lead</option>
@@ -181,7 +187,14 @@ const CreateLead = () => {
                         <Form.Label>Stage</Form.Label>
                         <Form.Select
                           value={formData.stage_id || ""}
-                          onChange={(e) => handleInputChange("stage_id", e.target.value ? Number(e.target.value) : undefined)}
+                          onChange={(e) =>
+                            handleInputChange(
+                              "stage_id",
+                              e.target.value
+                                ? Number(e.target.value)
+                                : undefined
+                            )
+                          }
                         >
                           <option value="">Select a stage</option>
                           {stages.map((stage) => (
@@ -200,21 +213,28 @@ const CreateLead = () => {
                       as="textarea"
                       rows={3}
                       value={formData.description}
-                      onChange={(e) => handleInputChange("description", e.target.value)}
+                      onChange={(e) =>
+                        handleInputChange("description", e.target.value)
+                      }
                       placeholder="Enter lead description"
                     />
                   </Form.Group>
 
                   <div className="d-flex gap-2">
                     <Button type="submit" variant="primary" disabled={loading}>
-                      {loading ? "Creating..." : (
+                      {loading ? (
+                        "Creating..."
+                      ) : (
                         <>
                           <FiSave className="me-2" />
                           Create Lead
                         </>
                       )}
                     </Button>
-                    <Link href="/crm/leads" className="btn btn-outline-secondary">
+                    <Link
+                      href="/crm/leads"
+                      className="btn btn-outline-secondary"
+                    >
                       Cancel
                     </Link>
                   </div>

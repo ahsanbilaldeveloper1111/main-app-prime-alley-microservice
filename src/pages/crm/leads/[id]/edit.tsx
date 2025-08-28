@@ -11,6 +11,7 @@ import {
   updateMeeting,
   deleteMeeting,
 } from "@utils/crm";
+import { GetHierarchyData } from "@utils/users";
 import {
   Button,
   Modal,
@@ -39,6 +40,8 @@ import {
 import Link from "next/link";
 import { toast } from "react-toastify";
 import { useRouter } from "next/router";
+import moment from "moment";
+import Select from "react-select";
 
 interface Meeting {
   id: number;
@@ -62,12 +65,12 @@ const EditLead = () => {
   const [editingMeeting, setEditingMeeting] = useState<Meeting | null>(null);
   const [meetingForm, setMeetingForm] = useState({
     name: "",
-    title: "",
     meeting_date: "",
     meeting_time: "",
     status: "scheduled",
     extensions: [""],
   });
+  const [extensions, setExtensions] = useState<any[]>([]);
 
   // Fetch lead data, stages, and meetings
   useEffect(() => {
@@ -75,6 +78,7 @@ const EditLead = () => {
       fetchLeadData();
       fetchStages();
       fetchMeetings();
+      fetchExtensions();
     }
   }, [id]);
 
@@ -105,6 +109,17 @@ const EditLead = () => {
       setMeetings(meetingsData?.data || []);
     } catch (error) {
       console.error("Failed to fetch meetings:", error);
+    }
+  };
+
+  const fetchExtensions = async () => {
+    try {
+      const hierarchyData = await GetHierarchyData();
+      if (hierarchyData?.extensions) {
+        setExtensions(hierarchyData.extensions);
+      }
+    } catch (error) {
+      console.error("Failed to fetch extensions:", error);
     }
   };
 
@@ -153,7 +168,6 @@ const EditLead = () => {
       setEditingMeeting(null);
       setMeetingForm({
         name: "",
-        title: "",
         meeting_date: "",
         meeting_time: "",
         status: "scheduled",
@@ -278,13 +292,30 @@ const EditLead = () => {
 
                   <Form.Group className="mb-3">
                     <Form.Label>User Extension</Form.Label>
-                    <Form.Control
-                      type="text"
-                      value={lead.user_extension || ""}
-                      onChange={(e) =>
-                        setLead({ ...lead, user_extension: e.target.value })
+                    <Select
+                      value={
+                        lead.user_extension
+                          ? {
+                              value: lead.user_extension,
+                              label:
+                                extensions?.find(
+                                  (ext: any) =>
+                                    ext.id.toString() ===
+                                    lead.user_extension?.toString()
+                                )?.display_name || "",
+                            }
+                          : null
                       }
-                      maxLength={15}
+                      onChange={(selectedOption: any) => {
+                        setLead({ ...lead, user_extension: selectedOption?.value || null });
+                      }}
+                      options={extensions?.map((extension: any) => ({
+                        value: extension.id,
+                        label: extension.display_name,
+                      })) || []}
+                      placeholder="Select User Extension (Optional)"
+                      isClearable
+                      isSearchable
                     />
                   </Form.Group>
 
@@ -428,7 +459,6 @@ const EditLead = () => {
                                         setEditingMeeting(meeting);
                                         setMeetingForm({
                                           name: meeting.name,
-                                          title: meeting.title,
                                           meeting_date: meeting.meeting_date,
                                           meeting_time: meeting.meeting_time,
                                           status: meeting.status,
@@ -493,19 +523,6 @@ const EditLead = () => {
                   />
                 </Form.Group>
               </Col>
-              <Col md={6}>
-                <Form.Group className="mb-3">
-                  <Form.Label>Title *</Form.Label>
-                  <Form.Control
-                    type="text"
-                    value={meetingForm.title}
-                    onChange={(e) =>
-                      setMeetingForm({ ...meetingForm, title: e.target.value })
-                    }
-                    required
-                  />
-                </Form.Group>
-              </Col>
             </Row>
 
             <Row>
@@ -514,7 +531,7 @@ const EditLead = () => {
                   <Form.Label>Meeting Date *</Form.Label>
                   <Form.Control
                     type="date"
-                    value={meetingForm.meeting_date}
+                    value={moment(meetingForm.meeting_date).format("YYYY-MM-DD")}
                     onChange={(e) =>
                       setMeetingForm({
                         ...meetingForm,
@@ -561,12 +578,27 @@ const EditLead = () => {
               <Form.Label>Extensions *</Form.Label>
               {meetingForm.extensions.map((extension, index) => (
                 <div key={index} className="d-flex gap-2 mb-2">
-                  <Form.Control
-                    type="text"
-                    value={extension}
-                    onChange={(e) => updateExtension(index, e.target.value)}
-                    placeholder="Enter extension"
-                    maxLength={15}
+                  <Select
+                    value={
+                      extension
+                        ? {
+                            value: extension,
+                            label:
+                              extensions?.find(
+                                (ext: any) =>
+                                  ext.id.toString() === extension.toString()
+                              )?.display_name || "",
+                          }
+                        : null
+                    }
+                    onChange={(selectedOption: any) => updateExtension(index, selectedOption?.value || "")}
+                    options={extensions?.map((ext: any) => ({
+                      value: ext.id,
+                      label: ext.display_name,
+                    })) || []}
+                    placeholder="Select Extension"
+                    isClearable
+                    isSearchable
                     required
                   />
                   {meetingForm.extensions.length > 1 && (

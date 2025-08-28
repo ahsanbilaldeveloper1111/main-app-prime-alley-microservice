@@ -11,6 +11,7 @@ interface GenericListPageProps {
     filters?: any;
     refreshKey?: number;
     search?: boolean;
+    pagination?: boolean;
 }
 
 const GenericListPage: React.FC<GenericListPageProps> = ({
@@ -23,6 +24,7 @@ const GenericListPage: React.FC<GenericListPageProps> = ({
     filters = {},
     refreshKey = 0,
     search = true,
+    pagination=true
 }) => {
     const [data, setData] = useState<any[]>([]);
     const [loading, setLoading] = useState<boolean>(false);
@@ -113,6 +115,8 @@ const GenericListPage: React.FC<GenericListPageProps> = ({
             onPerPageChange={handlePerPageChange}
             onSearch={handleSearch}
             showSearch={search}
+            pagination={pagination}
+            showPageSizeSelector={pagination}
         />
     );
 };

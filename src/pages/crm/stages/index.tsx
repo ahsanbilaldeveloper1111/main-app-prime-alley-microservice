@@ -1,8 +1,10 @@
 import "@assets/scss/datatable-style.scss";
-import React, { ReactElement, useState, useCallback, useEffect } from "react";
+import React, { ReactElement, useState, useCallback, useMemo } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
+import GenericListPage from "@components/GenericListPage";
 import { getStages, createStage, deleteStage } from "@utils/crm";
+import { Column } from "@components/CustomDataTable";
 import {
   Button,
   Modal,
@@ -10,17 +12,12 @@ import {
   Col,
   Badge,
   Form,
-  Card,
-  Table,
   Alert,
 } from "react-bootstrap";
 import {
-  FiEdit,
   FiTrash2,
   FiPlus,
   FiSave,
-  FiXCircle,
-  FiCheckCircle,
 } from "react-icons/fi";
 import { toast } from "react-toastify";
 
@@ -40,11 +37,10 @@ interface Stage {
 }
 
 const StagesManagement = () => {
-  const [stages, setStages] = useState<Stage[]>([]);
-  const [loading, setLoading] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [stageToDelete, setStageToDelete] = useState<Stage | null>(null);
+  const [refreshKey, setRefreshKey] = useState<number>(0);
   const [formData, setFormData] = useState({
     name: "",
     sequence: 1,
@@ -57,28 +53,45 @@ const StagesManagement = () => {
     active: true,
   });
 
-  // Fetch stages on component mount
-  useEffect(() => {
-    fetchStages();
-  }, []);
 
-  const fetchStages = async () => {
-    try {
-      setLoading(true);
-      const stagesData = await getStages();
-      console.log("ZE STAGES DATA", stagesData);
-      setStages(stagesData as any || []);
-    } catch (error) {
-      console.error("Failed to fetch stages:", error);
-      toast.error("Failed to fetch stages");
-    } finally {
-      setLoading(false);
-    }
-  };
+
+  const fetchStagesForTable = useCallback(
+    async (page = 1, perPage = 15, search = "") => {
+      try {
+        const stagesData = await getStages();
+        const filteredStages = stagesData.filter((stage) => {
+          if (!search) return true;
+          return !!stage.name.toLowerCase().includes(search.toLowerCase()) ||
+                 !!stage.description?.toLowerCase().includes(search.toLowerCase());
+        });
+        
+        return {
+          dataList: filteredStages,
+          meta: {
+            total: filteredStages.length,
+            current_page: page,
+            per_page: perPage,
+            last_page: Math.ceil(filteredStages.length / perPage),
+          },
+        };
+      } catch (error) {
+        console.error("Failed to fetch stages:", error);
+        return {
+          dataList: [],
+          meta: {
+            total: 0,
+            current_page: page,
+            per_page: perPage,
+            last_page: 1,
+          },
+        };
+      }
+    },
+    []
+  );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
 
     try {
       await createStage(formData);
@@ -95,12 +108,10 @@ const StagesManagement = () => {
         is_default: false,
         active: true,
       });
-      fetchStages();
+      setRefreshKey((oldKey) => oldKey + 1);
     } catch (error) {
       toast.error("Failed to create stage");
       console.error("Create stage error:", error);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -112,7 +123,7 @@ const StagesManagement = () => {
       toast.success("Stage deleted successfully!");
       setShowDeleteModal(false);
       setStageToDelete(null);
-      fetchStages();
+      setRefreshKey((oldKey) => oldKey + 1);
     } catch (error) {
       toast.error("Failed to delete stage");
       console.error("Delete stage error:", error);
@@ -139,15 +150,111 @@ const StagesManagement = () => {
     return <Badge bg="secondary">Active</Badge>;
   };
 
-  if (loading && stages.length === 0) {
-    return (
-      <div className="d-flex justify-content-center align-items-center" style={{ height: "400px" }}>
-        <div className="spinner-border" role="status">
-          <span className="visually-hidden">Loading...</span>
-        </div>
-      </div>
-    );
-  }
+  // Memoized columns for the table
+  const columns: Column[] = useMemo(
+    () => [
+      {
+        key: "name",
+        name: "Stage",
+        selector: (row: Stage) => row.name,
+        sortable: true,
+        cell: (props: Stage) => (
+          <div className="d-flex align-items-center">
+            <div
+              className="me-2"
+              style={{
+                width: "12px",
+                height: "12px",
+                backgroundColor: props.color,
+                borderRadius: "50%"
+              }}
+            />
+            <strong>{props.name}</strong>
+          </div>
+        ),
+      },
+      {
+        key: "sequence",
+        name: "Sequence",
+        selector: (row: Stage) => row.sequence,
+        sortable: true,
+        cell: (props: Stage) => (
+          <Badge bg="secondary">{props.sequence}</Badge>
+        ),
+      },
+      {
+        key: "color",
+        name: "Color",
+        selector: (row: Stage) => row.color,
+        sortable: false,
+        cell: (props: Stage) => (
+          <div className="d-flex align-items-center">
+            <div
+              className="me-2"
+              style={{
+                width: "20px",
+                height: "20px",
+                backgroundColor: props.color,
+                borderRadius: "4px"
+              }}
+            />
+            <small className="text-muted">{props.color}</small>
+          </div>
+        ),
+      },
+      {
+        key: "status",
+        name: "Status",
+        selector: (row: Stage) => row.is_won ? "won" : row.fold ? "fold" : row.is_default ? "default" : "active",
+        sortable: true,
+        cell: (props: Stage) => getStatusBadge(props),
+      },
+      {
+        key: "description",
+        name: "Description",
+        selector: (row: Stage) => row.description || "",
+        sortable: true,
+        cell: (props: Stage) => (
+          <small className="text-muted">
+            {props.description || "No description"}
+          </small>
+        ),
+      },
+      {
+        key: "created_at",
+        name: "Created",
+        selector: (row: Stage) => row.created_at,
+        sortable: true,
+        cell: (props: Stage) => (
+          <small className="text-muted">
+            {new Date(props.created_at).toLocaleDateString()}
+          </small>
+        ),
+      },
+      {
+        key: "actions",
+        name: "Actions",
+        selector: (row: Stage) => row.id,
+        sortable: false,
+        cell: (props: Stage) => (
+          <Button
+            variant="outline-danger"
+            size="sm"
+            onClick={() => {
+              setStageToDelete(props);
+              setShowDeleteModal(true);
+            }}
+            disabled={props.is_default}
+          >
+            <FiTrash2 />
+          </Button>
+        ),
+      },
+    ],
+    []
+  );
+
+  const filters = useMemo(() => ({}), []);
 
   return (
     <React.Fragment>
@@ -179,98 +286,16 @@ const StagesManagement = () => {
         {/* Stages List */}
         <div className="row">
           <div className="col-12">
-            <Card className="border-0 shadow-sm">
-              <Card.Body>
-                {stages.length === 0 ? (
-                  <div className="text-center py-4">
-                    <p className="text-muted">No stages found</p>
-                    <Button variant="primary" onClick={() => setShowCreateModal(true)}>
-                      <FiPlus className="me-2" />
-                      Create First Stage
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="table-responsive">
-                    <Table>
-                      <thead>
-                        <tr>
-                          <th>Stage</th>
-                          <th>Sequence</th>
-                          <th>Color</th>
-                          <th>Status</th>
-                          <th>Description</th>
-                          <th>Created</th>
-                          <th>Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {stages.map((stage) => (
-                          <tr key={stage.id}>
-                            <td>
-                              <div className="d-flex align-items-center">
-                                <div
-                                  className="me-2"
-                                  style={{
-                                    width: "12px",
-                                    height: "12px",
-                                    backgroundColor: stage.color,
-                                    borderRadius: "50%"
-                                  }}
-                                />
-                                <strong>{stage.name}</strong>
-                              </div>
-                            </td>
-                            <td>
-                              <Badge bg="secondary">{stage.sequence}</Badge>
-                            </td>
-                            <td>
-                              <div className="d-flex align-items-center">
-                                <div
-                                  className="me-2"
-                                  style={{
-                                    width: "20px",
-                                    height: "20px",
-                                    backgroundColor: stage.color,
-                                    borderRadius: "4px"
-                                  }}
-                                />
-                                <small className="text-muted">{stage.color}</small>
-                              </div>
-                            </td>
-                            <td>
-                              {getStatusBadge(stage)}
-                            </td>
-                            <td>
-                              <small className="text-muted">
-                                {stage.description || "No description"}
-                              </small>
-                            </td>
-                            <td>
-                              <small className="text-muted">
-                                {new Date(stage.created_at).toLocaleDateString()}
-                              </small>
-                            </td>
-                            <td>
-                              <Button
-                                variant="outline-danger"
-                                size="sm"
-                                onClick={() => {
-                                  setStageToDelete(stage);
-                                  setShowDeleteModal(true);
-                                }}
-                                disabled={stage.is_default}
-                              >
-                                <FiTrash2 />
-                              </Button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </Table>
-                  </div>
-                )}
-              </Card.Body>
-            </Card>
+            <GenericListPage
+              columns={columns}
+              fetchData={fetchStagesForTable}
+              title="Stages"
+              searchPlaceholder="Search stages..."
+              defaultPageSize={15}
+              refreshKey={refreshKey}
+              filters={filters}
+              pagination={false}
+            />
           </div>
         </div>
       </div>
@@ -374,13 +399,9 @@ const StagesManagement = () => {
           <Button variant="secondary" onClick={() => setShowCreateModal(false)}>
             Cancel
           </Button>
-          <Button type="submit" variant="primary" onClick={handleSubmit} disabled={loading}>
-            {loading ? "Creating..." : (
-              <>
-                <FiSave className="me-2" />
-                Create Stage
-              </>
-            )}
+          <Button type="submit" variant="primary" onClick={handleSubmit}>
+            <FiSave className="me-2" />
+            Create Stage
           </Button>
         </Modal.Footer>
       </Modal>
@@ -405,13 +426,9 @@ const StagesManagement = () => {
           <Button variant="secondary" onClick={() => setShowDeleteModal(false)}>
             Cancel
           </Button>
-          <Button variant="danger" onClick={handleDeleteStage} disabled={loading}>
-            {loading ? "Deleting..." : (
-              <>
-                <FiTrash2 className="me-2" />
-                Delete Stage
-              </>
-            )}
+          <Button variant="danger" onClick={handleDeleteStage}>
+            <FiTrash2 className="me-2" />
+            Delete Stage
           </Button>
         </Modal.Footer>
       </Modal>

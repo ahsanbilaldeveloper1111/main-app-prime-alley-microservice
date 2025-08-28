@@ -9,6 +9,7 @@ import React, {
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericListPage from "@components/GenericListPage";
+import CrmFilters from "@components/filters/CrmFilters";
 import {
   getLeads,
   deleteLead,
@@ -17,6 +18,7 @@ import {
   getStages,
   getLostReasons,
 } from "@utils/crm";
+import { GetHierarchyData } from "@utils/users";
 import { Column } from "@components/CustomDataTable";
 import {
   Button,
@@ -45,12 +47,21 @@ const CrmLeads = () => {
   const [lostReasons, setLostReasons] = useState<
     { id: number; name: string }[]
   >([]);
+  const [extensions, setExtensions] = useState<any[]>([]);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [currentFilters, setCurrentFilters] = useState<Record<string, any>>({});
 
   // Fetch stages and lost reasons on component mount
   useEffect(() => {
     fetchStages();
     fetchLostReasons();
+    fetchExtensions();
+  }, []);
+
+  // Handle filter changes
+  const handleFiltersChange = useCallback((filters: Record<string, any>) => {
+    setCurrentFilters(filters);
+    setRefreshKey((prev) => prev + 1);
   }, []);
 
   const fetchStages = async () => {
@@ -71,6 +82,17 @@ const CrmLeads = () => {
     }
   };
 
+  const fetchExtensions = async () => {
+    try {
+      const hierarchyData = await GetHierarchyData();
+      if (hierarchyData?.extensions) {
+        setExtensions(hierarchyData.extensions);
+      }
+    } catch (error) {
+      console.error("Failed to fetch extensions:", error);
+    }
+  };
+
   const fetchLeads = useCallback(
     async (page = 1, perPage = 15, search = "") => {
       const params: any = {
@@ -80,6 +102,14 @@ const CrmLeads = () => {
 
       if (search) {
         params.search = search;
+      }
+
+      // Add filter parameters at top level
+      if (currentFilters.stage_id) {
+        params.stage_id = currentFilters.stage_id;
+      }
+      if (currentFilters.is_lost !== undefined) {
+        params.is_lost = currentFilters.is_lost;
       }
 
       const response = await getLeads(params);
@@ -113,7 +143,7 @@ const CrmLeads = () => {
       console.log("Fallback data:", fallbackData);
       return fallbackData;
     },
-    [] // Empty dependency array since this function doesn't depend on any state
+    [currentFilters] // Add currentFilters as dependency
   );
 
   // Delete Lead Modal
@@ -239,7 +269,15 @@ const CrmLeads = () => {
         sortable: true,
         cell: (props: any) => (
           <div>
-            <div>Extension: {props.user_extension || "No Extension"}</div>
+            <div>
+              Extension:{" "}
+              {extensions.find(
+                (extension: any) =>
+                  extension.id.toString() === props.user_extension?.toString()
+              )?.display_name ||
+                props.user_extension ||
+                "No Extension"}
+            </div>
             <small className="text-muted">Type: {props.type || "lead"}</small>
           </div>
         ),
@@ -341,7 +379,7 @@ const CrmLeads = () => {
         ),
       },
     ],
-    [] // Remove dependencies to make it completely stable
+    [extensions]
   );
 
   return (
@@ -371,6 +409,11 @@ const CrmLeads = () => {
           </div>
         </div>
 
+        {/* CRM Filters */}
+        <div className="row mb-3">
+          <CrmFilters onFiltersChange={handleFiltersChange} />
+        </div>
+
         {/* Leads List */}
         <div className="row">
           <div className="col-12">
@@ -382,7 +425,7 @@ const CrmLeads = () => {
                   title="Leads"
                   searchPlaceholder="Search leads..."
                   defaultPageSize={15}
-                  filters={{}}
+                  filters={currentFilters}
                   refreshKey={refreshKey}
                 />
               </Card.Body>
