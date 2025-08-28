@@ -1,0 +1,70 @@
+a.btnServices{
+      background:white !important;
+      color:black !important;
+      border-radius:10px !important;
+      padding:10px 20px !important;
+      border:1px solid #d5d5d5 !important;
+      font-weight:600 !important;
+      font-size:1rem !important;
+      transition:all 0.3s ease !important;
+      &.active{
+          background:black !important;
+          color:white !important;
+      }
+  }
+
+
+  .dashboard-alert {
+      background: linear-gradient(to right bottom, rgba(79,70,229,0.85), rgba(99,102,241,0.85));
+      padding:20px;
+      color:white;
+      border-radius:20px;
+      min-height:230px;
+      display:flex;
+      flex-direction:column;
+      justify-content:center;
+      align-items:left;
+
+      h1{
+          color:white;
+          font-size: 2rem; font-weight: 700; margin-bottom: 1rem;
+      }
+      p{
+          color:white;
+          font-size: 1rem; margin-bottom: 1rem; color: #e0e7ff
+      }
+      .btn{
+          background:white;
+          color:white;
+          border-radius:10px;
+          padding:10px 20px;
+          background:  linear-gradient(90deg, #4f46e5, #6366f1);
+      }
+      .bt:hover{
+          background:white;
+          color:black;
+      }
+  }
+
+  .insights-box{
+      border-radius:20px;
+      height:140px;
+      display:flex;
+      flex-direction:column;
+      justify-content:center;
+      align-items:center;
+      
+  h2{
+          font-size: 1.5rem; font-weight: 700; margin-bottom: .5rem; color: #111827;
+      }
+          p{
+          font-size: .9rem; color:#6b7280;margin-top:5px;margin-bottom:0;
+          
+          }
+  }
+
+  .bg-success.service-badge {
+      background: #d3fbd5 !important;
+      color: #4CAF50;
+      font-weight: bold;
+  }

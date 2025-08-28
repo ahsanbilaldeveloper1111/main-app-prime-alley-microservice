@@ -4,6 +4,9 @@ import ImageStatus6 from '@assets/images/widget/img-status-6.svg'
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
+import { Button, Col, Row } from 'react-bootstrap';
+import AnimatedNumber from '@components/AnimatedNumber';
+import "@assets/scss/dashboard.scss";
 
 const Dashboard = () => {
     const { data: session, status } = useSession();
@@ -149,34 +152,77 @@ const Dashboard = () => {
         <React.Fragment>
             <div className="container-fluid px-4 py-5">
                 {/* Header Section */}
-                <div className="row mb-5">
+                <div className="row mb-2">
                     <div className="col-12">
                         <div className="d-flex align-items-center justify-content-between">
                             <div>
                                 <h1 className="display-6 fw-bold text-dark mb-2">Hello, {session?.user?.name || 'User'}</h1>
                                 <p className="text-muted fs-5">Welcome back! Here's an overview of your services.</p>
                             </div>
-                            {/* <div className="d-flex align-items-center">
-                                <div className="me-3">
-                                    <div className="d-flex align-items-center">
-                                        <div className="bg-primary rounded-circle d-flex align-items-center justify-content-center me-3" style={{width: '50px', height: '50px'}}>
-                                            <i className="fas fa-user text-white fs-5"></i>
-                                        </div>
-                                        <div>
-                                            <h6 className="mb-0 fw-semibold">{session?.user?.name || 'User'}</h6>
-                                            <small className="text-muted">{isAdmin ? 'Administrator' : 'User'}</small>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div> */}
+                            
                         </div>
                     </div>
                 </div>
+                
+                <Row className="mb-5">
+                    <Col md={12}>
+                        <div className="alert alert-primary dashboard-alert">
+                            <h1 className="alert-heading" style={{color:'white'}}>AI-Powered Insights for your business</h1>
+                            <p className="mb-3" style={{color:'white'}}>
+                                Transform your call operations with actionable analytics and automation designed for enterprise-grade performance.
+                            </p>
+                            <div>
+                            <button className="btn">Get Started</button>
+                            </div>
+                        </div>
+                    </Col>
+                </Row>
+
+
+                <Row className="">
+                    <Col md={12}>
+                        <h2 className="mb-4 f-w-600">Your Insights</h2>
+                    </Col>
+                    
+                    <Col md={4} className="mb-2">
+                        <div className="card text-center">
+                            <div className="card-body insights-box">
+                                <AnimatedNumber value={100} duration={1000} />
+                                <p>Card Text</p>
+                            </div>
+                        </div>
+                    </Col>
+
+                    <Col md={4} className="mb-2">
+                        <div className="card text-center">
+                            <div className="card-body insights-box">
+                                <AnimatedNumber value={100} duration={1000} />
+                                <p>Issue Pending</p>
+                            </div>
+                        </div>
+                    </Col>
+
+                    <Col md={4} className="mb-2">
+                        <div className="card text-center">
+                            <div className="card-body insights-box">
+                                <AnimatedNumber value={100} duration={1000} />
+                                <p>Uptime (this week)</p>
+                            </div>
+                        </div>
+                    </Col>
+
+                   
+                </Row>
 
                 {/* Service Cards Grid */}
                 <div className="row g-4">
+
+                <div className="col-xs-12">
+                    <h2 className="mb-2 f-w-600">Your Services</h2>
+                </div>
+
                     {serviceCards.map((service, index) => (
-                        <div key={service.id} className="col-lg-3 col-md-4 col-sm-6 col-xs-12">
+                        <div key={service.id} className="col-lg-4 col-md-4 col-sm-6 col-xs-12">
                             <div className={`card h-100 border-0 shadow-lg position-relative overflow-hidden transition-all duration-300 hover:shadow-xl ${
                                 permissions.includes(service.id) 
                                     ? `bg-gradient ${service.gradient} text-dark` 
@@ -194,22 +240,31 @@ const Dashboard = () => {
                                 e.currentTarget.style.transform = 'translateY(0)';
                             }}>
                                 
-                                <div className="card-body p-4 d-flex flex-column h-100 pt-5">
+                                <div className="card-body p-4 d-flex flex-column h-100">
                                     {/* Icon and Title */}
-                                    <div className="d-flex align-items-center mb-3">
-                                        <div>
-                                            <h4 className={`fw-bold mb-1 ${
+                                    <div className="d-block mb-3">
+                                        <div className="d-flex justify-content-between align-items-center">
+                                            <h4 className={`fw-bold mb-1  ${
                                                 permissions.includes(service.id) ? 'text-dark' : 'text-dark'
                                             }`}>
-                                                {service.title}
+                                                
+                                               {service.title}
                                             </h4>
-                                            <p className={`mb-0 ${
+
+                                            {permissions.includes(service.id) && (
+                                                    <span className="badge bg-success rounded-pill px-3 py-2 service-badge">
+                                                    <i className="fas fa-check me-1"></i>
+                                                    Active
+                                                </span>
+                                                )}
+                                        </div>
+                                    </div>
+
+                                    <p className={`mb-0 ${
                                                 permissions.includes(service.id) ? 'text-white-75' : 'text-muted'
                                             }`}>
                                                 {service.subtitle}
                                             </p>
-                                        </div>
-                                    </div>
 
                                     {/* Description */}
                                     <p className={`flex-grow-1 ${
@@ -219,89 +274,27 @@ const Dashboard = () => {
                                     </p>
 
                                     {/* Action Button */}
-                                    <div className="mt-4">
-                                        <Link href={service.link || ''} className={`btn w-100 fw-semibold px-4 py-3 border-0 ${
+                                    <div className="mt-4 text-left">
+                                        <Link href={service.link || ''} className={`btnServices ${
                                             permissions.includes(service.id)
-                                                ? 'btn-light text-dark'
-                                                : 'btn-primary'
+                                                ? ''
+                                                : ''
                                         }`}
-                                            style={{
-                                                borderRadius: '12px',
-                                                transition: 'all 0.3s ease'
-                                            }}
-                                            onMouseEnter={(e) => {
-                                                e.currentTarget.style.transform = 'scale(1.02)';
-                                            }}
-                                            onMouseLeave={(e) => {
-                                                e.currentTarget.style.transform = 'scale(1)';
-                                            }}>
-                                            <i className="fas fa-arrow-right me-2"></i>
-                                            View Details
+                                            >
+                                            
+                                            Open
                                         </Link>
                                     </div>
                                 </div>
 
-                                {/* Status Indicator */}
-                                {permissions.includes(service.id) && (
-                                    <div className="position-absolute top-3 start-3">
-                                        <span className="badge bg-success rounded-pill px-3 py-2">
-                                            <i className="fas fa-check me-1"></i>
-                                            Active
-                                        </span>
-                                    </div>
-                                )}
+                              
+                                
                             </div>
                         </div>
                     ))}
                 </div>
 
-                {/* Stats Section
-                <div className="row mt-5 g-4">
-                    <div className="col-12">
-                        <div className="card border-0 shadow-sm" style={{borderRadius: '20px'}}>
-                            <div className="card-body p-4">
-                                <h5 className="fw-bold text-dark mb-4">
-                                    <i className="fas fa-chart-line me-2 text-primary"></i>
-                                    Quick Statistics
-                                </h5>
-                                <div className="row g-4">
-                                    <div className="col-md-3 col-sm-6">
-                                        <div className="text-center p-3 rounded-3 bg-light">
-                                            <div className="fs-2 fw-bold text-primary mb-2">
-                                                {permissions.length}
-                                            </div>
-                                            <div className="text-muted">Active Services</div>
-                                        </div>
-                                    </div>
-                                    <div className="col-md-3 col-sm-6">
-                                        <div className="text-center p-3 rounded-3 bg-light">
-                                            <div className="fs-2 fw-bold text-success mb-2">
-                                                {isAdmin ? 'Full' : 'Limited'}
-                                            </div>
-                                            <div className="text-muted">Access Level</div>
-                                        </div>
-                                    </div>
-                                    <div className="col-md-3 col-sm-6">
-                                        <div className="text-center p-3 rounded-3 bg-light">
-                                            <div className="fs-2 fw-bold text-info mb-2">
-                                                {serviceCards.length}
-                                            </div>
-                                            <div className="text-muted">Total Services</div>
-                                        </div>
-                                    </div>
-                                    <div className="col-md-3 col-sm-6">
-                                        <div className="text-center p-3 rounded-3 bg-light">
-                                            <div className="fs-2 fw-bold text-warning mb-2">
-                                                {Math.round((permissions.length / serviceCards.length) * 100)}%
-                                            </div>
-                                            <div className="text-muted">Access Rate</div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div> */}
+              
             </div>
         </React.Fragment>
     )
