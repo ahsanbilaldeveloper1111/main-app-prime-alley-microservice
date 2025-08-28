@@ -535,13 +535,6 @@ const CreateOrder = () => {
                   <Col md={2}>
                     <Form.Group>
                       <Form.Label>Variant</Form.Label>
-                      <div
-                        onClick={() =>
-                          console.log(getSelectedProductVariants())
-                        }
-                      >
-                        ASDASD
-                      </div>
                       <Select
                         options={getSelectedProductVariants().map(
                           (variant) => ({

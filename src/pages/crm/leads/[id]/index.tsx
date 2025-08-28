@@ -3,6 +3,7 @@ import React, { ReactElement, useState, useEffect } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import { getLead, getMeetings } from "@utils/crm";
+import { GetHierarchyData } from "@utils/users";
 import {
   Button,
   Row,
@@ -40,12 +41,14 @@ const ViewLead = () => {
   const { id } = router.query;
   const [lead, setLead] = useState<any>(null);
   const [meetings, setMeetings] = useState<Meeting[]>([]);
+  const [extensions, setExtensions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (id) {
       fetchLeadData();
       fetchMeetings();
+      fetchExtensions();
     }
   }, [id]);
 
@@ -77,6 +80,17 @@ const ViewLead = () => {
     } catch (error) {
       console.error("Failed to fetch meetings:", error);
       setMeetings([]);
+    }
+  };
+
+  const fetchExtensions = async () => {
+    try {
+      const hierarchyData = await GetHierarchyData();
+      if (hierarchyData?.extensions) {
+        setExtensions(hierarchyData.extensions);
+      }
+    } catch (error) {
+      console.error("Failed to fetch extensions:", error);
     }
   };
 
@@ -173,7 +187,10 @@ const ViewLead = () => {
                   <Col md={6}>
                     <div className="mb-3">
                       <label className="form-label fw-bold">User Extension</label>
-                      <p className="mb-0">{lead.user_extension || 'Not specified'}</p>
+                      <p className="mb-0">{extensions.find(
+                        (extension: any) =>
+                          extension.id.toString() === lead.user_extension?.toString()
+                      )?.display_name || lead.user_extension || 'Not specified'}</p>
                     </div>
                   </Col>
                   <Col md={6}>
@@ -255,16 +272,6 @@ const ViewLead = () => {
                 </Link>
               </Card.Header>
               <Card.Body>
-                {/* Debug info */}
-                <div className="mb-3 p-2 bg-light rounded">
-                  <small className="text-muted">
-                    Debug: meetings type: {typeof meetings}, isArray: {Array.isArray(meetings)}, length: {meetings?.length || 0}
-                  </small>
-                  <br />
-                  <small className="text-muted">
-                    Meetings data: {JSON.stringify(meetings, null, 2)}
-                  </small>
-                </div>
                 
                 {(!meetings || !Array.isArray(meetings) || meetings.length === 0) ? (
                   <p className="text-muted text-center">No meetings scheduled</p>
@@ -323,12 +330,6 @@ const ViewLead = () => {
                     <Button variant="success">
                       <FiTarget className="me-2" />
                       Convert to Opportunity
-                    </Button>
-                  )}
-                  {!lead.is_lost && (
-                    <Button variant="warning">
-                      <FiXCircle className="me-2" />
-                      Mark as Lost
                     </Button>
                   )}
                   <Link href={`/crm/leads/${id}/edit`} className="btn btn-primary">

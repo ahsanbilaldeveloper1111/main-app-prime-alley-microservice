@@ -1,6 +1,6 @@
 import React, { ReactElement, useState, useEffect } from "react";
-import { useRouter } from "next/router";
 import Layout from "@layout/index";
+import { useRouter } from "next/router";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import {
   Card,
@@ -30,12 +30,11 @@ import {
   createProductVariant,
   updateProductVariant,
   deleteProductVariant,
-  ProductData,
   ProductVariantData,
 } from "@utils/sales";
 import { toast } from "react-toastify";
 
-const ManageProduct: React.FC = () => {
+const ManageProduct = () => {
   const router = useRouter();
   const { id } = router.query;
   const isEditMode = Boolean(id);
@@ -684,5 +683,8 @@ const ManageProduct: React.FC = () => {
     </React.Fragment>
   );
 };
+
+ManageProduct.getLayout = (page: React.ReactNode) => <Layout>{page}</Layout>;
+
 
 export default ManageProduct;

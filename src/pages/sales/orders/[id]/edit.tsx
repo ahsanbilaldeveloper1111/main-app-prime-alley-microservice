@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import Layout from "@layout/index";
 import { useRouter } from "next/router";
 import {
   Card,
@@ -45,7 +46,7 @@ interface OrderItem {
   variant?: ProductVariantData;
 }
 
-const EditOrder: React.FC = () => {
+const EditOrder = () => {
   const router = useRouter();
   const { id } = router.query;
   const [loading, setLoading] = useState(true);
@@ -893,5 +894,7 @@ const EditOrder: React.FC = () => {
     </div>
   );
 };
+
+EditOrder.getLayout = (page: React.ReactNode) => <Layout>{page}</Layout>;
 
 export default EditOrder;

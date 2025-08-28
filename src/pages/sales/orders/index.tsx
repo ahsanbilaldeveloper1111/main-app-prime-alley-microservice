@@ -40,14 +40,20 @@ import {
   listOrderLostReasons,
 } from "@utils/sales";
 import { OrderData, OrderStageData, OrderLostReasonData } from "@utils/sales";
-import OrdersFilters from "@components/filters/OrdersFilters";
+import SalesOrderFilters from "@components/filters/SalesOrderFilters";
 
 const OrdersList = () => {
   const { data: session, status } = useSession();
   const [refreshKey, setRefreshKey] = useState<number>(0);
-  const [currentFilters, setCurrentFilters] = useState({});
+  const [currentFilters, setCurrentFilters] = useState<Record<string, any>>({});
   const [stages, setStages] = useState<OrderStageData[]>([]);
   const [lostReasons, setLostReasons] = useState<OrderLostReasonData[]>([]);
+  
+  // Mark as Lost Modal State
+  const [showMarkLostModal, setShowMarkLostModal] = useState(false);
+  const [orderToMarkLost, setOrderToMarkLost] = useState<OrderData | null>(null);
+  const [lostReasonId, setLostReasonId] = useState<number | undefined>(undefined);
+  const [lostNotes, setLostNotes] = useState("");
 
   // Fetch stages and lost reasons on component mount
   useEffect(() => {
@@ -73,23 +79,60 @@ const OrdersList = () => {
     }
   };
 
+  const memoizedFilters = useMemo(() => {
+    console.log('memoizedFilters updated:', currentFilters);
+    return currentFilters;
+  }, [currentFilters]);
+
   const fetchOrders = useCallback(
     async (page = 1, perPage = 15, search = "") => {
-      return await listOrders({
+      console.log('fetchOrders called with memoizedFilters:', memoizedFilters);
+      
+      const params: any = {
         page,
         perPage,
         search,
-        filters: memoizedFilters,
-      });
+        ...memoizedFilters  // Use memoizedFilters from component state
+      };
+
+      console.log('fetchOrders final params:', params);
+      return await listOrders(params);
     },
-    [currentFilters]
+    [memoizedFilters]  // Add memoizedFilters as dependency
   );
 
-  const memoizedFilters = useMemo(() => currentFilters, [currentFilters]);
-
   const handleFiltersChange = useCallback((filters: any) => {
+    console.log('Filters changed in orders page:', filters);
+    console.log('Current filters before update:', currentFilters);
     setCurrentFilters(filters);
+    setRefreshKey(prev => prev + 1);
+  }, [currentFilters]);
+
+  // Mark Order Lost Handlers
+  const handleMarkLost = useCallback((order: OrderData) => {
+    setOrderToMarkLost(order);
+    setShowMarkLostModal(true);
   }, []);
+
+  const handleMarkLostSubmit = useCallback(async () => {
+    if (!orderToMarkLost || !lostReasonId) return;
+
+    try {
+      await markOrderLost({
+        order_id: orderToMarkLost.id,
+        lost_reason_id: lostReasonId,
+        notes: lostNotes || undefined,
+      });
+      setShowMarkLostModal(false);
+      setOrderToMarkLost(null);
+      setLostReasonId(undefined);
+      setLostNotes("");
+      toast.success("Order marked as lost successfully!");
+      setRefreshKey((oldKey) => oldKey + 1);
+    } catch (error) {
+      console.error("Failed to mark order as lost:", error);
+    }
+  }, [orderToMarkLost, lostReasonId, lostNotes]);
 
   const columns: Column[] = useMemo(
     () => [
@@ -269,12 +312,6 @@ const OrdersList = () => {
     }
   };
 
-  const handleMarkLost = async (order: OrderData) => {
-    // This would open a modal to select lost reason
-    // For now, just show a toast
-    toast.info("Mark as lost functionality would open a modal here");
-  };
-
   return (
     <React.Fragment>
       <BreadcrumbItem
@@ -298,11 +335,17 @@ const OrdersList = () => {
                   New Order
                 </Button>
               {/* )} */}
-              {/* <OrdersFilters onFiltersChange={handleFiltersChange} /> */}
             </h2>
           </div>
         </Col>
       </Row>
+
+      {/* Sales Order Filters */}
+      <div className="row mb-3">
+        <div className="col-12">
+          <SalesOrderFilters onFiltersChange={handleFiltersChange} />
+        </div>
+      </div>
 
       {/* {session?.user?.permissions?.includes("view-orders") && ( */}
         <GenericListPage
@@ -313,9 +356,74 @@ const OrdersList = () => {
           defaultPageSize={15}
           filters={memoizedFilters}
           refreshKey={refreshKey}
-          search={session?.user?.permissions?.includes("search-orders")}
+          search
         />
       {/* )} */}
+
+      {/* Mark Order Lost Modal */}
+      <Modal
+        show={showMarkLostModal}
+        onHide={() => setShowMarkLostModal(false)}
+      >
+        <Modal.Header closeButton>
+          <Modal.Title>Mark Order as Lost</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <Alert variant="warning">
+            <strong>Warning!</strong> Marking this order as lost will change its status and cannot be easily undone.
+          </Alert>
+          
+          <div className="mb-3">
+            <strong>Order:</strong> {orderToMarkLost?.order_number}
+            <br />
+            <strong>Customer:</strong> {orderToMarkLost?.customer_name}
+          </div>
+
+          <Form.Group className="mb-3">
+            <Form.Label>Lost Reason *</Form.Label>
+          <Form.Select
+              value={lostReasonId || ""}
+              onChange={(e) =>
+                setLostReasonId(e.target.value ? Number(e.target.value) : undefined)
+              }
+              required
+            >
+              <option value="">Select a reason</option>
+              {lostReasons.map((reason) => (
+                <option key={reason.id} value={reason.id}>
+                  {reason.name}
+                </option>
+              ))}
+            </Form.Select>
+          </Form.Group>
+          
+          <Form.Group>
+            <Form.Label>Additional Notes</Form.Label>
+            <Form.Control
+              as="textarea"
+              rows={3}
+              value={lostNotes}
+              onChange={(e) => setLostNotes(e.target.value)}
+              placeholder="Please provide additional notes about why this order was lost..."
+            />
+          </Form.Group>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button
+            variant="secondary"
+            onClick={() => setShowMarkLostModal(false)}
+          >
+            Cancel
+          </Button>
+          <Button 
+            variant="warning" 
+            onClick={handleMarkLostSubmit}
+            disabled={!lostReasonId}
+          >
+            Mark as Lost
+          </Button>
+        </Modal.Footer>
+      </Modal>
     </React.Fragment>
   );
 };

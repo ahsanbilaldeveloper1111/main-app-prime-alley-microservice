@@ -48,6 +48,7 @@ export interface CustomDataTableProps {
   onPageChange?: (page: number) => void;
   onPerPageChange?: (newPerPage: number) => void;
   onSearch?: (searchTerm: string) => void;
+  pagination?: boolean;
 }
 
 const CustomDataTable: React.FC<CustomDataTableProps> = ({
@@ -86,6 +87,7 @@ const CustomDataTable: React.FC<CustomDataTableProps> = ({
   onPageChange,
   onPerPageChange,
   onSearch,
+  pagination=true
 }) => {
   // State management
   const [pageSize, setPageSize] = useState<number>(defaultPageSize);
@@ -286,7 +288,7 @@ const CustomDataTable: React.FC<CustomDataTableProps> = ({
           columns={visibleColumnsData}
           data={filteredData}
           paginationComponentOptions={paginationComponentOptions}
-          pagination
+          pagination={pagination}
           paginationPerPage={currentPageSize}
           paginationRowsPerPageOptions={pageSizeOptions}
           onChangeRowsPerPage={handlePerRowsChange}

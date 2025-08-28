@@ -243,7 +243,7 @@ const ProductsList = () => {
           defaultPageSize={15}
           filters={memoizedFilters}
           refreshKey={refreshKey}
-          search={session?.user?.permissions?.includes("search-products")}
+          search
         />
       {/* )} */}
     </React.Fragment>

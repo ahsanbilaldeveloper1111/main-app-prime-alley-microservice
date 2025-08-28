@@ -216,7 +216,7 @@ export const listOrders = async (
   params: PaginationParams = {}
 ): Promise<PaginationWrapper<OrderData>> => {
   try {
-    const { page = 1, perPage = 15, search = "", filters = {} } = params;
+    const { page = 1, perPage = 15, search = "", ...filters } = params;
     
     const requestData = {
       page,

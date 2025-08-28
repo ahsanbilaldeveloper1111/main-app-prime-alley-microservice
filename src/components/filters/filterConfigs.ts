@@ -1090,3 +1090,101 @@ export const createCustomFilterConfig = (
     exportOptions
   };
 }; 
+
+// CRM Filters Configuration
+export const createCrmFiltersConfig = (stages: any[] = []): FilterTab[] => {
+  return [
+    {
+      id: 'stage',
+      title: 'Stage',
+      icon: 'ti ti-target',
+      fields: [
+        {
+          type: 'select',
+          name: 'stage_id',
+          label: 'Stage',
+          options: stages.map((stage: { id: number; name: string }) => ({
+            value: stage.id.toString(),
+            label: stage.name
+          })) || []
+        }
+      ]
+    },
+    {
+      id: 'status',
+      title: 'Status',
+      icon: 'ti ti-toggle-right',
+      fields: [
+        {
+          type: 'select',
+          name: 'is_lost',
+          label: 'Lead/Opportunity Status',
+          value: 'false',
+          options: [
+            { value: 'false', label: 'Active' },
+            { value: 'true', label: 'Lost' }
+          ]
+        }
+      ]
+    }
+  ];
+}; 
+
+// Sales Order Filters Configuration
+export const createSalesOrderFiltersConfig = (stages: any[] = []): FilterTab[] => {
+  return [
+    {
+      id: 'stage',
+      title: 'Stage',
+      icon: 'ti ti-target',
+      fields: [
+        {
+          type: 'select',
+          name: 'stage_id',
+          label: 'Order Stage',
+          options: stages.map((stage: { id: number; name: string }) => ({
+            value: stage.id.toString(),
+            label: stage.name
+          })) || []
+        }
+      ]
+    },
+    {
+      id: 'status',
+      title: 'Status',
+      icon: 'ti ti-toggle-right',
+      fields: [
+        {
+          type: 'select',
+          name: 'status',
+          label: 'Order Status',
+          options: [
+            { value: 'pending', label: 'Pending' },
+            { value: 'processing', label: 'Processing' },
+            { value: 'completed', label: 'Completed' },
+            { value: 'cancelled', label: 'Cancelled' }
+          ]
+        }
+      ]
+    },
+    {
+      id: 'date-range',
+      title: 'Date Range',
+      icon: 'ti ti-calendar',
+      fields: [
+        {
+          type: 'date',
+          name: 'date_from',
+          label: 'From Date',
+          placeholder: 'Select start date'
+        },
+        {
+          type: 'date',
+          name: 'date_to',
+          label: 'To Date',
+          placeholder: 'Select end date'
+        }
+      ]
+    }
+  ];
+}; 
