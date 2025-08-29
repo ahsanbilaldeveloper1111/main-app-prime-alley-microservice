@@ -18,14 +18,14 @@ import { useSession } from "next-auth/react";
 import moment from "moment";
 import Select from "react-select";
 
-import { getRanks } from "@utils/tms/tmsUserManagement";
+import { ListCustomerProfiling } from "@utils/tms/tmsProfiling";
 
 interface SelectOption {
   value: number;
   label: string;
 }
 
-const TmsRankPermissions = () => {
+const CustomerProfilingList = () => {
   const { data: session, status } = useSession();
 
   const [refreshKey, setRefreshKey] = useState<number>(0);
@@ -33,36 +33,50 @@ const TmsRankPermissions = () => {
 
   const columns: Column[] = useMemo(
     () => [
-      {key: "id",name: "ID",selector: (row: any) => row.id,sortable: true},
       {key: "name",name: "Name",selector: (row: any) => row.name,sortable: true},
-      {key: "description",name: "Description",selector: (row: any) => row.description,sortable: true},
-      {key: "company_id",name: "Company ID",selector: (row: any) => row.company_id,sortable: true},
-      {key: "created_at",name: "Created At",selector: (row: any) => row.created_at,sortable: true},
-      {key: "updated_at",name: "Updated At",selector: (row: any) => row.updated_at,sortable: true},
       {key: "users_count",name: "Users Count",selector: (row: any) => row.users_count,sortable: true},
-      {key: "permissions",name: "Permissions",selector: (row: any) => {
-          if (!row.permissions || !Array.isArray(row.permissions)) {
-            return "No permissions";
+      {key: "iccids",name: "ICCID Group",selector: (row: any) => row.iccid_group,sortable: true,
+        cell: (row: any) => {
+          if (row.iccids && Array.isArray(row.iccids)) {
+            const names = row.iccids.map((iccid: any) => iccid.name);
+            return names.join(', ');
           }
-          return row.permissions.map((permission: any) => permission.name || permission.action || "Unknown").join(", ");
-        },sortable: true,
-        render: (row: any) => {
-          if (!row.permissions || !Array.isArray(row.permissions)) {
-            return "No permissions";
-          }
-          return row.permissions.map((permission: any) => permission.name || permission.action || "Unknown").join(", ");
+          return '';
         }
       },
+      {key:'organization_unit',name:'Organization Unit',selector: (row: any) => row.organization_unit,sortable: true},
+      {action:true,name:'Action',selector: (row: any) => row.action,sortable: true,
+        cell: (row: any) => {
+          return <div className="d-flex gap-2">
+            
+            <Button size="sm" variant="outline-primary"  onClick={() => {
+              console.log(row);
+            }}>Edit</Button>
+
+            <Button size="sm" variant="outline-danger" onClick={() => {
+              console.log(row);
+            }}>Delete</Button>
+
+            <Button size="sm" variant="outline-primary" onClick={() => {
+              console.log(row);
+            }}>Create/Update ICCID</Button>
+
+
+          </div>
+        }
+      },
+      
+      
     ],
     []
   );
 
   const memoizedFilters = useMemo(() => currentFilters, [currentFilters]);
 
-  const fetchData = useCallback(
+  const fetchCustomerProfiling = useCallback(
       
       async (page = 1, perPage = 15, search = "") => {
-        return await getRanks();
+        return await ListCustomerProfiling();
       },
       [memoizedFilters]
     );
@@ -71,15 +85,15 @@ const TmsRankPermissions = () => {
   return (
     <React.Fragment>
       <BreadcrumbItem
-        mainTitle="Management"
-        mainLink="/tms/management"
-        subTitle="Rank Permissions"
+        mainTitle="Customer Profiling"
+        mainLink="/tms/profiling/customer"
+        subTitle="Customer Profiling"
       />
       <Row className="mb-3">
         <Col md={12}>
           <div className="page-header-title">
             <h2 className="mb-0 d-flex align-items-center">
-            List Rank Permissions
+            List Customer Profiling
             </h2>
           </div>
         </Col>
@@ -88,13 +102,13 @@ const TmsRankPermissions = () => {
       
         <GenericListPage
           columns={columns}
-          fetchData={fetchData}
-          title="Rank Permissions"
-          searchPlaceholder="Search Rank Permissions..."
+          fetchData={fetchCustomerProfiling}
+          title="Customer Profiling"
+          searchPlaceholder="Search Customer Profiling..."
           defaultPageSize={15}
           filters={memoizedFilters}
           refreshKey={refreshKey}
-          search={false}
+          search={true}
         />
       
 
@@ -102,8 +116,8 @@ const TmsRankPermissions = () => {
   );
 };
 
-TmsRankPermissions.getLayout = (page: ReactElement) => {
+CustomerProfilingList.getLayout = (page: ReactElement) => {
   return <Layout>{page}</Layout>;
 };
 
-export default TmsRankPermissions;
+export default CustomerProfilingList;

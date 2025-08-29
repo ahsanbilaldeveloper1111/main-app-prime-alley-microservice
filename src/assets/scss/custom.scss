@@ -311,3 +311,13 @@ body .nextjs-toast{
 .roles-box .form-check {
     display: inline-block;
 }
+
+.layout-collapse .pc-sidebar .main-caption .pc-item > .pc-link.active {
+    background: linear-gradient(135deg, #2583f2 0%, #1a6bc4 100%);
+}
+// .pc-sidebar .pc-navbar > .pc-item:hover{
+//     background: linear-gradient(135deg, #2583f2 0%, #1a6bc4 100%);
+//     color:white !important;
+
+//     .pc-link{color:white !important;}
+// }
