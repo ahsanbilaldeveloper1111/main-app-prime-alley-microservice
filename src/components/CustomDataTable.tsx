@@ -42,6 +42,9 @@ export interface CustomDataTableProps {
   paginationComponentOptions?: any;
   conditionalRowStyles?: any[];
   onRowClick?: (row: any) => void;
+  // Feature flags
+  rowClick?: boolean;
+  showCanvas?: boolean;
   // Server-side pagination props
   serverSide?: boolean;
   paginationInfo?: ServerPaginationInfo;
@@ -81,6 +84,9 @@ const CustomDataTable: React.FC<CustomDataTableProps> = ({
     },
   ],
   onRowClick,
+  // Feature flags
+  rowClick = false,
+  showCanvas = false,
   // Server-side pagination props
   serverSide = false,
   paginationInfo,
@@ -294,11 +300,11 @@ const CustomDataTable: React.FC<CustomDataTableProps> = ({
           onChangeRowsPerPage={handlePerRowsChange}
           onChangePage={handlePageChange}
           highlightOnHover={highlightOnHover}
-          pointerOnHover={pointerOnHover}
+          pointerOnHover={rowClick ? true : pointerOnHover}
           conditionalRowStyles={conditionalRowStyles}
           className={className}
           progressPending={loading}
-          //onRowClicked={onRowClick}
+          onRowClicked={rowClick && onRowClick ? onRowClick : undefined}
           paginationTotalRows={serverSide ? paginationInfo?.totalRows : undefined}
           paginationServer={serverSide}
         />

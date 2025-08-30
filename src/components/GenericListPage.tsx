@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import CustomDataTable, { Column, ServerPaginationInfo } from '@components/CustomDataTable';
+import SimpleCanvas from '@components/SimpleCanvas';
 
 interface GenericListPageProps {
     columns: Column[];
@@ -12,6 +13,9 @@ interface GenericListPageProps {
     refreshKey?: number;
     search?: boolean;
     pagination?: boolean;
+    // Feature flags
+    rowClick?: boolean;
+    showCanvas?: boolean;
 }
 
 const GenericListPage: React.FC<GenericListPageProps> = ({
@@ -24,7 +28,10 @@ const GenericListPage: React.FC<GenericListPageProps> = ({
     filters = {},
     refreshKey = 0,
     search = true,
-    pagination=true
+    pagination=true,
+    // Feature flags
+    rowClick = false,
+    showCanvas = false
 }) => {
     const [data, setData] = useState<any[]>([]);
     const [loading, setLoading] = useState<boolean>(false);
@@ -35,6 +42,10 @@ const GenericListPage: React.FC<GenericListPageProps> = ({
         perPage: defaultPageSize,
     });
     const [searchTerm, setSearchTerm] = useState<string>('');
+    
+    // Canvas state
+    const [canvasVisible, setCanvasVisible] = useState<boolean>(false);
+    const [selectedRowData, setSelectedRowData] = useState<any>(null);
 
     const fetchAndSetData = useCallback(async (page = 1, perPage = defaultPageSize, search = '') => {
         setLoading(true);
@@ -100,24 +111,50 @@ const GenericListPage: React.FC<GenericListPageProps> = ({
         fetchAndSetData(1, paginationInfo.perPage, search);
     };
 
+    // Handle row click with canvas functionality
+    const handleRowClickWithCanvas = (row: any) => {
+        if (showCanvas) {
+            setSelectedRowData(row);
+            setCanvasVisible(true);
+        }
+        // Call the original onRowClick if provided
+        if (onRowClick) {
+            onRowClick(row);
+        }
+    };
+
     return (
-        <CustomDataTable
-            columns={columns}
-            data={data}
-            title={title}
-            loading={loading}
-            defaultPageSize={defaultPageSize}
-            searchPlaceholder={searchPlaceholder}
-            onRowClick={onRowClick}
-            serverSide={true}
-            paginationInfo={paginationInfo}
-            onPageChange={handlePageChange}
-            onPerPageChange={handlePerPageChange}
-            onSearch={handleSearch}
-            showSearch={search}
-            pagination={pagination}
-            showPageSizeSelector={pagination}
-        />
+        <>
+            <CustomDataTable
+                columns={columns}
+                data={data}
+                title={title}
+                loading={loading}
+                defaultPageSize={defaultPageSize}
+                searchPlaceholder={searchPlaceholder}
+                onRowClick={rowClick || showCanvas ? handleRowClickWithCanvas : onRowClick}
+                // Feature flags
+                rowClick={rowClick}
+                showCanvas={showCanvas}
+                serverSide={true}
+                paginationInfo={paginationInfo}
+                onPageChange={handlePageChange}
+                onPerPageChange={handlePerPageChange}
+                onSearch={handleSearch}
+                showSearch={search}
+                pagination={pagination}
+                showPageSizeSelector={pagination}
+            />
+            
+            {showCanvas && (
+                <SimpleCanvas
+                    show={canvasVisible}
+                    onHide={() => setCanvasVisible(false)}
+                    rowData={selectedRowData}
+                    title={`Canvas for ${selectedRowData?.name || selectedRowData?.id || 'Selected Item'}`}
+                />
+            )}
+        </>
     );
 };
 

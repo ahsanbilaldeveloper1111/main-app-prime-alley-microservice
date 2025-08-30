@@ -85,7 +85,15 @@ export const getAuditLogs = async () => {
                   "organization_unit": "OU=xyzllc,OU=customers,DC=sipzon,DC=com"
               }
           },
-      ]
+      ],
+      "pagination": {
+                "total": 3917,
+                "limit": 10,
+                "page": 1,
+                "last_page": 392,
+                "from": 1,
+                "to": 10
+            }
   }
   const requiredResponse = {
     "draw": 1,

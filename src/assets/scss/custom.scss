@@ -18,7 +18,7 @@ $googleFontsUrl: "https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;
 //   font-family: 'Public Sans', sans-serif;
 // }
 .pc-sidebar{
-    background-color: #2c4661 !important;
+    background-color:#1e293b !important;
 }
 .pc-sidebar .pc-navbar > .pc-item{
     margin: 0 !important;
@@ -315,9 +315,19 @@ body .nextjs-toast{
 .layout-collapse .pc-sidebar .main-caption .pc-item > .pc-link.active {
     background: linear-gradient(135deg, #2583f2 0%, #1a6bc4 100%);
 }
-// .pc-sidebar .pc-navbar > .pc-item:hover{
-//     background: linear-gradient(135deg, #2583f2 0%, #1a6bc4 100%);
-//     color:white !important;
+.pc-sidebar .pc-navbar > .pc-item:hover{
+    background: linear-gradient(135deg, #2583f2 0%, #1a6bc4 100%);
+    color:white !important;
 
-//     .pc-link{color:white !important;}
-// }
+    .pc-link{color:white !important;}
+}
+.pc-sidebar .pc-navbar > .pc-item:hover ul.pc-submenu{
+    background:white;
+    .pc-link{
+        color:black !important;
+        &:hover{
+            color:var(--bs-primary) !important;
+        }
+    }
+
+}

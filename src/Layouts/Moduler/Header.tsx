@@ -344,11 +344,10 @@ const Header = ({ themeMode }: any) => {
                                     if (itemSubmenu) {
                                         itemSubmenu.style.display = 'none';
                                     }
-                                    // Reset chevron for other items
+                                    // Reset chevron for other items to right (closed state)
                                     const itemChevron = item.querySelector('.pc-arrow i');
                                     if (itemChevron) {
-                                        itemChevron.classList.remove('ph-chevron-right');
-                                        itemChevron.classList.add('ph-chevron-down');
+                                        itemChevron.className = 'ph-duotone ph-caret-right';
                                     }
                                 }
                             });
@@ -357,20 +356,18 @@ const Header = ({ themeMode }: any) => {
                             if (isActive) {
                                 menuItem.classList.remove('active');
                                 submenu.style.display = 'none';
-                                // Reset chevron to down
+                                // Reset chevron to right (closed state)
                                 const chevron = menuItem.querySelector('.pc-arrow i');
                                 if (chevron) {
-                                    chevron.classList.remove('ph-chevron-right');
-                                    chevron.classList.add('ph-chevron-down');
+                                    chevron.className = 'ph-duotone ph-caret-right';
                                 }
                             } else {
                                 menuItem.classList.add('active');
                                 submenu.style.display = 'block';
-                                // Change chevron to right
+                                // Change chevron to down (open state)
                                 const chevron = menuItem.querySelector('.pc-arrow i');
                                 if (chevron) {
-                                    chevron.classList.remove('ph-chevron-down');
-                                    chevron.classList.add('ph-chevron-right');
+                                    chevron.className = 'ph-duotone ph-caret-down';
                                 }
                             }
                             
@@ -394,6 +391,15 @@ const Header = ({ themeMode }: any) => {
             addSubmenuPopupEvents();
             addSidebarMouseLeaveEvent(); // Add this line
             addTabPaneMenuEvents();
+            
+            // Initialize all dropdown arrows to point right (closed state)
+            const allMenuItems = document.querySelectorAll('.pc-submenu-popup .tab-pane .pc-item.pc-hasmenu');
+            allMenuItems.forEach((menuItem) => {
+                const arrow = menuItem.querySelector('.pc-arrow i');
+                if (arrow) {
+                    arrow.className = 'ph-duotone ph-caret-right';
+                }
+            });
             
             // If navigation events failed, retry after a short delay
             if (!navigationSuccess) {
@@ -448,6 +454,20 @@ const Header = ({ themeMode }: any) => {
 
     return (
         <React.Fragment>
+            <style jsx>{`
+                .pc-arrow i {
+                    transition: all 0.3s ease;
+                    display: inline-block;
+                }
+                .pc-item.pc-hasmenu.active .pc-arrow i {
+                    transform: rotate(90deg);
+                }
+                .pc-arrow {
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                }
+            `}</style>
            <nav className="pc-sidebar">
                 <div className="navbar-wrapper">
                     <div className="m-header">
@@ -1047,135 +1067,82 @@ const Header = ({ themeMode }: any) => {
                                             <span className="pc-micon">
                                                 <i className="ph-duotone ph-phone"></i>
                                             </span>
-                                            <span className="pc-mtext" data-i18n="KB Access">Cisco PBX</span>
+                                            <span className="pc-mtext" data-i18n="Cisco PBX">Cisco PBX</span>
+                                            <span className="pc-arrow"><i className="ph-duotone ph-caret-right"></i></span>
                                         </Link>
                                         <ul className="pc-submenu">
                                             <li className="pc-item">
                                                 
                                                 
                                                 <Link className="pc-link" href={`${baseUrl}/tms/cisco-pbx/users`}>
-                                                    <span className="pc-micon">
-                                                        <i className="ph-duotone ph-users"></i>
-                                                    </span>
                                                     <span className="pc-mtext">Users</span>
                                                 </Link>
 
                                                 <Link className="pc-link" href={`${baseUrl}/tms/cisco-pbx/users-directory`}>
-                                                    <span className="pc-micon">
-                                                        <i className="ph-duotone ph-users"></i>
-                                                    </span>
                                                     <span className="pc-mtext">Users Directory</span>
                                                 </Link>
 
                                                 <Link className="pc-link" href={`${baseUrl}/tms/cisco-pbx/app-users`}>
-                                                    <span className="pc-micon">
-                                                        <i className="ph-duotone ph-users"></i>
-                                                    </span>
                                                     <span className="pc-mtext">App Users</span>
                                                 </Link>
 
                                                 <Link className="pc-link" href={`${baseUrl}/tms/cisco-pbx/custom-users`}>
-                                                    <span className="pc-micon">
-                                                        <i className="ph-duotone ph-users"></i>
-                                                    </span>
                                                     <span className="pc-mtext">Custom Users</span>
                                                 </Link>
 
                                                 <Link className="pc-link" href={`${baseUrl}/tms/cisco-pbx/facilities-info`}>
-                                                    <span className="pc-micon">
-                                                        <i className="ph-duotone ph-list"></i>
-                                                    </span>
                                                     <span className="pc-mtext">Facilities Info</span>
                                                 </Link>
 
                                                 <Link className="pc-link" href={`${baseUrl}/tms/cisco-pbx/recording-profile`}>
-                                                    <span className="pc-micon">
-                                                        <i className="ph-duotone ph-list"></i>
-                                                    </span>
                                                     <span className="pc-mtext">Recording Profile</span>
                                                 </Link>
 
                                                 <Link className="pc-link" href={`${baseUrl}/tms/cisco-pbx/remote-destination`}>
-                                                    <span className="pc-micon">
-                                                        <i className="ph-duotone ph-list"></i>
-                                                    </span>
                                                     <span className="pc-mtext">Remote Destination</span>
                                                 </Link>
 
                                                 <Link className="pc-link" href={`${baseUrl}/tms/cisco-pbx/remote-destination/profile`}>
-                                                    <span className="pc-micon">
-                                                        <i className="ph-duotone ph-list"></i>
-                                                    </span>
                                                     <span className="pc-mtext">Remote Destination Profile</span>
                                                 </Link>
 
                                                 <Link className="pc-link" href={`${baseUrl}/tms/cisco-pbx/line`}>
-                                                    <span className="pc-micon">
-                                                        <i className="ph-duotone ph-list"></i>
-                                                    </span>
                                                     <span className="pc-mtext">Line</span>
                                                 </Link>
 
                                                 <Link className="pc-link" href={`${baseUrl}/tms/cisco-pbx/phone`}>
-                                                    <span className="pc-micon">
-                                                        <i className="ph-duotone ph-list"></i>
-                                                    </span>
                                                     <span className="pc-mtext">Phone</span>
                                                 </Link>
 
                                                 <Link className="pc-link" href={`${baseUrl}/tms/cisco-pbx/sip-trunks`}>
-                                                    <span className="pc-micon">
-                                                        <i className="ph-duotone ph-list"></i>
-                                                    </span>
                                                     <span className="pc-mtext">SIP Trunks</span>
                                                 </Link>
 
                                                 <Link className="pc-link" href={`${baseUrl}/tms/cisco-pbx/translation-patterns`}>
-                                                    <span className="pc-micon">
-                                                        <i className="ph-duotone ph-list"></i>
-                                                    </span>
                                                     <span className="pc-mtext">Translation Patterns</span>
                                                 </Link>
 
                                                 <Link className="pc-link" href={`${baseUrl}/tms/cisco-pbx/device-pool`}>
-                                                    <span className="pc-micon">
-                                                        <i className="ph-duotone ph-list"></i>
-                                                    </span>
                                                     <span className="pc-mtext">Device Pool</span>
                                                 </Link>
 
                                                 <Link className="pc-link" href={`${baseUrl}/tms/cisco-pbx/locations`}>
-                                                    <span className="pc-micon">
-                                                        <i className="ph-duotone ph-list"></i>
-                                                    </span>
                                                     <span className="pc-mtext">Locations</span>
                                                 </Link>
 
                                                 <Link className="pc-link" href={`${baseUrl}/tms/cisco-pbx/route-partitions`}>
-                                                    <span className="pc-micon">
-                                                        <i className="ph-duotone ph-list"></i>
-                                                    </span>
                                                     <span className="pc-mtext">Route Partitions</span>
                                                 </Link>
 
                                                 <Link className="pc-link" href={`${baseUrl}/tms/cisco-pbx/css`}>
-                                                    <span className="pc-micon">
-                                                        <i className="ph-duotone ph-list"></i>
-                                                    </span>
                                                     <span className="pc-mtext">CSS</span>
                                                 </Link>
 
                                                 <Link className="pc-link" href={`${baseUrl}/tms/cisco-pbx/regions`}>
-                                                    <span className="pc-micon">
-                                                        <i className="ph-duotone ph-list"></i>
-                                                    </span>
                                                     <span className="pc-mtext">Regions</span>
                                                 </Link>
 
                                                 <Link className="pc-link" href={`${baseUrl}/tms/cisco-pbx/route-pattern`}>
-                                                    <span className="pc-micon">
-                                                        <i className="ph-duotone ph-list"></i>
-                                                    </span>
                                                     <span className="pc-mtext">Route Pattern</span>
                                                 </Link>
 
@@ -1204,24 +1171,57 @@ const Header = ({ themeMode }: any) => {
                                                 <i className="ph-duotone ph-users"></i>
                                             </span>
                                             <span className="pc-mtext" data-i18n="KB Access">Users Management</span>
+                                            <span className="pc-arrow"><i className="ph-duotone ph-caret-right"></i></span>
                                         </Link>
                                         <ul className="pc-submenu">
                                             <li className="pc-item">
                                                 
                                                 
                                                 <Link className="pc-link" href={`${baseUrl}/tms/management/users`}>
-                                                    <span className="pc-micon">
-                                                        <i className="ph-duotone ph-users"></i>
-                                                    </span>
                                                     <span className="pc-mtext">Users</span>
                                                 </Link>
 
                                                 <Link className="pc-link" href={`${baseUrl}/tms/management/rank-permissions`}>
-                                                    <span className="pc-micon">
-                                                        <i className="ph-duotone ph-list"></i>
-                                                    </span>
                                                     <span className="pc-mtext">Rank Permissions</span>
                                                 </Link>
+
+
+                                            </li>
+                                        </ul>
+                                    </li>
+
+
+                                    <li className="pc-item pc-hasmenu">
+                                        <Link className="pc-link" href="#!">
+                                            <span className="pc-micon">
+                                                <i className="ph-duotone ph-users"></i>
+                                            </span>
+                                            <span className="pc-mtext" data-i18n="Profiling">Profiling</span>
+                                            <span className="pc-arrow"><i className="ph-duotone ph-caret-right"></i></span>
+                                        </Link>
+                                        <ul className="pc-submenu">
+                                            <li className="pc-item">
+                                                
+                                                <Link className="pc-link" href={`${baseUrl}/tms/profiling/customers`}>
+                                                    <span className="pc-mtext">Customers</span>
+                                                </Link>
+
+                                                <Link className="pc-link" href={`${baseUrl}/tms/profiling/customers/create`}>
+                                                    <span className="pc-mtext">Create Profile</span>
+                                                </Link>
+
+                                                <Link className="pc-link" href={`${baseUrl}/tms/profiling/user`}>
+                                                    <span className="pc-mtext">User Profiles</span>
+                                                </Link>
+
+                                                <Link className="pc-link" href={`${baseUrl}/tms/profiling/user/create`}>
+                                                    <span className="pc-mtext">Create User Profile</span>
+                                                </Link>
+
+                                                <Link className="pc-link" href={`${baseUrl}/tms/profiling/logs`}>
+                                                    <span className="pc-mtext">Error Logs</span>
+                                                </Link>
+
 
 
                                             </li>
