@@ -18,7 +18,7 @@ import { useSession } from "next-auth/react";
 import moment from "moment";
 import Select from "react-select";
 
-import { LisrRegion } from "@utils/tmsCisxoPbx";
+import { LisrRegion } from "@utils/tms/tmsCisxoPbx";
 
 interface SelectOption {
   value: number;

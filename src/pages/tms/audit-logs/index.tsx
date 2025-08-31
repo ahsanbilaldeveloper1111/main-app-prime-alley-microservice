@@ -18,7 +18,7 @@ import { useSession } from "next-auth/react";
 import moment from "moment";
 import Select from "react-select";
 
-import { getAuditLogs } from "@utils/tmsAudit";
+import { getAuditLogs } from "@utils/tms/tmsAudit";
 
 interface SelectOption {
   value: number;

@@ -18,7 +18,7 @@ import { useSession } from "next-auth/react";
 import moment from "moment";
 import Select from "react-select";
 
-import { ListUsers } from "@utils/tmsUserManagement";
+import { ListUsers } from "@utils/tms/tmsUserManagement";
 
 interface SelectOption {
   value: number;

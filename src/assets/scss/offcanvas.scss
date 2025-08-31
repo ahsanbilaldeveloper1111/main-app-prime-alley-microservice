@@ -1,0 +1,22 @@
+.data-item {
+      .sbox{
+            border-bottom: 1px #d5d5d5 solid;
+            margin-bottom: 10px;
+      }
+      h5{
+            font-size: 14px;
+            text-transform: capitalize;
+      }
+  }
+  .offcanvas-header {
+      justify-content: space-between !important;
+      background: linear-gradient(135deg, #2583f2 0%, #1a6bc4 100%);
+
+      .offcanvas-title{
+            color: #fff !important;
+      }
+      .btn-close{
+            display: none !important;
+            color: #fff !important;
+      }
+}

@@ -18,7 +18,7 @@ import { useSession } from "next-auth/react";
 import moment from "moment";
 import Select from "react-select";
 
-import {ListCustomUsers } from "@utils/tmsCisxoPbx";
+import {ListCustomUsers } from "@utils/tms/tmsCisxoPbx";
 
 interface SelectOption {
   value: number;

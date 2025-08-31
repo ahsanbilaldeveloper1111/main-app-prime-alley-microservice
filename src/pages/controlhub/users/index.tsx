@@ -21,6 +21,10 @@ import imgStatus1 from '@assets/images/widget/img-status-1.svg'
 import imgStatus2 from '@assets/images/widget/img-status-2.svg'
 import imgStatus3 from '@assets/images/widget/img-status-3.svg'
 import imgStatus4 from '@assets/images/widget/img-status-4.svg'
+import EmptyState from '@components/EmptyState';
+import dynamic from 'next/dynamic';
+
+const ReactApexChart = dynamic(() => import('react-apexcharts'), { ssr: false });
 
 interface Summary {
     users: number;
@@ -181,6 +185,85 @@ const Users = () => {
         setShowAddGroupModal(false);
     }
 
+    const [growthChart, setGrowthChart] = React.useState<{
+        series: Array<{ name: string; data: number[] }>;
+        options: any;
+    }>({
+          
+        series: [{
+          name: 'series1',
+          data: [31, 40, 28, 51, 42, 109]
+        }],
+        options: {
+          chart: {
+            height: 250,
+            type: 'area',
+            toolbar: {
+              show: false
+            }
+          },
+          dataLabels: {
+            enabled: false
+          },
+          stroke: {
+            curve: 'smooth'
+          },
+          xaxis: {
+            type: 'category',
+            categories: ["Jan", "Feb", "Mar", "Apr", "May", "Jun"]
+          },
+          tooltip: {
+            x: {
+              //format: 'MMM'
+            },
+          },
+        },
+    });
+
+    const [departmentChart, setDepartmentChart] = React.useState<{
+        series: number[];
+        options: any;
+    }>({
+        series: [44, 55, 41, 17, 15],
+        options: {
+          chart: {
+            type: 'donut',
+            toolbar: {
+              show: false
+            }
+          },
+          labels: ['Sales', 'Marketing', 'Development', 'HR', 'Finance'],
+          legend: {
+            position: 'bottom',
+            markers: {
+              shape: 'rect',
+              
+            }
+          },
+          plotOptions: {
+            pie: {
+              donut: {
+                size: '40%'
+              }
+            }
+          },
+          dataLabels: {
+            enabled: false,
+          },
+          responsive: [{
+            breakpoint: 480,
+            options: {
+              chart: {
+                width: 200
+              },
+              legend: {
+                position: 'bottom'
+              }
+            }
+          }]
+        },
+    });
+
     return (
         <ProtectedRoute requiredPermissions={['view-users']}>
             <React.Fragment>
@@ -305,8 +388,89 @@ const Users = () => {
                         searchPlaceholder="Search users..."
                         defaultPageSize={15}
                         filters={currentFilters}
+                        // Feature flags - set these to true to enable functionality
+                        rowClick={true}
+                        showCanvas={true}
                     />
                 )}
+
+                <Row className=" mt-3">
+                  
+                  <Col md={7} className="mb-3">
+                    <div className="card">
+                      <div className="card-body">
+                        <h5>User Growwth (Last 6 Months)</h5>
+                        <ReactApexChart
+                  options={growthChart.options}
+                  series={growthChart.series}
+                  type="area"
+                  height={300}
+                />
+                      </div>
+                    </div>
+                  </Col>
+
+                  <Col md={5} className="mb-3">
+                    <div className="card">
+                      <div className="card-body">
+                        <h5>Department Distribution</h5>
+                        <ReactApexChart
+                  options={departmentChart.options}
+                  series={departmentChart.series}
+                  type="donut"
+                  height={300}
+                />
+                      </div>
+                    </div>
+                  </Col>
+
+                  <Col md={12} className="mb-3">
+                    <div className="card">
+                        <div className="card-header">
+                            <h5>Recent Activities</h5>
+                        </div>
+                      <div className="card-body">
+                      <Row className="recent-activity">
+                                                <Col md={1} className="d-flex align-items-center justify-content-center">
+                                                    <div className="ico">
+                                                    <i className="ti ti-history"></i>
+                                                    </div>
+                                                </Col>
+                                                <Col md={10} className="d-flex align-items-center">
+                                                    <div className="info">
+                                                    <h6>Login to platform</h6>
+                                                    <p className="mb-2 small">
+                                                        <span className=""><b>Date: </b> </span>
+                                                        <span className="text-muted me-4">23 Aug 2024</span>
+
+                                                        <span className=""><b>Time: </b> </span>
+                                                        <span className="text-muted me-4">12:00:00</span>
+
+                                                        <span className=""><b>Device: </b> </span>
+                                                        <span className="text-muted me-4">MacBook Pro</span>
+
+                                                        <span className=""><b>Browser: </b> </span>
+                                                        <span className="text-muted me-4">Chrome</span>
+
+
+                                                    </p>
+                                                    </div>
+                                                </Col>
+                                                <Col md={1} className="d-flex align-items-center justify-content-end">
+                                                <i className="ph-duotone ph-dots-three-outline-vertical"></i>
+                                                </Col>
+                                            </Row>
+                      </div>
+                    </div>
+                  </Col>
+
+
+                </Row>
+
+            
+
+
+
             </React.Fragment>
         </ProtectedRoute>
     );
