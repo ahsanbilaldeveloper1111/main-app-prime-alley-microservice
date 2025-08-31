@@ -41,20 +41,20 @@ const GenericListPage: React.FC<GenericListPageProps> = ({
         try {
             const response = await fetchData(page, perPage, search);
             
-            // Handle the response structure where meta is directly in the response
-            if (response && response.meta) {
-                setData(response.dataList || []);
+            // Handle the response structure where pagination data is directly in the response
+            if (response && response.data) {
+                setData(response.data || []);
                 setPaginationInfo({
-                    totalRows: response.meta.total || 0,
-                    totalPages: response.meta.last_page || 0,
-                    currentPage: response.meta.current_page || 1,
-                    perPage: response.meta.per_page || defaultPageSize,
+                    totalRows: response.total || 0,
+                    totalPages: response.last_page || 0,
+                    currentPage: response.current_page || 1,
+                    perPage: response.per_page || defaultPageSize,
                 });
                 console.log('paginationInfo updated:', {
-                    totalRows: response.meta.total || 0,
-                    totalPages: response.meta.last_page || 0,
-                    currentPage: response.meta.current_page || 1,
-                    perPage: response.meta.per_page || defaultPageSize,
+                    totalRows: response.total || 0,
+                    totalPages: response.last_page || 0,
+                    currentPage: response.current_page || 1,
+                    perPage: response.per_page || defaultPageSize,
                 });
             } else {
                 // Fallback for other response structures

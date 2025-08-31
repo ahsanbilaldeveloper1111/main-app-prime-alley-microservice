@@ -135,7 +135,7 @@ const TicketDashboard = () => {
 
             <Row>
                 <Col md={12}>
-                    <h4>Ticket Statuses Summary</h4>
+                    <h4>Ticket Status Summary</h4>
                 </Col>
             {statusSummary.map((status) => (
                 <Col md={3}>

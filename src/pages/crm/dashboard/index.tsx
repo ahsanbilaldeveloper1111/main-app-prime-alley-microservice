@@ -347,7 +347,7 @@ const CrmDashboard = () => {
                       </div>
                       <div className="flex-grow-1 ms-3">
                         <h6 className="mb-1">
-                          {meeting.title || "Untitled Meeting"}
+                          {meeting?.name || "Untitled Meeting"}
                         </h6>
                         <p
                           className="text-muted mb-0 small"

@@ -475,19 +475,47 @@ export const createTicketFiltersConfig = (hierarchyData?: any): FilterTab[] => {
   // Add other filters
   filters.push(
     {
-      id: 'modules',
-      title: 'Modules',
+      id: 'module-hierarchy',
+      title: 'Module Hierarchy',
       icon: 'ti ti-package',
+      description: 'Filter tickets by module, submodule, and submodule child. Select options in order: Module → Submodule → Submodule Child',
       fields: [
         {
           type: 'select',
           isMulti: false,
           name: 'module_id',
-          label: 'Modules',
+          label: 'Module',
+          placeholder: 'Select Module',
           options: hierarchyData?.modules?.map((module: { id: string; name: string }) => ({
             value: module.id,
             label: module.name
           })) || []
+        },
+        {
+          type: 'select',
+          isMulti: false,
+          name: 'submodule_id',
+          label: 'Submodule',
+          placeholder: hierarchyData?.submodules?.length > 0 ? 'Select Submodule' : 'Select Module first',
+          options: hierarchyData?.submodules?.map((submodule: { id: string; name: string }) => ({
+            value: submodule.id,
+            label: submodule.name
+          })) || [],
+          disabled: !hierarchyData?.submodules?.length,
+          description: 'Select a module first to see available submodules'
+        },
+        {
+          type: 'select',
+          isMulti: false,
+          name: 'submodule_child_id',
+          label: 'Submodule Child',
+          placeholder: hierarchyData?.submoduleChildren?.length > 0 ? 'Select Submodule Child' : 'Select Submodule first',
+          options: hierarchyData?.submoduleChildren?.map((child: { id: string; name: string }) => ({
+            value: child.id,
+            label: child.name
+          })) || [],
+          disabled: !hierarchyData?.submoduleChildren?.length,
+          description: 'Select a submodule first to see available submodule children'
         }
       ]
     },

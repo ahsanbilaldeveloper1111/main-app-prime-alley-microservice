@@ -117,6 +117,8 @@ export const UpdateTicketDetails = async (
   type: string,
   ticket_status_id: string,
   module_id: string,
+  submodule_id: string,
+  submodule_child_id?: string,
   user_extension: string,
   priority?: string,
   due_date?: string
@@ -130,6 +132,10 @@ export const UpdateTicketDetails = async (
     formData.append('ticket_type_id', type);
     formData.append('ticket_status_id', ticket_status_id);
     formData.append('module_id', module_id);
+    formData.append('submodule_id', submodule_id);
+    if (submodule_child_id) {
+      formData.append('submodule_child_id', submodule_child_id);
+    }
     formData.append('user_extension', user_extension);
     if (priority !== undefined) {
       formData.append('priority', priority);

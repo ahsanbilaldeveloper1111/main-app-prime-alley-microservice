@@ -15,27 +15,31 @@ interface SelectOption {
 // Types for the generic filter system
   export interface FilterField {
     type: 'text' | 'select' | 'date' | 'multiSelect' | 'radio' | 'checkbox' | 'number';
-  name: string;
-  label: string;
-  placeholder?: string;
-  options?: Array<{ value: string; label: string }>;
-  defaultValue?: any;
-  validation?: (value: any) => boolean;
-  isMulti?: boolean;
-  min?: number;
-  value?: any;
-}
+    name: string;
+    label: string;
+    placeholder?: string;
+    options?: Array<{ value: string; label: string }>;
+    defaultValue?: any;
+    validation?: (value: any) => boolean;
+    isMulti?: boolean;
+    min?: number;
+    value?: any;
+    disabled?: boolean;
+    description?: string;
+  }
 
 export interface FilterTab {
   id: string;
   title: string;
   icon: string;
   fields: FilterField[];
+  description?: string;
 }
 
 export interface GenericFilterProps {
   tabs: FilterTab[];
   onFiltersChange?: (filters: Record<string, any>) => void;
+  onFiltersChangeImmediate?: (filters: Record<string, any>) => void; // New callback for immediate filter changes
   showExport?: boolean;
   showFilters?: boolean;
   exportOptions?: Array<{ label: string; value: string }>;
@@ -49,6 +53,7 @@ export interface GenericFilterProps {
 export default function GenericFilter({ 
   tabs, 
   onFiltersChange, 
+  onFiltersChangeImmediate, 
   showExport = false, 
   showFilters = false,
   exportOptions = [
@@ -155,34 +160,56 @@ export default function GenericFilter({
   }, [selectedFilters, tabs]);
 
   const handleFilterChange = (fieldName: string, value: any) => {
-    setSelectedFilters((prev) => ({
-      ...prev,
+    const newFilters = {
+      ...selectedFilters,
       [fieldName]: value
-    }));
+    };
+    
+    setSelectedFilters(newFilters);
+    
+    // Call immediate callback if provided
+    if (onFiltersChangeImmediate) {
+      onFiltersChangeImmediate(newFilters);
+    }
   };
 
   const handleMultiSelectChange = (fieldName: string, selected: any) => {
     const values = selected ? selected.map((opt: any) => opt.value) : [];
-    setMultiSelectValues((prev) => ({
-      ...prev,
+    const newMultiSelectValues = {
+      ...multiSelectValues,
       [fieldName]: selected || []
-    }));
-    setSelectedFilters((prev) => ({
-      ...prev,
+    };
+    const newFilters = {
+      ...selectedFilters,
       [fieldName]: values
-    }));
+    };
+    
+    setMultiSelectValues(newMultiSelectValues);
+    setSelectedFilters(newFilters);
+    
+    // Call immediate callback if provided
+    if (onFiltersChangeImmediate) {
+      onFiltersChangeImmediate(newFilters);
+    }
   };
 
   const handleDateChange = (fieldName: string, date: Date) => {
-    setDateValues((prev) => ({
-      ...prev,
+    const newDateValues = {
+      ...dateValues,
       [fieldName]: date
-    }));
-    
-    setSelectedFilters((prev) => ({
-      ...prev,
+    };
+    const newFilters = {
+      ...selectedFilters,
       [fieldName]: date ? formatDateToCustomFormat(date) : null
-    }));
+    };
+    
+    setDateValues(newDateValues);
+    setSelectedFilters(newFilters);
+    
+    // Call immediate callback if provided
+    if (onFiltersChangeImmediate) {
+      onFiltersChangeImmediate(newFilters);
+    }
 
     // Real-time validation for date range
     validateDateRangeRealTime(fieldName, date);
@@ -305,6 +332,11 @@ export default function GenericFilter({
       onFiltersChange({});
     }
     
+    // Call immediate callback if provided
+    if (onFiltersChangeImmediate) {
+      onFiltersChangeImmediate({});
+    }
+    
     // Force a re-render of form fields to show cleared state
     setTimeout(() => {
       resetFormFieldsToCurrentState();
@@ -367,6 +399,12 @@ export default function GenericFilter({
         // Remove completely if no default value
         delete updated[key];
       }
+      
+      // Call immediate callback if provided
+      if (onFiltersChangeImmediate) {
+        onFiltersChangeImmediate(updated);
+      }
+      
       return updated;
     });
     
@@ -507,14 +545,15 @@ export default function GenericFilter({
           <div key={field.name} className="d-flex gap-2">
             <div className="w-100">
               <label className="form-label mb-1">{field.label}</label>
-            
-                <Select
+              
+              <Select
                 key={field.name}
                 className="w-100"
                 classNamePrefix="select"
                 isClearable={true}
                 isMulti={field.isMulti}
                 isSearchable={true}
+                isDisabled={field.disabled}
                 value={field.isMulti 
                   ? (selectedFilters[field.name] || []).map((val: string) => 
                       field.options?.find(opt => opt.value === val)
@@ -535,12 +574,16 @@ export default function GenericFilter({
                   value: option.value,
                   label: option.label
                 }))}
-              
+                placeholder={field.placeholder}
               />
-          
+              
+              {field.description && (
+                <small className="text-muted mt-1 d-block">
+                  {field.description}
+                </small>
+              )}
+            </div>
           </div>
-          </div>
-          
         );
 
       case 'multiSelect':
@@ -836,6 +879,11 @@ export default function GenericFilter({
                       <Card>
                         <Card.Header className="p-3 bg-gray-200">
                           <h5>{tab.title}</h5>
+                          {tab.description && (
+                            <small className="text-muted d-block mt-1">
+                              {tab.description}
+                            </small>
+                          )}
                         </Card.Header>
                         <Card.Body className="p-2">
                           {tab.fields.map((field) => (

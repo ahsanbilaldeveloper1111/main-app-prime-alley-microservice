@@ -1426,7 +1426,7 @@ const Header = ({ themeMode }: any) => {
                                     <li className="pc-item">
                                         <Link className="pc-link" href={`${baseUrl}/tickets/statuses`} >
                                             <span className="pc-micon"><i className="ph-duotone ph-link"></i></span>
-                                            <span className="pc-mtext">Statuses</span>
+                                            <span className="pc-mtext">Status</span>
                                         </Link>
                                     </li>
                                     )}
