@@ -23,6 +23,7 @@ import imgStatus3 from '@assets/images/widget/img-status-3.svg'
 import imgStatus4 from '@assets/images/widget/img-status-4.svg'
 import EmptyState from '@components/EmptyState';
 import dynamic from 'next/dynamic';
+import '@assets/scss/tabs.scss'
 
 const ReactApexChart = dynamic(() => import('react-apexcharts'), { ssr: false });
 
@@ -31,10 +32,12 @@ interface Summary {
     departments: number;
     ranks: number;
     groups: number;
+    activeUsers: number;
 }
 
 const Users = () => {
     const { data:session, status } = useSession();
+    const [activeTab, setActiveTab] = useState('overview');
 
     // Local dynamic custom-field columns
     const [customFieldColumns, setCustomFieldColumns] = useState<Column[]>([]);
@@ -43,31 +46,41 @@ const Users = () => {
     const baseColumns: Column[] = useMemo(() => [
         //{ key: 'ID', name: 'id', selector: (row: any) => row.id, sortable: true },
         ...(session?.user?.permissions?.includes('show-ldap-uuid-users') ? [
-            { key: 'User ID', name: 'ldap_uid', selector: (row: any) => row.ldap_uid, sortable: true }
+            { key: 'ldap_uid', name: 'User ID', selector: (row: any) => row.ldap_uid, sortable: true }
         ] : []),
-        { key: 'DisplayName', name: 'name', selector: (row: any) => row.name, sortable: true },
+        { key: 'name', name: 'Display Name', selector: (row: any) => row.name, sortable: true },
         { key: 'Email', name: 'email', selector: (row: any) => row.email, sortable: true },
         { key: 'Username', name: 'username', selector: (row: any) => row.username, sortable: true },
-        { key: 'Ext', name: 'phone', selector: (row: any) => row.phone, sortable: true },
+        { key: 'phone', name: 'Extension', selector: (row: any) => row.phone, sortable: true,
+          cell: (props: any) => {
+            return props.phone || '---';
+          }
+         },
         ...(session?.user?.permissions?.includes('show-ou-users') ? [
-            { key: 'OU', name: 'ou', selector: (row: any) => row.ou, sortable: true }
+            { key: 'OU', name: 'ou', selector: (row: any) => row.ou, sortable: true,
+              cell: (props: any) => {
+                return props.ou || '---';
+              }
+             }
         ] : []),
         { key: 'Department', name: 'department', selector: (row: any) => row.department, sortable: true,
             cell: (props: any) => {
-                console.log('Department:', props.department);
-                return props.department?.name ||'';
+                return props.department?.name || '---';
             }
          },
         { key: 'Company', name: 'company', selector: (row: any) => row.company, sortable: true,
             cell: (props: any) => {
-                console.log('Company:', props.company);
-                return props.company?.name ||'';
+                return props.company?.names || '---';
             }
          },
         { key: 'Role', name: 'role', selector: (row: any) => row.role, sortable: true },
-        { key: 'Group', name: 'group', selector: (row: any) => row.group, sortable: true },
+        { key: 'Group', name: 'group', selector: (row: any) => row.group, sortable: true ,
+          cell: (props: any) => {
+            return props.group || '---';
+          }
+        },
         { key: 'Status', name: 'status', selector: (row: any) => row.status, sortable: true },
-        { key: 'Last Synced', name: 'last_synced_at', selector: (row: any) => row.last_synced_at, sortable: true },
+        { key: 'last_synced_at', name: 'Last Synced', selector: (row: any) => row.last_synced_at, sortable: true },
     ], [session?.user?.permissions]);
 
     // Action column kept last
@@ -92,8 +105,6 @@ const Users = () => {
     // Memoize the columns array to prevent unnecessary re-renders
     const columns: Column[] = useMemo(() => {
         const finalColumns = [...baseColumns, ...customFieldColumns, actionColumn];
-        console.log('Final columns:', finalColumns);
-        console.log('Custom field columns count:', customFieldColumns.length);
         return finalColumns;
     }, [baseColumns, customFieldColumns, actionColumn]);
 
@@ -102,14 +113,14 @@ const Users = () => {
         users: 0,
         departments: 0,
         ranks: 0,
-        groups: 0
+        groups: 0,
+        activeUsers: 0
     });
 
     const fetchUsers = useCallback(
         async (page = 1, perPage = 15, search = "") => {
             const rssponse = await getAllUsers({ page, perPage, search, filters: currentFilters });
-            console.log(rssponse);
-
+            
             // Derive dynamic custom-field columns from the returned rows
             try {
                 const rows = rssponse?.dataList || rssponse?.dataList || [];
@@ -142,13 +153,11 @@ const Users = () => {
                         });
                     });
 
-                    console.log('Setting custom field columns:', dynamicCols);
                    // setCustomFieldColumns(dynamicCols);
                 } else {
                     setCustomFieldColumns([]);
                 }
             } catch (error) {
-                console.error('Error processing custom fields:', error);
                 setCustomFieldColumns([]);
             }
 
@@ -156,7 +165,9 @@ const Users = () => {
                 users: rssponse?.summary?.users,
                 departments: rssponse?.summary?.departments,
                 ranks: rssponse?.summary?.ranks,
-                groups: rssponse?.summary?.groups
+                groups: rssponse?.summary?.groups,
+                //activeUsers: rssponse?.summary?.activeUsers,
+                activeUsers: rssponse?.summary?.activeUserPercentage
             });
             return rssponse;
         },
@@ -264,213 +275,786 @@ const Users = () => {
         },
     });
 
+
+    const [ActiveInactiveChart, setActiveInactiveChart] = React.useState<{
+      series: {name: string, data: number[]}[];
+      options: any;
+  }>({
+      series: [
+        {
+          name: "Active",
+          data: [44, 55, 41, 17, 15, 34]
+        },
+        {
+          name: "Inactive",
+          data: [17, 15, 41, 55, 44, 34]
+        }
+      ],
+      options: {
+        chart: {
+          type: 'area',
+          toolbar: {
+            show: false
+          }
+        },
+        labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May','Jun'],
+        legend: {
+          position: 'bottom',
+          markers: {
+            shape: 'rect',
+            
+          }
+        },
+        plotOptions: {
+          pie: {
+            donut: {
+              size: '40%'
+            }
+          }
+        },
+        dataLabels: {
+          enabled: false,
+        },
+        responsive: [{
+          breakpoint: 480,
+          options: {
+            chart: {
+              width: 200
+            },
+            legend: {
+              position: 'bottom'
+            }
+          }
+        }]
+      },
+  });
+
+
+
+  const [FailedLoginAttemptsChart, setFailedLoginAttemptsChart] = React.useState<{
+    series: {name: string, data: number[]}[];
+    options: any;
+  }>({
+          
+    series: [{
+      name: 'Failed Login Attempts',
+      data: [44, 55, 57, 56, 61, 58, 63]
+    }],
+    options: {
+      chart: {
+        type: 'bar',
+        height: 350,
+        toolbar: {
+          show: false
+        }
+      },
+
+      toolbar: {
+        show: false
+      },
+      plotOptions: {
+        bar: {
+          horizontal: false,
+          columnWidth: '55%',
+          borderRadius: 5,
+          borderRadiusApplication: 'end'
+        },
+      },
+      dataLabels: {
+        enabled: false
+      },
+      stroke: {
+        show: true,
+        width: 2,
+        colors: ['transparent']
+      },
+      xaxis: {
+        categories: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+      },
+      yaxis: {
+        title: {
+         
+        }
+      },
+      fill: {
+        opacity: 1,
+        colors: ['#dc3545']
+      },
+    },
+});
+
+const [departmentGrowthChart, setDepartmentGrowthChart] = React.useState<{
+  series: {name: string, data: number[]}[];
+  options: any;
+}>({
+  series: [{
+    name: 'Sales',
+    data: [44, 55, 41, 17, 15, 34]
+  },
+  {
+    name: 'Role',
+    data: [17, 15, 41, 55, 44, 34]
+  }
+  ],
+  options: {
+    chart: {
+      type: 'donut',
+      toolbar: {
+        show: false
+      }
+    },
+    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May','Jun'],
+    legend: {
+      position: 'bottom',
+      markers: {
+        shape: 'rect',
+        
+      }
+    },
+    plotOptions: {
+      pie: {
+        donut: {
+          size: '40%'
+        }
+      }
+    },
+    dataLabels: {
+      enabled: false,
+    },
+    responsive: [{
+      breakpoint: 480,
+      options: {
+        chart: {
+          width: 200
+        },
+        legend: {
+          position: 'bottom'
+        }
+      }
+    }]
+  },
+});
+
+const [loginHeatMapChart, setLoginHeatMapChart] = React.useState<{
+  series: {name: string, data: number[]}[];
+  options: any;
+}>({
+  series: [
+    {
+      name: 'Monday',
+      data: [2, 1, 0, 0, 0, 0, 3, 15, 25, 30, 28, 22, 18, 20, 25, 30, 35, 40, 38, 32, 28, 20, 15, 8]
+    },
+    {
+      name: 'Tuesday',
+      data: [1, 0, 0, 0, 0, 0, 5, 18, 28, 35, 32, 25, 20, 22, 28, 35, 42, 45, 40, 35, 30, 22, 18, 10]
+    },
+    {
+      name: 'Wednesday',
+      data: [2, 1, 0, 0, 0, 0, 4, 16, 26, 32, 30, 24, 19, 21, 26, 32, 38, 42, 38, 33, 28, 21, 16, 9]
+    },
+    {
+      name: 'Thursday',
+      data: [1, 0, 0, 0, 0, 0, 3, 14, 24, 30, 28, 22, 18, 20, 25, 30, 36, 40, 36, 31, 26, 19, 14, 7]
+    },
+    {
+      name: 'Friday',
+      data: [3, 2, 1, 0, 0, 0, 6, 20, 30, 38, 35, 28, 22, 25, 30, 38, 45, 50, 45, 38, 32, 25, 20, 12]
+    },
+    {
+      name: 'Saturday',
+      data: [8, 5, 3, 2, 1, 0, 2, 8, 15, 20, 18, 15, 12, 10, 8, 6, 4, 3, 2, 1, 0, 0, 0, 0]
+    },
+    {
+      name: 'Sunday',
+      data: [6, 4, 2, 1, 0, 0, 1, 5, 10, 15, 12, 10, 8, 6, 4, 3, 2, 1, 0, 0, 0, 0, 0, 0]
+    }
+  ],
+  options: {
+    chart: {
+      type: 'heatmap',
+      height: 350,
+      toolbar: {
+        show: false
+      }
+    },
+    dataLabels: {
+      enabled: false
+    },
+    colors: ['#008FFB'],
+    xaxis: {
+      type: 'category',
+      categories: [
+        '12:00 AM', '1:00 AM', '2:00 AM', '3:00 AM', '4:00 AM', '5:00 AM',
+        '6:00 AM', '7:00 AM', '8:00 AM', '9:00 AM', '10:00 AM', '11:00 AM',
+        '12:00 PM', '1:00 PM', '2:00 PM', '3:00 PM', '4:00 PM', '5:00 PM',
+        '6:00 PM', '7:00 PM', '8:00 PM', '9:00 PM', '10:00 PM', '11:00 PM'
+      ],
+      labels: {
+        style: {
+          fontSize: '10px'
+        }
+      }
+    },
+    yaxis: {
+      labels: {
+        style: {
+          fontSize: '12px'
+        }
+      }
+    },
+    plotOptions: {
+      heatmap: {
+        shadeIntensity: 0.5,
+        radius: 0,
+        enableShades: false,
+        colorScale: {
+          ranges: [
+            {
+              from: 0,
+              to: 0,
+              color: '#E8F4FD',
+              name: 'No Activity'
+            },
+            {
+              from: 1,
+              to: 5,
+              color: '#B3D9F2',
+              name: 'Low Activity'
+            },
+            {
+              from: 6,
+              to: 15,
+              color: '#66A3D9',
+              name: 'Medium Activity'
+            },
+            {
+              from: 16,
+              to: 30,
+              color: '#1A75D2',
+              name: 'High Activity'
+            },
+            {
+              from: 31,
+              to: 100,
+              color: '#004C99',
+              name: 'Very High Activity'
+            }
+          ]
+        }
+      }
+    },
+    tooltip: {
+      y: {
+        formatter: function(val: number) {
+          return val + ' logins';
+        }
+      }
+    },
+    // title: {
+    //   text: 'Login Activity Heatmap',
+    //   align: 'center',
+    //   style: {
+    //     fontSize: '14px'
+    //   }
+    // }
+  }
+});
+
+// Function to generate realistic login heatmap data
+const generateLoginHeatmapData = () => {
+  const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+  const hours = 24;
+  
+  return days.map(day => {
+    const data = [];
+    for (let hour = 0; hour < hours; hour++) {
+      let loginCount = 0;
+      
+      // Business hours (8 AM - 6 PM) have higher activity
+      if (hour >= 8 && hour <= 18) {
+        // Weekdays have higher activity than weekends
+        if (day === 'Saturday' || day === 'Sunday') {
+          loginCount = Math.floor(Math.random() * 20) + 5; // 5-25 logins
+        } else {
+          loginCount = Math.floor(Math.random() * 40) + 20; // 20-60 logins
+        }
+        // Peak hours (9-11 AM and 2-4 PM) have even higher activity
+        if ((hour >= 9 && hour <= 11) || (hour >= 14 && hour <= 16)) {
+          loginCount += Math.floor(Math.random() * 20) + 10; // Additional 10-30 logins
+        }
+      } else if (hour >= 6 && hour <= 7) {
+        // Early morning (6-7 AM) - some early birds
+        loginCount = Math.floor(Math.random() * 15) + 5;
+      } else if (hour >= 19 && hour <= 22) {
+        // Evening (7-10 PM) - some late workers
+        loginCount = Math.floor(Math.random() * 10) + 2;
+      } else {
+        // Late night (11 PM - 5 AM) - minimal activity
+        loginCount = Math.floor(Math.random() * 5);
+      }
+      
+      data.push(loginCount);
+    }
+    
+    return {
+      name: day,
+      data: data
+    };
+  });
+};
+
+// Update login heatmap data when component mounts
+React.useEffect(() => {
+  const heatmapData = generateLoginHeatmapData();
+  setLoginHeatMapChart(prev => ({
+    ...prev,
+    series: heatmapData
+  }));
+}, []);
+
+
+
+
+    const renderOverviewTab = () => (
+        <>
+            <Row className="mb-3">
+                <Col md={12}>
+                    <div className="page-header-title">
+                        <div className="align-items-center row">
+                            <div className="col-md-4">
+                                <h3 className="mb-0 d-flex align-items-center">Overview</h3>
+                            </div>
+                            <div className="d-flex justify-content-end col-md-8">
+                                <UsersFilters onFiltersChange={handleFiltersChange} onExport={handleExport} />
+                            </div>
+                        </div>
+                        
+                    </div>
+                </Col>
+            </Row>
+
+            <Row>
+           <Col md={3}>
+              <div className="card statistics-card-1">
+                    <div className="card-body">
+                          <img src={imgStatus1.src} alt="img" className="img-fluid img-bg" />
+                          <div className="d-flex align-items-center">
+                                <div className="avtar bg-brand-color-1 text-white me-3">
+                                      <i className="ph-duotone ph-users f-26"></i>
+                                </div>
+                                <div>
+                                      <p className="text-muted mb-0">Users</p>
+                                      <div className="d-flex align-items-end">
+                                        {summary?.users > 0 ? (
+                                            <AnimatedNumber value={summary?.users} duration={1000} />
+                                        ) : (
+                                            <h2 className="mb-0 f-w-500">0</h2>
+                                        )}
+                                      </div>
+                                </div>  
+                          </div>
+                    </div>
+              </div>
+           </Col>
+
+           <Col md={3}>
+              <div className="card statistics-card-1">
+                    <div className="card-body">
+                          <img src={imgStatus1.src} alt="img" className="img-fluid img-bg" />
+                          <div className="d-flex align-items-center">
+                                <div className="avtar bg-brand-color-1 text-white me-3">
+                                      <i className="ph-duotone ph-buildings f-26"></i>
+                                </div>
+                                <div>
+                                      <p className="text-muted mb-0">Departments</p>
+                                      <div className="d-flex align-items-end">
+                                        {summary?.departments > 0 ? (
+                                            <AnimatedNumber value={summary?.departments} duration={1000} />
+                                        ) : (
+                                            <h2 className="mb-0 f-w-500">0</h2>
+                                        )}
+                                      </div>
+                                </div>
+                          </div>
+                    </div>
+              </div>
+           </Col>
+
+           <Col md={3}>
+              <div className="card statistics-card-1">
+                    <div className="card-body">
+                          <img src={imgStatus1.src} alt="img" className="img-fluid img-bg" />
+                          <div className="d-flex align-items-center">
+                                <div className="avtar bg-brand-color-2 text-white me-3">
+                                      <i className="ph-duotone ph-align-center-horizontal f-26"></i>
+                                </div>
+                                <div>
+                                      <p className="text-muted mb-0">Ranks</p>
+                                      <div className="d-flex align-items-end">
+                                        {summary?.ranks > 0 ? (
+                                            <AnimatedNumber value={summary?.ranks} duration={1000} />
+                                        ) : (
+                                            <h2 className="mb-0 f-w-500">0</h2>
+                                        )}
+                                      </div>
+                                </div>
+                          </div>
+                    </div>
+              </div>
+           </Col>
+
+           <Col md={3}>
+              <div className="card statistics-card-1">
+                    <div className="card-body">
+                          <img src={imgStatus2.src} alt="img" className="img-fluid img-bg" />
+                          <div className="d-flex align-items-center">
+                                <div className="avtar bg-brand-color-1 text-white me-3">
+                                      <i className="fas fa-layer-group f-26"></i>
+                                </div>
+                                <div>
+                                      <p className="text-muted mb-0">Groups</p>
+                                      <div className="d-flex align-items-end">
+                                        {summary?.groups > 0 ? (
+                                            <AnimatedNumber value={summary?.groups} duration={1000} />
+                                        ) : (
+                                            <h2 className="mb-0 f-w-500">0</h2>
+                                        )}
+                                      </div>
+                                </div>
+                          </div>
+                    </div>
+              </div>
+           </Col>
+        </Row>
+            
+            {session?.user?.permissions?.includes('list-users') && (
+                <GenericListPage
+                    key={`users-table-${customFieldColumns.length}-${customFieldColumns.map(c => c.key).join('|')}`}
+                    columns={columns}
+                    fetchData={fetchUsers}
+                    title="Users"
+                    searchPlaceholder="Search users..."
+                    defaultPageSize={15}
+                    filters={currentFilters}
+                    // Feature flags - set these to true to enable functionality
+                    rowClick={true}
+                    showCanvas={true}
+                />
+            )}
+
+            <Row className=" mt-3">
+              
+              <Col md={7} className="mb-3">
+                <div className="card">
+                  <div className="card-body">
+                    <h5>User Growwth (Last 6 Months)</h5>
+                    <ReactApexChart
+              options={growthChart.options}
+              series={growthChart.series}
+              type="area"
+              height={300}
+            />
+                  </div>
+                </div>
+              </Col>
+
+              <Col md={5} className="mb-3">
+                <div className="card">
+                  <div className="card-body">
+                    <h5>Department Distribution</h5>
+                    <ReactApexChart
+              options={departmentChart.options}
+              series={departmentChart.series}
+              type="donut"
+              height={300}
+            />
+                  </div>
+                </div>
+              </Col>
+
+              <Col md={12} className="mb-3">
+                <div className="card">
+                    <div className="card-header">
+                        <h5>Recent Activities</h5>
+                    </div>
+                  <div className="card-body">
+                  <Row className="recent-activity">
+                                        <Col md={1} className="d-flex align-items-center justify-content-center">
+                                            <div className="ico">
+                                            <i className="ti ti-history"></i>
+                                            </div>
+                                        </Col>
+                                        <Col md={10} className="d-flex align-items-center">
+                                            <div className="info">
+                                            <h6>Login to platform</h6>
+                                            <p className="mb-2 small">
+                                                <span className=""><b>Date: </b> </span>
+                                                <span className="text-muted me-4">23 Aug 2024</span>
+
+                                                <span className=""><b>Time: </b> </span>
+                                                <span className="text-muted me-4">12:00:00</span>
+
+                                                <span className=""><b>Device: </b> </span>
+                                                <span className="text-muted me-4">MacBook Pro</span>
+
+                                                <span className=""><b>Browser: </b> </span>
+                                                <span className="text-muted me-4">Chrome</span>
+
+
+                                            </p>
+                                            </div>
+                                        </Col>
+                                        <Col md={1} className="d-flex align-items-center justify-content-end">
+                                        <i className="ph-duotone ph-dots-three-outline-vertical"></i>
+                                        </Col>
+                                    </Row>
+                  </div>
+                </div>
+              </Col>
+
+
+            </Row>
+        </>
+    );
+
+    const renderInsightTab = () => (
+        <React.Fragment>
+            <Row>
+           <Col md={3}>
+              <div className="card statistics-card-1">
+                    <div className="card-body">
+                          <img src={imgStatus1.src} alt="img" className="img-fluid img-bg" />
+                          <div className="d-flex align-items-center">
+                                <div className="avtar bg-brand-color-1 text-white me-3">
+                                      <i className="ph-duotone ph-users f-26"></i>
+                                </div>
+                                <div>
+                                      <p className="text-muted mb-0">Users</p>
+                                      <div className="d-flex align-items-end">
+                                        {summary?.users > 0 ? (
+                                            <AnimatedNumber value={summary?.users} duration={1000} />
+                                        ) : (
+                                            <h2 className="mb-0 f-w-500">0</h2>
+                                        )}
+                                      </div>
+                                </div>  
+                          </div>
+                    </div>
+              </div>
+           </Col>
+
+           <Col md={3}>
+              <div className="card statistics-card-1">
+                    <div className="card-body">
+                          <img src={imgStatus1.src} alt="img" className="img-fluid img-bg" />
+                          <div className="d-flex align-items-center">
+                                <div className="avtar bg-brand-color-1 text-white me-3">
+                                      <i className="ph-duotone ph-users f-26"></i>
+                                </div>
+                                <div>
+                                      <p className="text-muted mb-0">Active Users</p>
+                                      <div className="d-flex align-items-end">
+                                        {summary?.activeUsers > 0 ? (
+                                            <div className="d-flex align-items-end">
+                                                <AnimatedNumber value={summary?.activeUsers} duration={1000} />
+                                                <span className="ms-1">%</span>
+                                            </div>
+                                        ) : (
+                                            <h2 className="mb-0 f-w-500">0%</h2>
+                                        )}
+                                      </div>
+                                </div>  
+                          </div>
+                    </div>
+              </div>
+           </Col>
+
+           <Col md={3}>
+              <div className="card statistics-card-1">
+                    <div className="card-body">
+                          <img src={imgStatus1.src} alt="img" className="img-fluid img-bg" />
+                          <div className="d-flex align-items-center">
+                                <div className="avtar bg-brand-color-1 text-white me-3">
+                                      <i className="ph-duotone ph-buildings f-26"></i>
+                                </div>
+                                <div>
+                                      <p className="text-muted mb-0">Departments</p>
+                                      <div className="d-flex align-items-end">
+                                        {summary?.departments > 0 ? (
+                                            <AnimatedNumber value={summary?.departments} duration={1000} />
+                                        ) : (
+                                            <h2 className="mb-0 f-w-500">0</h2>
+                                        )}
+                                      </div>
+                                </div>
+                          </div>
+                    </div>
+              </div>
+           </Col>
+
+           <Col md={3}>
+              <div className="card statistics-card-1">
+                    <div className="card-body">
+                          <img src={imgStatus1.src} alt="img" className="img-fluid img-bg" />
+                          <div className="d-flex align-items-center">
+                                <div className="avtar bg-brand-color-2 text-white me-3">
+                                      <i className="ph-duotone ph-align-center-horizontal f-26"></i>
+                                </div>
+                                <div>
+                                      <p className="text-muted mb-0">Ranks</p>
+                                      <div className="d-flex align-items-end">
+                                        {summary?.ranks > 0 ? (
+                                            <AnimatedNumber value={summary?.ranks} duration={1000} />
+                                        ) : (
+                                            <h2 className="mb-0 f-w-500">0</h2>
+                                        )}
+                                      </div>
+                                </div>
+                          </div>
+                    </div>
+              </div>
+           </Col>
+
+           
+        </Row>
+
+
+
+        <Row>
+          <Col md={4}>
+            <div className="card">
+              <div className="card-body">
+                <h5>Active vs Inactive Users</h5>
+                <ReactApexChart
+              options={ActiveInactiveChart.options}
+              series={ActiveInactiveChart.series}
+              type="area"
+              height={300}
+            />
+              </div>
+            </div>
+          </Col>
+          <Col md={4}>
+            <div className="card">
+              <div className="card-body">
+                <h5>Failed Login Attempts</h5>
+                <ReactApexChart
+              options={FailedLoginAttemptsChart.options}
+              series={FailedLoginAttemptsChart.series}
+              type="bar"
+              height={300}
+            />
+              </div>
+            </div>
+          </Col>
+          <Col md={4}>
+            <div className="card">
+              <div className="card-body">
+                <h5>Department / Role Growth</h5>
+                <ReactApexChart
+              options={departmentGrowthChart.options}
+              series={departmentGrowthChart.series}
+              type="area"
+              height={300}
+            />
+              </div>
+            </div>
+          </Col>
+        </Row>
+
+        <Row>
+          <Col md={8}>
+            <div className="card">
+              <div className="card-body">
+                <div className="d-flex justify-content-between align-items-center mb-3">
+                  <h5 className="mb-0">Login Heat Map</h5>
+                  {/* <Button 
+                    size="sm" 
+                    variant="outline-primary"
+                    onClick={() => {
+                      const heatmapData = generateLoginHeatmapData();
+                      setLoginHeatMapChart(prev => ({
+                        ...prev,
+                        series: heatmapData
+                      }));
+                    }}
+                  >
+                    <i className="ph-duotone ph-arrow-clockwise me-1"></i>
+                    Refresh
+                  </Button> */}
+                </div>
+                <ReactApexChart
+                  options={loginHeatMapChart.options}
+                  series={loginHeatMapChart.series}
+                  type="heatmap"
+                  height={350}
+                />
+              </div>
+            </div>
+          </Col>
+
+          <Col md={4}>
+            <div className="card">
+              <div className="card-body">
+                <h5>Geo Map of Login</h5>
+              </div>
+            </div>
+          </Col>
+        </Row>
+
+
+
+        </React.Fragment>
+    );
+
     return (
         <ProtectedRoute requiredPermissions={['view-users']}>
             <React.Fragment>
                 <BreadcrumbItem mainTitle="Controlhub" mainLink="/controlhub/users" subTitle="Users" />
                 
+                {/* Tabs Navigation */}
                 <Row className="mb-3">
                     <Col md={12}>
-                        <div className="page-header-title">
-                            <div className="align-items-center row">
-                                <div className="col-md-4">
-                                    <h3 className="mb-0 d-flex align-items-center">User Directory</h3>
-                                </div>
-                                <div className="d-flex justify-content-end col-md-8">
-                                    <UsersFilters onFiltersChange={handleFiltersChange} onExport={handleExport} />
-                                </div>
-                            </div>
-                            
-                        </div>
+                    <ul id="system-tabs" className="mb-3 tab-style-two nav nav-tabs" role="tablist">
+                                            <li className="nav-item" role="presentation">
+                                                <button
+                                                    className={`nav-link ${activeTab === 'overview' ? 'active' : ''}`}
+                                                    onClick={() => setActiveTab('overview')}
+                                                    type="button"
+                                                    role="tab"
+                                                >
+                                                    <i className="ph-duotone ph-users me-2"></i>
+                                                    Overview
+                                                </button>
+                                            </li>
+                                            <li className="nav-item" role="presentation">
+                                                <button
+                                                    className={`nav-link ${activeTab === 'insight' ? 'active' : ''}`}
+                                                    onClick={() => setActiveTab('insight')}
+                                                    type="button"
+                                                    role="tab"
+                                                >
+                                                    <i className="ph-duotone ph-chart-line-up me-2"></i>
+                                                    Insight
+                                                </button>
+                                            </li>
+                                        </ul>
                     </Col>
                 </Row>
 
-                <Row>
-               <Col md={3}>
-                  <div className="card statistics-card-1">
-                        <div className="card-body">
-                              <img src={imgStatus1.src} alt="img" className="img-fluid img-bg" />
-                              <div className="d-flex align-items-center">
-                                    <div className="avtar bg-brand-color-1 text-white me-3">
-                                          <i className="ph-duotone ph-users f-26"></i>
-                                    </div>
-                                    <div>
-                                          <p className="text-muted mb-0">Users</p>
-                                          <div className="d-flex align-items-end">
-                                            {summary?.users > 0 ? (
-                                                <AnimatedNumber value={summary?.users} duration={1000} />
-                                            ) : (
-                                                <h2 className="mb-0 f-w-500">0</h2>
-                                            )}
-                                          </div>
-                                    </div>  
-                              </div>
+                {/* Tab Content */}
+                <div className="tab-content">
+                    {activeTab === 'overview' && (
+                        <div className="tab-pane fade show active" role="tabpanel">
+                            {renderOverviewTab()}
                         </div>
-                  </div>
-               </Col>
-
-               <Col md={3}>
-                  <div className="card statistics-card-1">
-                        <div className="card-body">
-                              <img src={imgStatus1.src} alt="img" className="img-fluid img-bg" />
-                              <div className="d-flex align-items-center">
-                                    <div className="avtar bg-brand-color-1 text-white me-3">
-                                          <i className="ph-duotone ph-buildings f-26"></i>
-                                    </div>
-                                    <div>
-                                          <p className="text-muted mb-0">Departments</p>
-                                          <div className="d-flex align-items-end">
-                                            {summary?.departments > 0 ? (
-                                                <AnimatedNumber value={summary?.departments} duration={1000} />
-                                            ) : (
-                                                <h2 className="mb-0 f-w-500">0</h2>
-                                            )}
-                                          </div>
-                                    </div>
-                              </div>
+                    )}
+                    {activeTab === 'insight' && (
+                        <div className="tab-pane fade show active" role="tabpanel">
+                            {renderInsightTab()}
                         </div>
-                  </div>
-               </Col>
-
-               <Col md={3}>
-                  <div className="card statistics-card-1">
-                        <div className="card-body">
-                              <img src={imgStatus1.src} alt="img" className="img-fluid img-bg" />
-                              <div className="d-flex align-items-center">
-                                    <div className="avtar bg-brand-color-2 text-white me-3">
-                                          <i className="ph-duotone ph-align-center-horizontal f-26"></i>
-                                    </div>
-                                    <div>
-                                          <p className="text-muted mb-0">Ranks</p>
-                                          <div className="d-flex align-items-end">
-                                            {summary?.ranks > 0 ? (
-                                                <AnimatedNumber value={summary?.ranks} duration={1000} />
-                                            ) : (
-                                                <h2 className="mb-0 f-w-500">0</h2>
-                                            )}
-                                          </div>
-                                    </div>
-                              </div>
-                        </div>
-                  </div>
-               </Col>
-
-               <Col md={3}>
-                  <div className="card statistics-card-1">
-                        <div className="card-body">
-                              <img src={imgStatus2.src} alt="img" className="img-fluid img-bg" />
-                              <div className="d-flex align-items-center">
-                                    <div className="avtar bg-brand-color-1 text-white me-3">
-                                          <i className="fas fa-layer-group f-26"></i>
-                                    </div>
-                                    <div>
-                                          <p className="text-muted mb-0">Groups</p>
-                                          <div className="d-flex align-items-end">
-                                            {summary?.groups > 0 ? (
-                                                <AnimatedNumber value={summary?.groups} duration={1000} />
-                                            ) : (
-                                                <h2 className="mb-0 f-w-500">0</h2>
-                                            )}
-                                          </div>
-                                    </div>
-                              </div>
-                        </div>
-                  </div>
-               </Col>
-            </Row>
-                
-                {session?.user?.permissions?.includes('list-users') && (
-                    <GenericListPage
-                        key={`users-table-${customFieldColumns.length}-${customFieldColumns.map(c => c.key).join('|')}`}
-                        columns={columns}
-                        fetchData={fetchUsers}
-                        title="Users"
-                        searchPlaceholder="Search users..."
-                        defaultPageSize={15}
-                        filters={currentFilters}
-                        // Feature flags - set these to true to enable functionality
-                        rowClick={true}
-                        showCanvas={true}
-                    />
-                )}
-
-                <Row className=" mt-3">
-                  
-                  <Col md={7} className="mb-3">
-                    <div className="card">
-                      <div className="card-body">
-                        <h5>User Growwth (Last 6 Months)</h5>
-                        <ReactApexChart
-                  options={growthChart.options}
-                  series={growthChart.series}
-                  type="area"
-                  height={300}
-                />
-                      </div>
-                    </div>
-                  </Col>
-
-                  <Col md={5} className="mb-3">
-                    <div className="card">
-                      <div className="card-body">
-                        <h5>Department Distribution</h5>
-                        <ReactApexChart
-                  options={departmentChart.options}
-                  series={departmentChart.series}
-                  type="donut"
-                  height={300}
-                />
-                      </div>
-                    </div>
-                  </Col>
-
-                  <Col md={12} className="mb-3">
-                    <div className="card">
-                        <div className="card-header">
-                            <h5>Recent Activities</h5>
-                        </div>
-                      <div className="card-body">
-                      <Row className="recent-activity">
-                                                <Col md={1} className="d-flex align-items-center justify-content-center">
-                                                    <div className="ico">
-                                                    <i className="ti ti-history"></i>
-                                                    </div>
-                                                </Col>
-                                                <Col md={10} className="d-flex align-items-center">
-                                                    <div className="info">
-                                                    <h6>Login to platform</h6>
-                                                    <p className="mb-2 small">
-                                                        <span className=""><b>Date: </b> </span>
-                                                        <span className="text-muted me-4">23 Aug 2024</span>
-
-                                                        <span className=""><b>Time: </b> </span>
-                                                        <span className="text-muted me-4">12:00:00</span>
-
-                                                        <span className=""><b>Device: </b> </span>
-                                                        <span className="text-muted me-4">MacBook Pro</span>
-
-                                                        <span className=""><b>Browser: </b> </span>
-                                                        <span className="text-muted me-4">Chrome</span>
-
-
-                                                    </p>
-                                                    </div>
-                                                </Col>
-                                                <Col md={1} className="d-flex align-items-center justify-content-end">
-                                                <i className="ph-duotone ph-dots-three-outline-vertical"></i>
-                                                </Col>
-                                            </Row>
-                      </div>
-                    </div>
-                  </Col>
-
-
-                </Row>
-
-            
-
-
-
+                    )}
+                </div>
             </React.Fragment>
         </ProtectedRoute>
     );

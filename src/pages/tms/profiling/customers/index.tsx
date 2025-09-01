@@ -45,7 +45,7 @@ const CustomerProfilingList = () => {
         }
       },
       {key:'organization_unit',name:'Organization Unit',selector: (row: any) => row.organization_unit,sortable: true},
-      {action:true,name:'Action',selector: (row: any) => row.action,sortable: true,
+      {key: 'action', name: 'Action', selector: (row: any) => row.action, sortable: true,
         cell: (row: any) => {
           return <div className="d-flex gap-2">
             

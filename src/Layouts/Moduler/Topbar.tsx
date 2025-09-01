@@ -41,6 +41,7 @@ const TopBar = ({ handleOffcanvasToggle, changeThemeMode, toogleSidebarHide, too
     
     const [loggedInUserName, setLoggedInUserName] = useState('');
     const [loggedInUserEmail, setLoggedInUserEmail] = useState('');
+    const [isMobileSidebarActive, setIsMobileSidebarActive] = useState(false);
     
     useEffect(() => {
         if (status !=="loading" && session) {
@@ -77,6 +78,21 @@ const TopBar = ({ handleOffcanvasToggle, changeThemeMode, toogleSidebarHide, too
         }
     };
 
+    const handleMobileSidebarToggle = () => {
+        setIsMobileSidebarActive(!isMobileSidebarActive);
+        
+        // Toggle mob-sidebar-active class on navbar
+        const navbar = document.querySelector('.pc-sidebar');
+        if (navbar) {
+            navbar.classList.toggle('mob-sidebar-active');
+        }
+        
+        // Call the original toggle function if it exists
+        if (toogleMobileSidebarHide) {
+            toogleMobileSidebarHide();
+        }
+    };
+
     return (
         <React.Fragment>
 
@@ -85,14 +101,14 @@ const TopBar = ({ handleOffcanvasToggle, changeThemeMode, toogleSidebarHide, too
                     <div className="me-auto pc-mob-drp">
                         <ul className="list-unstyled">
                             <li className="pc-h-item pc-sidebar-collapse">
-                                <Link href="#" className="pc-head-link ms-0" id="sidebar-hide" onClick={toggleSidebar}>
+                                <Link href="javascript:void(0)" className="pc-head-link ms-0" id="sidebar-hide" onClick={toggleSidebar}>
                                     <i className="ti ti-menu-2"></i>
                                 </Link>
                             </li>
                             <li className="pc-h-item pc-sidebar-popup">
-                                <Link href="#" className="pc-head-link ms-0" id="mobile-collapse" onClick={toogleMobileSidebarHide}>
+                                <Button variant="link" className="pc-head-link ms-0" id="mobile-collapse" onClick={handleMobileSidebarToggle}>
                                     <i className="ti ti-menu-2"></i>
-                                </Link>
+                                </Button>
                             </li>
                             
                         </ul>

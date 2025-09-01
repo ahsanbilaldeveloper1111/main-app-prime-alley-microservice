@@ -1,10 +1,10 @@
 .data-item {
       .sbox{
-            border-bottom: 1px #d5d5d5 solid;
-            margin-bottom: 10px;
+            // border-bottom: 1px #d5d5d5 solid;
+            margin-bottom: 5px;
       }
       h5{
-            font-size: 14px;
+            font-size: 12px;
             text-transform: capitalize;
       }
   }
@@ -20,3 +20,109 @@
             color: #fff !important;
       }
 }
+
+.uAvatar {
+      display: flex;
+      align-items: center;
+      justify-content: start;
+      gap: 10px;
+      margin:0 0 20px;
+      
+      .iBox {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background-color: #bed4ee;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            font-weight: 600;
+            }
+            .dContent {
+                  
+                  
+                  .dName {
+                        font-size: 14px;
+                        font-weight: 600;
+                        margin-top:0px;
+                        margin-bottom: 0;
+                        white-space: nowrap;
+                        overflow: hidden;
+                        text-overflow: ellipsis;
+                        max-width: 200px;
+                  }
+                  .dRole {
+                        margin:0;
+                  }
+            }
+}
+.userActvityHistory{
+      margin-top: 20px;
+      h5{
+            font-size: 14px;
+            text-transform: capitalize;
+            margin:10px 0;
+      }
+}
+     
+        .timeline {
+              margin-top: 15px;
+              
+              .timeline-item {
+                    display: flex;
+                    align-items: flex-start;
+                    margin-bottom: 20px;
+                    position: relative;
+                    
+                    &:not(:last-child)::after {
+                          content: '';
+                          position: absolute;
+                          left: 20px;
+                          top: 40px;
+                          bottom: -20px;
+                          width: 2px;
+                          background-color: #e0e0e0;
+                    }
+                    
+                    .timeline-number {
+                          width: 40px;
+                          height: 40px;
+                          border-radius: 50%;
+                          background-color: #03a9f42b;
+                          color: #03A9F4;
+                          border: 1px #03A9F4 solid;
+                          display: flex;
+                          align-items: center;
+                          justify-content: center;
+                          font-size: 14px;
+                          font-weight: 600;
+                          margin-right: 15px;
+                          flex-shrink: 0;
+                    }
+                    
+                    .timeline-content {
+                          flex: 1;
+                          
+                          .activity-title {
+                                font-size: 14px;
+                                font-weight: 600;
+                                color: #333;
+                                margin-bottom: 1px;
+                          }
+                          
+                          .activity-time {
+                                font-size: 10px;
+                                color: #666;
+                                margin-bottom: 5px;
+                          }
+                          
+                          .activity-details {
+                                font-size: 13px;
+                                color: #555;
+                                line-height: 1.4;
+                          }
+                    }
+              }
+        }
+     

@@ -30,14 +30,25 @@ const Moduler = ({ children}: LayoutProps) => {
   };
   const toogleMobileSidebarHide = () => {
     const sidebarHideId = document.getElementById("pc-sidebar-hide") as HTMLDivElement | null;
+    const existingOverlay = document.querySelector('.pc-menu-overlay');
 
-    if (sidebarHideId) {
-      sidebarHideId.classList.toggle("mob-sidebar-active");
+    // If overlay already exists, remove it and close sidebar
+    if (existingOverlay) {
+      existingOverlay.remove();
+      if (sidebarHideId) {
+        sidebarHideId.classList.remove("mob-sidebar-active");
+      }
+      return;
     }
 
-    // Create a new element
+    // If no overlay exists, create one and open sidebar
+    if (sidebarHideId) {
+      sidebarHideId.classList.add("mob-sidebar-active");
+    }
+
+    // Create a new overlay element
     const newElement = document.createElement('div');
-    newElement.className = 'pc-menu-overlay'; // Set the desired class name
+    newElement.className = 'pc-menu-overlay';
 
     // Insert the new element after the .navbar-wrapper
     const navbarWrapper = document.querySelector('.navbar-wrapper') as Element | null;
@@ -45,12 +56,15 @@ const Moduler = ({ children}: LayoutProps) => {
       navbarWrapper.insertAdjacentElement('afterend', newElement);
     }
 
-    // Add an event listener to remove the "mob-sidebar-active" class when the new element is clicked
+    // Add an event listener to close the sidebar when the overlay is clicked
     newElement.addEventListener('click', function () {
-      if (sidebarHideId) {
-        sidebarHideId.classList.remove("mob-sidebar-active");
-        newElement.remove(); // Remove the new element when clicked
+      console.log("Overlay clicked - closing sidebar");
+      const navbar = document.querySelector('.pc-sidebar');
+      if (navbar) {
+        navbar.classList.remove("mob-sidebar-active");
+        newElement.remove();
       }
+      
     });
   };
 

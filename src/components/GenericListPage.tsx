@@ -16,6 +16,10 @@ interface GenericListPageProps {
     // Feature flags
     rowClick?: boolean;
     showCanvas?: boolean;
+    // Row selection
+    rowSelection?: boolean;
+    onSelectionChange?: (selectedRows: any[]) => void;
+    keyField?: string;
 }
 
 const GenericListPage: React.FC<GenericListPageProps> = ({
@@ -31,7 +35,11 @@ const GenericListPage: React.FC<GenericListPageProps> = ({
     pagination=true,
     // Feature flags
     rowClick = false,
-    showCanvas = false
+    showCanvas = false,
+    // Row selection
+    rowSelection = false,
+    onSelectionChange,
+    keyField
 }) => {
     const [data, setData] = useState<any[]>([]);
     const [loading, setLoading] = useState<boolean>(false);
@@ -144,6 +152,9 @@ const GenericListPage: React.FC<GenericListPageProps> = ({
                 showSearch={search}
                 pagination={pagination}
                 showPageSizeSelector={pagination}
+                rowSelection={rowSelection}
+                onSelectionChange={onSelectionChange}
+                keyField={keyField}
             />
             
             {showCanvas && (

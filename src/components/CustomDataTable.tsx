@@ -45,6 +45,10 @@ export interface CustomDataTableProps {
   // Feature flags
   rowClick?: boolean;
   showCanvas?: boolean;
+  // Row selection
+  rowSelection?: boolean;
+  onSelectionChange?: (selectedRows: any[]) => void;
+  keyField?: string;
   // Server-side pagination props
   serverSide?: boolean;
   paginationInfo?: ServerPaginationInfo;
@@ -87,13 +91,17 @@ const CustomDataTable: React.FC<CustomDataTableProps> = ({
   // Feature flags
   rowClick = false,
   showCanvas = false,
+  // Row selection
+  rowSelection = false,
+  onSelectionChange,
   // Server-side pagination props
   serverSide = false,
   paginationInfo,
   onPageChange,
   onPerPageChange,
   onSearch,
-  pagination=true
+  pagination=true,
+  keyField = "id"
 }) => {
   // State management
   const [pageSize, setPageSize] = useState<number>(defaultPageSize);
@@ -101,6 +109,7 @@ const CustomDataTable: React.FC<CustomDataTableProps> = ({
   const [visibleColumns, setVisibleColumns] = useState<string[]>(
     columns.map(col => col.key)
   );
+  const [selectedRows, setSelectedRows] = useState<any[]>([]);
 
   // Sync pageSize with server-side prop
   useEffect(() => {
@@ -180,6 +189,11 @@ const CustomDataTable: React.FC<CustomDataTableProps> = ({
     onSearch?.(e.target.value);
   };
 
+  const handleRowSelectionChange = (selected: { allSelected: boolean; selectedCount: number; selectedRows: unknown[] }) => {
+    setSelectedRows(selected.selectedRows);
+    onSelectionChange?.(selected.selectedRows);
+  };
+
   return (
     <div className="custom-datatable">
       {/* Title Section
@@ -246,7 +260,7 @@ const CustomDataTable: React.FC<CustomDataTableProps> = ({
               <div className="d-flex align-items-center justify-content-end">
                 <Dropdown>
                   <Dropdown.Toggle variant="outline-secondary" size="sm">
-                    Columns ({visibleColumns.length}/{columns.length})
+                    Customize Table ({visibleColumns.length}/{columns.length})
                   </Dropdown.Toggle>
                   <Dropdown.Menu>
                     <Dropdown.Header>Select Columns to Show</Dropdown.Header>
@@ -307,6 +321,17 @@ const CustomDataTable: React.FC<CustomDataTableProps> = ({
           onRowClicked={rowClick && onRowClick ? onRowClick : undefined}
           paginationTotalRows={serverSide ? paginationInfo?.totalRows : undefined}
           paginationServer={serverSide}
+          selectableRows={rowSelection}
+          onSelectedRowsChange={handleRowSelectionChange}
+          keyField={keyField}
+          selectableRowsComponentProps={{ 
+            style: { 
+              display: 'flex', 
+              justifyContent: 'center', 
+              alignItems: 'center',
+              width: '100%'
+            } 
+          }}
         />
       ) : (
         <div className="text-center p-4 border rounded">

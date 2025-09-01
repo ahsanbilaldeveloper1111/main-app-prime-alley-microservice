@@ -1,5 +1,5 @@
 import '@assets/scss/datatable-style.scss';
-import React, { ReactElement, useState, useCallback } from 'react';
+import React, { ReactElement, useState, useCallback, useMemo } from 'react';
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
 import GenericListPage from '@components/GenericListPage';
@@ -16,46 +16,57 @@ import Link from 'next/link';
 const Ranks = () => {
     const { data:session, status } = useSession();
    
-    const columns: Column[] = [
-        { key: 'Name', name: 'name', selector: (row: any) => row.name, sortable: true},
-
-        ...(session?.user?.is_admin === "1" ? [
-            { key: 'Company', name: 'company', selector: (row: any) => row.company, sortable: true }
-        ] : []),
-
-
-        {
-            key: 'Action',
-            name: 'ACTION',
-            selector: (row: any) => row.id,
-            sortable: false,
-            cell: (props: any) => (
-                
-                <div className="d-flex gap-3">
-    
-                    {session?.user?.permissions?.includes('edit-ranks')  && (
-                        <button className="btn btn-sm btn-outline-primary" onClick={() => handleEditRank(props)}>Edit Rank</button>
-                    )}  
-
-                    {session?.user?.permissions?.includes('delete-ranks')  && (
-                        <button className="btn btn-sm btn-outline-danger" onClick={() => handleDeleteRank(props)}>Delete Rank</button>
-                    )}
-
-                    {session?.user?.permissions?.includes('view-permissions-ranks')  && (
-                        <Link href={`/controlhub/ranks/permissions/${props.id}`} className="btn btn-sm btn-outline-primary">View Permissions</Link>
-                    )}
-                    
-                    {session?.user?.permissions?.includes('assign-permissions-ranks')  && (
-                        <Link href={`/controlhub/ranks/permissions/edit/${props.id}`} className="btn btn-sm btn-outline-danger">Assign Permissions</Link>
-                    )}
-    
-                </div>
-            ),
-        },
-    ];
-
     const [refreshKey, setRefreshKey] = useState<number>(0);
     const [currentFilters, setCurrentFilters] = useState({});
+    const [selectedRows, setSelectedRows] = useState<any[]>([]);
+    const [rowSelectionEnabled, setRowSelectionEnabled] = useState<boolean>(true);
+
+    const handleSelectionChange = (selectedRows: any[]) => {
+        setSelectedRows(selectedRows);
+        console.log('Selected rows:', selectedRows);
+    };
+
+    const columns: Column[] = useMemo(() => {
+        const baseColumns: Column[] = [
+            { key: 'Name', name: 'name', selector: (row: any) => row.name, sortable: true},
+
+            ...(session?.user?.is_admin === "1" ? [
+                { key: 'Company', name: 'company', selector: (row: any) => row.company, sortable: true }
+            ] : []),
+
+
+            {
+                key: 'Action',
+                name: 'ACTION',
+                selector: (row: any) => row.id,
+                sortable: false,
+                cell: (props: any) => (
+                    
+                    <div className="d-flex gap-3">
+        
+                        {session?.user?.permissions?.includes('edit-ranks')  && (
+                            <button className="btn btn-sm btn-outline-primary" onClick={() => handleEditRank(props)}>Edit Rank</button>
+                        )}  
+
+                        {session?.user?.permissions?.includes('delete-ranks')  && (
+                            <button className="btn btn-sm btn-outline-danger" onClick={() => handleDeleteRank(props)}>Delete Rank</button>
+                        )}
+
+                        {session?.user?.permissions?.includes('view-permissions-ranks')  && (
+                            <Link href={`/controlhub/ranks/permissions/${props.id}`} className="btn btn-sm btn-outline-primary">View Permissions</Link>
+                        )}
+                        
+                        {session?.user?.permissions?.includes('assign-permissions-ranks')  && (
+                            <Link href={`/controlhub/ranks/permissions/edit/${props.id}`} className="btn btn-sm btn-outline-danger">Assign Permissions</Link>
+                        )}
+        
+                    </div>
+                ),
+            },
+        ];
+        
+        return baseColumns;
+    }, [rowSelectionEnabled, session?.user?.is_admin, session?.user?.permissions]);
 
     const fetchRoles = useCallback(
         async (page = 1, perPage = 15, search = "") => {
@@ -151,13 +162,27 @@ const Ranks = () => {
                         <Button variant="outline-primary" size="sm" className="ms-3" onClick={() => setShowCreateRankModal(true)}>New Rank</Button>
                     )}
                     
-
                     <RolesFilters onFiltersChange={handleFiltersChange} onExport={handleExport} />
                     
                 </h2>
                 </div>
             </Col>
             </Row>
+
+            {rowSelectionEnabled && selectedRows.length > 0 && (
+                <Row className="mb-3">
+                    <Col md={12}>
+                        <div className="alert alert-info d-flex align-items-center justify-content-between .selectionRowBox ">
+                            <div className="selected-rows">
+                                <strong>{selectedRows.length}</strong> Selected
+                            </div>
+                            <div className="btn-group">
+                                <Button variant="outline-danger" size="sm" onClick={() => console.log('Bulk delete selected rows:', selectedRows)}>Bulk Delete</Button>
+                            </div>
+                        </div>
+                    </Col>
+                </Row>
+            )}
 
             {session?.user?.permissions?.includes('list-ranks') && (
                  <GenericListPage
@@ -168,6 +193,9 @@ const Ranks = () => {
                  defaultPageSize={15}
                  filters={currentFilters}
                  refreshKey={refreshKey}
+                 rowSelection={rowSelectionEnabled}
+                 onSelectionChange={handleSelectionChange}
+                 keyField="id"
              />
             )}
 
