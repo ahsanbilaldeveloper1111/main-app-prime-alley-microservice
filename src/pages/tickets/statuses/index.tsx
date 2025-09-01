@@ -122,8 +122,8 @@ const TicketStatuses = () => {
     }, []);
 
     const handleSubmitDeleteStatus  = useCallback(async () => {
-        const confirmDeleteValue = confirmDelete.trim().toLowerCase();
-        if(confirmDeleteValue == "delete"){
+        const confirmDeleteValue = confirmDelete.trim();
+        if(confirmDeleteValue === "DELETE"){
             const response = await DeleteStatus(selectedStatus);
             if(response){
                 setSelectedStatus(null);
@@ -133,7 +133,7 @@ const TicketStatuses = () => {
                 setRefreshKey(prev => prev + 1); // Trigger refresh
             }
         }else{
-            toast.error('Please type the word delete to confirm');
+            toast.error('Please type the word DELETE to confirm');
         }
     }, [confirmDelete, selectedStatus]);
 
@@ -166,12 +166,12 @@ const TicketStatuses = () => {
 
     return (
         <React.Fragment>
-            <BreadcrumbItem mainTitle="Tickets" mainLink="/tickets/statuses" subTitle="Ticket Statuses" />
+            <BreadcrumbItem mainTitle="Tickets" mainLink="/tickets/statuses" subTitle="Ticket Status" />
             <Row className="mb-3">
             <Col md={12}>
                 <div className="page-header-title">
                 <h2 className="mb-0 d-flex align-items-center">
-                    Ticket Statuses
+                    Ticket Status
                     {session?.user?.permissions?.includes('create-ticket-status-tickets') && (
                         <Button variant="outline-primary" size="sm" className="ms-3" onClick={openCreateStatusModal}>New Status</Button>
                     )}
@@ -185,7 +185,7 @@ const TicketStatuses = () => {
                  <GenericListPage
                  columns={columns}
                  fetchData={fetchStatuses}
-                 title="Statuses"
+                 title="Status"
                  searchPlaceholder="Search statuses..."
                  defaultPageSize={15}
                  filters={memoizedFilters}
@@ -237,9 +237,9 @@ const TicketStatuses = () => {
                             Are you sure you want to delete this <b className="text-danger">{selectedStatusName}</b> status?
                         </p>
                         <p>
-                            Type the word <b className="text-danger">delete</b> to confirm
+                            Type the word <b className="text-danger">DELETE</b> to confirm
                         </p>
-                        <input type="text" className="form-control" id="confirmDelete" value={confirmDelete} onChange={handleConfirmDeleteChange} placeholder="Type the word delete to confirm" />
+                        <input type="text" className="form-control" id="confirmDelete" value={confirmDelete} onChange={handleConfirmDeleteChange} placeholder="Type the word DELETE to confirm" />
 
                     </Modal.Body>
                     <Modal.Footer>

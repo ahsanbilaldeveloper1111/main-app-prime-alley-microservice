@@ -69,7 +69,7 @@ export default function CrmFilters({ onFiltersChange, onExport }: CrmFiltersProp
       onFiltersChange={onFiltersChange}
       showFilters={showFilters}
       onExport={onExport}
-      showExport={showExport}
+      showExport={false}
       exportOptions={[
         { label: 'Excel', value: 'excel' },
         { label: 'PDF', value: 'pdf' }

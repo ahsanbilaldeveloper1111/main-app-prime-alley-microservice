@@ -163,8 +163,8 @@ const TicketTypes = () => {
   }, []);
 
   const handleSubmitDeleteType = useCallback(async () => {
-    const confirmDeleteValue = confirmDelete.trim().toLowerCase();
-    if (confirmDeleteValue == "delete") {
+    const confirmDeleteValue = confirmDelete.trim();
+    if (confirmDeleteValue === "DELETE") {
       const response = await DeleteType(selectedType);
       if (response) {
         setSelectedType(null);
@@ -174,7 +174,7 @@ const TicketTypes = () => {
         setRefreshKey((prev) => prev + 1); // Trigger refresh
       }
     } else {
-      toast.error("Please type the word delete to confirm");
+      toast.error("Please type the word DELETE to confirm");
     }
   }, [confirmDelete, selectedType]);
 
@@ -329,7 +329,7 @@ const TicketTypes = () => {
               <b className="text-danger">{selectedTypeName}</b> ticket type?
             </p>
             <p>
-              Type the word <b className="text-danger">delete</b> to confirm
+              Type the word <b className="text-danger">DELETE</b> to confirm
             </p>
             <input
               type="text"
@@ -337,7 +337,7 @@ const TicketTypes = () => {
               id="confirmDelete"
               value={confirmDelete}
               onChange={handleConfirmDeleteChange}
-              placeholder="Type the word delete to confirm"
+              placeholder="Type the word DELETE to confirm"
             />
           </Modal.Body>
           <Modal.Footer>

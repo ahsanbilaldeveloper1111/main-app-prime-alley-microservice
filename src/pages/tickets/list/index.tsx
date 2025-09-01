@@ -30,7 +30,7 @@ import { useTokenService } from "src/hooks/useTokenService";
 import { useSession } from "next-auth/react";
 import moment from "moment";
 import { CreateStatus } from "@utils/ticket-statuses";
-import { GetAllModules } from "@utils/ticket-module";
+import { GetAllModules, GetAllSubmodules, GetAllSubmoduleChildren } from "@utils/ticket-module";
 import Select from "react-select";
 import TicketsFilters from "@components/filters/TicketFilters";
 
@@ -64,9 +64,15 @@ const TicketList = () => {
     () => [
       {
         key: "title",
-        name: "Title",
+        name: "Ticket ID & Title",
         selector: (row: any) => row.title,
         sortable: true,
+        cell: (props: any) => (
+          <div>
+            <div className="fw-bold text-primary">#{props.id}</div>
+            <div>{props.title}</div>
+          </div>
+        ),
       },
       {
         key: "type",
@@ -86,6 +92,18 @@ const TicketList = () => {
         name: "Description",
         selector: (row: any) => row.description,
         sortable: true,
+        cell: (props: any) => {
+          const description = props.description || '';
+          const truncatedDescription = description.length > 50 
+            ? description.substring(0, 50) + '...' 
+            : description;
+          
+          return (
+            <div title={description}>
+              {truncatedDescription}
+            </div>
+          );
+        },
       },
       {
         key: "user_extension",
@@ -96,7 +114,7 @@ const TicketList = () => {
           <span className="badge bg-info">
             {extensions.find(
               (extension: any) =>
-                extension.id.toString() === props.user_extension?.toString()
+                extension.id == props.user_extension
             )?.display_name || props.user_extension}
           </span>
         ),
@@ -137,8 +155,8 @@ const TicketList = () => {
         selector: (row: any) => row.priority,
         sortable: true,
         cell: (props: any) => {
-          const priorityLabels = ["Low", "Medium", "High"];
-          const priorityColors = ["bg-success", "bg-warning", "bg-danger"];
+          const priorityLabels = ["Low", "Medium", "High", "Critical"];
+          const priorityColors = ["bg-success", "bg-warning", "bg-danger", "bg-danger"];
           return (
             <span
               className={`badge ${
@@ -276,14 +294,7 @@ const TicketList = () => {
   const [viewTicketData, setViewTicketData] = useState<any>([]);
   const [showImageModal, setShowImageModal] = useState<boolean>(false);
   const [selectedImage, setSelectedImage] = useState<string>("");
-  const handleViewTicket = useCallback((props: any) => {
-    setViewTicketData(props);
-    console.log("View ticket:", props);
-    setShowViewTicketModal(true);
-    // Fetch comments when opening the modal
-    fetchComments(props.id);
-  }, []);
-
+  
   const closeViewTicketModal = useCallback(
     () => {
       setShowViewTicketModal(false);
@@ -339,6 +350,43 @@ const TicketList = () => {
     }
   }, []);
 
+  const handleViewTicket = useCallback(async (props: any) => {
+    setViewTicketData(props);
+    console.log("View ticket:", props);
+    setShowViewTicketModal(true);
+    
+    // Fetch comments when opening the modal
+    fetchComments(props.id);
+    
+    // Fetch submodule and submodule child data if module_id exists
+    if (props.module_id) {
+      try {
+        const submoduleData = await GetAllSubmodules();
+        const filteredSubmodules = submoduleData?.filter((sub: any) => sub.module_id == props.module_id) || [];
+        
+        if (props.submodule_id) {
+          const submoduleChildData = await GetAllSubmoduleChildren();
+          const filteredChildren = submoduleChildData?.filter((child: any) => child.submodule_id == props.submodule_id) || [];
+          
+          // Update viewTicketData with the fetched submodule information
+          setViewTicketData({
+            ...props,
+            submodule: filteredSubmodules.find((sub: any) => sub.id == props.submodule_id),
+            submodule_child: filteredChildren.find((child: any) => child.id == props.submodule_child_id)
+          });
+        } else {
+          setViewTicketData({
+            ...props,
+            submodule: null,
+            submodule_child: null
+          });
+        }
+      } catch (error) {
+        console.error('Error fetching submodule data:', error);
+      }
+    }
+  }, []);
+
   const handleAddComment = useCallback(async (ticketId: string) => {
     if (!newComment.trim()) {
       toast.error('Please enter a comment');
@@ -387,20 +435,7 @@ const TicketList = () => {
     useState<boolean>(false);
   const [showDeleteTicketModal, setShowDeleteTicketModal] =
     useState<boolean>(false);
-  const handleEditTicket = useCallback(
-    (props: any) => {
-      console.log("Edit ticket props:", props);
-      console.log("User extension from props:", props.user_extension);
-      console.log("Available extensions:", extensions);
 
-
-      setSelectedTicket(props);
-      setSelectedTicketTitle(props.title);
-      setSelectedTicketDescription(props.description);
-      setShowEditTicketModal(true);
-    },
-    [extensions]
-  );
 
   const handleSubmitEditTicket = useCallback(async () => {
     //console.log('Submit edit group:', selectedGroup, selectedGroupName);
@@ -411,6 +446,8 @@ const TicketList = () => {
       selectedTicket.ticket_type_id || selectedTicket.type,
       selectedTicket.ticket_status_id,
       selectedTicket.module_id,
+      selectedTicket.submodule_id,
+      selectedTicket.submodule_child_id,
       selectedTicket.user_extension,
       selectedTicket.priority,
       selectedTicket.due_date
@@ -433,8 +470,8 @@ const TicketList = () => {
   }, []);
 
   const handleSubmitDeleteTicket = useCallback(async () => {
-    const confirmDeleteValue = confirmDelete.trim().toLowerCase();
-    if (confirmDeleteValue == "delete") {
+    const confirmDeleteValue = confirmDelete.trim();
+    if (confirmDeleteValue === "DELETE") {
       const response = await DeleteTicket(selectedTicket);
       if (response) {
         setSelectedTicket(null);
@@ -444,7 +481,7 @@ const TicketList = () => {
         setRefreshKey((prev) => prev + 1); // Trigger refresh
       }
     } else {
-      toast.error("Please type the word delete to confirm");
+      toast.error("Please type the word DELETE to confirm");
     }
   }, [confirmDelete, selectedTicket]);
 
@@ -460,6 +497,13 @@ const TicketList = () => {
   const [newTicketDueDate, setNewTicketDueDate] = useState<string>("");
 
   const [newTicketImage, setNewTicketImage] = useState<File | null>(null);
+  
+  // Add state for submodules and submodule children
+  const [newTicketSubmodule, setNewTicketSubmodule] = useState<string>("");
+  const [newTicketSubmoduleChild, setNewTicketSubmoduleChild] = useState<string>("");
+  const [submodules, setSubmodules] = useState<any[]>([]);
+  const [submoduleChildren, setSubmoduleChildren] = useState<any[]>([]);
+
   console.log("ZE UES IS ", session);
   const handleSubmitCreateTicket = useCallback(async () => {
     console.log("=== COMPONENT DEBUG ===");
@@ -477,6 +521,12 @@ const TicketList = () => {
     formData.append("ticket_type_id", newTicketType);
     formData.append("ticket_status_id", newTicketStatus);
     formData.append("module_id", newTicketModule);
+    if (newTicketSubmodule) {
+      formData.append("submodule_id", newTicketSubmodule);
+    }
+    if (newTicketSubmoduleChild) {
+      formData.append("submodule_child_id", newTicketSubmoduleChild);
+    }
     formData.append("priority", newTicketPriority || "0");
     
     formData.append("created_by", "321");
@@ -511,9 +561,13 @@ const TicketList = () => {
       setNewTicketType("");
       setNewTicketStatus("");
       setNewTicketModule("");
+      setNewTicketSubmodule("");
+      setNewTicketSubmoduleChild("");
       setNewTicketPriority("");
       setNewTicketDueDate("");
       setNewTicketImage(null);
+      setSubmodules([]);
+      setSubmoduleChildren([]);
       setShowCreateTicketModal(false);
       setRefreshKey((prev) => prev + 1); // Trigger refresh
     }
@@ -523,6 +577,8 @@ const TicketList = () => {
     newTicketType,
     newTicketStatus,
     newTicketModule,
+    newTicketSubmodule,
+    newTicketSubmoduleChild,
     newTicketPriority,
     newTicketDueDate,
     newTicketImage,
@@ -541,9 +597,13 @@ const TicketList = () => {
     setNewTicketType("");
     setNewTicketStatus("");
     setNewTicketModule("");
+    setNewTicketSubmodule("");
+    setNewTicketSubmoduleChild("");
     setNewTicketPriority("");
     setNewTicketDueDate("");
     setNewTicketImage(null);
+    setSubmodules([]);
+    setSubmoduleChildren([]);
 
     // Reset the file input element
     const fileInput = document.getElementById(
@@ -603,6 +663,66 @@ const TicketList = () => {
 
   const closeImageModal = useCallback(() => setShowImageModal(false), []);
 
+  const fetchSubmodules = useCallback(async (moduleId: string) => {
+    if (moduleId) {
+      try {
+        const submoduleData = await GetAllSubmodules();
+        // Filter submodules by module_id
+        const filteredSubmodules = submoduleData?.filter((sub: any) => sub.module_id == moduleId) || [];
+        setSubmodules(filteredSubmodules);
+        setNewTicketSubmodule("");
+        setNewTicketSubmoduleChild("");
+        setSubmoduleChildren([]);
+      } catch (error) {
+        console.error('Error fetching submodules:', error);
+      }
+    } else {
+      setSubmodules([]);
+      setNewTicketSubmodule("");
+      setNewTicketSubmoduleChild("");
+      setSubmoduleChildren([]);
+    }
+  }, []);
+
+  const fetchSubmoduleChildren = useCallback(async (submoduleId: string) => {
+    if (submoduleId) {
+      try {
+        const childrenData = await GetAllSubmoduleChildren();
+        // Filter children by submodule_id
+        const filteredChildren = childrenData?.filter((child: any) => child.submodule_id == submoduleId) || [];
+        setSubmoduleChildren(filteredChildren);
+        setNewTicketSubmoduleChild("");
+      } catch (error) {
+        console.error('Error fetching submodule children:', error);
+      }
+    } else {
+      setSubmoduleChildren([]);
+      setNewTicketSubmoduleChild("");
+    }
+  }, []);
+
+  const handleEditTicket = useCallback(
+    async (props: any) => {
+      console.log("Edit ticket props:", props);
+      console.log("User extension from props:", props.user_extension);
+      console.log("Available extensions:", extensions);
+
+      setSelectedTicket(props);
+      setSelectedTicketTitle(props.title);
+      setSelectedTicketDescription(props.description);
+      setShowEditTicketModal(true);
+      
+      // Load submodules and submodule children for the selected module
+      if (props.module_id) {
+        await fetchSubmodules(props.module_id);
+        if (props.submodule_id) {
+          await fetchSubmoduleChildren(props.submodule_id);
+        }
+      }
+    },
+    [extensions, fetchSubmodules, fetchSubmoduleChildren]
+  );
+
   return (
     <React.Fragment>
       <BreadcrumbItem
@@ -653,7 +773,7 @@ const TicketList = () => {
           size="lg"
         >
           <Modal.Header closeButton>
-            <Modal.Title>Edit Ticket</Modal.Title>
+            <Modal.Title>Edit Ticket #{selectedTicket?.id}</Modal.Title>
           </Modal.Header>
           <Modal.Body>
             <div className="row">
@@ -693,7 +813,7 @@ const TicketList = () => {
                       <option
                         key={type.id}
                         value={type.id}
-                        selected={selectedTicket?.ticket_type_id === type.id}
+                        selected={selectedTicket?.ticket_type_id == type.id}
                       >
                         {type.name}
                       </option>
@@ -703,17 +823,7 @@ const TicketList = () => {
               </div>
             </div>
 
-            <div className="form-group mb-3">
-              <label htmlFor="editTicketDescription">Ticket Description</label>
-              <textarea
-                className="form-control"
-                id="editTicketDescription"
-                value={selectedTicketDescription}
-                onChange={handleEditTicketDescriptionChange}
-                placeholder="Ticket Description"
-                rows={4}
-              ></textarea>
-            </div>
+
 
             <div className="row">
               <div className="col-md-6">
@@ -735,7 +845,7 @@ const TicketList = () => {
                       <option
                         value={status.id}
                         selected={
-                          selectedTicket?.ticket_status_id === status.id
+                          selectedTicket?.ticket_status_id == status.id
                         }
                       >
                         {status.name}
@@ -751,23 +861,74 @@ const TicketList = () => {
                     className="form-control"
                     id="editTicketModule"
                     value={selectedTicket?.module_id || ""}
-                    onChange={(e) =>
+                    onChange={(e) => {
                       setSelectedTicket({
                         ...selectedTicket,
                         module_id: e.target.value,
-                      })
-                    }
+                      });
+                      fetchSubmodules(e.target.value);
+                    }}
                   >
                     <option value="">Select Module</option>
                     {modules.length > 0 &&
                       modules.map((module: any) => (
                         <option
                           value={module.id}
-                          selected={selectedTicket?.module_id === module.id}
+                          selected={selectedTicket?.module_id == module.id}
                         >
                           {module.name}
                         </option>
                       ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div className="row">
+              <div className="col-md-6">
+                <div className="form-group mb-3">
+                  <label htmlFor="editTicketSubmodule">Submodule (Required)</label>
+                  <select
+                    className="form-control"
+                    id="editTicketSubmodule"
+                    value={selectedTicket?.submodule_id || ""}
+                    onChange={(e) => {
+                      setSelectedTicket({
+                        ...selectedTicket,
+                        submodule_id: e.target.value,
+                      });
+                      fetchSubmoduleChildren(e.target.value);
+                    }}
+                    disabled={!selectedTicket?.module_id || submodules.length == 0}
+                  >
+                    <option value="">Select Submodule</option>
+                    {submodules.map((submodule: any) => (
+                      <option key={submodule.id} value={submodule.id}>
+                        {submodule.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div className="col-md-6">
+                <div className="form-group mb-3">
+                  <label htmlFor="editTicketSubmoduleChild">Submodule Child (Optional)</label>
+                  <select
+                    className="form-control"
+                    id="editTicketSubmoduleChild"
+                    value={selectedTicket?.submodule_child_id || ""}
+                    onChange={(e) => setSelectedTicket({
+                      ...selectedTicket,
+                      submodule_child_id: e.target.value,
+                    })}
+                    disabled={!selectedTicket?.submodule_id || submoduleChildren.length == 0}
+                  >
+                    <option value="">Select Submodule Child</option>
+                    {submoduleChildren.map((child: any) => (
+                      <option key={child.id} value={child.id}>
+                        {child.name}
+                      </option>
+                    ))}
                   </select>
                 </div>
               </div>
@@ -790,6 +951,7 @@ const TicketList = () => {
                 <option value="0">Low</option>
                 <option value="1">Medium</option>
                 <option value="2">High</option>
+                <option value="3">Critical</option>
               </select>
             </div>
 
@@ -870,7 +1032,7 @@ const TicketList = () => {
               <b className="text-danger">{selectedTicketTitle}</b> ticket?
             </p>
             <p>
-              Type the word <b className="text-danger">delete</b> to confirm
+              Type the word <b className="text-danger">DELETE</b> to confirm
             </p>
             <input
               type="text"
@@ -878,7 +1040,7 @@ const TicketList = () => {
               id="confirmDelete"
               value={confirmDelete}
               onChange={handleConfirmDeleteChange}
-              placeholder="Type the word delete to confirm"
+              placeholder="Type the word DELETE to confirm"
             />
           </Modal.Body>
           <Modal.Footer>
@@ -943,9 +1105,18 @@ const TicketList = () => {
                 id="newTicketDescription"
                 value={newTicketDescription}
                 onChange={handleNewTicketDescriptionChange}
-                placeholder="Ticket Description"
+                placeholder="Ticket Description (Min: 50 chars, Max: 500 chars)"
                 rows={4}
+                maxLength={500}
               ></textarea>
+              <div className="d-flex justify-content-between mt-1">
+                <small className={`text-muted ${newTicketDescription.length < 50 ? 'text-danger' : ''}`}>
+                  Min: 50 characters
+                </small>
+                <small className={`text-muted ${newTicketDescription.length > 500 ? 'text-danger' : ''}`}>
+                  {newTicketDescription.length}/500 characters
+                </small>
+              </div>
             </div>
 
             <div className="row">
@@ -974,7 +1145,10 @@ const TicketList = () => {
                     className="form-control"
                     id="newTicketModule"
                     value={newTicketModule || ""}
-                    onChange={(e) => setNewTicketModule(e.target.value)}
+                    onChange={(e) => {
+                      setNewTicketModule(e.target.value);
+                      fetchSubmodules(e.target.value);
+                    }}
                   >
                     <option value="">Select Module</option>
                     {modules.length > 0 &&
@@ -983,6 +1157,51 @@ const TicketList = () => {
                           {module.name}
                         </option>
                       ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div className="row">
+              <div className="col-md-6">
+                <div className="form-group mb-3">
+                  <label htmlFor="newTicketSubmodule">Submodule (Required)</label>
+                  <select
+                    className="form-control"
+                    id="newTicketSubmodule"
+                    value={newTicketSubmodule || ""}
+                    onChange={(e) => {
+                      setNewTicketSubmodule(e.target.value);
+                      fetchSubmoduleChildren(e.target.value);
+                    }}
+                    disabled={!newTicketModule || submodules.length == 0}
+                    required
+                  >
+                    <option value="">Select Submodule</option>
+                    {submodules.map((submodule: any) => (
+                      <option key={submodule.id} value={submodule.id}>
+                        {submodule.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div className="col-md-6">
+                <div className="form-group mb-3">
+                  <label htmlFor="newTicketSubmoduleChild">Submodule Child (Optional)</label>
+                  <select
+                    className="form-control"
+                    id="newTicketSubmoduleChild"
+                    value={newTicketSubmoduleChild || ""}
+                    onChange={(e) => setNewTicketSubmoduleChild(e.target.value)}
+                    disabled={!newTicketModule || submoduleChildren.length == 0}
+                  >
+                    <option value="">Select Submodule Child</option>
+                    {submoduleChildren.map((child: any) => (
+                      <option key={child.id} value={child.id}>
+                        {child.name}
+                      </option>
+                    ))}
                   </select>
                 </div>
               </div>
@@ -1000,6 +1219,7 @@ const TicketList = () => {
                 <option value="0">Low</option>
                 <option value="1">Medium</option>
                 <option value="2">High</option>
+                <option value="3">Critical</option>
               </select>
             </div>
 
@@ -1060,6 +1280,7 @@ const TicketList = () => {
             <Button
               variant="primary"
               onClick={() => handleSubmitCreateTicket()}
+              disabled={newTicketDescription.length < 50 || newTicketDescription.length > 500}
             >
               Create
             </Button>
@@ -1074,15 +1295,15 @@ const TicketList = () => {
           size="lg"
         >
           <Modal.Header closeButton>
-            <Modal.Title>Ticket Information</Modal.Title>
+            <Modal.Title>Ticket #{viewTicketData?.id} Information</Modal.Title>
           </Modal.Header>
           <Modal.Body>
             <table className="table table-bordered">
               <tbody>
-                {/* <tr>
-                                    <td><strong>Ticket ID</strong></td>
-                                    <td>{viewTicketData?.id}</td>
-                                </tr> */}
+                <tr>
+                  <td><strong>Ticket ID</strong></td>
+                  <td><span className="badge bg-primary">#{viewTicketData?.id}</span></td>
+                </tr>
                 <tr>
                   <td>
                     <strong>Ticket Title</strong>
@@ -1146,6 +1367,48 @@ const TicketList = () => {
                 </tr>
                 <tr>
                   <td>
+                    <strong>Submodule</strong>
+                  </td>
+                  <td>
+                    {viewTicketData?.submodule ? (
+                      <span
+                        className="badge"
+                        style={{
+                          backgroundColor: `${viewTicketData?.submodule?.color}30`,
+                          color: viewTicketData?.submodule?.color,
+                          fontWeight: "bold",
+                        }}
+                      >
+                        {viewTicketData?.submodule?.name}
+                      </span>
+                    ) : (
+                      <span className="text-muted">Not assigned</span>
+                    )}
+                  </td>
+                </tr>
+                <tr>
+                  <td>
+                    <strong>Submodule Child</strong>
+                  </td>
+                  <td>
+                    {viewTicketData?.submodule_child ? (
+                      <span
+                        className="badge"
+                        style={{
+                          backgroundColor: `${viewTicketData?.submodule_child?.color}30`,
+                          color: viewTicketData?.submodule_child?.color,
+                          fontWeight: "bold",
+                        }}
+                      >
+                        {viewTicketData?.submodule_child?.name}
+                      </span>
+                    ) : (
+                      <span className="text-muted">Not assigned</span>
+                    )}
+                  </td>
+                </tr>
+                <tr>
+                  <td>
                     <strong>User Extension</strong>
                   </td>
                   <td>
@@ -1153,7 +1416,7 @@ const TicketList = () => {
                       {/* {viewTicketData?.user_extension} */}
                       {extensions.find(
                         (extension: any) =>
-                          extension.id === viewTicketData?.user_extension
+                          extension.id == viewTicketData?.user_extension
                       )?.display_name || viewTicketData?.user_extension}
                     </span>
                   </td>
@@ -1322,7 +1585,7 @@ const TicketList = () => {
                                   <small className="text-muted" style={{ fontWeight: '600', color: '#6c757d' }}>
                                     {extensions.find(
                                       (extension: any) =>
-                                        extension.id.toString() === comment.user_extension?.toString()
+                                        extension.id == comment.user_extension
                                     )?.display_name || comment.user_extension || 'Unknown User'}
                                   </small>
                                   <div className="text-end">
@@ -1379,7 +1642,7 @@ const TicketList = () => {
                                   <small className="text-muted" style={{ fontWeight: '600', color: '#6c757d' }}>
                                     {extensions.find(
                                       (extension: any) =>
-                                        extension.id.toString() === comment.user_extension?.toString()
+                                        extension.id == comment.user_extension
                                     )?.display_name || comment.user_extension || 'Unknown User'}
                                   </small>
                                   <div className="text-end">

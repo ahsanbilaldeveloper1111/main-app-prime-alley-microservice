@@ -13,6 +13,7 @@ import { useSession } from 'next-auth/react';
 import moment from 'moment';
 import { GetHierarchyData } from '@utils/users';
 import Select from 'react-select';
+import { ListSubmodules, DeleteSubmodule } from '@utils/ticket-module';
 
 const TicketModules = () => {
     const { data:session, status } = useSession();
@@ -80,6 +81,13 @@ const TicketModules = () => {
                             Edit
                         </button>
                     )}  
+
+                    <button 
+                        className="btn btn-sm btn-outline-info" 
+                        onClick={() => openSubmoduleModal(props)}
+                    >
+                        Manage Submodules
+                    </button>
 
                     {session?.user?.permissions?.includes('delete-ticket-module-tickets')  && props.tickets_count == 0 && (
                         <button 
@@ -168,8 +176,8 @@ const TicketModules = () => {
     }, []);
 
     const handleSubmitDeleteModule = useCallback(async () => {
-        const confirmDeleteValue = confirmDelete.trim().toLowerCase();
-        if(confirmDeleteValue == "delete"){
+        const confirmDeleteValue = confirmDelete.trim();
+        if(confirmDeleteValue === "DELETE"){
             const response = await DeleteModule(selectedModule);
             if(response){
                 setSelectedModule(null);
@@ -179,7 +187,7 @@ const TicketModules = () => {
                 setRefreshKey(prev => prev + 1); // Trigger refresh
             }
         }else{
-            toast.error('Please type the word delete to confirm');
+            toast.error('Please type the word DELETE to confirm');
         }
     }, [confirmDelete, selectedModule]);
 
@@ -229,6 +237,54 @@ const TicketModules = () => {
     const handleEditModuleColorChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => setSelectedModuleColor(e.target.value), []);
     const handleConfirmDeleteChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => setConfirmDelete(e.target.value), []);
 
+    // Submodule management functions
+    const [selectedModuleForSubmodules, setSelectedModuleForSubmodules] = useState<any>(null);
+    const [showSubmoduleModal, setShowSubmoduleModal] = useState<boolean>(false);
+    const [submodules, setSubmodules] = useState<any[]>([]);
+
+
+
+
+    const openSubmoduleModal = useCallback((module: any) => {
+        setSelectedModuleForSubmodules(module);
+        setShowSubmoduleModal(true);
+        fetchSubmodulesForModule(module.id);
+    }, []);
+
+    const closeSubmoduleModal = useCallback(() => {
+        setShowSubmoduleModal(false);
+        setSelectedModuleForSubmodules(null);
+        setSubmodules([]);
+    }, []);
+
+    const fetchSubmodulesForModule = useCallback(async (moduleId: string) => {
+        try {
+            const response = await ListSubmodules({ filters: { module_id: moduleId } });
+            if (response?.data) {
+                setSubmodules(response.data);
+            }
+        } catch (error) {
+            console.error('Error fetching submodules:', error);
+        }
+    }, []);
+
+
+
+
+
+
+
+    const handleDeleteSubmodule = useCallback(async (submodule: any) => {
+        if (window.confirm(`Are you sure you want to delete submodule "${submodule.name}"?`)) {
+            const response = await DeleteSubmodule(submodule.id);
+            if (response) {
+                fetchSubmodulesForModule(selectedModuleForSubmodules.id);
+            }
+        }
+    }, [selectedModuleForSubmodules]);
+
+
+
     return (
         <React.Fragment>
             <BreadcrumbItem mainTitle="Tickets" mainLink="/tickets/modules" subTitle="Ticket Modules" />
@@ -240,7 +296,7 @@ const TicketModules = () => {
                     {session?.user?.permissions?.includes('create-ticket-module-tickets') && (
                         <Button variant="outline-primary" size="sm" className="ms-3" onClick={openCreateModuleModal}>New Module</Button>
                     )}
-                    
+                    <Button variant="outline-info" size="sm" className="ms-2" onClick={() => window.location.href = '/tickets/modules/submodules'}>Manage Submodules</Button>
                 </h2>
                 </div>
             </Col>
@@ -286,7 +342,7 @@ const TicketModules = () => {
                         </div>
 
                         <div className="form-group mb-3">
-                            <label htmlFor="editModuleUserExtension">User Extension (Optional)</label>
+                            <label htmlFor="editModuleUserExtension">User Extension d (Optional)</label>
                             <Select
                                 id="editModuleUserExtension"
                                 value={
@@ -335,9 +391,9 @@ const TicketModules = () => {
                             Are you sure you want to delete this <b className="text-danger">{selectedModuleName}</b> module?
                         </p>
                         <p>
-                            Type the word <b className="text-danger">delete</b> to confirm
+                            Type the word <b className="text-danger">DELETE</b> to confirm
                         </p>
-                        <input type="text" className="form-control" id="confirmDelete" value={confirmDelete} onChange={handleConfirmDeleteChange} placeholder="Type the word delete to confirm" />
+                        <input type="text" className="form-control" id="confirmDelete" value={confirmDelete} onChange={handleConfirmDeleteChange} placeholder="Type the word DELETE to confirm" />
 
                     </Modal.Body>
                     <Modal.Footer>
@@ -391,7 +447,7 @@ const TicketModules = () => {
                         </div>
 
                         <div className="form-group mb-3">
-                            <label htmlFor="newModuleUserExtension">User Extension (Optional)</label>
+                            <label htmlFor="newModuleUserExtension">User Extension a (Optional)</label>
                             <Select
                                 id="newModuleUserExtension"
                                 value={newModuleUserExtension}
@@ -413,6 +469,68 @@ const TicketModules = () => {
                     <Modal.Footer>
                         <Button variant="secondary" onClick={closeCreateModuleModal}>Close</Button>
                         <Button variant="primary" onClick={() => handleSubmitCreateModule()}>Create</Button>
+                    </Modal.Footer>
+                </Modal>
+            )}
+
+            {/* Submodule Management Modal */}
+            {showSubmoduleModal && (
+                <Modal
+                    show={showSubmoduleModal}
+                    onHide={closeSubmoduleModal}
+                    size="lg"
+                >
+                    <Modal.Header closeButton>
+                        <Modal.Title>Module Submodules - {selectedModuleForSubmodules?.name}</Modal.Title>
+                    </Modal.Header>
+                    <Modal.Body>
+                        <div className="text-center mb-4">
+                            <h5>Submodule Management</h5>
+                            <p className="text-muted">
+                                This module has {submodules.length} submodule{submodules.length !== 1 ? 's' : ''}.
+                            </p>
+                            <Button 
+                                variant="outline-info" 
+                                onClick={() => {
+                                    closeSubmoduleModal();
+                                    window.location.href = '/tickets/modules/submodules';
+                                }}
+                            >
+                                Go to Submodules Management Page
+                            </Button>
+                        </div>
+                        
+                        {submodules.length > 0 && (
+                            <div>
+                                <h6>Current Submodules:</h6>
+                                <div className="submodules-list" style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                                    {submodules.map((submodule: any) => (
+                                        <div key={submodule.id} className="card mb-2">
+                                            <div className="card-body p-2">
+                                                <div className="d-flex justify-content-between align-items-center">
+                                                    <div>
+                                                        <h6 className="mb-1">{submodule.name}</h6>
+                                                        <p className="mb-1 text-muted small">{submodule.description || 'No description'}</p>
+                                                    </div>
+                                                    <div>
+                                                        <Button 
+                                                            variant="outline-danger" 
+                                                            size="sm" 
+                                                            onClick={() => handleDeleteSubmodule(submodule)}
+                                                        >
+                                                            Delete
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </Modal.Body>
+                    <Modal.Footer>
+                        <Button variant="secondary" onClick={closeSubmoduleModal}>Close</Button>
                     </Modal.Footer>
                 </Modal>
             )}
