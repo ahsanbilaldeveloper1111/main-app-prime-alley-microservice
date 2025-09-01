@@ -3,12 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev  -p 4000",
+    "dev": "next dev",
     "build": "next build",
     "build:no-lint": "next build --no-lint",
     "build:silent": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+     "build:all-ts-errors": "__NEXT_TEST_MODE=true npm run build"
   },
   "dependencies": {
     "@ckeditor/ckeditor5-build-balloon": "^44.3.0",

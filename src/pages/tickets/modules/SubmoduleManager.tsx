@@ -104,7 +104,7 @@ const SubmoduleManager: React.FC<SubmoduleManagerProps> = ({ show, onHide, modul
             newSubmoduleDescription,
             module.id,
             newSubmoduleColor,
-            newSubmoduleUserExtension
+            // newSubmoduleUserExtension
         );
         
         if (response) {
@@ -460,7 +460,7 @@ const SubmoduleManager: React.FC<SubmoduleManagerProps> = ({ show, onHide, modul
 
                 {/* Edit Submodule Modal */}
                 {editingSubmodule && (
-                    <Modal show={!!editingSubmodule} onHide={() => setEditingSubmodule(null)} size="md">
+                    <Modal show={!!editingSubmodule} onHide={() => setEditingSubmodule(null)} size="lg">
                         <Modal.Header closeButton>
                             <Modal.Title>Edit Submodule</Modal.Title>
                         </Modal.Header>
@@ -532,7 +532,7 @@ const SubmoduleManager: React.FC<SubmoduleManagerProps> = ({ show, onHide, modul
 
                 {/* Edit Submodule Child Modal */}
                 {editingSubmoduleChild && (
-                    <Modal show={!!editingSubmoduleChild} onHide={() => setEditingSubmoduleChild(null)} size="md">
+                    <Modal show={!!editingSubmoduleChild} onHide={() => setEditingSubmoduleChild(null)} size="lg">
                         <Modal.Header closeButton>
                             <Modal.Title>Edit Submodule Child</Modal.Title>
                         </Modal.Header>

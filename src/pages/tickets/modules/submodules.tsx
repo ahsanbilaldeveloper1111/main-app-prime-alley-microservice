@@ -237,20 +237,20 @@ const SubmodulesPage = () => {
       key: 'module',
       name: 'Module',
       selector: (row: Submodule) => {
-        const module = modules.find(m => m.id == row.module_id);
-        return module?.name || 'Unknown';
+        const moduleItem = modules.find(m => m.id == row.module_id);
+        return moduleItem?.name || 'Unknown';
       },
       sortable: true,
       cell: (props: Submodule) => {
-        const module = modules.find(m => m.id == props.module_id);
+        const moduleItem = modules.find(m => m.id == props.module_id);
         return (
           <Badge 
             style={{ 
-              backgroundColor: module?.color || '#6c757d',
+              backgroundColor: moduleItem?.color || '#6c757d',
               color: 'white'
             }}
           >
-            {module?.name || 'Unknown'}
+            {moduleItem?.name || 'Unknown'}
           </Badge>
         );
       }
