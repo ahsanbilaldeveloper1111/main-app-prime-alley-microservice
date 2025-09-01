@@ -1,4 +1,6 @@
-import { ReportType, GroupingType } from '@components/CallReportsPage';
+// Define types locally since CallReportsPage component doesn't exist
+export type ReportType = 'stats' | 'trend' | 'incoming';
+export type GroupingType = 'extension' | 'department' | 'country';
 
 export interface CallReportConfig {
   reportType: ReportType;

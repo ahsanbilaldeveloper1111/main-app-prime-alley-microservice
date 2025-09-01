@@ -72,7 +72,7 @@ const CustomerProfilingLogs = () => {
             }
           },
 
-          {action:true,name:'Action',selector: (row: any) => row.action,sortable: true,
+          {key: "action", action:true,name:'Action',selector: (row: any) => row.action,sortable: true,
             cell: (row: any) => {
               return <div className="d-flex gap-2">
                 <Button size="sm" variant="outline-primary" onClick={() => {

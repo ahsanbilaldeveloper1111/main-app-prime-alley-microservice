@@ -51,8 +51,8 @@ const UnifiedOpsList = () => {
   );
 };
 
-TmsUserManagement.getLayout = (page: ReactElement) => {
+UnifiedOpsList.getLayout = (page: ReactElement) => {
   return <Layout>{page}</Layout>;
 };
 
-export default TmsUserManagement;
+export default UnifiedOpsList;
