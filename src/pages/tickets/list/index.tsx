@@ -303,11 +303,11 @@ const TicketList = () => {
   const [selectedImage, setSelectedImage] = useState<string>("");
 
   function loadImg(imgPath: string) {
-    if(viewTicketImage) { 
-    // URL.revokeObjectURL(viewTicketImage);
+    if (viewTicketImage) {
+      // URL.revokeObjectURL(viewTicketImage);
     }
     loadImage(imgPath).then((res: any) => {
-      console.log('ze ran', res);
+      console.log("ze ran", res);
       // const url = URL.createObjectURL(res);
       setViewTicketImage(res);
     });
@@ -317,10 +317,8 @@ const TicketList = () => {
     console.log("ZE RAN");
     if (viewTicketData?.image) {
       loadImg(viewTicketData.image);
-    }
-    else {
+    } else {
       setViewTicketImage("");
-      
     }
   }, [viewTicketData, viewTicketData?.image]);
 
@@ -573,7 +571,41 @@ const TicketList = () => {
     );
     console.log("newTicketImage MIME type:", newTicketImage?.type);
     console.log("newTicketImage size:", newTicketImage?.size);
-
+    if (newTicketDescription.length < 50 || newTicketDescription.length > 500) {
+      toast.error("Ticket description must be between 50 and 500 characters");
+      return;
+    }
+    if(!newTicketType)
+    {
+      toast.error("Please select a ticket type");
+      return;
+    }
+    if(!newTicketStatus)
+    {
+      toast.error("Please select a ticket status");
+      return;
+    }
+    if(!newTicketModule)
+    {
+      toast.error("Please select a ticket module");
+      return;
+    }
+    if(!newTicketSubmodule)
+    {
+      toast.error("Please select a ticket submodule");
+      return;
+    }
+    if(!newTicketPriority)
+    {
+      toast.error("Please select a ticket priority");
+      return;
+    }
+    if(!newTicketTitle)
+    {
+      toast.error("Please enter a ticket title");
+      return;
+    }
+    
     const formData = new FormData();
     formData.append("title", newTicketTitle);
     formData.append("description", newTicketDescription);
@@ -1364,10 +1396,6 @@ const TicketList = () => {
             <Button
               variant="primary"
               onClick={() => handleSubmitCreateTicket()}
-              disabled={
-                newTicketDescription.length < 50 ||
-                newTicketDescription.length > 500
-              }
             >
               Create
             </Button>
@@ -1385,9 +1413,12 @@ const TicketList = () => {
             <Modal.Title>Ticket #{viewTicketData?.id} Information</Modal.Title>
           </Modal.Header>
           <Modal.Body>
-            <table className="table table-bordered" style={{
-              tableLayout: 'fixed',
-            }}>
+            <table
+              className="table table-bordered"
+              style={{
+                tableLayout: "fixed",
+              }}
+            >
               <tbody>
                 <tr>
                   <td>
@@ -1409,9 +1440,15 @@ const TicketList = () => {
                   <td>
                     <strong>Ticket Description</strong>
                   </td>
-                  <td><span style={{
-                    whiteSpace: 'pre-wrap',
-                  }}>{viewTicketData?.description}</span></td>
+                  <td>
+                    <span
+                      style={{
+                        whiteSpace: "pre-wrap",
+                      }}
+                    >
+                      {viewTicketData?.description}
+                    </span>
+                  </td>
                 </tr>
                 <tr>
                   <td>
@@ -1904,7 +1941,7 @@ const TicketList = () => {
           </Modal.Header>
           <Modal.Body className="text-center">
             <img
-              src={selectedImage}
+              src={viewTicketImage}
               alt="Ticket Image Full Size"
               className="img-fluid"
               style={{ maxHeight: "70vh" }}
