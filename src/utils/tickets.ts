@@ -366,3 +366,20 @@ export const GetAssigneeComments = async (ticketId: string) => {
     throw error;
   }
 };
+
+
+export const loadImage = async (image: string) => {
+  try {
+    const response = await axiosInstance.get(`/${image}`, {
+      params: { image: image },
+      // responseType: 'blob'
+    });
+    if(response?.data){
+      return response.data?.data?.base64_data_url;
+    }else{
+      toast.error('Failed to load image');
+    }
+  } catch (error) {
+    throw error;
+  }
+};
