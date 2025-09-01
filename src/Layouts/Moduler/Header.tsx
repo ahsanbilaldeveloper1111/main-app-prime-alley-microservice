@@ -106,6 +106,11 @@ const Header = ({ themeMode }: any) => {
                 }
                 
                 navLinks.forEach((link) => {
+                    // Skip links that don't have data-bs-target (like Dashboard) - they don't need popup menu
+                    if (!link.getAttribute('data-bs-target')) {
+                        return;
+                    }
+                    
                     // Mouse enter event
                     link.addEventListener('mouseenter', function(e) {
                         const target = e.target as HTMLElement;
@@ -380,6 +385,11 @@ const Header = ({ themeMode }: any) => {
                 // Also update height when tab changes - use more specific selector
                 const tabLinks = document.querySelectorAll('#pc-layout-submenus > li > .pc-link');
                 tabLinks.forEach((link) => {
+                    // Skip links that don't have data-bs-target (like Dashboard) - they don't need popup menu height updates
+                    if (!link.getAttribute('data-bs-target')) {
+                        return;
+                    }
+                    
                     link.addEventListener('click', function() {
                         setTimeout(updateSubmenuPopupHeight, 100);
                     });
@@ -416,6 +426,11 @@ const Header = ({ themeMode }: any) => {
             // Clean up navigation link event listeners - use more specific selector
             const navLinks = document.querySelectorAll('#pc-layout-submenus > li > .pc-link');
             navLinks.forEach((link: Element) => {
+                // Skip links that don't have data-bs-target (like Dashboard) - they don't need cleanup
+                if (!link.getAttribute('data-bs-target')) {
+                    return;
+                }
+                
                 // Remove event listeners by recreating the element or using a different approach
                 const newLink = link.cloneNode(true);
                 if (link.parentNode) {
@@ -490,7 +505,19 @@ const Header = ({ themeMode }: any) => {
                                         <ul className="pc-navbar main-caption nav" role="tablist" id="pc-layout-submenus" style={{display: "block"}}>
 
 
-                                       
+                                       <li className="pc-item nav-item NoTab">
+                                                <Link 
+                                                    className={`pc-link nav-link${router.asPath.includes('dashboard') ? ' active' : ''}`} 
+                                                    href={`${baseUrl}/dashboard`} 
+                                                    role="" 
+                                                    aria-selected="false"
+                                                >
+                                                <span className="pc-micon">
+                                                    <i className="ti ti-settings"></i>
+                                                </span>
+                                                <span className="pc-mtext">Dashboard</span>
+                                                </Link>
+                                        </li>
                                             
                                         {permissions.includes('control-hub-services') && (
                                             <li className="pc-item nav-item" role="presentation">
@@ -657,7 +684,7 @@ const Header = ({ themeMode }: any) => {
                                             </li>
                                             )}
                                             
-                                            {permissions.includes('webrtc-services') && (
+                                            {/* {permissions.includes('webrtc-services') && (
                                             <li className="pc-item nav-item bg-danger" role="presentation">
                                                 <Link 
                                                 className={`pc-link nav-link${router.asPath.includes('webrtc') ? ' active' : ''}`} 
@@ -668,7 +695,7 @@ const Header = ({ themeMode }: any) => {
                                                 <span className="pc-mtext">WebRTC</span>
                                                 </Link>
                                             </li>
-                                            )}
+                                            )} */}
                                             
                                             {permissions.includes('omni-channel-services') && (
                                             <li className="pc-item nav-item bg-danger" role="presentation">
@@ -717,7 +744,7 @@ const Header = ({ themeMode }: any) => {
                                                 <span className="pc-micon">
                                                     <i className="ph-duotone ph-heartbeat"></i>
                                                 </span>
-                                                <span className="pc-mtext">Health Care</span>
+                                                <span className="pc-mtext">NetOps</span>
                                                 </Link>
                                             </li>
                                             )}
@@ -1467,12 +1494,12 @@ const Header = ({ themeMode }: any) => {
 
                             {/* tab pane start */}
                             <div className="tab-pane" id="pc-tab-16" role="tabpanel" aria-labelledby="pc-tab-link-16" tabIndex={16}>
-                                <div className="pc-submenu-title">Health Care</div>
+                                <div className="pc-submenu-title">NetOps</div>
                                 <ul className="pc-navbar">
                                     <li className="pc-item">
                                         <Link className="pc-link" href={`${baseUrl}/coming-soon`} >
                                             <span className="pc-micon"><i className="ph-duotone ph-link"></i></span>
-                                            <span className="pc-mtext">Health Care</span>
+                                            <span className="pc-mtext">NetOps</span>
                                         </Link>
                                     </li>
                                 </ul>

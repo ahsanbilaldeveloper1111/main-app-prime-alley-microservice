@@ -154,7 +154,7 @@ const Dashboard = () => {
             <p className='topTicker'>
             🚀 New Feature: AI-Powered Call Summaries now available! Check it out
             </p>
-            <div className="container-fluid px-4 py-5">
+            <div className="container-fluid  py-5">
                 {/* Header Section */}
                 <div className="row mb-2">
                     <div className="col-12">
@@ -188,7 +188,7 @@ const Dashboard = () => {
                         <h2 className="mb-4 f-w-600">Your Insights</h2>
                     </Col>
                     
-                    <Col md={4} className="mb-2">
+                    <Col md={4} sm={4} xs={4} className="mb-2">
                         <div className="card text-center">
                             <div className="card-body insights-box">
                                 <AnimatedNumber value={100} duration={1000} />
@@ -197,7 +197,7 @@ const Dashboard = () => {
                         </div>
                     </Col>
 
-                    <Col md={4} className="mb-2">
+                    <Col md={4} sm={4} xs={4} className="mb-2">
                         <div className="card text-center">
                             <div className="card-body insights-box">
                                 <AnimatedNumber value={100} duration={1000} />
@@ -206,7 +206,7 @@ const Dashboard = () => {
                         </div>
                     </Col>
 
-                    <Col md={4} className="mb-2">
+                    <Col md={4} sm={4} xs={4} className="mb-2">
                         <div className="card text-center">
                             <div className="card-body insights-box">
                                 <AnimatedNumber value={100} duration={1000} />

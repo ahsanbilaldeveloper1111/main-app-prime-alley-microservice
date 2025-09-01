@@ -18,7 +18,9 @@ import { useSession } from "next-auth/react";
 import moment from "moment";
 import Select from "react-select";
 
-import { ListCustomerProfiling, ListDratCustomerProfile } from "@utils/tms/tmsProfiling";
+import {  ListDratCustomerProfile } from "@utils/tms/tmsProfiling";
+import Link from "next/link";
+import { m } from "framer-motion";
 
 interface SelectOption {
   value: number;
@@ -33,35 +35,46 @@ const CustomerProfilingDraftList = () => {
 
   const columns: Column[] = useMemo(
     () => [
-      {key: "name",name: "Name",selector: (row: any) => row.name,sortable: true},
-      {key: "users_count",name: "Users Count",selector: (row: any) => row.users_count,sortable: true},
-      {key: "iccids",name: "ICCID Group",selector: (row: any) => row.iccid_group,sortable: true,
+      
+      {key: "id",name: "Company",selector: (row: any) => row.email,sortable: true,
         cell: (row: any) => {
-          if (row.iccids && Array.isArray(row.iccids)) {
-            const names = row.iccids.map((iccid: any) => iccid.name);
-            return names.join(', ');
-          }
-          return '';
+          return <div>
+            <p>{row?.data?.companyName}</p>
+          </div>
         }
       },
-      {key:'organization_unit',name:'Organization Unit',selector: (row: any) => row.organization_unit,sortable: true},
-      {action:true,name:'Action',selector: (row: any) => row.action,sortable: true,
+      {key: "id",name: "User Id",selector: (row: any) => row.id,sortable: true,
+        cell: (row: any) => {
+          return <div>
+            <p>{row?.data?.userId}</p>
+          </div>
+        }
+      },
+      {key: "id",name: "Extension Number",selector: (row: any) => row.id,sortable: true,
+        cell: (row: any) => {
+          return <div>
+            <p>{row?.data?.extensionNumber || 'N/A'}</p>
+          </div>
+        }
+      },
+      {key: "created_at",name: "Data Time",selector: (row: any) => row.id,sortable: true,
+        cell: (row: any) => {
+          return <div>
+            <p>{moment(row?.created_at).format('DD-MM-YYYY HH:mm:ss')}</p>
+          </div>
+        }
+      },
+
+     
+      {key: 'action', action: true, name: 'Action', selector: (row: any) => row.action, sortable: true,
         cell: (row: any) => {
           return <div className="d-flex gap-2">
-            
-            <Button size="sm" variant="outline-primary"  onClick={() => {
+            <Button size="sm" variant="outline-primary" onClick={() => {
               console.log(row);
             }}>Edit</Button>
-
             <Button size="sm" variant="outline-danger" onClick={() => {
               console.log(row);
             }}>Delete</Button>
-
-            <Button size="sm" variant="outline-primary" onClick={() => {
-              console.log(row);
-            }}>Create/Update ICCID</Button>
-
-
           </div>
         }
       },
@@ -91,10 +104,11 @@ const CustomerProfilingDraftList = () => {
       />
       <Row className="mb-3">
         <Col md={12}>
-          <div className="page-header-title">
+          <div className="page-header-title d-flex align-items-center justify-content-between">
             <h2 className="mb-0 d-flex align-items-center">
             List Customer Profiling Draft
             </h2>
+            <Link className="btn btn-sm btn-outline-primary ms-2" href="/tms/profiling/user/create">Create User Profile</Link>
           </div>
         </Col>
       </Row>
@@ -108,7 +122,7 @@ const CustomerProfilingDraftList = () => {
           defaultPageSize={15}
           filters={memoizedFilters}
           refreshKey={refreshKey}
-          search={true}
+          search={false}
         />
       
 

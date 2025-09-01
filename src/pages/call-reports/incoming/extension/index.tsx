@@ -3,7 +3,7 @@ import React, { ReactElement, useEffect, useState, useCallback } from 'react';
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
 import GenericListPage from '@components/GenericListPage';
-import { ListCallLogs, ExportCallLogs } from '@utils/calls';
+import { ListCallLogs, ExportCallLogs, DownloadStreamingExport } from '@utils/calls';
 import { GetHierarchyData } from '@utils/users';
 import { Column } from '@components/CustomDataTable';
 import { Button, Modal, Row, Tab, Tabs } from 'react-bootstrap';
@@ -64,6 +64,33 @@ const CallIncomingExtension = () => {
     const { data:session, status } = useSession();
     const [loading, setLoading] = useState(false);
     const [activeTab, setActiveTab] = useState('calls_chart');
+    
+    // Debug session state
+    useEffect(() => {
+        console.log('Session state:', { session, status });
+        if (status === 'authenticated' && session) {
+            console.log('Session authenticated successfully');
+        } else if (status === 'loading') {
+            console.log('Session still loading...');
+        } else if (status === 'unauthenticated') {
+            console.log('User not authenticated');
+        }
+    }, [session, status]);
+    
+    // Debug component mounting
+    useEffect(() => {
+        console.log('CallIncomingExtension component mounted');
+        console.log('Initial props and state:', { 
+            session, 
+            status, 
+            filtersReady, 
+            dataLoaded, 
+            loading 
+        });
+        return () => {
+            console.log('CallIncomingExtension component unmounting');
+        };
+    }, []);
 
     // Animation variants for tab transitions
     const tabVariants = {
@@ -109,8 +136,13 @@ const CallIncomingExtension = () => {
 
     const [refreshKey, setRefreshKey] = useState<number>(0);
     const [currentFilters, setCurrentFilters] = useState({
-      is_incoming_only:'true'
+      is_incoming_only: 'true'
     });
+    
+    // Debug current filters state
+    useEffect(() => {
+        console.log('Current filters state changed:', currentFilters);
+    }, [currentFilters]);
     const [dataLoaded, setDataLoaded] = useState(false);
     const [filtersReady, setFiltersReady] = useState(false);
     const [summary, setSummary] = useState<Summary>({
@@ -126,17 +158,58 @@ const CallIncomingExtension = () => {
     const fetchCallLogs = useCallback(async (page = 1, perPage = 15, search = "") => {
         // Only fetch if filters are ready
         if (!filtersReady) {
+            console.log('Filters not ready yet, skipping fetch');
             return;
         }
         
+        console.log('Fetching call logs with filters:', currentFilters);
         setLoading(true);
-        const response = await ListCallLogs({ page, perPage, search, filters: currentFilters,reportType: 'incomingStatsExtension' }, 'call-logs/statsIncomingByExtension');
-        if(response?.summary  ) {
-            setSummary(response.summary);
-            setDataLoaded(true);
+        
+        try {
+            console.log('About to call ListCallLogs with params:', { page, perPage, search, filters: currentFilters, reportType: 'incomingStatsExtension' });
+            const response = await ListCallLogs({ page, perPage, search, filters: currentFilters, reportType: 'incomingStatsExtension' }, 'call-logs/statsIncomingByExtension');
+            console.log('API response:', response);
+            console.log('API response type:', typeof response);
+            console.log('API response keys:', response ? Object.keys(response) : 'null/undefined');
+            
+            if (response?.summary) {
+                setSummary(response.summary);
+                setDataLoaded(true);
+                console.log('Summary data set:', response.summary);
+                console.log('DataLoaded set to true');
+            } else if (response?.data) {
+                // Fallback: check if data exists but no summary
+                console.log('Response has data but no summary:', response.data);
+                setDataLoaded(true);
+                console.log('DataLoaded set to true (fallback 1)');
+            } else if (response && typeof response === 'object') {
+                // Check if response is an object but doesn't have expected properties
+                console.log('Response is object but missing expected properties:', response);
+                setDataLoaded(true);
+                console.log('DataLoaded set to true (fallback 2)');
+            } else {
+                console.warn('No summary or data in response:', response);
+                setDataLoaded(true); // Mark as loaded even if no data
+                console.log('DataLoaded set to true (fallback 3)');
+            }
+            
             setLoading(false);
+            return response;
+        } catch (error: unknown) {
+            console.error('Error fetching call logs:', error);
+            if (error instanceof Error) {
+                console.error('Error details:', {
+                    message: error.message,
+                    stack: error.stack,
+                    name: error.name
+                });
+            }
+            setLoading(false);
+            setDataLoaded(true); // Mark as loaded even on error
+            console.log('DataLoaded set to true (error case)');
+            toast.error('Failed to fetch call data');
+            return null;
         }
-        return response;
     }, [currentFilters, filtersReady]);
 
     const [simpleDonut, setSimpleDonut] = React.useState<{ series: number[]; labels: string[] } | null>(null);
@@ -147,31 +220,147 @@ const CallIncomingExtension = () => {
           const answeredCalls = Number(summary.answered_calls) || 0;
           const unansweredCalls = Number(summary.unanswered_calls) || 0;
           
-          // Set chart data only when all data is loaded
-          setSimpleDonut({
-            series: [answeredCalls, unansweredCalls],
-            labels: ['Answered Calls', 'Unanswered Calls']
-          });
+          // Check if both values are 0, if so don't set chart data (will show empty state)
+          if (answeredCalls === 0 && unansweredCalls === 0) {
+            console.log('Both answered and unanswered calls are 0, not setting chart data');
+            setSimpleDonut(null);
+          } else {
+            // Set chart data only when there's actual data
+            setSimpleDonut({
+              series: [answeredCalls, unansweredCalls],
+              labels: ['Answered Calls', 'Unanswered Calls']
+            });
+          }
         }
     }, [summary, dataLoaded]);
 
+    // Trigger initial data fetch when filters become ready
+    useEffect(() => {
+        console.log('Initial data fetch useEffect triggered:', { filtersReady, status, session });
+        if (filtersReady && status === 'authenticated' && session) {
+            console.log('Filters ready and session authenticated, triggering initial fetch');
+            console.log('DataLoaded before fetch:', dataLoaded);
+            fetchCallLogs(1, 15, "");
+        } else if (status === 'loading') {
+            console.log('Session still loading, waiting...');
+        } else if (status === 'unauthenticated') {
+            console.log('User not authenticated');
+        } else {
+            console.log('Not ready for data fetch:', { filtersReady, status, hasSession: !!session });
+        }
+    }, [filtersReady, fetchCallLogs, status, session]);
+    
+    // Fallback: if filters haven't been marked as ready after 1 second, mark them as ready
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            if (!filtersReady) {
+                console.log('Fallback: marking filters as ready');
+                setFiltersReady(true);
+            }
+        }, 1000);
+        
+        return () => clearTimeout(timer);
+    }, [filtersReady]);
+    
+    // Additional fallback: if session is authenticated but filters still not ready after 2 seconds
+    useEffect(() => {
+        if (status === 'authenticated' && session) {
+            const timer = setTimeout(() => {
+                if (!filtersReady) {
+                    console.log('Session-based fallback: marking filters as ready');
+                    setFiltersReady(true);
+                }
+            }, 2000);
+            
+            return () => clearTimeout(timer);
+        }
+    }, [status, session, filtersReady]);
+    
+    // Debug initial state
+    useEffect(() => {
+        console.log('Initial state:', { 
+            filtersReady, 
+            dataLoaded, 
+            loading, 
+            currentFilters, 
+            session: !!session, 
+            status 
+        });
+        
+        // Log the actual API functions to make sure they're available
+        console.log('API functions check:', {
+            ListCallLogs: typeof ListCallLogs,
+            ExportCallLogs: typeof ExportCallLogs,
+            DownloadStreamingExport: typeof DownloadStreamingExport
+        });
+    }, [filtersReady, dataLoaded, loading, currentFilters, session, status]);
+
     
     const handleFiltersChange = (filters: any) => {
+        console.log('Filters changed:', filters);
+        console.log('Previous filters:', currentFilters);
+        console.log('New filters:', filters);
+        
+        // Check if filters actually changed
+        const filtersChanged = JSON.stringify(currentFilters) !== JSON.stringify(filters);
+        console.log('Filters actually changed:', filtersChanged);
+        
+        // Check if this is a complete clear (empty object or only has default values)
+        const isCompletelyCleared = Object.keys(filters).length === 0 || 
+            (Object.keys(filters).length === 1 && filters.hasOwnProperty('is_incoming_only'));
+        
+        console.log('Is completely cleared:', isCompletelyCleared);
+        
         setCurrentFilters(filters);
+        
         // Mark filters as ready when they are first set
         if (!filtersReady) {
+            console.log('Marking filters as ready for the first time');
             setFiltersReady(true);
+        }
+        
+        // Reset data loaded state when filters actually change or when cleared
+        if ((filtersChanged && filtersReady) || isCompletelyCleared) {
+            console.log('Resetting data loaded state due to filter change or clear');
+            setDataLoaded(false);
+            console.log('DataLoaded set to false due to filter change');
+            setSummary({
+                total_calls: 0,
+                answered_calls: 0,
+                unanswered_calls: 0,
+                total_cost: 0,
+                total_duration: 0,
+                avg_duration: 0,
+                avg_ring_time: 0
+            });
+            
+            // Trigger refresh
+            setRefreshKey(prev => prev + 1);
+            console.log('Refresh key updated, new value:', refreshKey + 1);
+        } else if (!filtersChanged) {
+            console.log('Filters did not change, keeping dataLoaded state:', dataLoaded);
         }
     };
 
     const handleExport = async (exportType: string, filters: Record<string, any>) => {
-        try {
-            const response = await ExportCallLogs({ page: 1, perPage: 15, search: "", filters, isExport: true, exportType });
-            //console.log(response);
-        } catch (error) {
-            //console.error('Export error:', error);
-            toast.error('Export failed. Please try again.');
+      try {
+        if (exportType === 'excel') {
+         
+          await DownloadStreamingExport(
+            { filters: currentFilters, isExport: true, exportType ,reportType:'incomingStatsExtension' }, 'call-logs/statsIncomingByExtension'
+          );
         }
+      } catch (error: unknown) {
+        console.error('Export error:', error);
+        if (error instanceof Error) {
+            console.error('Export error details:', {
+                message: error.message,
+                stack: error.stack,
+                name: error.name
+            });
+        }
+        toast.error('Export failed');
+      }
     };
 
     const [chartCalls, setChartCalls] = useState<{ series: any[]; categories: string[] } | null>(null);
@@ -345,13 +534,6 @@ const CallIncomingExtension = () => {
         };
         fetchHierarchyData();
     }, []);
-
-    // Trigger initial data fetch when filters become ready
-    useEffect(() => {
-        if (filtersReady) {
-            fetchCallLogs(1, 15, "");
-        }
-    }, [filtersReady, fetchCallLogs]);
 
     
 

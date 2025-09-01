@@ -331,3 +331,82 @@ body .nextjs-toast{
     }
 
 }
+
+// NoTab class styling - for links that don't need popup menus
+.pc-sidebar .pc-navbar > .pc-item.NoTab {
+    // Ensure no popup menu behavior
+    &:hover {
+        // Keep the same hover effect as other items
+        background: linear-gradient(135deg, #2583f2 0%, #1a6bc4 100%);
+        color: white !important;
+        
+        .pc-link {
+            color: white !important;
+        }
+    }
+    
+    // Prevent any submenu or popup behavior
+    .pc-link {
+        cursor: pointer;
+        
+        // Ensure no tab-related styling
+        &[role="tab"] {
+            cursor: default;
+        }
+    }
+    
+    // Ensure no submenu appears
+    &:hover .pc-submenu,
+    &:hover + .pc-submenu-popup {
+        display: none !important;
+    }
+}
+
+.card.statistics-card-1 {
+    background: linear-gradient(135deg, #2583f2, #4facfe);
+    color: white;
+
+    img{display: none;}
+
+    p,h2{
+        color: white !important;
+    }
+    .avtar{ 
+        background:none !important;
+        color: white !important;
+    }
+}
+
+[data-pc-preset=preset-1] .btn-primary {
+    background: linear-gradient(135deg, #2583f2, #4facfe);
+    border-color: #2583f2;
+    &:hover{
+        background: linear-gradient(135deg, #2374d4, #4facfe);
+    }
+}
+.btn-outline-primary{
+    border-color: #2583f2;
+    &:hover{
+        background: linear-gradient(135deg, #2583f2, #4facfe);
+    }
+}
+.selectionRowBox {
+    background: #7cb1f01f;
+    border-color: #2583f26e;
+}
+
+@media (max-width: 480px) {
+    .pc-sidebar .pc-submenu-popup.active{width:100% !important;}
+    .pc-sidebar .pc-link{padding:14px 10px !important;font-size:12px !important;}
+    .layout-collapse .pc-sidebar .pc-submenu-popup .pc-submenu-title {
+        padding: 10px;
+        font-weight: 700;
+        font-size: 12px;
+        text-align: center;
+    }
+    .pc-sidebar .pc-micon{margin-right:10px;}
+    .layout-collapse .pc-sidebar .pc-submenu-popup .pc-submenu-title::after{
+        left:0;
+        right:0;
+    }
+}
