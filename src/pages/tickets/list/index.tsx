@@ -18,6 +18,7 @@ import {
   GetAssigneeComments,
   AddComment,
   AddAssigneeComment,
+  loadImage,
 } from "@utils/tickets";
 import { GetHierarchyData } from "@utils/users";
 import { GetAllStatuses } from "@utils/ticket-statuses";
@@ -30,7 +31,11 @@ import { useTokenService } from "src/hooks/useTokenService";
 import { useSession } from "next-auth/react";
 import moment from "moment";
 import { CreateStatus } from "@utils/ticket-statuses";
-import { GetAllModules, GetAllSubmodules, GetAllSubmoduleChildren } from "@utils/ticket-module";
+import {
+  GetAllModules,
+  GetAllSubmodules,
+  GetAllSubmoduleChildren,
+} from "@utils/ticket-module";
 import Select from "react-select";
 import TicketsFilters from "@components/filters/TicketFilters";
 
@@ -93,16 +98,13 @@ const TicketList = () => {
         selector: (row: any) => row.description,
         sortable: true,
         cell: (props: any) => {
-          const description = props.description || '';
-          const truncatedDescription = description.length > 50 
-            ? description.substring(0, 50) + '...' 
-            : description;
-          
-          return (
-            <div title={description}>
-              {truncatedDescription}
-            </div>
-          );
+          const description = props.description || "";
+          const truncatedDescription =
+            description.length > 50
+              ? description.substring(0, 50) + "..."
+              : description;
+
+          return <div title={description}>{truncatedDescription}</div>;
         },
       },
       {
@@ -113,8 +115,7 @@ const TicketList = () => {
         cell: (props: any) => (
           <span className="badge bg-info">
             {extensions.find(
-              (extension: any) =>
-                extension.id == props.user_extension
+              (extension: any) => extension.id == props.user_extension
             )?.display_name || props.user_extension}
           </span>
         ),
@@ -156,7 +157,12 @@ const TicketList = () => {
         sortable: true,
         cell: (props: any) => {
           const priorityLabels = ["Low", "Medium", "High", "Critical"];
-          const priorityColors = ["bg-success", "bg-warning", "bg-danger", "bg-danger"];
+          const priorityColors = [
+            "bg-success",
+            "bg-warning",
+            "bg-danger",
+            "bg-danger",
+          ];
           return (
             <span
               className={`badge ${
@@ -261,14 +267,14 @@ const TicketList = () => {
 
   useEffect(() => {
     const fetchHierarchyData = async () => {
-        const hierarchyData = await GetHierarchyData();
-        setHierarchyData(hierarchyData);
-        console.log('Hierarchy Data:', hierarchyData);
-        setExtensions(hierarchyData?.extensions);
-        console.log('Extensions:', extensions);
+      const hierarchyData = await GetHierarchyData();
+      setHierarchyData(hierarchyData);
+      console.log("Hierarchy Data:", hierarchyData);
+      setExtensions(hierarchyData?.extensions);
+      console.log("Extensions:", extensions);
     };
     fetchHierarchyData();
-}, []);
+  }, []);
 
   const memoizedFilters = useMemo(() => currentFilters, [currentFilters]);
 
@@ -292,21 +298,41 @@ const TicketList = () => {
   const [showViewTicketModal, setShowViewTicketModal] =
     useState<boolean>(false);
   const [viewTicketData, setViewTicketData] = useState<any>([]);
+  const [viewTicketImage, setViewTicketImage] = useState<string>("");
   const [showImageModal, setShowImageModal] = useState<boolean>(false);
   const [selectedImage, setSelectedImage] = useState<string>("");
-  
-  const closeViewTicketModal = useCallback(
-    () => {
-      setShowViewTicketModal(false);
-      // Reset comment states when closing
-      setComments([]);
-      setAssigneeComments([]);
-      setNewComment("");
-      setNewAssigneeComment("");
-      setShowComments(false);
-    },
-    []
-  );
+
+  function loadImg(imgPath: string) {
+    if(viewTicketImage) { 
+    // URL.revokeObjectURL(viewTicketImage);
+    }
+    loadImage(imgPath).then((res: any) => {
+      console.log('ze ran', res);
+      // const url = URL.createObjectURL(res);
+      setViewTicketImage(res);
+    });
+  }
+
+  useEffect(() => {
+    console.log("ZE RAN");
+    if (viewTicketData?.image) {
+      loadImg(viewTicketData.image);
+    }
+    else {
+      setViewTicketImage("");
+      
+    }
+  }, [viewTicketData, viewTicketData?.image]);
+
+  const closeViewTicketModal = useCallback(() => {
+    setShowViewTicketModal(false);
+    // Reset comment states when closing
+    setComments([]);
+    setAssigneeComments([]);
+    setNewComment("");
+    setNewAssigneeComment("");
+    setShowComments(false);
+  }, []);
 
   // Comment handling functions
   const fetchComments = useCallback(async (ticketId: string) => {
@@ -314,37 +340,46 @@ const TicketList = () => {
       setIsLoadingComments(true);
       const [commentsData, assigneeCommentsData] = await Promise.all([
         GetComments(ticketId),
-        GetAssigneeComments(ticketId)
+        GetAssigneeComments(ticketId),
       ]);
-      
-      console.log('Raw comments data:', commentsData);
-      console.log('Raw assignee comments data:', assigneeCommentsData);
-      
+
+      console.log("Raw comments data:", commentsData);
+      console.log("Raw assignee comments data:", assigneeCommentsData);
+
       // Extract comments from the nested response structure
       if (commentsData?.data?.data) {
-        console.log('Setting comments from data.data.data:', commentsData.data.data);
+        console.log(
+          "Setting comments from data.data.data:",
+          commentsData.data.data
+        );
         setComments(commentsData.data.data);
       } else if (commentsData?.data) {
-        console.log('Setting comments from data.data:', commentsData.data);
+        console.log("Setting comments from data.data:", commentsData.data);
         setComments(commentsData.data);
       } else {
-        console.log('No comments data found, setting empty array');
+        console.log("No comments data found, setting empty array");
         setComments([]);
       }
-      
+
       if (assigneeCommentsData?.data?.data) {
-        console.log('Setting assignee comments from data.data.data:', assigneeCommentsData.data.data);
+        console.log(
+          "Setting assignee comments from data.data.data:",
+          assigneeCommentsData.data.data
+        );
         setAssigneeComments(assigneeCommentsData.data.data);
       } else if (assigneeCommentsData?.data) {
-        console.log('Setting assignee comments from data.data:', assigneeCommentsData.data);
+        console.log(
+          "Setting assignee comments from data.data:",
+          assigneeCommentsData.data
+        );
         setAssigneeComments(assigneeCommentsData.data);
       } else {
-        console.log('No assignee comments data found, setting empty array');
+        console.log("No assignee comments data found, setting empty array");
         setAssigneeComments([]);
       }
     } catch (error) {
-      console.error('Error fetching comments:', error);
-      toast.error('Failed to fetch comments');
+      console.error("Error fetching comments:", error);
+      toast.error("Failed to fetch comments");
     } finally {
       setIsLoadingComments(false);
     }
@@ -354,74 +389,98 @@ const TicketList = () => {
     setViewTicketData(props);
     console.log("View ticket:", props);
     setShowViewTicketModal(true);
-    
+
     // Fetch comments when opening the modal
     fetchComments(props.id);
-    
+
     // Fetch submodule and submodule child data if module_id exists
     if (props.module_id) {
       try {
         const submoduleData = await GetAllSubmodules();
-        const filteredSubmodules = submoduleData?.filter((sub: any) => sub.module_id == props.module_id) || [];
-        
+        const filteredSubmodules =
+          submoduleData?.filter(
+            (sub: any) => sub.module_id == props.module_id
+          ) || [];
+
         if (props.submodule_id) {
           const submoduleChildData = await GetAllSubmoduleChildren();
-          const filteredChildren = submoduleChildData?.filter((child: any) => child.submodule_id == props.submodule_id) || [];
-          
+          const filteredChildren =
+            submoduleChildData?.filter(
+              (child: any) => child.submodule_id == props.submodule_id
+            ) || [];
+
           // Update viewTicketData with the fetched submodule information
           setViewTicketData({
             ...props,
-            submodule: filteredSubmodules.find((sub: any) => sub.id == props.submodule_id),
-            submodule_child: filteredChildren.find((child: any) => child.id == props.submodule_child_id)
+            submodule: filteredSubmodules.find(
+              (sub: any) => sub.id == props.submodule_id
+            ),
+            submodule_child: filteredChildren.find(
+              (child: any) => child.id == props.submodule_child_id
+            ),
           });
         } else {
           setViewTicketData({
             ...props,
             submodule: null,
-            submodule_child: null
+            submodule_child: null,
           });
         }
       } catch (error) {
-        console.error('Error fetching submodule data:', error);
+        console.error("Error fetching submodule data:", error);
       }
     }
   }, []);
 
-  const handleAddComment = useCallback(async (ticketId: string) => {
-    if (!newComment.trim()) {
-      toast.error('Please enter a comment');
-      return;
-    }
-
-    try {
-      const response = await AddComment(ticketId, newComment.trim(), viewTicketData.user_extension || '');
-      if (response) {
-        setNewComment("");
-        // Refresh comments
-        fetchComments(ticketId);
+  const handleAddComment = useCallback(
+    async (ticketId: string) => {
+      if (!newComment.trim()) {
+        toast.error("Please enter a comment");
+        return;
       }
-    } catch (error) {
-      console.error('Error adding comment:', error);
-    }
-  }, [newComment, viewTicketData]);
 
-  const handleAddAssigneeComment = useCallback(async (ticketId: string) => {
-    if (!newAssigneeComment.trim()) {
-      toast.error('Please enter an assignee comment');
-      return;
-    }
-
-    try {
-      const response = await AddAssigneeComment(ticketId, newAssigneeComment.trim(), viewTicketData.user_extension || '');
-      if (response) {
-        setNewAssigneeComment("");
-        // Refresh comments
-        fetchComments(ticketId);
+      try {
+        const response = await AddComment(
+          ticketId,
+          newComment.trim(),
+          viewTicketData.user_extension || ""
+        );
+        if (response) {
+          setNewComment("");
+          // Refresh comments
+          fetchComments(ticketId);
+        }
+      } catch (error) {
+        console.error("Error adding comment:", error);
       }
-    } catch (error) {
-      console.error('Error adding assignee comment:', error);
-    }
-  }, [newAssigneeComment, viewTicketData]);
+    },
+    [newComment, viewTicketData]
+  );
+
+  const handleAddAssigneeComment = useCallback(
+    async (ticketId: string) => {
+      if (!newAssigneeComment.trim()) {
+        toast.error("Please enter an assignee comment");
+        return;
+      }
+
+      try {
+        const response = await AddAssigneeComment(
+          ticketId,
+          newAssigneeComment.trim(),
+          viewTicketData.user_extension || ""
+        );
+        if (response) {
+          setNewAssigneeComment("");
+          // Refresh comments
+          fetchComments(ticketId);
+        }
+      } catch (error) {
+        console.error("Error adding assignee comment:", error);
+      }
+    },
+    [newAssigneeComment, viewTicketData]
+  );
 
   const toggleComments = useCallback(() => {
     setShowComments(!showComments);
@@ -435,7 +494,6 @@ const TicketList = () => {
     useState<boolean>(false);
   const [showDeleteTicketModal, setShowDeleteTicketModal] =
     useState<boolean>(false);
-
 
   const handleSubmitEditTicket = useCallback(async () => {
     //console.log('Submit edit group:', selectedGroup, selectedGroupName);
@@ -492,15 +550,16 @@ const TicketList = () => {
   const [newTicketType, setNewTicketType] = useState<string>("");
   const [newTicketStatus, setNewTicketStatus] = useState<string>("");
   const [newTicketModule, setNewTicketModule] = useState<string>("");
-  
+
   const [newTicketPriority, setNewTicketPriority] = useState<string>("");
   const [newTicketDueDate, setNewTicketDueDate] = useState<string>("");
 
   const [newTicketImage, setNewTicketImage] = useState<File | null>(null);
-  
+
   // Add state for submodules and submodule children
   const [newTicketSubmodule, setNewTicketSubmodule] = useState<string>("");
-  const [newTicketSubmoduleChild, setNewTicketSubmoduleChild] = useState<string>("");
+  const [newTicketSubmoduleChild, setNewTicketSubmoduleChild] =
+    useState<string>("");
   const [submodules, setSubmodules] = useState<any[]>([]);
   const [submoduleChildren, setSubmoduleChildren] = useState<any[]>([]);
 
@@ -528,7 +587,7 @@ const TicketList = () => {
       formData.append("submodule_child_id", newTicketSubmoduleChild);
     }
     formData.append("priority", newTicketPriority || "0");
-    
+
     formData.append("created_by", "321");
     if (newTicketDueDate) {
       formData.append("due_date", newTicketDueDate);
@@ -668,13 +727,14 @@ const TicketList = () => {
       try {
         const submoduleData = await GetAllSubmodules();
         // Filter submodules by module_id
-        const filteredSubmodules = submoduleData?.filter((sub: any) => sub.module_id == moduleId) || [];
+        const filteredSubmodules =
+          submoduleData?.filter((sub: any) => sub.module_id == moduleId) || [];
         setSubmodules(filteredSubmodules);
         setNewTicketSubmodule("");
         setNewTicketSubmoduleChild("");
         setSubmoduleChildren([]);
       } catch (error) {
-        console.error('Error fetching submodules:', error);
+        console.error("Error fetching submodules:", error);
       }
     } else {
       setSubmodules([]);
@@ -689,11 +749,14 @@ const TicketList = () => {
       try {
         const childrenData = await GetAllSubmoduleChildren();
         // Filter children by submodule_id
-        const filteredChildren = childrenData?.filter((child: any) => child.submodule_id == submoduleId) || [];
+        const filteredChildren =
+          childrenData?.filter(
+            (child: any) => child.submodule_id == submoduleId
+          ) || [];
         setSubmoduleChildren(filteredChildren);
         setNewTicketSubmoduleChild("");
       } catch (error) {
-        console.error('Error fetching submodule children:', error);
+        console.error("Error fetching submodule children:", error);
       }
     } else {
       setSubmoduleChildren([]);
@@ -711,7 +774,7 @@ const TicketList = () => {
       setSelectedTicketTitle(props.title);
       setSelectedTicketDescription(props.description);
       setShowEditTicketModal(true);
-      
+
       // Load submodules and submodule children for the selected module
       if (props.module_id) {
         await fetchSubmodules(props.module_id);
@@ -762,7 +825,9 @@ const TicketList = () => {
           defaultPageSize={15}
           filters={memoizedFilters}
           refreshKey={refreshKey}
-          search={session?.user?.permissions?.includes("search-tickets-tickets")}
+          search={session?.user?.permissions?.includes(
+            "search-tickets-tickets"
+          )}
         />
       )}
 
@@ -823,8 +888,6 @@ const TicketList = () => {
               </div>
             </div>
 
-
-
             <div className="row">
               <div className="col-md-6">
                 <div className="form-group mb-3">
@@ -844,9 +907,7 @@ const TicketList = () => {
                     {statuses.map((status: any) => (
                       <option
                         value={status.id}
-                        selected={
-                          selectedTicket?.ticket_status_id == status.id
-                        }
+                        selected={selectedTicket?.ticket_status_id == status.id}
                       >
                         {status.name}
                       </option>
@@ -887,7 +948,9 @@ const TicketList = () => {
             <div className="row">
               <div className="col-md-6">
                 <div className="form-group mb-3">
-                  <label htmlFor="editTicketSubmodule">Submodule (Required)</label>
+                  <label htmlFor="editTicketSubmodule">
+                    Submodule (Required)
+                  </label>
                   <select
                     className="form-control"
                     id="editTicketSubmodule"
@@ -899,7 +962,9 @@ const TicketList = () => {
                       });
                       fetchSubmoduleChildren(e.target.value);
                     }}
-                    disabled={!selectedTicket?.module_id || submodules.length == 0}
+                    disabled={
+                      !selectedTicket?.module_id || submodules.length == 0
+                    }
                   >
                     <option value="">Select Submodule</option>
                     {submodules.map((submodule: any) => (
@@ -912,16 +977,23 @@ const TicketList = () => {
               </div>
               <div className="col-md-6">
                 <div className="form-group mb-3">
-                  <label htmlFor="editTicketSubmoduleChild">Submodule Child (Optional)</label>
+                  <label htmlFor="editTicketSubmoduleChild">
+                    Submodule Child (Optional)
+                  </label>
                   <select
                     className="form-control"
                     id="editTicketSubmoduleChild"
                     value={selectedTicket?.submodule_child_id || ""}
-                    onChange={(e) => setSelectedTicket({
-                      ...selectedTicket,
-                      submodule_child_id: e.target.value,
-                    })}
-                    disabled={!selectedTicket?.submodule_id || submoduleChildren.length == 0}
+                    onChange={(e) =>
+                      setSelectedTicket({
+                        ...selectedTicket,
+                        submodule_child_id: e.target.value,
+                      })
+                    }
+                    disabled={
+                      !selectedTicket?.submodule_id ||
+                      submoduleChildren.length == 0
+                    }
                   >
                     <option value="">Select Submodule Child</option>
                     {submoduleChildren.map((child: any) => (
@@ -1110,10 +1182,18 @@ const TicketList = () => {
                 maxLength={500}
               ></textarea>
               <div className="d-flex justify-content-between mt-1">
-                <small className={`text-muted ${newTicketDescription.length < 50 ? 'text-danger' : ''}`}>
+                <small
+                  className={`text-muted ${
+                    newTicketDescription.length < 50 ? "text-danger" : ""
+                  }`}
+                >
                   Min: 50 characters
                 </small>
-                <small className={`text-muted ${newTicketDescription.length > 500 ? 'text-danger' : ''}`}>
+                <small
+                  className={`text-muted ${
+                    newTicketDescription.length > 500 ? "text-danger" : ""
+                  }`}
+                >
                   {newTicketDescription.length}/500 characters
                 </small>
               </div>
@@ -1165,7 +1245,9 @@ const TicketList = () => {
             <div className="row">
               <div className="col-md-6">
                 <div className="form-group mb-3">
-                  <label htmlFor="newTicketSubmodule">Submodule (Required)</label>
+                  <label htmlFor="newTicketSubmodule">
+                    Submodule (Required)
+                  </label>
                   <select
                     className="form-control"
                     id="newTicketSubmodule"
@@ -1188,7 +1270,9 @@ const TicketList = () => {
               </div>
               <div className="col-md-6">
                 <div className="form-group mb-3">
-                  <label htmlFor="newTicketSubmoduleChild">Submodule Child (Optional)</label>
+                  <label htmlFor="newTicketSubmoduleChild">
+                    Submodule Child (Optional)
+                  </label>
                   <select
                     className="form-control"
                     id="newTicketSubmoduleChild"
@@ -1280,7 +1364,10 @@ const TicketList = () => {
             <Button
               variant="primary"
               onClick={() => handleSubmitCreateTicket()}
-              disabled={newTicketDescription.length < 50 || newTicketDescription.length > 500}
+              disabled={
+                newTicketDescription.length < 50 ||
+                newTicketDescription.length > 500
+              }
             >
               Create
             </Button>
@@ -1298,11 +1385,19 @@ const TicketList = () => {
             <Modal.Title>Ticket #{viewTicketData?.id} Information</Modal.Title>
           </Modal.Header>
           <Modal.Body>
-            <table className="table table-bordered">
+            <table className="table table-bordered" style={{
+              tableLayout: 'fixed',
+            }}>
               <tbody>
                 <tr>
-                  <td><strong>Ticket ID</strong></td>
-                  <td><span className="badge bg-primary">#{viewTicketData?.id}</span></td>
+                  <td>
+                    <strong>Ticket ID</strong>
+                  </td>
+                  <td>
+                    <span className="badge bg-primary">
+                      #{viewTicketData?.id}
+                    </span>
+                  </td>
                 </tr>
                 <tr>
                   <td>
@@ -1314,7 +1409,9 @@ const TicketList = () => {
                   <td>
                     <strong>Ticket Description</strong>
                   </td>
-                  <td>{viewTicketData?.description}</td>
+                  <td><span style={{
+                    whiteSpace: 'pre-wrap',
+                  }}>{viewTicketData?.description}</span></td>
                 </tr>
                 <tr>
                   <td>
@@ -1323,8 +1420,7 @@ const TicketList = () => {
                   <td>
                     <span className="badge bg-primary text-uppercase">
                       {types.find(
-                        (type: any) =>
-                          type.id == viewTicketData?.ticket_type_id
+                        (type: any) => type.id == viewTicketData?.ticket_type_id
                       )?.name ||
                         viewTicketData?.type?.name ||
                         "Unknown"}
@@ -1462,9 +1558,9 @@ const TicketList = () => {
                     <strong>Ticket Image</strong>
                   </td>
                   <td>
-                    {viewTicketData?.image ? (
+                    {viewTicketImage ? (
                       <img
-                        src={`http://crmstaging.sipzon.com:7518/storage/${viewTicketData.image}`}
+                        src={viewTicketImage}
                         alt="Ticket Image"
                         className="img-fluid"
                         style={{
@@ -1473,9 +1569,7 @@ const TicketList = () => {
                           cursor: "pointer",
                         }}
                         onClick={() =>
-                          handleImageClick(
-                            `http://crmstaging.sipzon.com:7518/storage/${viewTicketData.image}`
-                          )
+                          handleImageClick(`/api/${viewTicketData.image}`)
                         }
                       />
                     ) : (
@@ -1507,35 +1601,42 @@ const TicketList = () => {
             </table>
 
             {/* Comments Section */}
-            <div className="mt-4" style={{ borderTop: '1px solid #dee2e6', paddingTop: '20px' }}>
+            <div
+              className="mt-4"
+              style={{ borderTop: "1px solid #dee2e6", paddingTop: "20px" }}
+            >
               <div className="d-flex justify-content-between align-items-center mb-3">
                 <div>
-                  <h6 className="mb-0" style={{ color: '#495057', fontWeight: '600' }}>
-                    Comments 
+                  <h6
+                    className="mb-0"
+                    style={{ color: "#495057", fontWeight: "600" }}
+                  >
+                    Comments
                     <span className="badge bg-secondary ms-2">
                       {comments.length + assigneeComments.length} total
                     </span>
                   </h6>
                   <small className="text-muted">
-                    {comments.length} user comments • {assigneeComments.length} assignee comments
+                    {comments.length} user comments • {assigneeComments.length}{" "}
+                    assignee comments
                   </small>
                 </div>
                 <div>
-                  <Button 
-                    variant="outline-primary" 
-                    size="sm" 
+                  <Button
+                    variant="outline-primary"
+                    size="sm"
                     onClick={toggleComments}
                     className="me-2"
                   >
-                    {showComments ? 'Hide Comments' : 'Show Comments'}
+                    {showComments ? "Hide Comments" : "Show Comments"}
                   </Button>
-                  <Button 
-                    variant="outline-secondary" 
-                    size="sm" 
+                  <Button
+                    variant="outline-secondary"
+                    size="sm"
                     onClick={() => fetchComments(viewTicketData?.id)}
                     disabled={isLoadingComments}
                   >
-                    {isLoadingComments ? 'Loading...' : 'Refresh'}
+                    {isLoadingComments ? "Loading..." : "Refresh"}
                   </Button>
                 </div>
               </div>
@@ -1544,7 +1645,10 @@ const TicketList = () => {
                 <div>
                   {isLoadingComments ? (
                     <div className="text-center py-4">
-                      <div className="spinner-border text-primary" role="status">
+                      <div
+                        className="spinner-border text-primary"
+                        role="status"
+                      >
                         <span className="visually-hidden">Loading...</span>
                       </div>
                       <p className="mt-2 text-muted">Loading comments...</p>
@@ -1553,122 +1657,232 @@ const TicketList = () => {
                     <div className="row">
                       {/* User Comments Column */}
                       <div className="col-md-6">
-                    <div className="card" style={{ border: '1px solid #e9ecef', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
-                      <div className="card-header" style={{ backgroundColor: '#f8f9fa', borderBottom: '1px solid #dee2e6' }}>
-                        <h6 className="mb-0" style={{ color: '#495057', fontWeight: '600' }}>User Comments</h6>
-                      </div>
-                      <div className="card-body">
-                        <div className="mb-3">
-                          <textarea
-                            className="form-control"
-                            rows={3}
-                            placeholder="Add a new comment..."
-                            value={newComment}
-                            onChange={(e) => setNewComment(e.target.value)}
-                          />
-                          <Button
-                            variant="primary"
-                            size="sm"
-                            className="mt-2"
-                            onClick={() => handleAddComment(viewTicketData?.id)}
-                            disabled={!newComment.trim()}
+                        <div
+                          className="card"
+                          style={{
+                            border: "1px solid #e9ecef",
+                            boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
+                          }}
+                        >
+                          <div
+                            className="card-header"
+                            style={{
+                              backgroundColor: "#f8f9fa",
+                              borderBottom: "1px solid #dee2e6",
+                            }}
                           >
-                            Add Comment
-                          </Button>
-                        </div>
-                        
-                        <div className="comments-list" style={{ maxHeight: '300px', overflowY: 'auto' }}>
-                          {comments.length > 0 ? (
-                            comments.map((comment: any, index: number) => (
-                              <div key={index} className="comment-item border-bottom pb-2 mb-2" style={{ padding: '10px', backgroundColor: '#f8f9fa', borderRadius: '5px', marginBottom: '10px' }}>
-                                <div className="d-flex justify-content-between">
-                                  <small className="text-muted" style={{ fontWeight: '600', color: '#6c757d' }}>
-                                    {extensions.find(
-                                      (extension: any) =>
-                                        extension.id == comment.user_extension
-                                    )?.display_name || comment.user_extension || 'Unknown User'}
-                                  </small>
-                                  <div className="text-end">
-                                    <small className="text-muted d-block">
-                                      {moment(comment.created_at).fromNow()}
-                                    </small>
-                                    <small className="text-muted">
-                                      {moment(comment.created_at).format('DD/MM/YYYY HH:mm')}
-                                    </small>
-                                  </div>
-                                </div>
-                                <div className="mt-1" style={{ color: '#495057', lineHeight: '1.4' }}>{comment.content}</div>
-                              </div>
-                            ))
-                          ) : (
-                            <p className="text-muted text-center">No user comments yet</p>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                            <h6
+                              className="mb-0"
+                              style={{ color: "#495057", fontWeight: "600" }}
+                            >
+                              User Comments
+                            </h6>
+                          </div>
+                          <div className="card-body">
+                            <div className="mb-3">
+                              <textarea
+                                className="form-control"
+                                rows={3}
+                                placeholder="Add a new comment..."
+                                value={newComment}
+                                onChange={(e) => setNewComment(e.target.value)}
+                              />
+                              <Button
+                                variant="primary"
+                                size="sm"
+                                className="mt-2"
+                                onClick={() =>
+                                  handleAddComment(viewTicketData?.id)
+                                }
+                                disabled={!newComment.trim()}
+                              >
+                                Add Comment
+                              </Button>
+                            </div>
 
-                  {/* Assignee Comments Column */}
-                  <div className="col-md-6">
-                    <div className="card" style={{ border: '1px solid #e9ecef', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
-                      <div className="card-header" style={{ backgroundColor: '#f8f9fa', borderBottom: '1px solid #dee2e6' }}>
-                        <h6 className="mb-0" style={{ color: '#495057', fontWeight: '600' }}>Assignee Comments</h6>
-                      </div>
-                      <div className="card-body">
-                        <div className="mb-3">
-                          <textarea
-                            className="form-control"
-                            rows={3}
-                            placeholder="Add a new assignee comment..."
-                            value={newAssigneeComment}
-                            onChange={(e) => setNewAssigneeComment(e.target.value)}
-                          />
-                          <Button
-                            variant="success"
-                            size="sm"
-                            className="mt-2"
-                            onClick={() => handleAddAssigneeComment(viewTicketData?.id)}
-                            disabled={!newAssigneeComment.trim()}
-                          >
-                            Add Assignee Comment
-                          </Button>
-                        </div>
-                        
-                        <div className="comments-list" style={{ maxHeight: '300px', overflowY: 'auto' }}>
-                          {assigneeComments.length > 0 ? (
-                            assigneeComments.map((comment: any, index: number) => (
-                              <div key={index} className="comment-item border-bottom pb-2 mb-2" style={{ padding: '10px', backgroundColor: '#f8f9fa', borderRadius: '5px', marginBottom: '10px' }}>
-                                <div className="d-flex justify-content-between">
-                                  <small className="text-muted" style={{ fontWeight: '600', color: '#6c757d' }}>
-                                    {extensions.find(
-                                      (extension: any) =>
-                                        extension.id == comment.user_extension
-                                    )?.display_name || comment.user_extension || 'Unknown User'}
-                                  </small>
-                                  <div className="text-end">
-                                    <small className="text-muted d-block">
-                                      {moment(comment.created_at).fromNow()}
-                                    </small>
-                                    <small className="text-muted">
-                                      {moment(comment.created_at).format('DD/MM/YYYY HH:mm')}
-                                    </small>
+                            <div
+                              className="comments-list"
+                              style={{ maxHeight: "300px", overflowY: "auto" }}
+                            >
+                              {comments.length > 0 ? (
+                                comments.map((comment: any, index: number) => (
+                                  <div
+                                    key={index}
+                                    className="comment-item border-bottom pb-2 mb-2"
+                                    style={{
+                                      padding: "10px",
+                                      backgroundColor: "#f8f9fa",
+                                      borderRadius: "5px",
+                                      marginBottom: "10px",
+                                    }}
+                                  >
+                                    <div className="d-flex justify-content-between">
+                                      <small
+                                        className="text-muted"
+                                        style={{
+                                          fontWeight: "600",
+                                          color: "#6c757d",
+                                        }}
+                                      >
+                                        {extensions.find(
+                                          (extension: any) =>
+                                            extension.id ==
+                                            comment.user_extension
+                                        )?.display_name ||
+                                          comment.user_extension ||
+                                          "Unknown User"}
+                                      </small>
+                                      <div className="text-end">
+                                        <small className="text-muted d-block">
+                                          {moment(comment.created_at).fromNow()}
+                                        </small>
+                                        <small className="text-muted">
+                                          {moment(comment.created_at).format(
+                                            "DD/MM/YYYY HH:mm"
+                                          )}
+                                        </small>
+                                      </div>
+                                    </div>
+                                    <div
+                                      className="mt-1"
+                                      style={{
+                                        color: "#495057",
+                                        lineHeight: "1.4",
+                                      }}
+                                    >
+                                      {comment.content}
+                                    </div>
                                   </div>
-                                </div>
-                                <div className="mt-1" style={{ color: '#495057', lineHeight: '1.4' }}>{comment.content}</div>
-                              </div>
-                            ))
-                          ) : (
-                            <p className="text-muted text-center">No assignee comments yet</p>
-                          )}
+                                ))
+                              ) : (
+                                <p className="text-muted text-center">
+                                  No user comments yet
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Assignee Comments Column */}
+                      <div className="col-md-6">
+                        <div
+                          className="card"
+                          style={{
+                            border: "1px solid #e9ecef",
+                            boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
+                          }}
+                        >
+                          <div
+                            className="card-header"
+                            style={{
+                              backgroundColor: "#f8f9fa",
+                              borderBottom: "1px solid #dee2e6",
+                            }}
+                          >
+                            <h6
+                              className="mb-0"
+                              style={{ color: "#495057", fontWeight: "600" }}
+                            >
+                              Assignee Comments
+                            </h6>
+                          </div>
+                          <div className="card-body">
+                            <div className="mb-3">
+                              <textarea
+                                className="form-control"
+                                rows={3}
+                                placeholder="Add a new assignee comment..."
+                                value={newAssigneeComment}
+                                onChange={(e) =>
+                                  setNewAssigneeComment(e.target.value)
+                                }
+                              />
+                              <Button
+                                variant="success"
+                                size="sm"
+                                className="mt-2"
+                                onClick={() =>
+                                  handleAddAssigneeComment(viewTicketData?.id)
+                                }
+                                disabled={!newAssigneeComment.trim()}
+                              >
+                                Add Assignee Comment
+                              </Button>
+                            </div>
+
+                            <div
+                              className="comments-list"
+                              style={{ maxHeight: "300px", overflowY: "auto" }}
+                            >
+                              {assigneeComments.length > 0 ? (
+                                assigneeComments.map(
+                                  (comment: any, index: number) => (
+                                    <div
+                                      key={index}
+                                      className="comment-item border-bottom pb-2 mb-2"
+                                      style={{
+                                        padding: "10px",
+                                        backgroundColor: "#f8f9fa",
+                                        borderRadius: "5px",
+                                        marginBottom: "10px",
+                                      }}
+                                    >
+                                      <div className="d-flex justify-content-between">
+                                        <small
+                                          className="text-muted"
+                                          style={{
+                                            fontWeight: "600",
+                                            color: "#6c757d",
+                                          }}
+                                        >
+                                          {extensions.find(
+                                            (extension: any) =>
+                                              extension.id ==
+                                              comment.user_extension
+                                          )?.display_name ||
+                                            comment.user_extension ||
+                                            "Unknown User"}
+                                        </small>
+                                        <div className="text-end">
+                                          <small className="text-muted d-block">
+                                            {moment(
+                                              comment.created_at
+                                            ).fromNow()}
+                                          </small>
+                                          <small className="text-muted">
+                                            {moment(comment.created_at).format(
+                                              "DD/MM/YYYY HH:mm"
+                                            )}
+                                          </small>
+                                        </div>
+                                      </div>
+                                      <div
+                                        className="mt-1"
+                                        style={{
+                                          color: "#495057",
+                                          lineHeight: "1.4",
+                                        }}
+                                      >
+                                        {comment.content}
+                                      </div>
+                                    </div>
+                                  )
+                                )
+                              ) : (
+                                <p className="text-muted text-center">
+                                  No assignee comments yet
+                                </p>
+                              )}
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
+                  )}
                 </div>
               )}
             </div>
-          )}
-        </div>
           </Modal.Body>
           <Modal.Footer>
             <Button variant="secondary" onClick={closeViewTicketModal}>

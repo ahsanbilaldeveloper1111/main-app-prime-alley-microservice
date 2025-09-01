@@ -17,6 +17,7 @@ import { CreateStatus } from '@utils/ticket-statuses';
 import { GetAllModules } from '@utils/ticket-module';
 import Select from 'react-select';
 import AnimatedNumber from '@components/AnimatedNumber';
+import ChartDonut from '@components/ChartDonut';
 import imgStatus1 from '@assets/images/widget/img-status-1.svg'
 import imgStatus2 from '@assets/images/widget/img-status-2.svg'
 import imgStatus3 from '@assets/images/widget/img-status-3.svg'
@@ -168,43 +169,52 @@ const TicketDashboard = () => {
                 <Col md={12}>
                     <h4>Module Summary</h4>
                 </Col>
-                {moduleSummary.map((module) => (
-                    <Col md={4}>
-                        <div className="card">
-                            <div className="card-header">
-                                <h5 className="card-title mb-0 d-flex align-items-center justify-content-between">
-                                    <span className="text-muted">
-                                        {module.module_name}
-                                    </span>
-
-                                    <span className="badge bg-primary">
-                                        Tickets: {module.total_tickets}
-                                    </span>
-                                </h5>
-                            </div>
-                            <div className="card-body">
-                                <div className="">
-                                    <table className="table table-bordered">
-                                        <thead>
-                                            <tr>
-                                                <th>Status Name</th>
-                                                <th>Ticket Count</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {module.statuses.map((status) => (
-                                                <tr key={status.name}>
-                                                    <td>{status.name}</td>
-                                                    <td>{status.count}</td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
+                {moduleSummary.map((module, index) => {
+                    // Transform module data to chart format
+                    const chartSeries = module.statuses.map(status => status.count);
+                    const chartLabels = module.statuses.map(status => status.name);
+                    
+                    return (
+                        <Col md={4} key={index}>
+                            <div className="card">
+                                <div className="card-header">
+                                    <h5 className="card-title mb-0 d-flex align-items-center justify-content-between">
+                                        <span className="text-muted">
+                                            {module.module_name}
+                                        </span>
+                                        <span className="badge bg-primary">
+                                            Total: {module.total_tickets}
+                                        </span>
+                                    </h5>
+                                </div>
+                                <div className="card-body">
+                                    {module.statuses.length > 0 && module.total_tickets > 0 ? (
+                                        <ChartDonut 
+                                            series={chartSeries}
+                                            labels={chartLabels}
+                                            dataType="percentage"
+                                            height={250}
+                                            width="100%"
+                                            showDataLabels={true}
+                                            showLegend={true}
+                                            legendPosition="bottom"
+                                            donutWidth="60%"
+                                            title=""
+                                        />
+                                    ) : (
+                                        <div className="d-flex flex-column align-items-center justify-content-center" style={{ height: '250px' }}>
+                                            <div className="avtar bg-light text-muted mb-3" style={{ width: '60px', height: '60px' }}>
+                                                <i className="ph-duotone ph-ticket f-24"></i>
+                                            </div>
+                                            <h6 className="text-muted mb-1">No Tickets</h6>
+                                            <p className="text-muted mb-0 small">This module has no tickets yet</p>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
-                        </div>
-                    </Col>
-                ))}
+                        </Col>
+                    );
+                })}
             </Row>
             
         
