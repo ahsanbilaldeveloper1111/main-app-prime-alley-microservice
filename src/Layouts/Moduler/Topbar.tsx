@@ -101,9 +101,9 @@ const TopBar = ({ handleOffcanvasToggle, changeThemeMode, toogleSidebarHide, too
                     <div className="me-auto pc-mob-drp">
                         <ul className="list-unstyled">
                             <li className="pc-h-item pc-sidebar-collapse">
-                                <Link href="javascript:void(0)" className="pc-head-link ms-0" id="sidebar-hide" onClick={toggleSidebar}>
+                                <button type="button" className="pc-head-link ms-0" id="sidebar-hide" onClick={toggleSidebar}>
                                     <i className="ti ti-menu-2"></i>
-                                </Link>
+                                </button>
                             </li>
                             <li className="pc-h-item pc-sidebar-popup">
                                 <Button variant="link" className="pc-head-link ms-0" id="mobile-collapse" onClick={handleMobileSidebarToggle}>

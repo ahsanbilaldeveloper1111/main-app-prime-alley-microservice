@@ -394,7 +394,11 @@ body .nextjs-toast{
     background: #7cb1f01f;
     border-color: #2583f26e;
 }
-
+button#sidebar-hide {
+    padding: 0 !important;
+    border: 0 !important;
+    background: none !important;
+}
 @media (max-width: 480px) {
     .pc-sidebar .pc-submenu-popup.active{width:100% !important;}
     .pc-sidebar .pc-link{padding:14px 10px !important;font-size:12px !important;}

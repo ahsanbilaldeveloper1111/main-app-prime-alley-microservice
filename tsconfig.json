@@ -32,7 +32,8 @@
       "@slices/*": ["src/slices/*"],
       "@views/*": ["src/views/*"],
       "@helpers/*": ["src/helpers/*"],
-      "@utils/*": ["src/utils/*"]
+      "@utils/*": ["src/utils/*"],
+      "@services/*": ["src/services/*"]
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
