@@ -1,4 +1,40 @@
+import { toast } from "react-toastify";
+import axiosInstance from "@utils/axios";
 
+interface PaginationParams {
+    page?: number;
+    perPage?: number;
+    search?: string;
+    draw?: number;
+    filters?: any;
+    isExport?: boolean;
+    exportType?: string;
+  }
+  
+//   export const getCiscoPbxUsers = async (params: PaginationParams = {}) => {
+//     try {
+//       const { page = 1, perPage = 15, search = "", draw = 1, filters = {}, } = params;
+    
+      
+//       const response = await axiosInstance.get(
+//         `tms/getPbxusers`,
+//         {
+//           page,
+//           perPage,
+//           search,
+//           draw,
+//           ...filters
+//         },
+//       );
+
+//       console.log('response', response);
+      
+//       return null
+//     } catch (error) {
+//       console.error('API Error:', error);
+//       throw error;
+//     }
+//   };
 export const getCiscoPbxUsers = async () => {
       const response = {
             "success": true,
@@ -46,6 +82,8 @@ export const getCiscoPbxUsers = async () => {
         "meta": response.pagination
     }
     return requiredResponse;
+
+
 }
 
 export const getCiscoPbxUsersDirectory = async () => {
@@ -702,7 +740,7 @@ export const ListCSS= async () => {
   return requiredResponse;
 }
 
-export const LisrRegion = async () => {
+export const ListRegion = async () => {
   const response = {
     "success": true,
     "message": "Success",

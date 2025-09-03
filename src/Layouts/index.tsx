@@ -52,7 +52,7 @@ const Layout = ({ children }: LayoutProps) => {
 		});
 	};
 
-	// TMS route guard: block /tms routes unless tmsSession is valid (except /tms/login)
+	//	TMS route guard: block /tms routes unless tmsSession is valid (except /tms/login)
 	useEffect(() => {
 		if (typeof window === 'undefined') return;
 		const path = router.pathname;

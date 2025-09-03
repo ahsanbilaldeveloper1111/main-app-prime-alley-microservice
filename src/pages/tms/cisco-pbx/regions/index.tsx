@@ -18,7 +18,7 @@ import { useSession } from "next-auth/react";
 import moment from "moment";
 import Select from "react-select";
 
-import { LisrRegion } from "@utils/tms/tmsCisxoPbx";
+import { ListRegion } from "@utils/tms/tmsCisxoPbx";
 
 interface SelectOption {
   value: number;
@@ -45,7 +45,7 @@ const CiscoPbxListRegion = () => {
   const fetchRegion = useCallback(
       
       async (page = 1, perPage = 15, search = "") => {
-        return await LisrRegion();
+        return await ListRegion();
       },
       [memoizedFilters]
     );

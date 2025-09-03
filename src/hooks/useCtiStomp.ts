@@ -285,7 +285,8 @@ export default function useCtiStomp(wsPath = '/ws') {
     };
 
     const connectWithToken = async (token: string, userAddress: string) => {
-      const brokerURL = 'ws://crmstaging.sipzon.com:7515/ws'; // Updated to use the correct endpoint
+      
+      const brokerURL = process.env.CTI_SOCKET_URL;
       
       // Set userAddress in state
       setUserAddress(userAddress);

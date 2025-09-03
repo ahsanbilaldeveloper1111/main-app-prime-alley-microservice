@@ -1,3 +1,6 @@
+import { toast } from "react-toastify";
+import axiosInstance from "@utils/axios";
+
 export interface TmsLoginResponse {
   code: number;
   message?: string;
@@ -15,17 +18,16 @@ export interface TmsLoginResponse {
 
 export async function tmsLogin(email: string, password: string): Promise<TmsLoginResponse> {
   const formData = new URLSearchParams();
-  formData.append('email', email);
+  formData.append('suser', email);
   formData.append('password', password);
 
-  const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}testTmsLogin`, {
-    method: 'get',
+  const res = await axiosInstance.post(`tms/login`, formData, {
     headers: {
       Accept: 'application/json',
       'Content-Type': 'application/x-www-form-urlencoded',
     },
   });
+  console.log('res', res);
 
-  const json = (await res.json()) as TmsLoginResponse;
-  return json;
+  return res.data as TmsLoginResponse;
 }
