@@ -57,7 +57,7 @@ const CiscoPbxCustomUsers = () => {
 
   const fetchCustomUsers = useCallback(
     async (page = 1, perPage = 15, search = "") => {
-      return await ListCustomUsers();
+      return await ListCustomUsers({ page, perPage, search, filters: currentFilters });
     },
     [memoizedFilters]
   );
@@ -88,7 +88,7 @@ const CiscoPbxCustomUsers = () => {
           defaultPageSize={15}
           filters={memoizedFilters}
           refreshKey={refreshKey}
-          search={false}
+          search={true}
         />
       
 

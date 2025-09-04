@@ -68,13 +68,11 @@ const CiscoPbxListTranslationPatterns = () => {
   const fetchTranslationPatterns = useCallback(
       
       async (page = 1, perPage = 15, search = "") => {
-        return await ListTranslationPatterns();
+        return await ListTranslationPatterns({ page, perPage, search, filters: currentFilters });
       },
       [memoizedFilters]
     );
 
-
-      
 
   return (
     <React.Fragment>
@@ -102,7 +100,7 @@ const CiscoPbxListTranslationPatterns = () => {
           defaultPageSize={15}
           filters={memoizedFilters}
           refreshKey={refreshKey}
-          search={false}
+          search={true}
         />
       
 

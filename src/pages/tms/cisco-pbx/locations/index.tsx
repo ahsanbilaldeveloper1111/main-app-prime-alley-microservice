@@ -49,15 +49,10 @@ const CiscoPbxListLocation = () => {
   const fetchLocation = useCallback(
       
       async (page = 1, perPage = 15, search = "") => {
-        return await ListLocation();
+        return await ListLocation({ page, perPage, search, filters: currentFilters });
       },
       [memoizedFilters]
     );
-
-
-      
-
-      
 
   return (
     <React.Fragment>
@@ -85,7 +80,7 @@ const CiscoPbxListLocation = () => {
           defaultPageSize={15}
           filters={memoizedFilters}
           refreshKey={refreshKey}
-          search={false}
+          search={true}
         />
       
 

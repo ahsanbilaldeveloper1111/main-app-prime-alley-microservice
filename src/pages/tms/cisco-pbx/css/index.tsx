@@ -46,15 +46,11 @@ const CiscoPbxListCSS = () => {
   const fetchCSS = useCallback(
       
       async (page = 1, perPage = 15, search = "") => {
-        return await ListCSS();
+        return await ListCSS({ page, perPage, search, filters: currentFilters });
       },
       [memoizedFilters]
     );
 
-
-      
-
-      
 
   return (
     <React.Fragment>
@@ -82,7 +78,7 @@ const CiscoPbxListCSS = () => {
           defaultPageSize={15}
           filters={memoizedFilters}
           refreshKey={refreshKey}
-          search={false}
+          search={true}
         />
       
 

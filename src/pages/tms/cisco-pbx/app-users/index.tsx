@@ -64,7 +64,7 @@ const CiscoPbxAppUsers = () => {
 
   const fetchAppUsers = useCallback(
     async (page = 1, perPage = 15, search = "") => {
-      return await ListAppUsers();
+      return await ListAppUsers({ page, perPage, search, filters: currentFilters });
     },
     [memoizedFilters]
   );
@@ -89,13 +89,13 @@ const CiscoPbxAppUsers = () => {
       
         <GenericListPage
           columns={columns}
-          fetchData={ListAppUsers}
+          fetchData={fetchAppUsers}
           title="Cisco PBX App Users"
           searchPlaceholder="Search app users..."
           defaultPageSize={15}
           filters={memoizedFilters}
           refreshKey={refreshKey}
-          search={false}
+          search={true}
         />
       
 

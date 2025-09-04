@@ -68,7 +68,7 @@ const CiscoPbxUsersDirectory = () => {
 
   const fetchCiscoPbxUsersDirectory = useCallback(
     async (page = 1, perPage = 15, search = "") => {
-      return await getCiscoPbxUsersDirectory();
+      return await getCiscoPbxUsersDirectory({ page, perPage, search, filters: currentFilters });
     },
     [memoizedFilters]
   );
@@ -93,13 +93,13 @@ const CiscoPbxUsersDirectory = () => {
       
         <GenericListPage
           columns={columns}
-          fetchData={getCiscoPbxUsersDirectory}
+          fetchData={fetchCiscoPbxUsersDirectory}
           title="Cisco PBX Users Directory"
           searchPlaceholder="Search users directory..."
           defaultPageSize={15}
           filters={memoizedFilters}
           refreshKey={refreshKey}
-          search={false}
+          search={true}
         />
       
 

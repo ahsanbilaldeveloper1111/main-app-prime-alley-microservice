@@ -56,15 +56,11 @@ const CiscoPbxListDevicePool = () => {
   const fetchDevicePool = useCallback(
       
       async (page = 1, perPage = 15, search = "") => {
-        return await ListDeviePool();
+        return await ListDeviePool({ page, perPage, search, filters: currentFilters });
       },
       [memoizedFilters]
     );
 
-
-      
-
-      
 
   return (
     <React.Fragment>
@@ -92,7 +88,7 @@ const CiscoPbxListDevicePool = () => {
           defaultPageSize={15}
           filters={memoizedFilters}
           refreshKey={refreshKey}
-          search={false}
+          search={true}
         />
       
 

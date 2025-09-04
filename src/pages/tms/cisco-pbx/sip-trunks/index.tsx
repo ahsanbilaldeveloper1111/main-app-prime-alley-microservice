@@ -70,13 +70,10 @@ const CiscoPbxListSipTrunks = () => {
   const fetchSipTrunks = useCallback(
       
       async (page = 1, perPage = 15, search = "") => {
-        return await ListSipTrunks();
+        return await ListSipTrunks({ page, perPage, search, filters: currentFilters });
       },
       [memoizedFilters]
     );
-
-
-      
 
   return (
     <React.Fragment>
@@ -104,7 +101,7 @@ const CiscoPbxListSipTrunks = () => {
           defaultPageSize={15}
           filters={memoizedFilters}
           refreshKey={refreshKey}
-          search={false}
+          search={true}
         />
       
 

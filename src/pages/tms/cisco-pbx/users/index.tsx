@@ -77,7 +77,7 @@ const CiscoPbxUsers = () => {
 
   const fetchCiscoPbxUsers = useCallback(
     async (page = 1, perPage = 15, search = "") => {
-      return await getCiscoPbxUsers();
+      return await getCiscoPbxUsers({ page, perPage, search, filters: currentFilters });
     },
     [memoizedFilters]
   );
@@ -102,13 +102,13 @@ const CiscoPbxUsers = () => {
       
         <GenericListPage
           columns={columns}
-          fetchData={getCiscoPbxUsers}
+          fetchData={fetchCiscoPbxUsers}
           title="Cisco PBX Users"
           searchPlaceholder="Search users..."
           defaultPageSize={15}
           filters={memoizedFilters}
           refreshKey={refreshKey}
-          search={false}
+          search={true}
         />
       
 

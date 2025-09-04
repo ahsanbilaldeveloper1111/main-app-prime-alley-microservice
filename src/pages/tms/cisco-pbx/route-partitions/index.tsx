@@ -51,15 +51,11 @@ const CiscoPbxListRoutePartition = () => {
   const fetchRoutePartition = useCallback(
       
       async (page = 1, perPage = 15, search = "") => {
-        return await ListRoutePartition();
+        return await ListRoutePartition({ page, perPage, search, filters: currentFilters });
       },
       [memoizedFilters]
     );
 
-
-      
-
-      
 
   return (
     <React.Fragment>
@@ -86,8 +82,8 @@ const CiscoPbxListRoutePartition = () => {
           searchPlaceholder="Search route partitions..."
           defaultPageSize={15}
           filters={memoizedFilters}
-          refreshKey={refreshKey}
-          search={false}
+            refreshKey={refreshKey}
+            search={false}
         />
       
 

@@ -286,7 +286,8 @@ export default function useCtiStomp(wsPath = '/ws') {
 
     const connectWithToken = async (token: string, userAddress: string) => {
       
-      const brokerURL = process.env.CTI_SOCKET_URL;
+      const brokerURL = process.env.NEXT_PUBLIC_CTI_SOCKET_URL;
+      console.log('brokerURL:', brokerURL);
       
       // Set userAddress in state
       setUserAddress(userAddress);
@@ -404,8 +405,8 @@ export default function useCtiStomp(wsPath = '/ws') {
         //console.log('Bearer token received, connecting to STOMP...');
         await connectWithToken(token.token, token.userAddress);
       } else {
-        console.error('Failed to get bearer token from /api/cti/connect');
-        setError('Failed to get bearer token - check API endpoint /api/cti/connect');
+        console.error('Service unavailable');
+        setError('Service unavailable');
       }
     };
 

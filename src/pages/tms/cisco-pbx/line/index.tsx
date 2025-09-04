@@ -19,6 +19,7 @@ import moment from "moment";
 import Select from "react-select";
 
 import { ListLine } from "@utils/tms/tmsCisxoPbx";
+import { Truculenta } from "next/font/google";
 
 interface SelectOption {
   value: number;
@@ -60,13 +61,10 @@ const CiscoPbxListLine = () => {
   const fetchLine = useCallback(
       
       async (page = 1, perPage = 15, search = "") => {
-        return await ListLine();
+        return await ListLine({ page, perPage, search, filters: currentFilters });
       },
       [memoizedFilters]
     );
-
-
-      
 
   return (
     <React.Fragment>
@@ -94,7 +92,7 @@ const CiscoPbxListLine = () => {
           defaultPageSize={15}
           filters={memoizedFilters}
           refreshKey={refreshKey}
-          search={false}
+          search={true}
         />
       
 

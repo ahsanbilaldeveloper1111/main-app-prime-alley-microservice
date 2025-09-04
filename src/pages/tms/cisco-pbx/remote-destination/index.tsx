@@ -61,7 +61,7 @@ const CiscoPbxRemoteDestination = () => {
   const fetchRemoteDestination = useCallback(
       
       async (page = 1, perPage = 15, search = "") => {
-        return await ListRemoteDestination();
+        return await ListRemoteDestination({ page, perPage, search, filters: currentFilters });
       },
       [memoizedFilters]
     );
@@ -94,7 +94,7 @@ const CiscoPbxRemoteDestination = () => {
           defaultPageSize={15}
           filters={memoizedFilters}
           refreshKey={refreshKey}
-          search={false}
+          search={true}
         />
       
 

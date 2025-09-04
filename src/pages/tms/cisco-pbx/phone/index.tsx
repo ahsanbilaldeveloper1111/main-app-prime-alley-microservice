@@ -82,13 +82,11 @@ const CiscoPbxListPhone = () => {
   const fetchPhone = useCallback(
       
       async (page = 1, perPage = 15, search = "") => {
-        return await ListPhone();
+        return await ListPhone({ page, perPage, search, filters: currentFilters });
       },
       [memoizedFilters]
     );
-
-
-      
+   
 
   return (
     <React.Fragment>
@@ -116,7 +114,7 @@ const CiscoPbxListPhone = () => {
           defaultPageSize={15}
           filters={memoizedFilters}
           refreshKey={refreshKey}
-          search={false}
+          search={true}
         />
       
 

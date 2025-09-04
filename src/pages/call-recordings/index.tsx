@@ -72,7 +72,7 @@ interface RecordingUpdate {
   };
 }
 
-const SOCKET_URL = "http://192.168.30.131:3000";
+const SOCKET_URL = process.env.CALL_LOGS_SOCKET_URL;
 
 const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => React.ReactNode } = () => {
   const { data: session, status } = useSession();
@@ -245,7 +245,7 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
               className='ph-duotone ph-arrow-line-down text-info'
               style={{ fontSize: '1rem' }}
               onClick={() => {
-                handleDownload(props.Id);
+                handleDownload(props);
               }}
             />
             <i
@@ -425,11 +425,11 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
     }
   };
 
-  const handleDownload = async (id: string) => {
+  const handleDownload = async (props: any) => {
+    const { Id, AgentExtension } = props;
     return await DownloadCallRecording(
-      id,'call-logs/recordings/download'
+      Id,AgentExtension,'call-logs/recordings/download'
     );
-    //0F0582EF-00D3-4734-85A9-83155199962F
   };
 
   const handleAnalysis = async (props: any) => {
@@ -443,7 +443,9 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
 
   const handlePlayRecording = (recording: any) => {
     const trackId = recording.Id;
-    loadAuthenticatedAudio(trackId);
+    const agentExtension = recording.AgentExtension;
+
+    loadAuthenticatedAudio(trackId, agentExtension);
 
     setSelectedRecording(recording);
      
@@ -452,7 +454,7 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
   };
 
 
-  const loadAuthenticatedAudio = async (audioTrackId: string) => {
+  const loadAuthenticatedAudio = async (audioTrackId: string, agentExtension: string) => {
     if (!audioTrackId) return;
     
     setAudioLoading(true);
@@ -467,6 +469,9 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
       console.log('Attempting to load audio via axiosInstance...');
       const response = await axiosInstance.get(`call-logs/recordings/download/${audioTrackId}`, {
         responseType: 'blob',
+        params: {
+          extension_number: agentExtension
+        },
         headers: {
           'Accept': 'audio/*, application/octet-stream, */*'
         }

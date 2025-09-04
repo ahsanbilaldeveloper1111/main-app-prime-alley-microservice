@@ -9,8 +9,8 @@ import { tmsSession } from '@utils/tmsSession';
 const TmsLogin = () => {
 
     const router = useRouter();
-    const [email, setEmail] = useState('test@test.com');
-    const [password, setPassword] = useState('test@123');
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [showPassword, setShowPassword] = useState(false);
@@ -20,7 +20,7 @@ const TmsLogin = () => {
         setError(null);
         setLoading(true);
         try {
-            const res = await tmsLogin(email, password);
+            const res = await tmsLogin(email, password,false);
             if (res.code !== 200 || !res.data?.access_token) {
                 setError(res.message || 'TMS login failed');
                 setLoading(false);
@@ -67,15 +67,15 @@ const TmsLogin = () => {
                                 )}
                                 <Form onSubmit={handleSubmit}>
                                     <Form.Group className="mb-3">
-                                        <Form.Label className="fw-semibold">Email</Form.Label>
+                                        <Form.Label className="fw-semibold">Username</Form.Label>
                                         <InputGroup>
                                             <InputGroup.Text><i className="ph-duotone ph-envelope"></i></InputGroup.Text>
                                             <Form.Control 
-                                                type="email" 
+                                                type="text" 
                                                 value={email} 
                                                 onChange={(e) => setEmail(e.target.value)} 
                                                 required 
-                                                placeholder="you@company.com" 
+                                                placeholder="username" 
                                             />
                                         </InputGroup>
                                     </Form.Group>

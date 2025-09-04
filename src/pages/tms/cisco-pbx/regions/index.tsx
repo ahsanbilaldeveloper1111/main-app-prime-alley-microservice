@@ -45,7 +45,7 @@ const CiscoPbxListRegion = () => {
   const fetchRegion = useCallback(
       
       async (page = 1, perPage = 15, search = "") => {
-        return await ListRegion();
+        return await ListRegion({ page, perPage, search, filters: currentFilters });
       },
       [memoizedFilters]
     );
@@ -77,7 +77,7 @@ const CiscoPbxListRegion = () => {
           defaultPageSize={15}
           filters={memoizedFilters}
           refreshKey={refreshKey}
-          search={false}
+          search={true}
         />
       
 

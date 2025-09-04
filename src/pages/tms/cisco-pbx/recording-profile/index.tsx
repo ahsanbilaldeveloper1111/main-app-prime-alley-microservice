@@ -49,7 +49,7 @@ const CiscoPbxRecordingProfile = () => {
 
   const fetchRecordingProfile = useCallback(
     async (page = 1, perPage = 15, search = "") => {
-      return await ListRecordingProfile();
+      return await ListRecordingProfile({ page, perPage, search, filters: currentFilters });
     },
     [memoizedFilters]
   );
@@ -80,7 +80,7 @@ const CiscoPbxRecordingProfile = () => {
           defaultPageSize={15}
           filters={memoizedFilters}
           refreshKey={refreshKey}
-          search={false}
+          search={true}
         />
       
 

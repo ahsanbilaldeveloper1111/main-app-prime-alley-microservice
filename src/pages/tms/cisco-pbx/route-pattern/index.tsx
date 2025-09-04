@@ -65,7 +65,7 @@ const CiscoPbxListRoutePattern = () => {
   const fetchRoutePattern = useCallback(
       
       async (page = 1, perPage = 15, search = "") => {
-        return await ListRoutePattern();
+        return await ListRoutePattern({ page, perPage, search, filters: currentFilters });
       },
       [memoizedFilters]
     );
@@ -97,7 +97,7 @@ const CiscoPbxListRoutePattern = () => {
           defaultPageSize={15}
           filters={memoizedFilters}
           refreshKey={refreshKey}
-          search={false}
+          search={true}
         />
       
 

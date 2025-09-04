@@ -16,16 +16,13 @@ export interface TmsLoginResponse {
   };
 }
 
-export async function tmsLogin(email: string, password: string): Promise<TmsLoginResponse> {
-  const formData = new URLSearchParams();
-  formData.append('suser', email);
-  formData.append('password', password);
+export async function tmsLogin(email: string, password: string, enable_2fa: boolean): Promise<TmsLoginResponse> {
+ 
 
-  const res = await axiosInstance.post(`tms/login`, formData, {
-    headers: {
-      Accept: 'application/json',
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
+  const res = await axiosInstance.post(`tms/login`, {
+    samaccountname: email,
+    password: password,
+    enable_2fa: enable_2fa,
   });
   console.log('res', res);
 
