@@ -526,7 +526,7 @@ export const createTicketFiltersConfig = (hierarchyData?: any): FilterTab[] => {
       fields: [
         {
           type: 'select',
-          isMulti: false,
+          isMulti: true,
           name: 'status_id',
           label: 'Status',
           options: hierarchyData?.statuses?.map((status: { id: string; name: string }) => ({
@@ -543,7 +543,7 @@ export const createTicketFiltersConfig = (hierarchyData?: any): FilterTab[] => {
       fields: [
         {
           type: 'select',
-          isMulti: false,
+          isMulti: true,
           name: 'type_id',
           label: 'Types',
           options: hierarchyData?.types?.map((type: { id: string; name: string }) => ({

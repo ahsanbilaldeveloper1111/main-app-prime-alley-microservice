@@ -38,6 +38,7 @@ import {
 } from "@utils/ticket-module";
 import Select from "react-select";
 import TicketsFilters from "@components/filters/TicketFilters";
+import { Tooltip } from "react-tooltip";
 
 interface SelectOption {
   value: number;
@@ -75,7 +76,13 @@ const TicketList = () => {
         cell: (props: any) => (
           <div>
             <div className="fw-bold text-primary">#{props.id}</div>
-            <div>{props.title}</div>
+            <div
+              style={{
+                textTransform: "capitalize",
+              }}
+            >
+              {props.title}
+            </div>
           </div>
         ),
       },
@@ -222,14 +229,22 @@ const TicketList = () => {
               </button>
             )}
 
+            <Tooltip id="delete-ticket-tooltip" />
             {session?.user?.permissions?.includes("delete-ticket-tickets") && (
-              <button
-                className="btn btn-sm btn-outline-danger"
-                onClick={() => handleDeleteTicket(props)}
-                //disabled={props.tickets_count > 0}
+              <div
+                data-tooltip-id="delete-ticket-tooltip"
+                data-tooltip-content={
+                  props.user_extension ? "Assigned to User" : "Delete"
+                }
               >
-                Delete
-              </button>
+                <button
+                  className="btn btn-sm btn-outline-danger"
+                  onClick={() => handleDeleteTicket(props)}
+                  disabled={props.user_extension}
+                >
+                  Delete
+                </button>
+              </div>
             )}
           </div>
         ),
@@ -438,6 +453,7 @@ const TicketList = () => {
       }
 
       try {
+        setCreatingTicket(true);
         const response = await AddComment(
           ticketId,
           newComment.trim(),
@@ -450,6 +466,8 @@ const TicketList = () => {
         }
       } catch (error) {
         console.error("Error adding comment:", error);
+      } finally {
+        setCreatingTicket(false);
       }
     },
     [newComment, viewTicketData]
@@ -463,6 +481,7 @@ const TicketList = () => {
       }
 
       try {
+        setCreatingTicket(true);
         const response = await AddAssigneeComment(
           ticketId,
           newAssigneeComment.trim(),
@@ -475,6 +494,8 @@ const TicketList = () => {
         }
       } catch (error) {
         console.error("Error adding assignee comment:", error);
+      } finally {
+        setCreatingTicket(false);
       }
     },
     [newAssigneeComment, viewTicketData]
@@ -495,19 +516,66 @@ const TicketList = () => {
 
   const handleSubmitEditTicket = useCallback(async () => {
     //console.log('Submit edit group:', selectedGroup, selectedGroupName);
-    const response = await UpdateTicketDetails(
-      selectedTicket.id,
-      selectedTicketTitle,
-      selectedTicketDescription,
-      selectedTicket.ticket_type_id || selectedTicket.type,
-      selectedTicket.ticket_status_id,
-      selectedTicket.module_id,
-      selectedTicket.submodule_id,
-      selectedTicket.submodule_child_id,
-      selectedTicket.user_extension,
-      selectedTicket.priority,
-      selectedTicket.due_date
-    );
+    if (
+      !selectedTicketTitle?.trim() ||
+      selectedTicketTitle?.trim()?.length < 5
+    ) {
+      toast.error("Please enter a ticket title (Min: 5 chars)");
+      return;
+    }
+    if (
+      !selectedTicketDescription?.trim() ||
+      selectedTicketDescription?.trim()?.length < 50 ||
+      selectedTicketDescription?.trim()?.length > 500
+    ) {
+      toast.error(
+        "Please enter a ticket description (Min: 50 chars, Max: 500 chars)"
+      );
+      return;
+    }
+    if (!selectedTicket.ticket_type_id) {
+      toast.error("Please select a ticket type");
+      return;
+    }
+    if (!selectedTicket.ticket_status_id) {
+      toast.error("Please select a ticket status");
+      return;
+    }
+    if (!selectedTicket.module_id) {
+      toast.error("Please select a ticket module");
+      return;
+    }
+    if (!selectedTicket.submodule_id) {
+      toast.error("Please select a ticket primary issue");
+      return;
+    }
+    if (!selectedTicket.priority) {
+      toast.error("Please select a ticket priority");
+      return;
+    }
+
+    setCreatingTicket(true);
+    let response = null;
+    try {
+      response = await UpdateTicketDetails(
+        selectedTicket.id,
+        selectedTicketTitle,
+        selectedTicketDescription,
+        selectedTicket.ticket_type_id || selectedTicket.type,
+        selectedTicket.ticket_status_id,
+        selectedTicket.module_id,
+        selectedTicket.submodule_id,
+        selectedTicket.submodule_child_id,
+        selectedTicket.user_extension,
+        selectedTicket.priority,
+        selectedTicket.due_date
+      );
+    } catch (error) {
+      console.error("Error updating ticket details:", error);
+      return;
+    } finally {
+      setCreatingTicket(false);
+    }
     if (response) {
       setSelectedTicket(null);
       setSelectedTicketTitle(null);
@@ -560,7 +628,7 @@ const TicketList = () => {
     useState<string>("");
   const [submodules, setSubmodules] = useState<any[]>([]);
   const [submoduleChildren, setSubmoduleChildren] = useState<any[]>([]);
-
+  const [creatingTicket, setCreatingTicket] = useState<boolean>(false);
   console.log("ZE UES IS ", session);
   const handleSubmitCreateTicket = useCallback(async () => {
     console.log("=== COMPONENT DEBUG ===");
@@ -571,41 +639,35 @@ const TicketList = () => {
     );
     console.log("newTicketImage MIME type:", newTicketImage?.type);
     console.log("newTicketImage size:", newTicketImage?.size);
+    if (!newTicketTitle?.trim() || newTicketTitle?.trim()?.length < 5) {
+      toast.error("Please enter a ticket title (Min: 5 chars)");
+      return;
+    }
+    if (!newTicketType) {
+      toast.error("Please select a ticket type");
+      return;
+    }
     if (newTicketDescription.length < 50 || newTicketDescription.length > 500) {
       toast.error("Ticket description must be between 50 and 500 characters");
       return;
     }
-    if(!newTicketType)
-    {
-      toast.error("Please select a ticket type");
-      return;
-    }
-    if(!newTicketStatus)
-    {
+    if (!newTicketStatus) {
       toast.error("Please select a ticket status");
       return;
     }
-    if(!newTicketModule)
-    {
+    if (!newTicketModule) {
       toast.error("Please select a ticket module");
       return;
     }
-    if(!newTicketSubmodule)
-    {
-      toast.error("Please select a ticket submodule");
+    if (!newTicketSubmodule) {
+      toast.error("Please select a ticket primary issue");
       return;
     }
-    if(!newTicketPriority)
-    {
+    if (!newTicketPriority) {
       toast.error("Please select a ticket priority");
       return;
     }
-    if(!newTicketTitle)
-    {
-      toast.error("Please enter a ticket title");
-      return;
-    }
-    
+
     const formData = new FormData();
     formData.append("title", newTicketTitle);
     formData.append("description", newTicketDescription);
@@ -625,6 +687,21 @@ const TicketList = () => {
       formData.append("due_date", newTicketDueDate);
     }
     if (newTicketImage) {
+      // sometimes|image|mimes:jpeg,png,jpg,gif|max:5120
+      console.log("newTicketImage type:", newTicketImage);
+      if (!newTicketImage?.type?.includes("image/")) {
+        toast.error("Attachment must be an image (jpeg, png, jpg, gif)");
+        return;
+      }
+      const maxSize = 5 * 1024 * 1024; // 5 MB in bytes
+      console.log(
+        "newTicketImage type IMAGE SIZE IN MB :",
+        newTicketImage?.size / (1024 * 1024)
+      );
+      if (newTicketImage?.size > maxSize) {
+        toast.error("Attachment size must be less than 5MB");
+        return;
+      }
       formData.append("image", newTicketImage);
     }
 
@@ -636,7 +713,7 @@ const TicketList = () => {
       console.log("Image type:", newTicketImage.type);
       console.log("Image size:", newTicketImage.size);
     }
-
+    setCreatingTicket(true);
     console.log(
       "FormData created type:",
       typeof formData,
@@ -644,8 +721,15 @@ const TicketList = () => {
     );
     console.log("FormData constructor:", formData?.constructor?.name);
     console.log("=== END COMPONENT DEBUG ===");
-
-    const response = await CreateTicket(formData);
+    let response = null;
+    try {
+      response = await CreateTicket(formData);
+    } catch (error) {
+      toast.error("Failed to create ticket");
+      console.error("Create ticket error:", error);
+    } finally {
+      setCreatingTicket(false);
+    }
     if (response) {
       setNewTicketTitle("");
       setNewTicketDescription("");
@@ -818,6 +902,15 @@ const TicketList = () => {
     [extensions, fetchSubmodules, fetchSubmoduleChildren]
   );
 
+  const [rerenderTrigger, setRerenderTrigger] = useState<number>(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setRerenderTrigger(prev => prev + 1);
+    }, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
   return (
     <React.Fragment>
       <BreadcrumbItem
@@ -981,7 +1074,7 @@ const TicketList = () => {
               <div className="col-md-6">
                 <div className="form-group mb-3">
                   <label htmlFor="editTicketSubmodule">
-                    Submodule (Required)
+                    Primary Issue (Required)
                   </label>
                   <select
                     className="form-control"
@@ -998,7 +1091,7 @@ const TicketList = () => {
                       !selectedTicket?.module_id || submodules.length == 0
                     }
                   >
-                    <option value="">Select Submodule</option>
+                    <option value="">Select Primary Issue</option>
                     {submodules.map((submodule: any) => (
                       <option key={submodule.id} value={submodule.id}>
                         {submodule.name}
@@ -1010,7 +1103,7 @@ const TicketList = () => {
               <div className="col-md-6">
                 <div className="form-group mb-3">
                   <label htmlFor="editTicketSubmoduleChild">
-                    Submodule Child (Optional)
+                    Specific Problem (Optional)
                   </label>
                   <select
                     className="form-control"
@@ -1027,7 +1120,7 @@ const TicketList = () => {
                       submoduleChildren.length == 0
                     }
                   >
-                    <option value="">Select Submodule Child</option>
+                    <option value="">Select Specific Problem</option>
                     {submoduleChildren.map((child: any) => (
                       <option key={child.id} value={child.id}>
                         {child.name}
@@ -1040,10 +1133,11 @@ const TicketList = () => {
 
             <div className="form-group mb-3">
               <label htmlFor="editTicketPriority">Priority</label>
+
               <select
                 className="form-control"
                 id="editTicketPriority"
-                value={selectedTicket?.priority || ""}
+                value={selectedTicket?.priority?.toString() || ""}
                 onChange={(e) =>
                   setSelectedTicket({
                     ...selectedTicket,
@@ -1278,7 +1372,7 @@ const TicketList = () => {
               <div className="col-md-6">
                 <div className="form-group mb-3">
                   <label htmlFor="newTicketSubmodule">
-                    Submodule (Required)
+                    Primary Issue (Required)
                   </label>
                   <select
                     className="form-control"
@@ -1291,7 +1385,7 @@ const TicketList = () => {
                     disabled={!newTicketModule || submodules.length == 0}
                     required
                   >
-                    <option value="">Select Submodule</option>
+                    <option value="">Select Primary Issue</option>
                     {submodules.map((submodule: any) => (
                       <option key={submodule.id} value={submodule.id}>
                         {submodule.name}
@@ -1303,7 +1397,7 @@ const TicketList = () => {
               <div className="col-md-6">
                 <div className="form-group mb-3">
                   <label htmlFor="newTicketSubmoduleChild">
-                    Submodule Child (Optional)
+                    Specific Problem (Optional)
                   </label>
                   <select
                     className="form-control"
@@ -1312,7 +1406,7 @@ const TicketList = () => {
                     onChange={(e) => setNewTicketSubmoduleChild(e.target.value)}
                     disabled={!newTicketModule || submoduleChildren.length == 0}
                   >
-                    <option value="">Select Submodule Child</option>
+                    <option value="">Select Specific Problem</option>
                     {submoduleChildren.map((child: any) => (
                       <option key={child.id} value={child.id}>
                         {child.name}
@@ -1396,8 +1490,9 @@ const TicketList = () => {
             <Button
               variant="primary"
               onClick={() => handleSubmitCreateTicket()}
+              disabled={creatingTicket}
             >
-              Create
+              {creatingTicket ? "Creating..." : "Create"}
             </Button>
           </Modal.Footer>
         </Modal>
@@ -1434,7 +1529,13 @@ const TicketList = () => {
                   <td>
                     <strong>Ticket Title</strong>
                   </td>
-                  <td>{viewTicketData?.title}</td>
+                  <td
+                    style={{
+                      textTransform: "capitalize",
+                    }}
+                  >
+                    {viewTicketData?.title}
+                  </td>
                 </tr>
                 <tr>
                   <td>
@@ -1500,7 +1601,7 @@ const TicketList = () => {
                 </tr>
                 <tr>
                   <td>
-                    <strong>Submodule</strong>
+                    <strong>Primary Issue</strong>
                   </td>
                   <td>
                     {viewTicketData?.submodule ? (
@@ -1521,7 +1622,7 @@ const TicketList = () => {
                 </tr>
                 <tr>
                   <td>
-                    <strong>Submodule Child</strong>
+                    <strong>Specific Problem</strong>
                   </td>
                   <td>
                     {viewTicketData?.submodule_child ? (
@@ -1659,22 +1760,31 @@ const TicketList = () => {
                   </small>
                 </div>
                 <div>
-                  <Button
-                    variant="outline-primary"
-                    size="sm"
-                    onClick={toggleComments}
-                    className="me-2"
-                  >
-                    {showComments ? "Hide Comments" : "Show Comments"}
-                  </Button>
-                  <Button
-                    variant="outline-secondary"
-                    size="sm"
-                    onClick={() => fetchComments(viewTicketData?.id)}
-                    disabled={isLoadingComments}
-                  >
-                    {isLoadingComments ? "Loading..." : "Refresh"}
-                  </Button>
+                  {(session?.user?.permissions?.includes(
+                    "view-ticket-comments-tickets"
+                  ) ||
+                    session?.user?.permissions?.includes(
+                      "view-ticket-assignee-comments-tickets"
+                    )) && (
+                    <>
+                      <Button
+                        variant="outline-primary"
+                        size="sm"
+                        onClick={toggleComments}
+                        className="me-2"
+                      >
+                        {showComments ? "Hide Comments" : "Show Comments"}
+                      </Button>
+                      <Button
+                        variant="outline-secondary"
+                        size="sm"
+                        onClick={() => fetchComments(viewTicketData?.id)}
+                        disabled={isLoadingComments}
+                      >
+                        {isLoadingComments ? "Loading..." : "Refresh"}
+                      </Button>
+                    </>
+                  )}
                 </div>
               </div>
 
@@ -1716,26 +1826,34 @@ const TicketList = () => {
                             </h6>
                           </div>
                           <div className="card-body">
-                            <div className="mb-3">
-                              <textarea
-                                className="form-control"
-                                rows={3}
-                                placeholder="Add a new comment..."
-                                value={newComment}
-                                onChange={(e) => setNewComment(e.target.value)}
-                              />
-                              <Button
-                                variant="primary"
-                                size="sm"
-                                className="mt-2"
-                                onClick={() =>
-                                  handleAddComment(viewTicketData?.id)
-                                }
-                                disabled={!newComment.trim()}
-                              >
-                                Add Comment
-                              </Button>
-                            </div>
+                            {session?.user?.permissions?.includes(
+                              "update-ticket-comments-tickets"
+                            ) && (
+                              <div className="mb-3">
+                                <textarea
+                                  className="form-control"
+                                  rows={3}
+                                  placeholder="Add a new comment..."
+                                  value={newComment}
+                                  onChange={(e) =>
+                                    setNewComment(e.target.value)
+                                  }
+                                />
+                                <Button
+                                  variant="primary"
+                                  size="sm"
+                                  className="mt-2"
+                                  onClick={() =>
+                                    handleAddComment(viewTicketData?.id)
+                                  }
+                                  disabled={
+                                    !newComment.trim() || creatingTicket
+                                  }
+                                >
+                                  Add Comment
+                                </Button>
+                              </div>
+                            )}
 
                             <div
                               className="comments-list"
@@ -1842,7 +1960,9 @@ const TicketList = () => {
                                 onClick={() =>
                                   handleAddAssigneeComment(viewTicketData?.id)
                                 }
-                                disabled={!newAssigneeComment.trim()}
+                                disabled={
+                                  !newAssigneeComment.trim() || creatingTicket
+                                }
                               >
                                 Add Assignee Comment
                               </Button>
