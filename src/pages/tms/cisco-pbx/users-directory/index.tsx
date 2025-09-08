@@ -31,7 +31,7 @@ import { useSession } from "next-auth/react";
 import moment from "moment";
 import Select from "react-select";
 
-import { getCiscoPbxUsers,getCiscoPbxUsersDirectory } from "@utils/tms/tmsCisxoPbx";
+import { getCiscoPbxUsers,getCiscoPbxUsersDirectory } from "@utils/tms/List";
 
 interface SelectOption {
   value: number;

@@ -62,7 +62,7 @@ const TmsRankPermissions = () => {
   const fetchData = useCallback(
       
       async (page = 1, perPage = 15, search = "") => {
-        return await getRanks();
+        return await getRanks({page, perPage, search, filters: currentFilters});
       },
       [memoizedFilters]
     );
@@ -94,7 +94,7 @@ const TmsRankPermissions = () => {
           defaultPageSize={15}
           filters={memoizedFilters}
           refreshKey={refreshKey}
-          search={false}
+          search={true}
         />
       
 

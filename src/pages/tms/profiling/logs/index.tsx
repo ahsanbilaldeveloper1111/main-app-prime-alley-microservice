@@ -19,6 +19,7 @@ import moment from "moment";
 import Select from "react-select";
 
 import { ListCustomerProfilingLogs } from "@utils/tms/tmsProfiling";
+import Link from "next/link";
 
 interface SelectOption {
   value: number;
@@ -37,22 +38,23 @@ const CustomerProfilingLogs = () => {
       {key: "applicant_details",name: "Applicant ID",selector: (row: any) => row.applicant_details,sortable: true,
         cell: (row: any) => {
           return <div>
-            <p>{row.applicant_details?.userIds[0]}</p>
+            <p>{row.applicant_details?.userid}</p>
           </div>
         }
       },
       {key: "company",name: "Company",selector: (row: any) => row.company,sortable: true,
             cell: (row: any) => {
               return <div>
-                <p>{row.company?.name}</p>
+                <p>{row?.applicant_details?.company?.name}</p>
               </div>
             }
           },
 
           {key: "action_performed_by",name: "Action Performed By",selector: (row: any) => row.action_performed_by,sortable: true,
             cell: (row: any) => {
+              
               return <div>
-                <p>{row.user?.name}</p>
+                <p>{row?.user?.name}</p>
               </div>
             }
           },
@@ -75,9 +77,11 @@ const CustomerProfilingLogs = () => {
           {key: "action", action:true,name:'Action',selector: (row: any) => row.action,sortable: true,
             cell: (row: any) => {
               return <div className="d-flex gap-2">
-                <Button size="sm" variant="outline-primary" onClick={() => {
-                  console.log(row);
-                }}>View</Button>
+                <Link 
+                        href={`/tms/profiling/logs/${row.id}`} 
+                        className="btn btn-sm btn-outline-primary">
+                        View
+                    </Link> 
               </div>
             }
           },
@@ -91,10 +95,19 @@ const CustomerProfilingLogs = () => {
   const fetchCustomerProfilingLogs = useCallback(
       
       async (page = 1, perPage = 15, search = "") => {
-        return await ListCustomerProfilingLogs();
+        return await ListCustomerProfilingLogs({page, perPage, search, filters: currentFilters});
       },
       [memoizedFilters]
     );
+
+  const [detailsModal, setDetailsModal] = useState(false);
+  const [details, setDetails] = useState(null);
+
+  const handleAction = (row: any) => {
+    console.log(row);
+    setDetails(row);
+    setDetailsModal(true);
+  }
 
 
   return (

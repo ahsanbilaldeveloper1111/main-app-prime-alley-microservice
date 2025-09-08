@@ -1,5 +1,6 @@
 import { Client } from '@stomp/stompjs';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import axiosInstance from '@utils/axios';
 
 interface CtiDevice {
   dn: string;
@@ -256,15 +257,15 @@ export default function useCtiStomp(wsPath = '/ws') {
   useEffect(() => {
     const getBearerToken = async (): Promise<{ token: string; userAddress: string } | null> => {
       try {
-        const response = await fetch('/api/cti/connect', {
-          method: 'GET',
+        const response = await axiosInstance.get('/cti/connect', {
           headers: {
             'Content-Type': 'application/json',
-          },
+          }
         });
+        console.log('response cti connect:', response);
 
-        if (response.ok) {
-          const data = await response.json();
+        if (response.status === 200) {
+          const data = response.data;
           const token = data.token || data.accessToken || data.bearerToken;
           const userAddress = data.userAddress || data.user_address
           

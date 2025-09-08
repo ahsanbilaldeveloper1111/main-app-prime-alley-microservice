@@ -3,7 +3,7 @@ import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
 import { Card, Row, Col, Button, Form, InputGroup, Alert } from 'react-bootstrap';
 import { useRouter } from 'next/router';
-import { tmsLogin } from '@services/tmsAuth';
+import { tmsLogin } from '@services/tms/tmsAuth';
 import { tmsSession } from '@utils/tmsSession';
 
 const TmsLogin = () => {

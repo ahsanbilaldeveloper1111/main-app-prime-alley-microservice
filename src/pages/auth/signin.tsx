@@ -37,6 +37,7 @@ const Signin = () => {
         email: credentials.email,
         password: credentials.password,
         redirect: false,
+        callbackUrl: callbackUrl ? decodeURIComponent(callbackUrl as string) : '/dashboard',
       }
     );
 
@@ -50,9 +51,13 @@ const Signin = () => {
         }
       } else {
         toast.success('Login successful');
-        // Redirect to callback URL if provided, otherwise to dashboard
+        // Use NextAuth's built-in redirect mechanism for better reliability
         const redirectUrl = callbackUrl ? decodeURIComponent(callbackUrl as string) : '/dashboard';
-        router.push(redirectUrl);
+        
+        // Small delay to ensure session is established, then redirect
+        setTimeout(() => {
+          window.location.href = redirectUrl;
+        }, 100);
       }
     } catch (error) {
       console.error('Sign in error:', error);

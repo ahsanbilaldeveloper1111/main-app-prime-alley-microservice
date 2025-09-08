@@ -1,45 +1,116 @@
-export const ListUsers = async () => {
-  const response = {
-      "success": true,
-      "message": "Success",
-      "action": "view",
-      "data": [
-          {
-              "name": "testyou testme",
-              "email": "testmenow25_S99@sipzon.com",
-              "user_type": "partner",
-              "guid": "2a633217-8998-49ed-961d-1eda38ef8a99",
-              "imagicle": null,
-              "status": "1",
-              "username": "testmenow25_S99",
-              "phone_no": "20184",
-              "id": 2437,
-              "company": "XYZ FZ LLC",
-              "user_access_info": {
-                  "permissions": []
-              },
-              "blocked_permissions": [],
-              "extended_permissions": [],
-              "ranks": []
-          }
-      ],
-      "pagination": {
-          "total": 2391,
-          "limit": 10,
-          "page": 1,
-          "last_page": 240,
-          "from": 1,
-          "to": 10
+import { toast } from "react-toastify";
+import axiosInstance from "@utils/axios";
+import { tmsSession } from "@utils/tmsSession";
+
+/**
+ * General function to handle TMS authentication errors (4009 response code)
+ * Clears TMS session and redirects to TMS login page
+ * @param response - The API response object
+ */
+const handleTmsAuthError = (response: any) => {
+  const responseCode = response?.data?.code;
+  if (responseCode === 4009) {
+    toast.error(response?.data?.message);
+    // Clear TMS session and redirect to TMS login
+    tmsSession.clear();
+    if (typeof window !== 'undefined') {
+      window.location.href = '/tms/login';
+    }
+  }
+
+};
+
+interface PaginationParams {
+    page?: number;
+    perPage?: number;
+    search?: string;
+    draw?: number;
+    filters?: any;
+}
+
+interface ApiResponse {
+  success: boolean;
+  message: string;
+  action: string;
+  data: any[];
+  pagination: {
+    total: number;
+    limit: number;
+    page: number;
+    last_page: number;
+    from: number;
+    to: number;
+  };
+}
+
+interface TransformedResponse {
+  draw: number;
+  recordsTotal: number;
+  recordsFiltered: number;
+  dataList: any[];
+  meta: {
+    total: number;
+    limit: number;
+    page: number;
+    last_page: number;
+    from: number;
+    to: number;
+  };
+}
+
+/**
+ * General utility function to transform API responses to a standardized format
+ * @param response - The API response object
+ * @param draw - The draw number for DataTables (default: 1)
+ * @returns Transformed response in the required format
+ */
+const transformApiResponse = (response: ApiResponse, draw: number = 1): TransformedResponse => {
+  if (response.success === true) {
+    return {
+      draw,
+      recordsTotal: response?.pagination?.total,
+      recordsFiltered: response?.pagination?.total,
+      dataList: response?.data,
+      meta: response?.pagination
+    };
+  } else {
+    console.log('response msg', response?.message);
+    return {
+      draw,
+      recordsTotal: 0,
+      recordsFiltered: 0,
+      dataList: [],
+      meta: {
+        total: 0,
+        limit: 10,
+        page: 1,
+        last_page: 0,
+        from: 0,
+        to: 0
       }
+    };
   }
-  const requiredResponse = {
-    "draw": 1,
-    "recordsTotal": response.pagination.total,
-    "recordsFiltered": response.pagination.total,
-    "dataList": response.data,
-    "meta": response.pagination
-  }
-  return requiredResponse;
+};
+
+
+export const ListUsers = async (params: PaginationParams = {}) => {
+  const { page = 1, perPage = 15, search = "", draw = 1, filters = {}, } = params;
+  const response = await axiosInstance.get(
+    `tms/getTmsUsers`,
+    {
+      params: {
+        page,
+        perPage,
+        search,
+        draw,
+        ...filters
+      }
+    },
+  );
+  handleTmsAuthError(response);
+  const responseData = response?.data?.data; 
+  return transformApiResponse(responseData, draw);
+  
 }
 
 export const GetModule = async () => {
@@ -93,50 +164,21 @@ export const GetModule = async () => {
 
 
 
-export  const getRanks = async () => {
-  const response = {
-      "success": true,
-      "message": "Success",
-      "action": "view",
-      "data": [
-          {
-              "id": 17,
-              "name": "RESTRICTED AGENT",
-              "description": null,
-              "company_id": null,
-              "created_at": "2025-08-08T20:59:50.127000Z",
-              "updated_at": "2025-08-08T20:59:50.127000Z",
-              "users_count": "1",
-              "permissions": [
-                  {
-                      "id": 29,
-                      "action": "update",
-                      "module_id": "8",
-                      "created_at": "2025-06-15T09:51:05.217000Z",
-                      "updated_at": "2025-06-15T09:51:05.217000Z",
-                      "pivot": {
-                          "rank_id": "17",
-                          "permission_id": "29"
-                      }
-                  }
-              ]
-          }
-      ],
-      "pagination": {
-          "total": 13,
-          "limit": 10,
-          "page": 1,
-          "last_page": 2,
-          "from": 1,
-          "to": 10
+export  const getRanks = async (params: PaginationParams = {}) => {
+  const { page = 1, perPage = 15, search = "", draw = 1, filters = {}, } = params;
+  const response = await axiosInstance.get(
+    `tms/getTmsRanks`,
+    {
+      params: {
+        page,
+        perPage,
+        search,
+        draw,
+        ...filters
       }
-  }
-  const requiredResponse = {
-      "draw": 1,
-      "recordsTotal": response.pagination.total,
-      "recordsFiltered": response.pagination.total,
-      "dataList": response.data,
-      "meta": response.pagination
-    }
-    return requiredResponse; 
+    },
+  );
+  handleTmsAuthError(response);
+  const responseData = response?.data?.data; 
+  return transformApiResponse(responseData, draw);
 }

@@ -33,7 +33,9 @@
       "@views/*": ["src/views/*"],
       "@helpers/*": ["src/helpers/*"],
       "@utils/*": ["src/utils/*"],
-      "@services/*": ["src/services/*"]
+      "@services/*": ["src/services/*"],
+      "@models/*": ["src/Models/*"],
+      "@hooks/*": ["src/hooks/*"]
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],

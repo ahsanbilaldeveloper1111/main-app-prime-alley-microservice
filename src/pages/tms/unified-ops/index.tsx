@@ -18,7 +18,7 @@ import { useSession } from "next-auth/react";
 import moment from "moment";
 import Select from "react-select";
 
-import { ListUnifiedOps } from "@utils/tms/tmsUnifiedOps";
+import { ListUnifiedOps } from "@utils/tms/List";
 
 interface SelectOption {
   value: number;
@@ -56,7 +56,7 @@ const UnifiedOpsList = () => {
   const fetchUnifiedOps = useCallback(
       
       async (page = 1, perPage = 15, search = "") => {
-        return await ListUnifiedOps();
+        return await ListUnifiedOps({ page, perPage, search, filters: currentFilters });
       },
       [memoizedFilters]
     );
@@ -88,7 +88,7 @@ const UnifiedOpsList = () => {
           defaultPageSize={15}
           filters={memoizedFilters}
           refreshKey={refreshKey}
-          search={false}
+          search={true}
         />
       
 

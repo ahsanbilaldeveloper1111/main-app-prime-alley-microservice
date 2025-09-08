@@ -18,7 +18,7 @@ import { useSession } from "next-auth/react";
 import moment from "moment";
 import Select from "react-select";
 
-import { ListLine } from "@utils/tms/tmsCisxoPbx";
+import { ListLine } from "@utils/tms/List";
 import { Truculenta } from "next/font/google";
 
 interface SelectOption {

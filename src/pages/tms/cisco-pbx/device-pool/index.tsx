@@ -18,7 +18,7 @@ import { useSession } from "next-auth/react";
 import moment from "moment";
 import Select from "react-select";
 
-import { ListDeviePool } from "@utils/tms/tmsCisxoPbx";
+import { ListDeviePool } from "@utils/tms/List";
 
 interface SelectOption {
   value: number;
