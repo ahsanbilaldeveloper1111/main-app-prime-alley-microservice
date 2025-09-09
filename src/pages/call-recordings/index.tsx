@@ -540,6 +540,7 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
     fetchHierarchyData();
   }, []);
 
+
   //Socket connection effect
   // useEffect(() => {
   //   if (status === 'authenticated' && session) {

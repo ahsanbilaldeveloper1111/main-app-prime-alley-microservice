@@ -14,7 +14,7 @@ const handleTmsAuthError = (response: any) => {
     // Clear TMS session and redirect to TMS login
     tmsSession.clear();
     if (typeof window !== 'undefined') {
-      window.location.href = '/tms/login';
+      window.location.href = '/tms/verification';
     }
   }
 

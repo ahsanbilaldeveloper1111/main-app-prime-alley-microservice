@@ -90,7 +90,7 @@ const ProfileView = () => {
 
         //await fetchRoles();
         //await fetchGroups();
-        const getUser = await getUserById(session?.user?.id as string);
+        const getUser = await getUserById(session?.user?.id as string, false);
         setCurrentUser(getUser?.userData);
         setUpdatedGroup(getUser?.userData?.group_id);
         setUpdatedRole(getUser?.userData?.role_id);

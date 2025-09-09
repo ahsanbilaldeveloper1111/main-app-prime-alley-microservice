@@ -52,15 +52,15 @@ const Layout = ({ children }: LayoutProps) => {
 		});
 	};
 
-	//	TMS route guard: block /tms routes unless tmsSession is valid (except /tms/login)
+	//	TMS route guard: block /tms routes unless tmsSession is valid (except /tms/verification)
 	useEffect(() => {
 		if (typeof window === 'undefined') return;
 		const path = router.pathname;
-		const isTmsRoute = path.startsWith('/tms') && path !== '/tms/login';
+		const isTmsRoute = path.startsWith('/tms') && path !== '/tms/verification';
 		if (isTmsRoute) {
 			if (!tmsSession.isValid()) {
-				if (router.asPath !== '/tms/login') {
-					router.replace('/tms/login');
+				if (router.asPath !== '/tms/verification') {
+					router.replace('/tms/verification');
 				}
 			}
 		}
@@ -133,7 +133,7 @@ const Layout = ({ children }: LayoutProps) => {
 	};
 
 	// Prevent rendering protected TMS content while redirecting
-	const isTmsRoute = router.pathname.startsWith('/tms') && router.pathname !== '/tms/login';
+	const isTmsRoute = router.pathname.startsWith('/tms') && router.pathname !== '/tms/verification';
 	if (isTmsRoute && !tmsSession.isValid()) {
 		return null;
 	}

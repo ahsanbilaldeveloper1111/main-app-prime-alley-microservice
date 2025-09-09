@@ -85,13 +85,14 @@ export const getParentUsers = async () => {
   }
 };
 
-export const getUserById = async (id: string) => {
+export const getUserById = async (id: string, encrypt: boolean = true) => {
   try {
    
     const response = await axiosInstance.post(
       `users/view`,
       {
         user_id: id,
+        encFlag: encrypt
       },
       {
         responseType: 'json',

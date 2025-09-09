@@ -89,18 +89,12 @@ const CallAnalysis = () => {
   const [callType, setCallType] = useState<string | null>(null);
   const [dataFound, setDataFound] = useState<boolean>(false);
 
+  
   // Audio related state
-  // const [uuid, setUuid] = useState('');//2025003611026
-  // const [date, setDate] = useState('');//2025-07-2
-  // const [localPartyNumber, setLocalPartyNumber] = useState('');//2408
-  // const [ownerUsername, setOwnerUsername] = useState('');//default
-
-  // Audio related state
-  const [uuid, setUuid] = useState('2025003611026');//
-  const [date, setDate] = useState('2025-07-02');//
-  const [localPartyNumber, setLocalPartyNumber] = useState('2408');//
-  const [ownerUsername, setOwnerUsername] = useState('default');//
-
+  const [uuid, setUuid] = useState('');
+  const [date, setDate] = useState('');
+  const [localPartyNumber, setLocalPartyNumber] = useState('');
+  const [ownerUsername, setOwnerUsername] = useState('');
 
   const [audioTrackId, setAudioTrackId] = useState('');
   const [audioUrl, setAudioUrl] = useState<string>('');
@@ -123,6 +117,8 @@ const CallAnalysis = () => {
         
         if (id) {
           setAudioTrackId(id as string);
+          setUuid(id as string);
+          console.log('uuid is:', id);
         }
         if (direction) {
           setCallType(direction as string);
@@ -162,7 +158,7 @@ const CallAnalysis = () => {
               });
               
               // Set state variables
-              setUuid(timestamp);
+              
               setLocalPartyNumber(extension);
               setOwnerUsername(user);
               setDate(formattedDate);
@@ -176,9 +172,12 @@ const CallAnalysis = () => {
                 phoneNumber,
                 formattedDate
               });
+
+              console.log('audioTrackId is:', audioTrackId);
+              console.log('id is:', id);
               
               // Call analysis with extracted values directly
-              handleGetCallAnalysisWithData(formattedDate, extension, user, timestamp);
+              handleGetCallAnalysisWithData(formattedDate, extension, user, id as string);
             }
           }
         }
@@ -200,7 +199,7 @@ const CallAnalysis = () => {
   useEffect(() => {
     //handleGetCallAnalysis();
     if (audioTrackId) {
-      loadAuthenticatedAudio();
+      loadAuthenticatedAudio(audioTrackId);
     }
     
     return () => {
@@ -221,7 +220,7 @@ const CallAnalysis = () => {
     
     try {
       setLoading(true);
-      const response = await GetCallAnalysis(date, localPartyNumber, ownerUsername, uuid);
+      const response = await GetCallAnalysis(date, localPartyNumber, ownerUsername, audioTrackId);
      
 
       //heck if object has analysis and it has error
@@ -257,6 +256,7 @@ const CallAnalysis = () => {
     setError(null);
     
     try {
+      console.log('uuidParam is working:', uuidParam);
       setLoading(true);
       const response = await GetCallAnalysis(dateParam, localPartyNumberParam, ownerUsernameParam, uuidParam);
       if (response && response.analysis && response.analysis.error) {
@@ -283,20 +283,21 @@ const CallAnalysis = () => {
     }
   };
 
-  const loadAuthenticatedAudio = async () => {
-    if (!audioTrackId) return;
+  const loadAuthenticatedAudio = async (trackId?: string) => {
+    const currentTrackId = trackId || audioTrackId;
+    if (!currentTrackId) return;
     
     setAudioLoading(true);
     setAudioError(null);
     setMediaPlayerShow(false);
     
     console.log('=== AUDIO LOADING DEBUG ===');
-    console.log('trackId:', audioTrackId);
+    console.log('trackId:', currentTrackId);
 
     
     try {
       console.log('Attempting to load audio via axiosInstance...');
-      const response = await axiosInstance.get(`call-logs/recordings/download/${audioTrackId}`, {
+      const response = await axiosInstance.get(`call-logs/recordings/download/${currentTrackId}`, {
         responseType: 'blob',
         headers: {
           'Accept': 'audio/*, application/octet-stream, */*'
