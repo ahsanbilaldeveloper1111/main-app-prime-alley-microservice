@@ -19,12 +19,15 @@ export const tmsSession = {
   save(session: TmsSessionData): void {
     try {
       if (typeof window === 'undefined') return;
-      window.sessionStorage.setItem(TMS_SESSION_STORAGE_KEY, JSON.stringify(session));
+      // Use localStorage for cross-tab persistence
+      window.localStorage.setItem(TMS_SESSION_STORAGE_KEY, JSON.stringify(session));
+      // Also clear from sessionStorage to avoid conflicts
+      window.sessionStorage.removeItem(TMS_SESSION_STORAGE_KEY);
     } catch (err) {
-      // Fallback to localStorage if sessionStorage is not available
+      // Fallback to sessionStorage if localStorage is not available
       try {
         if (typeof window === 'undefined') return;
-        window.localStorage.setItem(TMS_SESSION_STORAGE_KEY, JSON.stringify(session));
+        window.sessionStorage.setItem(TMS_SESSION_STORAGE_KEY, JSON.stringify(session));
       } catch (_) {
         // Ignore
       }
@@ -34,7 +37,8 @@ export const tmsSession = {
   load(): TmsSessionData | null {
     try {
       if (typeof window === 'undefined') return null;
-      const raw = window.sessionStorage.getItem(TMS_SESSION_STORAGE_KEY) || window.localStorage.getItem(TMS_SESSION_STORAGE_KEY);
+      // Try localStorage first for cross-tab persistence
+      const raw = window.localStorage.getItem(TMS_SESSION_STORAGE_KEY) || window.sessionStorage.getItem(TMS_SESSION_STORAGE_KEY);
       if (!raw) return null;
       return JSON.parse(raw) as TmsSessionData;
     } catch {
@@ -45,8 +49,9 @@ export const tmsSession = {
   clear(): void {
     try {
       if (typeof window === 'undefined') return;
-      window.sessionStorage.removeItem(TMS_SESSION_STORAGE_KEY);
+      // Clear from both storage types
       window.localStorage.removeItem(TMS_SESSION_STORAGE_KEY);
+      window.sessionStorage.removeItem(TMS_SESSION_STORAGE_KEY);
     } catch {
       // Ignore
     }

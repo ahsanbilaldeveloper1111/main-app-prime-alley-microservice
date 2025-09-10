@@ -2,6 +2,7 @@ import { useSession, signOut } from 'next-auth/react';
 import { useEffect, useState } from 'react';
 import { initializeTokensFromSession, hasTokens } from '../utils/tokenUtils';
 import { useTokenService } from './useTokenService';
+import { tmsSession } from '../utils/tmsSession';
 
 export const useAuth = () => {
   const { data: session, status } = useSession();
@@ -20,6 +21,8 @@ export const useAuth = () => {
     } else if (status === 'unauthenticated') {
       // Clear tokens when not authenticated
       clearTokens();
+      // Clear TMS session when not authenticated
+      tmsSession.clear();
       setIsInitialized(true);
     }
   }, [session, status, clearTokens]);
@@ -27,6 +30,8 @@ export const useAuth = () => {
   const logout = async () => {
     try {
       clearTokens();
+      // Clear TMS session on logout
+      tmsSession.clear();
       await signOut();
       // Simple redirect to login page
       if (typeof window !== 'undefined') {

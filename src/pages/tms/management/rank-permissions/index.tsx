@@ -18,7 +18,8 @@ import { useSession } from "next-auth/react";
 import moment from "moment";
 import Select from "react-select";
 
-import { getRanks } from "@utils/tms/tmsUserManagement";
+import { getRanks, AddRank, EditRank,DeleteRank } from "@utils/tms/tmsUserManagement";
+import Link from "next/link";
 
 interface SelectOption {
   value: number;
@@ -33,26 +34,43 @@ const TmsRankPermissions = () => {
 
   const columns: Column[] = useMemo(
     () => [
-      {key: "id",name: "ID",selector: (row: any) => row.id,sortable: true},
+      // {key: "id",name: "ID",selector: (row: any) => row.id,sortable: true},
       {key: "name",name: "Name",selector: (row: any) => row.name,sortable: true},
-      {key: "description",name: "Description",selector: (row: any) => row.description,sortable: true},
-      {key: "company_id",name: "Company ID",selector: (row: any) => row.company_id,sortable: true},
-      {key: "created_at",name: "Created At",selector: (row: any) => row.created_at,sortable: true},
-      {key: "updated_at",name: "Updated At",selector: (row: any) => row.updated_at,sortable: true},
+      // {key: "description",name: "Description",selector: (row: any) => row.description,sortable: true},
+      {key: "company_id",name: "Company",selector: (row: any) => row.company_id,sortable: true},
       {key: "users_count",name: "Users Count",selector: (row: any) => row.users_count,sortable: true},
-      {key: "permissions",name: "Permissions",selector: (row: any) => {
-          if (!row.permissions || !Array.isArray(row.permissions)) {
-            return "No permissions";
-          }
-          return row.permissions.map((permission: any) => permission.name || permission.action || "Unknown").join(", ");
-        },sortable: true,
-        render: (row: any) => {
-          if (!row.permissions || !Array.isArray(row.permissions)) {
-            return "No permissions";
-          }
-          return row.permissions.map((permission: any) => permission.name || permission.action || "Unknown").join(", ");
-        }
+      {key: "created_at",name: "Created At",selector: (row: any) => row.created_at,sortable: true,
+        cell: (props: any) => (
+            <span>{moment(props.created_at).format('YYYY-MM-DD HH:mm:ss A')}</span>
+        )
       },
+      {key: "updated_at",name: "Updated At",selector: (row: any) => row.updated_at,sortable: true,
+        cell: (props: any) => (
+            <span>{moment(props.updated_at).format('YYYY-MM-DD HH:mm:ss A')}</span>
+        )
+      },
+      {
+        key: 'Action',
+        name: 'ACTION',
+        selector: (row: any) => row.id,
+        sortable: false,
+        cell: (props: any) => (
+            
+            <div className="action-buttons-container">
+
+               
+                    <button className="btn btn-sm btn-outline-primary" onClick={() => handleEditRank(props)}>Edit Rank</button>
+              
+
+                    <button className="btn btn-sm btn-outline-danger" onClick={() => handleDeleteRank(props)}>Delete Rank</button>
+
+                    <Link href={`/tms/management/rank-permissions/${props.id}`} className="btn btn-sm btn-outline-primary">Permissions</Link>
+              
+
+                
+            </div>
+        ),
+    },
     ],
     []
   );
@@ -62,10 +80,78 @@ const TmsRankPermissions = () => {
   const fetchData = useCallback(
       
       async (page = 1, perPage = 15, search = "") => {
-        return await getRanks({page, perPage, search, filters: currentFilters});
+        const response = await getRanks({page, perPage, search, filters: currentFilters});
+        console.log('response', response);
+        return response;
       },
       [memoizedFilters]
     );
+
+
+    const [selectedRank, setSelectedRank] = useState<any>(null);
+    const [selectedRankName, setSelectedRankName] = useState<any>(null);
+    const [selectedRankDescription, setSelectedRankDescription] = useState<any>(null);
+    const [showEditRankModal, setShowEditRankModal] = useState<boolean>(false);
+
+    const handleEditRank = (props: any) => {
+        setSelectedRank(props.id);
+        setSelectedRankName(props.name);
+        setSelectedRankDescription(props.description);
+        setShowEditRankModal(true);
+    };
+
+    const handleSubmitEditRank = async () => {
+        const response = await EditRank({id: selectedRank, name: selectedRankName, description: selectedRankDescription});
+        if(response){
+            setSelectedRank(null);
+            setSelectedRankName(null);
+            setSelectedRankDescription(null);
+            setShowEditRankModal(false);
+            setRefreshKey(prev => prev + 1);
+            toast.success('Rank updated successfully');
+        }
+    };
+
+    const [showDeleteRankModal, setShowDeleteRankModal] = useState<boolean>(false);
+    const [confirmDelete, setConfirmDelete] = useState<string>("");
+
+    const handleDeleteRank = (props: any) => {
+        setSelectedRank(props.id);
+        setSelectedRankName(props.name);
+        setShowDeleteRankModal(true);
+    };
+
+    const handleSubmitDeleteRank = async () => {
+        const confirmDeleteValue = confirmDelete.trim().toLowerCase();
+        if(confirmDeleteValue == "delete"){
+            const response = await DeleteRank(selectedRank);
+            if(response){
+                setSelectedRank(null);
+                setSelectedRankName(null);
+                setShowDeleteRankModal(false);
+                setConfirmDelete("");
+                setRefreshKey(prev => prev + 1);
+                toast.success('Rank deleted successfully');
+            }
+        }else{
+            toast.error('Please type the word delete to confirm');
+        }
+    };
+
+    const [showCreateRnkModal, setShowCreateRankModal] = useState<boolean>(false);
+    const [newRankName, setNewRankName] = useState<string>("");
+    const [newRankDescription, setNewRankDescription] = useState<string>("");
+
+    const handleSubmitCreateRank = async () => {
+        const response = await AddRank({name: newRankName, description: newRankDescription});
+        if(response){
+            setNewRankName("");
+            setNewRankDescription("");
+            setShowCreateRankModal(false);
+            setRefreshKey(prev => prev + 1);
+            toast.success('Rank created successfully');
+        }
+    };
 
 
   return (
@@ -77,10 +163,11 @@ const TmsRankPermissions = () => {
       />
       <Row className="mb-3">
         <Col md={12}>
-          <div className="page-header-title">
-            <h2 className="mb-0 d-flex align-items-center">
+          <div className="page-header-title d-flex justify-content-between align-items-center">
+            <h2 className="mb-0">
             List Rank Permissions
             </h2>
+            <button className="btn btn-sm btn-outline-primary" onClick={() => setShowCreateRankModal(true)}>Create Rank</button>
           </div>
         </Col>
       </Row>
@@ -94,8 +181,92 @@ const TmsRankPermissions = () => {
           defaultPageSize={15}
           filters={memoizedFilters}
           refreshKey={refreshKey}
-          search={true}
+          search={false}
         />
+
+{showEditRankModal && (
+                <Modal
+                    show={showEditRankModal}
+                    onHide={() => setShowEditRankModal(false)}
+                >
+                    <Modal.Header closeButton>
+                        <Modal.Title>Edit Rank</Modal.Title>
+                    </Modal.Header>
+                    <Modal.Body>
+
+                      <div className="form-group mb-2">
+                      <label>Name</label>
+                        <input className="form-control" type="text" value={selectedRankName} onChange={(e) => setSelectedRankName(e.target.value)} />
+                      </div>
+
+                      <div className="form-group mb-2">
+                        <label>Description</label>
+                        <input className="form-control" type="text" value={selectedRankDescription} onChange={(e) => setSelectedRankDescription(e.target.value)} />
+                      </div>
+
+
+                    </Modal.Body>
+                    <Modal.Footer>
+                        <Button variant="secondary" onClick={() => setShowEditRankModal(false)}>Close</Button>
+                        <Button variant="primary" onClick={() => handleSubmitEditRank()}>Save changes</Button>
+                    </Modal.Footer>
+                </Modal>
+            )}
+
+            {showDeleteRankModal && (
+                <Modal
+                    show={showDeleteRankModal}
+                    onHide={() => setShowDeleteRankModal(false)}
+                >
+                    <Modal.Header closeButton>
+                        <Modal.Title>Delete Rank?</Modal.Title>
+                    </Modal.Header>
+                    <Modal.Body>
+                        <p>
+                            Are you sure you want to delete this <b className="text-danger">{selectedRankName}</b> rank?
+                        </p>
+                        <p>
+                            Type the word <b className="text-danger">delete</b> to confirm
+                        </p>
+                        <input type="text" className="form-control" id="confirmDelete" value={confirmDelete} onChange={(e) => setConfirmDelete(e.target.value)} placeholder="Type the word delete to confirm" />
+
+                    </Modal.Body>
+                    <Modal.Footer>
+                        <Button variant="secondary" onClick={() => setShowDeleteRankModal(false)}>Close</Button>
+                        <Button variant="danger" onClick={() => handleSubmitDeleteRank()}>Delete</Button>
+                    </Modal.Footer>
+                    
+                </Modal>
+            )}
+
+            {showCreateRnkModal && (
+                <Modal
+                    show={showCreateRnkModal}
+                    onHide={() => setShowCreateRankModal(false)}
+                >
+                    <Modal.Header closeButton>
+                        <Modal.Title>New Rank</Modal.Title>
+                    </Modal.Header>
+                    <Modal.Body>
+
+                      <div className="form-group mb-2">
+                        <label>Name</label>
+                        <input type="text" className="form-control" id="newRankName"  value={newRankName} onChange={(e) => setNewRankName(e.target.value)} placeholder="Rank Name" />
+                      </div>
+
+                      <div className="form-group mb-2">
+                        <label>Description</label>
+                        <input type="text" className="form-control" id="newRankDescription"  value={newRankDescription} onChange={(e) => setNewRankDescription(e.target.value)} placeholder="Rank Description" />
+                      </div>
+                       
+
+                    </Modal.Body>
+                    <Modal.Footer>
+                        <Button variant="secondary" onClick={() => setShowCreateRankModal(false)}>Close</Button>
+                        <Button variant="primary" onClick={() => handleSubmitCreateRank()}>Create</Button>
+                    </Modal.Footer>
+                </Modal>
+            )}
       
 
     </React.Fragment>

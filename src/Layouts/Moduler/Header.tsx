@@ -18,6 +18,7 @@ import { Card, Dropdown, Form } from "react-bootstrap";
 //import CompanyLogo from "@assets/images/Prime-Alley-Logo.png";
 import CompanyLogo from "@assets/images/ringedge-logo.png";
 import { authAPI } from "@utils/api";
+import { tmsSession } from "@utils/tmsSession";
 import { useAuth } from "../../hooks/useAuth";
 
 const baseUrl = '';
@@ -66,9 +67,13 @@ const Header = ({ themeMode }: any) => {
     const handleLogout = async () => {
         try {
           await authAPI.logout();
+          // Clear TMS session on logout
+          tmsSession.clear();
           await logout();
         } catch (error) {
           console.error('Logout failed:', error);
+          // Clear TMS session even if logout fails
+          tmsSession.clear();
           await logout();
         }
       };

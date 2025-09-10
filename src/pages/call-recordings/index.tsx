@@ -18,6 +18,7 @@ import AnimatedNumber from '@components/AnimatedNumber';
 import StatCard from '@components/StatCard';
 import ChartBar from '@components/ChartBar';
 import { Column } from '@components/CustomDataTable';
+import CustomDataTable from '@components/CustomDataTable';
 import AudioPlayer, { AudioPlayerRef } from '@components/AudioPlayer';
 import EmptyState from '@components/EmptyState';
 
@@ -72,7 +73,7 @@ interface RecordingUpdate {
   };
 }
 
-const SOCKET_URL = process.env.CALL_LOGS_SOCKET_URL;
+const SOCKET_URL = process.env.NEXT_PUBLIC_CALL_LOGS_SOCKET_URL;
 
 const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => React.ReactNode } = () => {
   const { data: session, status } = useSession();
@@ -94,6 +95,19 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
   const [audioUrl, setAudioUrl] = useState<string>('');
   const [audioError, setAudioError] = useState<string | null>(null);
   const [mediaPlayerShow, setMediaPlayerShow] = useState(false);
+  
+  // State for managing data and manual additions
+  const [currentData, setCurrentData] = useState<any[]>([]);
+  const [isDataModified, setIsDataModified] = useState(false);
+  const modifiedDataRef = useRef<any[]>([]);
+  const [tableData, setTableData] = useState<any[]>([]);
+  const [paginationInfo, setPaginationInfo] = useState<any>({
+    totalRows: 0,
+    totalPages: 0,
+    currentPage: 1,
+    perPage: 15,
+  });
+  const [socketExtensions, setSocketExtensions] = useState<number[]>([]);
 
   const [summary, setSummary] = useState<Summary>({
     numbers: 0,
@@ -264,14 +278,75 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
   ];
 
   // Functions
-  const fetchCallLogs = useCallback(async (page = 1, perPage = 15, search = "") => {
+  const addNewRecord = () => {
+    const newRecord = {
+      "Id": "F035BC55-6FA5-4553-A4F3-0C36D269C3E0",
+      "Direction": "CALL_OUTGOING",
+      "LocalCallId": null,
+      "RemoteCallId": null,
+      "AgentExtension": "4030",
+      "RemotePartyNumber": "0543879764",
+      "RecordId": "2025004387522",
+      "AudioTrack": "\\2025\\08\\07\\Record_20250807021403_4030_default_C808a6829400671_Recorder",
+      "Duration": 5553198016,
+      "OwnerId": "89CD4A38-A4AB-4F8F-BD52-3B1A2CE886A9",
+      "PreservingUserId": null,
+      "NoteOwnerId": null,
+      "Note": null,
+      "DateTime": "2025-08-06T22:14:03.944000Z",
+      "NoteDateTime": null,
+      "OwnerPropertiesId": "6E39C533-9D5D-4CC3-9B28-B1F4A96282AE",
+      "PreservingUserPropertiesId": null,
+      "NoteOwnerPropertiesId": null,
+      "NodeId": "IMAGICLE_GW_DC_02",
+      "Size": "2222624"
+    };
+
+    // Update the table data directly without triggering API call
+    setTableData(prevData => {
+      const updatedData = [...prevData, newRecord];
+      modifiedDataRef.current = updatedData;
+      setIsDataModified(true);
+      return updatedData;
+    });
+
+    // Update summary counts
+    setSummary(prevSummary => ({
+      ...prevSummary,
+      numbers: prevSummary.numbers + 1,
+      outbound: prevSummary.outbound + 1
+    }));
+
+    toast.success('New record added successfully');
+  };
+
+  const fetchCallLogsOriginal = useCallback(async (page = 1, perPage = 15, search = "") => {
     const response = await ListCallLogs(
       { page, perPage, search, filters: currentFilters, reportType: 'recordings' },
       'call-logs/recordings'
     );
+    
 
     if (response?.summary) {
       setSummary(response.summary)
+    }
+
+    // Store the original data from API
+    if (response?.dataList) {
+      setCurrentData(response.dataList);
+      setTableData(response.dataList);
+      modifiedDataRef.current = response.dataList;
+      setIsDataModified(false);
+    }
+
+    // Update pagination info
+    if (response) {
+      setPaginationInfo({
+        totalRows: response.total || 0,
+        totalPages: response.last_page || 0,
+        currentPage: response.current_page || 1,
+        perPage: response.per_page || 15,
+      });
     }
 
     if (response?.chart?.extension) {
@@ -394,6 +469,21 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
     return response;
   }, [currentFilters]);
 
+  // Wrapper function that handles modified data
+  const fetchCallLogs = useCallback(async (page = 1, perPage = 15, search = "") => {
+    const response = await fetchCallLogsOriginal(page, perPage, search);
+    
+    // Return modified data if data has been manually added, otherwise return original response
+    if (isDataModified && modifiedDataRef.current.length > 0) {
+      return {
+        ...response,
+        dataList: modifiedDataRef.current
+      };
+    }
+    
+    return response;
+  }, [fetchCallLogsOriginal, isDataModified]);
+
   const handleOpenChartModal = (
     chartData: { series: any[]; categories: string[] } | null,
     title: string,
@@ -408,6 +498,58 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
 
   const handleFiltersChange = (filters: any) => {
     setCurrentFilters(filters);
+    
+    // Clear chart data when filters are cleared
+    if (!filters || Object.keys(filters).length === 0) {
+      setCurrentChartData(null);
+      setCallDirectionTwo({
+        series: [],
+        options: {
+          chart: {
+            type: 'bar' as const,
+            height: 200,
+            toolbar: {
+              show: false
+            }
+          },
+          plotOptions: {
+            bar: {
+              horizontal: false,
+              columnWidth: '55%',
+              borderRadius: 5,
+              borderRadiusApplication: 'end' as const
+            },
+          },
+          dataLabels: {
+            enabled: false
+          },
+          stroke: {
+            show: true,
+            width: 2,
+            colors: ['transparent']
+          },
+          xaxis: {
+            categories: [] as string[],
+          },
+          yaxis: {
+            title: {
+              text: 'Calls'
+            }
+          },
+          fill: {
+            opacity: 1
+          },
+          tooltip: {
+            y: {
+              formatter: function (val: any) {
+                return val + ' calls'
+              }
+            }
+          }
+        },
+      });
+      setChartLoading(false);
+    }
   };
 
   const handleExport = async (exportType: string, filters: Record<string, any>) => {
@@ -536,49 +678,91 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
   useEffect(() => {
     const fetchHierarchyData = async () => {
       const hierarchyData = await GetHierarchyData();
+      
+      const extensions = hierarchyData?.extensions;
+      if (extensions && Array.isArray(extensions)) {
+        // Extract IDs from extensions array where each object has {id, name}
+        const extensionIds = extensions.map(ext => ext.id).filter(id => id !== undefined);
+        setSocketExtensions(extensionIds);
+      }
     };
     fetchHierarchyData();
   }, []);
 
+  // Load initial data
+  useEffect(() => {
+    const loadInitialData = async () => {
+      try {
+        const response = await fetchCallLogsOriginal(1, 15, '');
+        // Data is already set in fetchCallLogsOriginal
+      } catch (error) {
+        console.error('Error loading initial data:', error);
+      }
+    };
+    loadInitialData();
+  }, [currentFilters]);
 
-  //Socket connection effect
-  // useEffect(() => {
-  //   if (status === 'authenticated' && session) {
-  //     // Initialize socket connection
-  //     socketRef.current = io(SOCKET_URL, {
-  //       auth: {
-  //         token: stableGetAccessToken()
-  //       }
-  //     });
 
-  //     // Socket event listeners
-  //     socketRef.current.on('connect', () => {
-  //       console.log('Socket connected to call recordings');
-  //     });
+  // Socket connection effect
+  useEffect(() => {
+    if (status === 'authenticated' && session) {
+      // Initialize socket connection
+      socketRef.current = io(SOCKET_URL, {
+        auth: {
+          token: stableGetAccessToken()
+        }
+      });
 
-  //     socketRef.current.on('disconnect', () => {
-  //       console.log('Socket disconnected from call recordings');
-  //     });
+       // Socket event listeners
+       socketRef.current.on('connect', () => {
+         // Join room for all extensions
+         if (socketExtensions.length > 0) {
+           socketRef.current?.emit('join:recording', socketExtensions);
+         }
+       });
 
-  //     socketRef.current.on('recording_update', (data: RecordingUpdate) => {
-  //       console.log('Recording update received:', data);
-  //       // Refresh the data when a new recording is available
-  //       setRefreshKey(prev => prev + 1);
-  //     });
+      socketRef.current.on('disconnect', () => {
+        console.log('Socket disconnected from call recordings');
+      });
 
-  //     socketRef.current.on('error', (error: any) => {
-  //       console.error('Socket error:', error);
-  //     });
+       socketRef.current.on('recording_update', (data: RecordingUpdate) => {
+         console.log('Recording update received:', data);
+         
+         // Add the new recording data to the table
+         if (data) {
+           
+           // Add to table data directly
+           setTableData(prevData => {
+             const updatedData = [...prevData, data];
+             modifiedDataRef.current = updatedData;
+             setIsDataModified(true);
+             return updatedData;
+           });
 
-  //     // Cleanup function
-  //     return () => {
-  //       if (socketRef.current) {
-  //         socketRef.current.disconnect();
-  //         socketRef.current = null;
-  //       }
-  //     };
-  //   }
-  // }, [status, session, stableGetAccessToken]);
+           // Update summary counts
+           setSummary(prevSummary => ({
+             ...prevSummary,
+             numbers: prevSummary.numbers + 1,
+             outbound: prevSummary.outbound + 1
+           }));
+
+           toast.success('New recording received and added to table');
+         }
+       });
+
+      socketRef.current.on('error', (error: any) => {
+        console.error('Socket error:', error);
+      });
+
+      // Cleanup function
+      return () => {
+        if (socketRef.current) {
+          socketRef.current.disconnect();
+          socketRef.current = null;
+        }
+      };
+    }
+   }, [status, session, stableGetAccessToken, socketExtensions]);
 
   return (
     <React.Fragment>
@@ -623,7 +807,15 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
                   Call Recordings
                 </h2>
               </Col>
-              <Col md={9} className="d-flex justify-content-end">
+              <Col md={9} className="d-flex justify-content-end align-items-center gap-3">
+                {/* <Button 
+                  variant="primary" 
+                  onClick={addNewRecord}
+                  className="d-flex align-items-center gap-2"
+                >
+                  <i className="ph-duotone ph-plus"></i>
+                  Add Record
+                </Button> */}
                 <CallRecordingsFilters onFiltersChange={handleFiltersChange} onExport={handleExport} />
               </Col>
             </Row>
@@ -741,15 +933,18 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
       </Row>
 
       {/* Data Table */}
-      <GenericListPage
+      <CustomDataTable
         columns={columns}
-        fetchData={fetchCallLogs}
+        data={tableData}
         title="Call Recordings"
-        searchPlaceholder="Search call recordings..."
+        loading={false}
         defaultPageSize={15}
-        filters={currentFilters}
-        refreshKey={refreshKey}
-        search={false}
+        searchPlaceholder="Search call recordings..."
+        serverSide={false}
+        paginationInfo={paginationInfo}
+        showSearch={false}
+        pagination={true}
+        showPageSizeSelector={true}
       />
 
       {/* Media Player Modal */}

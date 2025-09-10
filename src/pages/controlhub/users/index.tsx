@@ -70,7 +70,7 @@ const Users = () => {
          },
         { key: 'Company', name: 'company', selector: (row: any) => row.company, sortable: true,
             cell: (props: any) => {
-                return props.company?.names || '---';
+                return props.company?.name || '---';
             }
          },
         { key: 'Role', name: 'role', selector: (row: any) => row.role, sortable: true },

@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import tokenService from '../utils/tokenService';
+import { tmsSession } from '../utils/tmsSession';
 
 interface SessionHandlerProps {
   children: React.ReactNode;
@@ -27,6 +28,8 @@ const SessionHandler: React.FC<SessionHandlerProps> = ({ children }) => {
       // User is not authenticated, clear tokens and redirect
       //console.log('Session unauthenticated, clearing tokens');
       tokenService.clearTokens();
+      // Clear TMS session when not authenticated
+      tmsSession.clear();
       
       // Only redirect if not already on auth page
       if (!router.pathname.startsWith('/auth/')) {

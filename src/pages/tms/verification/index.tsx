@@ -144,10 +144,17 @@ const TmsLogin = () => {
         try {
             const res = await tmsLogin(email, password, false);
             
-            if (res?.requires_email_verification) {
+            // Handle new response structure with data wrapper
+            const userData = res?.data?.user || res?.user;
+            const requiresEmailVerification = res?.data?.requires_email_verification || res?.requires_email_verification;
+            const requiresGoogleAuthVerification = res?.data?.requires_google_auth_verification || res?.requires_google_auth_verification;
+            const accessToken = res?.data?.access_token || res?.access_token;
+            const expiresIn = res?.data?.expires_in || res?.expires_in;
+            
+            if (requiresEmailVerification) {
                 setVerificationStep('email');
                 setCodeSent(true); // Code is sent automatically by server
-                setUserId(res?.user?.id?.toString() || ''); // Store user_id for verification
+                setUserId(userData?.id?.toString() || ''); // Store user_id for verification
                 setOtpDigits(['', '', '', '', '', '']); // Reset OTP digits
                 setVerificationCode(''); // Reset verification code
                 startOtpTimer(); // Start 5-minute timer
@@ -156,10 +163,10 @@ const TmsLogin = () => {
             }
 
             // Check if 2FA is required
-            if (res?.requires_google_auth_verification) {
+            if (requiresGoogleAuthVerification) {
                 setVerificationStep('2fa');
                 setCodeSent(false);
-                setUserId(res?.user?.id?.toString() || ''); // Set userId from login response
+                setUserId(userData?.id?.toString() || ''); // Set userId from login response
                 setOtpDigits(['', '', '', '', '', '']); // Reset OTP digits
                 setVerificationCode(''); // Reset verification code
                 setLoading(false);
@@ -167,19 +174,19 @@ const TmsLogin = () => {
             }
 
             // Direct login if no verification required
-            if (res?.access_token) {
-                const expiresAt = Math.floor(Date.now() / 1000) + (res.expires_in || 3600);
+            if (accessToken) {
+                const expiresAt = Math.floor(Date.now() / 1000) + (expiresIn || 3600);
                 tmsSession.save({
-                    accessToken: res.access_token,
+                    accessToken: accessToken,
                     expiresAt,
                     user: {
-                        ...res.user,
-                        id: res.user?.id?.toString()
+                        ...userData,
+                        id: userData?.id?.toString()
                     },
                 });
                 router.push('/tms');
             } else {
-                toast.error(res.message || 'Login failed. Please try again.');
+                toast.error(res?.data?.message || res?.message || 'Login failed. Please try again.');
             }
         } catch (err: any) {
             // Handle different error response structures
@@ -211,35 +218,41 @@ const TmsLogin = () => {
             
             const res = await verifyEmailCode(userId, code, verificationStep === '2fa');
 
-            if (res && res.access_token) {
+            // Handle new response structure with data wrapper
+            const accessToken = res?.data?.access_token || res?.access_token;
+            const expiresIn = res?.data?.expires_in || res?.expires_in;
+            const userData = res?.data?.user || res?.user;
+            const requiresGoogleAuthVerification = res?.data?.requires_google_auth_verification || res?.requires_google_auth_verification;
+
+            if (res && accessToken) {
                 // Check if 2FA is required after email verification
-                if (verificationStep === 'email' && res?.requires_google_auth_verification) {
+                if (verificationStep === 'email' && requiresGoogleAuthVerification) {
                     setVerificationStep('2fa');
                     setOtpDigits(['', '', '', '', '', '']); // Reset OTP digits
                     setVerificationCode(''); // Reset verification code
                     setError(null); // Clear any errors
                     // Keep userId for 2FA verification
-                } else if (res?.access_token) {
+                } else if (accessToken) {
                     // Direct login if no 2FA required or 2FA verification successful
                     // Convert expires_in to number if it's a string
-                    const expiresIn = typeof res.expires_in === 'string' ? parseInt(res.expires_in) : (res.expires_in || 3600);
-                    const expiresAt = Math.floor(Date.now() / 1000) + expiresIn;
+                    const expiresInNumber = typeof expiresIn === 'string' ? parseInt(expiresIn) : (expiresIn || 3600);
+                    const expiresAt = Math.floor(Date.now() / 1000) + expiresInNumber;
                     
                     tmsSession.save({
-                        accessToken: res.access_token,
+                        accessToken: accessToken,
                         expiresAt,
                         user: {
-                            ...res.user,
-                            id: res.user?.id?.toString()
+                            ...userData,
+                            id: userData?.id?.toString()
                         },
                     });
                     
                     router.push('/tms');
                 } else {
-                    toast.error(res?.response?.message || res.message || 'Verification failed');
+                    toast.error(res?.data?.message || res?.response?.message || res?.message || 'Verification failed');
                 }
             } else {
-                toast.error(res?.response?.message || res.message || 'Verification failed');
+                toast.error(res?.data?.message || res?.response?.message || res?.message || 'Verification failed');
             }
         } catch (err: any) {
             // Handle different error response structures
@@ -271,35 +284,41 @@ const TmsLogin = () => {
             
             const res = await verifyEmailCode(userId, verificationCode, verificationStep === '2fa');
 
-            if (res &&  res.access_token) {
+            // Handle new response structure with data wrapper
+            const accessToken = res?.data?.access_token || res?.access_token;
+            const expiresIn = res?.data?.expires_in || res?.expires_in;
+            const userData = res?.data?.user || res?.user;
+            const requiresGoogleAuthVerification = res?.data?.requires_google_auth_verification || res?.requires_google_auth_verification;
+
+            if (res && accessToken) {
                 // Check if 2FA is required after email verification
-                if (verificationStep === 'email' && res?.requires_google_auth_verification) {
+                if (verificationStep === 'email' && requiresGoogleAuthVerification) {
                     setVerificationStep('2fa');
                     setOtpDigits(['', '', '', '', '', '']); // Reset OTP digits
                     setVerificationCode(''); // Reset verification code
                     setError(null); // Clear any errors
                     // Keep userId for 2FA verification
-                } else if (res?.access_token) {
+                } else if (accessToken) {
                     // Direct login if no 2FA required or 2FA verification successful
                     // Convert expires_in to number if it's a string
-                    const expiresIn = typeof res.expires_in === 'string' ? parseInt(res.expires_in) : (res.expires_in || 3600);
-                    const expiresAt = Math.floor(Date.now() / 1000) + expiresIn;
+                    const expiresInNumber = typeof expiresIn === 'string' ? parseInt(expiresIn) : (expiresIn || 3600);
+                    const expiresAt = Math.floor(Date.now() / 1000) + expiresInNumber;
                     
                     tmsSession.save({
-                        accessToken: res.access_token,
+                        accessToken: accessToken,
                         expiresAt,
                         user: {
-                            ...res.user,
-                            id: res.user?.id?.toString()
+                            ...userData,
+                            id: userData?.id?.toString()
                         },
                     });
                     
                     router.push('/tms');
                 } else {
-                    toast.error(res?.response?.message || res.message || 'Verification failed');
+                    toast.error(res?.data?.message || res?.response?.message || res?.message || 'Verification failed');
                 }
             } else {
-                toast.error(res?.response?.message || res.message || 'Verification failed');
+                toast.error(res?.data?.message || res?.response?.message || res?.message || 'Verification failed');
             }
         } catch (err: any) {
             // Handle different error response structures

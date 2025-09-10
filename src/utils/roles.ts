@@ -152,32 +152,7 @@ export const updateRole = async (id: string, name: string) => {
     }
   };
 
-  export const viewRank = async (id: string) => {
-    try {
-        
-      const response = await axiosInstance.post(
-        `ranks/view`,
-        {
-          id: id
-        }
-      );
-      if(response.data){
-        const responseData = response.data;
-        if(responseData.code == 200){
-          return responseData.data;
-        }else{
-          toast.error(responseData.message);
-          return false;
-        } 
-      }else{
-        toast.error('Failed to rank');
-        return false;
-      }
-      
-    } catch (error) {
-      throw error;
-    }
-  };
+  
 
   export const updateRankPermissions = async (id: string, permissions: any) => {
     try {
@@ -226,6 +201,33 @@ export const updateRole = async (id: string, name: string) => {
         return false;
       }
       return response.data;
+    } catch (error) {
+      throw error;
+    }
+  };
+
+  export const viewRank = async (id: string) => {
+    try {
+        
+      const response = await axiosInstance.post(
+        `ranks/view`,
+        {
+          id: id
+        }
+      );
+      if(response.data){
+        const responseData = response.data;
+        if(responseData.code == 200){
+          return responseData.data;
+        }else{
+          toast.error(responseData.message);
+          return false;
+        } 
+      }else{
+        toast.error('Failed to rank');
+        return false;
+      }
+      
     } catch (error) {
       throw error;
     }

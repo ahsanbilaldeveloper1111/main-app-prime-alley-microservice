@@ -180,5 +180,94 @@ export  const getRanks = async (params: PaginationParams = {}) => {
   );
   handleTmsAuthError(response);
   const responseData = response?.data?.data; 
+  
   return transformApiResponse(responseData, draw);
+}
+
+export  const GetModules = async () => {
+  const response = await axiosInstance.get(
+    `tms/getTmsModules`
+  );
+  return checkResponse(response);
+}
+
+export const AddRank = async (data: any) => {
+  const response = await axiosInstance.post(`tms/addRank`, data);
+  return checkResponse(response);
+}
+
+export const EditRank = async (data: any) => {
+  const response = await axiosInstance.post(`tms/updateRank`, data);
+  return checkResponse(response);
+}
+
+export const DeleteRank = async (id: number) => {
+  const response = await axiosInstance.post(`tms/deleteRank`, {
+    id:id
+  });
+  return checkResponse(response);
+}
+
+export const assignPermissions = async (payload: any) => {
+  try {
+    const response = await axiosInstance.post(
+      `ranks/assignPermissions`,
+      payload
+    );
+    if(response.data){
+      const responseData = response.data;
+      if(responseData.code == 200){
+        return responseData.data;
+      }else{
+        toast.error(responseData.message);
+        return false;
+      }
+    }else{
+      toast.error('Failed to assign permissions');
+      return false;
+    }
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+};
+
+export const viewRank = async (id: string) => {
+  try {
+      
+    const response = await axiosInstance.get(
+      `tms/viewTmsRank`,{
+        params: {
+          id: id
+        }
+      }
+      
+    );
+    if(response.data){
+      const responseData = response.data;
+      if(responseData.code == 200){
+        return responseData.data;
+      }else{
+        toast.error(responseData.message);
+        return false;
+      } 
+    }else{
+      toast.error('Failed to rank');
+      return false;
+    }
+    
+  } catch (error) {
+    throw error;
+  }
+};
+
+const checkResponse = (response: any) => {
+  console.log('response checkResponse', response);
+  const responseData = response?.data;
+  if(responseData?.success){
+    return responseData?.data;
+  }else{
+    toast.error(responseData?.message);
+    return false;
+  }
 }
