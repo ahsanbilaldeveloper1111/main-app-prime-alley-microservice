@@ -1009,7 +1009,7 @@ const CrmDataManagement = () => {
                 <li>... and {selectedRows.length - 5} more items</li>
               )}
             </ul>
-          </div>
+          </div> 
         </Modal.Body>
         <Modal.Footer>
           <Button variant="secondary" onClick={handleAssignModalClose}>
