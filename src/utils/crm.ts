@@ -77,6 +77,23 @@ export interface LeadData {
   stage?: StageData;
   lost_reason?: LostReasonData;
   meetings?: MeetingData[];
+  audit_trail?: Array<{
+    id: number;
+    event: string;
+    description: string;
+    changes: {
+      [key: string]: {
+        old: any;
+        new: any;
+      };
+    };
+    user_extension: string;
+    created_at: string;
+    created_at_human: string;
+  }>;
+  campaign_id: number | null;
+  campaign_field_values: Record<string, any> | null;
+  crm_data_id: number | null;
 }
 
 export interface OpportunityData extends LeadData {
@@ -589,6 +606,232 @@ export const deleteOpportunity = async (id: number): Promise<void> => {
     return await axiosInstance.delete(`/crm/opportunities/${id}`);
   } catch (error: any) {
     toast.error(error?.message || "Failed to delete opportunity");
+    throw error;
+  }
+};
+
+// CRM Data Management
+export interface CrmDataItem {
+  id: number;
+  phone: string | null;
+  data: Record<string, any>;
+  user_extension: string | null;
+  is_viewed: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CrmDataPagination {
+  current_page: number;
+  last_page: number;
+  per_page: number;
+  total: number;
+  from: number | null;
+  to: number | null;
+}
+
+export interface CrmDataResponse {
+  success: boolean;
+  data: CrmDataItem[];
+  pagination: CrmDataPagination;
+}
+
+export interface CrmDataApiResponse {
+  code: number;
+  message: string;
+  data: CrmDataResponse;
+}
+
+export interface CrmDataUploadResponse {
+  success: boolean;
+  message: string;
+  processed_count: number;
+  errors: string[];
+}
+
+export const getCrmData = async (params: PaginationParams = {}): Promise<CrmDataResponse> => {
+  try {
+    const response = await axiosInstance.get("/crm/crm-data", { params });
+    return response.data?.data;
+  } catch (error: any) {
+    toast.error(error?.response?.data?.message || "Failed to fetch CRM data");
+    throw error;
+  }
+};
+
+export const uploadCrmDataCsv = async (file: File): Promise<CrmDataUploadResponse> => {
+  try {
+    const formData = new FormData();
+    formData.append("csv_file", file);
+    
+    const response = await axiosInstance.post("/crm/crm-data/upload-csv", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+    
+    if (response.data.success) {
+      toast.success(response.data.message);
+    }
+    
+    return response.data;
+  } catch (error: any) {
+    toast.error(error?.response?.data?.message || "Failed to upload CSV file");
+    throw error;
+  }
+};
+
+export const deleteCrmData = async (id: number): Promise<void> => {
+  try {
+    await axiosInstance.delete(`/crm/crm-data/${id}`);
+    toast.success("CRM data deleted successfully");
+  } catch (error: any) {
+    toast.error(error?.response?.data?.message || "Failed to delete CRM data");
+    throw error;
+  }
+};
+
+export const assignCrmDataToExtension = async (
+  userExtension: string,
+  itemIds: number[]
+): Promise<void> => {
+  try {
+    await axiosInstance.post("/crm/crm_data/assign", {
+      user_extension: userExtension,
+      item_ids: itemIds,
+    });
+    toast.success(`Successfully assigned ${itemIds.length} items to ${userExtension}`);
+  } catch (error: any) {
+    toast.error(error?.response?.data?.message || "Failed to assign CRM data");
+    throw error;
+  }
+};
+
+export const markCrmDataAsViewed = async (itemId: number): Promise<void> => {
+  try {
+    await axiosInstance.post("/crm/crm_data/mark-as-viewed", {
+      item_id: itemId,
+    });
+    toast.success("Item marked as viewed");
+  } catch (error: any) {
+    toast.error(error?.response?.data?.message || "Failed to mark item as viewed");
+    throw error;
+  }
+};
+
+// Campaign Management
+export interface CampaignField {
+  id?: number;
+  campaign_id?: number;
+  field_name: string;
+  field_type: 'string' | 'text' | 'integer' | 'date' | 'email' | 'dropdown';
+  field_options?: string[];
+  sort_order?: number;
+}
+
+export interface CampaignData {
+  id: number;
+  name: string;
+  description: string | null;
+  start_date: string;
+  end_date: string;
+  status: 'active' | 'inactive';
+  options: Record<string, any> | null;
+  created_at: string;
+  updated_at: string;
+  fields?: CampaignField[];
+}
+
+export const getCampaigns = async (
+  params: PaginationParams = {}
+): Promise<PaginationWrapper<CampaignData>> => {
+  try {
+    const { page = 1, per_page = 15, search = "", filters = {} } = params;
+    
+    // Build query parameters
+    const queryParams: any = {
+      page,
+      per_page,
+      ...filters
+    };
+    
+    // Add search if provided
+    if (search) {
+      queryParams.search = search;
+    }
+    
+    const response = await axiosInstance.get("/crm/campaigns", { params: queryParams });
+    return extractData<PaginationWrapper<CampaignData>>(response.data);
+  } catch (error: any) {
+    toast.error(error?.message || "Failed to fetch campaigns");
+    throw error;
+  }
+};
+
+export const createCampaign = async (
+  data: Partial<CampaignData> & { fields?: CampaignField[] }
+): Promise<CampaignData> => {
+  try {
+    const response = await axiosInstance.post("/crm/campaigns", data);
+    return extractData<CampaignData>(response.data);
+  } catch (error: any) {
+    toast.error(error?.message || "Failed to create campaign");
+    throw error;
+  }
+};
+
+export const getCampaign = async (id: number): Promise<CampaignData> => {
+  try {
+    const response = await axiosInstance.get(`/crm/campaigns/${id}`);
+    return extractData<CampaignData>(response.data);
+  } catch (error: any) {
+    toast.error(error?.message || "Failed to fetch campaign");
+    throw error;
+  }
+};
+
+export const updateCampaign = async (
+  id: number,
+  data: Partial<CampaignData> & { fields?: CampaignField[] }
+): Promise<CampaignData> => {
+  try {
+    const response = await axiosInstance.put(`/crm/campaigns/${id}`, data);
+    return extractData<CampaignData>(response.data);
+  } catch (error: any) {
+    toast.error(error?.message || "Failed to update campaign");
+    throw error;
+  }
+};
+
+export const deleteCampaign = async (id: number): Promise<void> => {
+  try {
+    await axiosInstance.delete(`/crm/campaigns/${id}`);
+    toast.success("Campaign deleted successfully");
+  } catch (error: any) {
+    toast.error(error?.message || "Failed to delete campaign");
+    throw error;
+  }
+};
+
+export const getCampaignFields = async (id: number): Promise<CampaignField[]> => {
+  try {
+    const response = await axiosInstance.get(`/crm/campaigns/${id}/fields`);
+    return extractData<CampaignField[]>(response.data);
+  } catch (error: any) {
+    toast.error(error?.message || "Failed to fetch campaign fields");
+    throw error;
+  }
+};
+
+export const createCampaignField = async (
+  campaignId: number,
+  data: Partial<CampaignField>
+): Promise<CampaignField> => {
+  try {
+    const response = await axiosInstance.post(`/crm/campaigns/${campaignId}/fields`, data);
+    return extractData<CampaignField>(response.data);
+  } catch (error: any) {
+    toast.error(error?.message || "Failed to create campaign field");
     throw error;
   }
 };
