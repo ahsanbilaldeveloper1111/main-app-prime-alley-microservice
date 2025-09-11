@@ -1,24 +1,51 @@
 import "@assets/scss/datatable-style.scss";
-import React, { ReactElement, useState, useEffect, useCallback, useMemo } from "react";
+import React, {
+  ReactElement,
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+} from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericListPage from "@components/GenericListPage";
 import CrmFilters from "@components/filters/CrmFilters";
-import { Button, Card, Row, Col, Form, Alert, Spinner, Modal, Badge } from "react-bootstrap";
+import {
+  Button,
+  Card,
+  Row,
+  Col,
+  Form,
+  Alert,
+  Spinner,
+  Modal,
+  Badge,
+} from "react-bootstrap";
+import CreatableSelect from "react-select/creatable";
 import { toast } from "react-toastify";
 import { useSession } from "next-auth/react";
 import moment from "moment";
-import { FiUpload, FiDatabase, FiSearch, FiFilter, FiTrash2, FiEye, FiUser, FiCheck, FiUsers } from "react-icons/fi";
+import {
+  FiUpload,
+  FiDatabase,
+  FiSearch,
+  FiFilter,
+  FiTrash2,
+  FiEye,
+  FiUser,
+  FiCheck,
+  FiUsers,
+} from "react-icons/fi";
 import { Column } from "@components/CustomDataTable";
-import { 
-  getCrmData, 
-  uploadCrmDataCsv, 
+import {
+  getCrmData,
+  uploadCrmDataCsv,
   deleteCrmData,
   assignCrmDataToExtension,
   markCrmDataAsViewed,
-  CrmDataItem, 
-  CrmDataPagination, 
-  CrmDataResponse 
+  CrmDataItem,
+  CrmDataPagination,
+  CrmDataResponse,
 } from "@utils/crm";
 import { GetHierarchyData } from "@utils/users";
 
@@ -32,13 +59,23 @@ const CrmDataManagement = () => {
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [showViewModal, setShowViewModal] = useState(false);
-  const [selectedDataItem, setSelectedDataItem] = useState<CrmDataItem | null>(null);
+  const [selectedDataItem, setSelectedDataItem] = useState<CrmDataItem | null>(
+    null
+  );
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<CrmDataItem | null>(null);
   const [selectedRows, setSelectedRows] = useState<CrmDataItem[]>([]);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [assignExtension, setAssignExtension] = useState("");
   const [extensions, setExtensions] = useState<any[]>([]);
+  const [selectedUploadExtensions, setSelectedUploadExtensions] = useState<
+    readonly any[]
+  >([]);
+  const [selectedAssignExtensions, setSelectedAssignExtensions] = useState<
+    readonly any[]
+  >([]);
+  const [assignMode, setAssignMode] = useState<"auto" | "custom">("auto");
+  const [customData, setCustomData] = useState<Record<string, number>>({});
 
   const memoizedFilters = useMemo(() => currentFilters, [currentFilters]);
 
@@ -98,39 +135,44 @@ const CrmDataManagement = () => {
   );
 
   // CSV validation function
-  const validateCsvFile = (file: File): { isValid: boolean; errors: string[] } => {
+  const validateCsvFile = (
+    file: File
+  ): { isValid: boolean; errors: string[] } => {
     const errors: string[] = [];
-    
+
     // Check file type
-    if (!file.type.includes("csv") && !file.name.toLowerCase().endsWith(".csv")) {
+    if (
+      !file.type.includes("csv") &&
+      !file.name.toLowerCase().endsWith(".csv")
+    ) {
       errors.push("File must be a CSV file");
     }
-    
+
     // Check file size (10MB max)
     const maxSize = 10 * 1024 * 1024; // 10MB in bytes
     if (file.size > maxSize) {
       errors.push("File size must be less than 10MB");
     }
-    
+
     // Check if file is empty
     if (file.size === 0) {
       errors.push("File cannot be empty");
     }
-    
+
     return {
       isValid: errors.length === 0,
-      errors
+      errors,
     };
   };
 
   // Handle file selection
   const handleFileSelect = (file: File) => {
     const validation = validateCsvFile(file);
-    
+
     if (validation.isValid) {
       setSelectedFile(file);
     } else {
-      validation.errors.forEach(error => toast.error(error));
+      validation.errors.forEach((error) => toast.error(error));
     }
   };
 
@@ -149,7 +191,7 @@ const CrmDataManagement = () => {
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
-    
+
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       handleFileSelect(e.dataTransfer.files[0]);
     }
@@ -175,7 +217,7 @@ const CrmDataManagement = () => {
     try {
       // Simulate progress for better UX
       const progressInterval = setInterval(() => {
-        setUploadProgress(prev => {
+        setUploadProgress((prev) => {
           if (prev >= 90) {
             clearInterval(progressInterval);
             return prev;
@@ -184,17 +226,23 @@ const CrmDataManagement = () => {
         });
       }, 200);
 
-      const response = await uploadCrmDataCsv(selectedFile);
-      
+      // Extract user extension IDs from selected options
+      const userExtensions = Array.from(selectedUploadExtensions).map(
+        (ext) => ext.value
+      );
+
+      const response = await uploadCrmDataCsv(selectedFile, userExtensions);
+
       clearInterval(progressInterval);
       setUploadProgress(100);
-      
+
       setSelectedFile(null);
+      setSelectedUploadExtensions([]);
       setShowUploadModal(false);
       setUploadProgress(0);
-      
+
       // Refresh data
-      setRefreshKey(prev => prev + 1);
+      setRefreshKey((prev) => prev + 1);
     } catch (error: any) {
       console.error("Upload error:", error);
     } finally {
@@ -222,7 +270,7 @@ const CrmDataManagement = () => {
       await deleteCrmData(itemToDelete.id);
       setShowDeleteModal(false);
       setItemToDelete(null);
-      setRefreshKey(prev => prev + 1);
+      setRefreshKey((prev) => prev + 1);
     } catch (error: any) {
       console.error("Delete error:", error);
     }
@@ -235,8 +283,8 @@ const CrmDataManagement = () => {
 
   // Handle assign to extension
   const handleAssignToExtension = useCallback(async () => {
-    if (!assignExtension.trim()) {
-      toast.error("Please select a user");
+    if (selectedAssignExtensions.length === 0) {
+      toast.error("Please select at least one user extension");
       return;
     }
 
@@ -245,26 +293,49 @@ const CrmDataManagement = () => {
       return;
     }
 
-    try {
-      await assignCrmDataToExtension(
-        assignExtension.trim(),
-        selectedRows.map(row => row.id)
+    // Validate custom mode data
+    if (assignMode === "custom") {
+      const totalCustomAllocation = Object.values(customData).reduce(
+        (sum, count) => sum + count,
+        0
       );
+      if (totalCustomAllocation !== selectedRows.length) {
+        toast.error(
+          `Custom allocation must equal total selected items (${selectedRows.length}). Current total: ${totalCustomAllocation}`
+        );
+        return;
+      }
+    }
+
+    try {
+      const userExtensions = Array.from(selectedAssignExtensions).map(
+        (ext) => ext.value
+      );
+
+      await assignCrmDataToExtension(
+        userExtensions,
+        selectedRows.map((row) => row.id),
+        assignMode,
+        assignMode === "custom" ? customData : undefined
+      );
+
       setShowAssignModal(false);
-      setAssignExtension("");
+      setSelectedAssignExtensions([]);
+      setCustomData({});
+      setAssignMode("auto");
       setSelectedRows([]);
       handleAssignModalClose();
-      setRefreshKey(prev => prev + 1);
+      setRefreshKey((prev) => prev + 1);
     } catch (error: any) {
       console.error("Assign error:", error);
     }
-  }, [assignExtension, selectedRows]);
+  }, [selectedAssignExtensions, selectedRows, assignMode, customData]);
 
   // Handle mark as viewed
   const handleMarkAsViewed = useCallback(async (item: CrmDataItem) => {
     try {
       await markCrmDataAsViewed(item.id);
-      setRefreshKey(prev => prev + 1);
+      setRefreshKey((prev) => prev + 1);
     } catch (error: any) {
       console.error("Mark as viewed error:", error);
     }
@@ -273,9 +344,32 @@ const CrmDataManagement = () => {
   // Handle assign modal close
   const handleAssignModalClose = useCallback(() => {
     setShowAssignModal(false);
-    setAssignExtension("");
+    setSelectedAssignExtensions([]);
+    setCustomData({});
+    setAssignMode("auto");
     setSelectedRows([]);
   }, []);
+
+  // Handle custom data change
+  const handleCustomDataChange = useCallback(
+    (extensionId: string, count: number) => {
+      setCustomData((prev) => ({
+        ...prev,
+        [extensionId]: count,
+      }));
+    },
+    []
+  );
+
+  // Reset custom data when extensions change
+  const handleAssignExtensionsChange = useCallback(
+    (selected: readonly any[]) => {
+      setSelectedAssignExtensions(selected);
+      // Reset custom data when extensions change
+      setCustomData({});
+    },
+    []
+  );
 
   // Define columns for GenericListPage
   const columns: Column[] = useMemo(
@@ -285,9 +379,7 @@ const CrmDataManagement = () => {
         name: "ID",
         selector: (row: any) => row.id,
         sortable: true,
-        cell: (props: any) => (
-          <div className="fw-medium">#{props.id}</div>
-        ),
+        cell: (props: any) => <div className="fw-medium">#{props.id}</div>,
       },
       {
         key: "phone",
@@ -347,11 +439,14 @@ const CrmDataManagement = () => {
         cell: (props: any) => (
           <div className="text-truncate" style={{ maxWidth: "300px" }}>
             {Object.entries(props.data || {}).length > 0 ? (
-              Object.entries(props.data).slice(0, 2).map(([key, value]) => (
-                <div key={key} className="small mb-1">
-                  <span className="fw-bold text-primary">{key}:</span> {String(value)}
-                </div>
-              ))
+              Object.entries(props.data)
+                .slice(0, 2)
+                .map(([key, value]) => (
+                  <div key={key} className="small mb-1">
+                    <span className="fw-bold text-primary">{key}:</span>{" "}
+                    {String(value)}
+                  </div>
+                ))
             ) : (
               <span className="text-muted small">No data</span>
             )}
@@ -461,8 +556,7 @@ const CrmDataManagement = () => {
         </div>
 
         {/* CRM Filters */}
-        <div className="row mb-3">
-        </div>
+        <div className="row mb-3"></div>
 
         {/* CRM Data List */}
         <div className="row">
@@ -487,7 +581,11 @@ const CrmDataManagement = () => {
       </div>
 
       {/* Upload Modal */}
-      <Modal show={showUploadModal} onHide={() => setShowUploadModal(false)} size="lg">
+      <Modal
+        show={showUploadModal}
+        onHide={() => setShowUploadModal(false)}
+        size="lg"
+      >
         <Modal.Header closeButton>
           <Modal.Title className="d-flex align-items-center">
             <FiUpload className="me-2" />
@@ -506,7 +604,10 @@ const CrmDataManagement = () => {
           >
             {selectedFile ? (
               <div>
-                <FiDatabase className="text-success" style={{ fontSize: "3rem" }} />
+                <FiDatabase
+                  className="text-success"
+                  style={{ fontSize: "3rem" }}
+                />
                 <p className="mt-2 mb-0">
                   <strong>{selectedFile.name}</strong>
                 </p>
@@ -559,11 +660,42 @@ const CrmDataManagement = () => {
             </div>
           )}
 
+          <Form.Group className="mt-3">
+            <Form.Label>Assign to User Extensions (Optional)</Form.Label>
+            <CreatableSelect
+              isMulti
+              value={selectedUploadExtensions}
+              onChange={(selected) =>
+                setSelectedUploadExtensions(selected || [])
+              }
+              options={extensions.map((extension: any) => ({
+                value: extension.id.toString(),
+                label: extension.display_name || extension.name || extension.id,
+              }))}
+              placeholder="Select user extensions..."
+              styles={{
+                control: (base) => ({
+                  ...base,
+                  borderColor: "#ced4da",
+                  boxShadow: "none",
+                  fontSize: "14px",
+                }),
+              }}
+            />
+            <Form.Text className="text-muted">
+              Select user extensions to assign the uploaded data to. This is
+              optional.
+            </Form.Text>
+          </Form.Group>
+
           <Alert variant="info" className="mt-3">
             <strong>CSV Format Requirements:</strong>
             <ul className="mb-0 mt-2">
               <li>First row should contain column headers</li>
-              <li>Phone numbers should be in a column named "phone" (case insensitive)</li>
+              <li>
+                Phone numbers should be in a column named "phone" (case
+                insensitive)
+              </li>
               <li>Maximum file size: 10MB</li>
               <li>Supported formats: CSV, TXT</li>
             </ul>
@@ -595,7 +727,11 @@ const CrmDataManagement = () => {
       </Modal>
 
       {/* View Data Modal */}
-      <Modal show={showViewModal} onHide={() => setShowViewModal(false)} size="lg">
+      <Modal
+        show={showViewModal}
+        onHide={() => setShowViewModal(false)}
+        size="lg"
+      >
         <Modal.Header closeButton>
           <Modal.Title className="d-flex align-items-center">
             <FiEye className="me-2" />
@@ -605,7 +741,7 @@ const CrmDataManagement = () => {
         <Modal.Body>
           {selectedDataItem && (
             <div>
-              <Row >
+              <Row>
                 <Col className="mb-3" md={6}>
                   <strong>ID:</strong> {selectedDataItem.id}
                 </Col>
@@ -613,29 +749,39 @@ const CrmDataManagement = () => {
                   <strong>Phone:</strong> {selectedDataItem.phone || "N/A"}
                 </Col>
                 <Col className="mb-3" md={6}>
-                  <strong>Assigned To:</strong> {selectedDataItem.user_extension ? (
-                    extensions.find(
-                      (extension: any) =>
-                        extension.id.toString() === selectedDataItem.user_extension?.toString()
-                    )?.display_name || selectedDataItem.user_extension
-                  ) : "Unassigned"}
+                  <strong>Assigned To:</strong>{" "}
+                  {selectedDataItem.user_extension
+                    ? extensions.find(
+                        (extension: any) =>
+                          extension.id.toString() ===
+                          selectedDataItem.user_extension?.toString()
+                      )?.display_name || selectedDataItem.user_extension
+                    : "Unassigned"}
                 </Col>
                 <Col className="mb-3" md={6}>
-                  <strong>Status:</strong> {selectedDataItem.is_viewed ? "Viewed" : "New"}
+                  <strong>Status:</strong>{" "}
+                  {selectedDataItem.is_viewed ? "Viewed" : "New"}
                 </Col>
                 <Col className="mb-3" md={6}>
-                  <strong>Created At:</strong> {moment(selectedDataItem.created_at).format("MMM DD, YYYY HH:mm")}
+                  <strong>Created At:</strong>{" "}
+                  {moment(selectedDataItem.created_at).format(
+                    "MMM DD, YYYY HH:mm"
+                  )}
                 </Col>
                 <Col className="mb-3" md={6}>
-                  <strong>Updated At:</strong> {moment(selectedDataItem.updated_at).format("MMM DD, YYYY HH:mm")}
+                  <strong>Updated At:</strong>{" "}
+                  {moment(selectedDataItem.updated_at).format(
+                    "MMM DD, YYYY HH:mm"
+                  )}
                 </Col>
-                {Object.entries(selectedDataItem.data || {}).map(([key, value]) => (
-                  <Col className="mb-3" key={key} md={6}>
-                    <strong>{key}:</strong> {String(value) || "N/A"}
-                  </Col>
-                ))}
+                {Object.entries(selectedDataItem.data || {}).map(
+                  ([key, value]) => (
+                    <Col className="mb-3" key={key} md={6}>
+                      <strong>{key}:</strong> {String(value) || "N/A"}
+                    </Col>
+                  )
+                )}
               </Row>
-             
             </div>
           )}
         </Modal.Body>
@@ -655,20 +801,24 @@ const CrmDataManagement = () => {
           </Modal.Title>
         </Modal.Header>
         <Modal.Body>
-          <p>
-            Are you sure you want to delete this CRM data record?
-          </p>
+          <p>Are you sure you want to delete this CRM data record?</p>
           {itemToDelete && (
             <div className="alert alert-warning">
-              <strong>Record ID:</strong> #{itemToDelete.id}<br />
-              <strong>Phone:</strong> {itemToDelete.phone || "N/A"}<br />
-              <strong>Assigned To:</strong> {itemToDelete.user_extension ? (
-                extensions.find(
-                  (extension: any) =>
-                    extension.id.toString() === itemToDelete.user_extension?.toString()
-                )?.display_name || itemToDelete.user_extension
-              ) : "Unassigned"}<br />
-              <strong>Created:</strong> {moment(itemToDelete.created_at).format("MMM DD, YYYY HH:mm")}
+              <strong>Record ID:</strong> #{itemToDelete.id}
+              <br />
+              <strong>Phone:</strong> {itemToDelete.phone || "N/A"}
+              <br />
+              <strong>Assigned To:</strong>{" "}
+              {itemToDelete.user_extension
+                ? extensions.find(
+                    (extension: any) =>
+                      extension.id.toString() ===
+                      itemToDelete.user_extension?.toString()
+                  )?.display_name || itemToDelete.user_extension
+                : "Unassigned"}
+              <br />
+              <strong>Created:</strong>{" "}
+              {moment(itemToDelete.created_at).format("MMM DD, YYYY HH:mm")}
             </div>
           )}
           <p className="text-danger">
@@ -690,44 +840,167 @@ const CrmDataManagement = () => {
         <Modal.Header closeButton>
           <Modal.Title className="d-flex align-items-center">
             <FiUsers className="me-2" />
-            Assign to User Extension
+            Assign to User Extensions
           </Modal.Title>
         </Modal.Header>
         <Modal.Body>
           <p>
-            Assign <strong>{selectedRows.length}</strong> selected items to a user extension.
+            Assign <strong>{selectedRows.length}</strong> selected items to user
+            extensions.
           </p>
-          
+
           <Form.Group className="mb-3">
-            <Form.Label>Assign to User</Form.Label>
-            <Form.Select
-              value={assignExtension}
-              onChange={(e) => setAssignExtension(e.target.value)}
-            >
-              <option value="">Select a user...</option>
-              {extensions.map((extension: any) => (
-                <option key={extension.id} value={extension.id}>
-                  {extension.display_name || extension.name || extension.id}
-                </option>
-              ))}
-            </Form.Select>
+            <Form.Label>Assign to Users</Form.Label>
+            <CreatableSelect
+              isMulti
+              value={selectedAssignExtensions}
+              onChange={handleAssignExtensionsChange}
+              options={extensions.map((extension: any) => ({
+                value: extension.id.toString(),
+                label: extension.display_name || extension.name || extension.id,
+              }))}
+              placeholder="Select user extensions..."
+              styles={{
+                control: (base) => ({
+                  ...base,
+                  borderColor: "#ced4da",
+                  boxShadow: "none",
+                  fontSize: "14px",
+                }),
+              }}
+            />
             <Form.Text className="text-muted">
-              Select the user you want to assign these items to.
+              Select the user extensions you want to assign these items to.
             </Form.Text>
           </Form.Group>
+
+          <Form.Group className="mb-3">
+            <Form.Label>Assignment Mode</Form.Label>
+            <div>
+              <Form.Check
+                type="radio"
+                id="auto-mode"
+                name="assignMode"
+                label="Auto (Equal distribution)"
+                value="auto"
+                checked={assignMode === "auto"}
+                onChange={(e) =>
+                  setAssignMode(e.target.value as "auto" | "custom")
+                }
+                className="mb-2"
+              />
+              <Form.Check
+                type="radio"
+                id="custom-mode"
+                name="assignMode"
+                label="Custom (Specify count per extension)"
+                value="custom"
+                checked={assignMode === "custom"}
+                onChange={(e) =>
+                  setAssignMode(e.target.value as "auto" | "custom")
+                }
+              />
+            </div>
+            <Form.Text className="text-muted">
+              {assignMode === "auto"
+                ? "Items will be distributed equally among selected extensions."
+                : "Specify how many items each extension should receive."}
+            </Form.Text>
+          </Form.Group>
+
+          {assignMode === "custom" && selectedAssignExtensions.length > 0 && (
+            <Form.Group className="mb-3">
+              <div className="d-flex justify-content-between align-items-center mb-2">
+                <Form.Label className="mb-0">Custom Allocation</Form.Label>
+                <Button
+                  variant="outline-secondary"
+                  size="sm"
+                  onClick={() => {
+                    const equalDistribution = Math.floor(
+                      selectedRows.length / selectedAssignExtensions.length
+                    );
+                    const remainder =
+                      selectedRows.length % selectedAssignExtensions.length;
+                    const newCustomData: Record<string, number> = {};
+
+                    Array.from(selectedAssignExtensions).forEach(
+                      (extension: any, index: number) => {
+                        newCustomData[extension.value] =
+                          equalDistribution + (index < remainder ? 1 : 0);
+                      }
+                    );
+
+                    setCustomData(newCustomData);
+                  }}
+                >
+                  Auto-fill Equal
+                </Button>
+              </div>
+              <div className="border rounded p-3 bg-light">
+                <p className="small text-muted mb-3">
+                  Total items: <strong>{selectedRows.length}</strong> |
+                  Allocated:{" "}
+                  <strong>
+                    {Object.values(customData).reduce(
+                      (sum, count) => sum + count,
+                      0
+                    )}
+                  </strong>{" "}
+                  | Remaining:{" "}
+                  <strong>
+                    {selectedRows.length -
+                      Object.values(customData).reduce(
+                        (sum, count) => sum + count,
+                        0
+                      )}
+                  </strong>
+                </p>
+                {Array.from(selectedAssignExtensions).map((extension: any) => (
+                  <div key={extension.value} className="mb-2">
+                    <Row>
+                      <Col md={6}>
+                        <Form.Label className="small mb-0">
+                          {extension.label}
+                        </Form.Label>
+                      </Col>
+                      <Col md={6}>
+                        <Form.Control
+                          type="number"
+                          min="0"
+                          max={selectedRows.length}
+                          value={customData[extension.value] || 0}
+                          onChange={(e) =>
+                            handleCustomDataChange(
+                              extension.value,
+                              parseInt(e.target.value) || 0
+                            )
+                          }
+                          size="sm"
+                        />
+                      </Col>
+                    </Row>
+                  </div>
+                ))}
+              </div>
+            </Form.Group>
+          )}
 
           <div className="alert alert-info">
             <strong>Selected Items:</strong>
             <ul className="mb-0 mt-2">
               {selectedRows.slice(0, 5).map((item) => (
                 <li key={item.id}>
-                  #{item.id} - {item.phone || "No phone"} 
+                  #{item.id} - {item.phone || "No phone"}
                   {item.user_extension && (
                     <span className="text-muted">
-                      {" "}(Currently: {extensions.find(
+                      {" "}
+                      (Currently:{" "}
+                      {extensions.find(
                         (extension: any) =>
-                          extension.id.toString() === item.user_extension?.toString()
-                      )?.display_name || item.user_extension})
+                          extension.id.toString() ===
+                          item.user_extension?.toString()
+                      )?.display_name || item.user_extension}
+                      )
                     </span>
                   )}
                 </li>
@@ -742,7 +1015,20 @@ const CrmDataManagement = () => {
           <Button variant="secondary" onClick={handleAssignModalClose}>
             Cancel
           </Button>
-          <Button variant="success" onClick={handleAssignToExtension}>
+          <Button
+            variant="success"
+            disabled={
+              selectedAssignExtensions.length === 0 ||
+              (assignMode === "custom" &&
+                selectedRows.length -
+                  Object.values(customData).reduce(
+                    (sum, count) => sum + count,
+                    0
+                  ) !=
+                  0)
+            }
+            onClick={handleAssignToExtension}
+          >
             Assign Items
           </Button>
         </Modal.Footer>

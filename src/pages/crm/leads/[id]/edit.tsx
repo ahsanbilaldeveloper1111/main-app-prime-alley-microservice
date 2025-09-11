@@ -893,23 +893,11 @@ const EditLead = () => {
                           {selectedCrmData.phone || "N/A"}
                         </Col>
                         {Object.entries(selectedCrmData.data || {})
-                          .slice(0, 4)
                           .map(([key, value]) => (
                             <Col md={6} key={key} className="mt-2">
                               <strong>{key}:</strong> {String(value) || "N/A"}
                             </Col>
                           ))}
-                        {Object.entries(selectedCrmData.data || {}).length >
-                          4 && (
-                          <Col md={12} className="mt-2">
-                            <small className="text-muted">
-                              +
-                              {Object.entries(selectedCrmData.data || {})
-                                .length - 4}{" "}
-                              more fields
-                            </small>
-                          </Col>
-                        )}
                       </Row>
                     </Card.Body>
                   </Card>

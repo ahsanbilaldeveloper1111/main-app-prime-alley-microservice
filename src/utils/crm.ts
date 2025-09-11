@@ -659,10 +659,17 @@ export const getCrmData = async (params: PaginationParams = {}): Promise<CrmData
   }
 };
 
-export const uploadCrmDataCsv = async (file: File): Promise<CrmDataUploadResponse> => {
+export const uploadCrmDataCsv = async (file: File, userExtensions: string[] = []): Promise<CrmDataUploadResponse> => {
   try {
     const formData = new FormData();
     formData.append("csv_file", file);
+    
+    // Add user_extensions as an array
+    if (userExtensions.length > 0) {
+      userExtensions.forEach((extensionId, index) => {
+        formData.append(`user_extensions[${index}]`, extensionId);
+      });
+    }
     
     const response = await axiosInstance.post("/crm/crm-data/upload-csv", formData, {
       headers: {
@@ -692,15 +699,26 @@ export const deleteCrmData = async (id: number): Promise<void> => {
 };
 
 export const assignCrmDataToExtension = async (
-  userExtension: string,
-  itemIds: number[]
+  userExtensions: string[],
+  itemIds: number[],
+  mode: "auto" | "custom" = "auto",
+  customData?: Record<string, number>
 ): Promise<void> => {
   try {
-    await axiosInstance.post("/crm/crm_data/assign", {
-      user_extension: userExtension,
+    const payload: any = {
+      user_extensions: userExtensions,
       item_ids: itemIds,
-    });
-    toast.success(`Successfully assigned ${itemIds.length} items to ${userExtension}`);
+      mode: mode,
+    };
+
+    if (mode === "custom" && customData) {
+      payload.custom_data = customData;
+    }
+
+    await axiosInstance.post("/crm/crm_data/assign", payload);
+    
+    const extensionNames = userExtensions.join(", ");
+    toast.success(`Successfully assigned ${itemIds.length} items to ${extensionNames}`);
   } catch (error: any) {
     toast.error(error?.response?.data?.message || "Failed to assign CRM data");
     throw error;
