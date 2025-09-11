@@ -539,7 +539,7 @@ const TicketList = () => {
       toast.error("Please select a ticket primary issue");
       return;
     }
-    if (!selectedTicket.priority) {
+    if (!selectedTicket.priority && selectedTicket.priority != 0) {
       toast.error("Please select a ticket priority");
       return;
     }
