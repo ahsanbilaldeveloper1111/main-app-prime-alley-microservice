@@ -523,16 +523,6 @@ const TicketList = () => {
       toast.error("Please enter a ticket title (Min: 5 chars)");
       return;
     }
-    if (
-      !selectedTicketDescription?.trim() ||
-      selectedTicketDescription?.trim()?.length < 50 ||
-      selectedTicketDescription?.trim()?.length > 500
-    ) {
-      toast.error(
-        "Please enter a ticket description (Min: 50 chars, Max: 500 chars)"
-      );
-      return;
-    }
     if (!selectedTicket.ticket_type_id) {
       toast.error("Please select a ticket type");
       return;
