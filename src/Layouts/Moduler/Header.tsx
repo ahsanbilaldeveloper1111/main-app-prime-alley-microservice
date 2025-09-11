@@ -661,7 +661,7 @@ const Header = ({ themeMode }: any) => {
                                             </li>
                                             )}
                                             
-                                            {permissions.includes('sales-services') && (
+                                            {/* {permissions.includes('sales-services') && (
                                             <li className="pc-item nav-item" role="presentation">
                                                 <Link 
                                                 className={`pc-link nav-link${router.asPath.includes('sales') ? ' active' : ''}`} 
@@ -672,7 +672,7 @@ const Header = ({ themeMode }: any) => {
                                                 <span className="pc-mtext">Sales</span>
                                                 </Link>
                                             </li>
-                                            )}
+                                            )} */}
                                             
                                             
                                             
@@ -1300,6 +1300,18 @@ const Header = ({ themeMode }: any) => {
                                         <Link className="pc-link" href={`${baseUrl}/crm/lost-reasons`}>
                                             <span className="pc-micon"><i className="ph-duotone ph-x-circle"></i></span>
                                             <span className="pc-mtext">Lost Reasons</span>
+                                        </Link>
+                                    </li>
+                                    <li className="pc-item">
+                                        <Link className="pc-link" href={`${baseUrl}/crm/data`}>
+                                            <span className="pc-micon"><i className="ph-duotone ph-database"></i></span>
+                                            <span className="pc-mtext">Data Management</span>
+                                        </Link>
+                                    </li>
+                                    <li className="pc-item">
+                                        <Link className="pc-link" href={`${baseUrl}/crm/campaigns`}>
+                                            <span className="pc-micon"><i className="ph-duotone ph-megaphone"></i></span>
+                                            <span className="pc-mtext">Campaigns</span>
                                         </Link>
                                     </li>
                                 </ul>

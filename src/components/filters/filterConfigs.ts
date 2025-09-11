@@ -1215,4 +1215,59 @@ export const createSalesOrderFiltersConfig = (stages: any[] = []): FilterTab[] =
       ]
     }
   ];
+};
+
+// Campaign Filters Configuration
+export const createCampaignFiltersConfig = (): FilterTab[] => {
+  return [
+    {
+      id: 'campaign-status',
+      title: 'Campaign Status',
+      icon: 'ti ti-toggle-right',
+      fields: [
+        {
+          type: 'select',
+          name: 'status',
+          label: 'Status',
+          options: [
+            { value: '', label: 'All Statuses' },
+            { value: 'active', label: 'Active' },
+            { value: 'inactive', label: 'Inactive' }
+          ]
+        }
+      ]
+    },
+    {
+      id: 'campaign-dates',
+      title: 'Campaign Dates',
+      icon: 'ti ti-calendar',
+      fields: [
+        {
+          type: 'date',
+          name: 'date_from',
+          label: 'Start Date From',
+          placeholder: 'Select start date'
+        },
+        {
+          type: 'date',
+          name: 'date_to',
+          label: 'End Date To',
+          placeholder: 'Select end date'
+        }
+      ]
+    },
+    {
+      id: 'campaign-search',
+      title: 'Search',
+      icon: 'ti ti-search',
+      fields: [
+        {
+          type: 'text',
+          name: 'search',
+          label: 'Search Campaigns',
+          placeholder: 'Search by name or description'
+        }
+      ]
+    }
+  ];
 }; 

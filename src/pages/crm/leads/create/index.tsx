@@ -2,11 +2,11 @@ import "@assets/scss/datatable-style.scss";
 import React, { ReactElement, useState, useEffect } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
-import { createLead, getStages, StageData } from "@utils/crm";
+import { createLead, getStages, StageData, getCampaigns, CampaignData, getCrmData, CrmDataItem } from "@utils/crm";
 import { GetHierarchyData } from "@utils/users";
-import { Button, Row, Col, Form, Card } from "react-bootstrap";
+import { Button, Row, Col, Form, Card, Alert } from "react-bootstrap";
 import Select from "react-select";
-import { FiSave, FiArrowLeft } from "react-icons/fi";
+import { FiSave, FiArrowLeft, FiDatabase, FiTarget } from "react-icons/fi";
 import Link from "next/link";
 import { toast } from "react-toastify";
 import { useRouter } from "next/router";
@@ -19,16 +19,24 @@ const CreateLead = () => {
     type: "lead" as "lead" | "opportunity",
     description: "",
     stage_id: undefined as number | undefined,
+    campaign_id: undefined as number | undefined,
+    crm_data_id: undefined as number | undefined,
+    campaign_field_values: {} as Record<string, any>,
   });
 
   const [stages, setStages] = useState<StageData[]>([]);
   const [extensions, setExtensions] = useState<any[]>([]);
+  const [campaigns, setCampaigns] = useState<CampaignData[]>([]);
+  const [crmData, setCrmData] = useState<CrmDataItem[]>([]);
+  const [selectedCampaign, setSelectedCampaign] = useState<CampaignData | null>(null);
   const [loading, setLoading] = useState(false);
 
   // Fetch stages and extensions on component mount
   useEffect(() => {
     fetchStages();
     fetchExtensions();
+    fetchCampaigns();
+    fetchCrmData();
   }, []);
 
   const fetchStages = async () => {
@@ -48,6 +56,24 @@ const CreateLead = () => {
       }
     } catch (error) {
       console.error("Failed to fetch extensions:", error);
+    }
+  };
+
+  const fetchCampaigns = async () => {
+    try {
+      const campaignsData = await getCampaigns({ per_page: 1000 });
+      setCampaigns(campaignsData?.data || []);
+    } catch (error) {
+      console.error("Failed to fetch campaigns:", error);
+    }
+  };
+
+  const fetchCrmData = async () => {
+    try {
+      const crmDataResponse = await getCrmData({ per_page: 1000 });
+      setCrmData(crmDataResponse?.data || []);
+    } catch (error) {
+      console.error("Failed to fetch CRM data:", error);
     }
   };
 
@@ -76,6 +102,101 @@ const CreateLead = () => {
       ...prev,
       [field]: value,
     }));
+  };
+
+  const handleCampaignChange = (selectedOption: any) => {
+    const campaignId = selectedOption?.value;
+    const campaign = campaigns.find(c => c.id === campaignId);
+    
+    setFormData((prev) => ({
+      ...prev,
+      campaign_id: campaignId,
+      campaign_field_values: {}, // Reset campaign field values when campaign changes
+    }));
+    
+    setSelectedCampaign(campaign || null);
+  };
+
+  const handleCampaignFieldChange = (fieldName: string, value: any) => {
+    setFormData((prev) => ({
+      ...prev,
+      campaign_field_values: {
+        ...prev.campaign_field_values,
+        [fieldName]: value,
+      },
+    }));
+  };
+
+  const renderCampaignField = (field: any) => {
+    const fieldValue = formData.campaign_field_values[field.field_name] || "";
+
+    switch (field.field_type) {
+      case "string":
+      case "email":
+        return (
+          <Form.Control
+            type={field.field_type === "email" ? "email" : "text"}
+            value={fieldValue}
+            onChange={(e) => handleCampaignFieldChange(field.field_name, e.target.value)}
+            placeholder={`Enter ${field.field_name}`}
+          />
+        );
+      
+      case "text":
+        return (
+          <Form.Control
+            as="textarea"
+            rows={3}
+            value={fieldValue}
+            onChange={(e) => handleCampaignFieldChange(field.field_name, e.target.value)}
+            placeholder={`Enter ${field.field_name}`}
+          />
+        );
+      
+      case "integer":
+        return (
+          <Form.Control
+            type="number"
+            value={fieldValue}
+            onChange={(e) => handleCampaignFieldChange(field.field_name, e.target.value)}
+            placeholder={`Enter ${field.field_name}`}
+          />
+        );
+      
+      case "date":
+        return (
+          <Form.Control
+            type="date"
+            value={fieldValue}
+            onChange={(e) => handleCampaignFieldChange(field.field_name, e.target.value)}
+          />
+        );
+      
+      case "dropdown":
+        return (
+          <Form.Select
+            value={fieldValue}
+            onChange={(e) => handleCampaignFieldChange(field.field_name, e.target.value)}
+          >
+            <option value="">Select {field.field_name}</option>
+            {field.field_options?.map((option: string, index: number) => (
+              <option key={index} value={option}>
+                {option}
+              </option>
+            ))}
+          </Form.Select>
+        );
+      
+      default:
+        return (
+          <Form.Control
+            type="text"
+            value={fieldValue}
+            onChange={(e) => handleCampaignFieldChange(field.field_name, e.target.value)}
+            placeholder={`Enter ${field.field_name}`}
+          />
+        );
+    }
   };
 
   return (
@@ -207,6 +328,57 @@ const CreateLead = () => {
                     </Col>
                   </Row>
 
+                  <Row>
+                    <Col md={6}>
+                      <Form.Group className="mb-3">
+                        <Form.Label>Campaign</Form.Label>
+                        <Select
+                          value={
+                            formData.campaign_id
+                              ? {
+                                  value: formData.campaign_id,
+                                  label: campaigns.find(c => c.id === formData.campaign_id)?.name || "",
+                                }
+                              : null
+                          }
+                          onChange={handleCampaignChange}
+                          options={campaigns.map((campaign) => ({
+                            value: campaign.id,
+                            label: campaign.name,
+                          }))}
+                          placeholder="Select a campaign (Optional)"
+                          isClearable
+                          isSearchable
+                        />
+                      </Form.Group>
+                    </Col>
+                    <Col md={6}>
+                      <Form.Group className="mb-3">
+                        <Form.Label>CRM Data Attribution</Form.Label>
+                        <Select
+                          value={
+                            formData.crm_data_id
+                              ? {
+                                  value: formData.crm_data_id,
+                                  label: `#${formData.crm_data_id} - ${crmData.find(d => d.id === formData.crm_data_id)?.phone || 'No Phone'}`,
+                                }
+                              : null
+                          }
+                          onChange={(selectedOption: any) => {
+                            handleInputChange("crm_data_id", selectedOption?.value || undefined);
+                          }}
+                          options={crmData.map((data) => ({
+                            value: data.id,
+                            label: `#${data.id} - ${data.phone || 'No Phone'}`,
+                          }))}
+                          placeholder="Select CRM data (Optional)"
+                          isClearable
+                          isSearchable
+                        />
+                      </Form.Group>
+                    </Col>
+                  </Row>
+
                   <Form.Group className="mb-3">
                     <Form.Label>Description</Form.Label>
                     <Form.Control
@@ -219,6 +391,81 @@ const CreateLead = () => {
                       placeholder="Enter lead description"
                     />
                   </Form.Group>
+
+                  {/* Campaign Custom Fields */}
+                  {selectedCampaign && selectedCampaign.fields && selectedCampaign.fields.length > 0 && (
+                    <div className="border-top pt-3 mt-4">
+                      <div className="d-flex align-items-center mb-3">
+                        <FiTarget className="me-2" />
+                        <h6 className="mb-0">Campaign Fields: {selectedCampaign.name}</h6>
+                      </div>
+                      <Alert variant="info" className="mb-3">
+                        <small>
+                          Fill in the custom fields for the selected campaign. These fields will be stored with the lead/opportunity.
+                        </small>
+                      </Alert>
+                      <Row>
+                        {selectedCampaign.fields.map((field, index) => (
+                          <Col md={6} key={index} className="mb-3">
+                            <Form.Group>
+                              <Form.Label>
+                                {field.field_name}
+                                {field.field_type === "email" && " (Email)"}
+                                {field.field_type === "integer" && " (Number)"}
+                                {field.field_type === "date" && " (Date)"}
+                                {field.field_type === "dropdown" && " (Select)"}
+                              </Form.Label>
+                              {renderCampaignField(field)}
+                            </Form.Group>
+                          </Col>
+                        ))}
+                      </Row>
+                    </div>
+                  )}
+
+                  {/* CRM Data Preview */}
+                  {formData.crm_data_id && (
+                    <div className="border-top pt-3 mt-4">
+                      <div className="d-flex align-items-center mb-3">
+                        <FiDatabase className="me-2" />
+                        <h6 className="mb-0">CRM Data Attribution Preview</h6>
+                      </div>
+                      <Alert variant="success" className="mb-3">
+                        <small>
+                          This lead/opportunity will be attributed to the selected CRM data record.
+                        </small>
+                      </Alert>
+                      {(() => {
+                        const selectedCrmData = crmData.find(d => d.id === formData.crm_data_id);
+                        return selectedCrmData ? (
+                          <Card className="bg-light">
+                            <Card.Body>
+                              <Row>
+                                <Col md={6}>
+                                  <strong>Record ID:</strong> #{selectedCrmData.id}
+                                </Col>
+                                <Col md={6}>
+                                  <strong>Phone:</strong> {selectedCrmData.phone || "N/A"}
+                                </Col>
+                                {Object.entries(selectedCrmData.data || {}).slice(0, 4).map(([key, value]) => (
+                                  <Col md={6} key={key} className="mt-2">
+                                    <strong>{key}:</strong> {String(value) || "N/A"}
+                                  </Col>
+                                ))}
+                                {Object.entries(selectedCrmData.data || {}).length > 4 && (
+                                  <Col md={12} className="mt-2">
+                                    <small className="text-muted">
+                                      +{Object.entries(selectedCrmData.data || {}).length - 4} more fields
+                                    </small>
+                                  </Col>
+                                )}
+                              </Row>
+                            </Card.Body>
+                          </Card>
+                        ) : null;
+                      })()}
+                    </div>
+                  )}
 
                   <div className="d-flex gap-2">
                     <Button type="submit" variant="primary" disabled={loading}>
