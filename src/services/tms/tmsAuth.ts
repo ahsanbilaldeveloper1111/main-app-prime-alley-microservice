@@ -304,8 +304,12 @@ export async function verifyEmailCode(user_id: string, code: string, isGoogleCod
 }
 
 export interface ResendEmailCodeResponse {
-  code: number;
+  success: boolean;
   message?: string;
+  action?: string;
+  data?: {
+    message?: string;
+  };
   response?: {
     message?: string;
     errors?: {

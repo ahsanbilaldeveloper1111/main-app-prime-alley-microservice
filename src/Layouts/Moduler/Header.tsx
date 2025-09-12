@@ -20,6 +20,7 @@ import CompanyLogo from "@assets/images/ringedge-logo.png";
 import { authAPI } from "@utils/api";
 import { tmsSession } from "@utils/tmsSession";
 import { useAuth } from "../../hooks/useAuth";
+import { useTmsPermissions } from "../../hooks/useTmsPermissions";
 
 const baseUrl = '';
 
@@ -36,6 +37,7 @@ const Header = ({ themeMode }: any) => {
     const { data: session, status } = useSession();
     const router = useRouter();
     const { logout } = useAuth();
+    const { hasPermission: hasTmsPermission } = useTmsPermissions();
 
     const [permissions, setPermissions] = useState<string[]>([]);
     const [isAdmin, setIsAdmin] = useState(false);
@@ -67,13 +69,11 @@ const Header = ({ themeMode }: any) => {
     const handleLogout = async () => {
         try {
           await authAPI.logout();
-          // Clear TMS session on logout
-          tmsSession.clear();
+          // TMS session clearing is now handled by the main logout function
           await logout();
         } catch (error) {
           console.error('Logout failed:', error);
-          // Clear TMS session even if logout fails
-          tmsSession.clear();
+          // Still try to logout even if API call fails
           await logout();
         }
       };
@@ -486,6 +486,11 @@ const Header = ({ themeMode }: any) => {
                     display: flex;
                     align-items: center;
                     justify-content: center;
+                    position: absolute;
+
+    top: 0;
+    bottom: 0;
+    right: 10px;
                 }
             `}</style>
            <nav className="pc-sidebar">
@@ -661,7 +666,7 @@ const Header = ({ themeMode }: any) => {
                                             </li>
                                             )}
                                             
-                                            {permissions.includes('sales-services') && (
+                                            {/* {permissions.includes('sales-services') && (
                                             <li className="pc-item nav-item" role="presentation">
                                                 <Link 
                                                 className={`pc-link nav-link${router.asPath.includes('sales') ? ' active' : ''}`} 
@@ -672,7 +677,7 @@ const Header = ({ themeMode }: any) => {
                                                 <span className="pc-mtext">Sales</span>
                                                 </Link>
                                             </li>
-                                            )}
+                                            )} */}
                                             
                                             
                                             
@@ -715,7 +720,7 @@ const Header = ({ themeMode }: any) => {
                                             </li>
                                             )}
 
-                                            {permissions.includes('hr-services') && (
+                                            {/* {permissions.includes('hr-services') && (
                                             <li className="pc-item nav-item bg-danger" role="presentation">
                                                 <Link 
                                                 className={`pc-link nav-link${router.asPath.includes('hr') ? ' active' : ''}`} 
@@ -726,7 +731,7 @@ const Header = ({ themeMode }: any) => {
                                                 <span className="pc-mtext">HR</span>
                                                 </Link>
                                             </li>
-                                            )}
+                                            )} */}
                                             
                                             {permissions.includes('accounts-services') && (
                                             <li className="pc-item nav-item bg-danger" role="presentation">
@@ -1086,14 +1091,17 @@ const Header = ({ themeMode }: any) => {
                                 <ul className="pc-navbar">
                                     
                                     
+                                
                                     <li className="pc-item">
                                         <Link className="pc-link" href={`${baseUrl}/tms`}>
                                             <span className="pc-micon"><i className="ph-duotone ph-link"></i></span>
                                             <span className="pc-mtext">Dashboard</span>
                                         </Link>
                                     </li>
+                                
 
 
+                                   {(hasTmsPermission('view','cisco_db') || hasTmsPermission('admin','global')) && (
                                     <li className="pc-item pc-hasmenu">
                                         <Link className="pc-link" href="#!">
                                             <span className="pc-micon">
@@ -1182,6 +1190,9 @@ const Header = ({ themeMode }: any) => {
                                             </li>
                                         </ul>
                                     </li>
+                                    )}
+
+                                    {(hasTmsPermission('view','unified_op') || hasTmsPermission('admin','global')) && (
 
                                     <li className="pc-item">
                                         <Link className="pc-link" href={`${baseUrl}/tms/unified-ops`}>
@@ -1189,14 +1200,22 @@ const Header = ({ themeMode }: any) => {
                                             <span className="pc-mtext">Unified Ops</span>
                                         </Link>
                                     </li>
+                                    )}
 
-                                    <li className="pc-item">
-                                        <Link className="pc-link" href={`${baseUrl}/tms/audit-logs`}>
-                                            <span className="pc-micon"><i className="ph-duotone ph-list"></i></span>
-                                            <span className="pc-mtext">Audit Log</span>
-                                        </Link>
-                                    </li>
+                                    {(hasTmsPermission('view','audit_log') || hasTmsPermission('admin','global')) && (
+                                        <li className="pc-item">
+                                            <Link className="pc-link" href={`${baseUrl}/tms/audit-logs`}>
+                                                <span className="pc-micon"><i className="ph-duotone ph-list"></i></span>
+                                                <span className="pc-mtext">Audit Log</span>
+                                            </Link>
+                                        </li>
+                                    )}
 
+                                    {(hasTmsPermission('view','user') || 
+                                    hasTmsPermission('view','rank') ||
+                                    hasTmsPermission('admin','global'))
+                                   
+                                    && (
                                     <li className="pc-item pc-hasmenu">
                                         <Link className="pc-link" href="#!">
                                             <span className="pc-micon">
@@ -1208,21 +1227,30 @@ const Header = ({ themeMode }: any) => {
                                         <ul className="pc-submenu">
                                             <li className="pc-item">
                                                 
-                                                
+                                            {(hasTmsPermission('view','user') || hasTmsPermission('update','user') || hasTmsPermission('admin','global')) && (
                                                 <Link className="pc-link" href={`${baseUrl}/tms/management/users`}>
                                                     <span className="pc-mtext">Users</span>
                                                 </Link>
+                                                )}
 
+                                            {(hasTmsPermission('view','rank','admin') || hasTmsPermission('admin','global')) && (
                                                 <Link className="pc-link" href={`${baseUrl}/tms/management/rank-permissions`}>
                                                     <span className="pc-mtext">Rank Permissions</span>
                                                 </Link>
+                                            )}
 
 
                                             </li>
                                         </ul>
                                     </li>
+                                    )}
 
-
+                                    {(hasTmsPermission('view','company')
+                                    || hasTmsPermission('view','customer_profiling')
+                                    || hasTmsPermission('view','user')
+                                    || hasTmsPermission('admin','global'))
+                                   
+                                    && (
                                     <li className="pc-item pc-hasmenu">
                                         <Link className="pc-link" href="#!">
                                             <span className="pc-micon">
@@ -1234,31 +1262,43 @@ const Header = ({ themeMode }: any) => {
                                         <ul className="pc-submenu">
                                             <li className="pc-item">
                                                 
+                                            {(hasTmsPermission('view','company', 'admin') || hasTmsPermission('admin','global')) && (
                                                 <Link className="pc-link" href={`${baseUrl}/tms/profiling/customers`}>
                                                     <span className="pc-mtext">Customers</span>
                                                 </Link>
+                                                )}
 
+                                              {(hasTmsPermission('create','customer_profiling','admin') || hasTmsPermission('admin','global')) && (
                                                 <Link className="pc-link" href={`${baseUrl}/tms/profiling/customers/create`}>
                                                     <span className="pc-mtext">Create Profile</span>
                                                 </Link>
+                                                )}
 
+                                                {(hasTmsPermission('create','user') || hasTmsPermission('admin','global')) 
+                                                  
+                                                  && (
                                                 <Link className="pc-link" href={`${baseUrl}/tms/profiling/user`}>
                                                     <span className="pc-mtext">User Profiles</span>
                                                 </Link>
+                                                )}
 
+                                                {(hasTmsPermission('create','user') || hasTmsPermission('admin','global')) && (
                                                 <Link className="pc-link" href={`${baseUrl}/tms/profiling/user/create`}>
                                                     <span className="pc-mtext">Create User Profile</span>
                                                 </Link>
+                                                )}
 
+                                                {(hasTmsPermission('view','user_profiling_error_log') || hasTmsPermission('admin','global')) && (
                                                 <Link className="pc-link" href={`${baseUrl}/tms/profiling/logs`}>
                                                     <span className="pc-mtext">Error Logs</span>
                                                 </Link>
-
+                                                )}
 
 
                                             </li>
                                         </ul>
                                     </li>
+                                    )}
 
                                     
 

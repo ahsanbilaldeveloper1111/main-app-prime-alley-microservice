@@ -208,25 +208,21 @@ export const DeleteRank = async (id: number) => {
   return checkResponse(response);
 }
 
+export const DeleteUser = async (id: number) => {
+  const response = await axiosInstance.post(`tms/deleteTmsUser`, {
+    user_id:id
+  });
+  return checkResponse(response);
+}
+
 export const assignPermissions = async (payload: any) => {
   try {
     const response = await axiosInstance.post(
-      `ranks/assignPermissions`,
+      `tms/updateRankPermissions`,
       payload
     );
-    if(response.data){
-      const responseData = response.data;
-      if(responseData.code == 200){
-        return responseData.data;
-      }else{
-        toast.error(responseData.message);
-        return false;
-      }
-    }else{
-      toast.error('Failed to assign permissions');
-      return false;
-    }
-    return response.data;
+    console.log('response assignPermissions', response);
+    return checkResponse(response);
   } catch (error) {
     throw error;
   }
@@ -243,30 +239,26 @@ export const viewRank = async (id: string) => {
       }
       
     );
-    if(response.data){
-      const responseData = response.data;
-      if(responseData.code == 200){
-        return responseData.data;
-      }else{
-        toast.error(responseData.message);
-        return false;
-      } 
-    }else{
-      toast.error('Failed to rank');
-      return false;
-    }
+    
+    return checkResponse(response);
     
   } catch (error) {
     throw error;
   }
 };
 
+export const UpdateUserTms = async (data: any) => {
+  const response = await axiosInstance.post(`tms/updateTmsUser`, data);
+  return checkResponse(response);
+}
+
 const checkResponse = (response: any) => {
-  console.log('response checkResponse', response);
+  
   const responseData = response?.data;
   if(responseData?.success){
     return responseData?.data;
   }else{
+    console.log('responseData?.message', responseData);
     toast.error(responseData?.message);
     return false;
   }

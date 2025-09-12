@@ -69,11 +69,10 @@ const TmsSettings = () => {
   // Initialize user data
   useEffect(() => {
     const initializeUser = async () => {
-      const tmsSessionData = tmsSession.load();
-      
-      if (tmsSessionData?.user) {
-        setUser(tmsSessionData.user as User);
-        await getUserDetails(tmsSessionData.user as User);
+      // Use NextAuth session data instead of localStorage
+      if (session?.user?.tmsSession?.user) {
+        setUser(session.user.tmsSession.user as User);
+        await getUserDetails(session.user.tmsSession.user as User);
       } else if (session?.user) {
         setUser(session.user as User);
       }

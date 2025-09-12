@@ -3,7 +3,33 @@ import type { NextAuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import { authAPI } from '../../../utils/api';
 import { signOut } from "next-auth/react";
+import { sessionStore } from '../../../utils/sessionStore';
 
+// Function to clear any existing TMS session data
+function clearExistingTmsSessions() {
+  try {
+    const sessionsToDelete: string[] = [];
+    
+    // Find all sessions that have TMS data
+    if (global.nextAuthSessions) {
+      global.nextAuthSessions.forEach((sessionData: any, sessionId: string) => {
+        if (sessionData.user?.tmsSession) {
+          sessionsToDelete.push(sessionId);
+        }
+      });
+    }
+    
+    // Delete sessions with TMS data
+    sessionsToDelete.forEach(sessionId => {
+      sessionStore.delete(sessionId);
+      console.log('Cleared existing TMS session:', sessionId);
+    });
+    
+    console.log(`Cleared ${sessionsToDelete.length} existing TMS sessions`);
+  } catch (error) {
+    console.error('Error clearing existing TMS sessions:', error);
+  }
+}
 
 declare module 'next-auth' {
   interface Session {
@@ -12,21 +38,23 @@ declare module 'next-auth' {
       name?: string | null;
       email?: string | null;
       is_admin?: string | null;
+      phone?: string | null;
       role?: string | null;
       permissions?: string[];
       access_token?: string;
       access_token_expires?: number | string;
       refresh_token?: string;
       refresh_token_expires?: number | string;
+      sessionId?: string; // Add session ID for custom session retrieval
     };
   }
 
   interface User {
-
     name?: string | null;
     email?: string | null;
     role?: string | null;
     is_admin?: string | null;
+    phone?: string | null;
     permissions?: string[];
     access_token?: string;
     access_token_expires?: number | string;
@@ -38,21 +66,6 @@ declare module 'next-auth' {
       refresh_token: string;
       refresh_token_expires: number | string;
     };
-  }
-}
-
-declare module 'next-auth/jwt' {
-  interface JWT {
-    id?: string | null;
-    name?: string | null;
-    email?: string | null;
-    is_admin?: string | null;
-    role?: string | null;
-    permissions?: string[];
-    access_token?: string;
-    access_token_expires?: number | string;
-    refresh_token?: string;
-    refresh_token_expires?: number | string;
   }
 }
 
@@ -87,9 +100,6 @@ export const authOptions: NextAuthOptions = {
          
         
           const jsonData = await res.json();
-          // console.log('login response:', jsonData);
-          // return;
-          
           
           if (jsonData.code === 400) { 
             return null;
@@ -104,6 +114,7 @@ export const authOptions: NextAuthOptions = {
             name: jsonData.data?.name,
             email: jsonData.data?.email,
             role: jsonData.data?.role,
+            phone: jsonData.data?.phone,
             is_admin: jsonData.data?.is_admin || null,
             permissions: jsonData.data?.permissions || [],
             token: {
@@ -134,12 +145,17 @@ export const authOptions: NextAuthOptions = {
 
   callbacks: {
     async jwt({ token, user }) {
-      
+      // Store only essential data in JWT to minimize size
       if (user) {
+        // Clear any existing TMS session data when creating new main app session
+        console.log('Clearing any existing TMS session data for new main app session');
+        clearExistingTmsSessions();
+        
         token.id = user.id;
         token.name = user.name;
         token.email = user.email;
         token.is_admin = user.is_admin;
+        token.phone = user.phone;
         token.role = user.role;
         token.permissions = user.permissions;
         
@@ -155,18 +171,19 @@ export const authOptions: NextAuthOptions = {
     },
 
     async session({ session, token }) {
-    
+      // Return minimal session data
       if (session.user) {
-        session.user.id = token.id;
-        session.user.name = token.name;
-        session.user.email = token.email;
-        session.user.role = token.role;
-        session.user.is_admin = token.is_admin;
-        session.user.permissions = token.permissions;
-        session.user.access_token = token.access_token;
-        session.user.access_token_expires = token.access_token_expires;
-        session.user.refresh_token = token.refresh_token;
-        session.user.refresh_token_expires = token.refresh_token_expires;
+        session.user.id = token.id as string | null;
+        session.user.name = token.name as string | null;
+        session.user.email = token.email as string | null;
+        session.user.role = token.role as string | null;
+        session.user.is_admin = token.is_admin as string | null;
+        session.user.phone = token.phone as string | null;
+        session.user.permissions = token.permissions as string[];
+        session.user.access_token = token.access_token as string | undefined;
+        session.user.access_token_expires = token.access_token_expires as number | string | undefined;
+        session.user.refresh_token = token.refresh_token as string | undefined;
+        session.user.refresh_token_expires = token.refresh_token_expires as number | string | undefined;
       }
 
       return session;

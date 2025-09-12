@@ -125,14 +125,13 @@ const TmsRankPermissions = () => {
         const confirmDeleteValue = confirmDelete.trim().toLowerCase();
         if(confirmDeleteValue == "delete"){
             const response = await DeleteRank(selectedRank);
-            if(response){
-                setSelectedRank(null);
+            setSelectedRank(null);
                 setSelectedRankName(null);
                 setShowDeleteRankModal(false);
                 setConfirmDelete("");
                 setRefreshKey(prev => prev + 1);
                 toast.success('Rank deleted successfully');
-            }
+                fetchData();
         }else{
             toast.error('Please type the word delete to confirm');
         }

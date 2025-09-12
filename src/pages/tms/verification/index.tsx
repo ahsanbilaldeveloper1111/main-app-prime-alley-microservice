@@ -4,7 +4,7 @@ import BreadcrumbItem from '@common/BreadcrumbItem';
 import { Card, Row, Col, Button, Form, InputGroup, Alert } from 'react-bootstrap';
 import { useRouter } from 'next/router';
 import { tmsLogin, verifyEmailCode, resendEmailCode } from '@services/tms/tmsAuth';
-import { tmsSession } from '@utils/tmsSession';
+import { signIn } from 'next-auth/react';
 import { toast } from 'react-toastify';
 
 const TmsLogin = () => {
@@ -26,12 +26,85 @@ const TmsLogin = () => {
     const [resendLoading, setResendLoading] = useState(false);
     const [otpExpiry, setOtpExpiry] = useState<number>(0);
     const [timeLeft, setTimeLeft] = useState<number>(0);
+    const [storedPassword, setStoredPassword] = useState<string>('');
+
+    // Debug: Log component mount
+    useEffect(() => {
+        console.log('TMS Verification component mounted');
+        return () => {
+            console.log('TMS Verification component unmounting');
+        };
+    }, []);
+
+    // Function to handle TMS session after verification
+    const handleTmsSessionSuccess = async (accessToken: string, userData: any, expiresIn: number) => {
+        try {
+            console.log('TMS verification successful, creating session...');
+            console.log('User data:', userData);
+            console.log('Stored password length:', storedPassword.length);
+            
+            // Create a custom session by calling our session API
+            const requestBody = {
+                accessToken,
+                userData,
+                expiresIn,
+                email: userData.email
+            };
+            
+            console.log('Sending session request with body:', {
+                accessToken: accessToken ? 'present' : 'missing',
+                accessTokenValue: accessToken,
+                userData: userData ? 'present' : 'missing',
+                userDataType: typeof userData,
+                userDataKeys: userData ? Object.keys(userData) : 'N/A',
+                expiresIn,
+                email: userData.email
+            });
+            
+            const response = await fetch('/api/auth/session', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(requestBody)
+            });
+
+            console.log('Session API response status:', response.status);
+            console.log('Session API response headers:', response.headers);
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('Session API error response:', errorText);
+                throw new Error(`Failed to create session: ${response.status} ${errorText}`);
+            }
+
+            const sessionData = await response.json();
+            console.log('Session created successfully:', sessionData);
+
+            // Store session ID in localStorage as backup
+            localStorage.setItem('tmsSessionId', sessionData.sessionId);
+            console.log('Stored session ID in localStorage as backup:', sessionData.sessionId);
+
+            toast.success('Verification successful');
+            console.log('Redirecting to dashboard...');
+            
+            // Add a small delay to ensure the cookie is set
+            setTimeout(() => {
+                console.log('Executing redirect to dashboard...');
+                window.location.href = '/tms/dashboard';
+            }, 500);
+
+        } catch (error) {
+            console.error('Session creation error:', error);
+            toast.error('Session setup failed. Please try again.');
+        }
+    };
 
     // Timer effect for OTP expiry
     useEffect(() => {
         let interval: NodeJS.Timeout;
         
-        if (otpExpiry > 0 && timeLeft > 0) {
+        if (otpExpiry > 0) {
             interval = setInterval(() => {
                 setTimeLeft((prev) => {
                     if (prev <= 1) {
@@ -47,7 +120,7 @@ const TmsLogin = () => {
                 clearInterval(interval);
             }
         };
-    }, [otpExpiry, timeLeft]);
+    }, [otpExpiry]);
 
 
     // Start OTP timer (5 minutes = 300 seconds)
@@ -141,6 +214,7 @@ const TmsLogin = () => {
         e.preventDefault();
         setError(null);
         setLoading(true);
+        setStoredPassword(password); // Store password for later use with NextAuth
         try {
             const res = await tmsLogin(email, password, false);
             
@@ -175,16 +249,9 @@ const TmsLogin = () => {
 
             // Direct login if no verification required
             if (accessToken) {
-                const expiresAt = Math.floor(Date.now() / 1000) + (expiresIn || 3600);
-                tmsSession.save({
-                    accessToken: accessToken,
-                    expiresAt,
-                    user: {
-                        ...userData,
-                        id: userData?.id?.toString()
-                    },
-                });
-                router.push('/tms');
+                // Handle TMS session directly
+                const directExpiresIn = typeof expiresIn === 'string' ? parseInt(expiresIn) : (expiresIn || 3600);
+                await handleTmsSessionSuccess(accessToken, userData, directExpiresIn);
             } else {
                 toast.error(res?.data?.message || res?.message || 'Login failed. Please try again.');
             }
@@ -233,21 +300,9 @@ const TmsLogin = () => {
                     setError(null); // Clear any errors
                     // Keep userId for 2FA verification
                 } else if (accessToken) {
-                    // Direct login if no 2FA required or 2FA verification successful
-                    // Convert expires_in to number if it's a string
-                    const expiresInNumber = typeof expiresIn === 'string' ? parseInt(expiresIn) : (expiresIn || 3600);
-                    const expiresAt = Math.floor(Date.now() / 1000) + expiresInNumber;
-                    
-                    tmsSession.save({
-                        accessToken: accessToken,
-                        expiresAt,
-                        user: {
-                            ...userData,
-                            id: userData?.id?.toString()
-                        },
-                    });
-                    
-                    router.push('/tms');
+                    // Handle TMS session directly
+                    const verifyExpiresIn = typeof expiresIn === 'string' ? parseInt(expiresIn) : (expiresIn || 3600);
+                    await handleTmsSessionSuccess(accessToken, userData, verifyExpiresIn);
                 } else {
                     toast.error(res?.data?.message || res?.response?.message || res?.message || 'Verification failed');
                 }
@@ -299,21 +354,9 @@ const TmsLogin = () => {
                     setError(null); // Clear any errors
                     // Keep userId for 2FA verification
                 } else if (accessToken) {
-                    // Direct login if no 2FA required or 2FA verification successful
-                    // Convert expires_in to number if it's a string
-                    const expiresInNumber = typeof expiresIn === 'string' ? parseInt(expiresIn) : (expiresIn || 3600);
-                    const expiresAt = Math.floor(Date.now() / 1000) + expiresInNumber;
-                    
-                    tmsSession.save({
-                        accessToken: accessToken,
-                        expiresAt,
-                        user: {
-                            ...userData,
-                            id: userData?.id?.toString()
-                        },
-                    });
-                    
-                    router.push('/tms');
+                    // Handle TMS session directly
+                    const verifyExpiresIn = typeof expiresIn === 'string' ? parseInt(expiresIn) : (expiresIn || 3600);
+                    await handleTmsSessionSuccess(accessToken, userData, verifyExpiresIn);
                 } else {
                     toast.error(res?.data?.message || res?.response?.message || res?.message || 'Verification failed');
                 }
@@ -341,12 +384,14 @@ const TmsLogin = () => {
         setResendLoading(true);
         try {
             const res = await resendEmailCode(userId);
-            if (res.code === 200) {
+            
+            // Handle new response structure
+            if (res.success === true) {
                 setCodeSent(true);
                 startOtpTimer(); // Restart timer for new code
-                toast.success('Verification code resent successfully');
+                toast.success(res?.data?.message || 'Verification code resent successfully');
             } else {
-                toast.error(res?.response?.message || res.message || 'Failed to resend verification code');
+                toast.error(res?.message || 'Failed to resend verification code');
             }
         } catch (err: any) {
             // Handle different error response structures

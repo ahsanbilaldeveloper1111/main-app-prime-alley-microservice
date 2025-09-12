@@ -142,6 +142,28 @@ class TokenService {
     // Clear all localStorage data
     clearAllLocalStorage();
     
+    // Clear TMS session ID from localStorage and cookies
+    if (typeof window !== 'undefined') {
+      // Clear from localStorage
+      localStorage.removeItem('tmsSessionId');
+      console.log('Cleared tmsSessionId from localStorage on auto logout');
+      
+      // Clear from cookies by setting them to expire
+      const cookieOptions = [
+        'tmsSessionId=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT',
+        'tmsSessionId=; Path=/; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT',
+        'tmsSessionId=; Path=/; HttpOnly; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT',
+        'tmsSessionId=; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT',
+        'tmsSessionId=; Path=/; SameSite=Lax; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT'
+      ];
+      
+      // Set cookies to expire
+      cookieOptions.forEach(cookie => {
+        document.cookie = cookie;
+      });
+      console.log('Cleared tmsSessionId cookies on auto logout');
+    }
+    
     signOut();
     // Simple redirect to login page
     if (typeof window !== 'undefined') {

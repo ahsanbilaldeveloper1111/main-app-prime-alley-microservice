@@ -5,6 +5,12 @@ export interface TmsSessionData {
     id?: string;
     name?: string;
     email?: string;
+    user_access_info?: {
+      permissions?: Array<{
+        module: string;
+        action: string;
+      }>;
+    };
     [key: string]: any;
   };
 }
@@ -15,8 +21,21 @@ function nowSeconds(): number {
   return Math.floor(Date.now() / 1000);
 }
 
+export enum PermissionAction {
+  VIEW = 'view',
+  CREATE = 'create',
+  UPDATE = 'update',
+  DELETE = 'delete',
+  ADMIN = 'admin'
+}
+
+
 export const tmsSession = {
   save(session: TmsSessionData): void {
+    console.warn('⚠️  tmsSession.save() is deprecated. Please migrate to NextAuth session management.');
+    console.warn('   Use useTmsSessionCompat() hook instead for backward compatibility.');
+    console.warn('   Session data is now managed server-side through NextAuth.');
+    
     try {
       if (typeof window === 'undefined') return;
       // Use localStorage for cross-tab persistence
@@ -35,6 +54,10 @@ export const tmsSession = {
   },
 
   load(): TmsSessionData | null {
+    console.warn('⚠️  tmsSession.load() is deprecated. Please migrate to NextAuth session management.');
+    console.warn('   Use useTmsSessionCompat() hook instead for backward compatibility.');
+    console.warn('   Session data is now managed server-side through NextAuth.');
+    
     try {
       if (typeof window === 'undefined') return null;
       // Try localStorage first for cross-tab persistence
@@ -47,6 +70,10 @@ export const tmsSession = {
   },
 
   clear(): void {
+    console.warn('⚠️  tmsSession.clear() is deprecated. Please migrate to NextAuth session management.');
+    console.warn('   Use NextAuth signOut() instead for proper session cleanup.');
+    console.warn('   Session data is now managed server-side through NextAuth.');
+    
     try {
       if (typeof window === 'undefined') return;
       // Clear from both storage types
@@ -67,5 +94,84 @@ export const tmsSession = {
     const s = this.load();
     if (!s) return 0;
     return Math.max(0, s.expiresAt - nowSeconds());
+  },
+
+  /**
+   * Get all permissions from TMS session in the format "action_module"
+   * @returns Array of permission strings like ["view_audit_log", "view_company"]
+   */
+  getPermissions(): any[] {
+    const s = this.load();
+    if (!s?.user?.user_access_info?.permissions) return [];
+    
+    // return s.user.user_access_info.permissions.map(permission => 
+    //   `${permission.action}_${permission.module}`
+    // );
+
+    return s.user.user_access_info.permissions;
+  },
+
+  getCustomerType(): string {
+    const s = this.load();
+    if (!s?.user?.user_type) return '';
+    return s.user.user_type;
+  },
+
+  /**
+   * Check if user has a specific permission
+   * @param permission - Permission to check in format "action_module" (e.g., "view_audit_log")
+   * @returns boolean - true if permission exists, false otherwise
+   */
+  hasPermission(action: string, module: string, checkCustomerType: string=''): boolean {
+
+    
+
+    const permissions = this.getPermissions();
+    const customerType = this.getCustomerType();
+  
+  const isSuperAdmin = permissions.some(
+      (permission) => 
+          permission.action === PermissionAction.ADMIN &&
+          permission.module === 'global'
+      );
+
+      
+  if(!isSuperAdmin){
+    const permission = permissions.some(permission => permission.module === module && permission.action === action);
+     
+        
+        if(checkCustomerType){
+          
+          return customerType == checkCustomerType  && permission;
+
+        }
+        return permission;
+      
+  }
+
+  return isSuperAdmin;
+
+  },
+
+ 
+
+  /**
+   * Check if user has any of the specified permissions
+   * @param permissions - Array of permissions to check
+   * @returns boolean - true if any permission exists, false otherwise
+   */
+  hasAnyPermission(permissions: string[]): boolean {
+    const userPermissions = this.getPermissions();
+    return permissions.some(permission => userPermissions.includes(permission));
+  },
+
+  /**
+   * Check if user has all of the specified permissions
+   * @param permissions - Array of permissions to check
+   * @returns boolean - true if all permissions exist, false otherwise
+   */
+  hasAllPermissions(permissions: string[]): boolean {
+    const userPermissions = this.getPermissions();
+    return permissions.every(permission => userPermissions.includes(permission));
   }
 };

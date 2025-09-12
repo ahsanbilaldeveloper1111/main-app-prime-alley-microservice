@@ -19,7 +19,32 @@ export default async function middleware(req: NextRequest) {
     return NextResponse.next();
   }
   
-  // Require token for all other protected routes
+  // Check for TMS routes - require TMS session ID
+  if (req.nextUrl.pathname.startsWith('/tms/')) {
+    // Allow access to TMS verification page without authentication
+    if (req.nextUrl.pathname === '/tms/verification') {
+      console.log('Middleware: Allowing access to TMS verification page');
+      return NextResponse.next();
+    }
+    
+    // For other TMS routes, check for TMS session ID
+    const tmsSessionId = req.cookies.get('tmsSessionId');
+    console.log('Middleware: Checking TMS session ID for route:', req.nextUrl.pathname);
+    console.log('Middleware: Available cookies:', req.cookies.getAll().map(c => c.name));
+    console.log('Middleware: TMS session ID value:', tmsSessionId?.value);
+    
+    // Note: Middleware can't access localStorage, so we'll rely on cookies
+    // If cookie is not set, the client-side will handle the fallback
+    if (!tmsSessionId) {
+      console.log('Middleware: No TMS session ID found, redirecting to TMS verification');
+      return NextResponse.redirect(new URL('/tms/verification', req.url));
+    }
+    
+    console.log('Middleware: TMS session ID found, allowing access to TMS route');
+    return NextResponse.next();
+  }
+  
+  // Require NextAuth token for all other protected routes
   if (!token) {
     // Redirect to signin without callbackUrl parameter
     return NextResponse.redirect(new URL('/auth/signin', req.url));

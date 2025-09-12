@@ -5,7 +5,6 @@ import { changeThemeLayout, changeThemeMode, changeThemePreset } from '../toolki
 import { changeLayoutTheme, changeSidebarTheme, changeSidebarThemeCaptions } from '../toolkit/themeLayouts/thunk';
 import { createSelector } from "reselect";
 import { useRouter } from 'next/router';
-import { tmsSession } from '@utils/tmsSession';
 
 
 import Moduler from './Moduler';
@@ -33,6 +32,12 @@ const Layout = ({ children }: LayoutProps) => {
 			sidebarHideId.classList.toggle("mob-sidebar-active");
 		}
 
+		// Check if overlay already exists to prevent duplicates
+		let existingOverlay = document.querySelector('.pc-menu-overlay');
+		if (existingOverlay) {
+			existingOverlay.remove();
+		}
+
 		// Create a new element
 		const newElement = document.createElement('div');
 		newElement.className = 'pc-menu-overlay'; // Set the desired class name
@@ -44,24 +49,47 @@ const Layout = ({ children }: LayoutProps) => {
 		}
 
 		// Add an event listener to remove the "mob-sidebar-active" class when the new element is clicked
-		newElement.addEventListener('click', function () {
+		const handleOverlayClick = () => {
 			if (sidebarHideId) {
 				sidebarHideId.classList.remove("mob-sidebar-active");
-				newElement.remove(); // Remove the new element when clicked
 			}
-		});
+			// Safely remove the element if it still exists
+			if (newElement && newElement.parentNode) {
+				newElement.parentNode.removeChild(newElement);
+			}
+			// Remove the event listener
+			newElement.removeEventListener('click', handleOverlayClick);
+		};
+
+		newElement.addEventListener('click', handleOverlayClick);
 	};
 
-	//	TMS route guard: block /tms routes unless tmsSession is valid (except /tms/verification)
+	//	TMS route guard: block /tms routes unless TMS session ID is valid (except /tms/verification)
 	useEffect(() => {
 		if (typeof window === 'undefined') return;
 		const path = router.pathname;
 		const isTmsRoute = path.startsWith('/tms') && path !== '/tms/verification';
 		if (isTmsRoute) {
-			if (!tmsSession.isValid()) {
+			// Check if we have a TMS session ID cookie or localStorage backup
+			const hasTmsSessionCookie = document.cookie.includes('tmsSessionId=');
+			const hasTmsSessionLocalStorage = localStorage.getItem('tmsSessionId');
+			const hasTmsSession = hasTmsSessionCookie || hasTmsSessionLocalStorage;
+			
+			// console.log('Layout TMS route guard:', {
+			// 	path,
+			// 	isTmsRoute,
+			// 	hasTmsSessionCookie,
+			// 	hasTmsSessionLocalStorage,
+			// 	hasTmsSession
+			// });
+			
+			if (!hasTmsSession) {
 				if (router.asPath !== '/tms/verification') {
+					//console.log('Layout: No TMS session found, redirecting to verification');
 					router.replace('/tms/verification');
 				}
+			} else {
+				//console.log('Layout: TMS session found, allowing access');
 			}
 		}
 	}, [router.pathname]);
@@ -134,8 +162,14 @@ const Layout = ({ children }: LayoutProps) => {
 
 	// Prevent rendering protected TMS content while redirecting
 	const isTmsRoute = router.pathname.startsWith('/tms') && router.pathname !== '/tms/verification';
-	if (isTmsRoute && !tmsSession.isValid()) {
-		return null;
+	if (isTmsRoute && typeof window !== 'undefined') {
+		const hasTmsSessionCookie = document.cookie.includes('tmsSessionId=');
+		const hasTmsSessionLocalStorage = localStorage.getItem('tmsSessionId');
+		const hasTmsSession = hasTmsSessionCookie || hasTmsSessionLocalStorage;
+		
+		if (!hasTmsSession) {
+			return null;
+		}
 	}
 
 	return (

@@ -126,15 +126,15 @@ const Dashboard = () => {
             gradient: 'from-pink-500 to-rose-600',
             link: '/coming-soon'
         },
-        {
-            id: 'hr-servicess',
-            title: 'Human Resources',
-            // subtitle: 'Human Resources',
-            description: 'Manage your employees, payroll, and benefits with ease.',
-            icon: <i className="ph-duotone ph-brain"></i>,
-            gradient: 'from-pink-500 to-rose-600',
-            link: '/coming-soon'
-        },
+        // {
+        //     id: 'hr-servicess',
+        //     title: 'Human Resources',
+        //     // subtitle: 'Human Resources',
+        //     description: 'Manage your employees, payroll, and benefits with ease.',
+        //     icon: <i className="ph-duotone ph-brain"></i>,
+        //     gradient: 'from-pink-500 to-rose-600',
+        //     link: '/coming-soon'
+        // },
         {
             id: 'accounts-servicess',
             title: 'Accounts',
