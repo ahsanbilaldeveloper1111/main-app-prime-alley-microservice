@@ -1342,6 +1342,18 @@ const Header = ({ themeMode }: any) => {
                                             <span className="pc-mtext">Lost Reasons</span>
                                         </Link>
                                     </li>
+                                    <li className="pc-item">
+                                        <Link className="pc-link" href={`${baseUrl}/crm/data`}>
+                                            <span className="pc-micon"><i className="ph-duotone ph-database"></i></span>
+                                            <span className="pc-mtext">Data Management</span>
+                                        </Link>
+                                    </li>
+                                    <li className="pc-item">
+                                        <Link className="pc-link" href={`${baseUrl}/crm/campaigns`}>
+                                            <span className="pc-micon"><i className="ph-duotone ph-megaphone"></i></span>
+                                            <span className="pc-mtext">Campaigns</span>
+                                        </Link>
+                                    </li>
                                 </ul>
                             </div>
                             {/* tab pane end */}

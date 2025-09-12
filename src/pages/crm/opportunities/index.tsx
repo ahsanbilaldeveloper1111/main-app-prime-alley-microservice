@@ -187,11 +187,8 @@ const CrmOpportunities = () => {
               Actions
             </Dropdown.Toggle>
             <Dropdown.Menu>
-              <Dropdown.Item href={`/crm/opportunities/${props.id}`}>
-                <FiEye className="me-2" />
-                View
-              </Dropdown.Item>
-              <Dropdown.Item href={`/crm/opportunities/${props.id}/edit`}>
+              
+              <Dropdown.Item href={`/crm/leads/${props.id}/edit`}>
                 <FiEdit className="me-2" />
                 Edit
               </Dropdown.Item>

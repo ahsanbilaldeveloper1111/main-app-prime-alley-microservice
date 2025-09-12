@@ -10,6 +10,10 @@ import {
   createMeeting,
   updateMeeting,
   deleteMeeting,
+  getCampaigns,
+  CampaignData,
+  getCrmData,
+  CrmDataItem,
 } from "@utils/crm";
 import { GetHierarchyData } from "@utils/users";
 import {
@@ -36,6 +40,7 @@ import {
   FiCalendar,
   FiClock,
   FiUsers,
+  FiDatabase,
 } from "react-icons/fi";
 import Link from "next/link";
 import { toast } from "react-toastify";
@@ -51,6 +56,21 @@ interface Meeting {
   meeting_time: string;
   status: string;
   extensions?: any[];
+}
+
+interface AuditLogEntry {
+  id: number;
+  event: string;
+  description: string;
+  changes: {
+    [key: string]: {
+      old: any;
+      new: any;
+    };
+  };
+  user_extension: string;
+  created_at: string;
+  created_at_human: string;
 }
 
 const EditLead = () => {
@@ -71,6 +91,12 @@ const EditLead = () => {
     extensions: [""],
   });
   const [extensions, setExtensions] = useState<any[]>([]);
+  const [campaigns, setCampaigns] = useState<CampaignData[]>([]);
+  const [crmData, setCrmData] = useState<CrmDataItem[]>([]);
+  const [selectedCampaign, setSelectedCampaign] = useState<CampaignData | null>(
+    null
+  );
+  const [auditLog, setAuditLog] = useState<AuditLogEntry[]>([]);
 
   // Fetch lead data, stages, and meetings
   useEffect(() => {
@@ -79,14 +105,37 @@ const EditLead = () => {
       fetchStages();
       fetchMeetings();
       fetchExtensions();
+      fetchCampaigns();
+      fetchCrmData();
     }
   }, [id]);
+
+  // Set selected campaign when both lead and campaigns data are available
+  useEffect(() => {
+    if (lead && campaigns.length > 0 && lead.campaign_id) {
+      const campaign = campaigns.find((c) => c.id == lead.campaign_id);
+      setSelectedCampaign(campaign || null);
+    }
+  }, [lead, campaigns]);
 
   const fetchLeadData = async () => {
     try {
       const leadData = await getLead(Number(id));
       console.log("ZE LEAD DATA", leadData);
-      setLead(leadData);
+
+      // Ensure campaign_field_values is properly initialized
+      const processedLeadData = {
+        ...leadData,
+        campaign_field_values: leadData.campaign_field_values || {},
+      };
+
+      setLead(processedLeadData);
+
+      // Set audit log if available
+      if (leadData.audit_trail) {
+        setAuditLog(leadData.audit_trail);
+      }
+
       setInitialLoading(false);
     } catch (error) {
       console.error("Failed to fetch lead:", error);
@@ -123,6 +172,24 @@ const EditLead = () => {
     }
   };
 
+  const fetchCampaigns = async () => {
+    try {
+      const campaignsData = await getCampaigns({ per_page: 1000 });
+      setCampaigns(campaignsData?.data || []);
+    } catch (error) {
+      console.error("Failed to fetch campaigns:", error);
+    }
+  };
+
+  const fetchCrmData = async () => {
+    try {
+      const crmDataResponse = await getCrmData({ per_page: 1000 });
+      setCrmData(crmDataResponse?.data || []);
+    } catch (error) {
+      console.error("Failed to fetch CRM data:", error);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -134,6 +201,9 @@ const EditLead = () => {
         type: lead.type,
         description: lead.description,
         stage_id: lead.stage_id,
+        campaign_id: lead.campaign_id,
+        crm_data_id: lead.crm_data_id,
+        campaign_field_values: lead.campaign_field_values || {},
       });
       toast.success("Lead updated successfully!");
       router.push("/crm/leads");
@@ -212,8 +282,115 @@ const EditLead = () => {
   const updateExtension = (index: number, value: string) => {
     setMeetingForm((prev) => ({
       ...prev,
-      extensions: prev.extensions.map((ext, i) => (i === index ? value : ext)),
+      extensions: prev.extensions.map((ext, i) => (i == index ? value : ext)),
     }));
+  };
+
+  const handleCampaignChange = (selectedOption: any) => {
+    const campaignId = selectedOption?.value;
+    const campaign = campaigns.find((c) => c.id == campaignId);
+
+    setLead((prev: any) => ({
+      ...prev,
+      campaign_id: campaignId,
+      campaign_field_values: {}, // Reset campaign field values when campaign changes
+    }));
+
+    setSelectedCampaign(campaign || null);
+  };
+
+  const handleCampaignFieldChange = (fieldName: string, value: any) => {
+    setLead((prev: any) => ({
+      ...prev,
+      campaign_field_values: {
+        ...prev.campaign_field_values,
+        [fieldName]: value,
+      },
+    }));
+  };
+
+  const renderCampaignField = (field: any) => {
+    const fieldValue = lead?.campaign_field_values?.[field.field_name] || "";
+
+    switch (field.field_type) {
+      case "string":
+      case "email":
+        return (
+          <Form.Control
+            type={field.field_type == "email" ? "email" : "text"}
+            value={fieldValue}
+            onChange={(e) =>
+              handleCampaignFieldChange(field.field_name, e.target.value)
+            }
+            placeholder={`Enter ${field.field_name}`}
+          />
+        );
+
+      case "text":
+        return (
+          <Form.Control
+            as="textarea"
+            rows={3}
+            value={fieldValue}
+            onChange={(e) =>
+              handleCampaignFieldChange(field.field_name, e.target.value)
+            }
+            placeholder={`Enter ${field.field_name}`}
+          />
+        );
+
+      case "integer":
+        return (
+          <Form.Control
+            type="number"
+            value={fieldValue}
+            onChange={(e) =>
+              handleCampaignFieldChange(field.field_name, e.target.value)
+            }
+            placeholder={`Enter ${field.field_name}`}
+          />
+        );
+
+      case "date":
+        return (
+          <Form.Control
+            type="date"
+            value={fieldValue}
+            onChange={(e) =>
+              handleCampaignFieldChange(field.field_name, e.target.value)
+            }
+          />
+        );
+
+      case "dropdown":
+        return (
+          <Form.Select
+            value={fieldValue}
+            onChange={(e) =>
+              handleCampaignFieldChange(field.field_name, e.target.value)
+            }
+          >
+            <option value="">Select {field.field_name}</option>
+            {field.field_options?.map((option: string, index: number) => (
+              <option key={index} value={option}>
+                {option}
+              </option>
+            ))}
+          </Form.Select>
+        );
+
+      default:
+        return (
+          <Form.Control
+            type="text"
+            value={fieldValue}
+            onChange={(e) =>
+              handleCampaignFieldChange(field.field_name, e.target.value)
+            }
+            placeholder={`Enter ${field.field_name}`}
+          />
+        );
+    }
   };
 
   if (initialLoading) {
@@ -239,6 +416,95 @@ const EditLead = () => {
 
   return (
     <React.Fragment>
+      <style jsx>{`
+        .timeline {
+          position: relative;
+          padding-left: 30px;
+        }
+
+        .timeline-item {
+          position: relative;
+          margin-bottom: 30px;
+        }
+
+        .timeline-marker {
+          position: absolute;
+          left: -30px;
+          top: 0;
+          width: 20px;
+          height: 20px;
+        }
+
+        .timeline-marker-dot {
+          width: 12px;
+          height: 12px;
+          background-color: #007bff;
+          border-radius: 50%;
+          border: 3px solid #fff;
+          box-shadow: 0 0 0 2px #007bff;
+        }
+
+        .timeline-item:not(:last-child)::before {
+          content: "";
+          position: absolute;
+          left: -25px;
+          top: 20px;
+          width: 2px;
+          height: calc(100% + 10px);
+          background-color: #e9ecef;
+        }
+
+        .timeline-content {
+          background: #f8f9fa;
+          border: 1px solid #e9ecef;
+          border-radius: 8px;
+          padding: 15px;
+          margin-left: 10px;
+        }
+
+        .changes-details {
+          background: #fff;
+          border: 1px solid #dee2e6;
+          border-radius: 4px;
+          padding: 10px;
+          margin-top: 10px;
+        }
+
+        .change-item {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin-bottom: 5px;
+          font-size: 0.875rem;
+        }
+
+        .field-name {
+          font-weight: 600;
+          color: #495057;
+          min-width: 100px;
+        }
+
+        .change-old {
+          background: #f8d7da;
+          color: #721c24;
+          padding: 2px 6px;
+          border-radius: 3px;
+          font-family: monospace;
+        }
+
+        .change-arrow {
+          color: #6c757d;
+          font-weight: bold;
+        }
+
+        .change-new {
+          background: #d4edda;
+          color: #155724;
+          padding: 2px 6px;
+          border-radius: 3px;
+          font-family: monospace;
+        }
+      `}</style>
       <BreadcrumbItem
         mainTitle="CRM"
         mainLink="/crm/dashboard"
@@ -300,19 +566,24 @@ const EditLead = () => {
                               label:
                                 extensions?.find(
                                   (ext: any) =>
-                                    ext.id.toString() ===
+                                    ext.id.toString() ==
                                     lead.user_extension?.toString()
                                 )?.display_name || "",
                             }
                           : null
                       }
                       onChange={(selectedOption: any) => {
-                        setLead({ ...lead, user_extension: selectedOption?.value || null });
+                        setLead({
+                          ...lead,
+                          user_extension: selectedOption?.value || null,
+                        });
                       }}
-                      options={extensions?.map((extension: any) => ({
-                        value: extension.id,
-                        label: extension.display_name,
-                      })) || []}
+                      options={
+                        extensions?.map((extension: any) => ({
+                          value: extension.id,
+                          label: extension.display_name,
+                        })) || []
+                      }
                       placeholder="Select User Extension (Optional)"
                       isClearable
                       isSearchable
@@ -362,6 +633,105 @@ const EditLead = () => {
                     />
                   </Form.Group>
 
+                  <Row>
+                    <Col md={6}>
+                      <Form.Group className="mb-3">
+                        <Form.Label>Campaign</Form.Label>
+                        <Select
+                          value={
+                            lead.campaign_id
+                              ? {
+                                  value: lead.campaign_id,
+                                  label:
+                                    campaigns.find(
+                                      (c) => c.id == lead.campaign_id
+                                    )?.name || "",
+                                }
+                              : null
+                          }
+                          onChange={handleCampaignChange}
+                          options={campaigns.map((campaign) => ({
+                            value: campaign.id,
+                            label: campaign.name,
+                          }))}
+                          placeholder="Select a campaign (Optional)"
+                          isClearable
+                          isSearchable
+                        />
+                      </Form.Group>
+                    </Col>
+                    <Col md={6}>
+                      <Form.Group className="mb-3">
+                        <Form.Label>CRM Data Attribution</Form.Label>
+                        <Select
+                          value={
+                            lead.crm_data_id
+                              ? {
+                                  value: lead.crm_data_id,
+                                  label: `#${lead.crm_data_id} - ${
+                                    crmData.find(
+                                      (d) => d.id == lead.crm_data_id
+                                    )?.phone || "No Phone"
+                                  }`,
+                                }
+                              : null
+                          }
+                          onChange={(selectedOption: any) => {
+                            setLead({
+                              ...lead,
+                              crm_data_id: selectedOption?.value || undefined,
+                            });
+                          }}
+                          options={crmData.map((data) => ({
+                            value: data.id,
+                            label: `#${data.id} - ${data.phone || "No Phone"}`,
+                          }))}
+                          placeholder="Select CRM data (Optional)"
+                          isClearable
+                          isSearchable
+                        />
+                      </Form.Group>
+                    </Col>
+                  </Row>
+
+                  {/* Campaign Custom Fields */}
+                  {selectedCampaign &&
+                    selectedCampaign.fields &&
+                    selectedCampaign.fields.length > 0 && (
+                      <div className="border-top pt-3 mt-4">
+                        <div className="d-flex align-items-center mb-3">
+                          <FiTarget className="me-2" />
+                          <h6 className="mb-0">
+                            Campaign Fields: {selectedCampaign.name}
+                          </h6>
+                        </div>
+                        <Alert variant="info" className="mb-3">
+                          <small>
+                            Fill in the custom fields for the selected campaign.
+                            These fields will be stored with the
+                            lead/opportunity.
+                          </small>
+                        </Alert>
+                        <Row>
+                          {selectedCampaign.fields.map((field, index) => (
+                            <Col md={6} key={index} className="mb-3">
+                              <Form.Group>
+                                <Form.Label>
+                                  {field.field_name}
+                                  {field.field_type == "email" && " (Email)"}
+                                  {field.field_type == "integer" && " (Number)"}
+                                  {field.field_type == "date" && " (Date)"}
+                                  {field.field_type == "dropdown" &&
+                                    " (Select)"}
+                                </Form.Label>
+                                {renderCampaignField(field)}
+                              </Form.Group>
+                            </Col>
+                          ))}
+                        </Row>
+                      </div>
+                    )}
+
                   <Button type="submit" variant="primary" disabled={loading}>
                     {loading ? (
                       "Updating..."
@@ -392,7 +762,7 @@ const EditLead = () => {
                 </Button>
               </Card.Header>
               <Card.Body>
-                {meetings.length === 0 ? (
+                {meetings.length == 0 ? (
                   <p className="text-muted text-center">
                     No meetings scheduled
                   </p>
@@ -408,92 +778,199 @@ const EditLead = () => {
                         </tr>
                       </thead>
                       <tbody>
-                        {
-                          meetings.map((meeting) => (
-                            <tr key={meeting.id}>
-                              <td>
+                        {meetings.map((meeting) => (
+                          <tr key={meeting.id}>
+                            <td>
+                              <div>
+                                <strong>{meeting.name}</strong>
+                                <br />
+                                <small className="text-muted">
+                                  {meeting.title}
+                                </small>
+                              </div>
+                            </td>
+                            <td>
+                              <div>
                                 <div>
-                                  <strong>{meeting.name}</strong>
-                                  <br />
-                                  <small className="text-muted">
-                                    {meeting.title}
-                                  </small>
+                                  <FiCalendar className="me-1" />
+                                  {new Date(
+                                    meeting.meeting_date
+                                  ).toLocaleDateString()}
                                 </div>
-                              </td>
-                              <td>
                                 <div>
-                                  <div>
-                                    <FiCalendar className="me-1" />
-                                    {new Date(
-                                      meeting.meeting_date
-                                    ).toLocaleDateString()}
-                                  </div>
-                                  <div>
-                                    <FiClock className="me-1" />
-                                    {meeting.meeting_time}
-                                  </div>
+                                  <FiClock className="me-1" />
+                                  {meeting.meeting_time}
                                 </div>
-                              </td>
-                              <td>
-                                <Badge
-                                  bg={
-                                    meeting.status === "scheduled"
-                                      ? "primary"
-                                      : "success"
-                                  }
+                              </div>
+                            </td>
+                            <td>
+                              <Badge
+                                bg={
+                                  meeting.status == "scheduled"
+                                    ? "primary"
+                                    : "success"
+                                }
+                              >
+                                {meeting.status}
+                              </Badge>
+                            </td>
+                            <td>
+                              <Dropdown>
+                                <Dropdown.Toggle
+                                  variant="outline-secondary"
+                                  size="sm"
                                 >
-                                  {meeting.status}
-                                </Badge>
-                              </td>
-                              <td>
-                                <Dropdown>
-                                  <Dropdown.Toggle
-                                    variant="outline-secondary"
-                                    size="sm"
+                                  Actions
+                                </Dropdown.Toggle>
+                                <Dropdown.Menu>
+                                  <Dropdown.Item
+                                    onClick={() => {
+                                      setEditingMeeting(meeting);
+                                      setMeetingForm({
+                                        name: meeting.name,
+                                        meeting_date: meeting.meeting_date,
+                                        meeting_time: meeting.meeting_time,
+                                        status: meeting.status,
+                                        extensions: meeting.extensions?.map(
+                                          (ext: any) => ext.extension
+                                        ) || [""],
+                                      });
+                                      setShowMeetingModal(true);
+                                    }}
                                   >
-                                    Actions
-                                  </Dropdown.Toggle>
-                                  <Dropdown.Menu>
-                                    <Dropdown.Item
-                                      onClick={() => {
-                                        setEditingMeeting(meeting);
-                                        setMeetingForm({
-                                          name: meeting.name,
-                                          meeting_date: meeting.meeting_date,
-                                          meeting_time: meeting.meeting_time,
-                                          status: meeting.status,
-                                          extensions: meeting.extensions?.map(
-                                            (ext: any) => ext.extension
-                                          ) || [""],
-                                        });
-                                        setShowMeetingModal(true);
-                                      }}
-                                    >
-                                      <FiEdit className="me-2" />
-                                      Edit
-                                    </Dropdown.Item>
-                                    <Dropdown.Item
-                                      onClick={() =>
-                                        handleDeleteMeeting(meeting.id)
-                                      }
-                                      className="text-danger"
-                                    >
-                                      <FiTrash2 className="me-2" />
-                                      Delete
-                                    </Dropdown.Item>
-                                  </Dropdown.Menu>
-                                </Dropdown>
-                              </td>
-                            </tr>
-                          ))}
+                                    <FiEdit className="me-2" />
+                                    Edit
+                                  </Dropdown.Item>
+                                  <Dropdown.Item
+                                    onClick={() =>
+                                      handleDeleteMeeting(meeting.id)
+                                    }
+                                    className="text-danger"
+                                  >
+                                    <FiTrash2 className="me-2" />
+                                    Delete
+                                  </Dropdown.Item>
+                                </Dropdown.Menu>
+                              </Dropdown>
+                            </td>
+                          </tr>
+                        ))}
                       </tbody>
                     </Table>
                   </div>
                 )}
               </Card.Body>
             </Card>
+            {(() => {
+              const selectedCrmData = crmData.find(
+                (d) => d.id == lead.crm_data_id
+              );
+              return selectedCrmData ? (
+                <React.Fragment>
+                  <Card>
+                    <Card.Header>
+                      <div className="d-flex align-items-center mb-3">
+                        <FiDatabase className="me-2" />
+                        <h6 className="mb-0">CRM Data Attribution Preview</h6>
+                      </div>
+                    </Card.Header>
+
+                    <Card.Body>
+                      <div className="">
+                        <Alert variant="success" className="mb-3">
+                          <small>
+                            This lead/opportunity will be attributed to the
+                            selected CRM data record.
+                          </small>
+                        </Alert>
+                      </div>
+                      <Row>
+                        <Col md={6}>
+                          <strong>Record ID:</strong> #{selectedCrmData.id}
+                        </Col>
+                        <Col md={6}>
+                          <strong>Phone:</strong>{" "}
+                          {selectedCrmData.phone || "N/A"}
+                        </Col>
+                        {Object.entries(selectedCrmData.data || {})
+                          .map(([key, value]) => (
+                            <Col md={6} key={key} className="mt-2">
+                              <strong>{key}:</strong> {String(value) || "N/A"}
+                            </Col>
+                          ))}
+                      </Row>
+                    </Card.Body>
+                  </Card>
+                </React.Fragment>
+              ) : null;
+            })()}
           </Col>
         </Row>
+
+        {/* Audit Log Section */}
+        {auditLog && auditLog.length > 0 && (
+          <Row className="mt-4">
+            <Col md={12}>
+              <Card className="border-0 shadow-sm">
+                <Card.Header>
+                  <h5 className="mb-0">
+                    <FiClock className="me-2" />
+                    Activity History
+                  </h5>
+                </Card.Header>
+                <Card.Body>
+                  <div className="timeline">
+                    {auditLog.map((entry, index) => (
+                      <div key={entry.id} className="timeline-item">
+                        <div className="timeline-marker">
+                          <div className="timeline-marker-dot"></div>
+                        </div>
+                        <div className="timeline-content">
+                          <div className="d-flex justify-content-between align-items-start mb-2">
+                            <h6 className="mb-1">{entry.description}</h6>
+                            <small className="text-muted">
+                              {entry.created_at_human}
+                            </small>
+                          </div>
+                          <div className="text-muted small mb-2">
+                            <strong>Event:</strong> {entry.event} |{" "}
+                            <strong>User:</strong> {entry.user_extension}
+                          </div>
+                          {Object.keys(entry.changes).length > 0 && (
+                            <div className="changes-details">
+                              <small className="text-muted">Changes:</small>
+                              {Object.entries(entry.changes)
+                                .map(([field, change]) =>
+                                  field != "campaign_field_values" ? (
+                                    <div key={field} className="change-item">
+                                      <span className="field-name">
+                                        {field}:
+                                      </span>
+                                      <span className="change-old">
+                                        "{change.old}"
+                                      </span>
+                                      <span className="change-arrow">→</span>
+                                      <span className="change-new">
+                                        "{change.new}"
+                                      </span>
+                                    </div>
+                                  ) : (
+                                    <div key={field} className="change-item">
+                                      Campaign Custom Field Values Updated
+                                    </div>
+                                  )
+                                )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </Card.Body>
+              </Card>
+            </Col>
+          </Row>
+        )}
       </div>
 
       {/* Meeting Modal */}
@@ -531,7 +1008,9 @@ const EditLead = () => {
                   <Form.Label>Meeting Date *</Form.Label>
                   <Form.Control
                     type="date"
-                    value={moment(meetingForm.meeting_date).format("YYYY-MM-DD")}
+                    value={moment(meetingForm.meeting_date).format(
+                      "YYYY-MM-DD"
+                    )}
                     onChange={(e) =>
                       setMeetingForm({
                         ...meetingForm,
@@ -586,16 +1065,20 @@ const EditLead = () => {
                             label:
                               extensions?.find(
                                 (ext: any) =>
-                                  ext.id.toString() === extension.toString()
+                                  ext.id.toString() == extension.toString()
                               )?.display_name || "",
                           }
                         : null
                     }
-                    onChange={(selectedOption: any) => updateExtension(index, selectedOption?.value || "")}
-                    options={extensions?.map((ext: any) => ({
-                      value: ext.id,
-                      label: ext.display_name,
-                    })) || []}
+                    onChange={(selectedOption: any) =>
+                      updateExtension(index, selectedOption?.value || "")
+                    }
+                    options={
+                      extensions?.map((ext: any) => ({
+                        value: ext.id,
+                        label: ext.display_name,
+                      })) || []
+                    }
                     placeholder="Select Extension"
                     isClearable
                     isSearchable
