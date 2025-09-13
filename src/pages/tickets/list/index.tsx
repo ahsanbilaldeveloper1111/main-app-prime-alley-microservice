@@ -128,6 +128,19 @@ const TicketList = () => {
         ),
       },
       {
+        key: "created_by",
+        name: "Created By",
+        selector: (row: any) => row.created_by,
+        sortable: true,
+        cell: (props: any) => (
+          <span className="badge bg-info">
+            {extensions.find(
+              (extension: any) => extension.id == props.created_by
+            )?.display_name || props.created_by}
+          </span>
+        ),
+      },
+      {
         key: "status",
         name: "Status & Module",
         selector: (row: any) => row.status,
