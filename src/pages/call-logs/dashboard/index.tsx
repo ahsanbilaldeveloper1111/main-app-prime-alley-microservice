@@ -249,20 +249,23 @@ const CallDashboard = () => {
     }, []);
     const fetchGeneralStats = async () => {
       const response = await ListCallLogs({ page:  page, perPage: perPage, search: "", filters: currentFilters,reportType: 'statsDashboard' }, 'call-logs/generalStats');
+
+      if(response.success){
+        const responseData = response.data;
       
       setGeneralStats({
-          totalCalls: response.total_calls,
-          totalInbound: response.inbound_calls,
-          totalOutbound: response.outbound_calls,
-          totalMissedIncoming: response.missed_incoming_calls,
-          totalMissedOutgoing: response.missed_outgoing_calls,
-          totalAvgRingTime: response.avg_ring_time,
-          totalAvgDuration: response.avg_duration,
-          totalAvgCost: response.avg_cost,
+          totalCalls: responseData.total_calls,
+          totalInbound: responseData.inbound_calls,
+          totalOutbound: responseData.outbound_calls,
+          totalMissedIncoming: responseData.missed_incoming_calls,
+          totalMissedOutgoing: responseData.missed_outgoing_calls,
+          totalAvgRingTime: responseData.avg_ring_time,
+          totalAvgDuration: responseData.avg_duration,
+          totalAvgCost: responseData.avg_cost,
       });
 
       // Extract and map chart data
-      const chartExtension = response?.chart_data?.extension;
+      const chartExtension = responseData?.chart_data?.extension;
       if(chartExtension){
         setShowExtensionChart(true);
         setExtensionChartData(chartExtension);
@@ -290,7 +293,7 @@ const CallDashboard = () => {
         });
       }
       
-      const chartDepartment = response?.chart_data?.department;
+      const chartDepartment = responseData?.chart_data?.department;
       if(chartDepartment){
         setShowDepartmentChart(true);
         setDepartmentChartData(chartDepartment);
@@ -340,7 +343,7 @@ const CallDashboard = () => {
         });
       }
       
-      const chartCountry = response?.chart_data?.country;
+      const chartCountry = responseData?.chart_data?.country;
       if(chartCountry){
         setShowCountryChart(true);
         setCountryChartData(chartCountry);
@@ -362,6 +365,7 @@ const CallDashboard = () => {
           }
         });
       }
+    }
 
   };
 

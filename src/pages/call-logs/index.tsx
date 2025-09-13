@@ -18,6 +18,7 @@ import imgStatus2 from '@assets/images/widget/img-status-2.svg'
 import imgStatus3 from '@assets/images/widget/img-status-3.svg'
 import imgStatus4 from '@assets/images/widget/img-status-4.svg'
 import moment from 'moment';
+import { convertUTCToUserTimezone, convertUTCTimeToUserTimezone, convertUTCSeparateDateTimeToUserTime, convertUTCSeparateDateTimeToUserDate, formatDuration } from '@utils/Helper';
 
 interface Summary {
     users: number;
@@ -30,10 +31,17 @@ const CallLogs = () => {
     const { data:session, status } = useSession();
    
     const columns: Column[] = [
-        { key: 'Date', name: 'Date', selector: (row: any) => row.Date, sortable: true },
+        { key: 'Date', name: 'Date', selector: (row: any) => row.Date, sortable: true,
+            cell: (props: any) => {
+                // Convert UTC date to user's timezone using separate date and time
+                const formattedDate = convertUTCSeparateDateTimeToUserDate(props.Date, props.Time, 'YYYY-MM-DD');
+                return formattedDate;
+            }
+         },
         { key: 'Time', name: 'Time', selector: (row: any) => row.Time, sortable: true,
             cell: (props: any) => {
-                const formattedTime = moment(props.Time, 'HH:mm:ss.SSSSSSS').format('hh:mm:ss A');
+                // Convert UTC time to user's timezone using separate date and time
+                const formattedTime = convertUTCSeparateDateTimeToUserTime(props.Date, props.Time, 'hh:mm:ss A');
                 return formattedTime;
             }
          },
@@ -46,17 +54,6 @@ const CallLogs = () => {
             selector: (row: any) => row.duration,
             sortable: true,
             cell: (props: any) => {
-              const formatDuration = (seconds: number) => {
-                const minutes = Math.floor(seconds / 60);
-                const secs = seconds % 60;
-                
-                if (minutes > 0) {
-                  return `${minutes}min ${secs}sec`;
-                } else {
-                  return `${secs}sec`;
-                }
-              };
-              
               const duration = parseInt(props.duration) || 0;
               return (
                 <div>

@@ -76,8 +76,7 @@ const CustomDataTable: React.FC<CustomDataTableProps> = ({
   paginationComponentOptions = {
     rowsPerPageText: "Data per page",
     rangeSeparatorText: "to",
-    selectAllRowsItem: true,
-    selectAllRowsItemText: ""
+    selectAllRowsItem: false
   },
   conditionalRowStyles = [
     {
