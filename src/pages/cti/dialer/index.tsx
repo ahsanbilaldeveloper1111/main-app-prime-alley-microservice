@@ -5,8 +5,9 @@ import { Button, Card, Col, Row, Alert, Badge } from 'react-bootstrap'
 import { toast } from 'react-toastify'
 import Link from 'next/link'
 import useCtiStomp from '../../../hooks/useCtiStomp'
-import { makeCall, endCall, holdCall, resumeCall, getCallingDeviceInfo, mergeCalls,transferCalls } from '../../../utils/dialer'
+import { makeCall, endCall, holdCall, resumeCall, getCallingDeviceInfo, mergeCalls,transferCalls, RemoveCall } from '../../../utils/dialer'
 import Select from 'react-select'
+import { FaLastfmSquare } from 'react-icons/fa'
 
 const CtiDialer = () => {
   // CTI Socket hook integration
@@ -47,6 +48,10 @@ const CtiDialer = () => {
   const [transferTarget, setTransferTarget] = useState('')
   const [mergedCalls, setMergedCalls] = useState<Map<string, {
     id: string
+    conferenceCallId?: string
+    callingDeviceName?: string
+    callingDeviceType?: string
+
     mergedCallId: string
     members: Array<{
       id: string
@@ -228,11 +233,11 @@ const CtiDialer = () => {
   }
 
   const handleDial = async () => {
-    if (!dialedNumber.trim() || !isDialedNumberValid(dialedNumber)) {
-      setShowInvalidWarning(true)
-      toast.error(`Cannot dial ${dialedNumber} - not an available extension`)
-      return
-    }
+    // if (!dialedNumber.trim() || !isDialedNumberValid(dialedNumber)) {
+    //   setShowInvalidWarning(true)
+    //   toast.error(`Cannot dial ${dialedNumber} - not an available extension`)
+    //   return
+    // }
 
     // Check if we can dial this number
     const dialCheck = canDialNumber(dialedNumber)
@@ -273,7 +278,8 @@ const CtiDialer = () => {
         callingDeviceName: callingDevice.callingDeviceName
       })
 
-      if (result.success) {
+      console.log(result, "result cti");
+      if (result.success) { console.log( "yes true");
         const responseData = result.data.responseData
         const callStatusFromAPI = responseData.status
         
@@ -539,7 +545,12 @@ const CtiDialer = () => {
         const mergedCallId = `merged_${Date.now()}`
         const mergedCall = {
           id: mergedCallId,
-          mergedCallId: mergedCallId, // Use generated ID
+          
+          conferenceCallId:result?.responseData?.conferenceCallId,
+          callingDeviceName: callingDevice.callingDeviceName,
+          callingDeviceType: callingDevice.callingDeviceType,
+          
+          mergedCallId: mergedCallId,
           members: [
             {
               id: heldCall.id,
@@ -1867,112 +1878,139 @@ const CtiDialer = () => {
   }
 
   // Remove a member from a merged call
-  const removeMemberFromMergedCall = (mergedCallId: string, memberId: string) => {
-    console.log(`🔄 Removing member ${memberId} from merged call ${mergedCallId}`)
+  const removeMemberFromMergedCall = async (mergedCallId: string, memberId: string) => {
+    const mergedCall = mergedCalls.get(mergedCallId);
     
-    setMergedCalls(prev => {
-      const newMap = new Map(prev)
-      const mergedCall = newMap.get(mergedCallId)
+    if (!mergedCall) {
+      console.log('Merged call not found')
+      return
+    }
+
+    console.log(`Removing member ${memberId} from merged call ${mergedCallId}`)
+    console.log(mergedCall, "mergdCall cti");
+    console.log(memberId, "memberId cti");
+    console.log( "=====================");
+    
+    const updatedMembers = mergedCall.members.filter(member => member.id === memberId);
+    console.log(updatedMembers, "updatedMembers cti");
+    console.log(updatedMembers?.[0], "updatedMembers[0] cti");
+    console.log( "=====================");
+
+    const payloadRemoveCall={
+      callId: mergedCall.conferenceCallId || '',
+      callingAddress: updatedMembers?.[0]?.callingAddress,
+      calledAddress: updatedMembers?.[0]?.calledAddress || '',
+      callingDeviceType: mergedCall.callingDeviceType || '',
+      callingDeviceName: mergedCall.callingDeviceName || ''
+    };
+    console.log(payloadRemoveCall, "payloadRemoveCall cti");
+
+    const removeFromMergedCall = await RemoveCall(payloadRemoveCall);
+    console.log(removeFromMergedCall, "removeFromMergedCall cti");
+    console.log( "=====================");
+
+
+
       
-      if (!mergedCall) {
-        console.log('❌ Merged call not found')
-        return newMap
-      }
+      // if (!mergedCall) {
+      //   console.log('Merged call not found')
+      //   return newMap
+      // }
       
-      console.log(`📞 Merged call members before removal:`, mergedCall.members.map(m => ({
-        id: m.id,
-        number: m.number,
-        callId: m.callId
-      })))
+      // console.log(`Merged call members before removal:`, mergedCall.members.map(m => ({
+      //   id: m.id,
+      //   number: m.number,
+      //   callId: m.callId
+      // })))  
+
+      // // Remove the member
+      // const updatedMembers = mergedCall.members.filter(member => member.id !== memberId)
       
-      // Remove the member
-      const updatedMembers = mergedCall.members.filter(member => member.id !== memberId)
+      // console.log(`Merged call members after removal:`, updatedMembers.map(m => ({
+      //   id: m.id,
+      //   number: m.number,
+      //   callId: m.callId
+      // })))
       
-      console.log(`Merged call members after removal:`, updatedMembers.map(m => ({
-        id: m.id,
-        number: m.number,
-        callId: m.callId
-      })))
-      
-              if (updatedMembers.length === 0) {
-          // If no members left, remove the entire merged call
-          newMap.delete(mergedCallId)
-          console.log('Removed merged call with no members left')
+      //   if (updatedMembers.length === 0) {
+      //     // If no members left, remove the entire merged call
+      //     newMap.delete(mergedCallId)
+      //     console.log('Removed merged call with no members left')
           
-          // Save to localStorage after updating - use current active calls
-          setTimeout(() => {
-            const currentActiveCalls = new Map(activeCalls)
-            saveCallStatesToStorage(currentActiveCalls)
-          }, 0)
-        } else if (updatedMembers.length === 1) {
-        // If only one member left, convert back to regular call
-        const remainingMember = updatedMembers[0]
-        const regularCall = {
-          id: remainingMember.id,
-          number: remainingMember.number,
-          startTime: remainingMember.startTime,
-          status: remainingMember.status,
-          callId: remainingMember.callId,
-          callingAddress: remainingMember.callingAddress,
-          calledAddress: remainingMember.calledAddress,
-          callingDeviceName: remainingMember.callingDeviceName,
-          callingDeviceType: remainingMember.callingDeviceType,
-          duration: 0
-        }
+      //     // Save to localStorage after updating - use current active calls
+      //     setTimeout(() => {
+      //       const currentActiveCalls = new Map(activeCalls)
+      //       saveCallStatesToStorage(currentActiveCalls)
+      //     }, 0)
+      //   } else if (updatedMembers.length === 1) {
+      //   // If only one member left, convert back to regular call
+      //   const remainingMember = updatedMembers[0]
+      //   const regularCall = {
+      //     id: remainingMember.id,
+      //     number: remainingMember.number,
+      //     startTime: remainingMember.startTime,
+      //     status: remainingMember.status,
+      //     callId: remainingMember.callId,
+      //     callingAddress: remainingMember.callingAddress,
+      //     calledAddress: remainingMember.calledAddress,
+      //     callingDeviceName: remainingMember.callingDeviceName,
+      //     callingDeviceType: remainingMember.callingDeviceType,
+      //     duration: 0
+      //   }
         
-        console.log(`Converting merged call back to regular call for member:`, {
-          id: remainingMember.id,
-          number: remainingMember.number,
-          callId: remainingMember.callId
-        })
+      //   console.log(`Converting merged call back to regular call for member:`, {
+      //     id: remainingMember.id,
+      //     number: remainingMember.number,
+      //     callId: remainingMember.callId
+      //   })
         
-        // Add back to active calls
-        setActiveCalls(prev => {
-          const newActiveMap = new Map(prev)
-          newActiveMap.set(remainingMember.id, regularCall)
-          // Save to localStorage after updating
-          setTimeout(() => saveCallStatesToStorage(newActiveMap), 0)
-          return newActiveMap
-        })
+      //   // Add back to active calls
+      //   setActiveCalls(prev => {
+      //     const newActiveMap = new Map(prev)
+      //     newActiveMap.set(remainingMember.id, regularCall)
+      //     // Save to localStorage after updating
+      //     setTimeout(() => saveCallStatesToStorage(newActiveMap), 0)
+      //     return newActiveMap
+      //   })
         
-        // Remove the merged call
-        newMap.delete(mergedCallId)
-        console.log('Converted merged call back to regular call')
-      } else {
-        // Update the merged call with remaining members
-        const updatedMergedCall = {
-          ...mergedCall,
-          members: updatedMembers
-        }
+      //   // Remove the merged call
+      //   newMap.delete(mergedCallId)
+      //   console.log('Converted merged call back to regular call')
+      // } else {
+      //   // Update the merged call with remaining members
+      //   const updatedMergedCall = {
+      //     ...mergedCall,
+      //     members: updatedMembers
+      //   }
         
-        // Validate that we don't have duplicate member IDs
-        const memberIds = updatedMembers.map(m => m.id)
-        const uniqueMemberIds = Array.from(new Set(memberIds))
+      //   // Validate that we don't have duplicate member IDs
+      //   const memberIds = updatedMembers.map(m => m.id)
+      //   const uniqueMemberIds = Array.from(new Set(memberIds))
         
-        if (memberIds.length !== uniqueMemberIds.length) {
-          console.warn('⚠️ Duplicate member IDs detected, filtering out duplicates')
-          const uniqueMembers = updatedMembers.filter((member, index) => 
-            memberIds.indexOf(member.id) === index
-          )
-          updatedMergedCall.members = uniqueMembers
-        }
+      //   if (memberIds.length !== uniqueMemberIds.length) {
+      //     console.warn('⚠️ Duplicate member IDs detected, filtering out duplicates')
+      //     const uniqueMembers = updatedMembers.filter((member, index) => 
+      //       memberIds.indexOf(member.id) === index
+      //     )
+      //     updatedMergedCall.members = uniqueMembers
+      //   }
         
-        newMap.set(mergedCallId, updatedMergedCall)
-        console.log('Updated merged call with remaining members:', updatedMergedCall.members.map(m => ({
-          id: m.id,
-          number: m.number,
-          callId: m.callId
-        })))
+      //   newMap.set(mergedCallId, updatedMergedCall)
+      //   console.log('Updated merged call with remaining members:', updatedMergedCall.members.map(m => ({
+      //     id: m.id,
+      //     number: m.number,
+      //     callId: m.callId
+      //   })))
         
-        // Save to localStorage after updating - use current active calls
-        setTimeout(() => {
-          const currentActiveCalls = new Map(activeCalls)
-          saveCallStatesToStorage(currentActiveCalls)
-        }, 0)
-      }
+      //   // Save to localStorage after updating - use current active calls
+      //   setTimeout(() => {
+      //     const currentActiveCalls = new Map(activeCalls)
+      //     saveCallStatesToStorage(currentActiveCalls)
+      //   }, 0)
+      // }
       
-      return newMap
-    })
+    //    return newMap
+    // })
   }
 
   // Get merged call for a specific call ID
@@ -2326,7 +2364,7 @@ const CtiDialer = () => {
                       size="lg"
                       className="w-100 py-3 mb-4"
                       onClick={handleDial}
-                      disabled={!dialedNumber.trim() || isDialing || !isDialedNumberValid(dialedNumber) || !canDialNumber(dialedNumber).canDial}
+                      //disabled={!dialedNumber.trim() || isDialing || !isDialedNumberValid(dialedNumber) || !canDialNumber(dialedNumber).canDial}
                     >
                       <i className="material-icons-two-tone me-2">call</i>
                       {isDialing ? 'Dialing...' : 'Dial'}

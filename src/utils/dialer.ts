@@ -1,3 +1,6 @@
+import axiosInstance from './axios'
+import { toast } from 'react-toastify'
+
 interface DialParams {
   callingAddress: string
   calledAddress: string
@@ -26,6 +29,28 @@ interface DialResponse {
   message?: string
   data?: any
   error?: string
+  responseData?: any
+}
+
+
+export const validateResponse = (response: any) => {
+  const responseData = response?.data;
+  console.log(responseData, "responseData cti");
+  if(responseData?.status === 'success'){
+    console.log(responseData, "yes cti");
+    return {
+      success: true,
+      data: responseData,
+      message: responseData?.responseData?.message
+    }
+  }else{
+    toast.error(responseData?.responseData?.message);
+    return {
+      success: false,
+      error: responseData?.responseData?.message,
+      data: responseData
+    }
+  }
 }
 
 /**
@@ -35,29 +60,10 @@ interface DialResponse {
  */
 export const makeCall = async (params: DialParams): Promise<DialResponse> => {
   try {
-    const response = await fetch('/api/cti/dialCall', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(params)
-    })
+    const response = await axiosInstance.post('/cti/dialCall', params);
+    
+    return validateResponse(response);
 
-    if (response.ok) {
-      const result = await response.json()
-      return {
-        success: true,
-        data: result,
-        message: 'Call initiated successfully'
-      }
-    } else {
-      const errorData = await response.json()
-      return {
-        success: false,
-        error: errorData.message || 'Failed to initiate call',
-        data: errorData
-      }
-    }
   } catch (error) {
     console.error('Error calling dial API:', error)
     return {
@@ -69,29 +75,10 @@ export const makeCall = async (params: DialParams): Promise<DialResponse> => {
 
 export const endCall = async (params: EndCallParams): Promise<DialResponse> => {
   try {
-    const response = await fetch('/api/cti/endCall', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(params)
-    })
+    const response = await axiosInstance.post('/cti/endCall', params);
 
-    if (response.ok) {
-      const result = await response.json()
-      return {
-        success: true,
-        data: result,
-        message: 'Call ended successfully'
-      }
-    } else {
-      const errorData = await response.json()
-      return {
-        success: false,
-        error: errorData.message || 'Failed to end call',
-        data: errorData
-      }
-    }
+    return validateResponse(response);
+
   } catch (error) {
     console.error('Error calling end-call API:', error)
     return {
@@ -103,29 +90,10 @@ export const endCall = async (params: EndCallParams): Promise<DialResponse> => {
 
 export const holdCall = async (params: EndCallParams): Promise<DialResponse> => {
   try {
-    const response = await fetch('/api/cti/holdCall', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(params)
-    })
+    const response = await axiosInstance.post('/cti/holdCall', params);
 
-    if (response.ok) {
-      const result = await response.json()
-      return {
-        success: true,
-        data: result,
-        message: 'Call held successfully'
-      }
-    } else {
-      const errorData = await response.json()
-      return {
-        success: false,
-        error: errorData.message || 'Failed to end call',
-        data: errorData
-      }
-    }
+    return validateResponse(response);
+    
   } catch (error) {
     console.error('Error calling end-call API:', error)
     return {
@@ -137,29 +105,10 @@ export const holdCall = async (params: EndCallParams): Promise<DialResponse> => 
 
 export const resumeCall = async (params: EndCallParams): Promise<DialResponse> => {
   try {
-    const response = await fetch('/api/cti/resumeCall', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(params)
-    })
+    const response = await axiosInstance.post('/cti/resumeCall', params);
 
-    if (response.ok) {
-      const result = await response.json()
-      return {
-        success: true,
-        data: result,
-        message: 'Call resumed successfully'
-      }
-    } else {
-      const errorData = await response.json()
-      return {
-        success: false,
-        error: errorData.message || 'Failed to end call',
-        data: errorData
-      }
-    }
+    return validateResponse(response);
+
   } catch (error) {
     console.error('Error calling end-call API:', error)
     return {
@@ -169,31 +118,25 @@ export const resumeCall = async (params: EndCallParams): Promise<DialResponse> =
   }
 }
 
+export const RemoveCall = async (params: any): Promise<DialResponse> => {
+  try {
+    const response = await axiosInstance.post('/cti/removeCall', params);
+    return validateResponse(response);
+  } catch (error) {
+    console.error('Error calling remove-call API:', error)
+    return {
+      success: false,
+      error: 'Network error occurred while removing call'
+    }
+  }
+}
+
 export const mergeCalls = async (params: MergeCallsParams): Promise<DialResponse> => {
   try {
-    const response = await fetch('/api/cti/mergeCall', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(params)
-    })
+    const response = await axiosInstance.post('/cti/mergeCall', params);
 
-    if (response.ok) {
-      const result = await response.json()
-      return {
-        success: true,
-        data: result,
-        message: 'Calls merged successfully'
-      }
-    } else {
-      const errorData = await response.json()
-      return {
-        success: false,
-        error: errorData.message || 'Failed to merge calls',
-        data: errorData
-      }
-    }
+    return validateResponse(response);
+    
   } catch (error) {
     console.error('Error calling merge-calls API:', error)
     return {
@@ -215,30 +158,11 @@ interface TransferCallParams {
 
 export const transferCalls = async (params: TransferCallParams): Promise<DialResponse> => {
   try {
-    const response = await fetch('/api/cti/transferCall', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(params)
-    })
+    const response = await axiosInstance.post('/cti/transferCall', params);
 
-    if (response.ok) {
-      const result = await response.json()
-      return {
-        success: true,
-        data: result,
-        message: 'Call transferred successfully'
-      }
-    } else {
-      const errorData = await response.json()
-      return {
-        success: false,
-        error: errorData.message || 'Failed to transfer call',
-        data: errorData
-      }
-    }
+    return validateResponse(response);
   } catch (error) {
+    
     console.error('Error calling transfer-call API:', error)
     return {
       success: false,
@@ -246,11 +170,6 @@ export const transferCalls = async (params: TransferCallParams): Promise<DialRes
     }
   }
 }
-
-
-
-
-
 
 
 

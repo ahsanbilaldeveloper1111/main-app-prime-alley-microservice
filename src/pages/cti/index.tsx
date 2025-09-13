@@ -45,6 +45,7 @@ const CtiDashboard = () => {
     getDnCallState,
     getCallStateForDevice,
     eventLog,
+    userAddress,
     syncPersistedCallStates
   } = useCtiStomp()
 
