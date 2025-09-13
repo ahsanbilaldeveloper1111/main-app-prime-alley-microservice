@@ -954,7 +954,7 @@ const TicketList = () => {
           filters={memoizedFilters}
           refreshKey={refreshKey}
           search={session?.user?.permissions?.includes(
-            "search-tickets-tickets"
+            "search-ticket-tickets"
           )}
         />
       )}

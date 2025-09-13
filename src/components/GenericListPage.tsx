@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import CustomDataTable, { Column, ServerPaginationInfo } from '@components/CustomDataTable';
 import SimpleCanvas from '@components/SimpleCanvas';
 
@@ -100,9 +100,23 @@ const GenericListPage: React.FC<GenericListPageProps> = ({
         }
     }, [fetchData, defaultPageSize]);
 
+    // Track previous values to determine if this is a refresh or filter/search change
+    const prevFiltersRef = useRef(filters);
+    const prevSearchTermRef = useRef(searchTerm);
+    
     // Combined effect to handle initial load, filters change, and refresh key changes
     useEffect(() => {
-        fetchAndSetData(1, paginationInfo.perPage, searchTerm);
+        // Check if filters or search term changed (reset to page 1)
+        const filtersChanged = JSON.stringify(filters) !== JSON.stringify(prevFiltersRef.current);
+        const searchChanged = searchTerm !== prevSearchTermRef.current;
+        
+        // Only reset to page 1 for filters and search changes, preserve current page for refreshKey changes
+        const pageToFetch = (filtersChanged || searchChanged) ? 1 : paginationInfo.currentPage;
+        fetchAndSetData(pageToFetch, paginationInfo.perPage, searchTerm);
+        
+        // Update refs for next comparison
+        prevFiltersRef.current = filters;
+        prevSearchTermRef.current = searchTerm;
     }, [fetchAndSetData, filters, refreshKey, paginationInfo.perPage, searchTerm]);
 
     const handlePageChange = (page: number) => {
