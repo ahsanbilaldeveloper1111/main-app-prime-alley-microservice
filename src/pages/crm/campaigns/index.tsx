@@ -41,6 +41,8 @@ import {
 import Link from "next/link";
 import { toast } from "react-toastify";
 import CampaignFilters from "@components/filters/CampaignFilters";
+import Select from "react-select";
+import { GetHierarchyData } from "@utils/users";
 
 const CrmCampaigns = () => {
   const [refreshKey, setRefreshKey] = useState(0);
@@ -72,6 +74,24 @@ const CrmCampaigns = () => {
     field_options: [] as string[],
     sort_order: 0,
   });
+
+  // Extensions and campaign users
+  const [extensions, setExtensions] = useState<any[]>([]);
+  const [campaignUsers, setCampaignUsers] = useState<readonly any[]>([]);
+
+  // Fetch extensions data
+  useEffect(() => {
+    const fetchExtensions = async () => {
+      try {
+        const hierarchyData = await GetHierarchyData();
+        setExtensions(hierarchyData?.extensions || []);
+      } catch (error) {
+        console.error('Failed to fetch extensions:', error);
+      }
+    };
+
+    fetchExtensions();
+  }, []);
 
   // Handle filter changes
   const handleFiltersChange = useCallback((filters: Record<string, any>) => {
@@ -184,6 +204,7 @@ const CrmCampaigns = () => {
         end_date: formData.end_date || undefined,
         status: formData.status as 'active' | 'inactive',
         fields: campaignFields,
+        campaign_users: campaignUsers.map(user => user.value),
       };
 
       if (showEditModal && selectedCampaign) {
@@ -204,7 +225,7 @@ const CrmCampaigns = () => {
     } finally {
       setLoading(false);
     }
-  }, [formData, campaignFields, showEditModal, selectedCampaign]);
+  }, [formData, campaignFields, campaignUsers, showEditModal, selectedCampaign]);
 
   // Field management functions
   const handleAddField = useCallback(() => {
@@ -440,6 +461,7 @@ const CrmCampaigns = () => {
           setShowCreateModal(false);
           setShowEditModal(false);
           setSelectedCampaign(null);
+          setCampaignUsers([]);
         }}
         size="xl"
       >
@@ -507,6 +529,31 @@ const CrmCampaigns = () => {
               onChange={(e) => setFormData({...formData, description: e.target.value})}
               placeholder="Enter campaign description (optional)"
             />
+          </Form.Group>
+
+          <Form.Group className="mb-4">
+            <Form.Label>Campaign Users</Form.Label>
+            <Select
+              isMulti
+              value={campaignUsers}
+              onChange={(selected) => setCampaignUsers(selected || [])}
+              options={extensions.map((extension: { id: string; display_name: string; name: string }) => ({
+                value: extension.id,
+                label: extension.display_name || extension.name || extension.id
+              }))}
+              placeholder="Select users for this campaign..."
+              styles={{
+                control: (base) => ({
+                  ...base,
+                  borderColor: "#ced4da",
+                  boxShadow: "none",
+                  fontSize: "14px",
+                }),
+              }}
+            />
+            <Form.Text className="text-muted">
+              Select users who will be assigned to this campaign.
+            </Form.Text>
           </Form.Group>
 
           {/* Campaign Fields Management */}
@@ -642,6 +689,7 @@ const CrmCampaigns = () => {
               setShowCreateModal(false);
               setShowEditModal(false);
               setSelectedCampaign(null);
+              setCampaignUsers([]);
             }}
           >
             Cancel

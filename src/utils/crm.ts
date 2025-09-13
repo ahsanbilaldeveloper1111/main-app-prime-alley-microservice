@@ -659,17 +659,32 @@ export const getCrmData = async (params: PaginationParams = {}): Promise<CrmData
   }
 };
 
-export const uploadCrmDataCsv = async (file: File, userExtensions: string[] = []): Promise<CrmDataUploadResponse> => {
+export const uploadCrmDataCsv = async (
+  file: File, 
+  campaignIds: string[] = [], 
+  fieldTags: string[] = [],
+  assignToCampaignUsers: boolean = false
+): Promise<CrmDataUploadResponse> => {
   try {
     const formData = new FormData();
     formData.append("csv_file", file);
     
-    // Add user_extensions as an array
-    if (userExtensions.length > 0) {
-      userExtensions.forEach((extensionId, index) => {
-        formData.append(`user_extensions[${index}]`, extensionId);
+    // Add campaign_ids as an array
+    if (campaignIds.length > 0) {
+      campaignIds.forEach((campaignId, index) => {
+        formData.append(`campaign_ids[${index}]`, campaignId);
       });
     }
+
+    // Add field_tags as an array
+    if (fieldTags.length > 0) {
+      fieldTags.forEach((tag, index) => {
+        formData.append(`field_tags[${index}]`, tag);
+      });
+    }
+
+    // Add assign_to_campaign_users flag
+    formData.append("assign_to_campaign_users", assignToCampaignUsers.toString());
     
     const response = await axiosInstance.post("/crm/crm-data/upload-csv", formData, {
       headers: {

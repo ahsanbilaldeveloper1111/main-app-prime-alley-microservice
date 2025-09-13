@@ -1,20 +1,19 @@
 import React, { useEffect, useState } from "react";
 import GenericFilter from './GenericFilter';
-import { createCrmFiltersConfig } from './filterConfigs';
+import { createCrmDataFiltersConfig } from './filterConfigs';
 import { useSession } from "next-auth/react";
-import { getStages, getCampaigns } from "@utils/crm";
+import { getCampaigns } from "@utils/crm";
 import { GetHierarchyData } from "@utils/users";
 
-interface CrmFiltersProps {
+interface CrmDataFiltersProps {
   onFiltersChange?: (filters: Record<string, any>) => void;
   onExport?: (exportType: string, filters: Record<string, any>) => void;
 }
 
-export default function CrmFilters({ onFiltersChange, onExport }: CrmFiltersProps) {
+export default function CrmDataFilters({ onFiltersChange, onExport }: CrmDataFiltersProps) {
   const { data: session, status } = useSession();
   const [showExport, setShowExport] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
-  const [stages, setStages] = useState<any[]>([]);
   const [campaigns, setCampaigns] = useState<any[]>([]);
   const [extensions, setExtensions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -37,13 +36,11 @@ export default function CrmFilters({ onFiltersChange, onExport }: CrmFiltersProp
     const fetchData = async () => {
       try {
         setLoading(true);
-        const [stagesData, campaignsData, hierarchyData] = await Promise.all([
-          getStages(),
+        const [campaignsData, hierarchyData] = await Promise.all([
           getCampaigns(),
           GetHierarchyData()
         ]);
         
-        setStages(stagesData || []);
         setCampaigns(campaignsData?.data || []);
         setExtensions(hierarchyData?.extensions || []);
       } catch (error) {
@@ -60,34 +57,33 @@ export default function CrmFilters({ onFiltersChange, onExport }: CrmFiltersProp
   }, [status]);
 
   // Create dynamic filter config with all data
-  const crmConfig = createCrmFiltersConfig(stages, campaigns, extensions, staticTags);
+  const crmDataConfig = createCrmDataFiltersConfig(campaigns, extensions, staticTags);
   
   useEffect(() => {
     if (status === 'authenticated') {
       // Only show export if onExport prop is provided and user has permission
-      if (onExport && session?.user?.permissions?.includes('export-crm')) {
+      if (onExport && session?.user?.permissions?.includes('export-crm-data')) {
         setShowExport(true);
       }
-      // if (session?.user?.permissions?.includes('filters-crm')) {
-        setShowFilters(true);
-      // }
+      // Show filters for CRM data
+      setShowFilters(true);
     }
   }, [status, session, onExport]);
 
-  // Show loading state while stages data is being fetched
+  // Show loading state while data is being fetched
   if (loading) {
     return <div>Loading filters...</div>;
   }
 
-  // Show error state if stages data failed to load
+  // Show error state if data failed to load
   if (error) {
-    console.error('Failed to load stages data:', error);
-    // Fall back to default config without stages data
+    console.error('Failed to load filter data:', error);
+    // Fall back to default config without data
   }
 
   return (
     <GenericFilter
-      tabs={crmConfig}
+      tabs={crmDataConfig}
       onFiltersChange={onFiltersChange}
       showFilters={showFilters}
       onExport={onExport}

@@ -1120,7 +1120,12 @@ export const createCustomFilterConfig = (
 }; 
 
 // CRM Filters Configuration
-export const createCrmFiltersConfig = (stages: any[] = []): FilterTab[] => {
+export const createCrmFiltersConfig = (
+  stages: any[] = [], 
+  campaigns: any[] = [], 
+  extensions: any[] = [], 
+  staticTags: any[] = []
+): FilterTab[] => {
   return [
     {
       id: 'stage',
@@ -1152,6 +1157,214 @@ export const createCrmFiltersConfig = (stages: any[] = []): FilterTab[] => {
             { value: 'false', label: 'Active' },
             { value: 'true', label: 'Lost' }
           ]
+        }
+      ]
+    },
+    {
+      id: 'campaigns',
+      title: 'Campaigns',
+      icon: 'ti ti-target',
+      fields: [
+        {
+          type: 'select',
+          isMulti: true,
+          name: 'campaign_id',
+          label: 'Campaigns',
+          options: campaigns.map((campaign: { id: number; name: string }) => ({
+            value: campaign.id.toString(),
+            label: campaign.name
+          })) || []
+        }
+      ]
+    },
+    {
+      id: 'tags',
+      title: 'Tags',
+      icon: 'ti ti-tag',
+      fields: [
+        {
+          type: 'select',
+          isMulti: true,
+          name: 'tags',
+          label: 'Tags',
+          options: staticTags || []
+        }
+      ]
+    },
+    {
+      id: 'assignment-status',
+      title: 'Assignment Status',
+      icon: 'ti ti-user-check',
+      fields: [
+        {
+          type: 'select',
+          name: 'assignment_status',
+          label: 'Assignment Status',
+          options: [
+            { value: '', label: 'All' },
+            { value: 'assigned', label: 'Assigned' },
+            { value: 'unassigned', label: 'Unassigned' }
+          ]
+        }
+      ]
+    },
+    {
+      id: 'user-extensions',
+      title: 'Users',
+      icon: 'ti ti-users',
+      fields: [
+        {
+          type: 'select',
+          isMulti: true,
+          name: 'user_extension',
+          label: 'Users',
+          options: extensions.map((extension: { id: string; display_name: string; name: string }) => ({
+            value: extension.id,
+            label: extension.display_name || extension.name || extension.id
+          })) || []
+        }
+      ]
+    },
+    {
+      id: 'date-range',
+      title: 'Date Range',
+      icon: 'ti ti-calendar',
+      fields: [
+        {
+          type: 'date',
+          name: 'start_date',
+          label: 'Start Date',
+          placeholder: 'Select start date'
+        },
+        {
+          type: 'date',
+          name: 'end_date',
+          label: 'End Date',
+          placeholder: 'Select end date (must be after start date)'
+        }
+      ]
+    }
+  ];
+};
+
+// CRM Data Filters Configuration (for CRM data management page)
+export const createCrmDataFiltersConfig = (
+  campaigns: any[] = [], 
+  extensions: any[] = [], 
+  staticTags: any[] = []
+): FilterTab[] => {
+  return [
+    {
+      id: 'phone-search',
+      title: 'Phone Search',
+      icon: 'ti ti-phone',
+      fields: [
+        {
+          type: 'text',
+          name: 'phone',
+          label: 'Phone Number',
+          placeholder: 'Enter phone number to search'
+        }
+      ]
+    },
+    {
+      id: 'campaigns',
+      title: 'Campaigns',
+      icon: 'ti ti-target',
+      fields: [
+        {
+          type: 'select',
+          isMulti: true,
+          name: 'campaign_id',
+          label: 'Campaigns',
+          options: campaigns.map((campaign: { id: number; name: string }) => ({
+            value: campaign.id.toString(),
+            label: campaign.name
+          })) || []
+        }
+      ]
+    },
+    {
+      id: 'tags',
+      title: 'Tags',
+      icon: 'ti ti-tag',
+      fields: [
+        {
+          type: 'select',
+          isMulti: true,
+          name: 'tags',
+          label: 'Tags',
+          options: staticTags || []
+        }
+      ]
+    },
+    {
+      id: 'assignment-status',
+      title: 'Assignment Status',
+      icon: 'ti ti-user-check',
+      fields: [
+        {
+          type: 'select',
+          name: 'assignment_status',
+          label: 'Assignment Status',
+          options: [
+            { value: '', label: 'All' },
+            { value: 'assigned', label: 'Assigned' },
+            { value: 'unassigned', label: 'Unassigned' }
+          ]
+        }
+      ]
+    },
+    {
+      id: 'user-extensions',
+      title: 'Users',
+      icon: 'ti ti-users',
+      fields: [
+        {
+          type: 'select',
+          isMulti: true,
+          name: 'user_extension',
+          label: 'Users',
+          options: extensions.map((extension: { id: string; display_name: string; name: string }) => ({
+            value: extension.id,
+            label: extension.display_name || extension.name || extension.id
+          })) || []
+        }
+      ]
+    },
+    {
+      id: 'view-status',
+      title: 'View Status',
+      icon: 'ti ti-eye',
+      fields: [
+        {
+          type: 'select',
+          name: 'is_viewed',
+          label: 'View Status',
+          options: [
+            { value: '', label: 'All' },
+            { value: 'true', label: 'Viewed' },
+            { value: 'false', label: 'New' }
+          ]
+        }
+      ]
+    },
+    {
+      id: 'date-range',
+      title: 'Date Range',
+      icon: 'ti ti-calendar',
+      fields: [
+        {
+          type: 'date',
+          name: 'start_date',
+          label: 'Start Date',
+          placeholder: 'Select start date'
+        },
+        {
+          type: 'date',
+          name: 'end_date',
+          label: 'End Date',
+          placeholder: 'Select end date (must be after start date)'
         }
       ]
     }
