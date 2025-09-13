@@ -58,6 +58,7 @@ export const ListCallLogs = async (params: PaginationParams = {}, endpoint: stri
     } else {
       const response = await axiosInstance.get(`${endpoint}?${queryParams.toString()}`);
       return response.data;
+     
     }
   } catch (error) {
     throw error;

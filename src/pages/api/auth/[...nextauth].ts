@@ -31,6 +31,7 @@ function clearExistingTmsSessions() {
   }
 }
 
+
 declare module 'next-auth' {
   interface Session {
     user: {
@@ -46,6 +47,22 @@ declare module 'next-auth' {
       refresh_token?: string;
       refresh_token_expires?: number | string;
       sessionId?: string; // Add session ID for custom session retrieval
+      tmsSession?: {
+        accessToken: string;
+        expiresAt: number;
+        user?: {
+          id?: string;
+          name?: string;
+          email?: string;
+          user_access_info?: {
+            permissions?: Array<{
+              module: string;
+              action: string;
+            }>;
+          };
+          [key: string]: any;
+        };
+      };
     };
   }
 
@@ -65,6 +82,22 @@ declare module 'next-auth' {
       access_token_expires: number | string;
       refresh_token: string;
       refresh_token_expires: number | string;
+    };
+    tmsSession?: {
+      accessToken: string;
+      expiresAt: number;
+      user?: {
+        id?: string;
+        name?: string;
+        email?: string;
+        user_access_info?: {
+          permissions?: Array<{
+            module: string;
+            action: string;
+          }>;
+        };
+        [key: string]: any;
+      };
     };
   }
 }
@@ -124,6 +157,9 @@ export const authOptions: NextAuthOptions = {
               refresh_token_expires: jsonData.data?.token?.refresh_token.expires_in,
             }
           };
+
+          // Clear TMS sessions from server-side memory
+          clearExistingTmsSessions();
           
           return user;
         } catch (error) {
@@ -165,6 +201,11 @@ export const authOptions: NextAuthOptions = {
           token.refresh_token = user.token.refresh_token;
           token.refresh_token_expires = user.token.refresh_token_expires;
         }
+        
+        // Add TMS session data if available
+        if (user.tmsSession) {
+          token.tmsSession = user.tmsSession;
+        }
       }
 
       return token;
@@ -184,6 +225,11 @@ export const authOptions: NextAuthOptions = {
         session.user.access_token_expires = token.access_token_expires as number | string | undefined;
         session.user.refresh_token = token.refresh_token as string | undefined;
         session.user.refresh_token_expires = token.refresh_token_expires as number | string | undefined;
+        
+        // Add TMS session data if available
+        if (token.tmsSession) {
+          session.user.tmsSession = token.tmsSession as any;
+        }
       }
 
       return session;

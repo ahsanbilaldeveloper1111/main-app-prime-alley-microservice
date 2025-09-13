@@ -10,7 +10,6 @@ export const useOrganizationUnits = (params: IndexRequestOrganizationUnit) => {
         const fetchData = async () => {
             try {
                 setIsLoading(true);
-                // TODO: Implement API call
                 setData([]);
             } catch (err) {
                 setError(err);

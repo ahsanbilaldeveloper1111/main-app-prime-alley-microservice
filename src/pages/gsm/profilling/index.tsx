@@ -22,7 +22,7 @@ const paginationComponentOptions = {
       rowsPerPageText: "Data per page",
       rangeSeparatorText: "to",
       selectAllRowsItem: true,
-      selectAllRowsItemText: "Todos"
+      selectAllRowsItemText: ""
 };
 
     

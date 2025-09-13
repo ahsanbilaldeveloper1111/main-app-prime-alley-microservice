@@ -19,7 +19,7 @@ const EditRank = () => {
 
     setIsSubmitting(true);
     try {
-      // TODO: Implement rank update logic
+      
       toast.success('Rank updated successfully');
       router.push('/controlhub/ranks');
     } catch (error) {

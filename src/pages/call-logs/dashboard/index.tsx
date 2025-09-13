@@ -72,300 +72,150 @@ const CallDashboard = () => {
     //const loadingBar = useRef<any>(null); // Removed as per edit hint
 
 
-    const [sampleChart, setSampleChart] = React.useState({
+    // const [sampleChart, setSampleChart] = React.useState({
           
-        series: [{
-          data: [400, 430, 448,970,980]
-        }],
-        options: {
-          chart: {
-            type: 'bar' as const,
-            toolbar: {
-              show: false
-            }
-          },
-          plotOptions: {
-            bar: {
-              borderRadius: 4,
-              borderRadiusApplication: 'end',
-              horizontal: true,
-            }
-          },
-          legend: {
-            show: false
-          },
-          dataLabels: {
-            enabled: false
-          },
-          tooltip: {
-            enabled: true,
-            y: {
-                title: {
-                    formatter: function(value: number) {
-                        return value + ' calls';
-                    }
-                }
-            }
+    //     series: [{
+    //       data: [400, 430, 448,970,980]
+    //     }],
+    //     options: {
+    //       chart: {
+    //         type: 'bar' as const,
+    //         toolbar: {
+    //           show: false
+    //         }
+    //       },
+    //       plotOptions: {
+    //         bar: {
+    //           borderRadius: 4,
+    //           borderRadiusApplication: 'end',
+    //           horizontal: true,
+    //         }
+    //       },
+    //       legend: {
+    //         show: false
+    //       },
+    //       dataLabels: {
+    //         enabled: false
+    //       },
+    //       tooltip: {
+    //         enabled: true,
+    //         y: {
+    //             title: {
+    //                 formatter: function(value: number) {
+    //                     return value + ' calls';
+    //                 }
+    //             }
+    //         }
            
-          },
-          xaxis: {
+    //       },
+    //       xaxis: {
             
-            categories: ['140', '150', '160', '170', '180'],
-          },
-          yaxis: {
-            show: false,
+    //         categories: ['140', '150', '160', '170', '180'],
+    //       },
+    //       yaxis: {
+    //         show: false,
 
-            title: {
-              text: 'Extensions', 
-              show: false,
-              style: {
-                fontSize: '12px',
-                fontWeight: 'bold',
-                color: '#263238',
-                marginRight: '10px'
-              }
-            }
-          }
-        },
-    });
+    //         title: {
+    //           text: 'Extensions', 
+    //           show: false,
+    //           style: {
+    //             fontSize: '12px',
+    //             fontWeight: 'bold',
+    //             color: '#263238',
+    //             marginRight: '10px'
+    //           }
+    //         }
+    //       }
+    //     },
+    // });
 
-
-    const [sampleCountryChart, setSampleCountryChart] = React.useState({
-          
-        series: [{
-          data: [400, 430, 448,970,980]
-        }],
-        options: {
-          chart: {
-            type: 'bar' as const,
-            toolbar: {
-              show: false
-            },
-            
-          },
-          plotOptions: {
-            bar: {
-              borderRadius: 4,
-              borderRadiusApplication: 'end',
-              horizontal: true,
-              columnHeight: '2px',
-            }
-          },
-          legend: {
-            show: false
-          },
-          dataLabels: {
-            enabled: false
-          },
-          xaxis: {
-            categories: ['United States', 'United Kingdom', 'Canada', 'Australia', 'New Zealand'],
-          },
-          yaxis: {
-            
-            title: {
-
-              text: '', // <-- Your custom label here
-              style: {
-                fontSize: '12px',
-                fontWeight: 'bold',
-                color: '#263238',
-                marginRight: '10px'
-              }
-            }
-          }
-        },
-    });
-
-    const [sampleDepartmentChart, setSampleDepartmentChart] = React.useState({
-      series: [{
-            name: 'Shortest',
-            data: [20, 34, 23, 34, 53]
-          }, {
-            name: 'Longest',
-            data: [76, 85, 101, 98, 87]
-          }, {
-            name: 'Avg Duration',
-            data: [30, 40, 60, 80, 60]
-          }],
-          options: {
-            chart: {
-              type: 'bar',
-              toolbar: {
-                show: false
-              }
-            },
-            plotOptions: {
-              bar: {
-                horizontal: false,
-                columnWidth: '55%',
-                borderRadius: 5,
-                borderRadiusApplication: 'end'
-              },
-            },
-            dataLabels: {
-              enabled: false
-            },
-            stroke: {
-              show: true,
-              width: 2,
-              colors: ['transparent']
-            },
-            xaxis: {
-              categories: ['Ocean_LAX', 'Ocean_HKG', 'Ocean_SFO', 'Ocean_LHR', 'Ocean_ISL'],
-
-            },
-            yaxis: {
-              //show: false,
-              title: {
-                text: ''
-              }
-            },
-            fill: {
-              opacity: 1
-            },
-            
-          },
-    });  
     
-    const [callDirectionTwo, setCallDirectionTwo] = React.useState({
+  //   const [callDirectionTwo, setCallDirectionTwo] = React.useState({
           
-      series: [{
-        name: 'Inbound',
-        data: [44, 55, 57]
-      },{
-        name: 'Outbound',
-        data: [35, 41, 36]
-      }],
-      options: {
-        chart: {
-          type: 'bar' as const,
-          height: 200,
-          toolbar: {
-            show: false
-          }
-        },
-        plotOptions: {
-          bar: {
-            horizontal: false,
-            columnWidth: '55%',
-            borderRadius: 5,
-            borderRadiusApplication: 'end' as const
-          },
-        },
-        dataLabels: {
-          enabled: false
-        },
-        stroke: {
-          show: true,
-          width: 2,
-          colors: ['transparent']
-        },
-        xaxis: {
-          categories: ['Apr', 'May', 'Jun'],
-        },
-        yaxis: {
-          title: {
-            text: 'Calls'
-          }
-        },
-        fill: {
-          opacity: 1
-        },
-        tooltip: {
-          y: {
-            formatter: function (val: any) {
-              return val + ' calls'
-            }
-          }
-        }
-      },
+  //     series: [{
+  //       name: 'Inbound',
+  //       data: [44, 55, 57]
+  //     },{
+  //       name: 'Outbound',
+  //       data: [35, 41, 36]
+  //     }],
+  //     options: {
+  //       chart: {
+  //         type: 'bar' as const,
+  //         height: 200,
+  //         toolbar: {
+  //           show: false
+  //         }
+  //       },
+  //       plotOptions: {
+  //         bar: {
+  //           horizontal: false,
+  //           columnWidth: '55%',
+  //           borderRadius: 5,
+  //           borderRadiusApplication: 'end' as const
+  //         },
+  //       },
+  //       dataLabels: {
+  //         enabled: false
+  //       },
+  //       stroke: {
+  //         show: true,
+  //         width: 2,
+  //         colors: ['transparent']
+  //       },
+  //       xaxis: {
+  //         categories: ['Apr', 'May', 'Jun'],
+  //       },
+  //       yaxis: {
+  //         title: {
+  //           text: 'Calls'
+  //         }
+  //       },
+  //       fill: {
+  //         opacity: 1
+  //       },
+  //       tooltip: {
+  //         y: {
+  //           formatter: function (val: any) {
+  //             return val + ' calls'
+  //           }
+  //         }
+  //       }
+  //     },
     
     
-  });
+  // });
 
-  const [callDurationBarChart, setCallDurationBarChart] = React.useState({
-      series: [{
-        name: 'Short',
-        data: [44, 55, 41,12,45]
-      },  {
-        name: 'Long',
-        data: [53, 32, 33,45,34]
-      }],
-      options: {
-        chart: {
-          type: 'bar' as const,
-          toolbar: {
-            show: false
-          }
-        },
-        plotOptions: {
-          bar: {
-            horizontal: true,
-            dataLabels: {
-              show: true,
-              position: 'top',
-            },
-          }
-        },
-        dataLabels: {
-          enabled: false,
-          
-        },
-        stroke: {
-          show: true,
-          width: 1,
-          colors: ['#fff']
-        },
-        tooltip: {
-          shared: false,
-          intersect: false
-        },
-        xaxis: {
-          categories: [123, 32, 231,123,422],
-        },
-        yaxis: {
-          title: {
-            text: '',
-        
-          },
-          
-        },
-        legend: {
-          position: 'bottom' as const,
-          horizontalAlign: 'center' as const,
-          offsetX: 40
-        }
-      },
-    });
+  
 
-    const [simpleDonut, setSimpleDonut] = React.useState({
+    // const [simpleDonut, setSimpleDonut] = React.useState({
           
-        series: [44, 55, 41],
-        options: {
+    //     series: [44, 55, 41],
+    //     options: {
 
-          chart: {
-            type: 'donut',
-          },
-          labels: [
-            'Avg Answered',
-            'Avg Unanswered',
-            'Avg Missed'
-          ],
-          responsive: [{
-            breakpoint: 480,
-            options: {
-              chart: {
-                width: 200
-              },
-              legend: {
-                position: 'bottom'
-              }
-            }
-          }]
-        },
+    //       chart: {
+    //         type: 'donut',
+    //       },
+    //       labels: [
+    //         'Avg Answered',
+    //         'Avg Unanswered',
+    //         'Avg Missed'
+    //       ],
+    //       responsive: [{
+    //         breakpoint: 480,
+    //         options: {
+    //           chart: {
+    //             width: 200
+    //           },
+    //           legend: {
+    //             position: 'bottom'
+    //           }
+    //         }
+    //       }]
+    //     },
       
       
-    });
+    // });
 
     const [refreshKey, setRefreshKey] = useState<number>(0);
     const [currentFilters, setCurrentFilters] = useState({
@@ -390,11 +240,16 @@ const CallDashboard = () => {
     const [showDepartmentChart, setShowDepartmentChart] = useState(true);
     const [showCountryChart, setShowCountryChart] = useState(true);
 
+    const [countryChartData, setCountryChartData] = useState<any[]>([]);
+    const [departmentChartData, setDepartmentChartData] = useState<any[]>([]);
+    const [extensionChartData, setExtensionChartData] = useState<any[]>([]);
+
     useEffect(() => {
         fetchGeneralStats();
     }, []);
     const fetchGeneralStats = async () => {
       const response = await ListCallLogs({ page:  page, perPage: perPage, search: "", filters: currentFilters,reportType: 'statsDashboard' }, 'call-logs/generalStats');
+      
       setGeneralStats({
           totalCalls: response.total_calls,
           totalInbound: response.inbound_calls,
@@ -406,20 +261,253 @@ const CallDashboard = () => {
           totalAvgCost: response.avg_cost,
       });
 
-      const chartExtension = response?.extension;
+      // Extract and map chart data
+      const chartExtension = response?.chart_data?.extension;
       if(chartExtension){
         setShowExtensionChart(true);
+        setExtensionChartData(chartExtension);
+        
+        // Map extension data to chart format
+        const extensionLabels = chartExtension.map((item: any) => item.label || 'Unknown');
+        const shortestData = chartExtension.map((item: any) => item.shortest ? parseInt(item.shortest) : 0);
+        const longestData = chartExtension.map((item: any) => item.longest ? parseInt(item.longest) : 0);
+        
+        setExtensionChart({
+          series: [{
+            name: 'Shortest',
+            data: shortestData
+          }, {
+            name: 'Longest', 
+            data: longestData
+          }],
+          options: {
+            ...ExtensionChart.options,
+            xaxis: {
+              ...ExtensionChart.options.xaxis,
+              categories: extensionLabels
+            }
+          }
+        });
       }
-      const chartDepartment = response?.department;
+      
+      const chartDepartment = response?.chart_data?.department;
       if(chartDepartment){
         setShowDepartmentChart(true);
+        setDepartmentChartData(chartDepartment);
+        
+        // Map department data to chart format
+        const departmentLabels = chartDepartment.map((item: any) => item.label || 'Unknown');
+        const shortestData = chartDepartment.map((item: any) => item.shortest ? parseInt(item.shortest) : 0);
+        const longestData = chartDepartment.map((item: any) => item.longest ? parseInt(item.longest) : 0);
+        const averageData = chartDepartment.map((item: any) => item.average ? parseInt(item.average) : 0);
+        
+        setDepartmentChart({
+          series: [{
+            name: 'Shortest',
+            data: shortestData
+          }, {
+            name: 'Longest',
+            data: longestData
+          }, {
+            name: 'Average',
+            data: averageData
+          }],
+          options: {
+            ...DepartmentChart.options,
+              xaxis: {
+                ...DepartmentChart.options.xaxis,
+                categories: departmentLabels as string[]
+              },
+            yaxis: {
+              ...DepartmentChart.options.yaxis,
+              
+            },
+            chart: {
+              ...DepartmentChart.options.chart
+            },
+            plotOptions: {
+              bar: {
+                horizontal: false,
+                columnWidth: '60%',
+                borderRadius: 4,
+                borderRadiusApplication: 'end'
+              }
+            },
+            dataLabels: {
+              enabled: false,
+            }
+          }
+        });
       }
-      const chartCountry = response?.country;
+      
+      const chartCountry = response?.chart_data?.country;
       if(chartCountry){
         setShowCountryChart(true);
+        setCountryChartData(chartCountry);
+        
+        // Map country data to chart format
+        const countryLabels = chartCountry.map((item: any) => item.label || 'Unknown');
+        const averageData = chartCountry.map((item: any) => item.average ? parseInt(item.average) : 0);
+        
+        setCountryChart({
+          series: [{
+            data: averageData
+          }],
+          options: {
+            ...CountryChart.options,
+            xaxis: {
+              ...CountryChart.options.xaxis,
+              categories: countryLabels
+            }
+          }
+        });
       }
 
   };
+
+  const [CountryChart, setCountryChart] = React.useState({
+          
+    series: [{
+      data: [] as number[]
+    }],
+    options: {
+      chart: {
+        type: 'bar' as const,
+        toolbar: {
+          show: false
+        },
+        
+      },
+      plotOptions: {
+        bar: {
+          borderRadius: 4,
+          borderRadiusApplication: 'end',
+          horizontal: true,
+          columnHeight: '2px',
+        }
+      },
+      legend: {
+        show: false
+      },
+      dataLabels: {
+        enabled: false
+      },
+      xaxis: {
+        categories: [] as string[],
+      },
+      yaxis: {
+        
+        title: {
+
+          text: '', // <-- Your custom label here
+          style: {
+            fontSize: '12px',
+            fontWeight: 'bold',
+            color: '#263238',
+            marginRight: '10px'
+          }
+        }
+      }
+    },
+}); 
+
+const [DepartmentChart, setDepartmentChart] = React.useState({
+  series: [] as any[],
+      options: {
+        chart: {
+          type: 'bar',
+          toolbar: {
+            show: false
+          }
+        },
+        plotOptions: {
+          bar: {
+            horizontal: false,
+            columnWidth: '55%',
+            borderRadius: 5,
+            borderRadiusApplication: 'end'
+          },
+        },
+        dataLabels: {
+          enabled: false
+        },
+        stroke: {
+          show: true,
+          width: 2,
+          colors: ['transparent']
+        },
+        xaxis: {
+          categories: [] as string[],
+          labels: {
+            show: true,
+            style: {
+              fontSize: '8px',
+             
+            }
+          }
+
+        },
+        yaxis: {
+          //show: false,
+          title: {
+            text: ''
+          }
+        },
+        fill: {
+          opacity: 1
+        },
+        
+      },
+});  
+
+const [ExtensionChart, setExtensionChart] = React.useState({
+  series: [] as any[],
+  options: {
+    chart: {
+      type: 'bar' as const,
+      toolbar: {
+        show: false
+      }
+    },
+    plotOptions: {
+      bar: {
+        horizontal: true,
+        dataLabels: {
+          show: true,
+          position: 'top',
+        },
+      }
+    },
+    dataLabels: {
+      enabled: false,
+      
+    },
+    stroke: {
+      show: true,
+      width: 1,
+      colors: ['#fff']
+    },
+    tooltip: {
+      shared: false,
+      intersect: false
+    },
+    xaxis: {
+      categories: [] as string[],
+    },
+    yaxis: {
+      title: {
+        text: '',
+    
+      },
+      
+    },
+    legend: {
+      position: 'bottom' as const,
+      horizontalAlign: 'center' as const,
+      offsetX: 40
+    }
+  },
+});
 
 
     const [showStatsByExtensionTable, setShowStatsByExtensionTable] = useState(true);
@@ -742,14 +830,14 @@ const CallDashboard = () => {
                             <h5 className="mb-0">Call by Country</h5>
                         </div>
                         <div className="card-body">
-                            {trendByCountryData.length === 0 ? (
+                            {countryChartData.length === 0 ? (
                                 <EmptyState
                                     title="No Call by Country Data"
                                     description="Chart data will appear here when available."
                                     className="table-empty-state"
                                 />
                             ) : (
-                                <ReactApexChart options={sampleCountryChart.options as ApexOptions} series={sampleChart.series} type="bar" height={200} />
+                                <ReactApexChart options={CountryChart.options as ApexOptions} series={CountryChart.series} type="bar" height={200} />
                             )}
                         </div>
                     </div>
@@ -763,11 +851,17 @@ const CallDashboard = () => {
                             <h5 className="mb-0">Call by Department</h5>
                         </div>
                         <div className="card-body">
-                            <EmptyState
-                                title="No Call by Department Data"
-                                description="Chart data will appear here when available."
-                                className="table-empty-state"
-                            />
+                            
+
+                            {departmentChartData.length === 0 ? (
+                                <EmptyState
+                                  title="No Call by Department Data"
+                                  description="Chart data will appear here when available."
+                                  className="table-empty-state"
+                              />
+                            ) : (
+                                <ReactApexChart options={DepartmentChart.options as ApexOptions} series={DepartmentChart.series} type="bar" height={200} />
+                            )}
                         </div>
                     </div>
                 </Col>
@@ -780,14 +874,14 @@ const CallDashboard = () => {
                             <h5 className="mb-0">Call by Extension</h5>
                         </div>
                         <div className="card-body">
-                            {extensionData.length === 0 ? (
+                            {extensionChartData.length === 0 ? (
                                 <EmptyState
                                     title="No Call by Extension Data"
                                     description="Chart data will appear here when available."
                                     className="table-empty-state"
                                 />
                             ) : (
-                                <ReactApexChart options={callDurationBarChart.options} series={callDurationBarChart.series} type="bar" height={200} />
+                                <ReactApexChart options={ExtensionChart.options} series={ExtensionChart.series} type="bar" height={200} />
                             )}
                         </div>
                     </div>

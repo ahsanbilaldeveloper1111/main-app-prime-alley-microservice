@@ -20,7 +20,29 @@ const SessionHandler: React.FC<SessionHandlerProps> = ({ children }) => {
 
 
     if (status === 'authenticated' && session) {
-      // User is authenticated, initialize token service
+      // User is authenticated, clear any existing TMS session data first
+      if (typeof window !== 'undefined') {
+        // Clear from localStorage
+        localStorage.removeItem('tmsSessionId');
+        console.log('Cleared tmsSessionId from localStorage on new session');
+        
+        // Clear from cookies by setting them to expire
+        const cookieOptions = [
+          'tmsSessionId=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT',
+          'tmsSessionId=; Path=/; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT',
+          'tmsSessionId=; Path=/; HttpOnly; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT',
+          'tmsSessionId=; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT',
+          'tmsSessionId=; Path=/; SameSite=Lax; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT'
+        ];
+        
+        // Set cookies to expire
+        cookieOptions.forEach(cookie => {
+          document.cookie = cookie;
+        });
+        console.log('Cleared tmsSessionId cookies on new session');
+      }
+      
+      // Initialize token service
       //console.log('Session authenticated, initializing token service');
       tokenService.initializeFromSession(session);
     } else if (status === 'unauthenticated') {

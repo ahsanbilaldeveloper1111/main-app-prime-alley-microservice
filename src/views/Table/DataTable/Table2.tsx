@@ -8,10 +8,10 @@ const DataTable = dynamic(() => import("react-data-table-component"), {
 });
 
 const paginationComponentOptions = {
-  rowsPerPageText: "Filas por página",
-  rangeSeparatorText: "de",
+  rowsPerPageText: "Per page",
+  rangeSeparatorText: "to",
   selectAllRowsItem: true,
-  selectAllRowsItemText: "Todo"
+  selectAllRowsItemText: ""
 };
 
 const Table2 = () => {
