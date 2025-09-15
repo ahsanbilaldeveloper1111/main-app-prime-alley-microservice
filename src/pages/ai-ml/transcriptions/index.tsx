@@ -39,8 +39,9 @@ const CallTranscriptions = () => {
     const [transcription, setTranscription] = useState<Transcription | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [uuid, setUuid] = useState('2025003611021');
+    const [uuid, setUuid] = useState('');
     const [summary, setSummary] = useState<Summary | null>(null);
+    const [target, setTarget] = useState('');
     const [activeTab, setActiveTab] = useState('en');
     // Animation variants for tab transitions
     const tabVariants = {
@@ -82,6 +83,15 @@ const CallTranscriptions = () => {
     const handleGetTranscriptions = async () => {
         setLoading(true);
         setError(null);
+
+        if(uuid === ''){
+          toast.error('Please enter a valid UUID');
+          setLoading(false);
+          return;
+      }
+
+     
+
         try {
             const response = await GetTranscriptions(uuid);
             setTranscription(response);
@@ -110,7 +120,7 @@ const CallTranscriptions = () => {
               <Card.Body>
                 <Form onSubmit={handleFormSubmit}>
                   <Row>
-                    <Col md={3}>
+                    <Col md={6}>
                       <Form.Group className="mb-3">
                         <Form.Label>UUID</Form.Label>
                         <Form.Control
@@ -122,8 +132,7 @@ const CallTranscriptions = () => {
                         />
                       </Form.Group>
                     </Col>
-                   
-                   
+
                   </Row>
                   <Row>
                     <Col md={12}>
@@ -172,28 +181,12 @@ const CallTranscriptions = () => {
             </Col>
             </Row>
 
-            {/* <Row className="mb-12">
-                <Col md={4}>
-                    <InputGroup>
-                        <Form.Control
-                            type="text"
-                            placeholder="Enter UUID"
-                            value={uuid}
-                            onChange={(e) => setUuid(e.target.value)}
-                        />
-                        <Button variant="primary" onClick={handleGetTranscriptions} disabled={loading}>
-                            {loading ? 'Loading...' : 'Get Transcriptions'}
-                        </Button>
-                    </InputGroup>
-                </Col>
-            </Row> */}
-
             {/* Always show the form */}
       {renderAnalysisForm()}
             
 
             <Row>
-                <Col md={4}>
+                <Col md={6}>
                     <StatCard
                         title="Characters"
                         value={summary?.characters || 0}
@@ -204,7 +197,7 @@ const CallTranscriptions = () => {
                         delay={0}
                         />
                 </Col>
-                <Col md={4}>
+                <Col md={6}>
                     <StatCard
                         title="Words"
                         value={summary?.words || 0}
@@ -215,7 +208,7 @@ const CallTranscriptions = () => {
                         delay={0}
                     />
                 </Col>
-                <Col md={4}>
+                {/* <Col md={4}>
                     <StatCard
                         title="Tokens"
                         value={summary?.tokens || 0}
@@ -225,12 +218,13 @@ const CallTranscriptions = () => {
                         bgImage={imgStatus3.src}
                         delay={0}
                     />
-                </Col>
+                </Col> */}
             </Row>
             <Row>
                 <Col md={12}>
                     <div className="card">
                         <div className="card-body">
+                          
                             <h5 className="card-title">Transcriptions List</h5>
                             <Tabs
                                  defaultActiveKey="calls_chart"

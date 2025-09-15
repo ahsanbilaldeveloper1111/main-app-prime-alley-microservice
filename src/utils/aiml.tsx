@@ -41,6 +41,7 @@ export const GetTranslations = async (uuid: string, target: string) => {
       return false;
     }
   } catch (error) {
+    console.log(error, "error get translations");
     throw error;
   }
 };

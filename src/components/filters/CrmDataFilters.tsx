@@ -72,7 +72,7 @@ export default function CrmDataFilters({ onFiltersChange, onExport }: CrmDataFil
 
   // Show loading state while data is being fetched
   if (loading) {
-    return <div>Loading filters...</div>;
+    return <div></div>;
   }
 
   // Show error state if data failed to load

@@ -11,14 +11,8 @@ import { GetTranslations } from '@utils/aiml';
 interface Translation {
     id: number;
     uuid: string;
-    execution_time: string;
-    no_of_tokens: number;
-    num_chars: number;
-    num_words: number;
-    transcription: string;
-    transcription_ar: string;
-    transcription_ur: string;
-    transcription_hi: string;
+    target: string;
+    translation: string;
 }
 
 const CallTranslations = () => {
@@ -26,16 +20,36 @@ const CallTranslations = () => {
     const [translations, setTranslations] = useState<Translation | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [uuid, setUuid] = useState('2025003611021');
+    const [uuid, setUuid] = useState('');
     const [target, setTarget] = useState('');
+    const [isError, setIsError] = useState(false);
 
     const handleGetTranslations = async () => {
         setLoading(true);
         setError(null);
+
+        if(uuid === ''){
+            toast.error('Please enter a valid UUID');
+            setLoading(false);
+            return;
+        }
+
+        if(target === ''){
+            toast.error('Please select a target language');
+            setLoading(false);
+            return;
+        }
         
         try {
             const response = await GetTranslations(uuid,target);
             setTranslations(response);
+            if(response.error){
+                toast.error(response.error);
+                setIsError(true);
+                setError(response.error);
+                setLoading(false);
+                return;
+            }
             console.log(response);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'An error occurred');
@@ -88,58 +102,51 @@ const CallTranslations = () => {
                     </InputGroup>
                 </Col>
             </Row>
+
+            {translations && (
             <Row>
                 <Col md={12}>
-                    <div className="card">
+                    {isError && (
+                        <div className="alert alert-danger">
+                            {error}
+                        </div>
+                    )}
+
+                    {!isError && translations && (
+                        <div className="card">
                         <div className="card-body">
-                            <h5 className="card-title">Translations</h5>
-                            {loading && <p>Loading translations...</p>}
-                            {error && <p className="text-danger">Error: {error}</p>}
-                            {translations && (
+                            
+                        
                                 <div>
+                                    <h5 className="card-title">Translations</h5>
                                     <div className="mb-3">
                                         <strong>UUID:</strong> {translations?.uuid}
                                     </div>
+
+                                    {translations?.target && (
                                     <div className="mb-3">
-                                        <strong>Execution Time:</strong> {translations.execution_time}
+                                        <strong>Language:</strong> {translations?.target}
                                     </div>
-                                    <div className="mb-3">
-                                        <strong>Characters:</strong> {translations.num_chars}
-                                    </div>
-                                    <div className="mb-3">
-                                        <strong>Words:</strong> {translations.num_words}
-                                    </div>
-                                    <div className="mb-3">
-                                        <strong>Tokens:</strong> {translations.no_of_tokens}
-                                    </div>
-                                    <div className="mb-3">
-                                        <strong>Transcription (English):</strong>
-                                        <p className="mt-2">{translations.transcription}</p>
-                                    </div>
-                                    {translations.transcription_ar && (
-                                        <div className="mb-3">
-                                            <strong>Transcription (Arabic):</strong>
-                                            <p className="mt-2" dir="rtl">{translations.transcription_ar}</p>
-                                        </div>
                                     )}
-                                    {translations.transcription_hi && (
-                                        <div className="mb-3">
-                                            <strong>Transcription (Hindi):</strong>
-                                            <p className="mt-2">{translations.transcription_hi}</p>
-                                        </div>
+
+                                    {translations?.translation && (
+                                    <div className="mb-3">
+                                        <strong>Translation:</strong> {translations?.translation}
+                                    </div>
                                     )}
-                                    {translations.transcription_ur && (
-                                        <div className="mb-3">
-                                            <strong>Transcription (Urdu):</strong>
-                                            <p className="mt-2" dir="rtl">{translations.transcription_ur}</p>
-                                        </div>
-                                    )}
+
+                            
                                 </div>
-                            )}
+                            
                         </div>
                     </div>
+                    )}
+                   
+                    
+                        
                 </Col>
             </Row>
+            )}
         </React.Fragment>
     );
 };

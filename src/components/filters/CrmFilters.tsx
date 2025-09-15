@@ -76,7 +76,7 @@ export default function CrmFilters({ onFiltersChange, onExport }: CrmFiltersProp
 
   // Show loading state while stages data is being fetched
   if (loading) {
-    return <div>Loading filters...</div>;
+    return <div></div>;
   }
 
   // Show error state if stages data failed to load

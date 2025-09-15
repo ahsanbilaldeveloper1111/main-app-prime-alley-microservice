@@ -266,6 +266,50 @@ export const formatDuration = (seconds: number): string => {
 };
 
 /**
+ * Simple datetime conversion to local timezone with custom format
+ * @param datetime - The datetime string (any format)
+ * @param format - The output format (e.g., 'YYYY-MM-DD', 'MM/DD/YYYY', 'hh:mm:ss A', 'YYYY-MM-DD hh:mm:ss A')
+ * @param inputFormat - Optional input format if you know the specific format of the input datetime
+ * @returns Formatted datetime string in user's local timezone
+ * 
+ * @example
+ * // Convert any datetime to local timezone
+ * formatDateTimeToLocal('2024-01-15 14:30:00', 'YYYY-MM-DD hh:mm:ss A')
+ * formatDateTimeToLocal('2024-01-15T14:30:00Z', 'MM/DD/YYYY hh:mm A')
+ * formatDateTimeToLocal('2024-01-15 14:30:00', 'YYYY-MM-DD', 'YYYY-MM-DD HH:mm:ss')
+ */
+export const formatDateTimeToLocal = (
+  datetime: string | Date,
+  format: string = 'YYYY-MM-DD hh:mm:ss A',
+  inputFormat?: string
+): string => {
+  try {
+    let momentObj: moment.Moment;
+    
+    if (datetime instanceof Date) {
+      momentObj = moment.utc(datetime);
+    } else if (inputFormat) {
+      // Parse with specific input format
+      momentObj = moment.utc(datetime, inputFormat);
+    } else {
+      // Auto-detect format
+      momentObj = moment.utc(datetime);
+    }
+    
+    if (!momentObj.isValid()) {
+      console.warn('Invalid datetime format:', datetime);
+      return 'Invalid Date';
+    }
+    
+    // Convert to user's local timezone and format
+    return momentObj.local().format(format);
+  } catch (error) {
+    console.error('Error formatting datetime:', error);
+    return 'Invalid Date';
+  }
+};
+
+/**
  * Debug function to test timezone conversion with your specific data
  * @param date - The UTC date string (e.g., "2023-10-03")
  * @param time - The UTC time string (e.g., "00:27:03.0000000")

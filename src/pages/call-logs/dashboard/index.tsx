@@ -763,7 +763,7 @@ const [ExtensionChart, setExtensionChart] = React.useState({
                                             colSpan={6}
                                         />
                                     ) : (
-                                      <div>
+                                      <div className="table-responsive">
                                         <table className="table table-bordered table-striped table-sm ">
                                       <thead>
                                         <tr>
@@ -817,7 +817,7 @@ const [ExtensionChart, setExtensionChart] = React.useState({
                                             colSpan={6}
                                         />
                                     ) : ( 
-                                      <div>
+                                      <div className="table-responsive">
                                        <table className="table table-bordered table-striped table-sm ">
                                 <thead>
                                   <tr>

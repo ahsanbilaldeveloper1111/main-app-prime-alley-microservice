@@ -25,6 +25,7 @@ import EmptyState from '@components/EmptyState';
 // Utils
 import { ListCallLogs, ExportCallLogs, DownloadCallRecording, DownloadStreamingExport } from '@utils/calls';
 import { GetHierarchyData } from '@utils/users';
+import { formatDateTimeToLocal } from '@utils/Helper';
 
 // Assets
 import imgStatus1 from '@assets/images/widget/img-status-1.svg';
@@ -34,6 +35,7 @@ import imgStatus4 from '@assets/images/widget/img-status-4.svg';
 import router from 'next/router';
 import axiosInstance from '@utils/axios';
 import { toast } from 'react-toastify';
+import { convertUTCToUserTimezone, convertUTCTimeToUserTimezone, convertUTCSeparateDateTimeToUserTime, convertUTCSeparateDateTimeToUserDate, formatDuration, convertUTCDateToUserTimezone } from '@utils/Helper';
 
 const ReactApexChart = dynamic(() => import('react-apexcharts'), { ssr: false });
 
@@ -176,7 +178,7 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
       cell: (props: any) => {
         return (
           <div>
-            {moment(props.DateTime).format('YYYY-MM-DD')}
+            {formatDateTimeToLocal(props.DateTime, 'YYYY-MM-DD')}
           </div>
         )
       }
@@ -189,7 +191,7 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
       cell: (props: any) => {
         return (
           <div>
-            {moment(props.DateTime, 'YYYY-MM-DD HH:mm:ss.SSSSSSS').format('hh:mm:ss A')}
+            {formatDateTimeToLocal(props.DateTime, 'hh:mm:ss A', 'YYYY-MM-DD HH:mm:ss.SSSSSSS')}
           </div>
         )
       }

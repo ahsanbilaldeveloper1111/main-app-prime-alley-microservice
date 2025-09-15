@@ -44,7 +44,7 @@ export default function GroupsFilters({ onFiltersChange, onExport, isVisibleCall
 
   // Show loading state while hierarchy data is being fetched
   if (hierarchyLoading) {
-    return <div>Loading filters...</div>;
+    return <div></div>;
   }
 
   // Show error state if hierarchy data failed to load

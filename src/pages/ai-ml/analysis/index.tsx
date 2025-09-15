@@ -140,8 +140,10 @@ const CallAnalysis = () => {
             
             if (parts.length >= 4) {
               const timestamp = parts[0];
-              const user = parts[1];
-              const extension = parts[2];
+              
+              const extension = parts[1];
+              const user = parts[2];
+
               const phoneNumber = parts[3];
               
               const year = timestamp.substring(0, 4);
