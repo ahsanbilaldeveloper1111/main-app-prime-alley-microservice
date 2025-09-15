@@ -138,7 +138,7 @@ export const DownloadCallRecording = async (id: string, agentExtension: string, 
   }
 };
 
-export const DownloadStreamingExport = async (params: PaginationParams = {}, endpoint: string) => {
+export const DownloadStreamingExport = async (params: PaginationParams = {}, endpoint: string, reportType: string) => {
   const {  search = "", filters = {}, isExport = true, exportType = 'excel' } = params;
   
   try {
@@ -147,7 +147,7 @@ export const DownloadStreamingExport = async (params: PaginationParams = {}, end
       search: search,
       isExport: isExport.toString(),
       exportType: exportType,
-      reportType: 'recordings'
+      reportType: reportType
     });
     
     // Flatten filters and add each key-value pair as separate query parameters

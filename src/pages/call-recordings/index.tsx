@@ -559,8 +559,9 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
       if (exportType === 'excel') {
        
         await DownloadStreamingExport(
-          { filters: currentFilters, isExport: true, exportType },
-          'call-logs/recordings'
+          { filters: currentFilters, isExport: true, exportType},
+          'call-logs/recordings',
+          'recordings'
         );
       }
     } catch (error) {

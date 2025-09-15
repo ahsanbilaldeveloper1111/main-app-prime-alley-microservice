@@ -3,7 +3,7 @@ import React, { ReactElement, useEffect, useState, useCallback } from 'react';
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
 import GenericListPage from '@components/GenericListPage';
-import { ListCallLogs, ExportCallLogs } from '@utils/calls';
+import { ListCallLogs, ExportCallLogs, DownloadStreamingExport } from '@utils/calls';
 import { GetHierarchyData } from '@utils/users';
 import { Column } from '@components/CustomDataTable';
 import { Button, Modal, Row } from 'react-bootstrap';
@@ -91,13 +91,21 @@ const CallLogs = () => {
     };
 
     const handleExport = async (exportType: string, filters: Record<string, any>) => {
-      //const response = await ListCallLogs({ filters: currentFilters, isExport: true, exportType }, 'call-logs/list');
-        try {
-            const response = await ExportCallLogs({ page: 1, perPage: 15, search: "", filters, isExport: true, exportType });
-        } catch (error) {
+     
+
+      try {
+            if (exportType === 'excel') {
+             
+              await DownloadStreamingExport(
+                { filters: currentFilters, isExport: true, exportType },
+                'call-logs/list',
+                'downlaodCallLogs'
+              );
+            }
+          } catch (error) {
             console.error('Export error:', error);
-            toast.error('Export failed. Please try again.');
-        }
+            toast.error('Export failed');
+          }
     };
 
     useEffect(() => {

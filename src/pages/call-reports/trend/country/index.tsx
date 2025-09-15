@@ -347,7 +347,8 @@ const CallTrendCountry = () => {
         if (exportType === 'excel') {
          
           await DownloadStreamingExport(
-            { filters: currentFilters, isExport: true, exportType ,reportType:'trendStatsCountry' }, 'call-logs/statsTrendByCountry'
+            { filters: currentFilters, isExport: true, exportType ,reportType:'trendStatsCountry' }, 'call-logs/statsTrendByCountry',
+            'trendStatsCountry'
           );
         }
       } catch (error: unknown) {

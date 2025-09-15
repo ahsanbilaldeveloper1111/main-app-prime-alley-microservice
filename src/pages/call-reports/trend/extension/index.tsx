@@ -347,7 +347,8 @@ const CallTrendExtension = () => {
         if (exportType === 'excel') {
          
           await DownloadStreamingExport(
-            { filters: currentFilters, isExport: true, exportType ,reportType:'trendStatsExtension' }, 'call-logs/statsTrendByExtension'
+            { filters: currentFilters, isExport: true, exportType ,reportType:'trendStatsExtension' }, 'call-logs/statsTrendByExtension',
+            'trendStatsExtension'
           );
         }
       } catch (error: unknown) {

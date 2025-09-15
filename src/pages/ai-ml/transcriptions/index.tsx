@@ -21,8 +21,6 @@ interface Transcription {
     uuid: string;
     execution_time: string;
     no_of_tokens: number;   
-    num_chars: number;
-    num_words: number;
     transcription: string;
     transcription_ar: string;
     transcription_ur: string;
@@ -32,6 +30,17 @@ interface Summary {
     characters: number;
     words: number;
     tokens: number;
+    num_chars: number;
+    num_words: number;
+
+    num_chars_ar: number;
+    num_words_ar: number;
+
+    num_chars_hi: number;
+    num_words_hi: number;
+
+    num_chars_ur: number;
+    num_words_ur: number;
 }
 
 const CallTranscriptions = () => {
@@ -99,7 +108,15 @@ const CallTranscriptions = () => {
             setSummary({
                 characters: response?.num_chars || 0,
                 words: response?.num_words || 0,
-                tokens: response?.no_of_tokens || 0
+                tokens: response?.no_of_tokens || 0,
+                num_chars: response?.num_chars || 0,
+                num_words: response?.num_words || 0,
+                num_chars_ar: response?.num_chars_ar || 0,
+                num_words_ar: response?.num_words_ar || 0,
+                num_chars_hi: response?.num_chars_hi || 0,
+                num_words_hi: response?.num_words_hi || 0,
+                num_chars_ur: response?.num_chars_ur || 0,
+                num_words_ur: response?.num_words_ur || 0
             });
 
         } catch (err) {
@@ -108,6 +125,33 @@ const CallTranscriptions = () => {
         } finally {
             setLoading(false);
         }
+    }
+
+
+    const getCharacters = (tab: string) => {
+        if(tab === 'en') {
+            return summary?.num_chars || 0;
+        } else if(tab === 'ar') {
+            return summary?.num_chars_ar || 0;
+        } else if(tab === 'hi') {
+            return summary?.num_chars_hi || 0;
+        } else if(tab === 'ur') {
+            return summary?.num_chars_ur || 0;
+        }
+        return 0; // Default fallback
+    }
+
+    const getWords = (tab: string) => {
+        if(tab === 'en') {
+            return summary?.num_words || 0;
+        } else if(tab === 'ar') {
+            return summary?.num_words_ar || 0;
+        } else if(tab === 'hi') {
+            return summary?.num_words_hi || 0;
+        } else if(tab === 'ur') {
+            return summary?.num_words_ur || 0;
+        }
+        return 0; // Default fallback
     }
 
     const renderAnalysisForm = () => (
@@ -187,38 +231,33 @@ const CallTranscriptions = () => {
 
             <Row>
                 <Col md={6}>
-                    <StatCard
+
+               
+                  <StatCard
                         title="Characters"
-                        value={summary?.characters || 0}
+                        value={getCharacters(activeTab)}
                         valueType="number"
                         icon="phone"
                         size="xl"
                         bgImage={imgStatus1.src}
                         delay={0}
                         />
+               
                 </Col>
                 <Col md={6}>
+                
+               
                     <StatCard
                         title="Words"
-                        value={summary?.words || 0}
+                        value={getWords(activeTab)}
                         valueType="number"
                         icon="phone"
                         size="xl"
                         bgImage={imgStatus2.src}
                         delay={0}
                     />
+                
                 </Col>
-                {/* <Col md={4}>
-                    <StatCard
-                        title="Tokens"
-                        value={summary?.tokens || 0}
-                        valueType="number"
-                        icon="phone"
-                        size="xl"
-                        bgImage={imgStatus3.src}
-                        delay={0}
-                    />
-                </Col> */}
             </Row>
             <Row>
                 <Col md={12}>

@@ -347,7 +347,8 @@ const CallIncomingExtension = () => {
         if (exportType === 'excel') {
          
           await DownloadStreamingExport(
-            { filters: currentFilters, isExport: true, exportType ,reportType:'incomingStatsExtension' }, 'call-logs/statsIncomingByExtension'
+            { filters: currentFilters, isExport: true, exportType ,reportType:'incomingStatsExtension' }, 'call-logs/statsIncomingByExtension',
+            'incomingStatsExtension'
           );
         }
       } catch (error: unknown) {

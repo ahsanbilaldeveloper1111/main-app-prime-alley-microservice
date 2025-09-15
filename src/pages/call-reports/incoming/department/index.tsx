@@ -347,7 +347,8 @@ const CallIncomingDepartment = () => {
         if (exportType === 'excel') {
          
           await DownloadStreamingExport(
-            { filters: currentFilters, isExport: true, exportType ,reportType:'incomingStatsDepartment' }, 'call-logs/statsIncomingByDepartment'
+            { filters: currentFilters, isExport: true, exportType ,reportType:'incomingStatsDepartment' }, 'call-logs/statsIncomingByDepartment',
+            'incomingStatsDepartment'
           );
         }
       } catch (error: unknown) {

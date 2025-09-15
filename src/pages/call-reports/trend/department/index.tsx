@@ -347,7 +347,8 @@ const CallTrendDepartment = () => {
         if (exportType === 'excel') {
          
           await DownloadStreamingExport(
-            { filters: currentFilters, isExport: true, exportType ,reportType:'trendStatsDepartment' }, 'call-logs/statsTrendByDepartment'
+            { filters: currentFilters, isExport: true, exportType ,reportType:'trendStatsDepartment' }, 'call-logs/statsTrendByDepartment',
+            'trendStatsDepartment'
           );
         }
       } catch (error: unknown) {
