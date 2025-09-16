@@ -51,7 +51,16 @@ import {
   uploadCrmDataCsv,
   deleteCrmData,
   assignCrmDataToExtension,
+  assignCrmDataAdvanced,
+  getCrmDataCounts,
+  bulkDeleteCrmData,
+  getCrmDataTags,
+  createCrmDataTag,
+  assignTagsToCrmData,
+  removeTagsFromCrmData,
   markCrmDataAsViewed,
+  getCampaigns,
+  CampaignData,
   CrmDataItem,
   CrmDataPagination,
   CrmDataResponse,
@@ -73,15 +82,9 @@ const CrmDataManagement = () => {
   );
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<CrmDataItem | null>(null);
-  const [showAssignModal, setShowAssignModal] = useState(false);
   const [showDataAssignmentModal, setShowDataAssignmentModal] = useState(false);
   const [showAfterCallModal, setShowAfterCallModal] = useState(false);
   const [extensions, setExtensions] = useState<any[]>([]);
-  const [selectedAssignExtensions, setSelectedAssignExtensions] = useState<
-    readonly any[]
-  >([]);
-  const [assignMode, setAssignMode] = useState<"auto" | "custom">("auto");
-  const [customData, setCustomData] = useState<Record<string, number>>({});
   const [selectedCampaigns, setSelectedCampaigns] = useState<readonly any[]>([]);
   const [fieldTags, setFieldTags] = useState<readonly any[]>([]);
   const [assignToCampaignUsers, setAssignToCampaignUsers] = useState(false);
@@ -95,6 +98,23 @@ const CrmDataManagement = () => {
   const [assignmentDistribution, setAssignmentDistribution] = useState<"equal" | "custom">("equal");
   const [totalRecordsToAssign, setTotalRecordsToAssign] = useState(0);
   const [customDistribution, setCustomDistribution] = useState<Record<string, number>>({});
+  const [assignmentCounts, setAssignmentCounts] = useState({
+    total: 0,
+    assigned: 0,
+    unassigned: 0,
+  });
+  const [availableTags, setAvailableTags] = useState<Array<{
+    value: string;
+    label: string;
+    id: number;
+  }>>([]);
+  const [availableCampaigns, setAvailableCampaigns] = useState<Array<{
+    value: string;
+    label: string;
+    id: number;
+  }>>([]);
+  const [selectedItems, setSelectedItems] = useState<number[]>([]);
+  const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
 
   // After Call modal states
   const [afterCallData, setAfterCallData] = useState({
@@ -118,18 +138,14 @@ const CrmDataManagement = () => {
 
   // History modal state
   const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [dashboardStats, setDashboardStats] = useState({
+    callsInNextHour: 0,
+    callsInNext24Hours: 0,
+    overdueCalls: 0,
+    assignedRecords: 0,
+    unassignedRecords: 0,
+  });
 
-  // Static campaign data
-  const campaigns = [
-    { value: "campaign-1", label: "Summer Sale 2024" },
-    { value: "campaign-2", label: "Holiday Promotion" },
-    { value: "campaign-3", label: "New Product Launch" },
-    { value: "campaign-4", label: "Customer Retention" },
-    { value: "campaign-5", label: "Lead Generation" },
-    { value: "campaign-6", label: "Referral Program" },
-    { value: "campaign-7", label: "Email Marketing" },
-    { value: "campaign-8", label: "Social Media Campaign" },
-  ];
 
   // Static tags data
   const staticTags = [
@@ -376,39 +392,68 @@ const CrmDataManagement = () => {
     }
   ];
 
-  // Calculate dashboard statistics
-  const calculateDashboardStats = useCallback(() => {
-    const scheduledCalls = getScheduledCalls();
-    const now = moment();
-    const nextHour = moment().add(1, 'hour');
-    const next24Hours = moment().add(24, 'hours');
+  // Calculate dashboard statistics using real data
+  const calculateDashboardStats = useCallback(async () => {
+    try {
+      // Get real counts from API
+      const counts = await getCrmDataCounts();
+      
+      const scheduledCalls = getScheduledCalls();
+      const now = moment();
+      const nextHour = moment().add(1, 'hour');
+      const next24Hours = moment().add(24, 'hours');
 
-    const callsInNextHour = scheduledCalls.filter(call => 
-      moment(call.scheduledAt).isAfter(now) && 
-      moment(call.scheduledAt).isBefore(nextHour)
-    ).length;
+      const callsInNextHour = scheduledCalls.filter(call => 
+        moment(call.scheduledAt).isAfter(now) && 
+        moment(call.scheduledAt).isBefore(nextHour)
+      ).length;
 
-    const callsInNext24Hours = scheduledCalls.filter(call => 
-      moment(call.scheduledAt).isAfter(now) && 
-      moment(call.scheduledAt).isBefore(next24Hours)
-    ).length;
+      const callsInNext24Hours = scheduledCalls.filter(call => 
+        moment(call.scheduledAt).isAfter(now) && 
+        moment(call.scheduledAt).isBefore(next24Hours)
+      ).length;
 
-    const overdueCalls = scheduledCalls.filter(call => 
-      moment(call.scheduledAt).isBefore(now) && call.status === "overdue"
-    ).length;
+      const overdueCalls = scheduledCalls.filter(call => 
+        moment(call.scheduledAt).isBefore(now) && call.status === "overdue"
+      ).length;
 
-    // Static data for assigned/unassigned
-    const totalRecords = 5000;
-    const assignedRecords = 2000;
-    const unassignedRecords = totalRecords - assignedRecords;
+      return {
+        callsInNextHour,
+        callsInNext24Hours,
+        overdueCalls,
+        assignedRecords: counts.summary.assigned_records,
+        unassignedRecords: counts.summary.unassigned_records,
+      };
+    } catch (error) {
+      console.error("Failed to get dashboard stats:", error);
+      // Fallback to static data
+      const scheduledCalls = getScheduledCalls();
+      const now = moment();
+      const nextHour = moment().add(1, 'hour');
+      const next24Hours = moment().add(24, 'hours');
 
-    return {
-      callsInNextHour,
-      callsInNext24Hours,
-      overdueCalls,
-      assignedRecords,
-      unassignedRecords,
-    };
+      const callsInNextHour = scheduledCalls.filter(call => 
+        moment(call.scheduledAt).isAfter(now) && 
+        moment(call.scheduledAt).isBefore(nextHour)
+      ).length;
+
+      const callsInNext24Hours = scheduledCalls.filter(call => 
+        moment(call.scheduledAt).isAfter(now) && 
+        moment(call.scheduledAt).isBefore(next24Hours)
+      ).length;
+
+      const overdueCalls = scheduledCalls.filter(call => 
+        moment(call.scheduledAt).isBefore(now) && call.status === "overdue"
+      ).length;
+
+      return {
+        callsInNextHour,
+        callsInNext24Hours,
+        overdueCalls,
+        assignedRecords: 2000,
+        unassignedRecords: 3000,
+      };
+    }
   }, []);
 
   const memoizedFilters = useMemo(() => currentFilters, [currentFilters]);
@@ -427,6 +472,63 @@ const CrmDataManagement = () => {
     };
     fetchExtensions();
   }, []);
+
+  // Load dashboard stats
+  useEffect(() => {
+    const loadDashboardStats = async () => {
+      try {
+        const stats = await calculateDashboardStats();
+        setDashboardStats(stats);
+      } catch (error) {
+        console.error("Failed to load dashboard stats:", error);
+      }
+    };
+    loadDashboardStats();
+  }, [calculateDashboardStats, refreshKey]);
+
+  // Load available tags
+  useEffect(() => {
+    const loadTags = async () => {
+      try {
+        const tags = await getCrmDataTags();
+        const tagOptions = tags.map(tag => ({
+          value: tag.name,
+          label: tag.name,
+          id: tag.id
+        }));
+        setAvailableTags(tagOptions);
+      } catch (error) {
+        console.error("Failed to load tags:", error);
+        // Fallback to static tags
+        setAvailableTags(staticTags.map(tag => ({
+          value: tag.value,
+          label: tag.label,
+          id: parseInt(tag.value.replace('tag-', '')) || 0
+        })));
+      }
+    };
+    loadTags();
+  }, [refreshKey]);
+
+  // Load available campaigns
+  useEffect(() => {
+    const loadCampaigns = async () => {
+      try {
+        const campaignsResponse = await getCampaigns({ per_page: 1000 });
+        const campaignOptions = campaignsResponse.data.map(campaign => ({
+          value: campaign.id.toString(),
+          label: campaign.name,
+          id: campaign.id
+        }));
+        setAvailableCampaigns(campaignOptions);
+      } catch (error) {
+        console.error("Failed to load campaigns:", error);
+        // Fallback to empty array
+        setAvailableCampaigns([]);
+      }
+    };
+    loadCampaigns();
+  }, [refreshKey]);
 
   // Handle filter changes
   const handleFiltersChange = useCallback((filters: Record<string, any>) => {
@@ -650,37 +752,82 @@ const CrmDataManagement = () => {
     }
   }, [itemToDelete]);
 
-  // Calculate filtered record counts (static data for now)
-  const calculateRecordCounts = useCallback(() => {
-    // Static data simulation
-    const totalRecords = 5000;
-    const assignedRecords = 2000;
-    const unassignedRecords = 3000;
-    
-    return {
-      total: totalRecords,
-      assigned: assignedRecords,
-      unassigned: unassignedRecords,
+  // Calculate filtered record counts using API
+  const calculateRecordCounts = useCallback(async () => {
+    try {
+      const campaignIds = Array.from(assignmentFilters.selectedCampaigns).map(
+        (campaign) => parseInt(campaign.value)
+      );
+      const tags = Array.from(assignmentFilters.selectedTags).map(
+        (tag) => tag.value
+      );
+      
+      const counts = await getCrmDataCounts(campaignIds, tags);
+      
+      return {
+        total: counts.summary.total_records,
+        assigned: counts.summary.assigned_records,
+        unassigned: counts.summary.unassigned_records,
+      };
+    } catch (error) {
+      console.error("Failed to get record counts:", error);
+      // Fallback to static data
+      return {
+        total: 5000,
+        assigned: 2000,
+        unassigned: 3000,
+      };
+    }
+  }, [assignmentFilters]);
+
+  // Auto-refetch counts when filter dropdowns change
+  useEffect(() => {
+    const refetchCounts = async () => {
+      if (assignmentFilters.selectedCampaigns.length > 0 || assignmentFilters.selectedTags.length > 0) {
+        try {
+          const counts = await calculateRecordCounts();
+          setAssignmentCounts(counts);
+          setTotalRecordsToAssign(counts.unassigned);
+        } catch (error) {
+          console.error("Failed to refetch counts:", error);
+        }
+      }
     };
-  }, []);
+
+    refetchCounts();
+  }, [assignmentFilters.selectedCampaigns, assignmentFilters.selectedTags, calculateRecordCounts]);
 
   // Handle data assignment
-  const handleDataAssignment = useCallback(() => {
-    const counts = calculateRecordCounts();
-    setTotalRecordsToAssign(counts.unassigned);
-    setShowDataAssignmentModal(true);
+  const handleDataAssignment = useCallback(async () => {
+    try {
+      const counts = await calculateRecordCounts();
+      setAssignmentCounts(counts);
+      setTotalRecordsToAssign(counts.unassigned);
+      setShowDataAssignmentModal(true);
+    } catch (error) {
+      console.error("Failed to get record counts:", error);
+      // Fallback to static data
+      setAssignmentCounts({ total: 5000, assigned: 2000, unassigned: 3000 });
+      setTotalRecordsToAssign(3000);
+      setShowDataAssignmentModal(true);
+    }
   }, [calculateRecordCounts]);
 
-  // Handle assign to extension
-  const handleAssignToExtension = useCallback(async () => {
-    if (selectedAssignExtensions.length === 0) {
-      toast.error("Please select at least one user extension");
+  // Handle data assignment directly (no second dialog)
+  const handleDataAssignmentSubmit = useCallback(async () => {
+    if (assignmentCampaign.length === 0) {
+      toast.error("Please select at least one campaign to assign records to");
       return;
     }
 
-    // Validate custom mode data
-    if (assignMode === "custom") {
-      const totalCustomAllocation = Object.values(customData).reduce(
+    if (totalRecordsToAssign === 0) {
+      toast.error("Please specify how many records to assign");
+      return;
+    }
+
+    // Validate custom distribution if in custom mode
+    if (assignmentDistribution === "custom") {
+      const totalCustomAllocation = Object.values(customDistribution).reduce(
         (sum, count) => sum + count,
         0
       );
@@ -693,29 +840,63 @@ const CrmDataManagement = () => {
     }
 
     try {
-      const userExtensions = Array.from(selectedAssignExtensions).map(
-        (ext) => ext.value
+      const campaignFilterIds = Array.from(assignmentFilters.selectedCampaigns).map(
+        (campaign) => parseInt(campaign.value)
+      );
+      const tagIds = Array.from(assignmentFilters.selectedTags).map(
+        (tag) => parseInt(tag.value)
       );
 
-      // This would be the actual API call for assignment
-      console.log("Assigning records:", {
-        userExtensions,
-        totalRecords: totalRecordsToAssign,
-        assignMode,
-        customData: assignMode === "custom" ? customData : undefined,
-        filters: assignmentFilters,
-      });
+      if (assignmentDistribution === "equal") {
+        // Equal distribution - single API call
+        const campaignIds = Array.from(assignmentCampaign).map(
+          (campaign) => parseInt(campaign.value)
+        );
 
-      setShowAssignModal(false);
-      setSelectedAssignExtensions([]);
-      setCustomData({});
-      setAssignMode("auto");
+        const result = await assignCrmDataAdvanced(
+          campaignFilterIds,
+          tagIds,
+          totalRecordsToAssign,
+          campaignIds
+        );
+
+        console.log("Assignment result:", result);
+      } else {
+        // Custom distribution - multiple API calls for each campaign
+        const assignmentPromises = Array.from(assignmentCampaign).map(async (campaign: any) => {
+          const campaignId = parseInt(campaign.value);
+          const countForThisCampaign = customDistribution[campaign.value] || 0;
+          
+          if (countForThisCampaign > 0) {
+            return await assignCrmDataAdvanced(
+              campaignFilterIds,
+              tagIds,
+              countForThisCampaign,
+              [campaignId]
+            );
+          }
+          return null;
+        });
+
+        const results = await Promise.all(assignmentPromises.filter(Boolean));
+        console.log("Custom assignment results:", results);
+      }
+
+      // Close modal and reset state
       setShowDataAssignmentModal(false);
+      setAssignmentFilters({
+        selectedTags: [],
+        selectedCampaigns: [],
+      });
+      setAssignmentCampaign([]);
+      setAssignmentDistribution("equal");
+      setTotalRecordsToAssign(0);
+      setCustomDistribution({});
       setRefreshKey((prev) => prev + 1);
     } catch (error: any) {
       console.error("Assign error:", error);
     }
-  }, [selectedAssignExtensions, assignMode, customData, totalRecordsToAssign, assignmentFilters]);
+  }, [assignmentCampaign, totalRecordsToAssign, assignmentFilters, assignmentDistribution, customDistribution]);
 
   // Handle mark as viewed
   const handleMarkAsViewed = useCallback(async (item: CrmDataItem) => {
@@ -776,13 +957,6 @@ const CrmDataManagement = () => {
     console.log("Playing recording:", recordingUrl);
   }, []);
 
-  // Handle assign modal close
-  const handleAssignModalClose = useCallback(() => {
-    setShowAssignModal(false);
-    setSelectedAssignExtensions([]);
-    setCustomData({});
-    setAssignMode("auto");
-  }, []);
 
   // Handle data assignment modal close
   const handleDataAssignmentModalClose = useCallback(() => {
@@ -893,26 +1067,29 @@ const CrmDataManagement = () => {
     handleScheduleModalClose();
   }, [scheduleData, selectedRecordForSchedule, handleScheduleModalClose]);
 
-  // Handle custom data change
-  const handleCustomDataChange = useCallback(
-    (extensionId: string, count: number) => {
-      setCustomData((prev) => ({
-        ...prev,
-        [extensionId]: count,
-      }));
-    },
-    []
-  );
 
-  // Reset custom data when extensions change
-  const handleAssignExtensionsChange = useCallback(
-    (selected: readonly any[]) => {
-      setSelectedAssignExtensions(selected);
-      // Reset custom data when extensions change
-      setCustomData({});
-    },
-    []
-  );
+  // Handle bulk delete
+  const handleBulkDelete = useCallback(async () => {
+    if (selectedItems.length === 0) {
+      toast.error("Please select items to delete");
+      return;
+    }
+
+    try {
+      await bulkDeleteCrmData(selectedItems);
+      setSelectedItems([]);
+      setShowBulkDeleteModal(false);
+      setRefreshKey((prev) => prev + 1);
+    } catch (error: any) {
+      console.error("Bulk delete error:", error);
+    }
+  }, [selectedItems]);
+
+  // Handle item selection
+  const handleItemSelection = useCallback((selected: CrmDataItem[]) => {
+    setSelectedItems(selected.map(item => item.id));
+  }, []);
+
 
   // Define columns for GenericListPage
   const columns: Column[] = useMemo(
@@ -973,8 +1150,8 @@ const CrmDataManagement = () => {
         selector: (row: any) => row.campaign_id,
         sortable: true,
         cell: (props: any) => {
-          const campaign = campaigns.find(
-            (c) => c.value === props.campaign_id
+          const campaign = availableCampaigns.find(
+            (c) => c.value === props.campaign_id?.toString()
           );
           return (
             <div>
@@ -994,12 +1171,12 @@ const CrmDataManagement = () => {
         sortable: false,
         cell: (props: any) => {
           // Show hardcoded tags for now
-          const hardcodedTags = ["Hot Lead", "Follow Up"];
+          const tags = props.tags;  
           return (
             <div className="d-flex flex-wrap gap-1">
-              {hardcodedTags.map((tag, index) => (
+              {tags?.map((tag: any, index: any) => (
                 <Badge key={index} bg="secondary" className="small">
-                  {tag}
+                  {tag.name}
                 </Badge>
               ))}
             </div>
@@ -1238,7 +1415,7 @@ const CrmDataManagement = () => {
         ),
       },
     ],
-    [handleViewData, handleMarkAsViewed, handleDeleteData, handleCallAction, handleCallClick, handlePlayRecording, extensions, campaigns, callEndReasons, scheduledCalls, handleScheduleCall, handleUnscheduleCall]
+    [handleViewData, handleMarkAsViewed, handleDeleteData, handleCallAction, handleCallClick, handlePlayRecording, extensions, availableCampaigns, callEndReasons, scheduledCalls, handleScheduleCall, handleUnscheduleCall]
   );
 
   return (
@@ -1284,6 +1461,15 @@ const CrmDataManagement = () => {
                 </p>
               </div>
               <div className="d-flex gap-2">
+                {selectedItems.length > 0 && (
+                  <Button
+                    variant="danger"
+                    onClick={() => setShowBulkDeleteModal(true)}
+                  >
+                    <FiTrash2 className="me-2" />
+                    Delete Selected ({selectedItems.length})
+                  </Button>
+                )}
                 <Button
                   variant="success"
                   onClick={handleDataAssignment}
@@ -1324,7 +1510,7 @@ const CrmDataManagement = () => {
               <Card.Body className="text-center">
                 <div className="d-flex align-items-center justify-content-center mb-2">
                   <FiClock className="text-warning me-2" size={24} />
-                  <h4 className="mb-0 text-warning">{calculateDashboardStats().callsInNextHour}</h4>
+                  <h4 className="mb-0 text-warning">{dashboardStats.callsInNextHour}</h4>
                 </div>
                 <p className="mb-0 small text-muted">Calls in Next Hour</p>
               </Card.Body>
@@ -1335,7 +1521,7 @@ const CrmDataManagement = () => {
               <Card.Body className="text-center">
                 <div className="d-flex align-items-center justify-content-center mb-2">
                   <FiClock className="text-info me-2" size={24} />
-                  <h4 className="mb-0 text-info">{calculateDashboardStats().callsInNext24Hours}</h4>
+                  <h4 className="mb-0 text-info">{dashboardStats.callsInNext24Hours}</h4>
                 </div>
                 <p className="mb-0 small text-muted">Calls in Next 24h</p>
               </Card.Body>
@@ -1346,7 +1532,7 @@ const CrmDataManagement = () => {
               <Card.Body className="text-center">
                 <div className="d-flex align-items-center justify-content-center mb-2">
                   <FiX className="text-danger me-2" size={24} />
-                  <h4 className="mb-0 text-danger">{calculateDashboardStats().overdueCalls}</h4>
+                  <h4 className="mb-0 text-danger">{dashboardStats.overdueCalls}</h4>
                 </div>
                 <p className="mb-0 small text-muted">Overdue Calls</p>
               </Card.Body>
@@ -1357,7 +1543,7 @@ const CrmDataManagement = () => {
               <Card.Body className="text-center">
                 <div className="d-flex align-items-center justify-content-center mb-2">
                   <FiUser className="text-success me-2" size={24} />
-                  <h4 className="mb-0 text-success">{calculateDashboardStats().assignedRecords.toLocaleString()}</h4>
+                  <h4 className="mb-0 text-success">{dashboardStats.assignedRecords.toLocaleString()}</h4>
                 </div>
                 <p className="mb-0 small text-muted">Assigned Records</p>
               </Card.Body>
@@ -1368,7 +1554,7 @@ const CrmDataManagement = () => {
               <Card.Body className="text-center">
                 <div className="d-flex align-items-center justify-content-center mb-2">
                   <FiAlertCircle className="text-warning me-2" size={24} />
-                  <h4 className="mb-0 text-warning">{calculateDashboardStats().unassignedRecords.toLocaleString()}</h4>
+                  <h4 className="mb-0 text-warning">{dashboardStats.unassignedRecords.toLocaleString()}</h4>
                 </div>
                 <p className="mb-0 small text-muted">Unassigned Records</p>
               </Card.Body>
@@ -1396,7 +1582,8 @@ const CrmDataManagement = () => {
                   defaultPageSize={15}
                   filters={memoizedFilters}
                   refreshKey={refreshKey}
-                  rowSelection={false}
+                  rowSelection={true}
+                  onSelectionChange={handleItemSelection}
                 />
               </Card.Body>
             </Card>
@@ -1490,7 +1677,7 @@ const CrmDataManagement = () => {
               isMulti
               value={selectedCampaigns}
               onChange={(selected) => setSelectedCampaigns(selected || [])}
-              options={campaigns}
+              options={availableCampaigns}
               placeholder="Select campaigns to assign data to..."
               styles={{
                 control: (base) => ({
@@ -1540,7 +1727,7 @@ const CrmDataManagement = () => {
               isMulti
               value={fieldTags}
               onChange={(selected) => setFieldTags(selected || [])}
-              options={staticTags}
+              options={availableTags}
               placeholder="Select or create tags for this data..."
               styles={{
                 control: (base) => ({
@@ -1629,7 +1816,7 @@ const CrmDataManagement = () => {
                 </Col>
                 <Col className="mb-3" md={6}>
                   <strong>Campaign:</strong>{" "}
-                  {campaigns.find(c => c.value === "campaign-1")?.label || "No Campaign"}
+                  {availableCampaigns.find(c => c.value === selectedDataItem.campaign_id?.toString())?.label || "No Campaign"}
                 </Col>
                 <Col className="mb-3" md={6}>
                   <strong>Last Call Status:</strong>{" "}
@@ -1789,188 +1976,6 @@ const CrmDataManagement = () => {
         </Modal.Footer>
       </Modal>
 
-      {/* Assign to Extension Modal */}
-      <Modal show={showAssignModal} onHide={handleAssignModalClose}>
-        <Modal.Header closeButton>
-          <Modal.Title className="d-flex align-items-center">
-            <FiUsers className="me-2" />
-            Assign to User Extensions
-          </Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <p>
-            Assign <strong>{totalRecordsToAssign}</strong> records to user
-            extensions.
-          </p>
-
-          <Form.Group className="mb-3">
-            <Form.Label>Assign to Users</Form.Label>
-            <CreatableSelect
-              isMulti
-              value={selectedAssignExtensions}
-              onChange={handleAssignExtensionsChange}
-              options={extensions.map((extension: any) => ({
-                value: extension.id.toString(),
-                label: extension.display_name || extension.name || extension.id,
-              }))}
-              placeholder="Select user extensions..."
-              styles={{
-                control: (base) => ({
-                  ...base,
-                  borderColor: "#ced4da",
-                  boxShadow: "none",
-                  fontSize: "14px",
-                }),
-              }}
-            />
-            <Form.Text className="text-muted">
-              Select the user extensions you want to assign these items to.
-            </Form.Text>
-          </Form.Group>
-
-          <Form.Group className="mb-3">
-            <Form.Label>Assignment Mode</Form.Label>
-            <div>
-              <Form.Check
-                type="radio"
-                id="auto-mode"
-                name="assignMode"
-                label="Auto (Equal distribution)"
-                value="auto"
-                checked={assignMode === "auto"}
-                onChange={(e) =>
-                  setAssignMode(e.target.value as "auto" | "custom")
-                }
-                className="mb-2"
-              />
-              <Form.Check
-                type="radio"
-                id="custom-mode"
-                name="assignMode"
-                label="Custom (Specify count per extension)"
-                value="custom"
-                checked={assignMode === "custom"}
-                onChange={(e) =>
-                  setAssignMode(e.target.value as "auto" | "custom")
-                }
-              />
-            </div>
-            <Form.Text className="text-muted">
-              {assignMode === "auto"
-                ? "Items will be distributed equally among selected extensions."
-                : "Specify how many items each extension should receive."}
-            </Form.Text>
-          </Form.Group>
-
-          {assignMode === "custom" && selectedAssignExtensions.length > 0 && (
-            <Form.Group className="mb-3">
-              <div className="d-flex justify-content-between align-items-center mb-2">
-                <Form.Label className="mb-0">Custom Allocation</Form.Label>
-                <Button
-                  variant="outline-secondary"
-                  size="sm"
-                  onClick={() => {
-                    const equalDistribution = Math.floor(
-                      totalRecordsToAssign / selectedAssignExtensions.length
-                    );
-                    const remainder =
-                      totalRecordsToAssign % selectedAssignExtensions.length;
-                    const newCustomData: Record<string, number> = {};
-
-                    Array.from(selectedAssignExtensions).forEach(
-                      (extension: any, index: number) => {
-                        newCustomData[extension.value] =
-                          equalDistribution + (index < remainder ? 1 : 0);
-                      }
-                    );
-
-                    setCustomData(newCustomData);
-                  }}
-                >
-                  Auto-fill Equal
-                </Button>
-              </div>
-              <div className="border rounded p-3 bg-light">
-                  <p className="small text-muted mb-3">
-                    Total items: <strong>{totalRecordsToAssign}</strong> |
-                    Allocated:{" "}
-                    <strong>
-                      {Object.values(customData).reduce(
-                        (sum, count) => sum + count,
-                        0
-                      )}
-                    </strong>{" "}
-                    | Remaining:{" "}
-                    <strong>
-                      {totalRecordsToAssign -
-                        Object.values(customData).reduce(
-                          (sum, count) => sum + count,
-                          0
-                        )}
-                    </strong>
-                  </p>
-                {Array.from(selectedAssignExtensions).map((extension: any) => (
-                  <div key={extension.value} className="mb-2">
-                    <Row>
-                      <Col md={6}>
-                        <Form.Label className="small mb-0">
-                          {extension.label}
-                        </Form.Label>
-                      </Col>
-                      <Col md={6}>
-                        <Form.Control
-                          type="number"
-                          min="0"
-                          max={totalRecordsToAssign}
-                          value={customData[extension.value] || 0}
-                          onChange={(e) =>
-                            handleCustomDataChange(
-                              extension.value,
-                              parseInt(e.target.value) || 0
-                            )
-                          }
-                          size="sm"
-                        />
-                      </Col>
-                    </Row>
-                  </div>
-                ))}
-              </div>
-            </Form.Group>
-          )}
-
-          <div className="alert alert-info">
-            <strong>Assignment Summary:</strong>
-            <ul className="mb-0 mt-2">
-              <li>Total records to assign: <strong>{totalRecordsToAssign}</strong></li>
-              <li>Distribution method: <strong>{assignMode === "auto" ? "Equal" : "Custom"}</strong></li>
-              <li>Selected campaigns: <strong>{assignmentFilters.selectedCampaigns.length}</strong></li>
-              <li>Selected tags: <strong>{assignmentFilters.selectedTags.length}</strong></li>
-            </ul>
-          </div> 
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={handleAssignModalClose}>
-            Cancel
-          </Button>
-          <Button
-            variant="success"
-            disabled={
-              selectedAssignExtensions.length === 0 ||
-              (assignMode === "custom" &&
-                totalRecordsToAssign -
-                  Object.values(customData).reduce(
-                    (sum, count) => sum + count,
-                    0
-                  ) !==
-                  0)
-            }
-            onClick={handleAssignToExtension}
-          >
-            Assign Items
-          </Button>
-        </Modal.Footer>
-      </Modal>
 
       {/* Data Assignment Modal */}
       <Modal show={showDataAssignmentModal} onHide={handleDataAssignmentModalClose} size="lg">
@@ -1996,7 +2001,7 @@ const CrmDataManagement = () => {
                         selectedTags: selected || []
                       }))
                     }
-                    options={staticTags}
+                    options={availableTags}
                     placeholder="Select tags to filter..."
                     styles={{
                       control: (base) => ({
@@ -2021,7 +2026,7 @@ const CrmDataManagement = () => {
                         selectedCampaigns: selected || []
                       }))
                     }
-                    options={campaigns}
+                    options={availableCampaigns}
                     placeholder="Select campaigns to filter..."
                     styles={{
                       control: (base) => ({
@@ -2043,7 +2048,7 @@ const CrmDataManagement = () => {
               <div className="col-md-4">
                 <div className="card bg-light">
                   <div className="card-body text-center">
-                    <h4 className="text-primary">{calculateRecordCounts().total}</h4>
+                    <h4 className="text-primary">{assignmentCounts.total}</h4>
                     <p className="mb-0">Total Records</p>
                   </div>
                 </div>
@@ -2051,7 +2056,7 @@ const CrmDataManagement = () => {
               <div className="col-md-4">
                 <div className="card bg-success text-white">
                   <div className="card-body text-center">
-                    <h4>{calculateRecordCounts().assigned}</h4>
+                    <h4>{assignmentCounts.assigned}</h4>
                     <p className="mb-0">Already Assigned</p>
                   </div>
                 </div>
@@ -2059,7 +2064,7 @@ const CrmDataManagement = () => {
               <div className="col-md-4">
                 <div className="card bg-warning text-white">
                   <div className="card-body text-center">
-                    <h4>{calculateRecordCounts().unassigned}</h4>
+                    <h4>{assignmentCounts.unassigned}</h4>
                     <p className="mb-0">Unassigned</p>
                   </div>
                 </div>
@@ -2070,8 +2075,8 @@ const CrmDataManagement = () => {
           <div className="mb-4">
             <h6>Assignment Details</h6>
             <p className="text-muted">
-              Out of the <strong>{calculateRecordCounts().total}</strong> records with these tags and campaigns, 
-              <strong> {calculateRecordCounts().unassigned}</strong> are unassigned.
+              Out of the <strong>{assignmentCounts.total}</strong> records with these tags and campaigns, 
+              <strong> {assignmentCounts.unassigned}</strong> are unassigned.
             </p>
             
             <Form.Group className="mb-3">
@@ -2080,7 +2085,7 @@ const CrmDataManagement = () => {
                 isMulti
                 value={assignmentCampaign}
                 onChange={(selected) => setAssignmentCampaign(selected || [])}
-                options={campaigns}
+                options={availableCampaigns}
                 placeholder="Select campaigns to assign records to..."
                 styles={{
                   control: (base) => ({
@@ -2101,7 +2106,7 @@ const CrmDataManagement = () => {
               <Form.Control
                 type="number"
                 min="0"
-                max={calculateRecordCounts().unassigned}
+                max={assignmentCounts.unassigned}
                 value={totalRecordsToAssign}
                 onChange={(e) => setTotalRecordsToAssign(parseInt(e.target.value) || 0)}
                 placeholder="Enter number of records to assign"
@@ -2208,6 +2213,10 @@ const CrmDataManagement = () => {
                 </div>
               </Form.Group>
             )}
+
+            <Alert variant="info" className="mt-3">
+              <strong>Assignment Info:</strong> Records will be automatically assigned to users within the selected campaigns based on their campaign user extensions. The system will distribute records equally among users in each campaign.
+            </Alert>
           </div>
         </Modal.Body>
         <Modal.Footer>
@@ -2227,9 +2236,9 @@ const CrmDataManagement = () => {
                   ) !==
                   0)
             }
-            onClick={() => setShowAssignModal(true)}
+            onClick={handleDataAssignmentSubmit}
           >
-            Proceed to User Assignment
+            Assign Records
           </Button>
         </Modal.Footer>
       </Modal>
@@ -2475,6 +2484,30 @@ const CrmDataManagement = () => {
         <Modal.Footer>
           <Button variant="secondary" onClick={() => setShowHistoryModal(false)}>
             Close
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
+      {/* Bulk Delete Modal */}
+      <Modal show={showBulkDeleteModal} onHide={() => setShowBulkDeleteModal(false)}>
+        <Modal.Header closeButton>
+          <Modal.Title className="d-flex align-items-center">
+            <FiTrash2 className="me-2" />
+            Bulk Delete CRM Data
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <p>Are you sure you want to delete {selectedItems.length} selected CRM data records?</p>
+          <div className="alert alert-warning">
+            <strong>Warning:</strong> This action cannot be undone. All selected records will be permanently deleted.
+          </div>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowBulkDeleteModal(false)}>
+            Cancel
+          </Button>
+          <Button variant="danger" onClick={handleBulkDelete}>
+            Delete {selectedItems.length} Records
           </Button>
         </Modal.Footer>
       </Modal>
