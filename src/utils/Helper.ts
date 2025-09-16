@@ -1,5 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
-import moment from 'moment';
+
+import moment from 'moment-timezone';
 
 export const generateCustomId = (prefix = '', length = 12) => {
   
@@ -154,7 +155,7 @@ export const convertUTCTimeToUserTimezone = (
  * @param outputFormat - Format for output display
  * @returns Formatted datetime string in user's timezone
  */
-export const convertUTCDateTimeToUserTimezone = (
+export const convertDubaiDateTimeToUserTimezone = (
   date: string,
   time: string,
   outputFormat: string = 'YYYY-MM-DD hh:mm:ss A'
@@ -167,8 +168,7 @@ export const convertUTCDateTimeToUserTimezone = (
     const utcDateTime = `${date} ${cleanTime}`;
     
     // Parse as UTC and convert to user's timezone
-    const momentObj = moment.utc(utcDateTime, 'YYYY-MM-DD HH:mm:ss');
-    
+    const momentObj = moment(utcDateTime, 'YYYY-MM-DD HH:mm:ss').tz('Asia/Dubai');
     if (!momentObj.isValid()) {
       console.warn('Invalid datetime format:', { date, time, utcDateTime });
       return 'Invalid Date';
@@ -195,7 +195,7 @@ export const convertUTCSeparateDateTimeToUserTime = (
   time: string,
   timeFormat: string = 'hh:mm:ss A'
 ): string => {
-  return convertUTCDateTimeToUserTimezone(date, time, timeFormat);
+  return convertDubaiDateTimeToUserTimezone(date, time, timeFormat);
 };
 
 /**
@@ -210,7 +210,7 @@ export const convertUTCSeparateDateTimeToUserDate = (
   time: string,
   dateFormat: string = 'YYYY-MM-DD'
 ): string => {
-  return convertUTCDateTimeToUserTimezone(date, time, dateFormat);
+  return convertDubaiDateTimeToUserTimezone(date, time, dateFormat);
 };
 
 /**
