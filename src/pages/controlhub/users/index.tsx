@@ -24,6 +24,7 @@ import imgStatus4 from '@assets/images/widget/img-status-4.svg'
 import EmptyState from '@components/EmptyState';
 import dynamic from 'next/dynamic';
 import '@assets/scss/tabs.scss'
+import { formatDateTimeToLocal, GlobalDateTimeFormat } from '@utils/Helper';
 
 const ReactApexChart = dynamic(() => import('react-apexcharts'), { ssr: false });
 
@@ -80,7 +81,11 @@ const Users = () => {
           }
         },
         { key: 'Status', name: 'status', selector: (row: any) => row.status, sortable: true },
-        { key: 'last_synced_at', name: 'Last Synced', selector: (row: any) => row.last_synced_at, sortable: true },
+        { key: 'last_synced_at', name: 'Last Synced', selector: (row: any) => row.last_synced_at, sortable: true,
+          cell: (props: any) => {
+            return formatDateTimeToLocal(props.last_synced_at, GlobalDateTimeFormat);
+          }
+         },
     ], [session?.user?.permissions]);
 
     // Action column kept last

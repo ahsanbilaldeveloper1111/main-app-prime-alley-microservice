@@ -67,6 +67,7 @@ interface ChartData {
 
 import dynamic from 'next/dynamic';
 import { ApexOptions } from 'apexcharts';
+import { ModuleSlug } from '@utils/Helper';
 const ReactApexChart = dynamic(() => import('react-apexcharts'), { ssr: false });
 
 const CallStatsExtension = () => {
@@ -571,14 +572,7 @@ const CallStatsExtension = () => {
         }
     };
 
-    useEffect(() => {
-        const fetchHierarchyData = async () => {
-            const hierarchyData = await GetHierarchyData();
-            //console.log(hierarchyData);
-        };
-        fetchHierarchyData();
-    }, []);
-
+   
     
     return (
         <React.Fragment>
@@ -596,7 +590,7 @@ const CallStatsExtension = () => {
                     </Col>
                     <Col md={8} className="d-flex justify-content-end">
                       <CallLogsFilters
-                       onFiltersChange={handleFiltersChange} onExport={handleExport} isVisibleCallDirection={false} />
+                       onFiltersChange={handleFiltersChange} onExport={handleExport} isVisibleCallDirection={false} moduleSlug={ModuleSlug.CALL_REPORTS} />
                     </Col>
                   </Row>
                

@@ -4,6 +4,7 @@ import '@assets/scss/offcanvas.scss';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import moment from 'moment';
+import { formatDateTimeToLocal, GlobalDateTimeFormat } from '@utils/Helper';
 
 interface SimpleCanvasProps {
   show: boolean;
@@ -120,7 +121,7 @@ const SimpleCanvas: React.FC<SimpleCanvasProps> = ({
 
                         <div className="sbox">
                           <p className="text-muted mb-0 small">Last Login</p>
-                          <h5><b>{rowData.last_login_at ? moment(rowData.last_login_at).format('YYYY-MM-DD HH:mm:ss A') : 'N/A'}</b></h5>
+                          <h5><b>{rowData.last_login_at ? formatDateTimeToLocal(rowData.last_login_at, GlobalDateTimeFormat) : 'N/A'}</b></h5>
                         </div>
 
 

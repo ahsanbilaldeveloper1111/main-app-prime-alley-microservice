@@ -338,3 +338,18 @@ export const debugTimezoneConversion = (date: string, time: string) => {
     isValid: utcMoment.isValid()
   };
 };
+
+
+
+export const GlobalDateFormat = 'DD-MM-YYYY';
+export const GlobalTimeFormat = 'hh:mm:ss A';
+export const GlobalDateTimeFormat = 'DD-MM-YYYY hh:mm:ss A';
+
+export const ModuleSlug = {
+  CALL_REPORTS: 'call-reports',
+  CALL_LOGS: 'call-logs',
+  CALL_RECORDINGS: 'call-recordings',
+  TICKET:'tickets',
+  CRM:'crm',
+  REPORTS:'reports'
+}

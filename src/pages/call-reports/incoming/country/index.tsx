@@ -67,6 +67,7 @@ interface ChartData {
 
 import dynamic from 'next/dynamic';
 import { ApexOptions } from 'apexcharts';
+import { ModuleSlug } from '@utils/Helper';
 const ReactApexChart = dynamic(() => import('react-apexcharts'), { ssr: false });
 
 const CallIncomingCountry = () => {
@@ -171,35 +172,21 @@ const CallIncomingCountry = () => {
             return;
         }
         
-        console.log('Fetching call logs with filters:', currentFilters);
         setLoading(true);
         
         try {
-            console.log('About to call ListCallLogs with params:', { page, perPage, search, filters: currentFilters, reportType: 'incomingStatsCountry' });
             const response = await ListCallLogs({ page, perPage, search, filters: currentFilters, reportType: 'incomingStatsCountry' }, 'call-logs/statsIncomingByCountry');
-            console.log('API response:', response);
-            console.log('API response type:', typeof response);
-            console.log('API response keys:', response ? Object.keys(response) : 'null/undefined');
             
             if (response?.summary) {
                 setSummary(response.summary);
                 setDataLoaded(true);
-                console.log('Summary data set:', response.summary);
-                console.log('DataLoaded set to true');
+                
             } else if (response?.data) {
-                // Fallback: check if data exists but no summary
-                console.log('Response has data but no summary:', response.data);
                 setDataLoaded(true);
-                console.log('DataLoaded set to true (fallback 1)');
             } else if (response && typeof response === 'object') {
-                // Check if response is an object but doesn't have expected properties
-                console.log('Response is object but missing expected properties:', response);
                 setDataLoaded(true);
-                console.log('DataLoaded set to true (fallback 2)');
             } else {
-                console.warn('No summary or data in response:', response);
-                setDataLoaded(true); // Mark as loaded even if no data
-                console.log('DataLoaded set to true (fallback 3)');
+                setDataLoaded(true);
             }
             
             setLoading(false);
@@ -215,7 +202,6 @@ const CallIncomingCountry = () => {
             }
             setLoading(false);
             setDataLoaded(true); // Mark as loaded even on error
-            console.log('DataLoaded set to true (error case)');
             toast.error('Failed to fetch call data');
             return null;
         }
@@ -225,13 +211,11 @@ const CallIncomingCountry = () => {
 
     useEffect(() => {
         if(summary && dataLoaded) {
-        console.log('Summary data:', summary);
           const answeredCalls = Number(summary.answered_calls) || 0;
           const unansweredCalls = Number(summary.unanswered_calls) || 0;
           
           // Check if both values are 0, if so don't set chart data (will show empty state)
           if (answeredCalls === 0 && unansweredCalls === 0) {
-            console.log('Both answered and unanswered calls are 0, not setting chart data');
             setSimpleDonut(null);
           } else {
             // Set chart data only when there's actual data
@@ -245,10 +229,8 @@ const CallIncomingCountry = () => {
 
     // Trigger initial data fetch when filters become ready
     useEffect(() => {
-        console.log('Initial data fetch useEffect triggered:', { filtersReady, status, session });
-        if (filtersReady && status === 'authenticated' && session) {
-            console.log('Filters ready and session authenticated, triggering initial fetch');
-            console.log('DataLoaded before fetch:', dataLoaded);
+            if (filtersReady && status === 'authenticated' && session) {
+            
             fetchCallLogs(1, 15, "");
         } else if (status === 'loading') {
             console.log('Session still loading, waiting...');
@@ -263,7 +245,6 @@ const CallIncomingCountry = () => {
     useEffect(() => {
         const timer = setTimeout(() => {
             if (!filtersReady) {
-                console.log('Fallback: marking filters as ready');
                 setFiltersReady(true);
             }
         }, 1000);
@@ -559,7 +540,7 @@ const CallIncomingCountry = () => {
                     </Col>
                     <Col md={8} className="d-flex justify-content-end">
                       <CallLogsFilters
-                       onFiltersChange={handleFiltersChange} onExport={handleExport} isVisibleCallDirection={false} />
+                       onFiltersChange={handleFiltersChange} onExport={handleExport} isVisibleCallDirection={false} moduleSlug={ModuleSlug.CALL_REPORTS} />
                     </Col>
                   </Row>
                

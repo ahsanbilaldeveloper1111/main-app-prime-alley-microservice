@@ -6,7 +6,7 @@ import Swal from 'sweetalert2'
 import { toast } from 'react-toastify'
 import { useSession } from 'next-auth/react'
 
-import { getUserById, assignRoleToUser,assignGroupToUser, updateUserStatus,getUserPermissions,UpdateExtendedPermission,UpdateBlockedPermission,getParentUsers,linkUsers,unlinkUsers,GetCustomFields, AddCustomFields,UpdateCustomFields,DeleteCustomFields } from '@utils/users'
+import { getUserById, assignRoleToUser,assignGroupToUser, updateUserStatus,getUserPermissions,UpdateExtendedPermission,UpdateBlockedPermission,getParentUsers,linkUsers,unlinkUsers,GetCustomFields, AddCustomFields,UpdateCustomFields,DeleteCustomFields, GetModules } from '@utils/users'
 import { getAllRoles } from '@utils/roles'
 import { getAllGroups } from '@utils/groups'
 
@@ -17,6 +17,8 @@ import Select from 'react-select';
 import '@assets/scss/tabs.scss'
 
 import imgStatus1 from '@assets/images/user/avatar-2.jpg'
+import { formatDateTimeToLocal, GlobalDateTimeFormat } from '@utils/Helper';
+
 
 
 interface User {
@@ -67,6 +69,20 @@ interface SelectOption {
     label: string;
 }
 
+// Add type for react-select option
+interface SelectOption {
+    value: number;
+    label: string;
+}
+
+interface Module {
+    id: number;
+    name: string;
+    slug: string;
+}
+
+
+
 const UserView = () => {
 
     const [isClearable, setIsClearable] = useState(true);
@@ -78,7 +94,7 @@ const UserView = () => {
 
     const [currentUser, setCurrentUser] = useState<User | null>(null);
     const [isLoading, setIsLoading] = useState(false);
-    const [linkedUsers, setLinkedUsers] = useState<User[]>([]);
+    const [linkedUsers, setLinkedUsers] = useState<any[]>([]);
 
     useEffect(() => {
         if (id) {
@@ -98,6 +114,7 @@ const UserView = () => {
         setUpdatedRole(getUser?.userData?.role_id);
         setUpdatedStatus(getUser?.userData?.status);
         setLinkedUsers(getUser?.linkedUsers);
+        console.log("Linked Users", getUser?.linkedUsers);
        // console.log("View User", getUser);
 
     };
@@ -305,6 +322,8 @@ const UserView = () => {
     }
 
     const [selectedParentUser, setSelectedParentUser] = useState<string>("");
+    const [selectedModule, setSelectedModule] = useState<string>("");
+    
     const handleLinkedUserChange = (selectedOption: SelectOption | null) => {
         if (selectedOption) {
             setSelectedParentUser(selectedOption.value.toString());
@@ -314,8 +333,44 @@ const UserView = () => {
         }
     };
 
+    const handleModuleChange = (selectedOption: any) => {
+        if (selectedOption) {
+            setSelectedModule(selectedOption.value);
+        } else {
+            setSelectedModule("");
+        }
+    };
+
+    const [modules, setModules] = useState<Module[]>([]);
+    const fetchModules = async () => {
+        const response = await GetModules();
+        console.log("Modules", response);
+        if(response){
+            setModules(response);
+        }
+    }
+    useEffect(() => {
+        fetchModules();
+    }, []);
+
+    // Filter modules based on user permissions
+    const filteredModules = modules.filter(module => {
+        return session?.user?.permissions?.includes(module.slug+'-services');
+    });
+
     const handleSubmitAddLinkedUser = async () => {
-        const response = await linkUsers(id as string, selectedParentUser);
+
+        if(selectedParentUser === ""){
+            toast.error('Please select a user to link');
+            return;
+        }
+
+        if(selectedModule === ""){
+            toast.error('Please select at least one module');
+            return;
+        }
+
+        const response = await linkUsers(id as string, selectedParentUser, selectedModule);
         if(response){
             setShowAddLinkedUserModal(false);
             fetchUser();
@@ -335,8 +390,8 @@ const UserView = () => {
         toast.success('Linked user edited successfully');
     }
 
-    const handleDeleteLinkedUser = async (delinkedUser: number) => {
-        const response = await unlinkUsers(id as string, delinkedUser+"");
+    const handleDeleteLinkedUser = async (delinkedUser: number, moduleId: number) => {
+        const response = await unlinkUsers(id as string, delinkedUser+"", moduleId+"");
         if(response){
             fetchUser();
         }
@@ -536,7 +591,7 @@ const UserView = () => {
                                             <Col md={6}>
 
                                             <p className="mb-0  small text-primary"><b>Last Synced</b></p>
-                                            <p className="mb-2 text-capitalize">{currentUser?.last_synced_at ? moment(currentUser?.last_synced_at).format('YYYY-MM-DD HH:mm:ss') : 'N/A'}</p>
+                                            <p className="mb-2 text-capitalize">{currentUser?.last_synced_at ? formatDateTimeToLocal(currentUser?.last_synced_at, GlobalDateTimeFormat) : 'N/A'}</p>
 
                                             
                                             {session?.user?.permissions?.includes('show-ou-users')  && (
@@ -769,39 +824,45 @@ const UserView = () => {
                                 <Modal.Title>Add Linked User</Modal.Title>
                             </Modal.Header>
                             <Modal.Body>
+                              
                               <div className="form-group">
                                 <label htmlFor="linkedUser">Select User</label>
-
                                 <Select
-        className="basic-single"
-        classNamePrefix="select"
-        isLoading={isLoading}
-        isClearable={isClearable}
-        isSearchable={isSearchable}
-        onChange={handleLinkedUserChange}
-        name="color"
-        options={parentUsers
-            .filter((user) => !linkedUsers.some(linkedUser => linkedUser.id === user.id))
-            .map((user) => ({
-          value: user.id,
-          label: `${user.name} (${user.email})`
-        }))}
-      />
-
-                            {/* <select className="form-control" id="linkedUser" onChange={handleLinkedUserChange}>
-                                    <option value="">Select User</option>
-                                  {parentUsers && parentUsers.length > 0 ? (
-                                    parentUsers.filter((user) =>
-                                        user.id !== Number(id) &&
-                                        !linkedUsers.some(linkedUser => linkedUser.id === user.id)
-                                    ).map((user) => (
-                                      <option key={`link_user_${user.id}`} value={user.id}>{user.name} ({user.email})</option>
-                                    ))
-                                  ) : (
-                                    <option value="">No parent users available</option>
-                                  )} 
-                                </select> */}
+                                    className="basic-single"
+                                    classNamePrefix="select"
+                                    isLoading={isLoading}
+                                    isClearable={isClearable}
+                                    isSearchable={isSearchable}
+                                    onChange={handleLinkedUserChange}
+                                    name="color"
+                                    options={parentUsers
+                                        .filter((user) => !linkedUsers.some(linkedUser => linkedUser.id === user.id))
+                                        .map((user) => ({
+                                    value: user.id,
+                                    label: `${user.name} (${user.email})`
+                                    }))}
+                                />
                               </div>
+
+                              <div className="form-group">
+                                <label htmlFor="linkedUser">Select Module</label>
+                                <Select
+                                    className="basic-single"
+                                    classNamePrefix="select"
+                                    isLoading={isLoading}
+                                    isClearable={isClearable}
+                                    isSearchable={isSearchable}
+                                    onChange={handleModuleChange}
+                                    name="module"
+                                    isMulti={false}
+                                    options={filteredModules.map((module) => ({
+                                        value: module.id.toString(),
+                                        label: `${module.name}`
+                                    }))}
+                                    placeholder="Select Module"
+                                />
+                              </div>
+                              
                             </Modal.Body>
                             <Modal.Footer>
                               <Button variant="secondary" onClick={handleCloseAddLinkedUserModal}>
@@ -856,18 +917,23 @@ const UserView = () => {
                                   <th>Phone</th>
                                   <th>Department</th>
                                   <th>Company</th>
+                                  <th>Module</th>
                                   <th>Action</th>
                                 </tr>
                               </thead>
                               <tbody>
                                 {linkedUsers && linkedUsers.length > 0 ? (
-                                  linkedUsers.map((user) => (
-                                    <tr>
-                                          <td>{user.name}</td>
-                                          <td>{user.email}</td>
-                                          <td>{user.phone}</td>
-                                          <td>{user.department}</td>
-                                          <td>{user.company}</td>
+                                  linkedUsers.map((obj) => (
+                                   
+                                    <tr key={obj.id}>
+                                          <td>{obj?.linked_user?.name}</td>
+                                          <td>{obj?.linked_user?.email}</td>
+                                          <td>{obj?.linked_user?.phone}</td>
+                                          <td>{obj?.linked_user?.department}</td>
+                                          <td>{obj?.linked_user?.company}</td>
+                                          <td>
+                                            {obj?.module?.name}
+                                          </td>
                                           <td>
                                                 <div className="d-flex gap-2 justify-content-end">
                                                       {/* <Button size="sm" variant="primary" onClick={() => {
@@ -875,7 +941,7 @@ const UserView = () => {
                                                       }}>Edit</Button> */}
                                                       {session?.user?.is_admin && session?.user?.permissions?.includes('unlink-users') && (
                                                         <Button size="sm" variant="danger" onClick={() => {
-                                                          handleDeleteLinkedUser(user.id)
+                                                          handleDeleteLinkedUser(obj?.linked_user?.id, obj?.module?.id)
                                                         }}>DeLink</Button>
                                                       )}
                                                 </div>
@@ -884,7 +950,7 @@ const UserView = () => {
                                   ))
                                 ) : (
                                   <tr>
-                                    <td colSpan={6} className="text-center">No linked users found</td>
+                                    <td colSpan={7} className="text-center">No linked users found</td>
                                   </tr>
                                 )}
 

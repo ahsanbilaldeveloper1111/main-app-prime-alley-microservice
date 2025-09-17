@@ -11,11 +11,12 @@ interface PaginationParams {
   isExport?: boolean;
   exportType?: string;
   reportType?: string;
+  moduleSlug?: string;
 }
 
 export const ListCallLogs = async (params: PaginationParams = {}, endpoint: string) => {
   try {
-    const { page = 1, perPage = 15, search = "", draw = 1, filters = {}, isExport = false, exportType = '', reportType = '' } = params;
+    const { page = 1, perPage = 15, search = "", draw = 1, filters = {}, isExport = false, exportType = '', reportType = '', moduleSlug = '' } = params;
     
     // Create base query parameters
     const queryParams = new URLSearchParams({
@@ -25,7 +26,8 @@ export const ListCallLogs = async (params: PaginationParams = {}, endpoint: stri
       draw: draw.toString(),
       isExport: isExport.toString(),
       exportType: exportType,
-      reportType: reportType
+      reportType: reportType,
+      moduleSlug: moduleSlug
     });
     
     // Flatten filters and add each key-value pair as separate query parameters
@@ -139,7 +141,7 @@ export const DownloadCallRecording = async (id: string, agentExtension: string, 
 };
 
 export const DownloadStreamingExport = async (params: PaginationParams = {}, endpoint: string, reportType: string) => {
-  const {  search = "", filters = {}, isExport = true, exportType = 'excel' } = params;
+  const {  search = "", filters = {}, isExport = true, exportType = 'excel', moduleSlug = '' } = params;
   
   try {
     // Create base query parameters
@@ -147,7 +149,8 @@ export const DownloadStreamingExport = async (params: PaginationParams = {}, end
       search: search,
       isExport: isExport.toString(),
       exportType: exportType,
-      reportType: reportType
+      reportType: reportType,
+      moduleSlug: moduleSlug
     });
     
     // Flatten filters and add each key-value pair as separate query parameters

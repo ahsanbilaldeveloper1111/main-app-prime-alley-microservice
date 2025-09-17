@@ -222,7 +222,7 @@ const CallAnalysis = () => {
     
     try {
       setLoading(true);
-      const response = await GetCallAnalysis(date, localPartyNumber, ownerUsername, audioTrackId);
+      const response = await GetCallAnalysis(date, localPartyNumber, ownerUsername, uuid);
      
 
       //heck if object has analysis and it has error

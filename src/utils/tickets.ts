@@ -12,6 +12,7 @@ interface PaginationParams {
   filters?: any;
   isExport?: boolean;
   exportType?: string;
+  moduleSlug?: string;
 }
 
 export const DashboardData = async (filters: any = {}) => {
@@ -27,12 +28,13 @@ export const DashboardData = async (filters: any = {}) => {
 
 export const ListTickets = async (params: PaginationParams = {}) => {
   try {
-    const { page = 1, perPage = 15, search = "", draw = 1, filters = {}, isExport = false, exportType = '' } = params;
+    const { page = 1, perPage = 15, search = "", draw = 1, filters = {}, isExport = false, exportType = '', moduleSlug = '' } = params;
     
     // Build query parameters for the new API
     const queryParams: any = {
       page,
       per_page: perPage,
+      module_slug: moduleSlug,
       ...filters
     };
     
@@ -48,7 +50,8 @@ export const ListTickets = async (params: PaginationParams = {}) => {
       draw,
       ...filters,
       isExport,
-      exportType
+      exportType,
+      module_slug: moduleSlug
     }, {
       responseType: isExport ? 'blob' : 'json',
       headers: isExport ? {

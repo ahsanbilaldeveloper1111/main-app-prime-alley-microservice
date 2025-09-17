@@ -21,6 +21,7 @@ import { Column } from '@components/CustomDataTable';
 import CustomDataTable from '@components/CustomDataTable';
 import AudioPlayer, { AudioPlayerRef } from '@components/AudioPlayer';
 import EmptyState from '@components/EmptyState';
+import { ModuleSlug } from '@utils/Helper';
 
 // Utils
 import { ListCallLogs, ExportCallLogs, DownloadCallRecording, DownloadStreamingExport } from '@utils/calls';
@@ -35,7 +36,7 @@ import imgStatus4 from '@assets/images/widget/img-status-4.svg';
 import router from 'next/router';
 import axiosInstance from '@utils/axios';
 import { toast } from 'react-toastify';
-import { convertUTCToUserTimezone, convertUTCTimeToUserTimezone, convertUTCSeparateDateTimeToUserTime, convertUTCSeparateDateTimeToUserDate, formatDuration, convertUTCDateToUserTimezone } from '@utils/Helper';
+import { convertUTCToUserTimezone, convertUTCTimeToUserTimezone, convertUTCSeparateDateTimeToUserTime, convertUTCSeparateDateTimeToUserDate, formatDuration, convertUTCDateToUserTimezone, GlobalDateFormat, GlobalTimeFormat } from '@utils/Helper';
 
 const ReactApexChart = dynamic(() => import('react-apexcharts'), { ssr: false });
 
@@ -178,7 +179,7 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
       cell: (props: any) => {
         return (
           <div>
-            {formatDateTimeToLocal(props.DateTime, 'YYYY-MM-DD')}
+            {formatDateTimeToLocal(props.DateTime, GlobalDateFormat)}
           </div>
         )
       }
@@ -191,7 +192,7 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
       cell: (props: any) => {
         return (
           <div>
-            {formatDateTimeToLocal(props.DateTime, 'hh:mm:ss A', 'YYYY-MM-DD HH:mm:ss.SSSSSSS')}
+            {formatDateTimeToLocal(props.DateTime, GlobalTimeFormat, 'YYYY-MM-DD HH:mm:ss.SSSSSSS')}
           </div>
         )
       }
@@ -324,7 +325,7 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
 
   const fetchCallLogsOriginal = useCallback(async (page = 1, perPage = 15, search = "") => {
     const response = await ListCallLogs(
-      { page, perPage, search, filters: currentFilters, reportType: 'recordings' },
+      { page, perPage, search, filters: currentFilters, reportType: 'recordings', moduleSlug: ModuleSlug.CALL_RECORDINGS },
       'call-logs/recordings'
     );
     
@@ -559,9 +560,10 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
       if (exportType === 'excel') {
        
         await DownloadStreamingExport(
-          { filters: currentFilters, isExport: true, exportType},
+          { filters: currentFilters, isExport: true, exportType, moduleSlug: ModuleSlug.CALL_RECORDINGS},
           'call-logs/recordings',
           'recordings'
+          
         );
       }
     } catch (error) {
@@ -680,7 +682,7 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
   // Effects
   useEffect(() => {
     const fetchHierarchyData = async () => {
-      const hierarchyData = await GetHierarchyData();
+      const hierarchyData = await GetHierarchyData(ModuleSlug.CALL_RECORDINGS);
       
       const extensions = hierarchyData?.extensions;
       if (extensions && Array.isArray(extensions)) {
@@ -819,7 +821,7 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
                   <i className="ph-duotone ph-plus"></i>
                   Add Record
                 </Button> */}
-                <CallRecordingsFilters onFiltersChange={handleFiltersChange} onExport={handleExport} />
+                <CallRecordingsFilters onFiltersChange={handleFiltersChange} onExport={handleExport} moduleSlug={ModuleSlug.CALL_RECORDINGS} />
               </Col>
             </Row>
           </div>

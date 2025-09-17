@@ -1,8 +1,10 @@
-import React, { ReactElement, useState } from 'react';
+import React, { ReactElement, useState, useEffect } from 'react';
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
-import { Card, Row, Col, Button } from 'react-bootstrap';
+import { Card, Row, Col, Button, Spinner, Alert } from 'react-bootstrap';
 import Link from 'next/link';
+import { useRouter } from 'next/router';
+import { useTmsSession } from '@utils/tmsSessionNextAuth';
 
 import AnimatedNumber from '@components/AnimatedNumber';
 import imgStatus1 from '@assets/images/widget/img-status-1.svg'
@@ -18,12 +20,64 @@ interface Summary {
 
 
 const TmsDashboard = () => {
-
-      const [summary, setSummary] = useState<Summary>({
+    const router = useRouter();
+    const { session, isAuthenticated, isLoading, isValid } = useTmsSession();
+    const [summary, setSummary] = useState<Summary>({
         users: 5000,
         company: 200,
         nonAdminUsers: 4800,
-      });
+    });
+
+    // Handle session validation
+    useEffect(() => {
+        console.log('TMS Dashboard - Session state:', {
+            isLoading,
+            isAuthenticated,
+            isValid,
+            hasSession: !!session,
+            sessionData: session
+        });
+        
+        if (!isLoading) {
+            if (!isAuthenticated || !isValid) {
+                console.log('TMS session not valid, redirecting to verification');
+                router.push('/tms/verification');
+            }
+        }
+    }, [isLoading, isAuthenticated, isValid, router, session]);
+
+    // Show loading state while checking session
+    if (isLoading) {
+        return (
+            <React.Fragment>
+                <BreadcrumbItem mainTitle="TMS" mainLink="/tms" subTitle="TMS Dashboard" />
+                <div className="d-flex justify-content-center align-items-center" style={{ minHeight: '50vh' }}>
+                    <div className="text-center">
+                        <Spinner animation="border" variant="primary" />
+                        <p className="mt-3">Loading TMS session...</p>
+                    </div>
+                </div>
+            </React.Fragment>
+        );
+    }
+
+    // Show error state if session is invalid
+    if (!isAuthenticated || !isValid) {
+        return (
+            <React.Fragment>
+                <BreadcrumbItem mainTitle="TMS" mainLink="/tms" subTitle="TMS Dashboard" />
+                <div className="d-flex justify-content-center align-items-center" style={{ minHeight: '50vh' }}>
+                    <Alert variant="warning" className="text-center">
+                        <Alert.Heading>Session Expired</Alert.Heading>
+                        <p>Your TMS session has expired. Please verify your identity again.</p>
+                        <Button variant="primary" onClick={() => router.push('/tms/verification')}>
+                            Go to Verification
+                        </Button>
+                    </Alert>
+                </div>
+            </React.Fragment>
+        );
+    }
 
     return (
         <React.Fragment>

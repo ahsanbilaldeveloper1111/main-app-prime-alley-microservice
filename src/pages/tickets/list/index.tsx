@@ -39,6 +39,7 @@ import {
 import Select from "react-select";
 import TicketsFilters from "@components/filters/TicketFilters";
 import { Tooltip } from "react-tooltip";
+import { ModuleSlug } from '@utils/Helper';
 
 interface SelectOption {
   value: number;
@@ -65,6 +66,7 @@ const TicketList = () => {
   const [newAssigneeComment, setNewAssigneeComment] = useState<string>("");
   const [showComments, setShowComments] = useState<boolean>(false);
   const [isLoadingComments, setIsLoadingComments] = useState<boolean>(false);
+
 
   const columns: Column[] = useMemo(
     () => [
@@ -295,7 +297,7 @@ const TicketList = () => {
 
   useEffect(() => {
     const fetchHierarchyData = async () => {
-      const hierarchyData = await GetHierarchyData();
+      const hierarchyData = await GetHierarchyData(ModuleSlug.TICKETS);
       setHierarchyData(hierarchyData);
       console.log("Hierarchy Data:", hierarchyData);
       setExtensions(hierarchyData?.extensions);
@@ -313,6 +315,7 @@ const TicketList = () => {
         perPage,
         search,
         filters: memoizedFilters,
+        moduleSlug: ModuleSlug.TICKET
       });
     },
     [memoizedFilters]
@@ -938,7 +941,7 @@ const TicketList = () => {
                   New Ticket
                 </Button>
               )}
-              <TicketsFilters onFiltersChange={handleFiltersChange} />
+              <TicketsFilters onFiltersChange={handleFiltersChange} moduleSlug={ModuleSlug.TICKET} />
             </h2>
           </div>
         </Col>

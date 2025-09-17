@@ -18,7 +18,8 @@ import imgStatus2 from '@assets/images/widget/img-status-2.svg'
 import imgStatus3 from '@assets/images/widget/img-status-3.svg'
 import imgStatus4 from '@assets/images/widget/img-status-4.svg'
 import moment from 'moment';
-import { convertUTCToUserTimezone, convertUTCTimeToUserTimezone, convertUTCSeparateDateTimeToUserTime, convertUTCSeparateDateTimeToUserDate, formatDuration } from '@utils/Helper';
+import { convertUTCToUserTimezone, convertUTCTimeToUserTimezone, convertUTCSeparateDateTimeToUserTime, convertUTCSeparateDateTimeToUserDate, formatDuration, GlobalDateFormat, GlobalTimeFormat } from '@utils/Helper';
+import { ModuleSlug } from '@utils/Helper';
 
 interface Summary {
     users: number;
@@ -34,14 +35,14 @@ const CallLogs = () => {
         { key: 'Date', name: 'Date', selector: (row: any) => row.Date, sortable: true,
             cell: (props: any) => {
                 // Convert UTC date to user's timezone using separate date and time
-                const formattedDate = convertUTCSeparateDateTimeToUserDate(props.Date, props.Time, 'YYYY-MM-DD');
+                const formattedDate = convertUTCSeparateDateTimeToUserDate(props.Date, props.Time, GlobalDateFormat);
                 return formattedDate;
             }
          },
         { key: 'Time', name: 'Time', selector: (row: any) => row.Time, sortable: true,
             cell: (props: any) => {
                 // Convert UTC time to user's timezone using separate date and time
-                const formattedTime = convertUTCSeparateDateTimeToUserTime(props.Date, props.Time, 'hh:mm:ss A');
+                const formattedTime = convertUTCSeparateDateTimeToUserTime(props.Date, props.Time, GlobalTimeFormat);
                 return formattedTime;
             }
          },
@@ -76,7 +77,7 @@ const CallLogs = () => {
     });
     
     const fetchCallLogs = useCallback(async (page = 1, perPage = 15, search = "") => {
-        const response = await ListCallLogs({ page, perPage, search, filters: currentFilters }, 'call-logs/list');
+        const response = await ListCallLogs({ page, perPage, search, filters: currentFilters, moduleSlug: ModuleSlug.CALL_LOGS }, 'call-logs/list');
         //console.log(response);
         if(response?.summary){
             setSummary(response.summary);
@@ -97,7 +98,7 @@ const CallLogs = () => {
             if (exportType === 'excel') {
              
               await DownloadStreamingExport(
-                { filters: currentFilters, isExport: true, exportType },
+                { filters: currentFilters, isExport: true, exportType, moduleSlug: ModuleSlug.CALL_LOGS },
                 'call-logs/list',
                 'downlaodCallLogs'
               );
@@ -108,13 +109,6 @@ const CallLogs = () => {
           }
     };
 
-    useEffect(() => {
-        const fetchHierarchyData = async () => {
-            const hierarchyData = await GetHierarchyData();
-            console.log(hierarchyData);
-        };
-        fetchHierarchyData();
-    }, []);
     
     return (
         <React.Fragment>
@@ -129,7 +123,7 @@ const CallLogs = () => {
                       </h2>
                     </Col>
                     <Col md={9} className="d-flex justify-content-end">
-                      <CallLogsFilters onFiltersChange={handleFiltersChange} onExport={handleExport} />
+                      <CallLogsFilters onFiltersChange={handleFiltersChange} onExport={handleExport} moduleSlug={ModuleSlug.CALL_LOGS} />
                     </Col>
                   </Row>
                

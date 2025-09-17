@@ -528,19 +528,7 @@ const CallIncomingExtension = () => {
         }
     };
 
-    useEffect(() => {
-        const fetchHierarchyData = async () => {
-            const hierarchyData = await GetHierarchyData();
-            //console.log(hierarchyData);
-        };
-        fetchHierarchyData();
-    }, []);
-
-    
-
-
-
-
+   
     
     return (
         <React.Fragment>
@@ -558,7 +546,7 @@ const CallIncomingExtension = () => {
                     </Col>
                     <Col md={8} className="d-flex justify-content-end">
                       <CallLogsFilters
-                       onFiltersChange={handleFiltersChange} onExport={handleExport} isVisibleCallDirection={false} />
+                       onFiltersChange={handleFiltersChange} onExport={handleExport} isVisibleCallDirection={false} moduleSlug="call-reports" />
                     </Col>
                   </Row>
                

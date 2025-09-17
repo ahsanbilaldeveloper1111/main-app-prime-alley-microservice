@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { GetHierarchyData } from '@utils/users';
 
-export const useHierarchyData = () => {
+export const useHierarchyData = (moduleSlug?: string) => {
   const [hierarchyDataUsers, setHierarchyDataUsers] = useState<string[]>([]);
   const [hierarchyDataDepartments, setHierarchyDataDepartments] = useState<string[]>([]);
   const [hierarchyDataCompanies, setHierarchyDataCompanies] = useState<string[]>([]);
@@ -13,7 +13,8 @@ export const useHierarchyData = () => {
     const fetchHierarchyData = async () => {
       try {
         setLoading(true);
-        const hierarchyData = await GetHierarchyData();
+        console.log('useHierarchyData - moduleSlug:', moduleSlug);
+        const hierarchyData = await GetHierarchyData(moduleSlug);
         //console.log(hierarchyData);
         if (hierarchyData) {
           setHierarchyDataUsers(hierarchyData?.users);
@@ -30,7 +31,7 @@ export const useHierarchyData = () => {
     };
 
     fetchHierarchyData();
-  }, []);
+  }, [moduleSlug]);
 
   return {
     hierarchyDataUsers,

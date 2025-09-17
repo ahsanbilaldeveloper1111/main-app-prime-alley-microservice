@@ -294,11 +294,12 @@ export const UpdateBlockedPermission = async (id: string, permissions: string[])
   }
 }
 
-export const linkUsers = async (user_id: string, link_id: string) => {
+export const linkUsers = async (user_id: string, link_id: string, module_id: string) => {
   try {
     const response = await axiosInstance.post(`users/linkUsers`, {
       user_id: user_id,
-      link_id: link_id
+      link_id: link_id, 
+      module_id: module_id
     });
     if(response){
       const responseData = response.data;
@@ -319,11 +320,12 @@ export const linkUsers = async (user_id: string, link_id: string) => {
   }
 }
 
-export const unlinkUsers = async (id: string, linkedUser: string) => {
+export const unlinkUsers = async (id: string, linkedUser: string, moduleId: string) => {
   try {
     const response = await axiosInstance.post(`users/unlinkUsers`, {
       user_id: id,
-      link_id: linkedUser
+      link_id: linkedUser,
+      module_id: moduleId
     });
     if(response){
       const responseData = response.data;
@@ -344,9 +346,11 @@ export const unlinkUsers = async (id: string, linkedUser: string) => {
   }
 }
 
-export const GetHierarchyData = async () => {
+export const GetHierarchyData = async (moduleSlug?: string) => {
   try {
-    const response = await axiosInstance.get(`users/hierarchyData`);
+    console.log("Module Slug", moduleSlug);
+    const params = moduleSlug ? { module_slug: moduleSlug } : {};
+    const response = await axiosInstance.get(`users/hierarchyData`, { params });
     if(response){
       const responseData = response.data;
       if(responseData.code === 200){
@@ -454,6 +458,27 @@ export const DeleteCustomFields = async (id: string) => {
       }
     }else{
       toast.error('Failed to delete custom fields');
+      return false;
+    }
+  } catch (error) {
+    console.error('API Error:', error);
+    throw error;
+  }
+}
+
+export const GetModules = async () => {
+  try {
+    const response = await axiosInstance.get(`users/modules`);
+    if(response){
+      const responseData = response.data;
+      if(responseData.code === 200){
+        return responseData?.data;
+      }else{
+        toast.error(responseData.message);
+        return false;
+      }
+    }else{
+      toast.error('Failed to get modules');
       return false;
     }
   } catch (error) {

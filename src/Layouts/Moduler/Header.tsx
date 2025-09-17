@@ -707,7 +707,7 @@ const Header = ({ themeMode }: any) => {
                                             </li>
                                             )} */}
                                             
-                                            {permissions.includes('omni-channel-services') && (
+                                            {/* {permissions.includes('omni-channel-services') && (
                                             <li className="pc-item nav-item bg-danger" role="presentation">
                                                 <Link 
                                                 className={`pc-link nav-link${router.asPath.includes('omni-channel') ? ' active' : ''}`} 
@@ -718,7 +718,7 @@ const Header = ({ themeMode }: any) => {
                                                 <span className="pc-mtext">Omni Channel</span>
                                                 </Link>
                                             </li>
-                                            )}
+                                            )} */}
 
                                             {/* {permissions.includes('hr-services') && (
                                             <li className="pc-item nav-item bg-danger" role="presentation">
@@ -734,7 +734,7 @@ const Header = ({ themeMode }: any) => {
                                             )} */}
                                             
                                             {permissions.includes('accounts-services') && (
-                                            <li className="pc-item nav-item bg-danger" role="presentation">
+                                            <li className="pc-item nav-item" role="presentation">
                                                 <Link 
                                                 className={`pc-link nav-link${router.asPath.includes('accounts') ? ' active' : ''}`} 
                                                 href="#!"  id="pc-tab-link-15" data-bs-target="#pc-tab-15" role="tab" data-bs-toggle="tab" aria-selected="false">
@@ -747,7 +747,7 @@ const Header = ({ themeMode }: any) => {
                                             )}
                                             
                                             {permissions.includes('health-care-services') && (
-                                            <li className="pc-item nav-item bg-danger" role="presentation">
+                                            <li className="pc-item nav-item" role="presentation">
                                                 <Link 
                                                 className={`pc-link nav-link${router.asPath.includes('health-care') ? ' active' : ''}`} 
                                                 href="#!"  id="pc-tab-link-16" data-bs-target="#pc-tab-16" role="tab" data-bs-toggle="tab" aria-selected="false">

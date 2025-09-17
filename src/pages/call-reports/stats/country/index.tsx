@@ -67,6 +67,7 @@ interface ChartData {
 
 import dynamic from 'next/dynamic';
 import { ApexOptions } from 'apexcharts';
+import { ModuleSlug } from '@utils/Helper';
 const ReactApexChart = dynamic(() => import('react-apexcharts'), { ssr: false });
 
 const CallStatsCountry = () => {
@@ -619,25 +620,8 @@ const CallStatsCountry = () => {
                     </Col>
                     <Col md={8} className="d-flex justify-content-end">
                       <CallLogsFilters
-                       onFiltersChange={handleFiltersChange} onExport={handleExport} isVisibleCallDirection={false} />
+                       onFiltersChange={handleFiltersChange} onExport={handleExport} isVisibleCallDirection={false} moduleSlug={ModuleSlug.CALL_REPORTS} />
                        
-                       {/* Debug button - remove in production */}
-                       {/* {process.env.NODE_ENV === 'development' && (
-                         <Button 
-                           variant="outline-secondary" 
-                           size="sm" 
-                           className="ms-2"
-                           onClick={() => {
-                             console.log('Manual refresh triggered');
-                             setRefreshKey(prev => prev + 1);
-                             if (filtersReady) {
-                               fetchCallLogs(1, 15, "");
-                             }
-                           }}
-                         >
-                           Refresh Data
-                         </Button>
-                       )} */}
                     </Col>
                   </Row>
                

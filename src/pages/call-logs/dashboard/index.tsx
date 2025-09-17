@@ -420,13 +420,7 @@ const [ExtensionChart, setExtensionChart] = React.useState({
       NProgress.done();
     }
 
-    useEffect(() => {
-        const fetchHierarchyData = async () => {
-            const hierarchyData = await GetHierarchyData();
-            //console.log(hierarchyData);
-        };
-        fetchHierarchyData();
-    }, []);
+   
 
     const formatDuration = (duration: number) => {
       if (!duration) return '00:00:00';

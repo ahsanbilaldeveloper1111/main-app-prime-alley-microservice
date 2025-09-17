@@ -8,9 +8,10 @@ interface GroupsFiltersProps {
   onFiltersChange?: (filters: Record<string, any>) => void;
   onExport?: (exportType: string, filters: Record<string, any>) => void;
   isVisibleCallDirection?: boolean;
+  moduleSlug?: string;
 }
 
-export default function GroupsFilters({ onFiltersChange, onExport, isVisibleCallDirection = true }: GroupsFiltersProps) {
+export default function GroupsFilters({ onFiltersChange, onExport, isVisibleCallDirection = true, moduleSlug }: GroupsFiltersProps) {
   const { data: session, status } = useSession();
   const [showExport, setShowExport] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
@@ -22,7 +23,7 @@ export default function GroupsFilters({ onFiltersChange, onExport, isVisibleCall
     hierarchyDataUsers,
     loading: hierarchyLoading, 
     error: hierarchyError 
-  } = useHierarchyData();
+  } = useHierarchyData(moduleSlug);
   // Create dynamic filter config with hierarchy data
   const callLogsConfig = createCallLogsFiltersConfig({
     departments: hierarchyDataDepartments,

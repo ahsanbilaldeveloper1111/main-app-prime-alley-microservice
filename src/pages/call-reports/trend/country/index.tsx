@@ -24,6 +24,7 @@ import '@assets/scss/report-style.scss';
 import '@assets/scss/tabs.scss';
 import { motion, AnimatePresence } from "framer-motion";
 import { easeInOut, easeOut, easeIn } from "framer-motion";
+import { ModuleSlug } from '@utils/Helper';
 import moment from 'moment';
 
 interface Summary {
@@ -528,19 +529,6 @@ const CallTrendCountry = () => {
         }
     };
 
-    useEffect(() => {
-        const fetchHierarchyData = async () => {
-            const hierarchyData = await GetHierarchyData();
-            //console.log(hierarchyData);
-        };
-        fetchHierarchyData();
-    }, []);
-
-    
-
-
-
-
     
     return (
         <React.Fragment>
@@ -558,7 +546,7 @@ const CallTrendCountry = () => {
                     </Col>
                     <Col md={8} className="d-flex justify-content-end">
                       <CallLogsFilters
-                       onFiltersChange={handleFiltersChange} onExport={handleExport} isVisibleCallDirection={false} />
+                       onFiltersChange={handleFiltersChange} onExport={handleExport} isVisibleCallDirection={false} moduleSlug={ModuleSlug.CALL_REPORTS} />
                     </Col>
                   </Row>
                
