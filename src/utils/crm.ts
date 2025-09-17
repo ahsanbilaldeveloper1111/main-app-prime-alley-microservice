@@ -617,6 +617,7 @@ export interface CrmDataItem {
   data: Record<string, any>;
   user_extension: string | null;
   is_viewed: boolean;
+  campaign_id: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -676,15 +677,18 @@ export const uploadCrmDataCsv = async (
       });
     }
 
-    // Add field_tags as an array
+    // Add tags as an array (matching Laravel controller)
     if (fieldTags.length > 0) {
       fieldTags.forEach((tag, index) => {
-        formData.append(`field_tags[${index}]`, tag);
+        formData.append(`tags[${index}]`, tag);
       });
     }
 
-    // Add assign_to_campaign_users flag
-    formData.append("assign_to_campaign_users", assignToCampaignUsers.toString());
+    // Add should_assign flag (matching Laravel controller)
+    formData.append("should_assign", assignToCampaignUsers.toString());
+    
+    // Add chunk_size for better performance
+    formData.append("chunk_size", "1000");
     
     const response = await axiosInstance.post("/crm/crm-data/upload-csv", formData, {
       headers: {
@@ -736,6 +740,209 @@ export const assignCrmDataToExtension = async (
     toast.success(`Successfully assigned ${itemIds.length} items to ${extensionNames}`);
   } catch (error: any) {
     toast.error(error?.response?.data?.message || "Failed to assign CRM data");
+    throw error;
+  }
+};
+
+// New advanced assignment function matching Laravel controller
+export const assignCrmDataAdvanced = async (
+  campaignFilterIds: number[],
+  tagIds: number[] = [],
+  count: number,
+  campaignIds: number[]
+): Promise<{
+  success: boolean;
+  message: string;
+  assigned_count: number;
+  total_filtered: number;
+  distribution: Array<{
+    campaign_id: number;
+    user_count: number;
+  }>;
+}> => {
+  try {
+    const payload = {
+      campaign_filter_ids: campaignFilterIds,
+      tag_ids: tagIds,
+      count: count,
+      campaign_ids: campaignIds
+    };
+
+    const response = await axiosInstance.post("/crm/crm_data/assign", payload);
+    
+    if (response.data.success) {
+      toast.success(response.data.message);
+    }
+    
+    return response.data;
+  } catch (error: any) {
+    toast.error(error?.response?.data?.message || "Failed to assign CRM data");
+    throw error;
+  }
+};
+
+// Get CRM data counts by campaigns and tags
+export const getCrmDataCounts = async (
+  campaignIds: number[] = [],
+  tags: string[] = []
+): Promise<{
+  summary: {
+    total_records: number;
+    assigned_records: number;
+    unassigned_records: number;
+  };
+  filters: {
+    campaign_ids: number[];
+    tags: string[];
+  };
+}> => {
+  try {
+    const payload = {
+      campaign_ids: campaignIds,
+      tags: tags
+    };
+
+    const response = await axiosInstance.post("/crm/crm-data/counts", payload);
+    return response.data.data?.data;
+  } catch (error: any) {
+    toast.error(error?.response?.data?.message || "Failed to get CRM data counts");
+    throw error;
+  }
+};
+
+// Bulk delete CRM data
+export const bulkDeleteCrmData = async (ids: number[]): Promise<{
+  success: boolean;
+  message: string;
+  deleted_count: number;
+}> => {
+  try {
+    const response = await axiosInstance.delete("/crm/crm-data/bulk/delete", {
+      data: { ids }
+    });
+    
+    if (response.data.success) {
+      toast.success(response.data.message);
+    }
+    
+    return response.data;
+  } catch (error: any) {
+    toast.error(error?.response?.data?.message || "Failed to delete CRM data");
+    throw error;
+  }
+};
+
+// Tag management functions
+export const getCrmDataTags = async (): Promise<Array<{
+  id: number;
+  name: string;
+  color?: string;
+  description?: string;
+  created_at: string;
+  updated_at: string;
+}>> => {
+  try {
+    const response = await axiosInstance.get("/crm/crm-data/tags");
+    return response.data.data?.data;
+  } catch (error: any) {
+    toast.error(error?.response?.data?.message || "Failed to get tags");
+    throw error;
+  }
+};
+
+export const createCrmDataTag = async (data: {
+  name: string;
+  color?: string;
+  description?: string;
+}): Promise<{
+  id: number;
+  name: string;
+  color?: string;
+  description?: string;
+  created_at: string;
+  updated_at: string;
+}> => {
+  try {
+    const response = await axiosInstance.post("/crm/crm-data/tags", data);
+    
+    if (response.data.success) {
+      toast.success(response.data.message);
+    }
+    
+    return response.data.data;
+  } catch (error: any) {
+    toast.error(error?.response?.data?.message || "Failed to create tag");
+    throw error;
+  }
+};
+
+export const updateCrmDataTag = async (
+  id: number,
+  data: {
+    name: string;
+    color?: string;
+    description?: string;
+  }
+): Promise<{
+  id: number;
+  name: string;
+  color?: string;
+  description?: string;
+  created_at: string;
+  updated_at: string;
+}> => {
+  try {
+    const response = await axiosInstance.put(`/crm/crm-data/tags/${id}`, data);
+    
+    if (response.data.success) {
+      toast.success(response.data.message);
+    }
+    
+    return response.data.data;
+  } catch (error: any) {
+    toast.error(error?.response?.data?.message || "Failed to update tag");
+    throw error;
+  }
+};
+
+export const deleteCrmDataTag = async (id: number): Promise<void> => {
+  try {
+    await axiosInstance.delete(`/crm/crm-data/tags/${id}`);
+    toast.success("Tag deleted successfully");
+  } catch (error: any) {
+    toast.error(error?.response?.data?.message || "Failed to delete tag");
+    throw error;
+  }
+};
+
+export const assignTagsToCrmData = async (
+  crmDataIds: number[],
+  tagIds: number[]
+): Promise<void> => {
+  try {
+    await axiosInstance.post("/crm/crm-data/tags/assign", {
+      crm_data_ids: crmDataIds,
+      tag_ids: tagIds
+    });
+    toast.success("Tags assigned successfully");
+  } catch (error: any) {
+    toast.error(error?.response?.data?.message || "Failed to assign tags");
+    throw error;
+  }
+};
+
+export const removeTagsFromCrmData = async (
+  crmDataIds: number[],
+  tagIds: number[]
+): Promise<void> => {
+  try {
+    await axiosInstance.post("/crm/crm-data/tags/remove", {
+      crm_data_ids: crmDataIds,
+      tag_ids: tagIds
+    });
+    toast.success("Tags removed successfully");
+  } catch (error: any) {
+    toast.error(error?.response?.data?.message || "Failed to remove tags");
     throw error;
   }
 };

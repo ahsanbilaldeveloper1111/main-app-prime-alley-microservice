@@ -1538,6 +1538,7 @@ const TicketList = () => {
                   <td
                     style={{
                       textTransform: "capitalize",
+                      whiteSpace: "pre-wrap",
                     }}
                   >
                     {viewTicketData?.title}
