@@ -486,3 +486,25 @@ export const GetModules = async () => {
     throw error;
   }
 }
+
+export const MarkAsCompanyAdmin = async (id: string, is_company_admin: boolean) => {
+  try {
+    const response = await axiosInstance.post(`users/mark-company-admin`, {
+      user_id: id,
+      is_company_admin: is_company_admin
+    });
+    if(response){
+      const responseData = response.data;
+      if(responseData.code === 200){
+        toast.success('Company admin updated successfully');
+        return true;
+      }
+    }else{
+      toast.error('Failed to update company admin');
+      return false;
+    }
+  } catch (error) {
+    console.error('API Error:', error);
+    throw error;
+  }
+}

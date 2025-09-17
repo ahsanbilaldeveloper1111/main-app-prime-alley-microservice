@@ -9,9 +9,13 @@ import { useRouter } from 'next/router'
 import { viewRank } from '@utils/roles'
 
 interface Permission {
+    id: number;
     name: string;
+    key: string;
     enabled: boolean;
     description: string;
+    module_id: number;
+    is_special: string;
 }
 
 interface PermissionGroup {
@@ -41,7 +45,7 @@ const ViewRolePermission = () => {
         setRolePermissions(role.permissions);
     }
 
-    // Filter permissions based on search term
+    // Filter permissions based on search term and separate special/non-special
     const filteredPermissions = rolePermissions.filter((group: PermissionGroup) => {
         const groupMatches = group.group.toLowerCase().includes(searchTerm.toLowerCase());
         const permissionMatches = group.permissions.some((perm: Permission) => 
@@ -55,6 +59,14 @@ const ViewRolePermission = () => {
             group.group.toLowerCase().includes(searchTerm.toLowerCase())
         )
     }));
+
+    // Separate permissions into special and non-special
+    const separatePermissions = (group: PermissionGroup) => {
+        const nonSpecialPermissions = group.permissions.filter(perm => perm.is_special === "0");
+        const specialPermissions = group.permissions.filter(perm => perm.is_special === "1");
+        
+        return { nonSpecialPermissions, specialPermissions };
+    };
 
     return (
 
@@ -85,15 +97,19 @@ const ViewRolePermission = () => {
 
             <Row>
                   <Col md={12}>
-                  {filteredPermissions?.map((group: PermissionGroup, groupIdx: number) => (
+                  {filteredPermissions?.map((group: PermissionGroup, groupIdx: number) => {
+                        const { nonSpecialPermissions, specialPermissions } = separatePermissions(group);
+                        
+                        return (
                             <React.Fragment key={groupIdx}>
                                 {group.permissions.length > 0 && (
                                     <>
-                                        <Card className="p-3">
-                                            <div className="roles-box" key={groupIdx}>
-
+                                        <Card className="p-3 mb-3">
+                                            <div className="roles-box">
                                                 <div className="roles-box-header clearfix">
-                                                    <span className="mb-2" style={{ float: "left" }}><h6> {group.group}</h6> </span>
+                                                    <span className="mb-2" style={{ float: "left" }}>
+                                                        <h6>{group.group}</h6>
+                                                    </span>
                                                     <label className="enableSwitch" style={{ float: "right" }}>
                                                         <Form.Check
                                                             type="switch"
@@ -104,36 +120,74 @@ const ViewRolePermission = () => {
                                                     </label>
                                                     <div className="clearfix"></div>
                                                 </div>
-                                                <div className="row">
-                                                    {group.permissions && group.permissions.map((perm: Permission, permIdx: number) => (
-                                                        <div className="col-md-4 mb-3" key={permIdx}>
-                                                            <OverlayTrigger
-                                                                placement="right"
-                                                                overlay={<Tooltip id={`tooltip-${permIdx}`}>
-                                                                    {perm?.description || 'No description available'}
-                                                                    </Tooltip>}
-                                                            >
-                                                                <div className='d-inline-block'>
-                                                                
-                                                                    <Form.Check
-                                                                        type="switch"
-                                                                        id={permIdx.toString()}
-                                                                        label={perm.name}
-                                                                        readOnly
-                                                                        checked={perm.enabled}
-                                                                    />
+
+                                                {/* Regular Permissions Section */}
+                                                {nonSpecialPermissions.length > 0 && (
+                                                    <div className="mb-2">
+                                                       
+                                                        <div className="row">
+                                                            {nonSpecialPermissions.map((perm: Permission, permIdx: number) => (
+                                                                <div className="col-md-4 mb-3" key={permIdx}>
+                                                                    <OverlayTrigger
+                                                                        placement="right"
+                                                                        overlay={<Tooltip id={`tooltip-regular-${permIdx}`}>
+                                                                            {perm?.description || 'No description available'}
+                                                                        </Tooltip>}
+                                                                    >
+                                                                        <div className='d-inline-block'>
+                                                                            <Form.Check
+                                                                                type="switch"
+                                                                                id={`regular-${permIdx}`}
+                                                                                label={perm.name}
+                                                                                readOnly
+                                                                                checked={perm.enabled}
+                                                                            />
+                                                                        </div>
+                                                                    </OverlayTrigger>
                                                                 </div>
-                                                            </OverlayTrigger>
+                                                            ))}
                                                         </div>
-                                                    ))
-                                                    }
-                                                </div>
+                                                    </div>
+                                                )}
+
+                                                {/* Special Permissions Section */}
+                                                {specialPermissions.length > 0 && (
+                                                    <div className="mb-4">
+                                                        <h6 className="text-warning mb-4" style={{borderBottom: '1px #d6d6d6 solid',paddingBottom: '10px'}}>
+                                                            <i className="fas fa-star me-2"></i>
+                                                            Special Permissions
+                                                        </h6>
+                                                        <div className="row">
+                                                            {specialPermissions.map((perm: Permission, permIdx: number) => (
+                                                                <div className="col-md-4 mb-3" key={permIdx}>
+                                                                    <OverlayTrigger
+                                                                        placement="right"
+                                                                        overlay={<Tooltip id={`tooltip-special-${permIdx}`}>
+                                                                            {perm?.description || 'No description available'}
+                                                                        </Tooltip>}
+                                                                    >
+                                                                        <div className='d-inline-block'>
+                                                                            <Form.Check
+                                                                                type="switch"
+                                                                                id={`special-${permIdx}`}
+                                                                                label={perm.name}
+                                                                                readOnly
+                                                                                checked={perm.enabled}
+                                                                            />
+                                                                        </div>
+                                                                    </OverlayTrigger>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
                                             </div>
                                         </Card>
                                     </>
                                 )}
                             </React.Fragment>
-                        ))}
+                        );
+                    })}
                   </Col>
             </Row>
         </React.Fragment>

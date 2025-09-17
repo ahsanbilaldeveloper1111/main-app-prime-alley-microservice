@@ -294,11 +294,11 @@ const ProfileView = () => {
     };
 
     const handleSubmitAddLinkedUser = async () => {
-        const response = await linkUsers(id as string, selectedParentUser);
-        if(response){
-            setShowAddLinkedUserModal(false);
-            fetchUser();
-        }
+        // const response = await linkUsers(id as string, selectedParentUser);
+        // if(response){
+        //     setShowAddLinkedUserModal(false);
+        //     fetchUser();
+        // }
     }
 
     const [showEditLinkedUserModal, setShowEditLinkedUserModal] = useState(false)
@@ -315,10 +315,10 @@ const ProfileView = () => {
     }
 
     const handleDeleteLinkedUser = async (delinkedUser: number) => {
-        const response = await unlinkUsers(id as string, delinkedUser+"");
-        if(response){
-            fetchUser();
-        }
+        // const response = await unlinkUsers(id as string, delinkedUser+"");
+        // if(response){
+        //     fetchUser();
+        // }
     }
 
     const [parentUsers, setParentUsers] = useState<User[]>([]);

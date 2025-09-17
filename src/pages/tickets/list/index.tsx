@@ -297,7 +297,7 @@ const TicketList = () => {
 
   useEffect(() => {
     const fetchHierarchyData = async () => {
-      const hierarchyData = await GetHierarchyData(ModuleSlug.TICKETS);
+      const hierarchyData = await GetHierarchyData(ModuleSlug.TICKET);
       setHierarchyData(hierarchyData);
       console.log("Hierarchy Data:", hierarchyData);
       setExtensions(hierarchyData?.extensions);
