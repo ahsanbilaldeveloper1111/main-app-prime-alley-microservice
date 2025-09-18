@@ -11,6 +11,7 @@ import {
   updateMeeting,
   deleteMeeting,
   getCampaigns,
+  getCampaignById,
   CampaignData,
   getCrmData,
   CrmDataItem,
@@ -110,12 +111,27 @@ const EditLead = () => {
     }
   }, [id]);
 
-  // Set selected campaign when both lead and campaigns data are available
+  // Set selected campaign when lead data is available
   useEffect(() => {
-    if (lead && campaigns.length > 0 && lead.campaign_id) {
-      const campaign = campaigns.find((c) => c.id == lead.campaign_id);
-      setSelectedCampaign(campaign || null);
-    }
+    const fetchCampaignForLead = async () => {
+      if (lead && lead.campaign_id) {
+        try {
+          // Fetch campaign details with fields
+          const campaign = await getCampaignById(lead.campaign_id);
+          console.log("ZE EDIT LEAD CAMPAIGN WITH FIELDS", campaign);
+          setSelectedCampaign(campaign);
+        } catch (error) {
+          console.error("Failed to fetch campaign details for lead:", error);
+          // Fallback to basic campaign from list if available
+          if (campaigns.length > 0) {
+            const basicCampaign = campaigns.find((c) => c.id == lead.campaign_id);
+            setSelectedCampaign(basicCampaign || null);
+          }
+        }
+      }
+    };
+
+    fetchCampaignForLead();
   }, [lead, campaigns]);
 
   const fetchLeadData = async () => {
@@ -174,7 +190,7 @@ const EditLead = () => {
 
   const fetchCampaigns = async () => {
     try {
-      const campaignsData = await getCampaigns({ per_page: 1000 });
+      const campaignsData = await getCampaigns({ per_page: 100 });
       setCampaigns(campaignsData?.data || []);
     } catch (error) {
       console.error("Failed to fetch campaigns:", error);
@@ -183,7 +199,7 @@ const EditLead = () => {
 
   const fetchCrmData = async () => {
     try {
-      const crmDataResponse = await getCrmData({ per_page: 1000 });
+      const crmDataResponse = await getCrmData({ per_page: 100 });
       setCrmData(crmDataResponse?.data || []);
     } catch (error) {
       console.error("Failed to fetch CRM data:", error);
@@ -286,17 +302,37 @@ const EditLead = () => {
     }));
   };
 
-  const handleCampaignChange = (selectedOption: any) => {
+  const handleCampaignChange = async (selectedOption: any) => {
     const campaignId = selectedOption?.value;
-    const campaign = campaigns.find((c) => c.id == campaignId);
+    
+    if (!campaignId) {
+      setSelectedCampaign(null);
+      setLead((prev: any) => ({
+        ...prev,
+        campaign_id: undefined,
+        campaign_field_values: {},
+      }));
+      return;
+    }
+    
+    try {
+      // Fetch campaign details with fields
+      const campaign = await getCampaignById(campaignId);
+      console.log("ZE EDIT CAMPAIGN WITH FIELDS", campaign);
+      
+      setLead((prev: any) => ({
+        ...prev,
+        campaign_id: campaignId,
+        campaign_field_values: {}, // Reset campaign field values when campaign changes
+      }));
 
-    setLead((prev: any) => ({
-      ...prev,
-      campaign_id: campaignId,
-      campaign_field_values: {}, // Reset campaign field values when campaign changes
-    }));
-
-    setSelectedCampaign(campaign || null);
+      setSelectedCampaign(campaign);
+    } catch (error) {
+      console.error("Failed to fetch campaign details:", error);
+      // Fallback to basic campaign from list
+      const basicCampaign = campaigns.find((c) => c.id == campaignId);
+      setSelectedCampaign(basicCampaign || null);
+    }
   };
 
   const handleCampaignFieldChange = (fieldName: string, value: any) => {

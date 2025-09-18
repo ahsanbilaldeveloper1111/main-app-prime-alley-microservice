@@ -47,7 +47,7 @@ import {
 } from "react-icons/fi";
 import { Column } from "@components/CustomDataTable";
 import {
-  getCrmData,
+getCrmData,
   uploadCrmDataCsv,
   deleteCrmData,
   assignCrmDataToExtension,
@@ -60,6 +60,13 @@ import {
   removeTagsFromCrmData,
   markCrmDataAsViewed,
   getCampaigns,
+  scheduleCall,
+  updateScheduledCall,
+  cancelScheduledCall,
+  unscheduleCall,
+  bulkScheduleCalls,
+  bulkUnscheduleCalls,
+  getCrmDataHistory,
   CampaignData,
   CrmDataItem,
   CrmDataPagination,
@@ -113,6 +120,7 @@ const CrmDataManagement = () => {
     label: string;
     id: number;
   }>>([]);
+  const [campaignsById, setCampaignsById] = useState<Record<number, string>>({});
   const [selectedItems, setSelectedItems] = useState<number[]>([]);
   const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
 
@@ -126,8 +134,7 @@ const CrmDataManagement = () => {
     generateLead: "no", // "yes" or "no"
   });
 
-  // Scheduled calls state
-  const [scheduledCalls, setScheduledCalls] = useState<Record<number, boolean>>({});
+  // Schedule modal state
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [selectedRecordForSchedule, setSelectedRecordForSchedule] = useState<any>(null);
   const [scheduleData, setScheduleData] = useState({
@@ -224,237 +231,105 @@ const CrmDataManagement = () => {
     return histories.slice(0, (recordId % 3) + 2);
   };
 
-  // Static scheduled calls data
-  const getScheduledCalls = () => [
-    {
-      id: 1,
-      phone: "+1234567890",
-      scheduledAt: moment().add(30, 'minutes').toISOString(),
-      status: "scheduled",
-    },
-    {
-      id: 2,
-      phone: "+1234567891",
-      scheduledAt: moment().add(2, 'hours').toISOString(),
-      status: "scheduled",
-    },
-    {
-      id: 3,
-      phone: "+1234567892",
-      scheduledAt: moment().add(1, 'day').toISOString(),
-      status: "scheduled",
-    },
-    {
-      id: 4,
-      phone: "+1234567893",
-      scheduledAt: moment().subtract(2, 'hours').toISOString(),
-      status: "overdue",
-    },
-    {
-      id: 5,
-      phone: "+1234567894",
-      scheduledAt: moment().subtract(1, 'day').toISOString(),
-      status: "overdue",
-    },
-  ];
 
-  // Static history data
-  const getHistoryData = () => [
-    {
-      id: 1,
-      type: "upload",
-      user: "John Smith",
-      action: "uploaded a CSV",
-      details: "10,000 records with tags 'hot-lead', 'follow-up' for campaigns 'Summer Sale 2024', 'Holiday Promotion'",
-      timestamp: moment().subtract(2, 'hours').format("MMM DD, YYYY HH:mm"),
-      icon: "upload",
-      color: "primary"
-    },
-    {
-      id: 2,
-      type: "assignment",
-      user: "Sarah Johnson",
-      action: "assigned records to campaign team",
-      details: "5,000 records to 'Summer Sale 2024' team",
-      timestamp: moment().subtract(3, 'hours').format("MMM DD, YYYY HH:mm"),
-      icon: "users",
-      color: "success"
-    },
-    {
-      id: 3,
-      type: "assignment",
-      user: "Mike Wilson",
-      action: "assigned records to users",
-      details: "1,000 records to 'John Doe' via 'Summer Sale 2024'",
-      timestamp: moment().subtract(4, 'hours').format("MMM DD, YYYY HH:mm"),
-      icon: "user",
-      color: "info"
-    },
-    {
-      id: 4,
-      type: "assignment",
-      user: "Mike Wilson",
-      action: "assigned records to users",
-      details: "1,000 records to 'Jane Smith' via 'Summer Sale 2024'",
-      timestamp: moment().subtract(4, 'hours').format("MMM DD, YYYY HH:mm"),
-      icon: "user",
-      color: "info"
-    },
-    {
-      id: 5,
-      type: "assignment",
-      user: "Mike Wilson",
-      action: "assigned records to users",
-      details: "1,000 records to 'Bob Johnson' via 'Summer Sale 2024'",
-      timestamp: moment().subtract(4, 'hours').format("MMM DD, YYYY HH:mm"),
-      icon: "user",
-      color: "info"
-    },
-    {
-      id: 6,
-      type: "assignment",
-      user: "Mike Wilson",
-      action: "assigned records to users",
-      details: "1,000 records to 'Alice Brown' via 'Summer Sale 2024'",
-      timestamp: moment().subtract(4, 'hours').format("MMM DD, YYYY HH:mm"),
-      icon: "user",
-      color: "info"
-    },
-    {
-      id: 7,
-      type: "assignment",
-      user: "Mike Wilson",
-      action: "assigned records to users",
-      details: "1,000 records to 'Charlie Davis' via 'Summer Sale 2024'",
-      timestamp: moment().subtract(4, 'hours').format("MMM DD, YYYY HH:mm"),
-      icon: "user",
-      color: "info"
-    },
-    {
-      id: 8,
-      type: "upload",
-      user: "Emily Chen",
-      action: "uploaded a CSV",
-      details: "5,000 records with tags 'cold-lead', 'callback' for campaigns 'Holiday Promotion'",
-      timestamp: moment().subtract(1, 'day').format("MMM DD, YYYY HH:mm"),
-      icon: "upload",
-      color: "primary"
-    },
-    {
-      id: 9,
-      type: "assignment",
-      user: "David Lee",
-      action: "assigned records to campaign team",
-      details: "3,000 records to 'Holiday Promotion' team",
-      timestamp: moment().subtract(1, 'day').format("MMM DD, YYYY HH:mm"),
-      icon: "users",
-      color: "success"
-    },
-    {
-      id: 10,
-      type: "assignment",
-      user: "David Lee",
-      action: "assigned records to users",
-      details: "2,000 records to 'Emma Wilson' via 'Holiday Promotion'",
-      timestamp: moment().subtract(1, 'day').format("MMM DD, YYYY HH:mm"),
-      icon: "user",
-      color: "info"
-    },
-    {
-      id: 11,
-      type: "upload",
-      user: "Alex Rodriguez",
-      action: "uploaded a CSV",
-      details: "8,000 records with tags 'qualified', 'interested' for campaigns 'Summer Sale 2024'",
-      timestamp: moment().subtract(2, 'days').format("MMM DD, YYYY HH:mm"),
-      icon: "upload",
-      color: "primary"
-    },
-    {
-      id: 12,
-      type: "assignment",
-      user: "Lisa Wang",
-      action: "assigned records to campaign team",
-      details: "4,000 records to 'Summer Sale 2024' team",
-      timestamp: moment().subtract(2, 'days').format("MMM DD, YYYY HH:mm"),
-      icon: "users",
-      color: "success"
-    },
-    {
-      id: 13,
-      type: "assignment",
-      user: "Lisa Wang",
-      action: "assigned records to users",
-      details: "4,000 records to 'Tom Anderson' via 'Summer Sale 2024'",
-      timestamp: moment().subtract(2, 'days').format("MMM DD, YYYY HH:mm"),
-      icon: "user",
-      color: "info"
+  // History data state
+  const [historyData, setHistoryData] = useState<any[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyPagination, setHistoryPagination] = useState({
+    current_page: 1,
+    last_page: 1,
+    per_page: 15,
+    total: 0,
+    from: 0,
+    to: 0
+  });
+
+  // Function to fetch campaigns by IDs
+  const fetchCampaignsByIds = useCallback(async (campaignIds: number[]) => {
+    try {
+      const campaignsMap: Record<number, string> = {};
+      
+      // Fetch campaigns in batches to avoid overwhelming the API
+      const batchSize = 50;
+      for (let i = 0; i < campaignIds.length; i += batchSize) {
+        const batch = campaignIds.slice(i, i + batchSize);
+        const campaignsResponse = await getCampaigns({ 
+          per_page: 1000,
+          filters: { ids: batch }
+        });
+        
+        campaignsResponse.data.forEach(campaign => {
+          campaignsMap[campaign.id] = campaign.name;
+        });
+      }
+      
+      setCampaignsById(prev => ({ ...prev, ...campaignsMap }));
+      return campaignsMap;
+    } catch (error) {
+      console.error("Failed to fetch campaigns by IDs:", error);
+      return {};
     }
-  ];
+  }, []);
+
+  // Fetch history data
+  const fetchHistoryData = useCallback(async (page: number = 1) => {
+    try {
+      setHistoryLoading(true);
+      const response = await getCrmDataHistory(page, 15);
+      console.log("ZE HISTORY DATA", response);
+      setHistoryData(response.data);
+      setHistoryPagination(response.pagination);
+      
+      // Extract campaign IDs from history data and fetch campaign names
+      const campaignIds: number[] = [];
+      response.data.forEach((activity: any) => {
+        if (activity.details?.campaign_ids) {
+          campaignIds.push(...activity.details.campaign_ids);
+        }
+      });
+      
+      if (campaignIds.length > 0) {
+        const uniqueCampaignIds = Array.from(new Set(campaignIds));
+        await fetchCampaignsByIds(uniqueCampaignIds);
+      }
+    } catch (error) {
+      console.error("Failed to fetch history data:", error);
+      setHistoryData([]);
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, [fetchCampaignsByIds]);
 
   // Calculate dashboard statistics using real data
   const calculateDashboardStats = useCallback(async () => {
     try {
-      // Get real counts from API
-      const counts = await getCrmDataCounts();
+      // Extract campaign IDs and tags from current filters
+      const campaignIds = currentFilters.campaign_id ? 
+        currentFilters.campaign_id.map((id: string) => parseInt(id)) : [];
+      const tags = currentFilters.tags || [];
       
-      const scheduledCalls = getScheduledCalls();
-      const now = moment();
-      const nextHour = moment().add(1, 'hour');
-      const next24Hours = moment().add(24, 'hours');
-
-      const callsInNextHour = scheduledCalls.filter(call => 
-        moment(call.scheduledAt).isAfter(now) && 
-        moment(call.scheduledAt).isBefore(nextHour)
-      ).length;
-
-      const callsInNext24Hours = scheduledCalls.filter(call => 
-        moment(call.scheduledAt).isAfter(now) && 
-        moment(call.scheduledAt).isBefore(next24Hours)
-      ).length;
-
-      const overdueCalls = scheduledCalls.filter(call => 
-        moment(call.scheduledAt).isBefore(now) && call.status === "overdue"
-      ).length;
-
+      // Get real counts from API with current filters
+      const counts = await getCrmDataCounts(campaignIds, tags);
+      
       return {
-        callsInNextHour,
-        callsInNext24Hours,
-        overdueCalls,
+        callsInNextHour: counts.scheduled_calls?.next_hour || 0,
+        callsInNext24Hours: counts.scheduled_calls?.next_24_hours || 0,
+        overdueCalls: counts.scheduled_calls?.overdue || 0,
         assignedRecords: counts.summary.assigned_records,
         unassignedRecords: counts.summary.unassigned_records,
       };
     } catch (error) {
       console.error("Failed to get dashboard stats:", error);
       // Fallback to static data
-      const scheduledCalls = getScheduledCalls();
-      const now = moment();
-      const nextHour = moment().add(1, 'hour');
-      const next24Hours = moment().add(24, 'hours');
-
-      const callsInNextHour = scheduledCalls.filter(call => 
-        moment(call.scheduledAt).isAfter(now) && 
-        moment(call.scheduledAt).isBefore(nextHour)
-      ).length;
-
-      const callsInNext24Hours = scheduledCalls.filter(call => 
-        moment(call.scheduledAt).isAfter(now) && 
-        moment(call.scheduledAt).isBefore(next24Hours)
-      ).length;
-
-      const overdueCalls = scheduledCalls.filter(call => 
-        moment(call.scheduledAt).isBefore(now) && call.status === "overdue"
-      ).length;
-
       return {
-        callsInNextHour,
-        callsInNext24Hours,
-        overdueCalls,
-        assignedRecords: 2000,
-        unassignedRecords: 3000,
+        callsInNextHour: 0,
+        callsInNext24Hours: 0,
+        overdueCalls: 0,
+        assignedRecords: 0,
+        unassignedRecords: 0,
       };
     }
-  }, []);
+  }, [currentFilters]);
 
   const memoizedFilters = useMemo(() => currentFilters, [currentFilters]);
 
@@ -484,7 +359,14 @@ const CrmDataManagement = () => {
       }
     };
     loadDashboardStats();
-  }, [calculateDashboardStats, refreshKey]);
+  }, [calculateDashboardStats, refreshKey, currentFilters]);
+
+  // Load history data when modal is opened
+  useEffect(() => {
+    if (showHistoryModal) {
+      fetchHistoryData();
+    }
+  }, [showHistoryModal, fetchHistoryData]);
 
   // Load available tags
   useEffect(() => {
@@ -521,6 +403,13 @@ const CrmDataManagement = () => {
           id: campaign.id
         }));
         setAvailableCampaigns(campaignOptions);
+        
+        // Also populate the campaignsById map
+        const campaignsMap: Record<number, string> = {};
+        campaignsResponse.data.forEach(campaign => {
+          campaignsMap[campaign.id] = campaign.name;
+        });
+        setCampaignsById(campaignsMap);
       } catch (error) {
         console.error("Failed to load campaigns:", error);
         // Fallback to empty array
@@ -543,19 +432,17 @@ const CrmDataManagement = () => {
         page,
         per_page: perPage,
       };
+      console.log("ZE PARAMS", params);
 
-      if (search) {
-        params.search = search;
+      // Use search from filters if available, otherwise use the search parameter
+      const searchTerm = memoizedFilters.search || search;
+      if (searchTerm) {
+        params.search = searchTerm;
       }
 
-      // Add filter parameters
-      if (memoizedFilters.phone) {
-        params.phone = memoizedFilters.phone;
-      }
-
-      // Add new filter parameters for CRM data
+      // Add filter parameters matching the Laravel controller
       if (memoizedFilters.campaign_id && memoizedFilters.campaign_id.length > 0) {
-        params.campaign_id = memoizedFilters.campaign_id;
+        params.campaign_ids = memoizedFilters.campaign_id;
       }
 
       if (memoizedFilters.tags && memoizedFilters.tags.length > 0) {
@@ -563,15 +450,11 @@ const CrmDataManagement = () => {
       }
 
       if (memoizedFilters.assignment_status) {
-        if (memoizedFilters.assignment_status === 'assigned') {
-          params.user_extension = 'not_null';
-        } else if (memoizedFilters.assignment_status === 'unassigned') {
-          params.user_extension = 'null';
-        }
+        params.assignment_status = memoizedFilters.assignment_status;
       }
 
       if (memoizedFilters.user_extension && memoizedFilters.user_extension.length > 0) {
-        params.user_extension = memoizedFilters.user_extension;
+        params.user_extensions = memoizedFilters.user_extension;
       }
 
       if (memoizedFilters.is_viewed !== undefined && memoizedFilters.is_viewed !== '') {
@@ -579,11 +462,11 @@ const CrmDataManagement = () => {
       }
 
       if (memoizedFilters.start_date) {
-        params.start_date = memoizedFilters.start_date;
+        params.date_from = memoizedFilters.start_date;
       }
 
       if (memoizedFilters.end_date) {
-        params.end_date = memoizedFilters.end_date;
+        params.date_to = memoizedFilters.end_date;
       }
 
       const response = await getCrmData(params);
@@ -847,40 +730,43 @@ const CrmDataManagement = () => {
         (tag) => parseInt(tag.value)
       );
 
+      const campaignIds = Array.from(assignmentCampaign).map(
+        (campaign) => parseInt(campaign.value)
+      );
+
+      let result;
+
       if (assignmentDistribution === "equal") {
         // Equal distribution - single API call
-        const campaignIds = Array.from(assignmentCampaign).map(
-          (campaign) => parseInt(campaign.value)
-        );
-
-        const result = await assignCrmDataAdvanced(
+        result = await assignCrmDataAdvanced(
+          campaignIds,
+          totalRecordsToAssign,
           campaignFilterIds,
           tagIds,
-          totalRecordsToAssign,
-          campaignIds
+          "equal"
         );
-
-        console.log("Assignment result:", result);
       } else {
-        // Custom distribution - multiple API calls for each campaign
-        const assignmentPromises = Array.from(assignmentCampaign).map(async (campaign: any) => {
+        // Custom distribution - single API call with campaign distribution
+        const campaignDistribution: Record<number, number> = {};
+        Array.from(assignmentCampaign).forEach((campaign: any) => {
           const campaignId = parseInt(campaign.value);
           const countForThisCampaign = customDistribution[campaign.value] || 0;
-          
           if (countForThisCampaign > 0) {
-            return await assignCrmDataAdvanced(
-              campaignFilterIds,
-              tagIds,
-              countForThisCampaign,
-              [campaignId]
-            );
+            campaignDistribution[campaignId] = countForThisCampaign;
           }
-          return null;
         });
 
-        const results = await Promise.all(assignmentPromises.filter(Boolean));
-        console.log("Custom assignment results:", results);
+        result = await assignCrmDataAdvanced(
+          campaignIds,
+          totalRecordsToAssign,
+          campaignFilterIds,
+          tagIds,
+          "custom",
+          campaignDistribution
+        );
       }
+
+      console.log("Assignment result:", result);
 
       // Close modal and reset state
       setShowDataAssignmentModal(false);
@@ -1002,18 +888,18 @@ const CrmDataManagement = () => {
       return;
     }
 
-    // Here you would typically save the after call data
-    console.log("After call data:", afterCallData);
+    // Close the dialog
+    handleAfterCallModalClose();
     
-    // Show different success messages based on lead generation choice
-    if (afterCallData.generateLead === "yes") {
-      toast.success("After call data saved successfully! Lead will be generated in the CRM system.");
+    // If lead generation is selected, redirect to create lead page with CRM data
+    if (afterCallData.generateLead === "yes" && selectedDataItem) {
+      // Show success message and navigate to create lead page
+      toast.success("Redirecting to create lead page with pre-filled data...");
+      window.location.href = `/crm/leads/create?crm_data_id=${selectedDataItem.id}`;
     } else {
       toast.success("After call data saved successfully! No lead generated.");
     }
-    
-    handleAfterCallModalClose();
-  }, [afterCallData, handleAfterCallModalClose]);
+  }, [afterCallData, selectedDataItem, handleAfterCallModalClose]);
 
   // Schedule/Unschedule call handlers
   const handleScheduleCall = useCallback((record: any) => {
@@ -1026,13 +912,15 @@ const CrmDataManagement = () => {
     setShowScheduleModal(true);
   }, []);
 
-  const handleUnscheduleCall = useCallback((record: any) => {
-    setScheduledCalls(prev => ({
-      ...prev,
-      [record.id]: false
-    }));
-    toast.success(`Call unscheduled for ${record.name || record.phone}`);
-  }, []);
+  const handleUnscheduleCall = useCallback(async (record: any) => {
+    try {
+      const userExtension = (session?.user as any)?.extension || 'default';
+      await unscheduleCall(record.id, userExtension);
+      setRefreshKey((prev) => prev + 1);
+    } catch (error) {
+      console.error("Failed to unschedule call:", error);
+    }
+  }, [session]);
 
   // Schedule modal handlers
   const handleScheduleModalClose = useCallback(() => {
@@ -1045,7 +933,7 @@ const CrmDataManagement = () => {
     });
   }, []);
 
-  const handleScheduleSubmit = useCallback(() => {
+  const handleScheduleSubmit = useCallback(async () => {
     if (!scheduleData.date) {
       toast.error("Please select a date");
       return;
@@ -1055,17 +943,17 @@ const CrmDataManagement = () => {
       return;
     }
 
-    // Schedule the call
-    setScheduledCalls(prev => ({
-      ...prev,
-      [selectedRecordForSchedule.id]: true
-    }));
-
-    const scheduledDateTime = moment(`${scheduleData.date} ${scheduleData.time}`).format("MMM DD, YYYY HH:mm");
-    toast.success(`Call scheduled for ${selectedRecordForSchedule.name || selectedRecordForSchedule.phone} on ${scheduledDateTime}`);
-    
-    handleScheduleModalClose();
-  }, [scheduleData, selectedRecordForSchedule, handleScheduleModalClose]);
+    try {
+      const userExtension = (session?.user as any)?.extension || 'default';
+      const scheduledDateTime = moment(`${scheduleData.date} ${scheduleData.time}`).toISOString();
+      
+      await scheduleCall(selectedRecordForSchedule.id, scheduledDateTime, userExtension);
+      setRefreshKey((prev) => prev + 1);
+      handleScheduleModalClose();
+    } catch (error) {
+      console.error("Failed to schedule call:", error);
+    }
+  }, [scheduleData, selectedRecordForSchedule, handleScheduleModalClose, session]);
 
 
   // Handle bulk delete
@@ -1245,27 +1133,23 @@ const CrmDataManagement = () => {
         },
       },
       {
-        key: "next_call_scheduled_at",
+        key: "scheduled_call_at",
         name: "Next Call Scheduled",
-        selector: (row: any) => row.next_call_scheduled_at,
+        selector: (row: any) => row.scheduled_call_at,
         sortable: true,
         cell: (props: any) => {
-          // Static data for now - some records have scheduled calls, some don't
-          const hasScheduledCall = Math.random() > 0.5;
-          const scheduledTime = "2024-01-16T14:30:00Z";
-          
-          if (!hasScheduledCall) {
+          if (!props.scheduled_call_at) {
             return <span className="text-muted small">Not scheduled</span>;
           }
           
-          const isOverdue = moment(scheduledTime).isBefore(moment());
-          const isNextHour = moment(scheduledTime).isBefore(moment().add(1, 'hour'));
+          const isOverdue = moment(props.scheduled_call_at).isBefore(moment());
+          const isNextHour = moment(props.scheduled_call_at).isBefore(moment().add(1, 'hour'));
           
           return (
             <div className="d-flex align-items-center">
               <FiClock className={`me-1 ${isOverdue ? 'text-danger' : isNextHour ? 'text-warning' : 'text-success'}`} size={12} />
               <span className={`small ${isOverdue ? 'text-danger' : isNextHour ? 'text-warning' : ''}`}>
-                {moment(scheduledTime).format("MMM DD, HH:mm")}
+                {moment(props.scheduled_call_at).format("MMM DD, HH:mm")}
                 {isOverdue && <span className="ms-1 fw-bold">(Overdue)</span>}
                 {isNextHour && !isOverdue && <span className="ms-1 fw-bold">(Soon)</span>}
               </span>
@@ -1384,7 +1268,7 @@ const CrmDataManagement = () => {
                 <FiCheck size={14} />
               </Button>
             )}
-            {scheduledCalls[props.id] ? (
+            {props.scheduled_call_at ? (
               <Button
                 variant="outline-warning"
                 size="sm"
@@ -1415,7 +1299,7 @@ const CrmDataManagement = () => {
         ),
       },
     ],
-    [handleViewData, handleMarkAsViewed, handleDeleteData, handleCallAction, handleCallClick, handlePlayRecording, extensions, availableCampaigns, callEndReasons, scheduledCalls, handleScheduleCall, handleUnscheduleCall]
+    [handleViewData, handleMarkAsViewed, handleDeleteData, handleCallAction, handleCallClick, handlePlayRecording, extensions, availableCampaigns, callEndReasons, handleScheduleCall, handleUnscheduleCall]
   );
 
   return (
@@ -1512,7 +1396,12 @@ const CrmDataManagement = () => {
                   <FiClock className="text-warning me-2" size={24} />
                   <h4 className="mb-0 text-warning">{dashboardStats.callsInNextHour}</h4>
                 </div>
-                <p className="mb-0 small text-muted">Calls in Next Hour</p>
+                <p className="mb-0 small text-muted">
+                  Calls in Next Hour
+                  {(currentFilters.campaign_id?.length > 0 || currentFilters.tags?.length > 0) && (
+                    <span className="text-primary"> (Filtered)</span>
+                  )}
+                </p>
               </Card.Body>
             </Card>
           </div>
@@ -1523,7 +1412,12 @@ const CrmDataManagement = () => {
                   <FiClock className="text-info me-2" size={24} />
                   <h4 className="mb-0 text-info">{dashboardStats.callsInNext24Hours}</h4>
                 </div>
-                <p className="mb-0 small text-muted">Calls in Next 24h</p>
+                <p className="mb-0 small text-muted">
+                  Calls in Next 24h
+                  {(currentFilters.campaign_id?.length > 0 || currentFilters.tags?.length > 0) && (
+                    <span className="text-primary"> (Filtered)</span>
+                  )}
+                </p>
               </Card.Body>
             </Card>
           </div>
@@ -1534,7 +1428,12 @@ const CrmDataManagement = () => {
                   <FiX className="text-danger me-2" size={24} />
                   <h4 className="mb-0 text-danger">{dashboardStats.overdueCalls}</h4>
                 </div>
-                <p className="mb-0 small text-muted">Overdue Calls</p>
+                <p className="mb-0 small text-muted">
+                  Overdue Calls
+                  {(currentFilters.campaign_id?.length > 0 || currentFilters.tags?.length > 0) && (
+                    <span className="text-primary"> (Filtered)</span>
+                  )}
+                </p>
               </Card.Body>
             </Card>
           </div>
@@ -1545,7 +1444,12 @@ const CrmDataManagement = () => {
                   <FiUser className="text-success me-2" size={24} />
                   <h4 className="mb-0 text-success">{dashboardStats.assignedRecords.toLocaleString()}</h4>
                 </div>
-                <p className="mb-0 small text-muted">Assigned Records</p>
+                <p className="mb-0 small text-muted">
+                  Assigned Records
+                  {(currentFilters.campaign_id?.length > 0 || currentFilters.tags?.length > 0) && (
+                    <span className="text-primary"> (Filtered)</span>
+                  )}
+                </p>
               </Card.Body>
             </Card>
           </div>
@@ -1556,13 +1460,85 @@ const CrmDataManagement = () => {
                   <FiAlertCircle className="text-warning me-2" size={24} />
                   <h4 className="mb-0 text-warning">{dashboardStats.unassignedRecords.toLocaleString()}</h4>
                 </div>
-                <p className="mb-0 small text-muted">Unassigned Records</p>
+                <p className="mb-0 small text-muted">
+                  Unassigned Records
+                  {(currentFilters.campaign_id?.length > 0 || currentFilters.tags?.length > 0) && (
+                    <span className="text-primary"> (Filtered)</span>
+                  )}
+                </p>
               </Card.Body>
             </Card>
           </div>
         </div>
 
-        {/* CRM Data Filters */}
+        {/* Search and Filters */}
+        <div className="row mb-3">
+          <div className="col-md-4">
+            <Form.Group>
+              <Form.Label>Search Records</Form.Label>
+              <Form.Control
+                type="text"
+                placeholder="Search by phone number..."
+                value={currentFilters.search || ''}
+                onChange={(e) => {
+                  handleFiltersChange({ ...currentFilters, search: e.target.value });
+                }}
+              />
+            </Form.Group>
+          </div>
+          <div className="col-md-4">
+            <Form.Group>
+              <Form.Label>Filter by Campaigns</Form.Label>
+              <CreatableSelect
+                isMulti
+                value={currentFilters.campaign_id ? availableCampaigns.filter(campaign => 
+                  currentFilters.campaign_id.includes(campaign.value)
+                ) : []}
+                onChange={(selected) => {
+                  const campaignIds = selected ? selected.map((item: any) => item.value) : [];
+                  handleFiltersChange({ ...currentFilters, campaign_id: campaignIds });
+                }}
+                options={availableCampaigns}
+                placeholder="Select campaigns to filter..."
+                styles={{
+                  control: (base) => ({
+                    ...base,
+                    borderColor: "#ced4da",
+                    boxShadow: "none",
+                    fontSize: "14px",
+                  }),
+                }}
+              />
+            </Form.Group>
+          </div>
+          <div className="col-md-4">
+            <Form.Group>
+              <Form.Label>Filter by Tags</Form.Label>
+              <CreatableSelect
+                isMulti
+                value={currentFilters.tags ? availableTags.filter(tag => 
+                  currentFilters.tags.includes(tag.value)
+                ) : []}
+                onChange={(selected) => {
+                  const tags = selected ? selected.map((item: any) => item.value) : [];
+                  handleFiltersChange({ ...currentFilters, tags: tags });
+                }}
+                options={availableTags}
+                placeholder="Select tags to filter..."
+                styles={{
+                  control: (base) => ({
+                    ...base,
+                    borderColor: "#ced4da",
+                    boxShadow: "none",
+                    fontSize: "14px",
+                  }),
+                }}
+              />
+            </Form.Group>
+          </div>
+        </div>
+
+        {/* Additional CRM Data Filters */}
         <div className="row mb-3">
           <div className="col-12">
             <CrmDataFilters onFiltersChange={handleFiltersChange} />
@@ -1582,6 +1558,7 @@ const CrmDataManagement = () => {
                   defaultPageSize={15}
                   filters={memoizedFilters}
                   refreshKey={refreshKey}
+                  search={false}
                   rowSelection={true}
                   onSelectionChange={handleItemSelection}
                 />
@@ -1600,7 +1577,7 @@ const CrmDataManagement = () => {
         <Modal.Header closeButton>
           <Modal.Title className="d-flex align-items-center">
             <FiUpload className="me-2" />
-            Upload CSV File
+            Import CRM Data
           </Modal.Title>
         </Modal.Header>
         <Modal.Body>
@@ -1672,13 +1649,13 @@ const CrmDataManagement = () => {
           )}
 
           <Form.Group className="mt-3">
-            <Form.Label>Select Campaigns (Optional)</Form.Label>
+            <Form.Label>Target Campaigns (Optional)</Form.Label>
             <CreatableSelect
               isMulti
               value={selectedCampaigns}
               onChange={(selected) => setSelectedCampaigns(selected || [])}
               options={availableCampaigns}
-              placeholder="Select campaigns to assign data to..."
+              placeholder="Choose which campaigns this data belongs to..."
               styles={{
                 control: (base) => ({
                   ...base,
@@ -1689,18 +1666,18 @@ const CrmDataManagement = () => {
               }}
             />
             <Form.Text className="text-muted">
-              Select campaigns to assign the uploaded data to. Data will be distributed equally among selected campaigns.
+              <strong>Pro Tip:</strong> Select specific campaigns to categorize your data. This helps with organization and targeted marketing efforts. Data will be automatically distributed among campaign users.
             </Form.Text>
           </Form.Group>
 
           <Form.Group className="mt-3">
-            <Form.Label>Campaign Assignment</Form.Label>
+            <Form.Label>User Assignment Strategy</Form.Label>
             <div>
               <Form.Check
                 type="radio"
                 id="assign-campaign-users"
                 name="assignToCampaignUsers"
-                label="Assign to campaign users"
+                label="Auto-assign to campaign team members"
                 value="true"
                 checked={assignToCampaignUsers === true}
                 onChange={() => setAssignToCampaignUsers(true)}
@@ -1710,25 +1687,25 @@ const CrmDataManagement = () => {
                 type="radio"
                 id="no-assign-campaign-users"
                 name="assignToCampaignUsers"
-                label="Do not assign to campaign users"
+                label="Keep unassigned for manual distribution"
                 value="false"
                 checked={assignToCampaignUsers === false}
                 onChange={() => setAssignToCampaignUsers(false)}
               />
             </div>
             <Form.Text className="text-muted">
-              Choose whether to assign the uploaded data to users associated with the selected campaigns.
+              <strong>Auto-assign:</strong> Data will be automatically distributed among users in the selected campaigns. <strong>Manual:</strong> Data remains unassigned for you to distribute later using the Data Assignment tool.
             </Form.Text>
           </Form.Group>
 
           <Form.Group className="mt-3">
-            <Form.Label>Field Tags (Optional)</Form.Label>
+            <Form.Label>Data Tags (Optional)</Form.Label>
             <CreatableSelect
               isMulti
               value={fieldTags}
               onChange={(selected) => setFieldTags(selected || [])}
               options={availableTags}
-              placeholder="Select or create tags for this data..."
+              placeholder="Add tags to organize and filter this data..."
               styles={{
                 control: (base) => ({
                   ...base,
@@ -1739,20 +1716,18 @@ const CrmDataManagement = () => {
               }}
             />
             <Form.Text className="text-muted">
-              Add custom field tags to categorize this data upload.
+              <strong>Organize:</strong> Add descriptive tags like "hot-lead", "follow-up", or "qualified" to help categorize and filter your data later. You can create new tags by typing them.
             </Form.Text>
           </Form.Group>
 
           <Alert variant="info" className="mt-3">
-            <strong>CSV Format Requirements:</strong>
+            <strong>📋 Import Guidelines:</strong>
             <ul className="mb-0 mt-2">
-              <li>First row should contain column headers</li>
-              <li>
-                Phone numbers should be in a column named "phone" (case
-                insensitive)
-              </li>
-              <li>Maximum file size: 10MB</li>
-              <li>Supported formats: CSV, TXT</li>
+              <li><strong>Headers:</strong> First row must contain column headers</li>
+              <li><strong>Phone Column:</strong> Include a "phone" column (case insensitive) for contact information</li>
+              <li><strong>File Size:</strong> Maximum 10MB per file</li>
+              <li><strong>Formats:</strong> CSV and TXT files supported</li>
+              <li><strong>Data Quality:</strong> Clean, valid data imports faster and works better</li>
             </ul>
           </Alert>
         </Modal.Body>
@@ -1982,16 +1957,20 @@ const CrmDataManagement = () => {
         <Modal.Header closeButton>
           <Modal.Title className="d-flex align-items-center">
             <FiUsers className="me-2" />
-            Data Assignment
+            Smart Data Distribution
           </Modal.Title>
         </Modal.Header>
         <Modal.Body>
           <div className="mb-4">
-            <h6>Filter Records</h6>
+            <div className="d-flex align-items-center mb-3">
+              <FiFilter className="me-2 text-primary" />
+              <h6 className="mb-0">Step 1: Filter Your Data</h6>
+            </div>
+            <p className="text-muted small mb-3">Choose which records to assign by filtering by tags and campaigns.</p>
             <Row>
               <Col md={6}>
                 <Form.Group className="mb-3">
-                  <Form.Label>Select Tags</Form.Label>
+                  <Form.Label>Filter by Tags</Form.Label>
                   <CreatableSelect
                     isMulti
                     value={assignmentFilters.selectedTags}
@@ -2002,7 +1981,7 @@ const CrmDataManagement = () => {
                       }))
                     }
                     options={availableTags}
-                    placeholder="Select tags to filter..."
+                    placeholder="Select tags to filter records..."
                     styles={{
                       control: (base) => ({
                         ...base,
@@ -2012,11 +1991,14 @@ const CrmDataManagement = () => {
                       }),
                     }}
                   />
+                  <Form.Text className="text-muted">
+                    Only records with these tags will be considered for assignment.
+                  </Form.Text>
                 </Form.Group>
               </Col>
               <Col md={6}>
                 <Form.Group className="mb-3">
-                  <Form.Label>Select Campaigns</Form.Label>
+                  <Form.Label>Filter by Campaigns</Form.Label>
                   <CreatableSelect
                     isMulti
                     value={assignmentFilters.selectedCampaigns}
@@ -2027,7 +2009,7 @@ const CrmDataManagement = () => {
                       }))
                     }
                     options={availableCampaigns}
-                    placeholder="Select campaigns to filter..."
+                    placeholder="Select campaigns to filter records..."
                     styles={{
                       control: (base) => ({
                         ...base,
@@ -2037,35 +2019,45 @@ const CrmDataManagement = () => {
                       }),
                     }}
                   />
+                  <Form.Text className="text-muted">
+                    Only records from these campaigns will be considered for assignment.
+                  </Form.Text>
                 </Form.Group>
               </Col>
             </Row>
           </div>
 
           <div className="mb-4">
-            <h6>Record Counts</h6>
+            <div className="d-flex align-items-center mb-3">
+              <FiDatabase className="me-2 text-info" />
+              <h6 className="mb-0">Step 2: Review Available Records</h6>
+            </div>
+            <p className="text-muted small mb-3">Based on your filters, here's what's available for assignment.</p>
             <div className="row">
               <div className="col-md-4">
-                <div className="card bg-light">
+                <div className="card bg-light border-primary">
                   <div className="card-body text-center">
-                    <h4 className="text-primary">{assignmentCounts.total}</h4>
-                    <p className="mb-0">Total Records</p>
+                    <h4 className="text-primary">{assignmentCounts.total.toLocaleString()}</h4>
+                    <p className="mb-0 small">Total Records</p>
+                    <small className="text-muted">Matching your filters</small>
                   </div>
                 </div>
               </div>
               <div className="col-md-4">
                 <div className="card bg-success text-white">
                   <div className="card-body text-center">
-                    <h4>{assignmentCounts.assigned}</h4>
-                    <p className="mb-0">Already Assigned</p>
+                    <h4>{assignmentCounts.assigned.toLocaleString()}</h4>
+                    <p className="mb-0 small">Already Assigned</p>
+                    <small className="opacity-75">In use by team members</small>
                   </div>
                 </div>
               </div>
               <div className="col-md-4">
                 <div className="card bg-warning text-white">
                   <div className="card-body text-center">
-                    <h4>{assignmentCounts.unassigned}</h4>
-                    <p className="mb-0">Unassigned</p>
+                    <h4>{assignmentCounts.unassigned.toLocaleString()}</h4>
+                    <p className="mb-0 small">Available</p>
+                    <small className="opacity-75">Ready for assignment</small>
                   </div>
                 </div>
               </div>
@@ -2073,20 +2065,22 @@ const CrmDataManagement = () => {
           </div>
 
           <div className="mb-4">
-            <h6>Assignment Details</h6>
-            <p className="text-muted">
-              Out of the <strong>{assignmentCounts.total}</strong> records with these tags and campaigns, 
-              <strong> {assignmentCounts.unassigned}</strong> are unassigned.
+            <div className="d-flex align-items-center mb-3">
+              <FiUsers className="me-2 text-success" />
+              <h6 className="mb-0">Step 3: Configure Assignment</h6>
+            </div>
+            <p className="text-muted small mb-3">
+              You have <strong>{assignmentCounts.unassigned.toLocaleString()}</strong> records ready for assignment out of <strong>{assignmentCounts.total.toLocaleString()}</strong> total matching records.
             </p>
             
             <Form.Group className="mb-3">
-              <Form.Label>Assign to Campaign *</Form.Label>
+              <Form.Label>Target Campaigns *</Form.Label>
               <CreatableSelect
                 isMulti
                 value={assignmentCampaign}
                 onChange={(selected) => setAssignmentCampaign(selected || [])}
                 options={availableCampaigns}
-                placeholder="Select campaigns to assign records to..."
+                placeholder="Choose which campaigns to assign records to..."
                 styles={{
                   control: (base) => ({
                     ...base,
@@ -2097,30 +2091,33 @@ const CrmDataManagement = () => {
                 }}
               />
               <Form.Text className="text-muted">
-                Select the campaign(s) where the records will be assigned.
+                <strong>Smart Distribution:</strong> Records will be automatically distributed among users in the selected campaigns based on their workload and availability.
               </Form.Text>
             </Form.Group>
             
             <Form.Group className="mb-3">
-              <Form.Label>How many records should be assigned?</Form.Label>
+              <Form.Label>Assignment Quantity</Form.Label>
               <Form.Control
                 type="number"
                 min="0"
                 max={assignmentCounts.unassigned}
                 value={totalRecordsToAssign}
                 onChange={(e) => setTotalRecordsToAssign(parseInt(e.target.value) || 0)}
-                placeholder="Enter number of records to assign"
+                placeholder="How many records to assign?"
               />
+              <Form.Text className="text-muted">
+                <strong>Maximum:</strong> {assignmentCounts.unassigned.toLocaleString()} records available. Start with a smaller batch to test the assignment process.
+              </Form.Text>
             </Form.Group>
 
             <Form.Group className="mb-3">
-              <Form.Label>Distribution Method</Form.Label>
+              <Form.Label>Distribution Strategy</Form.Label>
               <div>
                 <Form.Check
                   type="radio"
                   id="equal-distribution"
                   name="assignmentDistribution"
-                  label="Split equally among assignment campaigns"
+                  label="Auto-balance across campaigns"
                   value="equal"
                   checked={assignmentDistribution === "equal"}
                   onChange={() => setAssignmentDistribution("equal")}
@@ -2130,12 +2127,15 @@ const CrmDataManagement = () => {
                   type="radio"
                   id="custom-distribution"
                   name="assignmentDistribution"
-                  label="Assign fixed numbers to each assignment campaign"
+                  label="Custom allocation per campaign"
                   value="custom"
                   checked={assignmentDistribution === "custom"}
                   onChange={() => setAssignmentDistribution("custom")}
                 />
               </div>
+              <Form.Text className="text-muted">
+                <strong>Auto-balance:</strong> Records are distributed evenly. <strong>Custom:</strong> You specify exactly how many records each campaign gets.
+              </Form.Text>
             </Form.Group>
 
             {assignmentDistribution === "custom" && assignmentCampaign.length > 0 && (
@@ -2446,40 +2446,226 @@ const CrmDataManagement = () => {
           </Modal.Title>
         </Modal.Header>
         <Modal.Body>
-          <div className="mb-3">
-            <p className="text-muted">
-              Track all user activities including CSV uploads, data assignments, and campaign management.
-            </p>
+          <div className="mb-4">
+            <div className="d-flex justify-content-between align-items-center">
+              <div>
+                <h5 className="mb-1">System Activity Log</h5>
+                <p className="text-muted mb-0">
+                  Track all user activities including CSV uploads, data assignments, and campaign management.
+                </p>
+              </div>
+              <div className="text-end">
+                <Badge bg="info" className="me-2">
+                  {historyPagination.total} Total Activities
+                </Badge>
+                <Badge bg="secondary">
+                  Page {historyPagination.current_page} of {historyPagination.last_page}
+                </Badge>
+              </div>
+            </div>
           </div>
           
-          <div className="timeline">
-            {getHistoryData().map((activity, index) => (
-              <div key={activity.id} className="timeline-item mb-4">
-                <div className="d-flex">
-                  <div className="timeline-marker me-3">
-                    <div className={`bg-${activity.color} rounded-circle d-flex align-items-center justify-content-center`} 
-                         style={{ width: '40px', height: '40px' }}>
-                      {activity.icon === 'upload' && <FiUpload size={20} className="text-white" />}
-                      {activity.icon === 'users' && <FiUsers size={20} className="text-white" />}
-                      {activity.icon === 'user' && <FiUser size={20} className="text-white" />}
-                    </div>
-                  </div>
-                  <div className="timeline-content flex-grow-1">
-                    <div className="d-flex justify-content-between align-items-start mb-2">
-                      <div>
-                        <h6 className="mb-1">
-                          <strong>{activity.user}</strong> {activity.action}
-                        </h6>
-                        <p className="text-muted mb-0 small">{activity.details}</p>
+          {historyLoading ? (
+            <div className="text-center py-5">
+              <Spinner animation="border" variant="primary" />
+              <p className="mt-3 text-muted">Loading activity history...</p>
+            </div>
+          ) : historyData.length === 0 ? (
+            <div className="text-center py-5">
+              <FiClock size={48} className="text-muted mb-3" />
+              <h6 className="text-muted">No Activity Found</h6>
+              <p className="text-muted">No activities have been recorded yet.</p>
+            </div>
+          ) : (
+            <div className="timeline">
+              {historyData.map((activity, index) => {
+                const getActivityIcon = (action: string) => {
+                  switch (action) {
+                    case 'upload':
+                      return <FiUpload size={18} className="text-white" />;
+                    case 'assign':
+                      return <FiUsers size={18} className="text-white" />;
+                    case 'schedule_call':
+                    case 'reschedule_call':
+                      return <FiCalendar size={18} className="text-white" />;
+                    case 'cancel_call':
+                    case 'unschedule_call':
+                      return <FiX size={18} className="text-white" />;
+                    default:
+                      return <FiUser size={18} className="text-white" />;
+                  }
+                };
+
+                const getActivityColor = (action: string) => {
+                  switch (action) {
+                    case 'upload':
+                      return 'primary';
+                    case 'assign':
+                      return 'success';
+                    case 'schedule_call':
+                    case 'reschedule_call':
+                      return 'info';
+                    case 'cancel_call':
+                    case 'unschedule_call':
+                      return 'warning';
+                    default:
+                      return 'secondary';
+                  }
+                };
+
+                const formatActivityDetails = (activity: any) => {
+                  const details = activity.details || {};
+                  switch (activity.action) {
+                    case 'upload':
+                      const campaignNames = details.campaign_ids?.map((id: number) => 
+                        campaignsById[id] || `Campaign #${id}`
+                      ).join(', ') || 'No campaigns';
+                      const tags = details.tags?.join(', ') || 'No tags';
+                      return (
+                        <div>
+                          <div className="mb-1">
+                            <strong>Uploaded {activity.total_records || 0} records</strong>
+                          </div>
+                          <div className="small text-muted">
+                            <div><strong>Campaigns:</strong> {campaignNames}</div>
+                            <div><strong>Tags:</strong> {tags}</div>
+                          </div>
+                        </div>
+                      );
+                    case 'assign':
+                      return (
+                        <div>
+                          <div className="mb-1">
+                            <strong>Assigned {activity.total_records || 0} records</strong>
+                          </div>
+                          <div className="small text-muted">
+                            <strong>To:</strong> {activity.user_extension_done_to || 'Campaign team'}
+                          </div>
+                        </div>
+                      );
+                    case 'schedule_call':
+                      return (
+                        <div>
+                          <div className="mb-1">
+                            <strong>Scheduled call</strong>
+                          </div>
+                          <div className="small text-muted">
+                            <div><strong>Phone:</strong> {details.phone || 'N/A'}</div>
+                            <div><strong>Time:</strong> {moment(details.scheduled_call_at).format('MMM DD, YYYY HH:mm')}</div>
+                          </div>
+                        </div>
+                      );
+                    case 'reschedule_call':
+                      return (
+                        <div>
+                          <div className="mb-1">
+                            <strong>Rescheduled call</strong>
+                          </div>
+                          <div className="small text-muted">
+                            <div><strong>Phone:</strong> {details.phone || 'N/A'}</div>
+                            <div><strong>From:</strong> {moment(details.old_scheduled_call_at).format('MMM DD, HH:mm')}</div>
+                            <div><strong>To:</strong> {moment(details.new_scheduled_call_at).format('MMM DD, HH:mm')}</div>
+                          </div>
+                        </div>
+                      );
+                    case 'cancel_call':
+                    case 'unschedule_call':
+                      return (
+                        <div>
+                          <div className="mb-1">
+                            <strong>Cancelled call</strong>
+                          </div>
+                          <div className="small text-muted">
+                            <div><strong>Phone:</strong> {details.phone || 'N/A'}</div>
+                            <div><strong>Was scheduled:</strong> {moment(details.cancelled_scheduled_call_at || details.unscheduled_call_at).format('MMM DD, HH:mm')}</div>
+                          </div>
+                        </div>
+                      );
+                    default:
+                      return (
+                        <div>
+                          <div className="mb-1">
+                            <strong>{activity.action?.replace('_', ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}</strong>
+                          </div>
+                          <div className="small text-muted">
+                            {activity.details?.description || 'No details available'}
+                          </div>
+                        </div>
+                      );
+                  }
+                };
+
+                return (
+                  <div key={activity.id} className="timeline-item mb-4">
+                    <div className="d-flex">
+                      <div className="timeline-marker me-3">
+                        <div className={`bg-${getActivityColor(activity.action)} rounded-circle d-flex align-items-center justify-content-center shadow-sm`} 
+                             style={{ width: '36px', height: '36px' }}>
+                          {getActivityIcon(activity.action)}
+                        </div>
                       </div>
-                      <small className="text-muted">{activity.timestamp}</small>
+                      <div className="timeline-content flex-grow-1">
+                        <div className="card border-0 shadow-sm">
+                          <div className="card-body p-3">
+                            <div className="d-flex justify-content-between align-items-start mb-2">
+                              <div className="flex-grow-1">
+                                <h6 className="mb-1 d-flex align-items-center">
+                                  <strong className="text-primary">{activity.user_extension_done_by || 'System'}</strong>
+                                  <Badge bg={getActivityColor(activity.action)} className="ms-2 small">
+                                    {activity.action?.replace('_', ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}
+                                  </Badge>
+                                </h6>
+                                <div className="text-muted">
+                                  {formatActivityDetails(activity)}
+                                </div>
+                              </div>
+                              <div className="text-end">
+                                <small className="text-muted">
+                                  {moment(activity.created_at).format("MMM DD, YYYY")}
+                                </small>
+                                <br />
+                                <small className="text-muted">
+                                  {moment(activity.created_at).format("HH:mm:ss")}
+                                </small>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="timeline-line"></div>
+                      </div>
                     </div>
-                    <div className="timeline-line"></div>
                   </div>
-                </div>
+                );
+              })}
+            </div>
+          )}
+          
+          {/* Pagination */}
+          {!historyLoading && historyData.length > 0 && historyPagination.last_page > 1 && (
+            <div className="d-flex justify-content-center mt-4">
+              <div className="btn-group" role="group">
+                <Button
+                  variant="outline-secondary"
+                  size="sm"
+                  disabled={historyPagination.current_page === 1}
+                  onClick={() => fetchHistoryData(historyPagination.current_page - 1)}
+                >
+                  Previous
+                </Button>
+                <Button variant="outline-secondary" size="sm" disabled>
+                  {historyPagination.current_page} / {historyPagination.last_page}
+                </Button>
+                <Button
+                  variant="outline-secondary"
+                  size="sm"
+                  disabled={historyPagination.current_page === historyPagination.last_page}
+                  onClick={() => fetchHistoryData(historyPagination.current_page + 1)}
+                >
+                  Next
+                </Button>
               </div>
-            ))}
-          </div>
+            </div>
+          )}
         </Modal.Body>
         <Modal.Footer>
           <Button variant="secondary" onClick={() => setShowHistoryModal(false)}>

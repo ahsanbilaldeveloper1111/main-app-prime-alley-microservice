@@ -2,9 +2,9 @@ import "@assets/scss/datatable-style.scss";
 import React, { ReactElement, useState, useEffect } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
-import { createLead, getStages, StageData, getCampaigns, CampaignData, getCrmData, CrmDataItem } from "@utils/crm";
+import { createLead, getStages, StageData, getCampaigns, getCampaignById, CampaignData, getCrmData, getCrmDataById, CrmDataItem } from "@utils/crm";
 import { GetHierarchyData } from "@utils/users";
-import { Button, Row, Col, Form, Card, Alert } from "react-bootstrap";
+import { Button, Row, Col, Form, Card, Alert, Badge } from "react-bootstrap";
 import Select from "react-select";
 import { FiSave, FiArrowLeft, FiDatabase, FiTarget } from "react-icons/fi";
 import Link from "next/link";
@@ -28,6 +28,7 @@ const CreateLead = () => {
   const [extensions, setExtensions] = useState<any[]>([]);
   const [campaigns, setCampaigns] = useState<CampaignData[]>([]);
   const [crmData, setCrmData] = useState<CrmDataItem[]>([]);
+  const [selectedCrmData, setSelectedCrmData] = useState<CrmDataItem | null>(null);
   const [selectedCampaign, setSelectedCampaign] = useState<CampaignData | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -38,6 +39,78 @@ const CreateLead = () => {
     fetchCampaigns();
     fetchCrmData();
   }, []);
+
+  // Fetch specific CRM data record if crm_data_id is in URL
+  useEffect(() => {
+    const fetchCrmDataRecord = async () => {
+      if (router.isReady && router.query.crm_data_id) {
+        try {
+          const crmDataId = Number(router.query.crm_data_id);
+          const crmDataRecord = await getCrmDataById(crmDataId);
+          console.log("ZE CRM DATA RECORD", crmDataRecord);
+          setSelectedCrmData(crmDataRecord);
+          
+          // Pre-fill basic form fields
+          setFormData(prev => ({
+            ...prev,
+            crm_data_id: crmDataId,
+            campaign_id: Number(crmDataRecord.campaign_id) || undefined,
+            name: crmDataRecord.data?.name || crmDataRecord.data?.full_name || crmDataRecord.data?.first_name || crmDataRecord.phone || '',
+            description: crmDataRecord.data?.description || crmDataRecord.data?.notes || crmDataRecord.data?.comments || '',
+          }));
+        } catch (error) {
+          console.error("Failed to fetch CRM data record:", error);
+        }
+      }
+    };
+
+    fetchCrmDataRecord();
+  }, [router.isReady, router.query.crm_data_id]);
+
+  // Auto-select campaign and pre-fill fields when CRM data is available
+  useEffect(() => {
+    const fetchCampaignAndPreFill = async () => {
+      if (selectedCrmData && selectedCrmData.campaign_id) {
+        try {
+          // Fetch campaign details with fields
+          const campaign = await getCampaignById(selectedCrmData.campaign_id);
+          console.log("ZE AUTO-SELECTED CAMPAIGN WITH FIELDS", campaign);
+          
+          setSelectedCampaign(campaign);
+          
+          // Pre-fill campaign fields with CRM data (excluding dropdown fields)
+          const preFilledFields: Record<string, any> = {};
+          
+          if (campaign.fields && selectedCrmData.data) {
+            campaign.fields.forEach((field) => {
+              // Skip dropdown fields as requested
+              if (field.field_type === 'dropdown') {
+                return;
+              }
+              
+              // Try to find matching CRM data field
+              const crmDataValue = selectedCrmData.data[field.field_name] || 
+                                 selectedCrmData.data[field.field_name.toLowerCase()] ||
+                                 selectedCrmData.data[field.field_name.toUpperCase()];
+              
+              if (crmDataValue !== null && crmDataValue !== undefined && crmDataValue !== '') {
+                preFilledFields[field.field_name] = String(crmDataValue);
+              }
+            });
+          }
+          
+          setFormData(prev => ({
+            ...prev,
+            campaign_field_values: preFilledFields,
+          }));
+        } catch (error) {
+          console.error("Failed to fetch campaign details for auto-selection:", error);
+        }
+      }
+    };
+
+    fetchCampaignAndPreFill();
+  }, [selectedCrmData]);
 
   const fetchStages = async () => {
     try {
@@ -61,7 +134,7 @@ const CreateLead = () => {
 
   const fetchCampaigns = async () => {
     try {
-      const campaignsData = await getCampaigns({ per_page: 1000 });
+      const campaignsData = await getCampaigns({ per_page: 100 });
       setCampaigns(campaignsData?.data || []);
     } catch (error) {
       console.error("Failed to fetch campaigns:", error);
@@ -70,7 +143,7 @@ const CreateLead = () => {
 
   const fetchCrmData = async () => {
     try {
-      const crmDataResponse = await getCrmData({ per_page: 1000 });
+      const crmDataResponse = await getCrmData({ per_page: 100 });
       setCrmData(crmDataResponse?.data || []);
     } catch (error) {
       console.error("Failed to fetch CRM data:", error);
@@ -104,17 +177,58 @@ const CreateLead = () => {
     }));
   };
 
-  const handleCampaignChange = (selectedOption: any) => {
+  const handleCampaignChange = async (selectedOption: any) => {
     const campaignId = selectedOption?.value;
-    const campaign = campaigns.find(c => c.id === campaignId);
     
-    setFormData((prev) => ({
-      ...prev,
-      campaign_id: campaignId,
-      campaign_field_values: {}, // Reset campaign field values when campaign changes
-    }));
+    if (!campaignId) {
+      setSelectedCampaign(null);
+      setFormData((prev) => ({
+        ...prev,
+        campaign_id: undefined,
+        campaign_field_values: {},
+      }));
+      return;
+    }
     
-    setSelectedCampaign(campaign || null);
+    try {
+      // Fetch campaign details with fields
+      const campaign = await getCampaignById(campaignId);
+      console.log("ZE CAMPAIGN WITH FIELDS", campaign);
+      
+      // Pre-fill campaign fields with CRM data (excluding dropdown fields)
+      const preFilledFields: Record<string, any> = {};
+      
+      if (campaign.fields && selectedCrmData?.data) {
+        campaign.fields.forEach((field) => {
+          // Skip dropdown fields as requested
+          if (field.field_type === 'dropdown') {
+            return;
+          }
+          
+          // Try to find matching CRM data field
+          const crmDataValue = selectedCrmData.data[field.field_name] || 
+                             selectedCrmData.data[field.field_name.toLowerCase()] ||
+                             selectedCrmData.data[field.field_name.toUpperCase()];
+          
+          if (crmDataValue !== null && crmDataValue !== undefined && crmDataValue !== '') {
+            preFilledFields[field.field_name] = String(crmDataValue);
+          }
+        });
+      }
+      
+      setFormData((prev) => ({
+        ...prev,
+        campaign_id: campaignId,
+        campaign_field_values: preFilledFields, // Pre-fill with CRM data
+      }));
+      
+      setSelectedCampaign(campaign);
+    } catch (error) {
+      console.error("Failed to fetch campaign details:", error);
+      // Fallback to basic campaign from list
+      const basicCampaign = campaigns.find(c => c.id === campaignId);
+      setSelectedCampaign(basicCampaign || null);
+    }
   };
 
   const handleCampaignFieldChange = (fieldName: string, value: any) => {
@@ -233,7 +347,15 @@ const CreateLead = () => {
           <div className="col-12">
             <Card className="border-0 shadow-sm">
               <Card.Header>
-                <h5 className="mb-0">Lead Information</h5>
+                <div className="d-flex justify-content-between align-items-center">
+                  <h5 className="mb-0">Lead Information</h5>
+                  {selectedCrmData && (
+                    <Badge bg="info" className="d-flex align-items-center">
+                      <FiDatabase className="me-1" size={14} />
+                      Pre-filled from CRM Data #{selectedCrmData.id}
+                    </Badge>
+                  )}
+                </div>
               </Card.Header>
               <Card.Body>
                 <Form onSubmit={handleSubmit}>
@@ -398,10 +520,18 @@ const CreateLead = () => {
                       <div className="d-flex align-items-center mb-3">
                         <FiTarget className="me-2" />
                         <h6 className="mb-0">Campaign Fields: {selectedCampaign.name}</h6>
+                        {selectedCrmData && (
+                          <Badge bg="success" className="ms-2 small">
+                            Auto-filled from CRM Data
+                          </Badge>
+                        )}
                       </div>
                       <Alert variant="info" className="mb-3">
                         <small>
                           Fill in the custom fields for the selected campaign. These fields will be stored with the lead/opportunity.
+                          {selectedCrmData && (
+                            <><br /><strong>Note:</strong> Fields have been automatically filled from the selected CRM data record. Dropdown fields are excluded from auto-fill.</>
+                          )}
                         </small>
                       </Alert>
                       <Row>
@@ -424,7 +554,7 @@ const CreateLead = () => {
                   )}
 
                   {/* CRM Data Preview */}
-                  {formData.crm_data_id && (
+                  {selectedCrmData && (
                     <div className="border-top pt-3 mt-4">
                       <div className="d-flex align-items-center mb-3">
                         <FiDatabase className="me-2" />
@@ -435,35 +565,30 @@ const CreateLead = () => {
                           This lead/opportunity will be attributed to the selected CRM data record.
                         </small>
                       </Alert>
-                      {(() => {
-                        const selectedCrmData = crmData.find(d => d.id === formData.crm_data_id);
-                        return selectedCrmData ? (
-                          <Card className="bg-light">
-                            <Card.Body>
-                              <Row>
-                                <Col md={6}>
-                                  <strong>Record ID:</strong> #{selectedCrmData.id}
-                                </Col>
-                                <Col md={6}>
-                                  <strong>Phone:</strong> {selectedCrmData.phone || "N/A"}
-                                </Col>
-                                {Object.entries(selectedCrmData.data || {}).slice(0, 4).map(([key, value]) => (
-                                  <Col md={6} key={key} className="mt-2">
-                                    <strong>{key}:</strong> {String(value) || "N/A"}
-                                  </Col>
-                                ))}
-                                {Object.entries(selectedCrmData.data || {}).length > 4 && (
-                                  <Col md={12} className="mt-2">
-                                    <small className="text-muted">
-                                      +{Object.entries(selectedCrmData.data || {}).length - 4} more fields
-                                    </small>
-                                  </Col>
-                                )}
-                              </Row>
-                            </Card.Body>
-                          </Card>
-                        ) : null;
-                      })()}
+                      <Card className="bg-light">
+                        <Card.Body>
+                          <Row>
+                            <Col md={6}>
+                              <strong>Record ID:</strong> #{selectedCrmData.id}
+                            </Col>
+                            <Col md={6}>
+                              <strong>Phone:</strong> {selectedCrmData.phone || "N/A"}
+                            </Col>
+                            {Object.entries(selectedCrmData.data || {}).slice(0, 4).map(([key, value]) => (
+                              <Col md={6} key={key} className="mt-2">
+                                <strong>{key}:</strong> {String(value) || "N/A"}
+                              </Col>
+                            ))}
+                            {Object.entries(selectedCrmData.data || {}).length > 4 && (
+                              <Col md={12} className="mt-2">
+                                <small className="text-muted">
+                                  +{Object.entries(selectedCrmData.data || {}).length - 4} more fields
+                                </small>
+                              </Col>
+                            )}
+                          </Row>
+                        </Card.Body>
+                      </Card>
                     </div>
                   )}
 

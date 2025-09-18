@@ -660,6 +660,16 @@ export const getCrmData = async (params: PaginationParams = {}): Promise<CrmData
   }
 };
 
+export const getCrmDataById = async (id: number): Promise<CrmDataItem> => {
+  try {
+    const response = await axiosInstance.get(`/crm/crm-data/${id}`);
+    return response.data?.data?.data;
+  } catch (error: any) {
+    toast.error(error?.response?.data?.message || "Failed to fetch CRM data record");
+    throw error;
+  }
+};
+
 export const uploadCrmDataCsv = async (
   file: File, 
   campaignIds: string[] = [], 
@@ -746,10 +756,12 @@ export const assignCrmDataToExtension = async (
 
 // New advanced assignment function matching Laravel controller
 export const assignCrmDataAdvanced = async (
-  campaignFilterIds: number[],
-  tagIds: number[] = [],
+  campaignIds: number[],
   count: number,
-  campaignIds: number[]
+  campaignFilterIds: number[] = [],
+  tagIds: number[] = [],
+  distributionMode: "equal" | "custom" = "equal",
+  campaignDistribution?: Record<number, number>
 ): Promise<{
   success: boolean;
   message: string;
@@ -761,12 +773,25 @@ export const assignCrmDataAdvanced = async (
   }>;
 }> => {
   try {
-    const payload = {
-      campaign_filter_ids: campaignFilterIds,
-      tag_ids: tagIds,
+    const payload: any = {
+      campaign_ids: campaignIds,
       count: count,
-      campaign_ids: campaignIds
+      distribution_mode: distributionMode
     };
+
+    // Add optional parameters if provided
+    if (campaignFilterIds.length > 0) {
+      payload.campaign_filter_ids = campaignFilterIds;
+    }
+    
+    if (tagIds.length > 0) {
+      payload.tag_ids = tagIds;
+    }
+
+    // Add campaign distribution for custom mode
+    if (distributionMode === "custom" && campaignDistribution) {
+      payload.campaign_distribution = campaignDistribution;
+    }
 
     const response = await axiosInstance.post("/crm/crm_data/assign", payload);
     
@@ -790,6 +815,13 @@ export const getCrmDataCounts = async (
     total_records: number;
     assigned_records: number;
     unassigned_records: number;
+  };
+  scheduled_calls: {
+    total_scheduled: number;
+    not_scheduled: number;
+    next_hour: number;
+    next_24_hours: number;
+    overdue: number;
   };
   filters: {
     campaign_ids: number[];
@@ -1008,6 +1040,16 @@ export const getCampaigns = async (
   }
 };
 
+export const getCampaignById = async (id: number): Promise<CampaignData> => {
+  try {
+    const response = await axiosInstance.get(`/crm/campaigns/${id}`);
+    return extractData<CampaignData>(response.data);
+  } catch (error: any) {
+    toast.error(error?.message || "Failed to fetch campaign");
+    throw error;
+  }
+};
+
 export const createCampaign = async (
   data: Partial<CampaignData> & { fields?: CampaignField[] }
 ): Promise<CampaignData> => {
@@ -1072,6 +1114,205 @@ export const createCampaignField = async (
     return extractData<CampaignField>(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to create campaign field");
+    throw error;
+  }
+};
+
+// Schedule a call for a CRM data record
+export const scheduleCall = async (
+  crmDataId: number,
+  scheduledCallAt: string,
+  userExtension: string
+): Promise<{
+  success: boolean;
+  message: string;
+  data: any;
+}> => {
+  try {
+    const response = await axiosInstance.post(`/crm/crm-data/${crmDataId}/schedule-call`, {
+      scheduled_call_at: scheduledCallAt,
+      user_extension: userExtension
+    });
+    
+    if (response.data.success) {
+      toast.success(response.data.message);
+    }
+    
+    return response.data;
+  } catch (error: any) {
+    toast.error(error?.response?.data?.message || "Failed to schedule call");
+    throw error;
+  }
+};
+
+// Update scheduled call time
+export const updateScheduledCall = async (
+  crmDataId: number,
+  scheduledCallAt: string,
+  userExtension: string
+): Promise<{
+  success: boolean;
+  message: string;
+  data: any;
+}> => {
+  try {
+    const response = await axiosInstance.put(`/crm/crm-data/${crmDataId}/schedule-call`, {
+      scheduled_call_at: scheduledCallAt,
+      user_extension: userExtension
+    });
+    
+    if (response.data.success) {
+      toast.success(response.data.message);
+    }
+    
+    return response.data;
+  } catch (error: any) {
+    toast.error(error?.response?.data?.message || "Failed to update scheduled call");
+    throw error;
+  }
+};
+
+// Cancel scheduled call
+export const cancelScheduledCall = async (
+  crmDataId: number,
+  userExtension: string
+): Promise<{
+  success: boolean;
+  message: string;
+  data: any;
+}> => {
+  try {
+    const response = await axiosInstance.delete(`/crm/crm-data/${crmDataId}/schedule-call`, {
+      data: { user_extension: userExtension }
+    });
+    
+    if (response.data.success) {
+      toast.success(response.data.message);
+    }
+    
+    return response.data;
+  } catch (error: any) {
+    toast.error(error?.response?.data?.message || "Failed to cancel scheduled call");
+    throw error;
+  }
+};
+
+// Unschedule a call
+export const unscheduleCall = async (
+  crmDataId: number,
+  userExtension: string
+): Promise<{
+  success: boolean;
+  message: string;
+  data: any;
+}> => {
+  try {
+    const response = await axiosInstance.post(`/crm/crm-data/${crmDataId}/unschedule-call`, {
+      user_extension: userExtension
+    });
+    
+    if (response.data.success) {
+      toast.success(response.data.message);
+    }
+    
+    return response.data;
+  } catch (error: any) {
+    toast.error(error?.response?.data?.message || "Failed to unschedule call");
+    throw error;
+  }
+};
+
+// Bulk schedule calls
+export const bulkScheduleCalls = async (
+  crmDataIds: number[],
+  scheduledCallAt: string,
+  userExtension: string
+): Promise<{
+  success: boolean;
+  message: string;
+  scheduled_count: number;
+}> => {
+  try {
+    const response = await axiosInstance.post("/crm/crm-data/bulk-schedule-calls", {
+      crm_data_ids: crmDataIds,
+      scheduled_call_at: scheduledCallAt,
+      user_extension: userExtension
+    });
+    
+    if (response.data.success) {
+      toast.success(response.data.message);
+    }
+    
+    return response.data;
+  } catch (error: any) {
+    toast.error(error?.response?.data?.message || "Failed to schedule calls");
+    throw error;
+  }
+};
+
+// Bulk unschedule calls
+export const bulkUnscheduleCalls = async (
+  crmDataIds: number[],
+  userExtension: string
+): Promise<{
+  success: boolean;
+  message: string;
+  unscheduled_count: number;
+}> => {
+  try {
+    const response = await axiosInstance.post("/crm/crm-data/bulk-unschedule-calls", {
+      crm_data_ids: crmDataIds,
+      user_extension: userExtension
+    });
+    
+    if (response.data.success) {
+      toast.success(response.data.message);
+    }
+    
+    return response.data;
+  } catch (error: any) {
+    toast.error(error?.response?.data?.message || "Failed to unschedule calls");
+    throw error;
+  }
+};
+
+// Get CRM data history
+export const getCrmDataHistory = async (
+  page: number = 1,
+  perPage: number = 15,
+  filters: {
+    user_id?: number;
+    user_extensions?: string[];
+    action?: string;
+    date_from?: string;
+    date_to?: string;
+  } = {}
+): Promise<{
+  data: any[];
+  pagination: {
+    current_page: number;
+    last_page: number;
+    per_page: number;
+    total: number;
+    from: number;
+    to: number;
+  };
+}> => {
+  try {
+    const params: any = {
+      page,
+      per_page: perPage,
+      ...filters
+    };
+
+    const response = await axiosInstance.get("/crm/crm-data/history", { params });
+    
+    return {
+      data: response.data.data?.data,
+      pagination: response.data?.data?.pagination
+    };
+  } catch (error: any) {
+    console.error("Failed to get CRM data history:", error);
     throw error;
   }
 };

@@ -1255,50 +1255,6 @@ export const createCrmDataFiltersConfig = (
 ): FilterTab[] => {
   return [
     {
-      id: 'phone-search',
-      title: 'Phone Search',
-      icon: 'ti ti-phone',
-      fields: [
-        {
-          type: 'text',
-          name: 'phone',
-          label: 'Phone Number',
-          placeholder: 'Enter phone number to search'
-        }
-      ]
-    },
-    {
-      id: 'campaigns',
-      title: 'Campaigns',
-      icon: 'ti ti-target',
-      fields: [
-        {
-          type: 'select',
-          isMulti: true,
-          name: 'campaign_id',
-          label: 'Campaigns',
-          options: campaigns.map((campaign: { id: number; name: string }) => ({
-            value: campaign.id.toString(),
-            label: campaign.name
-          })) || []
-        }
-      ]
-    },
-    {
-      id: 'tags',
-      title: 'Tags',
-      icon: 'ti ti-tag',
-      fields: [
-        {
-          type: 'select',
-          isMulti: true,
-          name: 'tags',
-          label: 'Tags',
-          options: staticTags || []
-        }
-      ]
-    },
-    {
       id: 'assignment-status',
       title: 'Assignment Status',
       icon: 'ti ti-user-check',
