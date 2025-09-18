@@ -214,14 +214,14 @@ export const useTmsSession = () => {
     const isNotExpired = session.expiresAt > nowSeconds();
     const currentTime = nowSeconds();
     
-    console.log('isValid check:', {
-      hasAccessToken,
-      isNotExpired,
-      currentTime,
-      expiresAt: session.expiresAt,
-      timeUntilExpiry: session.expiresAt - currentTime,
-      session: session
-    });
+    // console.log('isValid check:', {
+    //   hasAccessToken,
+    //   isNotExpired,
+    //   currentTime,
+    //   expiresAt: session.expiresAt,
+    //   timeUntilExpiry: session.expiresAt - currentTime,
+    //   session: session
+    // });
     
     return hasAccessToken && isNotExpired;
   }, [session]);

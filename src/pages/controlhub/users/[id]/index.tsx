@@ -6,7 +6,7 @@ import Swal from 'sweetalert2'
 import { toast } from 'react-toastify'
 import { useSession } from 'next-auth/react'
 
-import { getUserById, assignRoleToUser,assignGroupToUser, updateUserStatus,getUserPermissions,UpdateExtendedPermission,UpdateBlockedPermission,getParentUsers,linkUsers,unlinkUsers,GetCustomFields, AddCustomFields,UpdateCustomFields,DeleteCustomFields, GetModules } from '@utils/users'
+import { getUserById, assignRoleToUser,assignGroupToUser, updateUserStatus,getUserPermissions,UpdateExtendedPermission,UpdateBlockedPermission,getParentUsers,linkUsers,unlinkUsers,GetCustomFields, AddCustomFields,UpdateCustomFields,DeleteCustomFields, GetModules,MarkAsCompanyAdmin } from '@utils/users'
 import { getAllRoles } from '@utils/roles'
 import { getAllGroups } from '@utils/groups'
 
@@ -31,6 +31,7 @@ interface User {
     company: string;
     last_synced_at: string;
     role_id: string;
+    is_company_admin: string;
     role: {
         name: string;
     };
@@ -409,6 +410,22 @@ const UserView = () => {
         }
     };
 
+    const [showChangeCompanyAdminModal, setShowChangeCompanyAdminModal] = useState(false)
+    const handleCloseChangeCompanyAdminModal = () => {
+        setShowChangeCompanyAdminModal(false)
+    }
+
+    const [isCompanyAdmin, setIsCompanyAdmin] = useState<boolean>(false)
+
+    const handleSubmitChangeCompanyAdmin = async () => {
+        
+        const response = await MarkAsCompanyAdmin(id as string, isCompanyAdmin);
+        if(response){
+            setShowChangeCompanyAdminModal(false);
+            fetchUser();
+        }
+    }
+
     return (
         <React.Fragment>
                  
@@ -606,9 +623,18 @@ const UserView = () => {
                                            
 
                                                 <p className="mb-0  small text-primary"><b>Department</b></p>
-                                                <p className="mb-0 text-capitalize">
+                                                <p className="mb-2 text-capitalize">
                                                     {currentUser?.department && currentUser?.department !== 'N/A' ? currentUser?.department : 'N/A'}
                                                 </p>
+
+                                                <p className="mb-0  small text-primary"><b>Extension</b></p>
+                                                <p className="mb-0 text-capitalize">
+                                                    {currentUser?.phone && currentUser?.phone !== 'N/A' ? currentUser?.phone : 'N/A'}
+                                                </p>
+
+
+
+
                                             </Col>
                                             <Col md={6}>
                                                 <p className="mb-0  small text-primary"><b>Status</b></p>
@@ -630,7 +656,7 @@ const UserView = () => {
                                                 </p>
 
                                                 <p className="mb-0  small text-primary"><b>Group</b></p>
-                                                <p className="mb-0 text-capitalize d-flex justify-content-between">
+                                                <p className="mb-2 text-capitalize d-flex justify-content-between">
                                                     {currentUser?.group?.name || 'Group not assigned'}
                                                     <span>
                                                     <i className="ti ti-edit" onClick={() => {
@@ -638,6 +664,21 @@ const UserView = () => {
                                                       }} style={{cursor: 'pointer'}}></i>
                                                     </span>
                                                 </p>
+
+
+                                                {session?.user?.permissions?.includes('mark-company-admin-users') && (
+                                                <div>
+                                                    <p className="mb-0  small text-primary"><b>Company Admin</b></p>
+                                                <p className="mb-0 text-capitalize d-flex justify-content-between">
+                                                      {currentUser?.is_company_admin === "1" ? "Yes" : "No"}
+                                                    <span>
+                                                    <i className="ti ti-edit" onClick={() => {
+                                                        setShowChangeCompanyAdminModal(true)
+                                                      }} style={{cursor: 'pointer'}}></i>
+                                                    </span>
+                                                </p>
+                                                </div>
+                                                )}
 
                                             </Col>
                                            </Row>
@@ -691,7 +732,45 @@ const UserView = () => {
                                     </Card>
                                 </Col>
                             </Row>
+
+                            {showChangeCompanyAdminModal && (
+                                
+                                <Modal show={showChangeCompanyAdminModal} onHide={handleCloseChangeCompanyAdminModal}>
+                                    <Modal.Header closeButton>
+                                        <Modal.Title>Mark as Company Admin</Modal.Title>
+                                    </Modal.Header>
+                                
+                                    <Modal.Body>
+                                        <div className="form-group">
+                                            <label htmlFor="companyAdmin">Mark as Company Admin</label>
+                                            <select className="form-control" id="companyAdmin" 
+                                            onChange={(e) => 
+                                            setIsCompanyAdmin(e.target.value === "1")} 
+                                            value={isCompanyAdmin ? "1" : "0"}>
+                                                <option value="1" selected={isCompanyAdmin === true}>Yes</option>
+                                                <option value="0" selected={isCompanyAdmin === false}>No</option>
+                                            </select>
+                                        </div>
+                                    </Modal.Body>
+                                    <Modal.Footer>
+                                        <Button variant="secondary" onClick={handleCloseChangeCompanyAdminModal}>
+                                            Close
+                                        </Button>
+                                        <Button variant="primary" onClick={handleSubmitChangeCompanyAdmin}>
+                                            Mark as Company Admin
+                                        </Button>
+                                    </Modal.Footer>
+                            </Modal>
+                            
+                            )}
                         </Tab>
+
+
+
+
+
+
+
                         <Tab eventKey="permissions" title="Permissions">
                         <Row>
                 {session?.user?.is_admin && session?.user?.permissions?.includes('extend-permission-users') && (
