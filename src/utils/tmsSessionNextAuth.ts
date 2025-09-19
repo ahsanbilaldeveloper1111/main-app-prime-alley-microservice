@@ -1,9 +1,18 @@
 import { TmsSessionData, PermissionAction } from './tmsSession';
-import { useMemo, useCallback, useState, useEffect } from 'react';
+import { useMemo, useCallback, useState, useEffect, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 
 function nowSeconds(): number {
   return Math.floor(Date.now() / 1000);
+}
+
+interface TmsSessionState {
+  session: TmsSessionData | null;
+  isLoading: boolean;
+  isAuthenticated: boolean;
+  tmsPermissions: any[];
+  tmsCustomerType: string;
+  isRefreshing: boolean;
 }
 
 /**
@@ -12,343 +21,260 @@ function nowSeconds(): number {
  */
 export const useTmsSession = () => {
   const { data: nextAuthSession, status } = useSession();
-  const [session, setSession] = useState<TmsSessionData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [tmsPermissions, setTmsPermissions] = useState<any[]>([]);
-  const [tmsCustomerType, setTmsCustomerType] = useState<string>('');
+  const [state, setState] = useState<TmsSessionState>({
+    session: null,
+    isLoading: true,
+    isAuthenticated: false,
+    tmsPermissions: [],
+    tmsCustomerType: '',
+    isRefreshing: false,
+  });
+  
+  const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isInitializedRef = useRef(false);
 
-  // Fetch TMS permissions directly using tmsSessionId
-  const fetchTmsPermissions = useCallback(async () => {
-    try {
-      // Get tmsSessionId from cookie or localStorage
-      const getTmsSessionId = () => {
+  // Helper function to get TMS session ID from cookies
+  const getTmsSessionId = useCallback((): string | null => {
         if (typeof window === 'undefined') return null;
         
-        // Try to get from cookie first
         const cookies = document.cookie.split(';');
         const tmsSessionIdCookie = cookies.find(cookie =>
           cookie.trim().startsWith('tmsSessionId=')
         );
         
-        if (tmsSessionIdCookie) {
-          return tmsSessionIdCookie.split('=')[1];
-        }
-        
-        // Fallback to localStorage
-        return localStorage.getItem('tmsSessionId');
-      };
+    return tmsSessionIdCookie ? tmsSessionIdCookie.split('=')[1] : null;
+  }, []);
 
-      const tmsSessionId = getTmsSessionId();
-      console.log('Fetching TMS permissions for session ID:', tmsSessionId);
+  // Helper function to create TmsSessionData from API response
+  const createTmsSessionData = useCallback((sessionData: any): TmsSessionData => {
+    const accessTokenExpires = sessionData.user?.access_token_expires;
+    const expiresAt = accessTokenExpires ? nowSeconds() + parseInt(accessTokenExpires.toString()) : 0;
+    
+    return {
+      accessToken: sessionData.user?.access_token || '',
+      expiresAt: expiresAt,
+      user: sessionData.user
+    };
+  }, []);
+
+  // Unified session fetching function
+  const fetchSessionData = useCallback(async (sessionId?: string): Promise<boolean> => {
+    try {
+      const tmsSessionId = sessionId || getTmsSessionId();
 
       if (!tmsSessionId) {
-        console.log('No TMS session ID found');
-        setTmsPermissions([]);
-        setTmsCustomerType('');
-        setSession(null);
-        setIsAuthenticated(false);
-        return;
+        setState(prev => ({
+          ...prev,
+          session: null,
+          isAuthenticated: false,
+          tmsPermissions: [],
+          tmsCustomerType: '',
+          isLoading: false,
+        }));
+        return false;
       }
 
       const response = await fetch(`/api/auth/app-session?sessionId=${tmsSessionId}`);
       
       if (!response.ok) {
-        console.log('Failed to fetch TMS session data');
-        setTmsPermissions([]);
-        setTmsCustomerType('');
-        setSession(null);
-        setIsAuthenticated(false);
-        return;
+        setState(prev => ({
+          ...prev,
+          session: null,
+          isAuthenticated: false,
+          tmsPermissions: [],
+          tmsCustomerType: '',
+          isLoading: false,
+        }));
+        return false;
       }
 
       const sessionData = await response.json();
-      console.log('TMS session data:', sessionData);
+      const tmsSessionData = createTmsSessionData(sessionData);
+      const permissions = sessionData?.user?.tmsPermissions || [];
+      const customerType = sessionData?.user?.user_type || '';
       
-      // Set the full session data
-      console.log('Setting session data:', {
-        tmsSession: sessionData.user.tmsSession,
-        hasAccessToken: !!sessionData.user.tmsSession?.accessToken,
-        expiresAt: sessionData.user.tmsSession?.expiresAt,
-        user: sessionData.user.tmsSession?.user
-      });
+      setState(prev => ({
+        ...prev,
+        session: tmsSessionData,
+        isAuthenticated: !!tmsSessionData.accessToken,
+        tmsPermissions: permissions,
+        tmsCustomerType: customerType,
+        isLoading: false,
+      }));
       
-      setSession(sessionData.user.tmsSession);
-      setIsAuthenticated(!!sessionData.user.tmsSession);
-      
-      // Extract permissions from TMS session
-      const permissions = sessionData?.user?.tmsSession?.user?.user_access_info?.permissions || [];
-      const customerType = sessionData?.user?.tmsSession?.user?.user_type || '';
-      
-      console.log('TMS permissions from session:', permissions);
-      console.log('TMS customer type from session:', customerType);
-      
-      setTmsPermissions(permissions);
-      setTmsCustomerType(customerType);
-    } catch (error) {
-      console.error('Error fetching TMS permissions:', error);
-      setTmsPermissions([]);
-      setTmsCustomerType('');
-      setSession(null);
-      setIsAuthenticated(false);
-    }
-  }, []);
-
-  // Fetch full session data using session ID
-  const fetchSession = useCallback(async () => {
-    try {
-      setIsLoading(true);
-      
-      if (!nextAuthSession?.user?.sessionId) {
-        setSession(null);
-        setIsAuthenticated(false);
-        return;
-      }
-
-      const response = await fetch(`/api/auth/app-session?sessionId=${nextAuthSession.user.sessionId}`);
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch full session');
-      }
-
-      const fullSession = await response.json();
-      setSession(fullSession.user.tmsSession);
-      setIsAuthenticated(!!fullSession.user.tmsSession);
+      return true;
     } catch (error) {
       console.error('Error fetching TMS session:', error);
-      setSession(null);
-      setIsAuthenticated(false);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [nextAuthSession?.user?.sessionId]);
-
-  // Fetch session when NextAuth session changes
-  useEffect(() => {
-    if (status === 'authenticated' && nextAuthSession?.user?.sessionId) {
-      fetchSession();
-    } else {
-      setSession(null);
-      setIsAuthenticated(false);
-      setIsLoading(false);
-    }
-  }, [status, nextAuthSession, fetchSession]);
-
-  // Fetch TMS permissions when component mounts or when tmsSessionId changes
-  useEffect(() => {
-    fetchTmsPermissions();
-  }, [fetchTmsPermissions]);
-
-  // Also try to restore session from cookie on initial load
-  useEffect(() => {
-    const restoreSessionFromCookie = async () => {
-      if (typeof window === 'undefined') return;
-      
-      // Check if we have a tmsSessionId in cookie
-      const cookies = document.cookie.split(';');
-      const tmsSessionIdCookie = cookies.find(cookie =>
-        cookie.trim().startsWith('tmsSessionId=')
-      );
-      
-      if (tmsSessionIdCookie) {
-        const tmsSessionId = tmsSessionIdCookie.split('=')[1];
-        console.log('Found TMS session ID in cookie, attempting to restore session:', tmsSessionId);
-        
-        try {
-          const response = await fetch(`/api/auth/app-session?sessionId=${tmsSessionId}`);
-          
-          if (response.ok) {
-            const sessionData = await response.json();
-            console.log('Successfully restored TMS session from cookie:', sessionData);
-            
-            // Set the session data
-            console.log('Restoring session data:', {
-              tmsSession: sessionData.user.tmsSession,
-              hasAccessToken: !!sessionData.user.tmsSession?.accessToken,
-              expiresAt: sessionData.user.tmsSession?.expiresAt,
-              user: sessionData.user.tmsSession?.user
-            });
-            
-            setSession(sessionData.user.tmsSession);
-            setIsAuthenticated(!!sessionData.user.tmsSession);
-            
-            // Extract permissions
-            const permissions = sessionData?.user?.tmsSession?.user?.user_access_info?.permissions || [];
-            const customerType = sessionData?.user?.tmsSession?.user?.user_type || '';
-            
-            setTmsPermissions(permissions);
-            setTmsCustomerType(customerType);
-          } else {
-            console.log('Failed to restore TMS session from cookie, clearing cookie');
-            // Clear invalid cookie
-            document.cookie = 'tmsSessionId=; Path=/; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT';
-            localStorage.removeItem('tmsSessionId');
-          }
-        } catch (error) {
-          console.error('Error restoring TMS session from cookie:', error);
-          // Clear invalid cookie
-          document.cookie = 'tmsSessionId=; Path=/; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT';
-          localStorage.removeItem('tmsSessionId');
-        }
-      }
-    };
-    
-    // Run this on initial load and when status changes
-    if (status === 'unauthenticated' || status === 'loading' || status === 'authenticated') {
-      restoreSessionFromCookie();
-    }
-  }, [status, nextAuthSession]);
-
-  const getRemainingSeconds = useCallback((): number => {
-    if (!session) return 0;
-    return Math.max(0, session.expiresAt - nowSeconds());
-  }, [session]);
-
-  const isValid = useCallback((): boolean => {
-    if (!session) {
-      console.log('isValid: No session found');
+      setState(prev => ({
+        ...prev,
+        session: null,
+        isAuthenticated: false,
+        tmsPermissions: [],
+        tmsCustomerType: '',
+        isLoading: false,
+      }));
       return false;
     }
+  }, [getTmsSessionId, createTmsSessionData]);
+
+  // Main effect to handle session initialization and restoration
+  useEffect(() => {
+    const initializeSession = async () => {
+      if (isInitializedRef.current) return;
+      isInitializedRef.current = true;
+
+      // Try to restore from NextAuth session first
+    if (status === 'authenticated' && nextAuthSession?.user?.sessionId) {
+        await fetchSessionData(nextAuthSession.user.sessionId);
+      } else if (status === 'unauthenticated' || status === 'loading') {
+        // Try to restore from cookies
+        await fetchSessionData();
+    } else {
+        setState(prev => ({
+          ...prev,
+          session: null,
+          isAuthenticated: false,
+          isLoading: false,
+        }));
+      }
+    };
+
+    initializeSession();
+  }, [status, nextAuthSession?.user?.sessionId, fetchSessionData]);
+
+  // Reset initialization flag when status changes to allow re-initialization
+  useEffect(() => {
+    if (status === 'unauthenticated') {
+      isInitializedRef.current = false;
+    }
+  }, [status]);
+
+  const getRemainingSeconds = useCallback((): number => {
+    if (!state.session) return 0;
+    return Math.max(0, state.session.expiresAt - nowSeconds());
+  }, [state.session]);
+
+  const isValid = useCallback((): boolean => {
+    if (!state.session) return false;
     
-    const hasAccessToken = !!session.accessToken;
-    const isNotExpired = session.expiresAt > nowSeconds();
-    const currentTime = nowSeconds();
-    
-    // console.log('isValid check:', {
-    //   hasAccessToken,
-    //   isNotExpired,
-    //   currentTime,
-    //   expiresAt: session.expiresAt,
-    //   timeUntilExpiry: session.expiresAt - currentTime,
-    //   session: session
-    // });
+    const hasAccessToken = !!state.session.accessToken;
+    const isNotExpired = state.session.expiresAt > nowSeconds();
     
     return hasAccessToken && isNotExpired;
-  }, [session]);
+  }, [state.session]);
 
-  // Session validation and refresh
+  // Session validation and refresh with optimized logic
   useEffect(() => {
     const validateAndRefreshSession = async () => {
-      if (!session || !isValid()) {
+      if (!state.session || !isValid() || state.isRefreshing) {
         return;
       }
 
-      // Check if session expires in the next 5 minutes
       const timeUntilExpiry = getRemainingSeconds();
-      if (timeUntilExpiry < 300) { // 5 minutes
+      if (timeUntilExpiry < 120) { // 2 minutes
         console.log('TMS session expires soon, attempting to refresh...');
         
-        try {
-          // Try to refresh the session by fetching it again
-          const cookies = document.cookie.split(';');
-          const tmsSessionIdCookie = cookies.find(cookie =>
-            cookie.trim().startsWith('tmsSessionId=')
-          );
-          
-          if (tmsSessionIdCookie) {
-            const tmsSessionId = tmsSessionIdCookie.split('=')[1];
-            const response = await fetch(`/api/auth/app-session?sessionId=${tmsSessionId}`);
-            
-            if (response.ok) {
-              const sessionData = await response.json();
-              console.log('TMS session refreshed successfully');
-              
-              // Update session data
-              setSession(sessionData.user.tmsSession);
-              setIsAuthenticated(!!sessionData.user.tmsSession);
-              
-              // Update permissions
-              const permissions = sessionData?.user?.tmsSession?.user?.user_access_info?.permissions || [];
-              const customerType = sessionData?.user?.tmsSession?.user?.user_type || '';
-              
-              setTmsPermissions(permissions);
-              setTmsCustomerType(customerType);
-            } else {
+        setState(prev => ({ ...prev, isRefreshing: true }));
+        
+        const success = await fetchSessionData();
+        if (!success) {
               console.log('Failed to refresh TMS session, clearing session');
-              setSession(null);
-              setIsAuthenticated(false);
-              setTmsPermissions([]);
-              setTmsCustomerType('');
-            }
-          }
-        } catch (error) {
-          console.error('Error refreshing TMS session:', error);
-          setSession(null);
-          setIsAuthenticated(false);
-          setTmsPermissions([]);
-          setTmsCustomerType('');
         }
+        
+        setState(prev => ({ ...prev, isRefreshing: false }));
       }
     };
 
-    // Run validation every minute
-    const interval = setInterval(validateAndRefreshSession, 60000);
-    
-    // Also run immediately
-    validateAndRefreshSession();
-
-    return () => clearInterval(interval);
-  }, [session, isValid, getRemainingSeconds]);
-
-  const getPermissions = useCallback((): any[] => {
-    
-    return tmsPermissions;
-  }, [tmsPermissions]);
-
-  const getCustomerType = useCallback((): string => {
-    return tmsCustomerType;
-  }, [tmsCustomerType]);
-
-  const hasPermission = useCallback((action: string, module: string, checkCustomerType: string = ''): boolean => {
-    const permissions = getPermissions();
-    const customerType = getCustomerType();
-
-    const isSuperAdmin = permissions.some(
-      (permission) => 
-        permission.action === 'admin' &&
-        permission.module === 'global'
-    );
-
-    //console.log('Is super admin:', isSuperAdmin,action,module,checkCustomerType);
-
-    if (!isSuperAdmin) {
-      //console.log('not super admin:');
-      const permission = permissions.some(permission => permission.module === module && permission.action === action);
-      
-     // console.log('Permission found:', permission);
-      
-      if (checkCustomerType) {
-        const result = customerType == checkCustomerType && permission;
-        //console.log('Permission with customer type check:', result);
-        return result;
-      }
-      return permission;
+    // Clear any existing timeout
+    if (refreshTimeoutRef.current) {
+      clearTimeout(refreshTimeoutRef.current);
     }
 
-    //console.log('is super admin return:', isSuperAdmin);
-    return isSuperAdmin;
-  }, [getPermissions, getCustomerType]);
+    // Set up refresh timeout
+    const timeUntilExpiry = getRemainingSeconds();
+    if (timeUntilExpiry > 0) {
+      const refreshTime = Math.max(0, timeUntilExpiry - 120) * 1000; // Refresh 2 minutes before expiry
+      refreshTimeoutRef.current = setTimeout(validateAndRefreshSession, refreshTime);
+    }
+
+    // Also run immediately if needed
+    validateAndRefreshSession();
+
+    return () => {
+      if (refreshTimeoutRef.current) {
+        clearTimeout(refreshTimeoutRef.current);
+      }
+    };
+  }, [state.session, isValid, getRemainingSeconds, fetchSessionData]);
+
+  const getPermissions = useCallback((): any[] => {
+    return state.tmsPermissions;
+  }, [state.tmsPermissions]);
+
+  const getCustomerType = useCallback((): string => {
+    return state.tmsCustomerType;
+  }, [state.tmsCustomerType]);
+
+  const hasPermission = useCallback((action: string, module: string, checkCustomerType: string = ''): boolean => {
+    const permissions = state.tmsPermissions;
+    const customerType = state.tmsCustomerType;
+
+    // Check if user is super admin (has admin_global permission)
+    const isSuperAdmin = permissions.includes('admin_global');
+
+    if (isSuperAdmin) {
+      return true;
+    }
+
+    // Check for specific permission in format "action_module"
+    const permissionString = `${action}_${module}`;
+    const hasSpecificPermission = permissions.includes(permissionString);
+    
+    if (checkCustomerType) {
+      return customerType === checkCustomerType && hasSpecificPermission;
+    }
+    
+    return hasSpecificPermission;
+  }, [state.tmsPermissions, state.tmsCustomerType]);
 
   const hasAnyPermission = useCallback((permissions: string[]): boolean => {
-    const userPermissions = getPermissions();
-    return permissions.some(permission => userPermissions.includes(permission));
-  }, [getPermissions]);
+    return permissions.some(permission => state.tmsPermissions.includes(permission));
+  }, [state.tmsPermissions]);
 
   const hasAllPermissions = useCallback((permissions: string[]): boolean => {
-    const userPermissions = getPermissions();
-    return permissions.every(permission => userPermissions.includes(permission));
-  }, [getPermissions]);
+    return permissions.every(permission => state.tmsPermissions.includes(permission));
+  }, [state.tmsPermissions]);
 
-  // Memoize the session data to prevent unnecessary re-renders
-  const sessionData = useMemo(() => session, [session]);
-  const isValidValue = useMemo(() => isValid(), [isValid]);
+  // Clear TMS session data
+  const clearTmsSession = useCallback(() => {
+    console.log('Clearing TMS session data...');
+    setState({
+      session: null,
+      isAuthenticated: false,
+      tmsPermissions: [],
+      tmsCustomerType: '',
+      isLoading: false,
+      isRefreshing: false,
+    });
+    
+    // Clear any pending refresh timeout
+    if (refreshTimeoutRef.current) {
+      clearTimeout(refreshTimeoutRef.current);
+      refreshTimeoutRef.current = null;
+    }
+    
+    // Reset initialization flag
+    isInitializedRef.current = false;
+  }, []);
 
-  return {
+  // Memoize the return object to prevent unnecessary re-renders
+  return useMemo(() => ({
     // Core session data
-    session: sessionData,
-    isValid: isValidValue,
-    isAuthenticated,
-    isLoading,
+    session: state.session,
+    isValid: isValid(),
+    isAuthenticated: state.isAuthenticated,
+    isLoading: state.isLoading,
+    isRefreshing: state.isRefreshing,
     
     // Utility methods (memoized)
     getRemainingSeconds,
@@ -358,9 +284,24 @@ export const useTmsSession = () => {
     hasAnyPermission,
     hasAllPermissions,
     
-    // Refresh function
-    refresh: fetchSession,
-  };
+    // Session management
+    refresh: () => fetchSessionData(),
+    clear: clearTmsSession,
+  }), [
+    state.session,
+    state.isAuthenticated,
+    state.isLoading,
+    state.isRefreshing,
+    isValid,
+    getRemainingSeconds,
+    getPermissions,
+    getCustomerType,
+    hasPermission,
+    hasAnyPermission,
+    hasAllPermissions,
+    fetchSessionData,
+    clearTmsSession,
+  ]);
 };
 
 /**

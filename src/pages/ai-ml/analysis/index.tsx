@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
-import { Row, Col, Card, Badge, Button, Spinner, Alert, Form } from 'react-bootstrap';
+import { Row, Col, Card, Button, Spinner, Alert, Form } from 'react-bootstrap';
 import { toast } from 'react-toastify';
 import moment from 'moment';
 import Tab from 'react-bootstrap/Tab';
 import Tabs from 'react-bootstrap/Tabs';
 import dynamic from 'next/dynamic';
-import { Client } from '@stomp/stompjs';
+import { useAnalysisSSE } from '@hooks/useAnalysisSSE';
 
 // Components
 import Layout from '@layout/index';
@@ -77,6 +77,26 @@ interface ExtractEntities {
 const CallAnalysis = () => {
   const { data: session, status } = useSession();
   const router = useRouter();
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
   
   // State declarations
   const [analysis, setAnalysis] = useState<CallAnalysis | null>(null);
@@ -89,8 +109,6 @@ const CallAnalysis = () => {
   const [callDuration, setCallDuration] = useState<string | null>(null);
   const [callType, setCallType] = useState<string | null>(null);
   const [dataFound, setDataFound] = useState<boolean>(false);
-  const [socketConnected, setSocketConnected] = useState<boolean>(false);
-  const [connectionStatus, setConnectionStatus] = useState<string>('disconnected');
 
   
   // Audio related state
@@ -110,247 +128,141 @@ const CallAnalysis = () => {
   // Refs
   const audioPlayerRef = useRef<AudioPlayerRef>(null);
   const audioStopTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const stompClientRef = useRef<Client | null>(null);
+
+  // Server-Sent Events connection to analysis server
+  const {
+    connected: socketConnected,
+    connecting: socketConnecting,
+    error: socketError,
+    lastMessage: socketMessage,
+    parametersReady: socketParametersReady,
+    connect: connectSocket,
+    disconnect: disconnectSocket
+  } = useAnalysisSSE({
+    uuid: uuid,
+    date: date,
+    localPartyNumber: localPartyNumber,
+    ownerUsername: ownerUsername,
+    onMessage: (data) => {
+      if (!data) return;
+
+      // Handle final analysis result
+      if (data.status === 'done' && data.result) {
+        const result = data.result;
+        
+        // Set main analysis data
+        if (result.sentiment || result.customer_intent) {
+          setAnalysis(result);
+        }
+        
+        // Set domain specific analysis
+        if (result.domain_specific_analysis) {
+          const domainAnalysis = result.domain_specific_analysis;
+          setDomainSpecificAnalysis(domainAnalysis);
+          setSummaryData(domainAnalysis?.summary_data);
+          setTranscription(domainAnalysis?.transcription);
+          setExtractEntities(domainAnalysis?.extracted_qualification_fields);
+          setCallDuration(domainAnalysis?.domain_specific_duration);
+        }
+        
+        setDataFound(true);
+        setLoading(false);
+      }
+      // Handle processing status
+      else if (data.status === 'processing') {
+        setLoading(true);
+      }
+      // Handle connection status
+      else if (data.type === 'connection') {
+        // Connection status handled by onOpen/onClose
+      }
+      // Handle ping messages
+      else if (data.type === 'ping') {
+        // Keep connection alive
+      }
+      // Fallback for other data structures
+      else if (data.analysis) {
+        setAnalysis(data.analysis);
+      } else if (data.sentiment || data.customer_intent) {
+        setAnalysis(data);
+      }
+    },
+    onError: (error) => {
+      console.error('Analysis SSE error:', error);
+      toast.error(`WebSocket connection failed: ${error.message || error}`);
+      setError(error.message || 'Analysis SSE connection failed');
+      setLoading(false);
+    },
+    onOpen: () => {
+      setError(null);
+    },
+    onClose: () => {
+      // Connection closed - handled silently
+    }
+  });
+
+ 
+
 
   // Extract data from URL parameters
   useEffect(() => {
-    if (router.isReady) {
-      try {
-        const { id, file, direction, phone } = router.query;
-        
-        
-        if (id) {
-          setAudioTrackId(id as string);
-          setUuid(id as string);
-          //console.log('uuid is:', id);
-        }
-        if (direction) {
-          setCallType(direction as string);
-        }
-        if (phone) {
-          setLocalPartyNumber(phone as string);
-        }
-        
-        
-        if (file) {
-          const filePath = file as string;
-          //console.log('File path:', filePath);
-          
-          const filename = filePath.split('\\').pop();
-          
-          if (filename) {
-            const cleanName = filename.replace('Record_', '').replace('_OUT', '');
-            const parts = cleanName.split('_');
-            
-            if (parts.length >= 4) {
-              const timestamp = parts[0];
-              
-              const extension = parts[1];
-              const user = parts[2];
+    if (!router.isReady) return;
 
-              const phoneNumber = parts[3];
-              
-              const year = timestamp.substring(0, 4);
-              const month = timestamp.substring(4, 6);
-              const day = timestamp.substring(6, 8);
-              const formattedDate = `${year}-${month}-${day}`;
-              
-             
-              
-              // Set state variables
-              
-              setLocalPartyNumber(extension);
-              setOwnerUsername(user);
-              setDate(formattedDate);
-              
-              // Call analysis with extracted values directly
-              handleGetCallAnalysisWithData(formattedDate, extension, user, id as string);
-            }
+    try {
+      const { id, file, direction, phone } = router.query;
+      
+      // Set basic parameters
+      if (id) {
+        setAudioTrackId(id as string);
+        setUuid(id as string);
+      }
+      if (direction) {
+        setCallType(direction as string);
+      }
+      if (phone) {
+        setLocalPartyNumber(phone as string);
+      }
+      
+      // Parse file path for additional parameters
+      if (file) {
+        const filePath = file as string;
+        const filename = filePath.split('\\').pop();
+        
+        if (filename) {
+          const cleanName = filename.replace('Record_', '').replace('_OUT', '');
+          const parts = cleanName.split('_');
+          
+          if (parts.length >= 4) {
+            const timestamp = parts[0];
+            const extension = parts[1];
+            const user = parts[2];
+            
+            // Format date from timestamp
+            const year = timestamp.substring(0, 4);
+            const month = timestamp.substring(4, 6);
+            const day = timestamp.substring(6, 8);
+            const formattedDate = `${year}-${month}-${day}`;
+            
+            // Set extracted parameters
+            setLocalPartyNumber(extension);
+            setOwnerUsername(user);
+            setDate(formattedDate);
+            
+            // Trigger analysis
+            handleGetCallAnalysisWithData(formattedDate, extension, user, id as string);
           }
         }
-
-        
-      } catch (error) {
-        console.error('Error parsing URL data:', error);
       }
+    } catch (error) {
+      console.error('Error parsing URL data:', error);
     }
   }, [router.isReady, router.query.id, router.query.file]);
 
-  // Debug useEffect to monitor date changes
-  useEffect(() => {
-    
-  }, [date]);
 
-  // STOMP connection setup
-  useEffect(() => {
-    const STOMP_URL = process.env.NEXT_PUBLIC_AIML_SOCKET_URL;
-    
-    if (STOMP_URL && uuid && date && localPartyNumber && ownerUsername) {
-      // Construct the STOMP broker URL - ensure it's a proper WebSocket URL
-      let brokerURL = STOMP_URL;
-      
-      // If the URL doesn't start with ws:// or wss://, add the appropriate protocol
-      if (!brokerURL.startsWith('ws://') && !brokerURL.startsWith('wss://')) {
-        // Check if it's HTTPS context to determine protocol
-        const isSecure = window.location.protocol === 'https:';
-        brokerURL = `${isSecure ? 'wss://' : 'ws://'}${brokerURL}`;
-      }
-      
-      // Ensure the URL ends with /ws for STOMP
-      if (!brokerURL.endsWith('/ws')) {
-        brokerURL = `${brokerURL}/ws`;
-      }
-      
-      console.log('Connecting to STOMP broker:', brokerURL);
-      console.log('Analysis parameters:', { uuid, date, localPartyNumber, ownerUsername });
-      console.log('Environment check:', {
-        protocol: window.location.protocol,
-        host: window.location.host,
-        isSecure: window.location.protocol === 'https:',
-        originalUrl: STOMP_URL
-      });
-      
-      // Initialize STOMP client
-      const client = new Client({
-        brokerURL,
-        connectHeaders: {
-          'uuid': uuid,
-          'date': date,
-          'localPartyNumber': localPartyNumber,
-          'ownerUsername': ownerUsername,
-        },
-        reconnectDelay: 5000,
-        heartbeatIncoming: 4000,
-        heartbeatOutgoing: 4000,
-        connectionTimeout: 10000, // 10 seconds connection timeout
-        debug: function (str) {
-          console.log('STOMP Debug:', str);
-        }
-      });
-      
-      stompClientRef.current = client;
-      
-      // STOMP event handlers
-      client.onConnect = () => {
-        console.log('STOMP connected successfully');
-        toast.success('Connected to analysis server');
-        setError(null);
-        setSocketConnected(true);
-        setConnectionStatus('connected');
-        
-        try {
-          console.log('Setting up STOMP subscriptions...');
-          
-          // Subscribe to analysis data
-          client.subscribe('/user/topic/analysis-data', ({ body }) => {
-            try {
-              console.log('Received analysis data:', body);
-              const data = JSON.parse(body);
-              
-              if (data) {
-                setAnalysis(data);
-                setSummaryData(data?.domain_specific_analysis?.summary_data);
-                setDomainSpecificAnalysis(data?.domain_specific_analysis);
-                setTranscription(data?.domain_specific_analysis?.transcription);
-                setExtractEntities(data?.domain_specific_analysis?.extracted_qualification_fields);
-                setCallDuration(data?.domain_specific_analysis?.domain_specific_duration);
-                setDataFound(true);
-                setLoading(false);
-              }
-            } catch (err) {
-              console.error('Failed to process analysis data:', err);
-              setError('Failed to process analysis data');
-            }
-          });
-          
-          // Subscribe to analysis errors
-          client.subscribe('/user/topic/analysis-error', ({ body }) => {
-            try {
-              console.error('Analysis error received:', body);
-              const errorData = JSON.parse(body);
-              toast.error(`Analysis error: ${errorData.message || errorData}`);
-              setError(errorData.message || 'Analysis failed');
-              setLoading(false);
-            } catch (err) {
-              console.error('Failed to process analysis error:', err);
-              setError('Failed to process analysis error');
-            }
-          });
-          
-          // Subscribe to analysis progress
-          client.subscribe('/user/topic/analysis-progress', ({ body }) => {
-            try {
-              console.log('Analysis progress:', body);
-              const progress = JSON.parse(body);
-              // You can add a progress indicator here if needed
-            } catch (err) {
-              console.error('Failed to process analysis progress:', err);
-            }
-          });
-          
-          console.log('All STOMP subscriptions set up successfully');
-        } catch (err) {
-          console.error('Error setting up subscriptions:', err);
-          setError('Failed to setup subscriptions');
-        }
-      };
-      
-      client.onStompError = (frame) => {
-        console.error('STOMP error:', frame);
-        const errorMessage = frame.headers?.message || 'Unknown STOMP error';
-        setSocketConnected(false);
-        setConnectionStatus('error');
-        toast.error(`STOMP error: ${errorMessage}`);
-        setError(`STOMP error: ${errorMessage}`);
-      };
-      
-      client.onWebSocketError = (ev) => {
-        console.error('WebSocket error:', ev);
-        console.error('WebSocket error details:', {
-          type: ev.type,
-          target: ev.target,
-          readyState: ev.target?.readyState,
-          url: ev.target?.url
-        });
-        
-        setSocketConnected(false);
-        setConnectionStatus('error');
-        
-        // Provide more specific error messages
-        let errorMessage = 'WebSocket connection failed';
-        if (ev.target?.readyState === 3) {
-          errorMessage = 'WebSocket connection closed unexpectedly';
-        } else if (ev.type === 'error') {
-          errorMessage = 'WebSocket connection error - server may be unavailable';
-        }
-        
-        toast.error(errorMessage);
-        setError(`${errorMessage} (${brokerURL})`);
-      };
-      
-      client.onWebSocketClose = (ev) => {
-        console.log('WebSocket connection closed:', ev);
-        setSocketConnected(false);
-        setConnectionStatus('disconnected');
-        toast.warning('Disconnected from analysis server');
-      };
-      
-      // Activate the client
-      client.activate();
-      
-      // Cleanup function
-      return () => {
-        if (client) {
-          client.deactivate();
-          stompClientRef.current = null;
-        }
-      };
-    }
-  }, [uuid, date, localPartyNumber, ownerUsername]);
+  // SSE will auto-connect when the hook is initialized
 
   // Load audio when uuid changes
   useEffect(() => {
-    //handleGetCallAnalysis();
     if (audioTrackId) {
       loadAuthenticatedAudio(audioTrackId);
     }
@@ -363,81 +275,58 @@ const CallAnalysis = () => {
   }, [audioTrackId]);
 
   const handleGetCallAnalysis = async () => {
+    // Validate required parameters
+    if (!uuid || !date || !localPartyNumber || !ownerUsername) {
+      toast.error('Please fill in all required fields (UUID, Date, Extension, Username)');
+      return;
+    }
     
     setLoading(true);
     setError(null);
-
-    // Check if STOMP client is connected and request analysis
-    if (stompClientRef.current && stompClientRef.current.connected) {
-      console.log('Requesting analysis via STOMP');
-      stompClientRef.current.publish({
-        destination: '/app/request/analysis',
-        body: JSON.stringify({
-          uuid,
-          date,
-          localPartyNumber,
-          ownerUsername
-        })
-      });
-    } else {
-      console.log('STOMP not connected, falling back to HTTP API');
-      try {
-        setLoading(true);
-        const response = await GetCallAnalysis(date, localPartyNumber, ownerUsername, uuid);
-       
-        // Check if object has analysis and it has error
-        if (response && response.analysis && response.analysis.error) {
-          toast.error(response.analysis.error);
-          setLoading(false);
-          return;
-        }
-        setAnalysis(response);
-
-        setSummaryData(response?.domain_specific_analysis?.summary_data);
-        setDomainSpecificAnalysis(response?.domain_specific_analysis);
-        setTranscription(response?.domain_specific_analysis?.transcription);
-        setExtractEntities(response?.domain_specific_analysis?.extracted_qualification_fields);
-        setCallDuration(response?.domain_specific_analysis?.domain_specific_duration);
-        setLoading(false);
-      } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : 'An error occurred';
-        setError(errorMessage);
-        console.error('Error fetching call analysis:', err as Error);
-      } finally {
-        setLoading(false);
-      }
+    
+    // Connect to WebSocket for analysis
+    if (socketParametersReady && !socketConnected && !socketConnecting) {
+      connectSocket();
     }
   };
 
-  const handleGetCallAnalysisWithData = async (dateParam: string, localPartyNumberParam: string, ownerUsernameParam: string, uuidParam: string) => {
-    return;
-
+  const handleHttpAnalysis = async () => {
     try {
+      const response = await GetCallAnalysis(date, localPartyNumber, ownerUsername, uuid);
      
-      setLoading(true);
-      const response = await GetCallAnalysis(dateParam, localPartyNumberParam, ownerUsernameParam, uuidParam);
+      // Check if object has analysis and it has error
       if (response && response.analysis && response.analysis.error) {
         toast.error(response.analysis.error);
         setLoading(false);
-        setDataFound(false);
         return;
       }
-
       setAnalysis(response);
+
       setSummaryData(response?.domain_specific_analysis?.summary_data);
       setDomainSpecificAnalysis(response?.domain_specific_analysis);
       setTranscription(response?.domain_specific_analysis?.transcription);
       setExtractEntities(response?.domain_specific_analysis?.extracted_qualification_fields);
+      setCallDuration(response?.domain_specific_analysis?.domain_specific_duration);
       setLoading(false);
-      setDataFound(true);
-    } catch (err: unknown) {
-      const errorMessage = (err as Error)?.message || 'An error occurred';
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'An error occurred';
       setError(errorMessage);
-      console.error('Error fetching call analysis:', err);
+      console.error('Error fetching call analysis:', err as Error);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleGetCallAnalysisWithData = async (dateParam: string, localPartyNumberParam: string, ownerUsernameParam: string, uuidParam: string) => {
+    // Set the parameters
+    setUuid(uuidParam);
+    setDate(dateParam);
+    setLocalPartyNumber(localPartyNumberParam);
+    setOwnerUsername(ownerUsernameParam);
     
+    // Set loading state
+    setLoading(true);
+    setError(null);
   };
 
   const loadAuthenticatedAudio = async (trackId?: string) => {
@@ -545,45 +434,38 @@ const CallAnalysis = () => {
     handleGetCallAnalysis();
   };
 
-  const handleReconnect = () => {
-    if (stompClientRef.current) {
-      stompClientRef.current.deactivate();
-      stompClientRef.current = null;
-    }
-    // Force reconnection by clearing the STOMP client ref
-    // The useEffect will recreate the connection
-    setConnectionStatus('disconnected');
-    setSocketConnected(false);
-    setError(null);
-  };
 
-  const testConnection = async () => {
-    const STOMP_URL = process.env.NEXT_PUBLIC_AIML_SOCKET_URL;
-    if (!STOMP_URL) {
-      toast.error('STOMP URL not configured');
-      return;
-    }
 
-    try {
-      // Test basic connectivity
-      const testUrl = STOMP_URL.replace(/^https?:\/\//, '');
-      const response = await fetch(`http://${testUrl}/health`, { 
-        method: 'HEAD',
-        mode: 'no-cors'
-      });
-      console.log('Server health check:', response);
-    } catch (error) {
-      console.error('Server health check failed:', error);
-      toast.warning('Server may be unavailable - check your connection');
-    }
-  };
+
 
   const renderAnalysisForm = () => (
     <Row className="mb-4">
       <Col md={12}>
+
+
         <Card>
           <Card.Header>
-            <h5 className="card-title mb-0">Analysis Parameters</h5>
+            <div className="d-flex justify-content-between align-items-center">
+              <h5 className="card-title mb-0">Analysis Parameters</h5>
+              {socketConnected && (
+                <span className="badge bg-success">
+                  <i className="ti ti-wifi me-1"></i>
+                  Connected
+                </span>
+              )}
+              {socketConnecting && (
+                <span className="badge bg-warning">
+                  <Spinner animation="border" size="sm" className="me-1" />
+                  Connecting...
+                </span>
+              )}
+              {socketError && (
+                <span className="badge bg-danger">
+                  <i className="ti ti-wifi-off me-1"></i>
+                  Connection Error
+                </span>
+              )}
+            </div>
           </Card.Header>
           <Card.Body>
             <Form onSubmit={handleFormSubmit}>
@@ -645,59 +527,68 @@ const CallAnalysis = () => {
                     <Button 
                       type="submit" 
                       variant="primary" 
-                      disabled={loading}
+                      disabled={loading || socketConnecting}
                       className="me-2"
                     >
-                      {loading ? (
+                      {socketConnecting ? (
                         <>
                           <Spinner animation="border" size="sm" className="me-2" />
-                          Loading...
+                          Connecting...
+                        </>
+                      ) : loading ? (
+                        <>
+                          <Spinner animation="border" size="sm" className="me-2" />
+                          Analyzing...
                         </>
                       ) : (
                         'Analyze Call'
                       )}
                     </Button>
+                    
                     <Button 
                       type="button" 
                       variant="outline-secondary"
                       onClick={() => {
+                        // Clear form values
                         setUuid('');
                         setLocalPartyNumber('');
                         setOwnerUsername('');
                         setDate('');
+                        
+                        // Clear all analysis data
+                        setAnalysis(null);
+                        setSummaryData(null);
+                        setDomainSpecificAnalysis(null);
+                        setTranscription(null);
+                        setExtractEntities(null);
+                        setCallDuration(null);
+                        setDataFound(false);
+                        
+                        // Clear loading and error states
+                        setLoading(false);
+                        setError(null);
+                        
+                        // Clear audio data
+                        setAudioUrl('');
+                        setMediaPlayerShow(false);
+                        setAudioError(null);
+                        setPlayingSegment(null);
+                        
+                        // Stop any playing audio
+                        if (audioPlayerRef.current) {
+                          audioPlayerRef.current.pause();
+                        }
+                        if (audioStopTimeoutRef.current) {
+                          clearTimeout(audioStopTimeoutRef.current);
+                          audioStopTimeoutRef.current = null;
+                        }
                       }}
                       className="me-2"
                     >
-                      Reset to Default
+                      Reset
                     </Button>
-                    <Button 
-                      type="button" 
-                      variant="outline-primary"
-                      onClick={handleReconnect}
-                      disabled={connectionStatus === 'reconnecting'}
-                      className="me-2"
-                    >
-                      {connectionStatus === 'reconnecting' ? (
-                        <>
-                          <Spinner animation="border" size="sm" className="me-2" />
-                          Reconnecting...
-                        </>
-                      ) : (
-                        <>
-                          <i className="ti ti-refresh me-1"></i>
-                          Reconnect
-                        </>
-                      )}
-                    </Button>
-                    <Button 
-                      type="button" 
-                      variant="outline-info"
-                      onClick={testConnection}
-                      size="sm"
-                    >
-                      <i className="ti ti-network me-1"></i>
-                      Test Connection
-                    </Button>
+                    
+                    
                   </div>
                 </Col>
               </Row>
@@ -809,7 +700,7 @@ const CallAnalysis = () => {
               <div className="vbox">
                 <h5>Sentiment</h5>
                 <div className="card-text">
-                  <h6>{analysis?.sentiment.charAt(0).toUpperCase() + analysis.sentiment.slice(1)}</h6>
+                  {/* <h6>{analysis?.sentiment?.charAt(0).toUpperCase() + analysis.sentiment.slice(1)}</h6> */}
                 </div>
               </div>
             )}
@@ -1302,25 +1193,7 @@ const CallAnalysis = () => {
                 <h2 className="mb-0 d-flex align-items-center">Call Analysis</h2>
               </Col>
               <Col md={9} className="text-end">
-                <div className="d-flex align-items-center justify-content-end gap-2">
-                  <span className="text-muted">Connection Status:</span>
-                  <Badge 
-                    bg={
-                      connectionStatus === 'connected' ? 'success' :
-                      connectionStatus === 'reconnecting' ? 'warning' :
-                      connectionStatus === 'error' || connectionStatus === 'failed' ? 'danger' :
-                      'secondary'
-                    }
-                    className="d-flex align-items-center gap-1"
-                  >
-                    {connectionStatus === 'connected' && <i className="ti ti-check"></i>}
-                    {connectionStatus === 'reconnecting' && <Spinner animation="border" size="sm" />}
-                    {connectionStatus === 'error' && <i className="ti ti-x"></i>}
-                    {connectionStatus === 'failed' && <i className="ti ti-x"></i>}
-                    {connectionStatus === 'disconnected' && <i className="ti ti-circle"></i>}
-                    {connectionStatus.charAt(0).toUpperCase() + connectionStatus.slice(1)}
-                  </Badge>
-                </div>
+                {/* Connection status hidden for cleaner UI */}
               </Col>
             </Row>
           </div>

@@ -23,9 +23,9 @@ export const cleanupExpiredSessions = () => {
     
     // Clear tmsSessionId from cookies when sessions are cleaned up
     if (typeof window !== 'undefined') {
-      // Clear from localStorage
-      localStorage.removeItem('tmsSessionId');
-      console.log('Cleared tmsSessionId from localStorage during session cleanup');
+      // Clear from sessionStorage
+      sessionStorage.removeItem('tmsSessionId');
+      console.log('Cleared tmsSessionId from sessionStorage during session cleanup');
       
       // Clear from cookies by setting them to expire
       const cookieOptions = [

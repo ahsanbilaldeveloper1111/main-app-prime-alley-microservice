@@ -5,6 +5,7 @@ import { Provider } from 'react-redux';
 import { ReactNode } from 'react';
 import { TokenServiceProvider } from './TokenServiceProvider';
 import SessionHandler from './SessionHandler';
+import { TmsSessionProvider } from '../contexts/TmsSessionContext';
 
 interface ProvidersProps {
   children: ReactNode;
@@ -14,17 +15,19 @@ interface ProvidersProps {
 export default function Providers({ children, store }: ProvidersProps) {
   return (
     <SessionProvider>
-      <TokenServiceProvider>
-        <SessionHandler>
-          {store ? (
-            <Provider store={store}>
-              {children}
-            </Provider>
-          ) : (
-            children
-          )}
-        </SessionHandler>
-      </TokenServiceProvider>
+      <TmsSessionProvider>
+        <TokenServiceProvider>
+          <SessionHandler>
+            {store ? (
+              <Provider store={store}>
+                {children}
+              </Provider>
+            ) : (
+              children
+            )}
+          </SessionHandler>
+        </TokenServiceProvider>
+      </TmsSessionProvider>
     </SessionProvider>
   );
 } 

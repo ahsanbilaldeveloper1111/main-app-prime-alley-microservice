@@ -84,7 +84,7 @@ const GenericListPage: React.FC<GenericListPageProps> = ({
                     currentPage: response?.meta?.current_page || 1,
                     perPage,
                 });
-                console.log('paginationInfo fallback:', paginationInfo);
+                //console.log('paginationInfo fallback:', paginationInfo);
             }
         } catch (error) {
             console.error('Error fetching data:', error);

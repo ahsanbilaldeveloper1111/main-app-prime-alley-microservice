@@ -348,7 +348,7 @@ export const unlinkUsers = async (id: string, linkedUser: string, moduleId: stri
 
 export const GetHierarchyData = async (moduleSlug?: string) => {
   try {
-    console.log("Module Slug", moduleSlug);
+    //console.log("Module Slug", moduleSlug);
     const params = moduleSlug ? { module_slug: moduleSlug } : {};
     const response = await axiosInstance.get(`users/hierarchyData`, { params });
     if(response){

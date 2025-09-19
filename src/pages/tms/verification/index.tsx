@@ -81,18 +81,15 @@ const TmsLogin = () => {
             const sessionData = await response.json();
             console.log('Session created successfully:', sessionData);
 
-            // Store session ID in localStorage as backup
-            localStorage.setItem('tmsSessionId', sessionData.sessionId);
-            console.log('Stored session ID in localStorage as backup:', sessionData.sessionId);
+            // Session ID is automatically stored in cookies by the server
+            console.log('Session created with ID:', sessionData.sessionId);
 
             toast.success('Verification successful');
-            console.log('Redirecting to dashboard...');
             
-            // Add a small delay to ensure the cookie is set
-            setTimeout(() => {
-                console.log('Executing redirect to dashboard...');
-                window.location.href = '/tms/dashboard';
-            }, 500);
+            // Redirect to dashboard - session is stored in cookies
+            console.log('Redirecting to dashboard...');
+            //router.push('/tms/dashboard');
+            window.location.href = '/tms/dashboard';
 
         } catch (error) {
             console.error('Session creation error:', error);
@@ -217,6 +214,7 @@ const TmsLogin = () => {
         setStoredPassword(password); // Store password for later use with NextAuth
         try {
             const res = await tmsLogin(email, password, false);
+            console.log('TMS login response:', res);
             
             // Handle new response structure with data wrapper
             const userData = res?.data?.user || res?.user;

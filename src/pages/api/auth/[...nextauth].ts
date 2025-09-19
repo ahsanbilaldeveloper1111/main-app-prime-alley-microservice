@@ -202,10 +202,6 @@ export const authOptions: NextAuthOptions = {
           token.refresh_token_expires = user.token.refresh_token_expires;
         }
         
-        // Add TMS session data if available
-        if (user.tmsSession) {
-          token.tmsSession = user.tmsSession;
-        }
       }
 
       return token;
@@ -226,10 +222,6 @@ export const authOptions: NextAuthOptions = {
         session.user.refresh_token = token.refresh_token as string | undefined;
         session.user.refresh_token_expires = token.refresh_token_expires as number | string | undefined;
         
-        // Add TMS session data if available
-        if (token.tmsSession) {
-          session.user.tmsSession = token.tmsSession as any;
-        }
       }
 
       return session;

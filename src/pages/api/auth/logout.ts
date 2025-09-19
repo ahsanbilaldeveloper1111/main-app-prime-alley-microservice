@@ -18,13 +18,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Clear the TMS session ID cookie with multiple variations to ensure it's cleared
     const isProduction = process.env.NODE_ENV === 'production';
     const cookieOptions = [
-      'tmsSessionId=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT',
-      'tmsSessionId=; Path=/; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT'
+      'tmsSessionId=; Path=/; SameSite=Lax; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT',
+      'tmsSessionId=; Path=/; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT',
+      'tmsSessionId=; Path=/; SameSite=Strict; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT'
     ];
     
     // Add Secure flag for production
     if (isProduction) {
-      cookieOptions.push('tmsSessionId=; Path=/; HttpOnly; SameSite=Lax; Secure; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT');
+      cookieOptions.push(
+        'tmsSessionId=; Path=/; SameSite=Lax; Secure; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT',
+        'tmsSessionId=; Path=/; SameSite=Strict; Secure; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT'
+      );
     }
     
     console.log('Setting cookie clearing headers:', cookieOptions);

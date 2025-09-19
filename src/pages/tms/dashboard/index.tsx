@@ -1,79 +1,146 @@
-import React, { ReactElement, useState, useEffect } from 'react';
+import React, { ReactElement, useState, useEffect, useCallback, useMemo } from 'react';
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
-import { Card, Row, Col, Button, Spinner, Alert } from 'react-bootstrap';
-import Link from 'next/link';
+import { Card, Row, Col, Spinner, Alert } from 'react-bootstrap';
 import { useRouter } from 'next/router';
-import { useTmsSession } from '@utils/tmsSessionNextAuth';
-
+import { useTmsSessionContext } from '../../../contexts/TmsSessionContext';
 import AnimatedNumber from '@components/AnimatedNumber';
-import imgStatus1 from '@assets/images/widget/img-status-1.svg'
-import imgStatus2 from '@assets/images/widget/img-status-2.svg'
-import imgStatus3 from '@assets/images/widget/img-status-3.svg'
-import imgStatus4 from '@assets/images/widget/img-status-4.svg'
+import imgStatus1 from '@assets/images/widget/img-status-1.svg';
+import imgStatus2 from '@assets/images/widget/img-status-2.svg';
+import imgStatus3 from '@assets/images/widget/img-status-3.svg';
+import imgStatus4 from '@assets/images/widget/img-status-4.svg';
 
 interface Summary {
-      users: number;
-      company: number;
-      nonAdminUsers: number;
-  }
+  users: number;
+  company: number;
+  nonAdminUsers: number;
+}
 
+interface StatCardProps {
+  title: string;
+  value: number;
+  icon: string;
+  bgColor: string;
+  iconClass: string;
+  image: any;
+}
 
-const TmsDashboard = () => {
+// Reusable StatCard component
+const StatCard = React.memo<StatCardProps>(({ title, value, icon, bgColor, iconClass, image }) => (
+  <Col md={4}>
+    <div className="card statistics-card-1">
+      <div className="card-body">
+        <img src={image.src} alt="img" className="img-fluid img-bg" />
+        <div className="d-flex align-items-center">
+          <div className={`avtar ${bgColor} text-white me-3`}>
+            <i className={`${iconClass} f-26`}></i>
+          </div>
+          <div>
+            <p className="text-muted mb-0">{title}</p>
+            <div className="d-flex align-items-end">
+              {value > 0 ? (
+                <AnimatedNumber value={value} duration={1000} />
+              ) : (
+                <h2 className="mb-0 f-w-500">0</h2>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </Col>
+));
+
+StatCard.displayName = 'StatCard';
+
+const TmsDashboard = React.memo(() => {
     const router = useRouter();
-    const { session, isAuthenticated, isLoading, isValid } = useTmsSession();
+    const { session, isAuthenticated, isLoading, isValid, isRefreshing } = useTmsSessionContext();
     const [summary, setSummary] = useState<Summary>({
-        users: 5000,
-        company: 200,
-        nonAdminUsers: 4800,
+        users: 0,
+        company: 0,
+        nonAdminUsers: 0,
     });
+    const [error, setError] = useState<string | null>(null);
+    const [isDataLoading, setIsDataLoading] = useState(true);
+
+    // Fetch dashboard data
+    const fetchDashboardData = useCallback(async () => {
+        try {
+            setIsDataLoading(true);
+            setError(null);
+            
+            // TODO: Replace with actual API call
+            // const response = await fetch('/api/tms/dashboard/summary');
+            // const data = await response.json();
+            
+            // Mock data for now
+            const mockData = {
+                users: 5000,
+                company: 200,
+                nonAdminUsers: 4800,
+            };
+            
+            setSummary(mockData);
+        } catch (err) {
+            setError('Failed to load dashboard data');
+            console.error('Dashboard data fetch error:', err);
+        } finally {
+            setIsDataLoading(false);
+        }
+    }, []);
 
     // Handle session validation
     useEffect(() => {
-        console.log('TMS Dashboard - Session state:', {
-            isLoading,
-            isAuthenticated,
-            isValid,
-            hasSession: !!session,
-            sessionData: session
-        });
-        
-        if (!isLoading) {
+        if (!isLoading && !isRefreshing) {
             if (!isAuthenticated || !isValid) {
-                console.log('TMS session not valid, redirecting to verification');
                 router.push('/tms/verification');
+                return;
             }
+            
+            // Fetch data when session is valid
+            fetchDashboardData();
         }
-    }, [isLoading, isAuthenticated, isValid, router, session]);
+    }, [isLoading, isRefreshing, isAuthenticated, isValid, router, fetchDashboardData]);
 
-    // Show loading state while checking session
-    if (isLoading) {
+    // Memoize stat cards data
+    const statCardsData = useMemo(() => [
+        {
+            title: 'Total Users',
+            value: summary.users,
+            icon: 'ph-duotone ph-users',
+            bgColor: 'bg-brand-color-1',
+            iconClass: 'ph-duotone ph-users',
+            image: imgStatus1,
+        },
+        {
+            title: 'Total Companies',
+            value: summary.company,
+            icon: 'ph-duotone ph-buildings',
+            bgColor: 'bg-brand-color-2',
+            iconClass: 'ph-duotone ph-buildings',
+            image: imgStatus2,
+        },
+        {
+            title: 'Non Admin Users',
+            value: summary.nonAdminUsers,
+            icon: 'ph-duotone ph-user-minus',
+            bgColor: 'bg-brand-color-3',
+            iconClass: 'ph-duotone ph-user-minus',
+            image: imgStatus3,
+        },
+    ], [summary]);
+
+    // Show loading state while checking session or refreshing
+    if (isLoading || isRefreshing) {
         return (
             <React.Fragment>
                 <BreadcrumbItem mainTitle="TMS" mainLink="/tms" subTitle="TMS Dashboard" />
                 <div className="d-flex justify-content-center align-items-center" style={{ minHeight: '50vh' }}>
                     <div className="text-center">
                         <Spinner animation="border" variant="primary" />
-                        <p className="mt-3">Loading TMS session...</p>
+                        <p className="mt-3">{isRefreshing ? 'Refreshing TMS session...' : 'Loading TMS session...'}</p>
                     </div>
-                </div>
-            </React.Fragment>
-        );
-    }
-
-    // Show error state if session is invalid
-    if (!isAuthenticated || !isValid) {
-        return (
-            <React.Fragment>
-                <BreadcrumbItem mainTitle="TMS" mainLink="/tms" subTitle="TMS Dashboard" />
-                <div className="d-flex justify-content-center align-items-center" style={{ minHeight: '50vh' }}>
-                    <Alert variant="warning" className="text-center">
-                        <Alert.Heading>Session Expired</Alert.Heading>
-                        <p>Your TMS session has expired. Please verify your identity again.</p>
-                        <Button variant="primary" onClick={() => router.push('/tms/verification')}>
-                            Go to Verification
-                        </Button>
-                    </Alert>
                 </div>
             </React.Fragment>
         );
@@ -89,90 +156,40 @@ const TmsDashboard = () => {
                 </Col>
             </Row>
 
+            {error && (
+                <Row className="mb-4">
+                    <Col md={12}>
+                        <Alert variant="danger" dismissible onClose={() => setError(null)}>
+                            {error}
+                        </Alert>
+                    </Col>
+                </Row>
+            )}
 
             <Row>
-
-            <Col md={4}>
-                  <div className="card statistics-card-1">
-                        <div className="card-body">
-                              <img src={imgStatus1.src} alt="img" className="img-fluid img-bg" />
-                              <div className="d-flex align-items-center">
-                                    <div className="avtar bg-brand-color-1 text-white me-3">
-                                          <i className="ph-duotone ph-users f-26"></i>
-                                    </div>
-                                    <div>
-                                          <p className="text-muted mb-0">Total Users</p>
-                                          <div className="d-flex align-items-end">
-                                            {summary?.users > 0 ? (
-                                                <AnimatedNumber value={summary?.users} duration={1000} />
-                                            ) : (
-                                                <h2 className="mb-0 f-w-500">0</h2>
-                                            )}
-                                          </div>
-                                    </div>  
-                              </div>
+                {isDataLoading ? (
+                    <Col md={12}>
+                        <div className="d-flex justify-content-center align-items-center" style={{ minHeight: '200px' }}>
+                            <div className="text-center">
+                                <Spinner animation="border" variant="primary" />
+                                <p className="mt-3">Loading dashboard data...</p>
+                            </div>
                         </div>
-                  </div>
-               </Col>
-
-
-
-               <Col md={4}>
-                  <div className="card statistics-card-1">
-                        <div className="card-body">
-                              <img src={imgStatus1.src} alt="img" className="img-fluid img-bg" />
-                              <div className="d-flex align-items-center">
-                                    <div className="avtar bg-brand-color-1 text-white me-3">
-                                          <i className="ph-duotone ph-users f-26"></i>
-                                    </div>
-                                    <div>
-                                          <p className="text-muted mb-0">Total Companies</p>
-                                          <div className="d-flex align-items-end">
-                                            {summary?.company > 0 ? (
-                                                <AnimatedNumber value={summary?.company} duration={1000} />
-                                            ) : (
-                                                <h2 className="mb-0 f-w-500">0</h2>
-                                            )}
-                                          </div>
-                                    </div>  
-                              </div>
-                        </div>
-                  </div>
-               </Col>
-
-               <Col md={4}>
-                  <div className="card statistics-card-1">
-                        <div className="card-body">
-                              <img src={imgStatus1.src} alt="img" className="img-fluid img-bg" />
-                              <div className="d-flex align-items-center">
-                                    <div className="avtar bg-brand-color-1 text-white me-3">
-                                          <i className="ph-duotone ph-users f-26"></i>
-                                    </div>
-                                    <div>
-                                          <p className="text-muted mb-0">Non Admin Users</p>
-                                          <div className="d-flex align-items-end">
-                                            {summary?.nonAdminUsers > 0 ? (
-                                                <AnimatedNumber value={summary?.nonAdminUsers} duration={1000} />
-                                            ) : (
-                                                <h2 className="mb-0 f-w-500">0</h2>
-                                            )}
-                                          </div>
-                                    </div>  
-                              </div>
-                        </div>
-                  </div>
-               </Col>
-
-
+                    </Col>
+                ) : (
+                    statCardsData.map((card, index) => (
+                        <StatCard key={index} {...card} />
+                    ))
+                )}
             </Row>
-           
-
-           
         </React.Fragment>
     );
-};
+});
 
-TmsDashboard.getLayout = (page: ReactElement) => {
+TmsDashboard.displayName = 'TmsDashboard';
+
+// Add getLayout as a static property
+(TmsDashboard as any).getLayout = (page: ReactElement) => {
     return <Layout>{page}</Layout>;
 };
 
