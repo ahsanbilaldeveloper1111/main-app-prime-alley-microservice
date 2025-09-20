@@ -835,65 +835,32 @@ export const createGsmInboxFiltersConfig = (hierarchyData?: any): FilterTab[] =>
       {
         type: 'select',
         isMulti: false,
-        name: 'gsm',
-        label: 'GSM',
-        options: hierarchyData?.gsm?.map((gsm: { id: string; name: string }) => ({
-          value: gsm.id,
-          label: gsm.name
-        })) || []
-      },
-      // {
-      //   type: 'select',
-      //   isMulti: false,
-      //   name: 'port',
-      //   label: 'Port',
-      //   options: [
-      //     { value: '', label: 'All' },
-      //     { value: 'power_on', label: 'Power On' },
-      //     { value: 'power_off', label: 'Power Off' }
-      //   ]
-      // }
-      
+        name: 'gsm_id',
+        label: 'GSM Device',
+        options: [
+          { value: '', label: 'All GSM Devices' },
+          ...(hierarchyData?.gsm?.map((gsm: { id: string; name: string }) => ({
+            value: gsm.id,
+            label: gsm.name
+          })) || [])
+        ]
+      }
     ]
   },
-
-  // {
-  //   id: 'company_filters',
-  //   title: 'Company Filters',
-  //   icon: 'ti ti-building',
-  //   fields: [
-  //     {
-  //       type: 'select',
-  //       isMulti: false,
-  //       name: 'company',
-  //       label: 'Company',
-  //       options: hierarchyData?.company?.map((company: { id: string; name: string }) => ({
-  //         value: company.name,
-  //         label: company.name
-  //       })) || []
-  //     }
-  //   ]
-  // },
-
-  
-
   {
-    id: 'mobile_number',
-    title: 'Mobile Number',
+    id: 'sender_filters',
+    title: 'Sender Filters',
     icon: 'ti ti-phone',
     fields: [
       {
         type: 'text',
         isMulti: false,
-        name: 'mobile_number',
-        label: 'Mobile Number',
-        placeholder: 'Enter Mobile Number'
+        name: 'sender',
+        label: 'Sender Number',
+        placeholder: 'Enter sender mobile number'
       }
     ]
-  },
-
-  
- 
+  }
 ];
 
 
