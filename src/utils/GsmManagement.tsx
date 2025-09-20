@@ -45,6 +45,65 @@ export const ListGsmManagement = async (params: PaginationParams = {}) => {
   }
 };
 
+export const ListGsmInbox = async (params: PaginationParams = {}) => {
+  try {
+    const { page = 1, perPage = 15, search = "", draw = 1, filters = {}, isExport = false, exportType = '' } = params;
+    
+    
+    // Build query parameters, only including non-empty values
+    const queryParams: any = {
+      page,
+      perPage,
+      search,
+      draw,
+    };
+    
+    // Add filter parameters if they exist and are not empty
+    if (filters.gsm_id && filters.gsm_id !== '') {
+      queryParams.gsm_id = filters.gsm_id;
+    }
+    if (filters.sender && filters.sender.trim() !== '') {
+      queryParams.sender = filters.sender.trim();
+    }
+    
+    console.log('Final query params:', queryParams);
+    
+    const response = await axiosInstance.get(
+      `gsm/inbox/list`,
+      {
+        params: queryParams,
+      },
+    );
+    
+    // Handle the nested response structure
+    const responseData = response.data?.data;
+    if (responseData) {
+      return {
+        data: responseData.data || [],
+        total: responseData.recordsTotal || 0,
+        per_page: perPage,
+        current_page: page,
+        last_page: Math.ceil((responseData.recordsTotal || 0) / perPage),
+        from: ((page - 1) * perPage) + 1,
+        to: Math.min(page * perPage, responseData.recordsTotal || 0),
+      };
+    }
+    
+    return {
+      data: [],
+      total: 0,
+      per_page: perPage,
+      current_page: page,
+      last_page: 1,
+      from: 0,
+      to: 0,
+    };
+  } catch (error) {
+    console.error('API Error:', error);
+    throw error;
+  }
+};
+
 export const getGsmData = async () => {
     try {
         
