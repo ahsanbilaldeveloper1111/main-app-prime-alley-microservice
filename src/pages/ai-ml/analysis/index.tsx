@@ -77,26 +77,6 @@ interface ExtractEntities {
 const CallAnalysis = () => {
   const { data: session, status } = useSession();
   const router = useRouter();
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
   
   // State declarations
   const [analysis, setAnalysis] = useState<CallAnalysis | null>(null);
@@ -109,6 +89,7 @@ const CallAnalysis = () => {
   const [callDuration, setCallDuration] = useState<string | null>(null);
   const [callType, setCallType] = useState<string | null>(null);
   const [dataFound, setDataFound] = useState<boolean>(false);
+  const [analysisComplete, setAnalysisComplete] = useState<boolean>(false);
 
   
   // Audio related state
@@ -143,6 +124,7 @@ const CallAnalysis = () => {
     date: date,
     localPartyNumber: localPartyNumber,
     ownerUsername: ownerUsername,
+    preventAutoConnect: analysisComplete,
     onMessage: (data) => {
       if (!data) return;
 
@@ -167,6 +149,10 @@ const CallAnalysis = () => {
         
         setDataFound(true);
         setLoading(false);
+        setAnalysisComplete(true);
+        
+        // Disconnect socket when analysis is complete
+        disconnectSocket();
       }
       // Handle processing status
       else if (data.status === 'processing') {
@@ -258,9 +244,6 @@ const CallAnalysis = () => {
     }
   }, [router.isReady, router.query.id, router.query.file]);
 
-
-  // SSE will auto-connect when the hook is initialized
-
   // Load audio when uuid changes
   useEffect(() => {
     if (audioTrackId) {
@@ -283,37 +266,11 @@ const CallAnalysis = () => {
     
     setLoading(true);
     setError(null);
+    setAnalysisComplete(false);
     
     // Connect to WebSocket for analysis
     if (socketParametersReady && !socketConnected && !socketConnecting) {
       connectSocket();
-    }
-  };
-
-  const handleHttpAnalysis = async () => {
-    try {
-      const response = await GetCallAnalysis(date, localPartyNumber, ownerUsername, uuid);
-     
-      // Check if object has analysis and it has error
-      if (response && response.analysis && response.analysis.error) {
-        toast.error(response.analysis.error);
-        setLoading(false);
-        return;
-      }
-      setAnalysis(response);
-
-      setSummaryData(response?.domain_specific_analysis?.summary_data);
-      setDomainSpecificAnalysis(response?.domain_specific_analysis);
-      setTranscription(response?.domain_specific_analysis?.transcription);
-      setExtractEntities(response?.domain_specific_analysis?.extracted_qualification_fields);
-      setCallDuration(response?.domain_specific_analysis?.domain_specific_duration);
-      setLoading(false);
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'An error occurred';
-      setError(errorMessage);
-      console.error('Error fetching call analysis:', err as Error);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -327,6 +284,7 @@ const CallAnalysis = () => {
     // Set loading state
     setLoading(true);
     setError(null);
+    setAnalysisComplete(false);
   };
 
   const loadAuthenticatedAudio = async (trackId?: string) => {
@@ -563,6 +521,7 @@ const CallAnalysis = () => {
                         setExtractEntities(null);
                         setCallDuration(null);
                         setDataFound(false);
+                        setAnalysisComplete(false);
                         
                         // Clear loading and error states
                         setLoading(false);

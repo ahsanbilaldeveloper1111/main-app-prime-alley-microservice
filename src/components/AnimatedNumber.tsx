@@ -6,9 +6,10 @@ interface AnimatedNumberProps {
   textColor?: string;
   suffix?: string;
   valueType?: string;
+  size?: string;
 }
 
-const AnimatedNumber = ({ value, duration = 1000, textColor = '', suffix = '', valueType = '' }: AnimatedNumberProps) => {
+const AnimatedNumber = ({ value, duration = 1000, textColor = '', suffix = '', valueType = '', size = '' }: AnimatedNumberProps) => {
   const [displayValue, setDisplayValue] = useState(0);
 
   // Function to format seconds as "1m 23s"
@@ -66,6 +67,18 @@ const AnimatedNumber = ({ value, duration = 1000, textColor = '', suffix = '', v
     return result;
   };
 
+  if(size === 'sm'){
+    return <h5 className={`mb-0 f-w-500 ${textColor}`}>{getFormattedValue()}{suffix}</h5>;
+  }
+  if(size === 'md'){
+    return <h4 className={`mb-0 f-w-500 ${textColor}`}>{getFormattedValue()}{suffix}</h4>;
+  }
+  if(size === 'lg'){
+    return <h5 className={`mb-0 f-w-500 ${textColor}`}>{getFormattedValue()}{suffix}</h5>;
+  }
+  if(size === 'xl'){
+    return <h6 className={`mb-0 f-w-500 ${textColor}`}>{getFormattedValue()}{suffix}</h6>;
+  }
   return <h2 className={`mb-0 f-w-500 ${textColor}`}>{getFormattedValue()}{suffix}</h2>;
 };
 

@@ -2,15 +2,17 @@ import React, { ReactElement, useEffect, useRef, useState } from 'react';
 import Layout from '@layout/index';
 import '@assets/scss/datatable-style.scss';
 import BreadcrumbItem from '@common/BreadcrumbItem';
-import { Button, Card, Col, Dropdown, Row } from 'react-bootstrap';
+import { Button, Card, Col, Dropdown, Modal, Row } from 'react-bootstrap';
 import AnimatedNumber from '@components/AnimatedNumber';
 import 'react-tooltip/dist/react-tooltip.css';
 import { Tooltip } from 'react-tooltip';
 import moment from 'moment';
 import '@assets/scss/cti-monitoring.scss';
+import Select from 'react-select';
 
 import dynamic from 'next/dynamic';
 import { ApexOptions } from 'apexcharts';
+
 const ReactApexChart = dynamic(() => import('react-apexcharts'), { ssr: false });
 
     
@@ -164,6 +166,7 @@ const CtiMonitoring = () => {
   const [selectedCompaign, setSelectedCompaign] = useState('All Compaigns');
   const [currentCampaignIndex, setCurrentCampaignIndex] = useState(0);
   const [isAutoCycling, setIsAutoCycling] = useState(true);
+  const [isSliding, setIsSliding] = useState(false);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const [serviceLevelThreshold, setServiceLevelThreshold] = useState(90);
@@ -209,6 +212,23 @@ const CtiMonitoring = () => {
     return () => clearInterval(interval);
   }, [serviceLevelThreshold, queueThreshold]);
 
+  const [agentModelShow, setAgentModelShow] = useState(false);
+
+  const agentInfo = {
+    name: 'Alice',
+    compaign: 'Sales Q3',
+    handledCalls: 100,
+    csatScore: 80,
+    aht: 50,
+    cph: 10,
+   activity:{
+    onCall:4000,
+    idle:1000,
+    acw:80,
+    break:80
+   }
+    
+  };
 
 
   // Campaign data
@@ -220,7 +240,22 @@ const CtiMonitoring = () => {
         agentOnCall: 100,
         agentIdle: 100,
         longestWait: 80,
-        serviceLevel: 80
+        serviceLevel: 80,
+        cph:90,
+        success:80,
+        abandon:10,
+        trend:"",
+        performance:{
+          calls_per_hour:90,
+          success_rate:90,
+          abandon_rate:80,
+          avg_handle_time:50,
+        },
+        manualOutbound:{
+          agent:8,
+          aht:310,
+          cph:10,
+        }
       }
     },
     {
@@ -230,7 +265,22 @@ const CtiMonitoring = () => {
         agentOnCall: 200,
         agentIdle: 10,
         longestWait: 120,
-        serviceLevel: 100
+        serviceLevel: 100,
+        cph:80,
+        success:70,
+        abandon:15,
+        trend:"",
+        performance:{
+          calls_per_hour:10,
+          success_rate:20,
+          abandon_rate:50,
+          avg_handle_time:30,
+        },
+        manualOutbound:{
+          agent:4,
+          aht:120,
+          cph:10,
+        }
       }
     },
     {
@@ -240,7 +290,22 @@ const CtiMonitoring = () => {
         agentOnCall: 150,
         agentIdle: 25,
         longestWait: 95,
-        serviceLevel: 85
+        serviceLevel: 85,
+        cph:70,
+        success:50,
+        abandon:30,
+        trend:"",
+        performance:{
+          calls_per_hour:80,
+          success_rate:10,
+          abandon_rate:30,
+          avg_handle_time:30,
+        },
+        manualOutbound:{
+          agent:6,
+          aht:180,
+          cph:10,
+        }
       }
     }
   ];
@@ -259,7 +324,8 @@ const CtiMonitoring = () => {
   useEffect(() => {
     if (isAutoCycling && selectedCompaign === 'All Compaigns' && campaigns.length > 1) {
       intervalRef.current = setInterval(() => {
-        setCurrentCampaignIndex((prevIndex) => (prevIndex + 1) % campaigns.length);
+        const nextIndex = (currentCampaignIndex + 1) % campaigns.length;
+        handleCampaignIndexChange(nextIndex);
       }, 5000); // 5 seconds
     } else {
       if (intervalRef.current) {
@@ -274,15 +340,32 @@ const CtiMonitoring = () => {
         intervalRef.current = null;
       }
     };
-  }, [isAutoCycling, selectedCompaign, campaigns.length]);
+  }, [isAutoCycling, selectedCompaign, campaigns.length, currentCampaignIndex]);
 
   // Handle campaign selection
   const handleCampaignSelect = (campaignName: string) => {
-    setSelectedCompaign(campaignName);
-    if (campaignName === 'All Compaigns') {
-      setIsAutoCycling(true);
-    } else {
-      setIsAutoCycling(false);
+    if (campaignName !== selectedCompaign) {
+      setIsSliding(true);
+      setTimeout(() => {
+        setSelectedCompaign(campaignName);
+        if (campaignName === 'All Compaigns') {
+          setIsAutoCycling(true);
+        } else {
+          setIsAutoCycling(false);
+        }
+        setTimeout(() => setIsSliding(false), 100);
+      }, 150);
+    }
+  };
+
+  // Handle campaign index change with slide effect
+  const handleCampaignIndexChange = (newIndex: number) => {
+    if (newIndex !== currentCampaignIndex) {
+      setIsSliding(true);
+      setTimeout(() => {
+        setCurrentCampaignIndex(newIndex);
+        setTimeout(() => setIsSliding(false), 100);
+      }, 150);
     }
   };
 
@@ -324,6 +407,21 @@ const CtiMonitoring = () => {
                       <Dropdown.Item onClick={() => handleCampaignSelect('Compaign 3')}>Compaign 3</Dropdown.Item>
                     </Dropdown.Menu>
                   </Dropdown>
+
+                  {selectedCompaign !== 'All Compaigns' && (
+                    <Button
+                      variant="outline-secondary"
+                      size="sm"
+                      onClick={() => handleCampaignSelect('All Compaigns')}
+                      className=""
+                      title="Reset to show all campaigns"
+                    >
+                      <i className="ti ti-refresh me-1"></i>
+                      Reset
+                    </Button>
+                  )}
+
+                  
 
                   
                   {/* {selectedCompaign === 'All Compaigns' && (
@@ -369,14 +467,14 @@ const CtiMonitoring = () => {
       <Row className='mb-3 '>
         <Col md={12}>
           <div className="card">
-            <div className="card-header d-flex justify-content-between align-items-center">
-              <h5 className="mb-0">
-                <i className="ti ti-building me-2"></i>
+            <div className="card-header d-flex justify-content-between align-items-center bg-color-theme text-white">
+              <h5 className="mb-0 text-white">
+                <i className="ti ti-building me-2 text-white"></i>
                 {currentCampaign.name} - Live Metrics
               </h5>
               <div className="d-flex align-items-center gap-2">
                 {selectedCompaign === 'All Compaigns' && (
-                  <span className="text-muted small">
+                  <span className=" small text-white">
                     Showing {currentCampaignIndex + 1} of {campaigns.length} compaigns
                   </span>
                 )}
@@ -388,7 +486,7 @@ const CtiMonitoring = () => {
                 )} */}
               </div>
             </div>
-            <div className="card-body">
+            <div className={`card-body ${isSliding ? 'slide-out' : 'slide-in'}`}>
 
                   {showThresholdAlert && (
                     <div className="row align-items-center justify-content-center text-center">
@@ -437,6 +535,134 @@ const CtiMonitoring = () => {
                     </div>
                   </div>
                 </Col>
+
+
+                <Col md={12} className=''>
+                  <Row className=''>
+                    <Col md={9}>
+
+                    <Row>
+                      <Col md={12}>
+                      <h5>{currentCampaign.name}</h5>
+                      <div className="compaign-description mb-3">
+                        <ul>
+                          <li>Manual</li>
+                          <li>Agent:8</li>
+                          <li>AHT:310S</li>
+                        </ul>
+                      </div>
+                      </Col>
+                      <Col md={3}>
+                        <div className="card">
+                          <div className="card-body text-center">
+                            <h5 className="card-title">CPH</h5>
+                            <AnimatedNumber value={currentCampaign.data.cph} textColor='text-success'/>
+                          </div>
+                        </div>
+                      </Col>
+                      
+                      <Col md={3}>
+                        <div className="card">
+                          <div className="card-body text-center">
+                            <h5 className="card-title">Success</h5>
+                            <AnimatedNumber value={currentCampaign.data.success} textColor='text-primary' suffix='%'/>
+                          </div>
+                        </div>
+                      </Col>
+
+                      <Col md={3}>
+                      <div className="card">
+                          <div className="card-body text-center">
+                            <h5 className="card-title">Abandon</h5>
+                            <AnimatedNumber value={currentCampaign.data.abandon} textColor='text-primary' suffix='%'/>
+                          </div>
+                        </div>
+                      </Col>
+
+                      <Col md={3}>
+                        <div className="card">
+                          <div className="card-body text-center">
+                            <h5 className="card-title">Trend</h5>
+                            <h2 className={`mb-0 f-w-500`}>{currentCampaign.data.trend || '---'}</h2>
+                          </div>
+                        </div>
+                      </Col>
+
+
+
+                      </Row>
+                    </Col>
+                    <Col md={3}>
+                    <div className="manual-outbound">
+                      <h5>Manual Outbound</h5>
+                    <div className="compaign-description mb-3">
+                        <ul>
+                          <li>Manual</li>
+                          <li>Agent:{currentCampaign.data.manualOutbound.agent}</li>
+                          <li>AHT:{currentCampaign.data.manualOutbound.aht}S</li>
+                        </ul>
+                      </div>
+
+                      <Col md={9}>
+                      <div className="card">
+                          <div className="card-body text-center">
+                            <h5 className="card-title">CPH</h5>
+                            <h2 className={`mb-0 f-w-500`}>{currentCampaign.data.manualOutbound.cph}</h2>
+                          </div>
+                        </div>
+                        </Col>
+
+
+
+                    </div>
+                    </Col>
+                  </Row>
+                </Col>
+
+
+                <Col md={12}>
+                {/* Navigation Dots for Campaigns */}
+                {selectedCompaign === 'All Compaigns' && (
+                    <div className="campaign-navigation d-flex align-items-center gap-2">
+                      {/* <Button
+                        variant="outline-light"
+                        size="sm"
+                        onClick={() => {
+                          setCurrentCampaignIndex((prevIndex) => 
+                            prevIndex === 0 ? campaigns.length - 1 : prevIndex - 1
+                          );
+                        }}
+                        title="Previous Campaign"
+                      >
+                        <i className="ti ti-chevron-left"></i>
+                      </Button> */}
+                      
+                       <div className="navigation-dots d-flex gap-2 justify-content-center">
+                        {campaigns.map((_, index) => (
+                          <button
+                            key={index}
+                            className={`dot ${index === currentCampaignIndex ? 'active' : ''}`}
+                            onClick={() => handleCampaignIndexChange(index)}
+                            title={`Go to ${campaigns[index].name}`}
+                          />
+                        ))}
+                      </div>
+                      
+                      {/* <Button
+                        variant="outline-light"
+                        size="sm"
+                        onClick={() => {
+                          setCurrentCampaignIndex((prevIndex) => 
+                            prevIndex === campaigns.length - 1 ? 0 : prevIndex + 1
+                          );
+                        }}
+                        title="Next Campaign"
+                      >
+                        <i className="ti ti-chevron-right"></i>
+                      </Button> */}
+                    </div>
+                  )}
+                </Col>
               </Row>
 
 
@@ -446,6 +672,23 @@ const CtiMonitoring = () => {
                     <div className="card h-100">
                       <div className="card-body">
                         <h5 className="card-title">Live Agents Status</h5>
+                         <div className="form-live-agent-status">
+                           <form className="d-flex gap-1 align-items-center mb-1">
+                             <div className="form-group flex-grow-1">
+                               <input type="text" className="form-control form-control-sm" id="agent-name" placeholder="Search Agent" />
+                             </div>
+                             <div className="form-group flex-grow-1">
+                                   <Select
+                                 options={[{value: 'all', label: 'All'}, {value: 'on-call', label: 'On Call'}, {value: 'idle', label: 'Idle'}, {value: 'online', label: 'Online'}]}
+                                className='form-select-sm'
+                                classNamePrefix="react-select"
+                                 id="agent-status"
+                                 placeholder="Status"
+                                 
+                               />
+                             </div>
+                           </form>
+                         </div>
                         <div className=" table-live-agents">
                           <table className="table table-bordered table-sm">
                             <thead>
@@ -457,18 +700,18 @@ const CtiMonitoring = () => {
                             </thead>
                             <tbody> 
                               
-                              <tr>
+                              <tr onClick={() => setAgentModelShow(true)}>
                                 <td><span className="bg-success statusBox"> </span> John Doe</td>
                                 <td>On Call</td>
                                 <td>Compaign 1</td>
                               </tr>
 
-                              <tr>
+                              <tr onClick={() => setAgentModelShow(true)}>
                                 <td><span className="bg-warning statusBox"> </span> Jane Doe</td>
                                 <td>Idle</td>
                                 <td>Compaign 1</td>
                               </tr>
-                              <tr>
+                              <tr onClick={() => setAgentModelShow(true)}>
                                 <td><span className="bg-info statusBox"> </span> Jim Doe</td>
                                 <td>Online</td>
                                 <td>Compaign 1</td>
@@ -591,6 +834,68 @@ const CtiMonitoring = () => {
               </Row>
 
 
+              <Row className='compaign-performance'>
+
+                <Col md={12} className='mb-3 text-center'>
+                  <h3 className="card-title">Compaign Performance</h3>
+                  <p className="text-muted">
+                    {currentCampaign.name}
+                  </p>
+                 
+                </Col>
+
+
+                <Col md={10} className=' justify-content-center'>
+
+                <Row>
+                <Col md={3}>
+                  <div className="card">
+                    <div className="card-body text-center">
+                    <AnimatedNumber value={currentCampaign.data.performance.calls_per_hour} textColor='text-success'/>
+                      <h5 className="card-title">Calls/Hour</h5>
+                    </div>
+                  </div>
+                </Col>
+
+                <Col md={3}>
+                  <div className="card">
+                    <div className="card-body text-center">
+                      
+                      <AnimatedNumber value={currentCampaign.data.performance.success_rate} textColor='text-primary' suffix='%'/>
+                      <h5 className="card-title">Success Rate</h5>
+                    </div>
+                  </div>
+                </Col>
+
+                <Col md={3}>
+                  <div className="card">
+                    <div className="card-body text-center">
+                      
+                      <AnimatedNumber value={currentCampaign.data.performance.abandon_rate} textColor='text-primary' suffix='%'/>
+                      <h5 className="card-title">Abandon Rate</h5>
+                    </div>
+                  </div>
+                </Col>
+
+
+               
+                <Col md={3}>
+                  <div className="card">
+                    <div className="card-body text-center">
+                      
+                      <AnimatedNumber value={currentCampaign.data.performance.avg_handle_time} textColor='text-danger' valueType='seconds'/>
+                      <h5 className="card-title">Avg Handle Time</h5>
+                    </div>
+                  </div>
+                </Col>
+                </Row>
+
+                </Col>
+                
+
+                </Row>
+
+
 
 
 
@@ -599,6 +904,116 @@ const CtiMonitoring = () => {
           </div>
         </Col>
       </Row>
+
+
+      {agentModelShow && (
+        <Modal 
+          size='lg'
+        className='agent-model-modal'
+          show={agentModelShow}
+          onHide={() => setAgentModelShow(false)}
+        >
+          <Modal.Header closeButton>
+            <Modal.Title>Alice</Modal.Title>
+          </Modal.Header>
+
+          <Modal.Body>
+            <div className="agent-model-content">
+              <p>Compaign: <b>Sales Q3</b></p>
+
+              <Row>
+              <Col md={4}>
+                  <div className="card card-bg-light-gray">
+                    <div className="card-body text-center">
+                      <h5 className="card-title">Calls Handled</h5>
+                      <AnimatedNumber value={agentInfo.handledCalls} 
+                      textColor='text-success'
+                      />
+                    </div>
+                  </div>
+                </Col>
+                <Col md={4}>
+                  <div className="card card-bg-light-gray">
+                    <div className="card-body text-center">
+                      <h5 className="card-title">CSAT Score</h5>
+                      <AnimatedNumber value={agentInfo.csatScore} suffix='%' 
+                      textColor='text-warning'
+                      />
+                    </div>
+                  </div>
+                </Col>
+                <Col md={4}>
+                  <div className="card card-bg-light-gray">
+                    <div className="card-body text-center">
+                      <h5 className="card-title">AHT</h5>
+                      <AnimatedNumber value={agentInfo.aht} 
+                      textColor='text-danger' 
+                      valueType='seconds'/>
+                    </div>
+                  </div>
+                </Col>
+              </Row>
+
+              <h4 className='mb-3 text-capitalize'>Today's activity breakdown</h4>
+              <Row>
+              <Col md={3}>
+                  <div className="card card-bg-light-gray">
+                    <div className="card-body text-center">
+                      <h6 className=" text-muted">On Call</h6>
+                      <AnimatedNumber value={agentInfo.activity.onCall} 
+                      //textColor='text-success' 
+                      size='sm'/>
+                    </div>
+                  </div>
+                </Col>
+                <Col md={3}>
+                  <div className="card card-bg-light-gray">
+                    <div className="card-body text-center">
+                      <h6 className=" text-muted">Idle</h6>
+                      <AnimatedNumber value={agentInfo.activity.idle} valueType='seconds' 
+                      //textColor='text-warning'
+                       size='sm'/>
+                    </div>
+                  </div>
+                </Col>
+                <Col md={3}>
+                  <div className="card card-bg-light-gray">
+                    <div className="card-body text-center">
+                      <h6 className=" text-muted">ACW</h6>
+                      <AnimatedNumber value={agentInfo.activity.acw} 
+                      //textColor='text-danger' 
+                      valueType='seconds' size='sm'/>
+                    </div>
+                  </div>
+                </Col>
+
+                <Col md={3}>
+                  <div className="card card-bg-light-gray">
+                    <div className="card-body text-center">
+                      <h6 className=" text-muted">Break</h6>
+                      <AnimatedNumber value={agentInfo.activity.break} 
+                      //textColor='text-danger' 
+                      valueType='seconds' size='sm'/>
+                    </div>
+                  </div>
+                </Col>
+
+
+                <Col md={12}>
+                <div className="button-group d-flex gap-2 justify-content-end">
+                  <Button variant="success">Listen Me</Button>
+                  <Button variant="primary">Wishper</Button>
+                  <Button variant="danger">Barge In</Button>
+                </div>
+                </Col>
+              </Row>
+            
+            </div>
+          </Modal.Body>
+
+
+        </Modal>
+      )}
 
       
 

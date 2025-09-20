@@ -9,6 +9,7 @@ interface SSEConfig {
   date?: string;
   localPartyNumber?: string;
   ownerUsername?: string;
+  preventAutoConnect?: boolean;
 }
 
 interface SSEState {
@@ -163,9 +164,9 @@ export const useAnalysisSSE = (config: SSEConfig) => {
     }));
   }, []); // Empty dependency array
 
-  // Auto-connect when parameters are ready
+  // Auto-connect when parameters are ready (unless prevented)
   useEffect(() => {
-    if (state.parametersReady && !state.connected && !state.connecting) {
+    if (state.parametersReady && !state.connected && !state.connecting && !configRef.current.preventAutoConnect) {
       connect();
     }
   }, [state.parametersReady, state.connected, state.connecting, connect]);
