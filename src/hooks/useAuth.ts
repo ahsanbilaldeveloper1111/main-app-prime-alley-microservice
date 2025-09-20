@@ -2,13 +2,11 @@ import { useSession, signOut } from 'next-auth/react';
 import { useEffect, useState } from 'react';
 import { initializeTokensFromSession, hasTokens } from '../utils/tokenUtils';
 import { useTokenService } from './useTokenService';
-import { useTmsSessionCompat } from './useTmsSessionCompat';
 import { sessionStore } from '../utils/sessionStore';
 
 export const useAuth = () => {
   const { data: session, status } = useSession();
   const { clearTokens, isAuthenticated } = useTokenService();
-  const { tmsSession } = useTmsSessionCompat();
   const [isInitialized, setIsInitialized] = useState(false);
 
   useEffect(() => {
@@ -34,33 +32,52 @@ export const useAuth = () => {
 
       // Clear TMS session data
       if (typeof window !== 'undefined') {
-        // Clear TMS session ID from localStorage
-        localStorage.removeItem('tmsSessionId');
-        console.log('Cleared tmsSessionId from localStorage');
+        // Note: TMS session ID is stored in cookies, not sessionStorage
 
         // Get current TMS session ID from cookie to clear from memory
         const cookies = document.cookie.split(';');
+        //console.log('Current cookies before logout:', cookies);
         const tmsSessionIdCookie = cookies.find(cookie =>
           cookie.trim().startsWith('tmsSessionId=')
         );
+        //console.log('Found tmsSessionId cookie:', tmsSessionIdCookie);
 
         if (tmsSessionIdCookie) {
           const sessionId = tmsSessionIdCookie.split('=')[1];
           if (sessionId) {
             // Clear session from memory store
             sessionStore.delete(sessionId);
-            console.log('Cleared TMS session from memory store:', sessionId);
+            //console.log('Cleared TMS session from memory store:', sessionId);
             
             // Call logout API to clear server-side session and cookie
             try {
-              await fetch('/api/auth/logout', {
+              const logoutResponse = await fetch('/api/auth/logout', {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({ sessionId }),
               });
-              console.log('Called logout API to clear server-side session');
+              
+              if (logoutResponse.ok) {
+                const logoutData = await logoutResponse.json();
+              console.log('Logout API response:', logoutData);
+              console.log('Successfully cleared server-side session and cookie');
+              
+              // Check if cookie was cleared
+              setTimeout(() => {
+                const cookiesAfter = document.cookie.split(';');
+                console.log('Cookies after logout API call:', cookiesAfter);
+                const tmsSessionIdAfter = cookiesAfter.find(cookie =>
+                  cookie.trim().startsWith('tmsSessionId=')
+                );
+                console.log('tmsSessionId cookie after logout API:', tmsSessionIdAfter);
+              }, 100);
+              } else {
+                console.error('Logout API returned error status:', logoutResponse.status);
+                const errorText = await logoutResponse.text();
+                console.error('Logout API error response:', errorText);
+              }
             } catch (apiError) {
               console.error('Error calling logout API:', apiError);
             }
@@ -112,7 +129,5 @@ export const useAuth = () => {
     hasTokens: hasTokens(),
     isInitialized,
     logout,
-    // Expose TMS session for backward compatibility
-    tmsSession,
   };
 }; 

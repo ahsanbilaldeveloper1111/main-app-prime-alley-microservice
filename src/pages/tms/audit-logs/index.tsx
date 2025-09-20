@@ -18,20 +18,61 @@ import { useTokenService } from "src/hooks/useTokenService";
 import { useSession } from "next-auth/react";
 import moment from "moment";
 import Select from "react-select";
-
+import AuditLogDetail from "./Details";
 
 import { getAuditLogs } from "@utils/tms/List";
+import AuditLogsFilters from "@components/filters/AuditLogsFilters";
+import { AuditLog } from "@models/tms/AuditLog";
 
 interface SelectOption {
   value: number;
   label: string;
 }
+export enum AuditLogResourceType {
+  RANK = "rank",
+  PERMISSION = "permission",
+  USER = "user",
+  COMPANY = "company",
+  AUDIT_LOG = "audit_log",
+  CISCO_DB = "cisco_db",
+  UNIFIED_OP = "unified_op",
+  CUSTOMER_PROFILING = "customer_profiling",
+  USER_PROFILING = "user_profiling",
+  USER_PROFILING_ERROR_LOG = "user_profiling_error_log",
+  GLOBAL = "global",
+  LDAP_USER = "ldap_user",
+  MODULE = "module",
+}
+// Resource type filter options
+const resourceTypeOptions = [
+  { value: '', label: 'All Resource Types' },
+  { value: AuditLogResourceType.RANK, label: 'Rank' },
+  { value: AuditLogResourceType.PERMISSION, label: 'Permission' },
+  { value: AuditLogResourceType.USER, label: 'User' },
+  { value: AuditLogResourceType.COMPANY, label: 'Company' },
+  { value: AuditLogResourceType.AUDIT_LOG, label: 'Audit Log' },
+  { value: AuditLogResourceType.CISCO_DB, label: 'Cisco DB' },
+  { value: AuditLogResourceType.UNIFIED_OP, label: 'Unified OP' },
+  { value: AuditLogResourceType.CUSTOMER_PROFILING, label: 'Customer Profiling' },
+  { value: AuditLogResourceType.USER_PROFILING, label: 'User Profiling' },
+  { value: AuditLogResourceType.USER_PROFILING_ERROR_LOG, label: 'User Profiling Error Log' },
+  { value: AuditLogResourceType.GLOBAL, label: 'Global' },
+  { value: AuditLogResourceType.LDAP_USER, label: 'LDAP User' },
+  { value: AuditLogResourceType.MODULE, label: 'Module' },
+];
 
 const TmsAuditLogs = () => {
   const { data: session, status } = useSession();
 
   const [refreshKey, setRefreshKey] = useState<number>(0);
   const [currentFilters, setCurrentFilters] = useState({});
+
+  const handleFiltersChange = useCallback((filters: any) => {
+    setCurrentFilters(filters);
+  }, []);
+
+  const [showDetail, setShowDetail] = useState(false);
+    const [auditLog, setAuditLog] = useState<AuditLog | null>(null);
 
 
   const columns: Column[] = useMemo(
@@ -64,111 +105,14 @@ const TmsAuditLogs = () => {
       {key: "action", name: "Action", selector: (row: any) => row.action, sortable: true,
         cell: (row: any) => {
           return <div>
-            <Button size="sm" variant="outline-primary" onClick={() => handleAction(row)}>Details</Button>
+            <Button size="sm" variant="outline-primary" onClick={() => {
+                            setAuditLog(row);
+                            setShowDetail(true);
+                        }}>Details</Button>
           </div>
         }
       },
       
-
-    //   {
-    //     "id": 310,
-    //     "company_id": "98",
-    //     "user_id": "5",
-    //     "action": "create",
-    //     "resource_type": "user_profiling",
-    //     "old_values": [],
-    //     "new_values": {
-    //         "companyName": "XYZ FZ LLC",
-    //         "extensionNumber": 20164,
-    //         "firstName": "Ali",
-    //         "email": "ab@test.com",
-    //         "lastName": "Bahadar",
-    //         "displayName": "Ali Bahadar",
-    //         "userId": "AB_S99",
-    //         "country": "Pakistan",
-    //         "company_id": 98,
-    //         "department": "test",
-    //         "jobTitle": "test",
-    //         "client_transactionid": "tms-18e00b5f70974555b645",
-    //         "update_user": false,
-    //         "verify": true,
-    //         "shareLineAppearanceCssName": "CSS-PA-SIP-MOB-LL",
-    //         "call_repetition": "individual",
-    //         "call_repetition_weekly": "12",
-    //         "call_repetition_daily": "12",
-    //         "allow_dncr": 0,
-    //         "mobile_user": "No",
-    //         "device_type": "CSF",
-    //         "iccid_number": null,
-    //         "allow_fac_info": 0
-    //     },
-    //     "message": null,
-    //     "ip_address": "192.168.30.254",
-    //     "user_agent": "Mozilla\/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit\/537.36 (KHTML, like Gecko) Chrome\/139.0.0.0 Safari\/537.36",
-    //     "created_at": "2025-08-30T09:49:03.907000Z",
-    //     "updated_at": "2025-08-30T09:49:03.907000Z",
-    //     "user": {
-    //         "id": 5,
-    //         "name": "crm user",
-    //         "username": "crm",
-    //         "company": null,
-    //         "company_id": null,
-    //         "phone_no": "0123456789",
-    //         "imagicle": null,
-    //         "notify_email": null,
-    //         "status": "1",
-    //         "blocked_permissions": null,
-    //         "extended_permissions": null,
-    //         "email": "crm@sipzon.com",
-    //         "email_verified_at": null,
-    //         "created_at": "2025-05-19T08:08:48.707000Z",
-    //         "updated_at": "2025-09-04T17:14:52.910000Z",
-    //         "guid": "6985b79e-e7e2-4b49-bf04-752c4e9bddf4",
-    //         "domain": "default",
-    //         "user_type": "admin",
-    //         "job_title": null,
-    //         "description": null,
-    //         "first_name": null,
-    //         "last_name": null,
-    //         "country": null,
-    //         "department": null,
-    //         "password_changed_at": null,
-    //         "google2fa_secret": "EQS3YZBHG6OTYQDJ",
-    //         "last_login_at": "2025-09-04T17:14:52.910000Z",
-    //         "user_access_info": {
-    //             "permissions": [
-    //                 {
-    //                     "module": "global",
-    //                     "action": "view"
-    //                 },
-    //                 {
-    //                     "module": "global",
-    //                     "action": "create"
-    //                 },
-    //                 {
-    //                     "module": "global",
-    //                     "action": "update"
-    //                 },
-    //                 {
-    //                     "module": "global",
-    //                     "action": "delete"
-    //                 },
-    //                 {
-    //                     "module": "global",
-    //                     "action": "admin"
-    //                 }
-    //             ]
-    //         }
-    //     },
-    //     "company": {
-    //         "id": 98,
-    //         "name": "XYZ FZ LLC",
-    //         "parent_id": null,
-    //         "created_at": "2025-07-23T11:48:47.443000Z",
-    //         "updated_at": "2025-07-23T15:04:55.887000Z",
-    //         "organization_unit": "OU=xyzllc,OU=customers,DC=sipzon,DC=com"
-    //     }
-    // },
      
     ],
     []
@@ -206,12 +150,21 @@ const TmsAuditLogs = () => {
       <Row className="mb-3">
         <Col md={12}>
           <div className="page-header-title">
-            <h2 className="mb-0 d-flex align-items-center">
-            List Audit Logs
+            <h2 className="mb-0 d-flex align-items-center justify-content-between">
+              List Audit Logs
+              <AuditLogsFilters onFiltersChange={handleFiltersChange} />
             </h2>
           </div>
         </Col>
       </Row>
+
+      {auditLog && (
+                <AuditLogDetail
+                    auditLog={auditLog}
+                    show={showDetail}
+                    close={() => setShowDetail(false)}
+                />
+            )}  
 
       
         <GenericListPage

@@ -13,7 +13,7 @@ export const useHierarchyData = (moduleSlug?: string) => {
     const fetchHierarchyData = async () => {
       try {
         setLoading(true);
-        console.log('useHierarchyData - moduleSlug:', moduleSlug);
+        //console.log('useHierarchyData - moduleSlug:', moduleSlug);
         const hierarchyData = await GetHierarchyData(moduleSlug);
         //console.log(hierarchyData);
         if (hierarchyData) {

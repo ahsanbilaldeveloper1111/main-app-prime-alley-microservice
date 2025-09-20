@@ -18,38 +18,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const sessionId = randomBytes(32).toString('hex');
       const expires = new Date(Date.now() + 2 * 60 * 60 * 1000); // 2 hours
 
-      // Create full session data with TMS session
+      // Create session data without TMS session
       const sessionData: NextAuthSessionData = {
         user: {
           ...session.user,
-          tmsSession: {
-            accessToken: session.user.access_token || '',
-            expiresAt: typeof session.user.access_token_expires === 'number' 
-              ? session.user.access_token_expires 
-              : Math.floor(Date.now() / 1000) + 3600,
-            user: {
-              id: session.user.id || undefined,
-              name: session.user.name || undefined,
-              email: session.user.email || undefined,
-              user_access_info: {
-                permissions: (session.user.permissions || []).map(permission => {
-                  if (typeof permission === 'string') {
-                    const parts = permission.split('_');
-                    return {
-                      module: parts[1] || permission,
-                      action: parts[0] || permission
-                    };
-                  }
-                  return {
-                    module: permission,
-                    action: permission
-                  };
-                })
-              },
-              user_type: session.user.role || undefined,
-              is_admin: session.user.is_admin || undefined
-            }
-          }
+          // TMS permissions will be empty for main app sessions
+          tmsPermissions: []
         },
         expires: expires.toISOString()
       };
@@ -96,14 +70,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(400).json({ message: 'Missing required fields' });
       }
 
-      // For TMS session, we don't need to re-authenticate with the main app
-      // We already have the TMS access token and user data
-      console.log('Creating TMS session without main app authentication');
-
-      // Extract permissions from TMS user data structure
-      console.log('Raw userData from TMS verification:', JSON.stringify(userData, null, 2));
-      console.log('userData.user_access_info:', userData?.user_access_info);
-      console.log('userData.user_access_info.permissions:', userData?.user_access_info?.permissions);
       
       // Check if permissions are in the correct format or need processing
       let tmsPermissions = userData?.user_access_info?.permissions || [];
@@ -189,22 +155,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           access_token_expires: user.token.access_token_expires,
           refresh_token: user.token.refresh_token,
           refresh_token_expires: user.token.refresh_token_expires,
-          tmsSession: {
-            accessToken: accessToken,
-            expiresAt: typeof expiresIn === 'number' 
-              ? expiresIn 
-              : Math.floor(Date.now() / 1000) + 3600,
-            user: {
-              id: userData.id || undefined,
-              name: userData.name || undefined,
-              email: userData.email || undefined,
-              user_access_info: {
-                permissions: tmsPermissions // Use the raw TMS permission objects
-              },
-              user_type: userData.user_type || undefined,
-              is_admin: userData.is_admin || undefined
-            }
-          }
         },
         expires: expires.toISOString()
       };
@@ -213,12 +163,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       console.log('Storing session data:', JSON.stringify(sessionData, null, 2));
       sessionStore.set(sessionId, sessionData);
 
-      // Set the TMS session ID cookie
+      // Set the TMS session ID cookie (not HttpOnly so client can read it)
       const isProduction = process.env.NODE_ENV === 'production';
       const cookieOptions = [
         `tmsSessionId=${sessionId}`,
         'Path=/',
-        'HttpOnly',
         'SameSite=Lax',
         'Max-Age=7200'
       ];

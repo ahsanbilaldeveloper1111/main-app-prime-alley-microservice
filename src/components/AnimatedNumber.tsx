@@ -3,10 +3,27 @@ import { useEffect, useState } from "react";
 interface AnimatedNumberProps {
   value: string | number;
   duration?: number;
+  textColor?: string;
+  suffix?: string;
+  valueType?: string;
 }
 
-const AnimatedNumber = ({ value, duration = 1000 }: AnimatedNumberProps) => {
+const AnimatedNumber = ({ value, duration = 1000, textColor = '', suffix = '', valueType = '' }: AnimatedNumberProps) => {
   const [displayValue, setDisplayValue] = useState(0);
+
+  // Function to format seconds as "1m 23s"
+  const formatSeconds = (seconds: number): string => {
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = Math.floor(seconds % 60);
+    
+    console.log('formatSeconds input:', seconds, 'minutes:', minutes, 'remainingSeconds:', remainingSeconds);
+    
+    if (minutes > 0) {
+      return `${minutes}m ${remainingSeconds}s`;
+    } else {
+      return `${remainingSeconds}s`;
+    }
+  };
 
   useEffect(() => {
     // Handle undefined, null, or invalid values
@@ -36,7 +53,20 @@ const AnimatedNumber = ({ value, duration = 1000 }: AnimatedNumberProps) => {
     return () => clearInterval(interval);
   }, [value, duration]);
 
-  return <h2 className="mb-0 f-w-500">{displayValue.toLocaleString()}</h2>;
+  // Format the display value based on valueType
+  const getFormattedValue = () => {
+    console.log('getFormattedValue - valueType:', valueType, 'displayValue:', displayValue);
+    if (valueType === 'second' || valueType === 'seconds') {
+      const result = formatSeconds(displayValue);
+      console.log('Using seconds formatter, result:', result);
+      return result;
+    }
+    const result = displayValue.toLocaleString();
+    console.log('Using default formatter, result:', result);
+    return result;
+  };
+
+  return <h2 className={`mb-0 f-w-500 ${textColor}`}>{getFormattedValue()}{suffix}</h2>;
 };
 
 export default AnimatedNumber;

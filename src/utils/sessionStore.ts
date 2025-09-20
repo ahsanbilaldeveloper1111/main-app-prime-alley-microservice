@@ -16,24 +16,6 @@ export interface NextAuthSessionData {
     access_token_expires?: number | string;
     refresh_token?: string;
     refresh_token_expires?: number | string;
-    tmsSession?: {
-      accessToken: string;
-      expiresAt: number;
-      user?: {
-        id?: string;
-        name?: string;
-        email?: string;
-        user_access_info?: {
-          permissions?: Array<{
-            module: string;
-            action: string;
-          }>;
-        };
-        user_type?: string;
-        is_admin?: string;
-        [key: string]: any;
-      };
-    };
   };
   expires: string;
 }

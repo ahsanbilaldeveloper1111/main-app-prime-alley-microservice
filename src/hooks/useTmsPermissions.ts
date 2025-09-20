@@ -1,47 +1,46 @@
-import { useState, useEffect } from 'react';
-import { useTmsSessionCompat } from './useTmsSessionCompat';
-
-
-
+import { useMemo, useCallback } from 'react';
+import { useTmsSessionContext } from '../contexts/TmsSessionContext';
 
 /**
  * React hook for TMS permissions
  * Provides easy access to TMS session permissions with reactive updates
  * Now uses NextAuth session instead of localStorage
+ * 
+ * Optimized version that directly uses context state without duplication
  */
 export const useTmsPermissions = () => {
-  const { modernTmsSession } = useTmsSessionCompat();
-  const [permissions, setPermissions] = useState<string[]>([]);
-  const [isValid, setIsValid] = useState(false);
+  const tmsSession = useTmsSessionContext();
 
-  useEffect(() => {
-    const valid = modernTmsSession.isValid;
-    setIsValid(valid);
-    
-    if (valid) {
-      setPermissions(modernTmsSession.getPermissions());
-    } else {
-      setPermissions([]);
-    }
-  }, [modernTmsSession.isValid, modernTmsSession.session]);
+  // Memoize permissions to prevent unnecessary recalculations
+  const permissions = useMemo(() => {
+    return tmsSession.isValid ? tmsSession.getPermissions() : [];
+  }, [tmsSession.isValid, tmsSession.getPermissions]);
 
-  const hasPermission = (permission: string, module: string, checkCustomerType: string=''): boolean => {
-    return modernTmsSession.hasPermission(permission, module, checkCustomerType);
-  };
+  // Memoize permission checking functions to prevent unnecessary re-renders
+  const hasPermission = useCallback((permission: string, module: string, checkCustomerType: string = ''): boolean => {
+    return tmsSession.hasPermission(permission, module, checkCustomerType);
+  }, [tmsSession.hasPermission]);
 
-  const hasAnyPermission = (permissions: string[]): boolean => {
-    return modernTmsSession.hasAnyPermission(permissions);
-  };
+  const hasAnyPermission = useCallback((permissions: string[]): boolean => {
+    return tmsSession.hasAnyPermission(permissions);
+  }, [tmsSession.hasAnyPermission]);
 
-  const hasAllPermissions = (permissions: string[]): boolean => {
-    return modernTmsSession.hasAllPermissions(permissions);
-  };
+  const hasAllPermissions = useCallback((permissions: string[]): boolean => {
+    return tmsSession.hasAllPermissions(permissions);
+  }, [tmsSession.hasAllPermissions]);
 
-  return {
+  // Memoize the return object to prevent unnecessary re-renders
+  return useMemo(() => ({
     permissions,
-    isValid,
+    isValid: tmsSession.isValid,
     hasPermission,
     hasAnyPermission,
     hasAllPermissions,
-  };
+  }), [
+    permissions,
+    tmsSession.isValid,
+    hasPermission,
+    hasAnyPermission,
+    hasAllPermissions,
+  ]);
 };

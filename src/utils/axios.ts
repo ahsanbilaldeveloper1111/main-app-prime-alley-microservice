@@ -41,9 +41,9 @@ const refreshToken = async () => {
         
         // Clear TMS session ID from localStorage and cookies
         if (typeof window !== 'undefined') {
-          // Clear from localStorage
-          localStorage.removeItem('tmsSessionId');
-          console.log('Cleared tmsSessionId from localStorage on auto logout');
+          // Clear from sessionStorage
+          sessionStorage.removeItem('tmsSessionId');
+          console.log('Cleared tmsSessionId from sessionStorage on auto logout');
           
           // Clear from cookies by setting them to expire
           const cookieOptions = [

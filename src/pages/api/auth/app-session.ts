@@ -25,25 +25,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(401).json({ message: 'Session expired' });
     }
 
-    // Clean up the session data - remove TMS session if it's not valid
-    const cleanedSessionData = {
-      ...sessionData,
-      user: {
-        ...sessionData.user,
-        // Only include TMS session if it has valid data
-        tmsSession: sessionData.user.tmsSession && 
-                   sessionData.user.tmsSession.accessToken && 
-                   sessionData.user.tmsSession.user ? 
-                   sessionData.user.tmsSession : undefined
-      }
-    };
-
-    console.log('Returning cleaned session data:', {
-      hasTmsSession: !!cleanedSessionData.user.tmsSession,
-      tmsSessionValid: !!(cleanedSessionData.user.tmsSession?.accessToken && cleanedSessionData.user.tmsSession?.user)
+    // Return the session data as-is (tmsSession has been removed from the structure)
+    console.log('Returning session data:', {
+      userId: sessionData.user.id,
+      hasTmsPermissions: !!sessionData.user.tmsPermissions,
+      tmsPermissionsCount: sessionData.user.tmsPermissions?.length || 0
     });
 
-    return res.status(200).json(cleanedSessionData);
+    return res.status(200).json(sessionData);
 
   } catch (error) {
     console.error('Full session API error:', error);
