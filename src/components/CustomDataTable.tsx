@@ -57,6 +57,7 @@ export interface CustomDataTableProps {
   onPerPageChange?: (newPerPage: number) => void;
   onSearch?: (searchTerm: string) => void;
   pagination?: boolean;
+  clearSelectedRows?: boolean;
   tableStyle?: string;
   // Style-2 specific props
   onFiltersClick?: () => void;
@@ -113,6 +114,7 @@ const CustomDataTable: React.FC<CustomDataTableProps> = ({
   onSearch,
   pagination=true,
   keyField = "id",
+  clearSelectedRows = false,
   // Style-2 specific props
   onFiltersClick,
   onExportClick,
@@ -514,6 +516,7 @@ const CustomDataTable: React.FC<CustomDataTableProps> = ({
           paginationServer={serverSide}
           selectableRows={rowSelection}
           onSelectedRowsChange={handleRowSelectionChange}
+          clearSelectedRows={clearSelectedRows}
           keyField={keyField}
           noTableHead={noTableHead}
           selectableRowsComponentProps={{ 

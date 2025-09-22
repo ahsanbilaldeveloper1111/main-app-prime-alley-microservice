@@ -955,7 +955,7 @@ const CrmDataManagement = () => {
     }
   }, [scheduleData, selectedRecordForSchedule, handleScheduleModalClose, session]);
 
-
+  const [clearSelectedRows, setClearSelectedRows] = useState(false);
   // Handle bulk delete
   const handleBulkDelete = useCallback(async () => {
     if (selectedItems.length === 0) {
@@ -965,14 +965,15 @@ const CrmDataManagement = () => {
 
     try {
       await bulkDeleteCrmData(selectedItems);
-      setSelectedItems([]);
       setShowBulkDeleteModal(false);
       setRefreshKey((prev) => prev + 1);
+      setSelectedItems([]);
+      setClearSelectedRows(!clearSelectedRows);
     } catch (error: any) {
       console.error("Bulk delete error:", error);
     }
   }, [selectedItems]);
-
+  
   // Handle item selection
   const handleItemSelection = useCallback((selected: CrmDataItem[]) => {
     setSelectedItems(selected.map(item => item.id));
@@ -1561,6 +1562,7 @@ const CrmDataManagement = () => {
                   search={false}
                   rowSelection={true}
                   onSelectionChange={handleItemSelection}
+                  clearSelectedRows={clearSelectedRows}
                 />
               </Card.Body>
             </Card>
