@@ -517,6 +517,13 @@ const Header = ({ themeMode }: HeaderProps) => {
                     icon: 'ph-duotone ph-list',
                     label: 'Company Assign',
                     href: '/gsm/assign'
+                },
+                {
+                    key: 'view-company-po',
+                    permission: 'view-gsm-management',
+                    icon: 'ph-duotone ph-building',
+                    label: 'Company PO',
+                    href: '/company/po'
                 }
             ]
         },
@@ -558,6 +565,20 @@ const Header = ({ themeMode }: HeaderProps) => {
                     icon: 'ph-duotone ph-envelope',
                     label: 'Inbox',
                     href: '/gsm/inbox'
+                },
+                {
+                    key: 'view-gsm-sync',
+                    permission: 'view-gsm-inbox',
+                    icon: 'ph-duotone ph-arrows-clockwise',
+                    label: 'Sync GSM',
+                    href: '/gsm/sync'
+                },
+                {
+                    key: 'view-company-po',
+                    permission: 'view-gsm-management',
+                    icon: 'ph-duotone ph-building',
+                    label: 'Company PO',
+                    href: '/company/po'
                 }
             ]
         },

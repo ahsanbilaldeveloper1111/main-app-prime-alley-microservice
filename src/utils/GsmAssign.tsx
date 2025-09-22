@@ -195,3 +195,125 @@ export const NewAssignement = async (gsm_ip: string, company_identifier: string)
     throw error;
   }
 }
+
+export const ViewGsm = async (id: string): Promise<any> => {
+  try {
+    const response: AxiosResponse<any> = await axiosInstance.get(`gsm/view-gsm/${id}`);
+    return response?.data?.data;
+  } catch (error) {
+    console.error('API Error:', error);
+    throw error;
+  }
+};
+
+
+export const GetCompanyList = async (): Promise<any> => {
+  try {
+    const response: AxiosResponse<any> = await axiosInstance.get(`gsm/company/list`);
+    return response?.data?.data;
+  } catch (error) {
+    console.error('API Error:', error);
+    throw error;
+  }
+};
+
+export const GetClientGsmProfile = async (params: PaginationParams = {}): Promise<any> => {
+  try {
+    const { page = 1, perPage = 15, search = "", filters = {} } = params;
+    
+    // Build query parameters
+    const queryParams = new URLSearchParams();
+    queryParams.append('page', page.toString());
+    queryParams.append('perPage', perPage.toString());
+    if (search) queryParams.append('search', search);
+    
+    // Add filter parameters
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        queryParams.append(key, value.toString());
+      }
+    });
+    
+    const response: AxiosResponse<any> = await axiosInstance.get(`gsm/client_gsm_profile?${queryParams.toString()}`);
+    return response?.data?.data;
+  } catch (error) {
+    console.error('API Error:', error);
+    throw error;
+  }
+};
+
+export const SyncPorts = async (type?: string, gsm?: string): Promise<boolean> => {
+  try {
+    const requestData: any = {};
+    
+    if (type) {
+      requestData.type = type;
+    }
+    
+    if (gsm) {
+      requestData.gsm = gsm;
+    }
+
+    const response = await axiosInstance.post(`gsm/ports/sync_ports`, requestData);
+
+    if(response){
+      const responseData = response.data;
+      if(responseData.code == 200){
+        const apiResponse = responseData.data;
+        if(apiResponse.code == 200){
+          toast.success(apiResponse.message);
+          return true;
+        }else{
+          toast.error(apiResponse.message);
+          return false;
+        }
+      }else{
+        toast.error(responseData.message);
+        return false;
+      }
+    }
+
+    return false;
+  } catch (error) {
+    console.error('API Error:', error);
+    throw error;
+  }
+};
+
+export const SyncPortsMobileNumber = async (ports: number[], gsm: string): Promise<boolean> => {
+  try {
+    const formData = new FormData();
+    formData.append('gsm', gsm);
+    ports.forEach(portId => {
+      formData.append('ports[]', portId.toString());
+    });
+
+    const response = await axiosInstance.post(`gsm/ports/sync_ports_mobile_number`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+
+    if(response){
+      const responseData = response.data;
+      if(responseData.code == 200){
+        const apiResponse = responseData.data;
+        if(apiResponse.code == 200){
+          toast.success(apiResponse.message);
+          return true;
+        }else{
+          toast.error(apiResponse.message);
+          return false;
+        }
+      }else{
+        toast.error(responseData.message);
+        return false;
+      }
+    }
+
+    return false;
+  } catch (error) {
+    console.error('API Error:', error);
+    throw error;
+  }
+};
