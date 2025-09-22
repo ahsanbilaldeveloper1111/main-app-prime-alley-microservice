@@ -313,6 +313,7 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
       return updatedData;
     });
 
+
     // Update summary counts
     setSummary(prevSummary => ({
       ...prevSummary,
@@ -486,6 +487,7 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
     
     return response;
   }, [fetchCallLogsOriginal, isDataModified]);
+
 
   const handleOpenChartModal = (
     chartData: { series: any[]; categories: string[] } | null,
@@ -708,6 +710,7 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
   }, [currentFilters]);
 
 
+
   // Socket connection effect
   useEffect(() => {
     if (status === 'authenticated' && session) {
@@ -743,6 +746,7 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
              setIsDataModified(true);
              return updatedData;
            });
+
 
            // Update summary counts
            setSummary(prevSummary => ({
@@ -938,7 +942,7 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
       </Row>
 
       {/* Data Table */}
-      <CustomDataTable
+      {/* <CustomDataTable
         columns={columns}
         data={tableData}
         title="Call Recordings"
@@ -950,7 +954,19 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
         showSearch={false}
         pagination={true}
         showPageSizeSelector={true}
-      />
+      /> */}
+
+{session?.user?.permissions?.includes('list-call-recordings') && (
+                 <GenericListPage
+                 columns={columns}
+                 fetchData={fetchCallLogs}
+                 title="Call Logs"
+                 searchPlaceholder="Search call logs..."
+                 defaultPageSize={15}
+                 filters={currentFilters}
+                 refreshKey={refreshKey}
+             />
+            )}
 
       {/* Media Player Modal */}
       <Modal
@@ -992,26 +1008,7 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
                   />
                 </div>
               )}
-              {/* <Row className='mt-3'>
-                <Col md={4}>
-                <p className="text-muted mb-1">
-                    <strong>Extension:</strong> 
-                    <br />{selectedRecording.AgentExtension}
-                  </p>
-                </Col>
-                <Col md={4}>
-                <p className="text-muted mb-1">
-                    <strong>Remote Number:</strong> 
-                    <br />{selectedRecording.RemotePartyNumber}
-                  </p>
-                </Col>
-                <Col md={4}>
-                <p className="text-muted mb-1">
-                    <strong>Direction:</strong> 
-                    <br />{selectedRecording.Direction}
-                  </p>
-                </Col>
-              </Row> */}
+              
               
             </div>
           )}

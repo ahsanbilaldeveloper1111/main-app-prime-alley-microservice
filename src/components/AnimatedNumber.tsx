@@ -64,7 +64,7 @@ const AnimatedNumber = ({ value, duration = 1000, textColor = '', suffix = '', v
       return result;
     }
     const result = displayValue.toLocaleString();
-    console.log('Using default formatter, result:', result);
+    //console.log('Using default formatter, result:', result);
     return result;
   };
 
