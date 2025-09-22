@@ -7,11 +7,12 @@ import { useSession } from "next-auth/react";
 interface GsmPortFilterProps {
   onFiltersChange?: (filters: Record<string, any>) => void;
   onExport?: (exportType: string, filters: Record<string, any>) => void;
+  showExport?: boolean;
 }
 
-export default function GsmPortFilter({ onFiltersChange, onExport }: GsmPortFilterProps) {
+export default function GsmPortFilter({ onFiltersChange, onExport, showExport }: GsmPortFilterProps) {
   const { data: session, status } = useSession();
-  const [showExport, setShowExport] = useState(false);
+  const [showExportFilter, setShowExportFilter] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   
   // Use the hierarchy data hook
@@ -32,7 +33,7 @@ export default function GsmPortFilter({ onFiltersChange, onExport }: GsmPortFilt
     if (status === 'authenticated') {
       // Only show export if onExport prop is provided and user has permission
       if (onExport && session?.user?.permissions?.includes('export-gsm-assignment')) {
-        setShowExport(true);
+        setShowExportFilter(true);
       }
       if (session?.user?.permissions?.includes('filters-gsm-assignment')) {
         setShowFilters(true);
@@ -57,7 +58,7 @@ export default function GsmPortFilter({ onFiltersChange, onExport }: GsmPortFilt
       onFiltersChange={onFiltersChange}
       showFilters={showFilters}
       onExport={onExport}
-      showExport={showExport}
+      showExport={showExportFilter}
       exportOptions={[
         { label: 'Excel', value: 'excel' },
         { label: 'PDF', value: 'pdf' }

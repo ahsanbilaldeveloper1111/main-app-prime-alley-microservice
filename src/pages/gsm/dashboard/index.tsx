@@ -15,6 +15,8 @@ import imgStatus7 from '@assets/images/widget/img-status-7.svg'
 import imgStatus8 from '@assets/images/widget/img-status-8.svg'
 import imgStatus9 from '@assets/images/widget/img-status-9.svg'
 import  '@assets/scss/gsm-dashboard.scss'
+import '@assets/scss/gsm-assign.scss';
+import '@assets/scss/dashboard-card.scss';
 import AnimatedNumber from '@components/AnimatedNumber';
 import moment from 'moment';
 const baseUrl = '';
@@ -23,6 +25,7 @@ import dynamic from 'next/dynamic';
 import { ApexOptions } from 'apexcharts';
 import { set } from 'nprogress'
 import Link from 'next/link'
+import { motion } from 'framer-motion'
 const ReactApexChart = dynamic(() => import('react-apexcharts'), { ssr: false });
 
 interface SummaryData {
@@ -184,6 +187,117 @@ const GsmDashboard = () => {
 
 
 
+      const [gsmStatusChart, setGsmStatusChart] = React.useState({
+          
+            series: [44, 55, 13],
+            options: {
+              chart: {
+                width: 380,
+                type: 'pie',
+                toolbar: {
+                  show: false
+                }
+              },
+              legend: {
+                  position: 'bottom'
+                 },
+                 dataLabels: {
+                   enabled: false
+                 },
+              labels: ['Online', 'Offline', 'UnAssigned'],
+              responsive: [{
+                breakpoint: 480,
+                options: {
+                  chart: {
+                    width: 200
+                  },
+                  legend: {
+                    position: 'bottom'
+                  }
+                }
+              }]
+            },
+          
+          
+        });
+
+
+
+        const [portUtilizationChart, setPortUtilizationChart] = React.useState({
+          
+            series: [44, 55],
+            options: {
+              chart: {
+                width: 380,
+                type: 'pie',
+                toolbar: {
+                  show: false
+                }
+              },
+              labels: ['Assigned', 'UnAssigned'],
+              legend: {
+               position: 'bottom'
+              },
+              dataLabels: {
+                enabled: false
+              },
+              responsive: [{
+                breakpoint: 480,
+                options: {
+                  chart: {
+                    width: 200
+                  },
+                  legend: {
+                    position: 'bottom'
+                  }
+                }
+              }]
+            },
+          
+          
+        });
+
+
+        const [gsmAssignmentsTrendChart, setGsmAssignmentsTrendChart] = React.useState({
+          
+            series: [{
+                name: "GSM Assignments",
+                data: [10, 41, 35, 51, 49, 62, 69, 91, 148]
+            }],
+            options: {
+              chart: {
+                height: 350,
+                type: 'line',
+                zoom: {
+                  enabled: false
+                },
+                toolbar: {
+                  show: false
+                }
+              },
+              dataLabels: {
+                enabled: false
+              },
+              stroke: {
+                curve: 'straight'
+              },
+             
+              grid: {
+                row: {
+                  colors: ['#f3f3f3', 'transparent'], // takes an array which will be repeated on columns
+                  opacity: 0.5
+                },
+              },
+              xaxis: {
+                categories: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep'],
+              }
+            },
+          
+          
+        });
+
+
+
     return (
 
         <React.Fragment>
@@ -223,14 +337,14 @@ const GsmDashboard = () => {
 
             <Row className='mb-3'>
                   <Col md={12}>
-                        <div className="page-header-title d-flex justify-content-between">
+                        <div className="page-header-title style-2">
                         <h2 className="mb-0 ">
                               Gsm Dashboard
                         </h2>
                         </div>
                   </Col>
             </Row>
-            <Row>
+            {/* <Row>
                <Col md={3}>
                <div className="card statistics-card-1">
                         <div className="card-body">
@@ -310,15 +424,141 @@ const GsmDashboard = () => {
                   </div>
 
                </Col>
+            </Row> */}
+
+            {/* GSM Summary Cards */}
+            <div className="dashboard-grid">
+                <motion.div 
+                    className="dashboard-card"
+                    initial={{ opacity: 0, x: -100, scale: 0.8 }}
+                    animate={{ opacity: 1, x: 0, scale: 1 }}
+                    transition={{ 
+                        duration: 0.8, 
+                        delay: 0.1,
+                        type: "spring",
+                        stiffness: 100,
+                        damping: 15
+                    }}
+                    whileHover={{ 
+                        scale: 1.05,
+                        transition: { duration: 0.2 }
+                    }}
+                >
+                    <h3>Total GSMs</h3>
+                    <div className="value" id="total-gsms-count">
+                        <AnimatedNumber value={6} duration={1000} fontStyle='style-2' />
+                    </div>
+                    <p>Total devices in the system</p>
+                </motion.div>
+                
+                <motion.div 
+                    className="dashboard-card"
+                    initial={{ opacity: 0, x: -100, scale: 0.8 }}
+                    animate={{ opacity: 1, x: 0, scale: 1 }}
+                    transition={{ 
+                        duration: 0.8, 
+                        delay: 0.3,
+                        type: "spring",
+                        stiffness: 100,
+                        damping: 15
+                    }}
+                    whileHover={{ 
+                        scale: 1.05,
+                        transition: { duration: 0.2 }
+                    }}
+                >
+                    <h3>Assigned GSMs</h3>
+                    <div className="value" id="assigned-gsms-count">
+                        <AnimatedNumber value={4} duration={1000}  fontStyle='style-2' />
+                    </div>
+                    <p>GSMs linked to a company</p>
+                </motion.div>
+                
+                <motion.div 
+                    className="dashboard-card"
+                    initial={{ opacity: 0, x: -100, scale: 0.8 }}
+                    animate={{ opacity: 1, x: 0, scale: 1 }}
+                    transition={{ 
+                        duration: 0.8, 
+                        delay: 0.5,
+                        type: "spring",
+                        stiffness: 100,
+                        damping: 15
+                    }}
+                    whileHover={{ 
+                        scale: 1.05,
+                        transition: { duration: 0.2 }
+                    }}
+                >
+                    <h3>Unassigned GSMs</h3>
+                    <div className="value" id="unassigned-gsms-count">
+                        <AnimatedNumber value={2} duration={1000}  fontStyle='style-2' />
+                    </div>
+                    <p>GSMs awaiting assignment</p>
+                </motion.div>
+                
+                <motion.div 
+                    className="dashboard-card"
+                    initial={{ opacity: 0, x: -100, scale: 0.8 }}
+                    animate={{ opacity: 1, x: 0, scale: 1 }}
+                    transition={{ 
+                        duration: 0.8, 
+                        delay: 0.7,
+                        type: "spring",
+                        stiffness: 100,
+                        damping: 15
+                    }}
+                    whileHover={{ 
+                        scale: 1.05,
+                        transition: { duration: 0.2 }
+                    }}
+                >
+                    <h3>Total Ports</h3>
+                    <div className="value" id="total-ports-count">
+                        <AnimatedNumber value={60} duration={1000} fontStyle='style-2' />
+                    </div>
+                    <p>Overall port capacity</p>
+                </motion.div>
+            </div>
+
+
+            <Row>
+                  <Col md={6}>
+                        <Card>
+                              
+                              <Card.Body>
+                              <h3 className="appHeading">GSM Status</h3>
+                                    <ReactApexChart options={gsmStatusChart.options as ApexOptions} series={gsmStatusChart.series} type="pie" height={200} />
+                              </Card.Body>
+                        </Card>
+                  </Col>
+                  <Col md={6}>
+                        <Card>
+                        
+                              <Card.Body>
+                              <h3 className="appHeading">Port Utilization</h3>
+                                    <ReactApexChart options={portUtilizationChart.options as ApexOptions} series={portUtilizationChart.series} type="pie" height={200} />
+                              </Card.Body>
+                        </Card>
+                  </Col>
+
+                  <Col md={12}>
+                        <Card>
+                        
+                              <Card.Body>
+                              <h3 className="appHeading">New Gsm Assignments Trend</h3>
+                                    <ReactApexChart options={gsmAssignmentsTrendChart.options as ApexOptions} series={gsmAssignmentsTrendChart.series} type="line" height={350} />
+                              </Card.Body>
+                        </Card>
+                  </Col>
             </Row>
 
             <Row>
                   <Col md={6}>
                         <div className="card">
-                              <div className="card-header">
-                                    <h5 className="mb-0">Recent GSM Activity</h5>
-                              </div>
-                              <div className="card-body">
+                             
+                              <div className="card-body dashboard-table">
+                              <h3 className="appHeading">Recent GSM Activity</h3>
                                     <div>
                                           <table className="table table-bordered table-striped table-sm">
                                                 <thead>
@@ -353,10 +593,10 @@ const GsmDashboard = () => {
                   </Col>
                   <Col md={6}>
                         <div className="card">
-                              <div className="card-header">
-                                    <h5 className="mb-0">Port Usage by GSM</h5>
-                              </div>
+                             
+                              
                               <div className="card-body">
+                              <h3 className="appHeading">Port Usage by GSM</h3>
                               {portUsage.series.length > 0 && <ReactApexChart options={portUsage.options as ApexOptions} series={portUsage.series} type="bar" height={290} />}
                               </div>
                         </div>
@@ -367,10 +607,9 @@ const GsmDashboard = () => {
             <Row>
                   <Col md={6}>
                         <div className="card">
-                              <div className="card-header">
-                                    <h5 className="mb-0">Inbox Messages Feed</h5>
-                              </div>
-                              <div className="card-body">
+                             
+                              <div className="card-body dashboard-table">
+                              <h3 className="appHeading">Inbox Messages Feed</h3>
                                     <table className="table table-bordered table-striped table-sm">
                                           <thead>
                                                 <tr>
@@ -401,11 +640,10 @@ const GsmDashboard = () => {
                   </Col>
                   <Col md={6}>
                         <div className="card">
-                              <div className="card-header">
-                                    <h5 className="mb-0">Companies Profilling</h5>
-                              </div>
-                              <div className="card-body">
-                                    <table className="table table-bordered table-striped table-sm">
+                             
+                              <div className="card-body dashboard-table">
+                              <h3 className="appHeading">Companies Profilling</h3>
+                                    <table className="table table-bordered table-striped table-sm ">
                                           <thead>
                                                 <tr>
                                                       <th>Company</th>

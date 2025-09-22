@@ -1,0 +1,117 @@
+.custom-datatable{
+
+      .table-content{
+            margin-bottom: 30px;
+          &.table-style-2{
+              background-color: var(--card-bg);
+              padding: 30px 30px 0px;
+              border-radius: var(--border-radius-md);
+              box-shadow: var(--shadow-md);
+              transition: var(--transition-speed);
+              overflow-x: auto;
+              color: #2c3e50
+               !important;
+
+              .table-bordered{
+                  border-radius: 0px !important;border:0 !important;
+                  overflow-x: auto;
+                  overflow-y: auto;
+
+                  
+            }
+
+              .rdt_TableRow{
+                  transition: background-color 0.2s 
+ease-in-out, transform 0.2s 
+ease-in-out, box-shadow 0.2s 
+ease-in-out;
+&:hover{
+
+      background-color: var(--input-bg);
+      transform: translateY(-2px);
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+      z-index: 1;
+      position: relative;
+}
+                  
+              }
+
+              .rdt_TableCol{
+                  font-weight: 600;
+                  color: var(--light-text);
+                  text-transform: uppercase;
+                  font-size: 0.75rem;
+                  letter-spacing: 0.08em;
+                  background-color: var(--bg-color);
+                  position: sticky;
+                  top: 0;
+                  z-index: 2;
+              }
+
+
+              th,td,.rdt_TableCell{
+                  padding: 18px 20px;
+                  text-align: left;
+                  border-bottom: 1px solid var(--border-color);
+              }
+
+              .rdt_TableHeadRow{
+                  
+                  font-weight: 600;
+                  color: var(--light-text);
+                  text-transform: uppercase;
+                  font-size: 0.75rem;
+                  letter-spacing: 0.08em;
+                  background-color: var(--bg-color);
+                  position: sticky;
+                  top: 0;
+                  z-index: 2;
+              }
+          }
+      }
+      
+  }
+
+
+  .table-action-dropdown{
+      .dropdown-toggle{
+          background: none;
+          border: none;
+          cursor: pointer;
+          font-size: 1.3rem;
+          color: var(--light-text);
+
+          svg{
+            color: #2c3e50;
+          }
+
+          &:after{
+              display: none;
+          }
+      }
+      .dropdown-toggle:hover{
+          background-color: var(--input-bg);
+      
+      }
+
+      .dropdown-item{
+            position: relative;
+            color: var(--main-text);
+            padding: 12px 20px;
+            text-decoration: none;
+            font-size: 0.9rem;
+            transition: var(--transition-speed); 
+            &:hover{
+                  background-color: var(--input-bg);
+                  color: var(--primary-accent);
+                  transform: translateX(5px);
+            }
+            
+            &.action-delete{
+                  color: var(--danger-color);
+                svg{
+                    color: var(--danger-color);
+                }
+            }
+      }
+  }

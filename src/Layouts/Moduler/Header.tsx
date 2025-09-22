@@ -8,6 +8,8 @@ import tokenService from "../../utils/tokenService";
 import "../../assets/scss/sidebar.scss";
 
 import CompanyLogo from "@assets/images/ringedge-logo.png";
+import CompanyLogo2 from "@assets/images/ringedge-logo-black-n-blue.png";
+
 import { authAPI } from "@utils/api";
 import { useAuth } from "../../hooks/useAuth";
 import { useTmsPermissions } from "../../hooks/useTmsPermissions";
@@ -1200,7 +1202,7 @@ const Header = ({ themeMode }: HeaderProps) => {
                 <div className="navbar-wrapper">
                     <div className="m-header">
                     <Link href={`${BASE_URL}/dashboard`}  className="b-brand text-primary">
-                        <img src={CompanyLogo.src} alt="logo" className="img-fluid" />
+                        <img src={CompanyLogo2.src} alt="logo" className="img-fluid" />
                                         </Link>
                             </div>
 
@@ -1219,7 +1221,7 @@ const Header = ({ themeMode }: HeaderProps) => {
 
                                        <li className="pc-item nav-item NoTab">
                                                 <Link 
-                                                    className={`pc-link nav-link${router.asPath.includes('dashboard') ? ' active' : ''}`} 
+                                                    className={`pc-link nav-link${router.asPath=='/dashboard' ? ' active' : ''}`} 
                                                     href={`${BASE_URL}/dashboard`} 
                                                     role="" 
                                                     aria-selected="false"

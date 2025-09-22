@@ -12,12 +12,17 @@ import { toast } from 'react-toastify';
 import { useTokenService } from 'src/hooks/useTokenService';
 import { useSession } from 'next-auth/react';
 import GsmListFilter from '@components/filters/GsmListFilter';
+import '@assets/scss/gsm-assign.scss';
+import '@assets/scss/dashboard-card.scss';
 
 import AnimatedNumber from '@components/AnimatedNumber';
+import { motion } from 'framer-motion';
 import imgStatus1 from '@assets/images/widget/img-status-1.svg'
 import imgStatus2 from '@assets/images/widget/img-status-2.svg'
 import imgStatus3 from '@assets/images/widget/img-status-3.svg'
 import imgStatus4 from '@assets/images/widget/img-status-4.svg'
+import { Dropdown, DropdownToggle, DropdownMenu, DropdownItem } from 'react-bootstrap';
+import { FiEdit, FiMoreVertical, FiTrash2 } from 'react-icons/fi';
 
 
 const GsmList = () => {
@@ -29,8 +34,22 @@ const GsmList = () => {
         { key: 'username', name: 'Username', selector: (row: any) => row.username, sortable: true },
         { key: 'device_status', name: 'Device Status', selector: (row: any) => row.device_status, sortable: true,
           cell: (row: any) => (
-           
-            <span className={`badge ${row.device_status == "power_off" ? 'bg-danger' : 'bg-success'}`}>{row?.device_status?.toUpperCase()}</span>
+            <div className="flex items-center gap-2">
+              {row?.device_status ? (
+                <>
+                 
+                  <div className="text-gray-700 text-sm font-medium uppercase device-status-container">
+
+                  <div className={`device-status-dot ${row.device_status === 'power_on' ? 'active animate-ping' : ''}`}></div>
+                    
+                    {row?.device_status?.toUpperCase() || 'OFFLINE'}
+                  
+                  </div>
+                </>
+              ) : (
+                <div className="text-gray-400 text-lg">---</div>
+              )}
+            </div>
           )
         },
         { key: 'companies', name: 'Companies', selector: (row: any) => row.company_name, sortable: true },
@@ -46,27 +65,74 @@ const GsmList = () => {
           sortable: false,
           cell: (props: any) => (
               
-              <div className="action-buttons-container">
+            //   <div className="action-buttons-container">
   
-                  {session?.user?.permissions?.includes('edit-gsm-management')  && (
-                      <button className="btn btn-sm btn-outline-primary" onClick={() => handleEditGsm(props)}>Edit</button>
-                  )}  
+            //       {session?.user?.permissions?.includes('edit-gsm-management')  && (
+            //           <button className="btn btn-sm btn-outline-primary" onClick={() => handleEditGsm(props)}>Edit</button>
+            //       )}  
 
-                  {session?.user?.permissions?.includes('delete-gsm-management')  && (
-                      <button className="btn btn-sm btn-outline-danger" onClick={() => handleDeleteGsm(props)}>Delete</button>
-                  )}
+            //       {session?.user?.permissions?.includes('delete-gsm-management')  && (
+            //           <button className="btn btn-sm btn-outline-danger" onClick={() => handleDeleteGsm(props)}>Delete</button>
+            //       )}
+            //   </div>
 
-                  
-              </div>
+            <Dropdown
+                className="table-action-dropdown"
+                //drop="start"
+                placement="top-start"
+            >
+                <DropdownToggle variant="outline-secondary" size="sm">
+                    <FiMoreVertical size={14} />
+                </DropdownToggle>
+                <DropdownMenu>
+                    <DropdownItem className="action-edit" onClick={() => handleEditGsm(props)}>
+                        <FiEdit className="me-2" />
+                        Edit
+                    </DropdownItem>
+                    <DropdownItem className="action-view" onClick={() => handleEditGsm(props)}>
+                        <FiEdit className="me-2" />
+                        View
+                    </DropdownItem>
+                    <DropdownItem className="action-delete" onClick={() => handleDeleteGsm(props)}>
+                        <FiTrash2 className="me-2" />
+                        Delete
+                    </DropdownItem>
+                </DropdownMenu>
+            </Dropdown>
           ),
       },
     ];
 
     const [refreshKey, setRefreshKey] = useState<number>(0);
     const [currentFilters, setCurrentFilters] = useState({});
+    
+    // GSM Summary Data
+    const [gsmSummary, setGsmSummary] = useState({
+        totalGsms: 0,
+        activeGsms: 0,
+        inactiveGsms: 0,
+        avgLatency: 0
+    });
 
     const fetchGsm = useCallback(async (page = 1, perPage = 15, search = "") => {
-        return await ListGsmManagement({ page, perPage, search, filters: currentFilters });
+        const response = await ListGsmManagement({ page, perPage, search, filters: currentFilters });
+        
+        // Calculate summary data when data is fetched
+        if (response && response.data) {
+            const totalGsms = response.data.length;
+            const activeGsms = response.data.filter((gsm: any) => gsm.device_status === 'power_on').length;
+            const inactiveGsms = response.data.filter((gsm: any) => gsm.device_status === 'power_off').length;
+            const avgLatency = response.data.reduce((sum: number, gsm: any) => sum + (gsm.latency || 0), 0) / totalGsms || 0;
+            
+            setGsmSummary({
+                totalGsms,
+                activeGsms,
+                inactiveGsms,
+                avgLatency: Math.round(avgLatency)
+            });
+        }
+        
+        return response;
     }, [currentFilters]);
 
     const handleFiltersChange = (filters: any) => {
@@ -168,27 +234,70 @@ const GsmList = () => {
       }
     };
 
-   
+    const [showExportSuccessfulModal, setShowExportSuccessfulModal] = useState(false);
+
+    const handleExportSuccessful = async () => {
+      setShowExportSuccessfulModal(true);
+    }
     
     return (
         <React.Fragment>
+            <style jsx>{`
+                @keyframes pulse {
+                    0% {
+                        transform: scale(1);
+                        opacity: 0.7;
+                    }
+                    50% {
+                        transform: scale(1.3);
+                        opacity: 0.3;
+                    }
+                    100% {
+                        transform: scale(1);
+                        opacity: 0.7;
+                    }
+                }
+            `}</style>
             <BreadcrumbItem mainTitle="" mainLink="" subTitle="Call Logs" />
             <Row className="mb-3">
             <Col md={12}>
-                <div className="page-header-title">
-                <Row className="align-items-center">
+                <div className="page-header-title style-2">
+                <Row className="d-flex justify-content-between align-items-center">
                     <Col md={5}>
-                      <h2 className="mb-0 d-flex align-items-center">
-                      Gsm Management
                       
-                      {session?.user?.permissions?.includes('add-gsm-management') && (
+                      <h2 className="mb-0">Gsm Management</h2>
+
+
+
+
+                      {/* {session?.user?.permissions?.includes('add-gsm-management') && (
                           <Button variant="outline-primary" size="sm" className="ms-3" onClick={() => setShowCreateGsmModal(true)}>New Gsm</Button>
                       )}
 
                       </h2>
                     </Col>
                     <Col md={7} className="d-flex justify-content-end">
-                      <GsmListFilter onFiltersChange={handleFiltersChange} onExport={handleExport} />
+                      <GsmListFilter onFiltersChange={handleFiltersChange} onExport={handleExport} /> */}
+                    </Col>
+
+
+                    <Col md={7} className="d-flex justify-content-end">
+                      
+                    <div className="action-buttons">
+                        <div className="search-container">
+                            <i className="fas fa-search search-icon"></i>
+                            <input type="text" className="search-bar" placeholder="Search GSM, Company..."/>
+                        </div>
+                        <button className="btn btn-primary" id="new-assign-btn">
+                            <i className="fas fa-plus"></i> New Assign
+                        </button>
+                        <button className="btn btn-export" id="export-btn">
+                            <i className="fas fa-download"></i> Export
+                        </button>
+                    </div>
+
+
+
                     </Col>
                   </Row>
                
@@ -197,6 +306,100 @@ const GsmList = () => {
             </Col>
             </Row>
 
+            {/* GSM Summary Cards */}
+            <div className="dashboard-grid">
+                <motion.div 
+                    className="dashboard-card"
+                    initial={{ opacity: 0, x: -100, scale: 0.8 }}
+                    animate={{ opacity: 1, x: 0, scale: 1 }}
+                    transition={{ 
+                        duration: 0.8, 
+                        delay: 0.1,
+                        type: "spring",
+                        stiffness: 100,
+                        damping: 15
+                    }}
+                    whileHover={{ 
+                        scale: 1.05,
+                        transition: { duration: 0.2 }
+                    }}
+                >
+                    <h3>Total GSMs</h3>
+                    <div className="value" id="total-gsms-count">
+                        <AnimatedNumber value={6} duration={1000} fontStyle='style-2' />
+                    </div>
+                    <p>Total devices in the system</p>
+                </motion.div>
+                
+                <motion.div 
+                    className="dashboard-card"
+                    initial={{ opacity: 0, x: -100, scale: 0.8 }}
+                    animate={{ opacity: 1, x: 0, scale: 1 }}
+                    transition={{ 
+                        duration: 0.8, 
+                        delay: 0.3,
+                        type: "spring",
+                        stiffness: 100,
+                        damping: 15
+                    }}
+                    whileHover={{ 
+                        scale: 1.05,
+                        transition: { duration: 0.2 }
+                    }}
+                >
+                    <h3>Assigned GSMs</h3>
+                    <div className="value" id="assigned-gsms-count">
+                        <AnimatedNumber value={4} duration={1000}  fontStyle='style-2' />
+                    </div>
+                    <p>GSMs linked to a company</p>
+                </motion.div>
+                
+                <motion.div 
+                    className="dashboard-card"
+                    initial={{ opacity: 0, x: -100, scale: 0.8 }}
+                    animate={{ opacity: 1, x: 0, scale: 1 }}
+                    transition={{ 
+                        duration: 0.8, 
+                        delay: 0.5,
+                        type: "spring",
+                        stiffness: 100,
+                        damping: 15
+                    }}
+                    whileHover={{ 
+                        scale: 1.05,
+                        transition: { duration: 0.2 }
+                    }}
+                >
+                    <h3>Unassigned GSMs</h3>
+                    <div className="value" id="unassigned-gsms-count">
+                        <AnimatedNumber value={2} duration={1000}  fontStyle='style-2' />
+                    </div>
+                    <p>GSMs awaiting assignment</p>
+                </motion.div>
+                
+                <motion.div 
+                    className="dashboard-card"
+                    initial={{ opacity: 0, x: -100, scale: 0.8 }}
+                    animate={{ opacity: 1, x: 0, scale: 1 }}
+                    transition={{ 
+                        duration: 0.8, 
+                        delay: 0.7,
+                        type: "spring",
+                        stiffness: 100,
+                        damping: 15
+                    }}
+                    whileHover={{ 
+                        scale: 1.05,
+                        transition: { duration: 0.2 }
+                    }}
+                >
+                    <h3>Total Ports</h3>
+                    <div className="value" id="total-ports-count">
+                        <AnimatedNumber value={60} duration={1000} fontStyle='style-2' />
+                    </div>
+                    <p>Overall port capacity</p>
+                </motion.div>
+            </div>
 
             {session?.user?.permissions?.includes('list-gsm-management') && (
                  <GenericListPage
@@ -207,42 +410,50 @@ const GsmList = () => {
                  defaultPageSize={15}
                  filters={currentFilters}
                  refreshKey={refreshKey}
+                 search={false}
+                 tableStyle="table-style-2"
+                 onFiltersClick={() => console.log('Filters clicked')}
+                 onExportClick={handleExportSuccessful}
+                 onNewClick={() => setShowCreateGsmModal(true)}
+                 filtersText="Filters"
+                 exportText="Export"
+                 newText="New GSM"
              />
             )}
 
             {showCreateGsmModal && (
-                 <Modal
+                 <Modal id="create-gsm-modal"
+                 className="customModal"
                  show={showCreateGsmModal}
                  onHide={() => setShowCreateGsmModal(false)}
              >
-                 <Modal.Header closeButton>
-                     <Modal.Title>New Gsm</Modal.Title>
-                 </Modal.Header>
+                 
                  <Modal.Body>
-                    
-                     <div className="form-group mb-3">
-                         <label htmlFor="newGsmName">Gsm Name</label>
+                 <span className="close-btn" id="action-close-btn"><i className="fas fa-times"></i></span>
+                 <h2 id="action-modal-title">New Gsm</h2>
+                     <div className="form-group">
+                         <label htmlFor="newGsmName" className="mb-0">Gsm Name</label>
                          <input type="text" className="form-control" id="newGsmName"  value={newGsmName} onChange={(e) => setNewGsmName(e.target.value)} placeholder="Gsm Name" required/>
                      </div>
 
-                     <div className="form-group mb-3"> 
-                        <label htmlFor="newGsmIpAddress">Ip Address</label>
+                     <div className="form-group"> 
+                        <label htmlFor="newGsmIpAddress" className="mb-0">Ip Address</label>
                         <input type="text" className="form-control" id="newGsmIpAddress"  value={newGsmIpAddress} onChange={(e) => setNewGsmIpAddress(e.target.value)} placeholder="Gsm Ip Address" required/>
                      </div>
 
-                     <div className="form-group mb-3"> 
-                        <label htmlFor="newGsmUsername">Username</label>
+                     <div className="form-group"> 
+                        <label htmlFor="newGsmUsername" className="mb-0">Username</label>
                         <input type="text" className="form-control" id="newGsmUsername"  value={newGsmUsername} onChange={(e) => setNewGsmUsername(e.target.value)} placeholder="Gsm Username" required/>
                      </div>
 
-                     <div className="form-group mb-3"> 
-                        <label htmlFor="newGsmPassword">Password</label>
+                     <div className="form-group"> 
+                        <label htmlFor="newGsmPassword" className="mb-0">Password</label>
                         <input type="password" className="form-control" id="newGsmPassword"  value={newGsmPassword} onChange={(e) => setNewGsmPassword(e.target.value)} placeholder="Gsm Password" required/>
                      </div>
                      
 
                  </Modal.Body>
-                 <Modal.Footer>
+                 <Modal.Footer className="mt-0">
                      <Button variant="secondary" onClick={() => setShowCreateGsmModal(false)}>Close</Button>
                      <Button variant="primary" onClick={() => handleSubmitCreateGsm()}>Create</Button>
                  </Modal.Footer>
@@ -312,6 +523,20 @@ const GsmList = () => {
                     </Modal.Footer>
                     
                 </Modal>
+            )}
+
+{showExportSuccessfulModal && (
+              <div id="action-modal" className="modal customModal" style={{display: 'flex'}}>
+              <div className="modal-content">
+                  <span className="close-btn" id="action-close-btn"><i className="fas fa-times"></i></span>
+                  <h2 id="action-modal-title">Export Successful!</h2>
+                  <p id="action-modal-text">The GSM data has been successfully exported as a JSON file.</p>
+                  <div className="modal-footer">
+                      <button className="btn btn-export" id="action-cancel-btn" style={{display: 'none'}} onClick={() => setShowExportSuccessfulModal(false)}>Cancel</button>
+                      <button className="btn btn-primary" id="action-confirm-btn" onClick={() => setShowExportSuccessfulModal(false)}>OK</button>
+                  </div>
+              </div>
+          </div>
             )}
             
 

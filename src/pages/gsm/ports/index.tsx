@@ -7,12 +7,15 @@ import { ListPorts } from '@utils/ports';
 import { getGsmData } from '@utils/GsmManagement';
 
 import { Column } from '@components/CustomDataTable';
-import { Button, Modal, Row } from 'react-bootstrap';
+import { Button, DropdownItem, DropdownMenu, Dropdown, Modal, Row,DropdownToggle   } from 'react-bootstrap';
 import { Col } from 'react-bootstrap';
 import { toast } from 'react-toastify';
 import { useTokenService } from 'src/hooks/useTokenService';
 import { useSession } from 'next-auth/react';
 import Select from 'react-select';
+import '@assets/scss/gsm-assign.scss';
+import '@assets/scss/dashboard-card.scss';
+import '@assets/scss/common.scss';
 
 import GsmPortFilter from '@components/filters/GsmPortFilter';
 
@@ -21,6 +24,7 @@ import imgStatus1 from '@assets/images/widget/img-status-1.svg'
 import imgStatus2 from '@assets/images/widget/img-status-2.svg'
 import imgStatus3 from '@assets/images/widget/img-status-3.svg'
 import imgStatus4 from '@assets/images/widget/img-status-4.svg'
+import { FiEdit, FiMoreVertical } from 'react-icons/fi';
 
 
 const GsmPorts = () => {
@@ -39,13 +43,40 @@ const GsmPorts = () => {
         { key: 'port_number', name: 'Port', selector: (row: any) => row.port_number, sortable: true },
         { key: 'mobile_number', name: 'Mobile Number', selector: (row: any) => row.mobile_number, sortable: true },
        
-        { key: 'sim_status', name: 'Sim Status', selector: (row: any) => row.sim_status, sortable: true },
+        { key: 'sim_status', name: 'Sim Status', selector: (row: any) => row.sim_status, sortable: true,
+          cell: (props: any) => (
+            <div>
+              {props?.sim_status==='REGISTER_OK' && <span className="status-badge success">REGISTERED</span>}
+              {props?.sim_status==='UNREGISTER_OK' && <span className="status-badge danger">UNREGISTERED</span>}
+              {props?.sim_status==='NO_SIM' && <span className="status-badge warning">NO SIM</span>}
+              {props?.sim_status==='POWER_OFF' && <span className="status-badge danger">POWER OFF</span>}
+            </div>
+          )
+         },
         { key: 'operator', name: 'Operator', selector: (row: any) => row.operator, sortable: true },
-        { key: 'signal_status', name: 'Signal Status', selector: (row: any) => row.signal_status, sortable: true },
+        { key: 'signal_status', name: 'Signal Status', selector: (row: any) => row.signal_status, sortable: true,
+          cell: (props: any) => (
+            <div>
+              {props?.status==='up' && <span className="status-badge success">
+                <i className="fas fa-signal"></i>
+                </span>}
+              {props?.status==='down' && <span className="status-badge danger">
+                <i className="fas fa-signal-slash"></i>
+                </span>}
+            </div>
+          )
+         },
         { key: 'imei', name: 'IMEI', selector: (row: any) => row.imei, sortable: true },
         { key: 'imsi', name: 'IMSI', selector: (row: any) => row.imsi, sortable: true },
         { key: 'iccid', name: 'ICCID', selector: (row: any) => row.iccid, sortable: true },
-        { key: 'port_status', name: 'Port Status', selector: (row: any) => row.port_status, sortable: true },
+        { key: 'status', name: 'Port Status', selector: (row: any) => row.port_status, sortable: true,
+          cell: (props: any) => (
+            <div>
+              {props?.status==='up' && <span className="status-badge success">Active</span>}
+              {props?.status==='down' && <span className="status-badge danger">Not Active</span>}
+            </div>
+          )
+         },
         { key: 'companyies', name: 'Company', selector: (row: any) => row.companies, sortable: true,
           cell: (props: any) => (
             <div>
@@ -61,10 +92,28 @@ const GsmPorts = () => {
           cell: (props: any) => (
               
               <div className="d-flex gap-3">
-                  {session?.user?.permissions?.includes('update-mobile-number-gsm-ports') && 
+                  {/* {session?.user?.permissions?.includes('update-mobile-number-gsm-ports') && 
                     props?.unassigned_ports?.length > 0 && (
                       <button className="btn btn-sm btn-outline-primary" onClick={() => handleUpdateMobileNumber(props.id)}>Update Mobile Number</button>
-                  )}    
+                  )}     */}
+
+<Dropdown
+                className="table-action-dropdown"
+                //drop="start"
+                placement="top-start"
+            >
+                <DropdownToggle variant="outline-secondary" size="sm">
+                    <FiMoreVertical size={14} />
+                </DropdownToggle>
+                <DropdownMenu>
+                    <DropdownItem className="action-edit" onClick={() => handleUpdateMobileNumber(props.id)}>
+                        <FiEdit className="me-2" />
+                        Update Mobile Number
+                    </DropdownItem>
+                   
+                    
+                </DropdownMenu>
+            </Dropdown>
               </div>
           ),
       },
@@ -95,6 +144,22 @@ const GsmPorts = () => {
 
     const handleUpdateMobileNumber = async (id: number) => {
         console.log(id);
+        setShowUpdateMobileNumberModal(true);
+    }
+
+
+    const [showExportSuccessfulModal, setShowExportSuccessfulModal] = useState(false);
+
+    const handleExportSuccessful = async () => {
+        setShowExportSuccessfulModal(true);
+    }
+
+    const [showUpdateMobileNumberModal, setShowUpdateMobileNumberModal] = useState(false);
+    const [showUpdateMobileNumberSubmitModal, setShowUpdateMobileNumberSubmitModal] = useState(false);
+
+    const submitMobileNumberUpdate = async () => {
+      setShowUpdateMobileNumberModal(false);
+        setShowUpdateMobileNumberSubmitModal(true);
     }
 
    
@@ -105,16 +170,28 @@ const GsmPorts = () => {
             <BreadcrumbItem mainTitle="" mainLink="" subTitle="Call Logs" />
             <Row className="mb-3">
             <Col md={12}>
-                <div className="page-header-title">
+                <div className="page-header-title style-2">
                 <Row className="align-items-center">
-                    <Col md={5}>
+                    <Col md={3}>
                       <h2 className="mb-0 d-flex align-items-center">
                       Ports
 
                       </h2>
                     </Col>
-                    <Col md={7} className="d-flex justify-content-end">
-                      <GsmPortFilter onFiltersChange={handleFiltersChange} onExport={handleExport} />
+                    <Col md={9} className="d-flex justify-content-end">
+
+                      
+                      <div className="action-buttons">
+                        <div className="search-container">
+                            <i className="fas fa-search search-icon"></i>
+                            <input type="text" className="search-bar" placeholder="Search IP, ICCID, Mobile..."/>
+                        </div>
+                        <GsmPortFilter onFiltersChange={handleFiltersChange} showExport={false} />
+                        
+                        <button className="btn btn-export" id="export-btn" onClick={handleExportSuccessful}>
+                            <i className="fas fa-download"></i> Export
+                        </button>
+                    </div>
                     </Col>
                   </Row>
                
@@ -133,7 +210,61 @@ const GsmPorts = () => {
                  defaultPageSize={15}
                  filters={currentFilters}
                  refreshKey={refreshKey}
+                 search={false}
+                 tableStyle="table-style-2"
+                
              />
+            )}
+
+{showExportSuccessfulModal && (
+              <div id="action-modal" className="modal customModal" style={{display: 'flex'}}>
+              <div className="modal-content">
+                  <span className="close-btn" id="action-close-btn" onClick={() => setShowExportSuccessfulModal(false)}><i className="fas fa-times"></i></span>
+                  <h2 id="action-modal-title">Export Successful!</h2>
+                  <p id="action-modal-text">The GSM ports data has been successfully exported as a JSON file.</p>
+                  <div className="modal-footer">
+                      <button className="btn btn-export" id="action-cancel-btn" style={{display: 'none'}} onClick={() => setShowExportSuccessfulModal(false)}>Cancel</button>
+                      <button className="btn btn-primary" id="action-confirm-btn" onClick={() => setShowExportSuccessfulModal(false)}>Done</button>
+                  </div>
+              </div>
+          </div>
+            )}
+
+
+            {showUpdateMobileNumberSubmitModal && (
+              <div id="action-modal" className="modal customModal" style={{display: 'flex'}}>
+              <div className="modal-content">
+                  <span className="close-btn" id="action-close-btn" onClick={() => setShowUpdateMobileNumberSubmitModal(false)}><i className="fas fa-times"></i></span>
+                  <h2 id="action-modal-title">Successful!</h2>
+                  <p id="action-modal-text">The GSM ports mobile number has been successfully updated.</p>
+                  <div className="modal-footer">
+                      <button className="btn btn-export" id="action-cancel-btn" style={{display: 'none'}} onClick={() => setShowUpdateMobileNumberSubmitModal(false)}>Cancel</button>
+                      <button className="btn btn-primary" id="action-confirm-btn" onClick={() => setShowUpdateMobileNumberSubmitModal(false)}>Done</button>
+                  </div>
+              </div>
+          </div>
+            )}
+
+            
+
+
+{showUpdateMobileNumberModal && (
+              <div id="action-modal" className="modal customModal" style={{display: 'flex'}}>
+              <div className="modal-content">
+                  <span className="close-btn" id="action-close-btn" onClick={() => setShowUpdateMobileNumberModal(false)}><i className="fas fa-times"></i></span>
+                  <h2 id="action-modal-title">Update Mobile Number!</h2>
+
+                  <div className="form-group mb-3">
+                    <label htmlFor="mobile_number">Mobile Number</label>
+                    <input type="text" className="form-control" id="mobile_number" placeholder="Enter Mobile Number" />
+                  </div>
+                  
+                  <div className="modal-footer">
+                      <button className="btn btn-secondary " style={{display: 'none'}} id="action-cancel-btn"  onClick={() => setShowUpdateMobileNumberModal(false)}>Cancel</button>
+                      <button className="btn btn-primary" id="action-confirm-btn" onClick={() => submitMobileNumberUpdate()}>Update Mobile Number</button>
+                  </div>
+              </div>
+          </div>
             )}
         
         </React.Fragment>

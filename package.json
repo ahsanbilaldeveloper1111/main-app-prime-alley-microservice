@@ -9,7 +9,8 @@
     "build:silent": "next build",
     "start": "next start",
     "lint": "next lint",
-    "build:all-ts-errors": "__NEXT_TEST_MODE=true npm run build"
+    "build:all-ts-errors": "__NEXT_TEST_MODE=true npm run build",
+    "test:cti-socket": "node test-cti-socket.js"
   },
   "dependencies": {
     "@ckeditor/ckeditor5-build-balloon": "^44.3.0",

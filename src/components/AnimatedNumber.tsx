@@ -7,9 +7,10 @@ interface AnimatedNumberProps {
   suffix?: string;
   valueType?: string;
   size?: string;
+  fontStyle?: string;
 }
 
-const AnimatedNumber = ({ value, duration = 1000, textColor = '', suffix = '', valueType = '', size = '' }: AnimatedNumberProps) => {
+const AnimatedNumber = ({ value, duration = 1000, textColor = '', suffix = '', valueType = '', size = '', fontStyle = '' }: AnimatedNumberProps) => {
   const [displayValue, setDisplayValue] = useState(0);
 
   // Function to format seconds as "1m 23s"
@@ -56,7 +57,7 @@ const AnimatedNumber = ({ value, duration = 1000, textColor = '', suffix = '', v
 
   // Format the display value based on valueType
   const getFormattedValue = () => {
-    console.log('getFormattedValue - valueType:', valueType, 'displayValue:', displayValue);
+    //console.log('getFormattedValue - valueType:', valueType, 'displayValue:', displayValue);
     if (valueType === 'second' || valueType === 'seconds') {
       const result = formatSeconds(displayValue);
       console.log('Using seconds formatter, result:', result);
@@ -79,7 +80,7 @@ const AnimatedNumber = ({ value, duration = 1000, textColor = '', suffix = '', v
   if(size === 'xl'){
     return <h6 className={`mb-0 f-w-500 ${textColor}`}>{getFormattedValue()}{suffix}</h6>;
   }
-  return <h2 className={`mb-0 f-w-500 ${textColor}`}>{getFormattedValue()}{suffix}</h2>;
+  return <h2 className={`mb-0 f-w-500 ${textColor} ${fontStyle}`}>{getFormattedValue()}{suffix}</h2>;
 };
 
 export default AnimatedNumber;

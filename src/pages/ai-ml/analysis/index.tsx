@@ -175,7 +175,7 @@ const CallAnalysis = () => {
     },
     onError: (error) => {
       console.error('Analysis SSE error:', error);
-      toast.error(`WebSocket connection failed: ${error.message || error}`);
+      //toast.error(`WebSocket connection failed: ${error.message || error}`);
       setError(error.message || 'Analysis SSE connection failed');
       setLoading(false);
     },

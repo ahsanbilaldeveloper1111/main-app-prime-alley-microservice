@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { Col, Row, Dropdown } from 'react-bootstrap';
 import dynamic from 'next/dynamic';
 import { Tooltip } from 'react-tooltip';
+import '@assets/scss/custom-datatable.scss';
 
 // Dynamic import for DataTable to avoid SSR issues
 const DataTable = dynamic(() => import("react-data-table-component"), {
@@ -56,6 +57,15 @@ export interface CustomDataTableProps {
   onPerPageChange?: (newPerPage: number) => void;
   onSearch?: (searchTerm: string) => void;
   pagination?: boolean;
+  tableStyle?: string;
+  // Style-2 specific props
+  onFiltersClick?: () => void;
+  onExportClick?: () => void;
+  onNewClick?: () => void;
+  filtersText?: string;
+  exportText?: string;
+  newText?: string;
+  noTableHead?: boolean;
 }
 
 const CustomDataTable: React.FC<CustomDataTableProps> = ({
@@ -72,7 +82,9 @@ const CustomDataTable: React.FC<CustomDataTableProps> = ({
   className = "table-bordered",
   striped = true,
   highlightOnHover = true,
+  tableStyle = 'table-style-1',
   pointerOnHover = true,
+  noTableHead = false,
   paginationComponentOptions = {
     rowsPerPageText: "Data per page",
     rangeSeparatorText: "to",
@@ -100,7 +112,14 @@ const CustomDataTable: React.FC<CustomDataTableProps> = ({
   onPerPageChange,
   onSearch,
   pagination=true,
-  keyField = "id"
+  keyField = "id",
+  // Style-2 specific props
+  onFiltersClick,
+  onExportClick,
+  onNewClick,
+  filtersText = 'Filters',
+  exportText = 'Export',
+  newText = 'New GSM'
 }) => {
   // State management
   const [pageSize, setPageSize] = useState<number>(defaultPageSize);
@@ -194,7 +213,7 @@ const CustomDataTable: React.FC<CustomDataTableProps> = ({
   };
 
   return (
-    <div className="custom-datatable">
+    <div className={`custom-datatable ${tableStyle}`}>
       {/* Title Section
       {title && (
         <Row className="mb-3">
@@ -208,10 +227,15 @@ const CustomDataTable: React.FC<CustomDataTableProps> = ({
         </Row>
       )} */}
 
-      {/* Controls Section */}
+     
+
+      
+      <div className={`table-content ${tableStyle}`}>
+
+         {/* Controls Section */}
       <Row className="mb-3">
         {/* Page Size Selector */}
-        {showPageSizeSelector && (
+        {showPageSizeSelector  && (
           <Col sm={12} md={6}>
             <div className="dataTables_length" id="dom-jqry_length">
               <label className="d-flex align-items-center">
@@ -234,7 +258,9 @@ const CustomDataTable: React.FC<CustomDataTableProps> = ({
           </Col>
         )}
 
+
         {/* Search and Column Controls */}
+        
         <Col sm={12} md={showPageSizeSelector ? 6 : 12}>
           <div className='d-flex align-items-center justify-content-end gap-2'>
             {/* Search Box */}
@@ -297,9 +323,175 @@ const CustomDataTable: React.FC<CustomDataTableProps> = ({
             )}
           </div>
         </Col>
+       
+
+
       </Row>
 
-      {/* DataTable */}
+      {tableStyle === 'table-style-2222' && (
+        <Col sm={12} md={12}>
+          <div className='d-flex align-items-center justify-content-between w-100' style={{ gap: '12px' }}>
+            {/* Search Box - Left Side */}
+            {showSearch && (
+              <div className="search-container" style={{ flex: '1'}}>
+                <div className="position-relative">
+                  <i className="fas fa-search position-absolute" style={{ 
+                    left: '12px', 
+                    top: '50%', 
+                    transform: 'translateY(-50%)', 
+                    color: '#999',
+                    fontSize: '14px',
+                    zIndex: 1
+                  }}></i>
+                  <input
+                    type="search"
+                    className="form-control"
+                    placeholder={searchPlaceholder}
+                    aria-controls="dom-jqry"
+                    onChange={handleSearchChange}
+                    value={searchTerm}
+                    style={{
+                      paddingLeft: '36px',
+                      paddingRight: '12px',
+                      borderRadius: '6px',
+                      border: '1px solid #e0e0e0',
+                      backgroundColor: '#f5f5f5',
+                      height: '36px',
+                      fontSize: '14px',
+                      color: '#333'
+                    }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Action Buttons - Right Side */}
+            <div className="d-flex align-items-center" style={{ gap: '12px' }}>
+              {/* Filters Button */}
+              {onFiltersClick && (
+                <button
+                  className="btn"
+                  onClick={onFiltersClick}
+                  style={{
+                    borderRadius: '6px',
+                    padding: '8px 16px',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    backgroundColor: '#3366ff',
+                    border: 'none',
+                    height: '36px',
+                    color: 'white',
+                    minWidth: '80px',
+                    justifyContent: 'center'
+                  }}
+                >
+                  <i className="fas fa-filter" style={{ fontSize: '12px' }}></i>
+                  {filtersText}
+                </button>
+              )}
+
+              {/* Export Button */}
+              {onExportClick && (
+                <button
+                  className="btn"
+                  onClick={onExportClick}
+                  style={{
+                    borderRadius: '6px',
+                    padding: '8px 16px',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    backgroundColor: '#e0e0e0',
+                    border: '1px solid #e0e0e0',
+                    color: '#333',
+                    height: '36px',
+                    minWidth: '80px',
+                    justifyContent: 'center'
+                  }}
+                >
+                  <i className="fas fa-download" style={{ fontSize: '12px' }}></i>
+                  {exportText}
+                </button>
+              )}
+
+              {/* New GSM Button */}
+              {onNewClick && (
+                <button
+                  className="btn"
+                  onClick={onNewClick}
+                  style={{
+                    borderRadius: '6px',
+                    padding: '8px 16px',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    backgroundColor: '#28a745',
+                    border: 'none',
+                    height: '36px',
+                    color: 'white',
+                    minWidth: '90px',
+                    justifyContent: 'center'
+                  }}
+                >
+                  <i className="fas fa-plus" style={{ fontSize: '12px' }}></i>
+                  {newText}
+                </button>
+              )}
+
+              {/* Column Visibility Controls */}
+              {showColumnVisibility && (
+                <div className="d-flex align-items-center">
+                  <Dropdown>
+                    <Dropdown.Toggle variant="outline-secondary" size="sm" style={{ 
+                      height: '36px', 
+                      borderRadius: '6px',
+                      fontSize: '12px',
+                      padding: '6px 12px'
+                    }}>
+                      <i className="fas fa-cog me-1"></i>
+                      Customize ({visibleColumns.length}/{columns.length})
+                    </Dropdown.Toggle>
+                    <Dropdown.Menu>
+                      <Dropdown.Header>Select Columns to Show</Dropdown.Header>
+                      <Dropdown.Divider />
+                      {columns.map((column) => (
+                        <div key={column.key} className="px-3 py-1">
+                          <div className="form-check">
+                            <input
+                              type="checkbox"
+                              className="form-check-input"
+                              checked={visibleColumns.includes(column.key)}
+                              onChange={() => toggleColumnVisibility(column.key)}
+                              id={`column-${column.key}`}
+                            />
+                            <label
+                              className="form-check-label"
+                              htmlFor={`column-${column.key}`}
+                              style={{ cursor: 'pointer' }}
+                            >
+                              {column.name}
+                            </label>
+                          </div>
+                        </div>
+                      ))}
+                    </Dropdown.Menu>
+                  </Dropdown>
+                </div>
+              )}
+            </div>
+          </div>
+        </Col>
+        )}
+
+        
+        {/* DataTable */}
       {visibleColumnsData.length > 0 ? (
         <DataTable
           key={`datatable-${currentPageSize}-${visibleColumns.length}-${serverSide ? 'server' : 'client'}`}
@@ -323,6 +515,7 @@ const CustomDataTable: React.FC<CustomDataTableProps> = ({
           selectableRows={rowSelection}
           onSelectedRowsChange={handleRowSelectionChange}
           keyField={keyField}
+          noTableHead={noTableHead}
           selectableRowsComponentProps={{ 
             style: { 
               display: 'flex', 
@@ -339,6 +532,7 @@ const CustomDataTable: React.FC<CustomDataTableProps> = ({
           </p>
         </div>
       )}
+      </div>
 
       <Tooltip id="my-tooltip" />
     </div>

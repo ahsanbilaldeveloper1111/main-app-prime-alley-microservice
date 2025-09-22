@@ -20,6 +20,15 @@ interface GenericListPageProps {
     rowSelection?: boolean;
     onSelectionChange?: (selectedRows: any[]) => void;
     keyField?: string;
+    tableStyle?: string;
+    // Style-2 specific props
+    onFiltersClick?: () => void;
+    onExportClick?: () => void;
+    onNewClick?: () => void;
+    filtersText?: string;
+    exportText?: string;
+    newText?: string;
+    noTableHead?: boolean;
 }
 
 const GenericListPage: React.FC<GenericListPageProps> = ({
@@ -39,7 +48,17 @@ const GenericListPage: React.FC<GenericListPageProps> = ({
     // Row selection
     rowSelection = false,
     onSelectionChange,
-    keyField
+    keyField,
+    tableStyle = 'table-style-1',
+    // Style-2 specific props
+    onFiltersClick,
+    onExportClick,
+    onNewClick,
+    filtersText,
+    exportText,
+    newText,
+    noTableHead = false,
+
 }) => {
     const [data, setData] = useState<any[]>([]);
     const [loading, setLoading] = useState<boolean>(false);
@@ -168,6 +187,14 @@ const GenericListPage: React.FC<GenericListPageProps> = ({
                 rowSelection={rowSelection}
                 onSelectionChange={onSelectionChange}
                 keyField={keyField}
+                tableStyle={tableStyle}
+                onFiltersClick={onFiltersClick}
+                onExportClick={onExportClick}
+                onNewClick={onNewClick}
+                filtersText={filtersText}
+                exportText={exportText}
+                newText={newText}
+                noTableHead={noTableHead}
             />
             
             {showCanvas && (
