@@ -20,6 +20,7 @@ interface GenericListPageProps {
     rowSelection?: boolean;
     onSelectionChange?: (selectedRows: any[]) => void;
     keyField?: string;
+    clearSelectedRows?: boolean;
 }
 
 const GenericListPage: React.FC<GenericListPageProps> = ({
@@ -39,7 +40,8 @@ const GenericListPage: React.FC<GenericListPageProps> = ({
     // Row selection
     rowSelection = false,
     onSelectionChange,
-    keyField
+    keyField,
+    clearSelectedRows = false
 }) => {
     const [data, setData] = useState<any[]>([]);
     const [loading, setLoading] = useState<boolean>(false);
@@ -54,7 +56,7 @@ const GenericListPage: React.FC<GenericListPageProps> = ({
     // Canvas state
     const [canvasVisible, setCanvasVisible] = useState<boolean>(false);
     const [selectedRowData, setSelectedRowData] = useState<any>(null);
-
+    console.log("ZEZEZE", selectedRowData);
     const fetchAndSetData = useCallback(async (page = 1, perPage = defaultPageSize, search = '') => {
         setLoading(true);
         try {
@@ -168,6 +170,7 @@ const GenericListPage: React.FC<GenericListPageProps> = ({
                 rowSelection={rowSelection}
                 onSelectionChange={onSelectionChange}
                 keyField={keyField}
+                clearSelectedRows={clearSelectedRows}
             />
             
             {showCanvas && (

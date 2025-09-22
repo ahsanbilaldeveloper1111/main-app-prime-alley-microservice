@@ -849,8 +849,8 @@ export const bulkDeleteCrmData = async (ids: number[]): Promise<{
   deleted_count: number;
 }> => {
   try {
-    const response = await axiosInstance.delete("/crm/crm-data/bulk/delete", {
-      data: { ids }
+    const response = await axiosInstance.post("/crm/crm-data/bulk/delete", {
+       ids : ids
     });
     
     if (response.data.success) {
