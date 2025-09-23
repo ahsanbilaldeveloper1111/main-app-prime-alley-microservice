@@ -296,22 +296,6 @@ const CrmOpportunities = () => {
                 New Opportunity
               </Button>
             </div>
-            <div className="d-flex gap-2">
-              <Button
-                variant="outline-secondary"
-                href="/crm/opportunities/import"
-                size="sm"
-              >
-                Import
-              </Button>
-              <Button
-                variant="outline-secondary"
-                href="/crm/opportunities/export"
-                size="sm"
-              >
-                Export
-              </Button>
-            </div>
           </div>
         </Col>
       </Row>
