@@ -13,10 +13,16 @@ import '@assets/scss/common.scss';
 import { ModuleSlug } from '@utils/Helper';
 
 // Custom hooks
-import { useCallStatsData, useCallStatsCharts, useCallStatsFilters } from '@hooks/useCallStats';
+import { useCallStatsData } from '@hooks/useCallStatsData';
+import { useCallStatsCharts } from '@hooks/useCallStatsCharts';
+import { useCallStatsFilters } from '@hooks/useCallStatsFilters';
 
 // Components
-import { SummaryCards, DonutChart, ChartsTabs, CallLogsTable, ChartModal } from '@components/call-stats';
+import SummaryCards from '@components/call-stats/SummaryCards';
+import DonutChart from '@components/call-stats/DonutChart';
+import ChartsTabs from '@components/call-stats/ChartsTabs';
+import CallLogsTable from '@components/call-stats/CallLogsTable';
+import ChartModal from '@components/call-stats/ChartModal';
 
 const CallStatsCountry = () => {
   const [showChartModal, setShowChartModal] = useState(false);

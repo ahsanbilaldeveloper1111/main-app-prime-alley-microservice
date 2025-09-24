@@ -2,6 +2,7 @@ import React, { ReactElement, useEffect, useState, useCallback } from 'react'
 import Layout from '@layout/index'
 import BreadcrumbItem from '@common/BreadcrumbItem'
 import { Button, Card, Col, Form, Modal, Row, Dropdown } from 'react-bootstrap'
+import DeviceSelectionModal from '../../components/DeviceSelectionModal'
 import { DashboardData } from '@utils/GsmManagement'
 import { toast } from 'react-toastify'
 import imgStatus1 from '@assets/images/widget/img-status-1.svg'
@@ -9,6 +10,7 @@ import imgStatus2 from '@assets/images/widget/img-status-2.svg'
 import imgStatus4 from '@assets/images/widget/img-status-4.svg'
 import '@assets/scss/gsm-dashboard.scss'
 import AnimatedNumber from '@components/AnimatedNumber'
+import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid'
 import moment from 'moment'
 import useCtiStomp from '../../hooks/useCtiStomp'
 import dynamic from 'next/dynamic'
@@ -17,10 +19,11 @@ import { set } from 'nprogress'
 import Link from 'next/link'
 import { clearAllLocalStorage, getLocalStorageInfo } from '../../utils/localStorageUtils'
 import { useSession } from 'next-auth/react';
-import '@assets/scss/gsm-assign.scss';
-import '@assets/scss/dashboard-card.scss';
+import { startMonitoring, stopMonitoring as stopMonitoringAPI, startBargeInMonitoring, stopBargeInMonitoring as stopBargeInMonitoringAPI } from '@utils/dialer'
+
+
 import '@assets/scss/common.scss';
-import { motion } from 'framer-motion'
+
 
 const baseUrl = ''
 const ReactApexChart = dynamic(() => import('react-apexcharts'), { ssr: false })
@@ -68,6 +71,23 @@ const CtiDashboard = () => {
   const [showPopup, setShowPopup] = useState<{ dn: string; deviceName: string } | null>(null)
   const [showDebugInfo, setShowDebugInfo] = useState(false)
   const [restoredCallStates, setRestoredCallStates] = useState<number>(0)
+  
+  // Device selection modal state
+  const [showDeviceSelectionModal, setShowDeviceSelectionModal] = useState(false)
+  const [availableDevices, setAvailableDevices] = useState<Array<{
+    deviceName: string;
+    deviceType: string;
+    terminalState: string;
+    when: string;
+    details: string;
+  }>>([])
+  const [pendingMonitoringData, setPendingMonitoringData] = useState<{
+    dn: string;
+    monitorType: string;
+    toneType: string;
+    monitoredDeviceName: string;
+    monitoredDeviceType: string;
+  } | null>(null)
 
   // Helper function to clear localStorage call states
   const clearLocalStorageCallStates = () => {
@@ -116,6 +136,23 @@ const CtiDashboard = () => {
       //   message: `Restored ${info.count} call state(s) from localStorage` 
       // })
     }
+  }, [])
+
+  // Clear CTI call states on page load
+  useEffect(() => {
+    const clearCtiCallStates = () => {
+      try {
+        // Clear specific CTI call states
+        localStorage.removeItem('cti_call_states')
+        localStorage.removeItem('cti_call_states_timestamp')
+        console.log('🧹 Cleared CTI call states on page load')
+      } catch (error) {
+        console.error('Error clearing CTI call states:', error)
+      }
+    }
+
+    // Clear on component mount
+    clearCtiCallStates()
   }, [])
 
   // Custom styles
@@ -476,7 +513,7 @@ const CtiDashboard = () => {
     setSelectedTone((prev) => ({ ...prev, [dn]: toneType }))
 
     if (tempMonitorSelection[dn] && toneType) {
-      startMonitoring(dn, tempMonitorSelection[dn] as 'SILENT' | 'WHISPER' | 'BARGE_IN', toneType)
+      startMonitoringLocal(dn, tempMonitorSelection[dn] as 'SILENT' | 'WHISPER' | 'BARGE_IN', toneType)
     }
 
     console.log('Selected Tone:', dn, toneType)
@@ -492,39 +529,175 @@ const CtiDashboard = () => {
     console.log('Barge In selected, waiting for tone selection...')
   }
 
-  const startMonitoring = async (dn: string, monitorType: string, toneType?: string) => {
+  // Helper function to create API payload
+  const createMonitoringPayload = (
+    monitorDeviceType: string,
+    monitorDeviceName: string,
+    monitoredDeviceType: string,
+    monitoredDeviceName: string,
+    type: string,
+    tone: string,
+    monitor: string,
+    monitoredDeviceDn: string
+  ) => {
+    return {
+      monitorDeviceType,
+      monitorDeviceName,
+      monitoredDeviceType,
+      monitoredDeviceName,
+      type,
+      tone,
+      monitor,
+      monitoredDeviceDn
+    }
+  }
+
+  // Helper function to get user's available devices
+  const getUserDevices = () => {
+    if (!userAddress || !dnsMap[userAddress]) return []
+    
+    const devices = Object.values(dnsMap[userAddress].devices || {})
+    return devices.map(device => ({
+      deviceName: device.deviceName,
+      deviceType: device.deviceType,
+      terminalState: device.terminalState,
+      when: new Date().toISOString(),
+      details: `Status: ${device.terminalState}`
+    }))
+  }
+
+  // Check if user has multiple devices
+  const hasMultipleDevices = () => {
+    const devices = getUserDevices()
+    return devices.length > 1
+  }
+
+  const startMonitoringLocal = async (dn: string, monitorType: string, toneType?: string) => {
     if (!toneType) {
       console.error('Tone is required for all monitoring types')
       setNotification({ type: 'danger', message: 'Tone selection is required to start monitoring' })
       return false
     }
 
-    console.log(`${monitorType} monitoring started successfully for:`, dn)
-    setActiveMonitoring({ dn, type: monitorType, deviceName: showPopup?.deviceName || undefined })
-    setMonitoringStartTime(prev => ({ ...prev, [dn]: new Date() }))
+    // Get monitored device info
+    const monitoredDevice = dnsMap[dn]?.devices?.[showPopup?.deviceName || '']
+    if (!monitoredDevice) {
+      console.error('Monitored device not found')
+      setNotification({ type: 'danger', message: 'Monitored device not found' })
+      return false
+    }
 
-    const message = `Started ${monitorType.toLowerCase().replace('_', ' ')} monitoring for ${dn} with ${toneType} tone`
-    setNotification({ type: 'success', message })
+    // Check if user has multiple devices for monitoring
+    if (hasMultipleDevices()) {
+      // Show device selection modal
+      setAvailableDevices(getUserDevices())
+      setPendingMonitoringData({
+        dn,
+        monitorType,
+        toneType,
+        monitoredDeviceName: monitoredDevice.deviceName,
+        monitoredDeviceType: monitoredDevice.deviceType
+      })
+      setShowDeviceSelectionModal(true)
+      return false // Don't proceed yet, wait for device selection
+    } else {
+      // Use the only available device
+      const userDevices = getUserDevices()
+      if (userDevices.length === 0) {
+        console.error('No user devices available')
+        setNotification({ type: 'danger', message: 'No user devices available for monitoring' })
+        return false
+      }
+      
+      const monitorDevice = userDevices[0]
+      return await executeMonitoring(dn, monitorType, toneType, monitorDevice, monitoredDevice)
+    }
+  }
 
-    return true
+  // Execute monitoring with selected devices
+  const executeMonitoring = async (
+    dn: string, 
+    monitorType: string, 
+    toneType: string, 
+    monitorDevice: any, 
+    monitoredDevice: CtiDevice
+  ) => {
+    // Create API payload
+    const payload = createMonitoringPayload(
+      monitorDevice.deviceType,
+      monitorDevice.deviceName,
+      monitoredDevice.deviceType,
+      monitoredDevice.deviceName,
+      monitorType,
+      toneType,
+      userAddress,
+      monitoredDevice.dn,
+    )
+
+    // Console log the payload
+    console.log('🎯 Monitoring API Payload:', payload)
+
+    try {
+      let response;
+      
+      // Use appropriate API based on monitoring type
+      if (monitorType === 'BARGE_IN') {
+        console.log('🚀 Calling startBargeInMonitoring API...')
+        response = await startBargeInMonitoring(payload)
+      } else {
+        // For SILENT and WHISPER monitoring
+        console.log('🚀 Calling startMonitoring API...')
+        response = await startMonitoring(payload)
+      }
+
+      if (response.success) {
+        console.log(`${monitorType} monitoring started successfully for:`, dn)
+        setActiveMonitoring({ 
+          dn, 
+          type: monitorType, 
+          deviceName: showPopup?.deviceName || undefined 
+        })
+        setMonitoringStartTime(prev => ({ ...prev, [dn]: new Date() }))
+
+        const message = `Started ${monitorType.toLowerCase().replace('_', ' ')} monitoring for ${dn} with ${toneType} tone`
+        setNotification({ type: 'success', message })
+        return true
+      } else {
+        console.error('Failed to start monitoring:', response.error)
+        setNotification({ type: 'danger', message: response.error || 'Failed to start monitoring' })
+        return false
+      }
+    } catch (error) {
+      console.error('Error starting monitoring:', error)
+      setNotification({ type: 'danger', message: 'Error starting monitoring' })
+      return false
+    }
   }
 
   const stopSilentMonitoring = async (dn: string) => {
-    return true
     try {
-      const response = await fetch(`${baseUrl}/api/cti/stop-silent-monitoring`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ dn })
-      })
+      // Get user's device info for stop monitoring
+      const userDevices = getUserDevices()
+      if (userDevices.length === 0) {
+        console.error('No user devices available for stopping monitoring')
+        return false
+      }
+      
+      const monitorDevice = userDevices[0]
+      const stopParams = {
+        monitorDeviceType: monitorDevice.deviceType,
+        monitorDeviceName: monitorDevice.deviceName,
+        monitor: userAddress || ''
+      }
 
-      if (response.ok) {
+      console.log('🛑 Stopping silent monitoring with params:', stopParams)
+      const response = await stopMonitoringAPI(stopParams)
+      
+      if (response.success) {
         console.log('Silent monitoring stopped successfully for:', dn)
         return true
       } else {
-        console.error('Failed to stop silent monitoring for:', dn)
+        console.error('Failed to stop silent monitoring:', response.error)
         return false
       }
     } catch (error) {
@@ -534,31 +707,106 @@ const CtiDashboard = () => {
   }
 
   const stopWhisperMonitoring = async (dn: string) => {
-    return true
-  }
-
-  const stopBargeInMonitoring = async (dn: string) => {
-    return true
     try {
-      const response = await fetch(`${baseUrl}/api/cti/stop-barge-in-monitoring`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ dn })
-      })
+      // Get user's device info for stop monitoring
+      const userDevices = getUserDevices()
+      if (userDevices.length === 0) {
+        console.error('No user devices available for stopping monitoring')
+        return false
+      }
+      
+      const monitorDevice = userDevices[0]
+      const stopParams = {
+        monitorDeviceType: monitorDevice.deviceType,
+        monitorDeviceName: monitorDevice.deviceName,
+        monitor: userAddress || ''
+      }
 
-      if (response.ok) {
-        console.log('Barge in monitoring stopped successfully for:', dn)
+      console.log('🛑 Stopping whisper monitoring with params:', stopParams)
+      const response = await stopMonitoringAPI(stopParams)
+      
+      if (response.success) {
+        console.log('Whisper monitoring stopped successfully for:', dn)
         return true
       } else {
-        console.error('Failed to stop barge in monitoring for:', dn)
+        console.error('Failed to stop whisper monitoring:', response.error)
         return false
       }
     } catch (error) {
-      console.error('Error stopping barge in monitoring:', error)
+      console.error('Error stopping whisper monitoring:', error)
       return false
     }
+  }
+
+  const stopBargeInMonitoringLocal = async (dn: string) => {
+    try {
+      // Get user's device info for stop monitoring
+      const userDevices = getUserDevices()
+      if (userDevices.length === 0) {
+        console.error('No user devices available for stopping monitoring')
+        return false
+      }
+      
+      const monitorDevice = userDevices[0]
+      const stopParams = {
+        monitorDeviceType: monitorDevice.deviceType,
+        monitorDeviceName: monitorDevice.deviceName,
+        monitor: userAddress || ''
+      }
+
+      console.log('🛑 Stopping barge-in monitoring with params:', stopParams)
+      const response = await stopBargeInMonitoringAPI(stopParams)
+      
+      if (response.success) {
+        console.log('Barge-in monitoring stopped successfully for:', dn)
+        return true
+      } else {
+        console.error('Failed to stop barge-in monitoring:', response.error)
+        return false
+      }
+    } catch (error) {
+      console.error('Error stopping barge-in monitoring:', error)
+      return false
+    }
+  }
+
+  // Device selection handlers
+  const handleDeviceSelect = (device: any) => {
+    console.log('🎯 Device selected for monitoring:', device)
+    
+    if (!pendingMonitoringData) {
+      console.error('No pending monitoring data found')
+      setNotification({ type: 'danger', message: 'No pending monitoring data found' })
+      return
+    }
+
+    // Get monitored device info
+    const monitoredDevice = dnsMap[pendingMonitoringData.dn]?.devices?.[pendingMonitoringData.monitoredDeviceName]
+    if (!monitoredDevice) {
+      console.error('Monitored device not found')
+      setNotification({ type: 'danger', message: 'Monitored device not found' })
+      return
+    }
+
+    // Execute monitoring with selected device
+    executeMonitoring(
+      pendingMonitoringData.dn,
+      pendingMonitoringData.monitorType,
+      pendingMonitoringData.toneType,
+      device,
+      monitoredDevice
+    )
+
+    // Close modal and reset state
+    setShowDeviceSelectionModal(false)
+    setAvailableDevices([])
+    setPendingMonitoringData(null)
+  }
+
+  const handleDeviceSelectionCancel = () => {
+    setShowDeviceSelectionModal(false)
+    setAvailableDevices([])
+    setPendingMonitoringData(null)
   }
 
   const stopMonitoring = async (dn: string, type: string) => {
@@ -572,7 +820,7 @@ const CtiDashboard = () => {
         success = await stopWhisperMonitoring(dn)
         break
       case 'BARGE_IN':
-        success = await stopBargeInMonitoring(dn)
+        success = await stopBargeInMonitoringLocal(dn)
         break
       default:
         console.error('Unknown monitoring type:', type)
@@ -1003,100 +1251,47 @@ const CtiDashboard = () => {
         
       </Row> */}
 
-       {/* GSM Summary Cards */}
-       <div className="dashboard-grid">
-                <motion.div 
-                    className="dashboard-card"
-                    initial={{ opacity: 0, x: -100, scale: 0.8 }}
-                    animate={{ opacity: 1, x: 0, scale: 1 }}
-                    transition={{ 
-                        duration: 0.8, 
-                        delay: 0.1,
-                        type: "spring",
-                        stiffness: 100,
-                        damping: 15
-                    }}
-                    whileHover={{ 
-                        scale: 1.05,
-                        transition: { duration: 0.2 }
-                    }}
-                >
-                    <h3>Extensions</h3>
-                    <div className="value" id="total-gsms-count">
-                        <AnimatedNumber value={summaryData.extensions} duration={1000} fontStyle='style-2' />
-                    </div>
-                    <p>Total extensions in the system</p>
-                </motion.div>
-                
-                <motion.div 
-                    className="dashboard-card"
-                    initial={{ opacity: 0, x: -100, scale: 0.8 }}
-                    animate={{ opacity: 1, x: 0, scale: 1 }}
-                    transition={{ 
-                        duration: 0.8, 
-                        delay: 0.3,
-                        type: "spring",
-                        stiffness: 100,
-                        damping: 15
-                    }}
-                    whileHover={{ 
-                        scale: 1.05,
-                        transition: { duration: 0.2 }
-                    }}
-                >
-                    <h3>Online</h3>
-                    <div className="value" id="assigned-gsms-count">
-                        <AnimatedNumber value={summaryData.online} duration={1000}  fontStyle='style-2' />
-                    </div>
-                    <p>Online devices</p>
-                </motion.div>
-                
-                <motion.div 
-                    className="dashboard-card"
-                    initial={{ opacity: 0, x: -100, scale: 0.8 }}
-                    animate={{ opacity: 1, x: 0, scale: 1 }}
-                    transition={{ 
-                        duration: 0.8, 
-                        delay: 0.5,
-                        type: "spring",
-                        stiffness: 100,
-                        damping: 15
-                    }}
-                    whileHover={{ 
-                        scale: 1.05,
-                        transition: { duration: 0.2 }
-                    }}
-                >
-                    <h3>On Hold</h3>
-                    <div className="value" id="unassigned-gsms-count">
-                        <AnimatedNumber value={summaryData.on_hold} duration={1000}  fontStyle='style-2' />
-                    </div>
-                    <p>On hold devices</p>
-                </motion.div>
-                
-                <motion.div 
-                    className="dashboard-card"
-                    initial={{ opacity: 0, x: -100, scale: 0.8 }}
-                    animate={{ opacity: 1, x: 0, scale: 1 }}
-                    transition={{ 
-                        duration: 0.8, 
-                        delay: 0.7,
-                        type: "spring",
-                        stiffness: 100,
-                        damping: 15
-                    }}
-                    whileHover={{ 
-                        scale: 1.05,
-                        transition: { duration: 0.2 }
-                    }}
-                >
-                    <h3>Connected</h3>
-                    <div className="value" id="total-ports-count">
-                        <AnimatedNumber value={summaryData.connected} duration={1000} fontStyle='style-2' />
-                    </div>
-                    <p>Connected devices</p>
-                </motion.div>
-            </div>
+       {/* CTI Summary Cards */}
+       <PageSummaryGrid 
+         cards={[
+           {
+             id: 'total-gsms-count',
+             title: 'Extensions',
+             value: summaryData.extensions,
+             description: 'Total extensions in the system',
+             delay: 0.1,
+             animationDuration: 1000,
+             fontStyle: 'style-2'
+           },
+           {
+             id: 'assigned-gsms-count',
+             title: 'Online',
+             value: summaryData.online,
+             description: 'Online devices',
+             delay: 0.3,
+             animationDuration: 1000,
+             fontStyle: 'style-2'
+           },
+           {
+             id: 'unassigned-gsms-count',
+             title: 'On Hold',
+             value: summaryData.on_hold,
+             description: 'On hold devices',
+             delay: 0.5,
+             animationDuration: 1000,
+             fontStyle: 'style-2'
+           },
+           {
+             id: 'total-ports-count',
+             title: 'Connected',
+             value: summaryData.connected,
+             description: 'Connected devices',
+             delay: 0.7,
+             animationDuration: 1000,
+             fontStyle: 'style-2'
+           }
+         ]}
+       />
 
 
 
@@ -1267,6 +1462,7 @@ const CtiDashboard = () => {
                                           if ( isDeviceActiveCall) {
                                             console.log('Opening popup for:', dn, deviceName)
                                             setShowPopup({ dn: dn, deviceName })
+                                            handleMonitorSelect(dn, 'SILENT', Object.values(dnsMap[dn]?.devices || {}))
                                           } else if (terminalState === 'STALE') {
                                             console.log('Device is STALE, popup disabled')
                                           } else {
@@ -1482,8 +1678,17 @@ const CtiDashboard = () => {
         </Modal.Footer>
       </Modal>
 
-      
-
+      {/* Device Selection Modal for Monitoring */}
+      <DeviceSelectionModal
+        show={showDeviceSelectionModal}
+        onHide={handleDeviceSelectionCancel}
+        devices={availableDevices}
+        onSelectDevice={handleDeviceSelect}
+        extensionNumber={pendingMonitoringData?.dn || ''}
+        context="monitoring"
+        monitorType={pendingMonitoringData?.monitorType}
+        toneType={pendingMonitoringData?.toneType}
+      />
 
     </React.Fragment>
   )

@@ -378,12 +378,13 @@ const Header = ({ themeMode }: HeaderProps) => {
             label: MENU_LABELS.CONTROL_HUB,
             target: '#pc-tab-controlhub'
         },
+        
         {
-            key: 'gsm',
-            permission: PERMISSIONS.GSM_SERVICES,
-            icon: ICONS.SIM_GATEWAY,
-            label: MENU_LABELS.SIM_GATEWAY,
-            target: '#pc-tab-1'
+            key: 'crm',
+            permission: PERMISSIONS.CRM_SERVICES,
+            icon: ICONS.CRM,
+            label: MENU_LABELS.CRM,
+            target: '#pc-tab-7'
         },
         {
             key: 'call-logs',
@@ -436,11 +437,11 @@ const Header = ({ themeMode }: HeaderProps) => {
             target: '#pc-tab-6'
         },
         {
-            key: 'accounts',
-            permission: 'accounts-services',
-            icon: 'ph-duotone ph-link',
-            label: 'Billing',
-            target: '#pc-tab-15'
+            key: 'gsm',
+            permission: PERMISSIONS.GSM_SERVICES,
+            icon: ICONS.SIM_GATEWAY,
+            label: MENU_LABELS.SIM_GATEWAY,
+            target: '#pc-tab-1'
         },
         {
             key: 'accounts',
@@ -449,13 +450,8 @@ const Header = ({ themeMode }: HeaderProps) => {
             label: 'Billing',
             target: '#pc-tab-15'
         },
-        {
-            key: 'crm',
-            permission: PERMISSIONS.CRM_SERVICES,
-            icon: ICONS.CRM,
-            label: MENU_LABELS.CRM,
-            target: '#pc-tab-7'
-        },
+       
+        
         {
             key: 'dncr',
             permission: PERMISSIONS.DNCR_SERVICES,

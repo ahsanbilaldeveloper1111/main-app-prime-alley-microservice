@@ -32,6 +32,39 @@ interface DialResponse {
   responseData?: any
 }
 
+interface MonitoringParams {
+  monitorDeviceType: string
+  monitorDeviceName: string
+  monitoredDeviceType: string
+  monitoredDeviceName: string
+  monitoredDeviceDn: string
+  type: string
+  tone: string
+  monitor: string
+}
+
+interface StopMonitoringParams {
+  monitorDeviceType: string
+  monitorDeviceName: string
+  monitor: string
+}
+
+interface StartBargeInMonitoringParams {
+  monitorDeviceType: string
+  monitorDeviceName: string
+  monitoredDeviceType: string
+  monitoredDeviceName: string
+  type: string
+  tone: string
+  monitor: string
+}
+
+interface StopBargeInMonitoringParams {
+  monitorDeviceType: string
+  monitorDeviceName: string
+  monitor: string
+}
+
 
 export const validateResponse = (response: any) => {
   const responseData = response?.data;
@@ -171,7 +204,59 @@ export const transferCalls = async (params: TransferCallParams): Promise<DialRes
   }
 }
 
+export const startMonitoring = async (params: any): Promise<any> => {
+  try {
+    const response = await axiosInstance.post('/cti/startMonitoring', params);
 
+    return validateResponse(response);
+  } catch (error) {
+    console.error('Error calling start-monitoring API:', error)
+    return {
+      success: false,
+      error: 'Network error occurred while starting monitoring'
+    }
+  }
+}
+
+export const stopMonitoring = async (params: StopMonitoringParams): Promise<any> => {
+  try {
+    const response = await axiosInstance.post('/cti/stopMonitoring', params);
+    return validateResponse(response);
+  } catch (error) {
+    console.error('Error calling stop-monitoring API:', error)
+    return {
+      success: false,
+      error: 'Network error occurred while stopping monitoring'
+    }
+  }
+}
+
+export const startBargeInMonitoring = async (params: StartBargeInMonitoringParams): Promise<any> => {
+  try {
+    const response = await axiosInstance.post('/cti/startBargeIn', params);
+    return validateResponse(response);
+  } catch (error) {
+    console.error('Error calling start-barge-in-monitoring API:', error)
+    console.error('Error calling start-barge-in-monitoring API:', error)
+    return {
+      success: false,
+      error: 'Network error occurred while starting barge-in monitoring'
+    }
+  }
+}
+
+export const stopBargeInMonitoring = async (params: StopBargeInMonitoringParams): Promise<any> => {
+  try {
+    const response = await axiosInstance.post('/cti/stopBargeIn', params);
+    return validateResponse(response);
+  } catch (error) {
+    console.error('Error calling stop-barge-in-monitoring API:', error)
+    return {
+      success: false,
+      error: 'Network error occurred while stopping barge-in monitoring'
+    }
+  }
+}
 
 /**
  * Get calling device information from CTI data
@@ -199,4 +284,32 @@ export const getCallingDeviceInfo = (
     callingDeviceType: device.deviceType || "SOFT_HARD",
     callingDeviceName: device.deviceName || "WebCTI"
   }
+}
+
+/**
+ * Get all available devices for a user extension
+ * @param userAddress - The user's extension number
+ * @param dnsMap - The CTI devices map
+ * @returns Array of devices or null if not available
+ */
+export const getAllUserDevices = (
+  userAddress: string, 
+  dnsMap: Record<string, { dn: string; devices: Record<string, any> }>
+) => {
+  if (!userAddress || !dnsMap[userAddress]) {
+    return null
+  }
+
+  const userDevices = Object.values(dnsMap[userAddress].devices || {})
+  if (userDevices.length === 0) {
+    return null
+  }
+
+  return userDevices.map(device => ({
+    deviceName: device.deviceName || "Unknown",
+    deviceType: device.deviceType || "UNKNOWN",
+    terminalState: device.terminalState || "UNKNOWN",
+    when: device.when || new Date().toISOString(),
+    details: device.details || "No details available"
+  }))
 }

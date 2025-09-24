@@ -176,12 +176,30 @@ export default function useCtiStomp(wsPath = '/ws') {
     }
 
     if (evt.isTerminating) {
+      console.log(`🔄 useCtiStomp: Processing terminating event:`, {
+        eventType: evt.eventType,
+        callId: evt.callId,
+        isTerminating: evt.isTerminating
+      });
+      
       setCallStateMap(prev => {
         const { [callId]: _, ...rest } = prev;
         const updated = { ...rest };
         // Save updated state after removing terminated call
         saveCallStatesToStorage(updated);
         return updated;
+      });
+      
+      // Still add terminating events to eventLog so dialer can process them
+      setEventLog(prev => {
+        const log = [...prev, evt];
+        if (log.length > 200) log.shift();
+        console.log(`📝 useCtiStomp: Added terminating event to eventLog:`, {
+          eventType: evt.eventType,
+          callId: evt.callId,
+          eventLogLength: log.length
+        });
+        return log;
       });
       return;
     }
@@ -196,6 +214,119 @@ export default function useCtiStomp(wsPath = '/ws') {
       const updated = { ...prev };
       const base = updated[callId] || {};
 
+      // Process parties to ensure callingDeviceType is included
+      const processedParties = (evt.parties || base.parties || []).map((party: any) => {
+        console.log(`🔍 Processing party:`, {
+          callingAddress: party.callingAddress,
+          callingDeviceName: party.callingDeviceName,
+          callingDeviceType: party.callingDeviceType,
+          hasDeviceType: !!party.callingDeviceType
+        });
+        
+        // First try to get device info from stored caller info
+        let storedCallerInfo = null;
+        try {
+          const stored = localStorage.getItem('cti_caller_info');
+          if (stored) {
+            storedCallerInfo = JSON.parse(stored);
+            console.log(`📋 Found stored caller info:`, storedCallerInfo);
+          }
+        } catch (error) {
+          console.error('Error retrieving stored caller info:', error);
+        }
+        
+        // If we have stored caller info and it matches this party, use it
+        if (storedCallerInfo && 
+            storedCallerInfo.callingAddress === party.callingAddress && 
+            storedCallerInfo.callingDeviceName === party.callingDeviceName) {
+          party.callingDeviceType = storedCallerInfo.callingDeviceType;
+          console.log(`✅ Using stored caller info:`, {
+            deviceName: party.callingDeviceName,
+            deviceType: party.callingDeviceType
+          });
+        }
+        // If callingDeviceType is still missing, try to get it from the dnsMap
+        else if (!party.callingDeviceType && party.callingAddress && party.callingDeviceName) {
+          console.log(`🔍 Looking up device type for:`, {
+            callingAddress: party.callingAddress,
+            callingDeviceName: party.callingDeviceName,
+            dnsMapHasAddress: !!dnsMap[party.callingAddress],
+            dnsMapKeys: Object.keys(dnsMap),
+            dnsMapForAddress: dnsMap[party.callingAddress]
+          });
+          
+          const userDevices = dnsMap[party.callingAddress]?.devices;
+          if (userDevices) {
+            console.log(`🔍 Available devices for ${party.callingAddress}:`, Object.keys(userDevices));
+            console.log(`🔍 Looking for device: "${party.callingDeviceName}"`);
+            
+            // Debug: Show all devices and their names
+            Object.values(userDevices).forEach((d: any, index) => {
+              console.log(`🔍 Device ${index}:`, {
+                deviceName: d.deviceName,
+                deviceType: d.deviceType,
+                exactMatch: d.deviceName === party.callingDeviceName,
+                includesMatch: d.deviceName.includes(party.callingDeviceName),
+                reverseMatch: party.callingDeviceName.includes(d.deviceName)
+              });
+            });
+            
+            const device = Object.values(userDevices).find((d: any) => d.deviceName === party.callingDeviceName);
+            if (device) {
+              party.callingDeviceType = device.deviceType;
+              console.log(`✅ Found device type:`, {
+                deviceName: party.callingDeviceName,
+                deviceType: device.deviceType,
+                fullDevice: device
+              });
+            } else {
+              console.log(`❌ Device not found in dnsMap:`, {
+                callingDeviceName: party.callingDeviceName,
+                availableDevices: Object.keys(userDevices),
+                allDevices: Object.values(userDevices)
+              });
+            }
+          } else {
+            console.log(`❌ No devices found for address:`, {
+              callingAddress: party.callingAddress,
+              dnsMapHasAddress: !!dnsMap[party.callingAddress],
+              dnsMap: dnsMap
+            });
+          }
+        } else {
+          console.log(`ℹ️ Device type already present or missing required data:`, {
+            callingDeviceType: party.callingDeviceType,
+            callingAddress: party.callingAddress,
+            callingDeviceName: party.callingDeviceName
+          });
+        }
+        
+        // Fallback: If still no device type, try to infer from device name
+        if (!party.callingDeviceType && party.callingDeviceName) {
+          let inferredType = 'UNKNOWN';
+          const deviceName = party.callingDeviceName.toLowerCase();
+          
+          if (deviceName.includes('android') || deviceName.includes('mobile')) {
+            inferredType = 'ANDROID';
+          } else if (deviceName.includes('soft') || deviceName.includes('csf') || deviceName.includes('web')) {
+            inferredType = 'SOFT';
+          } else if (deviceName.includes('phone') || deviceName.includes('ip')) {
+            inferredType = 'IP_PHONE';
+          } else if (deviceName.includes('hard') || deviceName.includes('desk')) {
+            inferredType = 'HARD';
+          }
+          
+          party.callingDeviceType = inferredType;
+          console.log(`🔄 Inferred device type:`, {
+            deviceName: party.callingDeviceName,
+            inferredType: inferredType
+          });
+        }
+        
+        console.log(`🔍 Final party data:`, party);
+        return party;
+      });
+
       updated[callId] = {
         ...base,
         callId,
@@ -204,7 +335,7 @@ export default function useCtiStomp(wsPath = '/ws') {
         eventTime: evt.eventTime,
         isConference: evt.isConference,
         isOneToOne: evt.isOneToOne,
-        parties: evt.parties || base.parties || [],
+        parties: processedParties,
         isTerminating: evt.isTerminating,
         hasActiveParticipants: evt.hasActiveParticipants,
         eventName: evt.eventName,

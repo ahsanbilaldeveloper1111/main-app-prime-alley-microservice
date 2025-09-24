@@ -5,7 +5,8 @@ import { Button, Card, Col, Row, Alert, Badge } from 'react-bootstrap'
 import { toast } from 'react-toastify'
 import Link from 'next/link'
 import useCtiStomp from '../../../hooks/useCtiStomp'
-import { makeCall, endCall, holdCall, resumeCall, getCallingDeviceInfo, mergeCalls,transferCalls, RemoveCall } from '../../../utils/dialer'
+import { makeCall, endCall, holdCall, resumeCall, getCallingDeviceInfo, getAllUserDevices, mergeCalls,transferCalls, RemoveCall} from '../../../utils/dialer'
+import DeviceSelectionModal from '../../../components/DeviceSelectionModal'
 import Select from 'react-select'
 import { FaLastfmSquare } from 'react-icons/fa'
 
@@ -68,8 +69,56 @@ const CtiDialer = () => {
     status: string
   }>>(new Map())
   const processedEventsRef = useRef<Set<string>>(new Set())
+  
+  // Device selection state
+  const [showDeviceSelectionModal, setShowDeviceSelectionModal] = useState(false)
+  const [availableDevices, setAvailableDevices] = useState<any[]>([])
+  const [pendingDialedNumber, setPendingDialedNumber] = useState('')
+  const [selectedDevice, setSelectedDevice] = useState<any>(null)
+
+  // Debug: Monitor activeCalls changes
+  useEffect(() => {
+    console.log(`📊 Active calls state changed:`, {
+      count: activeCalls.size,
+      calls: Array.from(activeCalls.values()).map(call => ({
+        id: call.id,
+        number: call.number,
+        status: call.status,
+        callId: call.callId
+      }))
+    })
+  }, [activeCalls])
 
   // Helper functions
+  const getStoredCallerInfo = () => {
+    try {
+      const stored = localStorage.getItem('cti_caller_info')
+      if (stored) {
+        const callerInfo = JSON.parse(stored)
+        console.log('📋 Retrieved stored caller info:', callerInfo)
+        return callerInfo
+      }
+    } catch (error) {
+      console.error('Error retrieving stored caller info:', error)
+    }
+    return null
+  }
+
+  const getCallingDeviceInfoForAPI = () => {
+    // First try to get from stored caller info
+    const storedCallerInfo = getStoredCallerInfo()
+    if (storedCallerInfo) {
+      return {
+        callingAddress: storedCallerInfo.callingAddress,
+        callingDeviceType: storedCallerInfo.callingDeviceType,
+        callingDeviceName: storedCallerInfo.callingDeviceName
+      }
+    }
+    
+    // Fallback to the original method
+    return getCallingDeviceInfo(userAddress, dnsMap)
+  }
+
   const getAvailableExtensions = () => {
     return Object.values(dnsMap)
       .filter(({ dn }) => dn !== userAddress)
@@ -220,6 +269,58 @@ const CtiDialer = () => {
   const handleClear = () => setDialedNumber('')
   const handleBackspace = () => setDialedNumber(prev => prev.slice(0, -1))
 
+  // Input handlers for paste and keyboard input
+  const handleNumberInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value
+    // Only allow numbers and limit length
+    const numbersOnly = value.replace(/[^0-9]/g, '')
+    if (numbersOnly.length <= 15) {
+      setDialedNumber(numbersOnly)
+    }
+  }
+
+  const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    e.preventDefault()
+    const pastedText = e.clipboardData.getData('text')
+    // Extract only numbers from pasted text
+    const numbersOnly = pastedText.replace(/[^0-9]/g, '')
+    if (numbersOnly.length <= 15) {
+      setDialedNumber(numbersOnly)
+    } else {
+      // If pasted text is too long, truncate it
+      setDialedNumber(numbersOnly.substring(0, 15))
+    }
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    // Handle Enter key to dial
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      if (dialedNumber.trim()) {
+        handleDial()
+      }
+      return
+    }
+    
+    // Allow backspace, delete, arrow keys, tab
+    if (['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab'].includes(e.key)) {
+      return
+    }
+    
+    // Allow numbers 0-9
+    if (e.key >= '0' && e.key <= '9') {
+      return
+    }
+    
+    // Allow Ctrl+A, Ctrl+C, Ctrl+V, Ctrl+X
+    if (e.ctrlKey && ['a', 'c', 'v', 'x'].includes(e.key.toLowerCase())) {
+      return
+    }
+    
+    // Prevent all other keys
+    e.preventDefault()
+  }
+
   const handleExtensionClick = (extensionNumber: string) => {
     // Check if we can dial this number
     const dialCheck = canDialNumber(extensionNumber)
@@ -233,12 +334,6 @@ const CtiDialer = () => {
   }
 
   const handleDial = async () => {
-    // if (!dialedNumber.trim() || !isDialedNumberValid(dialedNumber)) {
-    //   setShowInvalidWarning(true)
-    //   toast.error(`Cannot dial ${dialedNumber} - not an available extension`)
-    //   return
-    // }
-
     // Check if we can dial this number
     const dialCheck = canDialNumber(dialedNumber)
     if (!dialCheck.canDial) {
@@ -246,12 +341,40 @@ const CtiDialer = () => {
       return
     }
 
-    const callingDevice = getCallingDeviceInfo(userAddress, dnsMap)
+    // Check if user has multiple devices
+    const userDevices = getAllUserDevices(userAddress, dnsMap)
+    if (!userDevices) {
+      toast.error('No calling device information available')
+      return
+    }
+
+    console.log('User devices found:', userDevices.length, userDevices)
+
+    // If user has multiple devices, show device selection modal
+    if (userDevices.length > 1) {
+      console.log('Multiple devices detected, showing device selection modal')
+      setAvailableDevices(userDevices)
+      setPendingDialedNumber(dialedNumber)
+      setShowDeviceSelectionModal(true)
+      return
+    }
+
+    // If only one device, proceed with dialing
+    const callingDevice = getCallingDeviceInfoForAPI()
     if (!callingDevice) {
       toast.error('No calling device information available')
       return
     }
 
+    await performDial(callingDevice, dialedNumber)
+  }
+
+  const performDial = async (callingDevice: any, numberToDial: string) => {
+    console.log('📞 performDial called with:', {
+      callingDevice,
+      numberToDial
+    });
+    
     setIsDialing(true)
     setCallStatus('dialing')
     setShowInvalidWarning(false)
@@ -271,12 +394,16 @@ const CtiDialer = () => {
     // This prevents duplicate call entries from being created
 
     try {
-      const result = await makeCall({
+      const apiParams = {
         callingAddress: callingDevice.callingAddress,
-        calledAddress: dialedNumber,
+        calledAddress: numberToDial,
         callingDeviceType: callingDevice.callingDeviceType,
         callingDeviceName: callingDevice.callingDeviceName
-      })
+      };
+      
+      console.log('📞 Making API call with params:', apiParams);
+      
+      const result = await makeCall(apiParams)
 
       console.log(result, "result cti");
       if (result.success) { console.log( "yes true");
@@ -320,10 +447,18 @@ const CtiDialer = () => {
   }
 
   const removeCall = (callId: string) => {
+    console.log(`🗑️ Removing call from active calls:`, callId)
     setActiveCalls(prev => {
       const newMap = new Map(prev)
       // Only remove if the call still exists
       if (newMap.has(callId)) {
+        const callToRemove = newMap.get(callId)
+        console.log(`🗑️ Call removed:`, {
+          id: callToRemove?.id,
+          number: callToRemove?.number,
+          status: callToRemove?.status,
+          callId: callToRemove?.callId
+        })
         newMap.delete(callId)
       }
       // Save to localStorage after updating
@@ -362,6 +497,42 @@ const CtiDialer = () => {
     toast.info('All call data cleared')
   }
 
+  // Device selection handlers
+  const handleDeviceSelect = (device: any) => {
+    console.log('🎯 Device selected:', device)
+    const callingDevice = {
+      callingAddress: userAddress,
+      callingDeviceType: device.deviceType,
+      callingDeviceName: device.deviceName
+    }
+    
+    console.log('🎯 Calling device info for API:', callingDevice)
+    
+    // Store the selected device info in localStorage for consistent use
+    const callerInfo = {
+      callingAddress: userAddress,
+      callingDeviceName: device.deviceName,
+      callingDeviceType: device.deviceType,
+      selectedAt: new Date().toISOString()
+    }
+    
+    localStorage.setItem('cti_caller_info', JSON.stringify(callerInfo))
+    console.log('💾 Stored caller info in localStorage:', callerInfo)
+    
+    setSelectedDevice(device)
+    setShowDeviceSelectionModal(false)
+    
+    // Proceed with dialing using selected device
+    performDial(callingDevice, pendingDialedNumber)
+  }
+
+  const handleDeviceSelectionCancel = () => {
+    setShowDeviceSelectionModal(false)
+    setAvailableDevices([])
+    setPendingDialedNumber('')
+    setSelectedDevice(null)
+  }
+
   const handleHoldCall = async (callId: string) => {
     const call = activeCalls.get(callId)
     if (!call) {
@@ -380,11 +551,13 @@ const CtiDialer = () => {
 
     try {
       // Get calling device info for the API call
-      const callingDevice = getCallingDeviceInfo(userAddress, dnsMap)
+      const callingDevice = getCallingDeviceInfoForAPI()
       if (!callingDevice) {
         toast.error('No calling device information available')
         return
       }
+
+      console.log('Calling device:', callingDevice)
 
       // Call the holdCall API
       const result = await holdCall({
@@ -443,7 +616,7 @@ const CtiDialer = () => {
 
     try {
       // Get calling device info for the API call
-      const callingDevice = getCallingDeviceInfo(userAddress, dnsMap)
+      const callingDevice = getCallingDeviceInfoForAPI()
       if (!callingDevice) {
         toast.error('No calling device information available')
         return
@@ -518,7 +691,7 @@ const CtiDialer = () => {
     }
 
     // Get calling device info for the API call
-    const callingDevice = getCallingDeviceInfo(userAddress, dnsMap)
+    const callingDevice = getCallingDeviceInfoForAPI()
     if (!callingDevice) {
       toast.error('No calling device information available')
       return
@@ -658,7 +831,7 @@ const CtiDialer = () => {
 
     try {
       // Get calling device info for the API call
-      const callingDevice = getCallingDeviceInfo(userAddress, dnsMap)
+      const callingDevice = getCallingDeviceInfoForAPI()
       if (!callingDevice) {
         toast.error('No calling device information available')
         return
@@ -794,7 +967,7 @@ const CtiDialer = () => {
 
     try {
       // Get calling device info for the API call
-      const callingDevice = getCallingDeviceInfo(userAddress, dnsMap)
+      const callingDevice = getCallingDeviceInfoForAPI()
       if (!callingDevice) {
         toast.error('No calling device information available')
         return
@@ -940,12 +1113,20 @@ const CtiDialer = () => {
           return null
         }
         
-        const { callId, callingAddress, calledAddress, callStatus, callingDeviceName } = eventData
+        const { callId, callingAddress, calledAddress, callStatus, callingDeviceName, callingDeviceType } = eventData
         
         // First try to find by callId (most reliable)
         let existingCall = Array.from(activeCalls.values()).find(call => 
           call.callId === callId && callId
         )
+        
+        console.log(`🔍 findOrCreateCall - Looking for call:`, {
+          eventCallId: callId,
+          callingAddress,
+          calledAddress,
+          callStatus,
+          foundByCallId: !!existingCall
+        })
         
         // If not found by callId, try to find by addresses
         if (!existingCall) {
@@ -970,6 +1151,14 @@ const CtiDialer = () => {
             ['dialing', 'ringing', 'connected', 'onHold'].includes(call.status)
           )
         }
+        
+        console.log(`🔍 findOrCreateCall - Result:`, {
+          found: !!existingCall,
+          callId: existingCall?.id,
+          number: existingCall?.number,
+          status: existingCall?.status,
+          callIdFromEvent: existingCall?.callId
+        })
         
         return existingCall
       }
@@ -1035,7 +1224,8 @@ const CtiDialer = () => {
               ...(eventData?.callId && { callId: eventData.callId }),
               ...(eventData?.callingAddress && { callingAddress: eventData.callingAddress }),
               ...(eventData?.calledAddress && { calledAddress: eventData.calledAddress }),
-              ...(eventData?.callingDeviceName && { callingDeviceName: eventData.callingDeviceName })
+              ...(eventData?.callingDeviceName && { callingDeviceName: eventData.callingDeviceName }),
+              ...(eventData?.callingDeviceType && { callingDeviceType: eventData.callingDeviceType })
             }
             newMap.set(callId, updatedCall)
             console.log(`Updated call ${existingCall.number} status from ${currentStatus} to ${newStatus}`, {
@@ -1061,7 +1251,7 @@ const CtiDialer = () => {
           return null
         }
         
-        const { callId, callingAddress, calledAddress, callingDeviceName } = eventData
+        const { callId, callingAddress, calledAddress, callingDeviceName, callingDeviceType } = eventData
         
         // Validate input data
         if (!callingAddress || !calledAddress) {
@@ -1132,6 +1322,7 @@ const CtiDialer = () => {
           callingAddress: callingAddress,
           calledAddress: calledAddress,
           callingDeviceName: callingDeviceName,
+          callingDeviceType: callingDeviceType,
           duration: 0
         }
         
@@ -1423,15 +1614,22 @@ const CtiDialer = () => {
       }
       
       // Handle call termination events
+      console.log(`🔍 Checking for termination events:`, {
+        eventType: latestEvent.eventType,
+        hasParties: !!latestEvent.parties,
+        isTerminationEvent: ['DISCONNECTED', 'DROPPED', 'ENDED'].includes(latestEvent.eventType)
+      })
+      
       if (['DISCONNECTED', 'DROPPED', 'ENDED'].includes(latestEvent.eventType) && latestEvent.parties) {
         const eventData = latestEvent.parties[0]
         
         // Enhanced logging to debug call termination
-        console.log(`${latestEvent.eventType} event received:`, {
+        console.log(`🔴 ${latestEvent.eventType} event received:`, {
           eventType: latestEvent.eventType,
           eventCallId: eventData.callId,
           callingAddress: eventData.callingAddress,
           calledAddress: eventData.calledAddress,
+          callStatus: eventData.callStatus,
           eventTime: latestEvent.eventTime,
           allActiveCalls: Array.from(activeCalls.values()).map(call => ({
             id: call.id,
@@ -1441,7 +1639,15 @@ const CtiDialer = () => {
           }))
         })
         
-        const existingCall = findOrCreateCall(eventData)
+        let existingCall = findOrCreateCall(eventData)
+        
+        console.log(`🔍 Termination handler - Call found:`, {
+          found: !!existingCall,
+          callId: existingCall?.id,
+          number: existingCall?.number,
+          status: existingCall?.status,
+          callIdFromEvent: existingCall?.callId
+        })
         
         if (existingCall) {
           console.log(`${latestEvent.eventType} event processed for call:`, {
@@ -1450,42 +1656,95 @@ const CtiDialer = () => {
             status: existingCall.status,
             callIdFromEvent: existingCall.callId
           })
-          
-          // Check if this termination is legitimate or if it's a false positive
-          // Some CTI systems send termination events when making new calls
-          const isLegitimateTermination = checkIfTerminationIsLegitimate(latestEvent, existingCall)
-          
-          if (isLegitimateTermination) {
-            updateCallStatus(existingCall.id, 'ended')
-            
-            // Remove ended call after a delay
-            setTimeout(() => removeCall(existingCall.id), 2000)
-            
-            // Show toast outside of setState to avoid side effects
-            setTimeout(() => {
-              toast.info(`Call to ${existingCall.number} ${latestEvent.eventType.toLowerCase()}`)
-            }, 0)
-          } else {
-            console.log(`Delaying ${latestEvent.eventType} event - potential false positive, will re-evaluate in 10 seconds`)
-            
-            // Instead of ignoring, delay the termination to see if it's really legitimate
-            // This handles cases where the CTI system sends premature termination events
-            setTimeout(() => {
-              // Re-check if the call is still active
-              const currentCall = activeCalls.get(existingCall.id)
-              if (currentCall && currentCall.status !== 'ended') {
-                console.log(`Call ${existingCall.number} still active after 10s delay - termination was false positive`)
-                // Don't terminate the call
-              } else {
-                console.log(`Call ${existingCall.number} confirmed terminated after 10s delay - proceeding with cleanup`)
-                updateCallStatus(existingCall.id, 'ended')
-                setTimeout(() => removeCall(existingCall.id), 2000)
-              }
-            }, 10000) // 10 second delay
-          }
         } else {
-          console.log(`${latestEvent.eventType} event received but no matching call found`)
+          // Fallback: Try to find call by callId directly
+          console.log(`⚠️ Call not found by normal matching, trying fallback search...`)
+          const fallbackCall = Array.from(activeCalls.values()).find(call => 
+            call.callId === eventData.callId
+          )
+          
+          if (fallbackCall) {
+            console.log(`✅ Fallback search found call:`, {
+              id: fallbackCall.id,
+              number: fallbackCall.number,
+              status: fallbackCall.status,
+              callId: fallbackCall.callId
+            })
+            // Use the fallback call
+            existingCall = fallbackCall
+          } else {
+            console.log(`❌ No call found even with fallback search`)
+            return
+          }
         }
+        
+        // Check if this termination is legitimate or if it's a false positive
+        // Some CTI systems send termination events when making new calls
+        const isLegitimateTermination = checkIfTerminationIsLegitimate(latestEvent, existingCall)
+        
+        if (isLegitimateTermination) {
+          console.log(`✅ Legitimate termination confirmed, removing call immediately`)
+          
+          // Update call status to ended and remove in one state update
+          setActiveCalls(prev => {
+            const newMap = new Map(prev)
+            const callToUpdate = newMap.get(existingCall.id)
+            
+            console.log(`🔄 Before update - Active calls count:`, newMap.size)
+            console.log(`🔄 Before update - Call to update:`, callToUpdate)
+            
+            if (callToUpdate) {
+              console.log(`🔄 Updating call status to ended and removing:`, {
+                id: callToUpdate.id,
+                number: callToUpdate.number,
+                oldStatus: callToUpdate.status,
+                newStatus: 'ended'
+              })
+              
+              // Remove the call immediately (no need to update status first)
+              newMap.delete(existingCall.id)
+              
+              console.log(`🗑️ Call removed from active calls:`, {
+                id: existingCall.id,
+                number: existingCall.number
+              })
+              console.log(`🗑️ After removal - Active calls count:`, newMap.size)
+              console.log(`🗑️ Remaining calls:`, Array.from(newMap.values()).map(call => ({
+                id: call.id,
+                number: call.number,
+                status: call.status
+              })))
+            }
+            
+            // Save to localStorage after updating
+            setTimeout(() => saveCallStatesToStorage(newMap), 0)
+            return newMap
+          })
+          
+          // Show toast outside of setState to avoid side effects
+          setTimeout(() => {
+            toast.info(`Call to ${existingCall.number} ${latestEvent.eventType.toLowerCase()}`)
+          }, 0)
+        } else {
+          console.log(`Delaying ${latestEvent.eventType} event - potential false positive, will re-evaluate in 10 seconds`)
+          
+          // Instead of ignoring, delay the termination to see if it's really legitimate
+          // This handles cases where the CTI system sends premature termination events
+          setTimeout(() => {
+            // Re-check if the call is still active
+            const currentCall = activeCalls.get(existingCall.id)
+            if (currentCall && currentCall.status !== 'ended') {
+              console.log(`Call ${existingCall.number} still active after 10s delay - termination was false positive`)
+              // Don't terminate the call
+            } else {
+              console.log(`Call ${existingCall.number} confirmed terminated after 10s delay - proceeding with cleanup`)
+              updateCallStatus(existingCall.id, 'ended')
+              setTimeout(() => removeCall(existingCall.id), 2000)
+            }
+          }, 10000) // 10 second delay
+        }
+      } else {
+        console.log(`${latestEvent.eventType} event received but no matching call found`)
       }
     }
   }, [eventLog]) // Removed activeCalls dependency
@@ -1529,6 +1788,10 @@ const CtiDialer = () => {
 
   // Restore call states from localStorage on component mount
   useEffect(() => {
+    // Clear stored caller info on page load to start fresh
+    localStorage.removeItem('cti_caller_info')
+    console.log('🧹 Cleared stored caller info on page load')
+    
     const restoreCallStatesFromStorage = () => {
       try {
         const storedCallStates = localStorage.getItem('cti_call_states')
@@ -2057,39 +2320,38 @@ const CtiDialer = () => {
     // If the call is currently connected and we receive a termination event,
     // it might be a false positive from the CTI system when making new calls
     
-    // Check if this is a recent call (within last 30 seconds)
+    // Check if this is a very recent call (within last 3 seconds)
     const callAge = Date.now() - call.startTime.getTime()
-    const isRecentCall = callAge < 30000 // 30 seconds
+    const isVeryRecentCall = callAge < 3000 // 3 seconds
     
     // Check if we have other active calls
     const otherActiveCalls = Array.from(activeCalls.values()).filter(c => 
       c.id !== call.id && ['connected', 'ringing', 'dialing'].includes(c.status)
     )
     
-    // Check if this termination event has a very recent timestamp (within last 5 seconds)
+    // Check if this termination event has a very recent timestamp (within last 1 second)
     const eventAge = Date.now() - new Date(event.eventTime).getTime()
-    const isRecentEvent = eventAge < 5000 // 5 seconds
+    const isVeryRecentEvent = eventAge < 1000 // 1 second
     
     // Check if we're currently in the process of making a new call
     const isCurrentlyDialing = isDialing || Array.from(activeCalls.values()).some(c => c.status === 'dialing')
     
-    // If it's a recent call, recent event, and we're currently dialing or have other active calls,
-    // this might be a false positive termination
-    if (isRecentCall && isRecentEvent && (isCurrentlyDialing || otherActiveCalls.length > 0 || isInProtectedMode)) {
+    // Only treat as false positive if it's a VERY recent call AND very recent event AND we're actively dialing
+    // This is much more restrictive to avoid blocking legitimate terminations
+    if (isVeryRecentCall && isVeryRecentEvent && isCurrentlyDialing) {
       console.log(`⚠️ Potential false positive termination detected:`, {
         callId: call.id,
         callNumber: call.number,
         callAge: `${Math.round(callAge / 1000)}s`,
         eventAge: `${Math.round(eventAge / 1000)}s`,
-        otherActiveCalls: otherActiveCalls.length,
         isCurrentlyDialing,
-        reason: 'Recent call termination during active call session or dialing'
+        reason: 'Very recent call termination during active dialing'
       })
       return false
     }
     
-    // If the call has been active for a while, it's more likely legitimate
-    if (callAge > 30000) {
+    // If the call has been active for more than 3 seconds, it's likely legitimate
+    if (callAge > 3000) {
       console.log(`Legitimate termination detected:`, {
         callId: call.id,
         callNumber: call.number,
@@ -2249,7 +2511,38 @@ const CtiDialer = () => {
                   {/* Display Number */}
                   <div className="mb-4">
                     <div className="display-4 fw-bold mb-2 text-primary">
-                      {dialedNumber || '0'}
+                      <input
+                        type="text"
+                        value={dialedNumber}
+                        onChange={handleNumberInput}
+                        onPaste={handlePaste}
+                        onKeyDown={handleKeyDown}
+                        className="form-control form-control-lg text-center border-0 bg-transparent text-primary fw-bold"
+                        style={{ 
+                          fontSize: '2.5rem', 
+                          outline: 'none',
+                          boxShadow: 'none',
+                          borderBottom: '2px solid transparent',
+                          transition: 'border-bottom-color 0.3s ease'
+                        }}
+                        onFocus={(e) => {
+                          e.target.style.borderBottomColor = '#0d6efd'
+                        }}
+                        onBlur={(e) => {
+                          e.target.style.borderBottomColor = 'transparent'
+                        }}
+                        placeholder="Enter or paste number"
+                        maxLength={15}
+                        autoComplete="off"
+                        title="Type numbers or paste from clipboard"
+                      />
+                    </div>
+                    
+                    <div className="text-center mb-2">
+                      <small className="text-muted">
+                        <i className="material-icons-two-tone me-1" style={{ fontSize: '14px' }}>keyboard</i>
+                        Type numbers or paste from clipboard
+                      </small>
                     </div>
                     
                     {showInvalidWarning && (
@@ -2573,10 +2866,23 @@ const CtiDialer = () => {
               )}
 
               <Row>
-              {Array.from(activeCalls.values()).filter(call => 
-                ['dialing', 'ringing', 'connected', 'onHold'].includes(call.status) && !isCallMerged(call.id)
-              ).map((call) => (
-                <Col md={6} key={call.id} className="mb-4">
+              {(() => {
+                const activeCallsToRender = Array.from(activeCalls.values()).filter(call => 
+                  ['dialing', 'ringing', 'connected', 'onHold'].includes(call.status) && !isCallMerged(call.id)
+                )
+                console.log(`🎨 Rendering active calls:`, {
+                  totalActiveCalls: activeCalls.size,
+                  callsToRender: activeCallsToRender.length,
+                  calls: activeCallsToRender.map(call => ({
+                    id: call.id,
+                    number: call.number,
+                    status: call.status,
+                    callId: call.callId
+                  }))
+                })
+                return activeCallsToRender
+              })().map((call) => (
+                <Col md={6} key={`${call.id}-${call.status}-${call.callId}`} className="mb-4">
                   <Alert 
                     variant={isCallSelectedForMerge(call.id) ? "primary" : "info"} 
                     className={`text-center ${isCallSelectedForMerge(call.id) ? 'border-primary border-3' : ''}`}
@@ -3017,6 +3323,15 @@ const CtiDialer = () => {
           </div>
         </div>
       )}
+
+      {/* Device Selection Modal */}
+      <DeviceSelectionModal
+        show={showDeviceSelectionModal}
+        onHide={handleDeviceSelectionCancel}
+        devices={availableDevices}
+        onSelectDevice={handleDeviceSelect}
+        extensionNumber={userAddress || ''}
+      />
     </React.Fragment>
   )
 }
