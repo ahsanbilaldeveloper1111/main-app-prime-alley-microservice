@@ -448,6 +448,13 @@ const Header = ({ themeMode }: HeaderProps) => {
             target: '#pc-tab-6'
         },
         {
+            key: 'accounts',
+            permission: 'accounts-services',
+            icon: 'ph-duotone ph-link',
+            label: 'Billing',
+            target: '#pc-tab-15'
+        },
+        {
             key: 'crm',
             permission: 'crm-services',
             icon: 'ph-duotone ph-link',
@@ -460,13 +467,6 @@ const Header = ({ themeMode }: HeaderProps) => {
             icon: 'ph-duotone ph-link',
             label: 'DNCR',
             target: '#pc-tab-10'
-        },
-        {
-            key: 'accounts',
-            permission: 'accounts-services',
-            icon: 'ph-duotone ph-link',
-            label: 'Billing',
-            target: '#pc-tab-15'
         },
         {
             key: 'netops',
@@ -967,14 +967,62 @@ const Header = ({ themeMode }: HeaderProps) => {
         <div className="tab-pane" id="pc-tab-15" role="tabpanel" aria-labelledby="pc-tab-link-15" tabIndex={1}>
             <div className="pc-submenu-title">Billing</div>
             <ul className="pc-navbar">
-                                    <li className="pc-item">
-                                        <Link className="pc-link" href={`${BASE_URL}/coming-soon`} >
-                                            <span className="pc-micon"><i className="ph-duotone ph-link"></i></span>
-                                            <span className="pc-mtext">Billing</span>
-                                        </Link>
-                                    </li>
-                                </ul>                       
-                            </div>
+                <li className="pc-item">
+                    <Link className="pc-link" href={`${BASE_URL}/accounts`} >
+                        <span className="pc-micon"><i className="ph-duotone ph-gauge"></i></span>
+                        <span className="pc-mtext">Dashboard</span>
+                    </Link>
+                </li>
+                <li className="pc-item">
+                    <Link className="pc-link" href={`${BASE_URL}/accounting/resellers`} >
+                        <span className="pc-micon"><i className="ph-duotone ph-users"></i></span>
+                        <span className="pc-mtext">Resellers</span>
+                    </Link>
+                </li>
+                <li className="pc-item">
+                    <Link className="pc-link" href={`${BASE_URL}/accounting/companies`} >
+                        <span className="pc-micon"><i className="ph-duotone ph-building"></i></span>
+                        <span className="pc-mtext">Companies</span>
+                    </Link>
+                </li>
+                <li className="pc-item">
+                    <Link className="pc-link" href={`${BASE_URL}/accounting/invoices`} >
+                        <span className="pc-micon"><i className="ph-duotone ph-file-text"></i></span>
+                        <span className="pc-mtext">Invoices</span>
+                    </Link>
+                </li>
+                <li className="pc-item">
+                    <Link className="pc-link" href={`${BASE_URL}/accounting/expenses`} >
+                        <span className="pc-micon"><i className="ph-duotone ph-credit-card"></i></span>
+                        <span className="pc-mtext">Expenses</span>
+                    </Link>
+                </li>
+                <li className="pc-item">
+                    <Link className="pc-link" href={`${BASE_URL}/accounting/products`} >
+                        <span className="pc-micon"><i className="ph-duotone ph-package"></i></span>
+                        <span className="pc-mtext">Products</span>
+                    </Link>
+                </li>
+                <li className="pc-item">
+                    <Link className="pc-link" href={`${BASE_URL}/accounting/inventory`} >
+                        <span className="pc-micon"><i className="ph-duotone ph-warehouse"></i></span>
+                        <span className="pc-mtext">Inventory</span>
+                    </Link>
+                </li>
+                <li className="pc-item">
+                    <Link className="pc-link" href={`${BASE_URL}/accounting/locations`} >
+                        <span className="pc-micon"><i className="ph-duotone ph-map-pin"></i></span>
+                        <span className="pc-mtext">Locations</span>
+                    </Link>
+                </li>
+                <li className="pc-item">
+                    <Link className="pc-link" href={`${BASE_URL}/accounting/suppliers`} >
+                        <span className="pc-micon"><i className="ph-duotone ph-truck"></i></span>
+                        <span className="pc-mtext">Suppliers</span>
+                    </Link>
+                </li>
+            </ul>                       
+        </div>
     ), []);
 
     // NetOps submenu component with nested menus

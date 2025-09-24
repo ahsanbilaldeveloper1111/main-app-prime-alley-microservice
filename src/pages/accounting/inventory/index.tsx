@@ -1,0 +1,1004 @@
+import "@assets/scss/datatable-style.scss";
+import React, {
+  ReactElement,
+  useState,
+  useCallback,
+  useMemo,
+  useEffect,
+} from "react";
+import Layout from "@layout/index";
+import BreadcrumbItem from "@common/BreadcrumbItem";
+import GenericListPage from "@components/GenericListPage";
+import {
+  getInventories,
+  createInventory,
+  updateInventory,
+  deleteInventory,
+  getInventory,
+  getProductCategories,
+  getInventoryLocations,
+  getInventorySuppliers,
+  InventoryData,
+  InventoryCreateUpdatePayload,
+  ProductCategoryData,
+  InventoryLocationData,
+  InventorySupplierData,
+} from "@utils/accounting";
+import { Column } from "@components/CustomDataTable";
+import { Button, Modal, Row } from "react-bootstrap";
+import { Col } from "react-bootstrap";
+import { toast } from "react-toastify";
+import { useSession } from "next-auth/react";
+import moment from "moment";
+import "@assets/scss/gsm-assign.scss";
+import "@assets/scss/dashboard-card.scss";
+import "@assets/scss/common.scss";
+import { motion } from "framer-motion";
+
+const InventoryList = () => {
+  const { data: session, status } = useSession();
+
+  const [refreshKey, setRefreshKey] = useState<number>(0);
+  const [currentFilters, setCurrentFilters] = useState({});
+
+  const [categories, setCategories] = useState<ProductCategoryData[]>([]);
+  const [locations, setLocations] = useState<InventoryLocationData[]>([]);
+  const [suppliers, setSuppliers] = useState<InventorySupplierData[]>([]);
+
+  // Inventory Management
+  const [selectedInventory, setSelectedInventory] = useState<InventoryData | null>(null);
+  const [showEditInventoryModal, setShowEditInventoryModal] = useState<boolean>(false);
+  const [showCreateInventoryModal, setShowCreateInventoryModal] = useState<boolean>(false);
+  const [editingInventory, setEditingInventory] = useState<boolean>(false);
+  const [creatingInventory, setCreatingInventory] = useState<boolean>(false);
+  const [showDeleteInventoryModal, setShowDeleteInventoryModal] = useState<boolean>(false);
+  const [confirmDeleteInventory, setConfirmDeleteInventory] = useState<string>("");
+
+  const columns: Column[] = useMemo(
+    () => [
+      {
+        key: "name",
+        name: "Name",
+        selector: (row: InventoryData) => row.name,
+        sortable: true,
+        cell: (props: InventoryData) => (
+          <div>
+            <div className="fw-bold text-primary">{props.name}</div>
+            {props.description && (
+              <div 
+                className="text-muted small" 
+                dangerouslySetInnerHTML={{ __html: props.description }}
+              />
+            )}
+          </div>
+        ),
+      },
+      {
+        key: "category",
+        name: "Category",
+        selector: (row: InventoryData) => row.category?.name,
+        sortable: true,
+        cell: (props: InventoryData) => (
+          <span className="badge bg-info">
+            {props.category?.name || "No Category"}
+          </span>
+        ),
+      },
+      {
+        key: "current_stock",
+        name: "Stock",
+        selector: (row: InventoryData) => row.current_stock,
+        sortable: true,
+        cell: (props: InventoryData) => (
+          <div>
+            <div className="fw-bold">{props.current_stock}</div>
+            <div className="text-muted small">
+              Min: {props.minimum_stock} | Max: {props.maximum_stock}
+            </div>
+          </div>
+        ),
+      },
+      {
+        key: "base_price",
+        name: "Price",
+        selector: (row: InventoryData) => row.base_price,
+        sortable: true,
+        cell: (props: InventoryData) => (
+          <span className="fw-bold text-success">
+            ${parseFloat(props.base_price || "0").toFixed(2)}
+          </span>
+        ),
+      },
+      {
+        key: "status",
+        name: "Status",
+        selector: (row: InventoryData) => row.status,
+        sortable: true,
+        cell: (props: InventoryData) => {
+          const statusColors = {
+            in_stock: "success",
+            low_stock: "warning",
+            out_of_stock: "danger",
+          };
+          return (
+            <span
+              className={`status-badge ${
+                statusColors[props.status as keyof typeof statusColors] ||
+                "secondary"
+              }`}
+            >
+              {props.status.replace('_', ' ').toUpperCase()}
+            </span>
+          );
+        },
+      },
+      {
+        key: "last_updated",
+        name: "Last Updated",
+        selector: (row: InventoryData) => row.last_updated,
+        sortable: true,
+        cell: (props: InventoryData) => (
+          <span className="text-muted">
+            {moment(props.last_updated).format("DD/MM/YYYY HH:mm")}
+          </span>
+        ),
+      },
+      {
+        key: "Action",
+        name: "ACTION",
+        selector: (row: InventoryData) => row.id,
+        sortable: false,
+        cell: (props: InventoryData) => (
+          <div className="action-buttons-container">
+            <button
+              className="btn btn-sm btn-outline-primary me-1"
+              onClick={() => handleEditInventory(props)}
+            >
+              Edit
+            </button>
+            <button
+              className="btn btn-sm btn-outline-danger"
+              onClick={() => handleDeleteInventory(props)}
+            >
+              Delete
+            </button>
+          </div>
+        ),
+      },
+    ],
+    [session?.user?.permissions]
+  );
+
+  const fetchCategories = useCallback(async () => {
+    try {
+      const categoriesData = await getProductCategories();
+      setCategories(categoriesData.data || []);
+    } catch (error) {
+      console.error("Error fetching categories:", error);
+    }
+  }, []);
+
+  const fetchLocations = useCallback(async () => {
+    try {
+      const locationsData = await getInventoryLocations();
+      setLocations(locationsData.data || []);
+    } catch (error) {
+      console.error("Error fetching locations:", error);
+    }
+  }, []);
+
+  const fetchSuppliers = useCallback(async () => {
+    try {
+      const suppliersData = await getInventorySuppliers();
+      setSuppliers(suppliersData.data || []);
+    } catch (error) {
+      console.error("Error fetching suppliers:", error);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchCategories();
+    fetchLocations();
+    fetchSuppliers();
+  }, [fetchCategories, fetchLocations, fetchSuppliers]);
+
+  const memoizedFilters = useMemo(() => currentFilters, [currentFilters]);
+
+  const fetchInventories = useCallback(
+    async (page = 1, perPage = 15, search = "") => {
+      try {
+        const response = await getInventories({
+          page,
+          per_page: perPage,
+          search,
+          ...memoizedFilters,
+        });
+
+        return {
+          data: response.data,
+          total: response.pagination.total,
+          page: response.pagination.current_page,
+          per_page: response.pagination.per_page,
+          last_page: response.pagination.last_page,
+        };
+      } catch (error) {
+        console.error("Error fetching inventories:", error);
+        throw error;
+      }
+    },
+    [memoizedFilters]
+  );
+
+  const handleFiltersChange = useCallback((filters: any) => {
+    setCurrentFilters(filters);
+  }, []);
+
+  // Edit Inventory Modal
+  const handleEditInventory = useCallback((props: InventoryData) => {
+    setSelectedInventory(props);
+    setShowEditInventoryModal(true);
+  }, []);
+
+  const handleSubmitEditInventory = useCallback(async () => {
+    if (!selectedInventory) return;
+
+    if (!selectedInventory.name) {
+      toast.error("Please enter a name");
+      return;
+    }
+    if (!selectedInventory.category_id) {
+      toast.error("Please select a category");
+      return;
+    }
+    if (!selectedInventory.base_price || parseFloat(selectedInventory.base_price) < 0) {
+      toast.error("Please enter a valid price");
+      return;
+    }
+
+    setEditingInventory(true);
+    try {
+      const inventoryData: InventoryCreateUpdatePayload = {
+        name: selectedInventory.name,
+        description: selectedInventory.description || "",
+        base_price: selectedInventory.base_price,
+        category_id: selectedInventory.category_id,
+        location_id: selectedInventory.location_id,
+        supplier_id: selectedInventory.supplier_id,
+        current_stock: selectedInventory.current_stock,
+        minimum_stock: selectedInventory.minimum_stock,
+        maximum_stock: selectedInventory.maximum_stock,
+        reorder_point: selectedInventory.reorder_point,
+        status: selectedInventory.status,
+        notes: selectedInventory.notes,
+      };
+
+      const response = await updateInventory(selectedInventory.id, inventoryData);
+
+      if (response) {
+        setSelectedInventory(null);
+        setShowEditInventoryModal(false);
+        setRefreshKey((prev) => prev + 1);
+        toast.success("Inventory updated successfully");
+      }
+    } catch (error) {
+      console.error("Error updating inventory:", error);
+      toast.error("Failed to update inventory");
+    } finally {
+      setEditingInventory(false);
+    }
+  }, [selectedInventory]);
+
+  // Create Inventory Modal
+  const [newInventory, setNewInventory] = useState<InventoryCreateUpdatePayload>({
+    name: "",
+    description: "",
+    base_price: "",
+    category_id: "",
+    location_id: null,
+    supplier_id: null,
+    current_stock: 0,
+    minimum_stock: 0,
+    maximum_stock: 0,
+    reorder_point: null,
+    status: "in_stock",
+    notes: "",
+  });
+
+  const handleSubmitCreateInventory = useCallback(async () => {
+    if (!newInventory.name) {
+      toast.error("Please enter a name");
+      return;
+    }
+    if (!newInventory.category_id) {
+      toast.error("Please select a category");
+      return;
+    }
+    if (!newInventory.base_price || parseFloat(newInventory.base_price) < 0) {
+      toast.error("Please enter a valid price");
+      return;
+    }
+
+    setCreatingInventory(true);
+    try {
+      const response = await createInventory(newInventory);
+
+      if (response) {
+        setNewInventory({
+          name: "",
+          description: "",
+          base_price: "",
+          category_id: "",
+          location_id: null,
+          supplier_id: null,
+          current_stock: 0,
+          minimum_stock: 0,
+          maximum_stock: 0,
+          reorder_point: null,
+          status: "in_stock",
+          notes: "",
+        });
+        setShowCreateInventoryModal(false);
+        setRefreshKey((prev) => prev + 1);
+        toast.success("Inventory created successfully");
+      }
+    } catch (error) {
+      console.error("Error creating inventory:", error);
+      toast.error("Failed to create inventory");
+    } finally {
+      setCreatingInventory(false);
+    }
+  }, [newInventory]);
+
+  // Modal handlers
+  const openCreateInventoryModal = useCallback(
+    () => setShowCreateInventoryModal(true),
+    []
+  );
+  const closeCreateInventoryModal = useCallback(() => {
+    setShowCreateInventoryModal(false);
+    setNewInventory({
+      name: "",
+      description: "",
+      base_price: "",
+      category_id: "",
+      location_id: null,
+      supplier_id: null,
+      current_stock: 0,
+      minimum_stock: 0,
+      maximum_stock: 0,
+      reorder_point: null,
+      status: "in_stock",
+      notes: "",
+    });
+  }, []);
+
+  const closeEditInventoryModal = useCallback(() => {
+    setShowEditInventoryModal(false);
+    setSelectedInventory(null);
+  }, []);
+
+  // Input handlers
+  const handleNewInventoryChange = useCallback(
+    (field: keyof InventoryCreateUpdatePayload, value: any) => {
+      setNewInventory((prev: InventoryCreateUpdatePayload) => ({
+        ...prev,
+        [field]: value,
+      }));
+    },
+    []
+  );
+
+  const handleEditInventoryChange = useCallback(
+    (field: keyof InventoryData, value: any) => {
+      setSelectedInventory((prev: InventoryData | null) => ({
+        ...prev!,
+        [field]: value,
+      }));
+    },
+    []
+  );
+  
+  // Inventory Delete Handlers
+  const handleDeleteInventory = useCallback((props: InventoryData) => {
+    setSelectedInventory(props);
+    setShowDeleteInventoryModal(true);
+  }, []);
+
+  const handleSubmitDeleteInventory = useCallback(async () => {
+    if (!selectedInventory) return;
+
+    const confirmDeleteValue = confirmDeleteInventory.trim();
+    if (confirmDeleteValue === "DELETE") {
+      try {
+        await deleteInventory(selectedInventory.id);
+        setSelectedInventory(null);
+        setShowDeleteInventoryModal(false);
+        setConfirmDeleteInventory("");
+        setRefreshKey((prev) => prev + 1);
+        toast.success("Inventory deleted successfully");
+      } catch (error) {
+        console.error("Error deleting inventory:", error);
+        toast.error("Failed to delete inventory");
+      }
+    } else {
+      toast.error("Please type the word DELETE to confirm");
+    }
+  }, [confirmDeleteInventory, selectedInventory]);
+
+  return (
+    <React.Fragment>
+      <BreadcrumbItem mainTitle="" mainLink="" subTitle="Inventory" />
+
+      <Row className="mb-3">
+        <Col md={12}>
+          <div className="page-header-title style-2">
+            <Row className="d-flex justify-content-between align-items-center">
+              <Col md={4}>
+                <h2 className="mb-0">Inventory</h2>
+              </Col>
+
+              <Col md={8} className="d-flex justify-content-end">
+                <div className="action-buttons">
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={openCreateInventoryModal}
+                  >
+                    New Inventory Item
+                  </Button>
+                </div>
+              </Col>
+            </Row>
+          </div>
+        </Col>
+      </Row>
+
+      <GenericListPage
+        columns={columns}
+        fetchData={fetchInventories}
+        title="Inventory"
+        searchPlaceholder="Search inventory..."
+        defaultPageSize={15}
+        filters={memoizedFilters}
+        refreshKey={refreshKey}
+        search={true}
+        tableStyle="table-style-2"
+      />
+
+      {/* Create Inventory Modal */}
+      {showCreateInventoryModal && (
+        <Modal
+          show={showCreateInventoryModal}
+          onHide={closeCreateInventoryModal}
+          size="lg"
+        >
+          <Modal.Header closeButton>
+            <Modal.Title>Create New Inventory Item</Modal.Title>
+          </Modal.Header>
+          <Modal.Body>
+            <div className="row">
+              <div className="col-md-6">
+                <div className="form-group mb-3">
+                  <label htmlFor="newInventoryName">Name</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    id="newInventoryName"
+                    value={newInventory.name}
+                    onChange={(e) =>
+                      handleNewInventoryChange("name", e.target.value)
+                    }
+                    placeholder="Enter inventory item name"
+                  />
+                </div>
+              </div>
+              <div className="col-md-6">
+                <div className="form-group mb-3">
+                  <label htmlFor="newInventoryCategory">Category</label>
+                  <select
+                    className="form-control"
+                    id="newInventoryCategory"
+                    value={newInventory.category_id}
+                    onChange={(e) =>
+                      handleNewInventoryChange("category_id", e.target.value)
+                    }
+                  >
+                    <option value="">Select Category</option>
+                    {categories.map((category: ProductCategoryData) => (
+                      <option key={category.id} value={category.id}>
+                        {category.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div className="row">
+              <div className="col-md-12">
+                <div className="form-group mb-3">
+                  <label htmlFor="newInventoryDescription">Description</label>
+                  <textarea
+                    className="form-control"
+                    id="newInventoryDescription"
+                    value={newInventory.description}
+                    onChange={(e) =>
+                      handleNewInventoryChange("description", e.target.value)
+                    }
+                    rows={3}
+                    placeholder="Enter description..."
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="row">
+              <div className="col-md-4">
+                <div className="form-group mb-3">
+                  <label htmlFor="newInventoryBasePrice">Base Price</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    className="form-control"
+                    id="newInventoryBasePrice"
+                    value={newInventory.base_price}
+                    onChange={(e) =>
+                      handleNewInventoryChange("base_price", e.target.value)
+                    }
+                    placeholder="0.00"
+                  />
+                </div>
+              </div>
+              <div className="col-md-4">
+                <div className="form-group mb-3">
+                  <label htmlFor="newInventoryCurrentStock">Current Stock</label>
+                  <input
+                    type="number"
+                    className="form-control"
+                    id="newInventoryCurrentStock"
+                    value={newInventory.current_stock}
+                    onChange={(e) =>
+                      handleNewInventoryChange("current_stock", parseInt(e.target.value) || 0)
+                    }
+                    placeholder="0"
+                  />
+                </div>
+              </div>
+              <div className="col-md-4">
+                <div className="form-group mb-3">
+                  <label htmlFor="newInventoryStatus">Status</label>
+                  <select
+                    className="form-control"
+                    id="newInventoryStatus"
+                    value={newInventory.status}
+                    onChange={(e) =>
+                      handleNewInventoryChange("status", e.target.value)
+                    }
+                  >
+                    <option value="in_stock">In Stock</option>
+                    <option value="low_stock">Low Stock</option>
+                    <option value="out_of_stock">Out of Stock</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div className="row">
+              <div className="col-md-4">
+                <div className="form-group mb-3">
+                  <label htmlFor="newInventoryMinStock">Minimum Stock</label>
+                  <input
+                    type="number"
+                    className="form-control"
+                    id="newInventoryMinStock"
+                    value={newInventory.minimum_stock}
+                    onChange={(e) =>
+                      handleNewInventoryChange("minimum_stock", parseInt(e.target.value) || 0)
+                    }
+                    placeholder="0"
+                  />
+                </div>
+              </div>
+              <div className="col-md-4">
+                <div className="form-group mb-3">
+                  <label htmlFor="newInventoryMaxStock">Maximum Stock</label>
+                  <input
+                    type="number"
+                    className="form-control"
+                    id="newInventoryMaxStock"
+                    value={newInventory.maximum_stock}
+                    onChange={(e) =>
+                      handleNewInventoryChange("maximum_stock", parseInt(e.target.value) || 0)
+                    }
+                    placeholder="0"
+                  />
+                </div>
+              </div>
+              <div className="col-md-4">
+                <div className="form-group mb-3">
+                  <label htmlFor="newInventoryReorderPoint">Reorder Point</label>
+                  <input
+                    type="number"
+                    className="form-control"
+                    id="newInventoryReorderPoint"
+                    value={newInventory.reorder_point || ""}
+                    onChange={(e) =>
+                      handleNewInventoryChange("reorder_point", e.target.value ? parseInt(e.target.value) : null)
+                    }
+                    placeholder="Optional"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="row">
+              <div className="col-md-6">
+                <div className="form-group mb-3">
+                  <label htmlFor="newInventoryLocation">Location</label>
+                  <select
+                    className="form-control"
+                    id="newInventoryLocation"
+                    value={newInventory.location_id || ""}
+                    onChange={(e) =>
+                      handleNewInventoryChange("location_id", e.target.value ? parseInt(e.target.value) : null)
+                    }
+                  >
+                    <option value="">Select Location (Optional)</option>
+                    {locations.map((location: InventoryLocationData) => (
+                      <option key={location.id} value={location.id}>
+                        {location.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div className="col-md-6">
+                <div className="form-group mb-3">
+                  <label htmlFor="newInventorySupplier">Supplier</label>
+                  <select
+                    className="form-control"
+                    id="newInventorySupplier"
+                    value={newInventory.supplier_id || ""}
+                    onChange={(e) =>
+                      handleNewInventoryChange("supplier_id", e.target.value ? parseInt(e.target.value) : null)
+                    }
+                  >
+                    <option value="">Select Supplier (Optional)</option>
+                    {suppliers.map((supplier: InventorySupplierData) => (
+                      <option key={supplier.id} value={supplier.id}>
+                        {supplier.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div className="row">
+              <div className="col-md-12">
+                <div className="form-group mb-3">
+                  <label htmlFor="newInventoryNotes">Notes</label>
+                  <textarea
+                    className="form-control"
+                    id="newInventoryNotes"
+                    value={newInventory.notes || ""}
+                    onChange={(e) =>
+                      handleNewInventoryChange("notes", e.target.value)
+                    }
+                    rows={2}
+                    placeholder="Additional notes..."
+                  />
+                </div>
+              </div>
+            </div>
+          </Modal.Body>
+          <Modal.Footer>
+            <Button variant="secondary" onClick={closeCreateInventoryModal}>
+              Close
+            </Button>
+            <Button
+              variant="primary"
+              onClick={handleSubmitCreateInventory}
+              disabled={creatingInventory}
+            >
+              {creatingInventory ? "Creating..." : "Create Inventory Item"}
+            </Button>
+          </Modal.Footer>
+        </Modal>
+      )}
+
+      {/* Edit Inventory Modal */}
+      {showEditInventoryModal && selectedInventory && (
+        <Modal
+          show={showEditInventoryModal}
+          onHide={closeEditInventoryModal}
+          size="lg"
+        >
+          <Modal.Header closeButton>
+            <Modal.Title>
+              Edit Inventory: {selectedInventory.name}
+            </Modal.Title>
+          </Modal.Header>
+          <Modal.Body>
+            <div className="row">
+              <div className="col-md-6">
+                <div className="form-group mb-3">
+                  <label htmlFor="editInventoryName">Name</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    id="editInventoryName"
+                    value={selectedInventory.name || ""}
+                    onChange={(e) =>
+                      handleEditInventoryChange("name", e.target.value)
+                    }
+                    placeholder="Enter inventory item name"
+                  />
+                </div>
+              </div>
+              <div className="col-md-6">
+                <div className="form-group mb-3">
+                  <label htmlFor="editInventoryCategory">Category</label>
+                  <select
+                    className="form-control"
+                    id="editInventoryCategory"
+                    value={selectedInventory.category_id || ""}
+                    onChange={(e) =>
+                      handleEditInventoryChange("category_id", e.target.value)
+                    }
+                  >
+                    <option value="">Select Category</option>
+                    {categories.map((category: ProductCategoryData) => (
+                      <option key={category.id} value={category.id}>
+                        {category.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div className="row">
+              <div className="col-md-12">
+                <div className="form-group mb-3">
+                  <label htmlFor="editInventoryDescription">Description</label>
+                  <textarea
+                    className="form-control"
+                    id="editInventoryDescription"
+                    value={selectedInventory.description || ""}
+                    onChange={(e) =>
+                      handleEditInventoryChange("description", e.target.value)
+                    }
+                    rows={3}
+                    placeholder="Enter description..."
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="row">
+              <div className="col-md-4">
+                <div className="form-group mb-3">
+                  <label htmlFor="editInventoryBasePrice">Base Price</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    className="form-control"
+                    id="editInventoryBasePrice"
+                    value={selectedInventory.base_price || ""}
+                    onChange={(e) =>
+                      handleEditInventoryChange("base_price", e.target.value)
+                    }
+                    placeholder="0.00"
+                  />
+                </div>
+              </div>
+              <div className="col-md-4">
+                <div className="form-group mb-3">
+                  <label htmlFor="editInventoryCurrentStock">Current Stock</label>
+                  <input
+                    type="number"
+                    className="form-control"
+                    id="editInventoryCurrentStock"
+                    value={selectedInventory.current_stock || ""}
+                    onChange={(e) =>
+                      handleEditInventoryChange("current_stock", parseInt(e.target.value) || 0)
+                    }
+                    placeholder="0"
+                  />
+                </div>
+              </div>
+              <div className="col-md-4">
+                <div className="form-group mb-3">
+                  <label htmlFor="editInventoryStatus">Status</label>
+                  <select
+                    className="form-control"
+                    id="editInventoryStatus"
+                    value={selectedInventory.status || ""}
+                    onChange={(e) =>
+                      handleEditInventoryChange("status", e.target.value)
+                    }
+                  >
+                    <option value="in_stock">In Stock</option>
+                    <option value="low_stock">Low Stock</option>
+                    <option value="out_of_stock">Out of Stock</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div className="row">
+              <div className="col-md-4">
+                <div className="form-group mb-3">
+                  <label htmlFor="editInventoryMinStock">Minimum Stock</label>
+                  <input
+                    type="number"
+                    className="form-control"
+                    id="editInventoryMinStock"
+                    value={selectedInventory.minimum_stock || ""}
+                    onChange={(e) =>
+                      handleEditInventoryChange("minimum_stock", parseInt(e.target.value) || 0)
+                    }
+                    placeholder="0"
+                  />
+                </div>
+              </div>
+              <div className="col-md-4">
+                <div className="form-group mb-3">
+                  <label htmlFor="editInventoryMaxStock">Maximum Stock</label>
+                  <input
+                    type="number"
+                    className="form-control"
+                    id="editInventoryMaxStock"
+                    value={selectedInventory.maximum_stock || ""}
+                    onChange={(e) =>
+                      handleEditInventoryChange("maximum_stock", parseInt(e.target.value) || 0)
+                    }
+                    placeholder="0"
+                  />
+                </div>
+              </div>
+              <div className="col-md-4">
+                <div className="form-group mb-3">
+                  <label htmlFor="editInventoryReorderPoint">Reorder Point</label>
+                  <input
+                    type="number"
+                    className="form-control"
+                    id="editInventoryReorderPoint"
+                    value={selectedInventory.reorder_point || ""}
+                    onChange={(e) =>
+                      handleEditInventoryChange("reorder_point", e.target.value ? parseInt(e.target.value) : null)
+                    }
+                    placeholder="Optional"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="row">
+              <div className="col-md-6">
+                <div className="form-group mb-3">
+                  <label htmlFor="editInventoryLocation">Location</label>
+                  <select
+                    className="form-control"
+                    id="editInventoryLocation"
+                    value={selectedInventory.location_id || ""}
+                    onChange={(e) =>
+                      handleEditInventoryChange("location_id", e.target.value ? parseInt(e.target.value) : null)
+                    }
+                  >
+                    <option value="">Select Location (Optional)</option>
+                    {locations.map((location: InventoryLocationData) => (
+                      <option key={location.id} value={location.id}>
+                        {location.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div className="col-md-6">
+                <div className="form-group mb-3">
+                  <label htmlFor="editInventorySupplier">Supplier</label>
+                  <select
+                    className="form-control"
+                    id="editInventorySupplier"
+                    value={selectedInventory.supplier_id || ""}
+                    onChange={(e) =>
+                      handleEditInventoryChange("supplier_id", e.target.value ? parseInt(e.target.value) : null)
+                    }
+                  >
+                    <option value="">Select Supplier (Optional)</option>
+                    {suppliers.map((supplier: InventorySupplierData) => (
+                      <option key={supplier.id} value={supplier.id}>
+                        {supplier.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div className="row">
+              <div className="col-md-12">
+                <div className="form-group mb-3">
+                  <label htmlFor="editInventoryNotes">Notes</label>
+                  <textarea
+                    className="form-control"
+                    id="editInventoryNotes"
+                    value={selectedInventory.notes || ""}
+                    onChange={(e) =>
+                      handleEditInventoryChange("notes", e.target.value)
+                    }
+                    rows={2}
+                    placeholder="Additional notes..."
+                  />
+                </div>
+              </div>
+            </div>
+          </Modal.Body>
+          <Modal.Footer>
+            <Button variant="secondary" onClick={closeEditInventoryModal}>
+              Close
+            </Button>
+            <Button
+              variant="primary"
+              onClick={handleSubmitEditInventory}
+              disabled={editingInventory}
+            >
+              {editingInventory ? "Updating..." : "Update Inventory Item"}
+            </Button>
+          </Modal.Footer>
+        </Modal>
+      )}
+
+      {/* Delete Inventory Modal */}
+      {showDeleteInventoryModal && selectedInventory && (
+        <Modal
+          show={showDeleteInventoryModal}
+          onHide={() => setShowDeleteInventoryModal(false)}
+        >
+          <Modal.Header closeButton>
+            <Modal.Title>Delete Inventory Item?</Modal.Title>
+          </Modal.Header>
+          <Modal.Body>
+            <p>
+              Are you sure you want to delete inventory item{" "}
+              <b className="text-danger">{selectedInventory.name}</b>?
+            </p>
+            <p>
+              This action cannot be undone.
+            </p>
+            <p>
+              Type the word <b className="text-danger">DELETE</b> to confirm
+            </p>
+            <input
+              type="text"
+              className="form-control"
+              id="confirmDeleteInventory"
+              value={confirmDeleteInventory}
+              onChange={(e) => setConfirmDeleteInventory(e.target.value)}
+              placeholder="Type the word DELETE to confirm"
+            />
+          </Modal.Body>
+          <Modal.Footer>
+            <Button
+              variant="secondary"
+              onClick={() => setShowDeleteInventoryModal(false)}
+            >
+              Close
+            </Button>
+            <Button variant="danger" onClick={handleSubmitDeleteInventory}>
+              Delete
+            </Button>
+          </Modal.Footer>
+        </Modal>
+      )}
+    </React.Fragment>
+  );
+};
+
+InventoryList.getLayout = (page: ReactElement) => {
+  return <Layout>{page}</Layout>;
+};
+
+export default InventoryList;
