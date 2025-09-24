@@ -592,21 +592,22 @@ const CallStatsDepartment = () => {
     
     return (
         <React.Fragment>
-            <BreadcrumbItem mainTitle="" mainLink="" subTitle="Call Stats By Country" />
+            <BreadcrumbItem mainTitle="" mainLink="" subTitle="Call Stats By Department" />
 
 
             <Row className="mb-3">
             <Col md={12}>
-                <div className="page-header-title">
-                <Row className="align-items-center">
-                    <Col md={4}>
-                      <h3 className="mb-0 d-flex align-items-center">
-                      Call Stats By Department
-                      </h3>
-                    </Col>
-                    <Col md={8} className="d-flex justify-content-end">
-                      <CallLogsFilters
+                <div className="page-header-title style-2">
+                <Row className="d-flex justify-content-between align-items-center">
+                    <Col md={5}>
+						<h2 className="mb-0">Call Stats By Department</h2>
+					</Col>
+                    <Col md={7} className="d-flex justify-content-end">
+                      
+                    <div className="action-buttons">
+                    <CallLogsFilters
                        onFiltersChange={handleFiltersChange} onExport={handleExport} isVisibleCallDirection={false} moduleSlug={ModuleSlug.CALL_REPORTS} />
+                    </div>
                     </Col>
                   </Row>
                

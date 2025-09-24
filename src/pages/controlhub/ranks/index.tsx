@@ -13,8 +13,7 @@ import { useTokenService } from 'src/hooks/useTokenService';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 
-import '@assets/scss/gsm-assign.scss';
-import '@assets/scss/dashboard-card.scss';
+
 import '@assets/scss/common.scss';
 import { FiEdit, FiMoreVertical, FiTrash2 } from 'react-icons/fi';
 
@@ -46,26 +45,6 @@ const Ranks = () => {
                 selector: (row: any) => row.id,
                 sortable: false,
                 cell: (props: any) => (
-                    
-                    // <div className="d-flex gap-3">
-        
-                    //     {session?.user?.permissions?.includes('edit-ranks')  && (
-                    //         <button className="btn btn-sm btn-outline-primary" onClick={() => handleEditRank(props)}>Edit Rank</button>
-                    //     )}  
-
-                    //     {session?.user?.permissions?.includes('delete-ranks')  && (
-                    //         <button className="btn btn-sm btn-outline-danger" onClick={() => handleDeleteRank(props)}>Delete Rank</button>
-                    //     )}
-
-                    //     {session?.user?.permissions?.includes('view-permissions-ranks')  && (
-                    //         <Link href={`/controlhub/ranks/permissions/${props.id}`} className="btn btn-sm btn-outline-primary">View Permissions</Link>
-                    //     )}
-                        
-                    //     {session?.user?.permissions?.includes('assign-permissions-ranks')  && (
-                    //         <Link href={`/controlhub/ranks/permissions/edit/${props.id}`} className="btn btn-sm btn-outline-danger">Assign Permissions</Link>
-                    //     )}
-        
-                    // </div>
 
                     <Dropdown
                 className="table-action-dropdown"
@@ -197,21 +176,7 @@ const Ranks = () => {
     return (
         <React.Fragment>
             <BreadcrumbItem mainTitle="Controlhub" mainLink="/controlhub/ranks" subTitle="Ranks" />
-            {/* <Row className="mb-3">
-            <Col md={12}>
-                <div className="page-header-title">
-                <h2 className="mb-0 d-flex align-items-center">
-                    Ranks
-                    {session?.user?.permissions?.includes('add-ranks') && (
-                        <Button variant="outline-primary" size="sm" className="ms-3" onClick={() => setShowCreateRankModal(true)}>New Rank</Button>
-                    )}
-                    
-                    <RolesFilters onFiltersChange={handleFiltersChange} onExport={handleExport} />
-                    
-                </h2>
-                </div>
-            </Col>
-            </Row> */}
+            
 
 <Row className="mb-3">
             <Col md={12}>

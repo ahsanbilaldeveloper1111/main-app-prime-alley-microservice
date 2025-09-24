@@ -7,11 +7,12 @@ import { useSession } from "next-auth/react";
 interface GsmCompanyFilterProps {
   onFiltersChange?: (filters: Record<string, any>) => void;
   onExport?: (exportType: string, filters: Record<string, any>) => void;
+  showExport?: boolean;
 }
 
-export default function GsmCompanyFilter({ onFiltersChange, onExport }: GsmCompanyFilterProps) {
+export default function GsmCompanyFilter({ onFiltersChange, onExport, showExport = false }: GsmCompanyFilterProps) {
   const { data: session, status } = useSession();
-  const [showExport, setShowExport] = useState(false);
+  const [showExportFilter, setShowExportFilter] = useState(showExport);
   const [showFilters, setShowFilters] = useState(false);
   
   // Use the hierarchy data hook
@@ -31,8 +32,8 @@ export default function GsmCompanyFilter({ onFiltersChange, onExport }: GsmCompa
   useEffect(() => {
     if (status === 'authenticated') {
       // Only show export if onExport prop is provided and user has permission
-      if (onExport && session?.user?.permissions?.includes('export-gsm-assignment')) {
-        setShowExport(true);
+      if (onExport && session?.user?.permissions?.includes('export-gsm-assignment') &&  showExport===true) {
+        setShowExportFilter(true);
       }
       if (session?.user?.permissions?.includes('filters-gsm-assignment')) {
         setShowFilters(true);

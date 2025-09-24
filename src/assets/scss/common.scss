@@ -115,6 +115,82 @@
                         transform: none;
                         box-shadow: none;
                     }
+
+
+                    .btn-info {
+                        background-image: linear-gradient(135deg, var(--info-accent), var(--info-accent-dark));
+                        color: #ffffff;
+                        box-shadow: 0 6px 20px rgba(58, 123, 213, 0.45);
+                    }
+                    .btn-info:hover {
+                        transform: translateY(-3px);
+                        box-shadow: 0 8px 25px rgba(58, 123, 213, 0.55);
+                    }
+                    .btn-info:disabled {
+                        background: var(--light-text);
+                        cursor: not-allowed;
+                        transform: none;
+                        box-shadow: none;
+                    }
+
+
+                    .btn-success {
+                        background-image: linear-gradient(135deg, var(--success-accent), var(--success-accent-dark));
+                        color: #ffffff;
+                        box-shadow: 0 6px 20px rgba(46, 204, 113, 0.45);
+                    }
+                    .btn-success:hover {
+                        transform: translateY(-3px);
+                        box-shadow: 0 8px 25px rgba(46, 204, 113, 0.55);
+                    }
+                    .btn-success:disabled {
+                        background: var(--light-text);
+                        cursor: not-allowed;
+                        transform: none;
+                        box-shadow: none;
+                    }
+
+
+                    .btn-warning {
+                        background-image: linear-gradient(135deg, var(--warning-accent), var(--warning-accent-dark));
+                        color: #ffffff;
+                        box-shadow: 0 6px 20px rgba(241, 196, 15, 0.45);
+                    }
+                    .btn-warning:hover {
+                        transform: translateY(-3px);
+                        box-shadow: 0 8px 25px rgba(241, 196, 15, 0.55);
+                    }
+                    .btn-warning:disabled {
+                        background: var(--light-text);
+                        cursor: not-allowed;
+                        transform: none;
+                        box-shadow: none;
+                    }
+
+
+                    .btn-danger {
+                        background-image: linear-gradient(135deg, var(--danger-accent), var(--danger-accent-dark));
+                        color: #ffffff;
+                        box-shadow: 0 6px 20px rgba(231, 76, 60, 0.45);
+                    }
+                    .btn-danger:hover {
+                        transform: translateY(-3px);
+                        box-shadow: 0 8px 25px rgba(231, 76, 60, 0.55);
+                    }
+                    .btn-danger:disabled {
+                        background: var(--light-text);
+                        cursor: not-allowed;
+                        transform: none;
+                        box-shadow: none;
+                    }
+
+
+
+
+
+
+
+
             
                     .btn-export {
                         background-color: var(--card-bg);

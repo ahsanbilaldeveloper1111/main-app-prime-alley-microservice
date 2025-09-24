@@ -24,13 +24,11 @@ import CallLogsFilters from '@components/filters/CallLogsFilters';
 import AnimatedNumber from '@components/AnimatedNumber';
 import ChartBar from '@components/ChartBar';
 import ChartDonut from '@components/ChartDonut';
-import StatCard from '@components/StatCard';
-import imgStatus1 from '@assets/images/widget/img-status-1.svg'
-import imgStatus2 from '@assets/images/widget/img-status-2.svg'
-import imgStatus3 from '@assets/images/widget/img-status-3.svg'
-import imgStatus4 from '@assets/images/widget/img-status-4.svg'
+import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
 import '@assets/scss/report-style.scss';
 import '@assets/scss/tabs.scss';
+import '@assets/scss/common.scss';
+
 import { motion, AnimatePresence } from "framer-motion";
 import { easeInOut, easeOut, easeIn } from "framer-motion";
 import moment from 'moment';
@@ -132,12 +130,12 @@ const CallStatsCountry = () => {
     const columns: Column[] = [
         { key: 'Country', name: 'Country', selector: (row: any) => row.Country, sortable: true },
         { key: 'Answered', name: 'Answered', selector: (row: any) => row.Answered, sortable: true },
-        { key: 'AvgCost', name: 'Avg Cost', selector: (row: any) => row.AvgCost, sortable: true },
+        { key: 'Avg Cost', name: 'Avg Cost', selector: (row: any) => row.AvgCost, sortable: true },
         { key: 'AvgDuration', name: 'Avg Duration', selector: (row: any) => row.AvgDuration, sortable: true },
         { key: 'AvgRingTime', name: 'Avg Ring Time', selector: (row: any) => row.AvgRingTime, sortable: true },
         { key: 'Calls', name: 'Calls', selector: (row: any) => row.Calls, sortable: true },
         { key: 'Cost', name: 'Cost', selector: (row: any) => row.Cost, sortable: true },
-        { key: 'Country', name: 'Country', selector: (row: any) => row.Country, sortable: true },
+        
         { key: 'Duration', name: 'Duration', selector: (row: any) => row.Duration, sortable: true },
         { key: 'MaxRingTime', name: 'Max Ring Time', selector: (row: any) => row.MaxRingTime, sortable: true },
         { key: 'TotalDuration', name: 'Total Duration', selector: (row: any) => row.TotalDuration, sortable: true },
@@ -165,6 +163,54 @@ const CallStatsCountry = () => {
         avg_duration:0,
         avg_ring_time:0
     });
+
+    // Create cards data for PageSummaryGrid
+    const summaryCards: SummaryCard[] = [
+        {
+            id: 'total-calls',
+            title: 'Total Calls',
+            value: summary.total_calls,
+            description: 'Total number of calls',
+            delay: 0,
+            showAnimatedNumber: true,
+            animationDuration: 1000,
+            fontStyle: 'style-2',
+            valueType: 'number'
+        },
+        {
+            id: 'avg-ring-time',
+            title: 'Avg Ring Time',
+            value: summary.avg_ring_time,
+            description: 'Average ring time in seconds',
+            delay: 1,
+            showAnimatedNumber: true,
+            animationDuration: 1000,
+            fontStyle: 'style-2',
+            valueType: 'seconds'
+        },
+        {
+            id: 'avg-duration',
+            title: 'Avg Duration',
+            value: summary.avg_duration,
+            description: 'Average call duration in seconds',
+            delay: 2,
+            showAnimatedNumber: true,
+            animationDuration: 1000,
+            fontStyle: 'style-2',
+            valueType: 'seconds'
+        },
+        {
+            id: 'total-cost',
+            title: 'Cost',
+            value: summary.total_cost,
+            description: 'Total cost of calls',
+            delay: 3,
+            showAnimatedNumber: true,
+            animationDuration: 1000,
+            fontStyle: 'style-2',
+            valueType: 'cost'
+        }
+    ];
     
     const fetchCallLogs = useCallback(async (page = 1, perPage = 15, search = "") => {
         // Only fetch if filters are ready
@@ -610,19 +656,20 @@ const CallStatsCountry = () => {
             )} */}
 
 
-            <Row className="mb-3">
+
+<Row className="mb-3">
             <Col md={12}>
-                <div className="page-header-title">
-                <Row className="align-items-center">
-                    <Col md={4}>
-                      <h3 className="mb-0 d-flex align-items-center">
-                      Call Stats By Country
-                      </h3>
-                    </Col>
-                    <Col md={8} className="d-flex justify-content-end">
-                      <CallLogsFilters
+                <div className="page-header-title style-2">
+                <Row className="d-flex justify-content-between align-items-center">
+                    <Col md={5}>
+						<h2 className="mb-0">Call Stats By Country</h2>
+					</Col>
+                    <Col md={7} className="d-flex justify-content-end">
+                      
+                    <div className="action-buttons">
+                    <CallLogsFilters
                        onFiltersChange={handleFiltersChange} onExport={handleExport} isVisibleCallDirection={false} moduleSlug={ModuleSlug.CALL_REPORTS} />
-                       
+                    </div>
                     </Col>
                   </Row>
                
@@ -692,43 +739,12 @@ const CallStatsCountry = () => {
                             </Col>
                         ) : (
                             // Normal stat cards when data is available
-                            <>
-                                <StatCard
-                                    title="Total Calls"
-                                    value={summary.total_calls}
-                                    valueType="number"
-                                    icon="phone"
-                                    bgImage={imgStatus1.src}
-                                    delay={0}
-                                />
-
-                                <StatCard
-                                    title="Avg Ring Time"
-                                    value={summary.avg_ring_time}
-                                    valueType="seconds"
-                                    icon="phone_in_talk"
-                                    bgImage={imgStatus1.src}
-                                    delay={1}
-                                />
-
-                                <StatCard
-                                    title="Avg Duration"
-                                    value={summary.avg_duration}
-                                    valueType="seconds"
-                                    icon="info"
-                                    bgImage={imgStatus1.src}
-                                    delay={2}
-                                />
-
-                                <StatCard
-                                    title="Cost"
-                                    value={summary.total_cost}
-                                    valueType="cost"
-                                    icon="payment"
-                                    bgImage={imgStatus1.src}
-                                    delay={3}
-                                />
-                            </>
+                            <PageSummaryGrid 
+                                cards={summaryCards}
+                                className="dashboard-grid"
+                                cardClassName="dashboard-card"
+                                baseDelay={0.1}
+                            />
                         )}
                     </Row>
                 </Col>
@@ -740,7 +756,7 @@ const CallStatsCountry = () => {
                           transition={{ duration: 0.5, delay: 0.1 * 0 }}
                         >
                     <div className="report-grid ">
-                    <p className="text-muted mb-0">Total Calls</p>
+                    <h5 className=" app-title-heading">Total Calls</h5>
                         <div className="chart-one " >
                             {!dataLoaded ? (
                                 <div className="d-flex flex-column align-items-center justify-content-center text-center" style={{ height: '180px' }}>
@@ -766,7 +782,7 @@ const CallStatsCountry = () => {
                                     series={simpleDonut.series} 
                                     labels={simpleDonut.labels}
                                     dataType="calls"
-                                    height={180}
+                                    height={280}
                                     width={500}
                                     showDataLabels={true}
                                     dataLabelsFormatter={(value) => `${value.toFixed(0)}%`}
@@ -788,7 +804,7 @@ const CallStatsCountry = () => {
             <Row>
 
                 <Col md={12}>
-                    <h4 className="">Core Metrics</h4>
+                    <h2 className="app-title-heading">Core Metrics</h2>
                 </Col>
 
                 <Col md={12}>
@@ -1046,7 +1062,9 @@ const CallStatsCountry = () => {
                             defaultPageSize={15}
                             filters={currentFilters}
                             refreshKey={refreshKey}
-                            key={refreshKey} // Force re-render when refresh key changes
+                            key={refreshKey} 
+                            search={false}
+                            tableStyle='table-style-2'
                         />
                     )}
                 </>

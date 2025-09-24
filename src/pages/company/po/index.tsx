@@ -15,9 +15,7 @@ import { Button, Row, Col } from "react-bootstrap";
 import { useSession } from "next-auth/react";
 import moment from "moment";
 import CompanyPOFilters from "@components/filters/CompanyPOFilters";
-import  '@assets/scss/gsm-dashboard.scss'
-import '@assets/scss/gsm-assign.scss';
-import '@assets/scss/dashboard-card.scss';
+
 import '@assets/scss/common.scss';
 
 interface CompanyPOData {
@@ -205,10 +203,10 @@ const CompanyPO = () => {
                     <Col md={7} className="d-flex justify-content-end">
                       
                     <div className="action-buttons">
-                        <div className="search-container">
+                        {/* <div className="search-container">
                             <i className="fas fa-search search-icon"></i>
                             <input type="text" className="search-bar" placeholder="Search GSM, Company..."/>
-                        </div>
+                        </div> */}
 
                         <CompanyPOFilters onFiltersChange={handleFiltersChange}  />
                        

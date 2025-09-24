@@ -5,12 +5,15 @@ import BreadcrumbItem from '@common/BreadcrumbItem';
 import GenericListPage from '@components/GenericListPage';
 import { getAllGroups, ListGroups, updateGroup,deleteGroup,addGroup } from '@utils/groups';
 import { Column } from '@components/CustomDataTable';
-import { Button, Modal, Row } from 'react-bootstrap';
+import { Button, DropdownItem, DropdownToggle, Dropdown, DropdownMenu, Modal, Row } from 'react-bootstrap';
 import { Col } from 'react-bootstrap';
 import GroupsFilters from '@components/filters/GroupsFilters';
 import { toast } from 'react-toastify';
 import { useTokenService } from 'src/hooks/useTokenService';
 import { useSession } from 'next-auth/react';
+import '@assets/scss/common.scss';
+import { FiEdit, FiMoreVertical, FiTrash2 } from 'react-icons/fi';
+import { Link } from 'feather-icons-react';
 
 const Groups = () => {
     const { data:session, status } = useSession();
@@ -23,19 +26,34 @@ const Groups = () => {
             selector: (row: any) => row.id,
             sortable: false,
             cell: (props: any) => (
-                
-                <div className="action-buttons-container">
-    
-                    {session?.user?.permissions?.includes('edit-groups')  && (
-                        <button className="btn btn-sm btn-outline-primary" onClick={() => handleEditGroup(props)}>Edit Group</button>
-                    )}  
 
-                    {session?.user?.permissions?.includes('delete-groups')  && (
-                        <button className="btn btn-sm btn-outline-danger" onClick={() => handleDeleteGroup(props)}>Delete Group</button>
+                <Dropdown
+                className="table-action-dropdown"
+                //drop="start"
+                placement="top-start"
+            >
+                <DropdownToggle variant="outline-secondary" size="sm">
+                    <FiMoreVertical size={14} />
+                </DropdownToggle>
+                <DropdownMenu>
+                {session?.user?.permissions?.includes('edit-groups')  && (
+                    <DropdownItem className="action-edit" onClick={() => handleEditGroup(props)}>
+                        <FiEdit className="me-2" />
+                        Edit
+                    </DropdownItem>
+                )}
+
+{session?.user?.permissions?.includes('delete-groups')   && (
+                    <DropdownItem className="action-delete" onClick={() => handleDeleteGroup(props)}>
+                        <FiTrash2 className="me-2" />
+                        Delete
+                    </DropdownItem>
                     )}
+                </DropdownMenu>
 
-                    
-                </div>
+            </Dropdown>
+                
+               
             ),
         },
     ];
@@ -125,22 +143,45 @@ const Groups = () => {
     return (
         <React.Fragment>
             <BreadcrumbItem mainTitle="Controlhub" mainLink="/controlhub/groups" subTitle="Groups" />
+            
+
             <Row className="mb-3">
             <Col md={12}>
-                <div className="page-header-title">
-                <h2 className="mb-0 d-flex align-items-center">
-                    Groups
-                    {session?.user?.permissions?.includes('add-groups') && (
-                        <Button variant="outline-primary" size="sm" className="ms-3" onClick={() => setShowCreateGroupModal(true)}>New Group</Button>
-                    )}
-                    
+                <div className="page-header-title style-2">
+                <Row className="d-flex justify-content-between align-items-center">
+                    <Col md={4}>
+                      
+                      <h2 className="mb-0">Groups</h2>
+                    </Col>
 
-                    <GroupsFilters onFiltersChange={handleFiltersChange} onExport={handleExport} />
+
+                    <Col md={8} className="d-flex justify-content-end">
+                      
+                    <div className="action-buttons">
+                    <div className="search-container">
+                            <i className="fas fa-search search-icon"></i>
+                            <input type="text" className="search-bar" placeholder="Search group..." onChange={(e) => handleFiltersChange({...currentFilters, search: e.target.value})}/>
+                        </div>
                     
-                </h2>
+                        {/* <GroupsFilters onFiltersChange={handleFiltersChange} onExport={handleExport} /> */}
+
+                    {session?.user?.permissions?.includes('add-groups') && (
+                        <Button variant="primary" size="sm"  onClick={() => setShowCreateGroupModal(true)}>New Group</Button>
+                    )}
+                    </div>
+
+
+
+                    </Col>
+                  </Row>
+               
+                
                 </div>
             </Col>
             </Row>
+
+
+
 
             {session?.user?.permissions?.includes('list-groups') && (
                  <GenericListPage
@@ -151,6 +192,8 @@ const Groups = () => {
                  defaultPageSize={15}
                  filters={currentFilters}
                  refreshKey={refreshKey}
+                 search={false}
+                 tableStyle="table-style-2"
              />
             )}
 

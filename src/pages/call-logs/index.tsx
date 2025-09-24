@@ -12,17 +12,15 @@ import { toast } from 'react-toastify';
 import { useTokenService } from 'src/hooks/useTokenService';
 import { useSession } from 'next-auth/react';
 import CallLogsFilters from '@components/filters/CallLogsFilters';
-import AnimatedNumber from '@components/AnimatedNumber';
+import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
 import imgStatus1 from '@assets/images/widget/img-status-1.svg'
 import imgStatus2 from '@assets/images/widget/img-status-2.svg'
 import imgStatus3 from '@assets/images/widget/img-status-3.svg'
 import imgStatus4 from '@assets/images/widget/img-status-4.svg'
 import moment from 'moment';
 
-import '@assets/scss/gsm-assign.scss';
-import '@assets/scss/dashboard-card.scss';
+
 import '@assets/scss/common.scss';
-import { motion } from 'framer-motion';
 
 import { convertUTCToUserTimezone, convertUTCTimeToUserTimezone, convertUTCSeparateDateTimeToUserTime, convertUTCSeparateDateTimeToUserDate, formatDuration, GlobalDateFormat, GlobalTimeFormat } from '@utils/Helper';
 import { ModuleSlug } from '@utils/Helper';
@@ -82,6 +80,50 @@ const CallLogs = () => {
         inbound: 0,
         outbound: 0
     });
+
+    // Create cards data for PageSummaryGrid
+    const summaryCards: SummaryCard[] = [
+        {
+            id: 'total-users',
+            title: 'Total Users',
+            value: summary?.users || 0,
+            description: 'Total users in the system',
+            delay: 0.1,
+            showAnimatedNumber: true,
+            animationDuration: 1000,
+            fontStyle: 'style-2'
+        },
+        {
+            id: 'extensions',
+            title: 'Extensions',
+            value: summary?.extensions || 0,
+            description: 'Extensions in the system',
+            delay: 0.3,
+            showAnimatedNumber: true,
+            animationDuration: 1000,
+            fontStyle: 'style-2'
+        },
+        {
+            id: 'inbound',
+            title: 'Inbound',
+            value: summary?.inbound || 0,
+            description: 'Inbound calls in the system',
+            delay: 0.5,
+            showAnimatedNumber: true,
+            animationDuration: 1000,
+            fontStyle: 'style-2'
+        },
+        {
+            id: 'outbound',
+            title: 'Outbound',
+            value: summary?.outbound || 0,
+            description: 'Outbound calls in the system',
+            delay: 0.7,
+            showAnimatedNumber: true,
+            animationDuration: 1000,
+            fontStyle: 'style-2'
+        }
+    ];
     
     const fetchCallLogs = useCallback(async (page = 1, perPage = 15, search = "") => {
         const response = await ListCallLogs({ page, perPage, search, filters: currentFilters, moduleSlug: ModuleSlug.CALL_LOGS }, 'call-logs/list');
@@ -156,99 +198,7 @@ const CallLogs = () => {
             </Row>
 
            
-            <div className="dashboard-grid">
-                <motion.div 
-                    className="dashboard-card"
-                    initial={{ opacity: 0, x: -100, scale: 0.8 }}
-                    animate={{ opacity: 1, x: 0, scale: 1 }}
-                    transition={{ 
-                        duration: 0.8, 
-                        delay: 0.1,
-                        type: "spring",
-                        stiffness: 100,
-                        damping: 15
-                    }}
-                    whileHover={{ 
-                        scale: 1.05,
-                        transition: { duration: 0.2 }
-                    }}
-                >
-                    <h3>Total Users</h3>
-                    <div className="value" id="total-gsms-count">
-                        <AnimatedNumber value={summary?.users} duration={1000} fontStyle='style-2' />
-                    </div>
-                    <p>Total users in the system</p>
-                </motion.div>
-                
-                <motion.div 
-                    className="dashboard-card"
-                    initial={{ opacity: 0, x: -100, scale: 0.8 }}
-                    animate={{ opacity: 1, x: 0, scale: 1 }}
-                    transition={{ 
-                        duration: 0.8, 
-                        delay: 0.3,
-                        type: "spring",
-                        stiffness: 100,
-                        damping: 15
-                    }}
-                    whileHover={{ 
-                        scale: 1.05,
-                        transition: { duration: 0.2 }
-                    }}
-                >
-                    <h3>Extensions</h3>
-                    <div className="value" id="assigned-gsms-count">
-                        <AnimatedNumber value={summary?.extensions} duration={1000}  fontStyle='style-2' />
-                    </div>
-                    <p>Extensions in the system</p>
-                </motion.div>
-                
-                <motion.div 
-                    className="dashboard-card"
-                    initial={{ opacity: 0, x: -100, scale: 0.8 }}
-                    animate={{ opacity: 1, x: 0, scale: 1 }}
-                    transition={{ 
-                        duration: 0.8, 
-                        delay: 0.5,
-                        type: "spring",
-                        stiffness: 100,
-                        damping: 15
-                    }}
-                    whileHover={{ 
-                        scale: 1.05,
-                        transition: { duration: 0.2 }
-                    }}
-                >
-                    <h3>Inbound</h3>
-                    <div className="value" id="unassigned-gsms-count">
-                        <AnimatedNumber value={summary?.inbound} duration={1000}  fontStyle='style-2' />
-                    </div>
-                    <p>Inbound calls in the system</p>
-                </motion.div>
-                
-                <motion.div 
-                    className="dashboard-card"
-                    initial={{ opacity: 0, x: -100, scale: 0.8 }}
-                    animate={{ opacity: 1, x: 0, scale: 1 }}
-                    transition={{ 
-                        duration: 0.8, 
-                        delay: 0.7,
-                        type: "spring",
-                        stiffness: 100,
-                        damping: 15
-                    }}
-                    whileHover={{ 
-                        scale: 1.05,
-                        transition: { duration: 0.2 }
-                    }}
-                >
-                    <h3>Outbound</h3>
-                    <div className="value" id="total-ports-count">
-                        <AnimatedNumber value={summary?.outbound} duration={1000} fontStyle='style-2' />
-                    </div>
-                    <p>Outbound calls in the system</p>
-                </motion.div>
-            </div>
+            <PageSummaryGrid cards={summaryCards} />
 
             {session?.user?.permissions?.includes('list-call-logs') && (
                  <GenericListPage

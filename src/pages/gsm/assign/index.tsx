@@ -13,8 +13,7 @@ import { toast } from 'react-toastify';
 import { useTokenService } from 'src/hooks/useTokenService';
 import { useSession } from 'next-auth/react';
 import Select from 'react-select';
-import '@assets/scss/gsm-assign.scss';
-import '@assets/scss/dashboard-card.scss';
+import '@assets/scss/common.scss';
 
 import GsmCompanyFilter from '@components/filters/GsmCompanyFilter';
 import AnimatedNumber from '@components/AnimatedNumber';
@@ -344,18 +343,18 @@ const GsmAssign = () => {
                       </h2>
                     </Col>
                     <Col md={7} className="d-flex justify-content-end">
-                      {/* <GsmCompanyFilter onFiltersChange={handleFiltersChange} onExport={handleExport} /> */}
+                      
                       <div className="action-buttons">
-                        <div className="search-container">
+                        {/* <div className="search-container">
                             <i className="fas fa-search search-icon"></i>
-                            <input type="text" className="search-bar" placeholder="Search GSM, Company..."/>
-                        </div>
-                        <button className="btn btn-primary" id="new-assign-btn" onClick={() => handleAssignGsm()}>
+                            <input type="text" className="search-bar" placeholder="Search GSM, Company..." onChange={(e) => handleFiltersChange({...currentFilters, search: e.target.value})}/>
+                        </div> */}
+                        <GsmCompanyFilter onFiltersChange={handleFiltersChange} onExport={handleExport} showExport={false} />
+
+                        <button className="btn btn-info btn-sm"  onClick={() => handleAssignGsm()}>
                             <i className="fas fa-plus"></i> New Assign
                         </button>
-                        <button className="btn btn-export" id="export-btn" onClick={handleExportSuccessful}>
-                            <i className="fas fa-download"></i> Export
-                        </button>
+                        
                     </div>
                     </Col>
                   </Row>
