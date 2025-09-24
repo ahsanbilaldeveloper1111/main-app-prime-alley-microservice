@@ -9,14 +9,13 @@ import { ListGsmInbox } from '@utils/GsmManagement';
 import GsmInboxFilter from '@components/filters/GsmInboxFilter';
 import moment from 'moment';
 import '@assets/scss/common.scss';
-import '@assets/scss/dashboard-card.scss';
-import '@assets/scss/gsm-assign.scss';
+
 import '@assets/scss/gsm-inbox.scss';
 import { toast } from 'react-toastify';
 
 const GsmInbox = () => {
   const [refreshKey, setRefreshKey] = useState<number>(0);
-  const [currentFilters, setCurrentFilters] = useState({});
+  const [currentFilters, setCurrentFilters] = useState<{search?: string; [key: string]: any}>({});
 
   const columns: Column[] = useMemo(
     () => [
@@ -167,7 +166,7 @@ const GsmInbox = () => {
   const [perPage] = useState(15);
 
   useEffect(() => {
-    fetchGsmInbox(currentPage, perPage);
+    fetchGsmInbox(currentPage, perPage, memoizedFilters.search || "");
   }, [memoizedFilters, currentPage, perPage]);
 
   const fetchGsmInbox = useCallback(
@@ -175,7 +174,7 @@ const GsmInbox = () => {
       const response = await ListGsmInbox({
         page,
         perPage,
-        search,
+        search: search || memoizedFilters.search || "",
         filters: memoizedFilters,
       });
       console.log('response gsm inbox:', response);
@@ -187,6 +186,7 @@ const GsmInbox = () => {
 
   const handleFiltersChange = useCallback((filters: any) => {
     console.log('Filters changed:', filters);
+    console.log('Search value:', filters.search);
     setCurrentFilters(filters);
     // Trigger refresh when filters change
     setRefreshKey(prev => prev + 1);
@@ -299,7 +299,7 @@ const GsmInbox = () => {
                     <div className="action-buttons">
                         <div className="search-container">
                             <i className="fas fa-search search-icon"></i>
-                            <input type="text" className="search-bar" placeholder="Search by number or keyword..."/>
+                            <input type="text" className="search-bar" placeholder="Search by number or keyword..." onChange={(e) => handleFiltersChange({...currentFilters, search: e.target.value})}/>
                         </div>
                         <GsmInboxFilter onFiltersChange={handleFiltersChange} showExport={false} />
                         
@@ -311,19 +311,6 @@ const GsmInbox = () => {
 
                     </Col>
       </Row>
-
-      {/* <GenericListPage
-        columns={columns}
-        fetchData={fetchGsmInbox}
-        title="GSM Inbox"
-        searchPlaceholder="Search SMS messages..."
-        defaultPageSize={15}
-        filters={memoizedFilters}
-        refreshKey={refreshKey}
-        search={true}
-        noTableHead={true}
-      /> */}
-
 
       <Row>
         <Col md={12}>

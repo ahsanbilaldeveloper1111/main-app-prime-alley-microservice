@@ -13,22 +13,10 @@ import CompanyLogo2 from "@assets/images/ringedge-logo-black-n-blue.png";
 import { authAPI } from "@utils/api";
 import { useAuth } from "../../hooks/useAuth";
 import { useTmsPermissions } from "../../hooks/useTmsPermissions";
+import { HEADER_CONSTANTS } from "../../constants/headerConstants";
 
-// Constants
-const BASE_URL = '';
-const DOM_SELECTORS = {
-    NAV_LINKS: '#pc-layout-submenus > li > .pc-link',
-    SUBMENU_POPUP: '.pc-submenu-popup',
-    SIDEBAR: '.pc-sidebar',
-    TAB_PANES: '.pc-submenu-popup .tab-pane',
-    MENU_ITEMS: '.pc-submenu-popup .tab-pane .pc-item.pc-hasmenu'
-} as const;
-
-const TIMING = {
-    DOM_RENDER_DELAY: 100,
-    HEIGHT_UPDATE_DELAY: 10,
-    RETRY_DELAY: 200
-} as const;
+// Destructure constants for easier use
+const { BASE_URL, DOM_SELECTORS, TIMING, MENU_LABELS, SUBMENU_LABELS, ICONS, PERMISSIONS } = HEADER_CONSTANTS;
 
 // Extend Window interface for bootstrap
 declare global {
@@ -385,66 +373,66 @@ const Header = ({ themeMode }: HeaderProps) => {
     const navigationItems = useMemo((): MenuItem[] => [
         {
             key: 'controlhub',
-            permission: 'control-hub-services',
-            icon: 'ti ti-settings',
-            label: 'Control Hub',
+            permission: PERMISSIONS.CONTROL_HUB_SERVICES,
+            icon: ICONS.CONTROL_HUB,
+            label: MENU_LABELS.CONTROL_HUB,
             target: '#pc-tab-controlhub'
         },
         {
             key: 'gsm',
-            permission: 'gsm-services',
-            icon: 'ti ti-antenna-bars-4',
-            label: 'Sim Gateway',
+            permission: PERMISSIONS.GSM_SERVICES,
+            icon: ICONS.SIM_GATEWAY,
+            label: MENU_LABELS.SIM_GATEWAY,
             target: '#pc-tab-1'
         },
         {
             key: 'call-logs',
-            permission: 'call-logs-services',
-            icon: 'ph-duotone ph-file-text',
-            label: 'Call Logs',
+            permission: PERMISSIONS.CALL_LOGS_SERVICES,
+            icon: ICONS.CALL_LOGS,
+            label: MENU_LABELS.CALL_LOGS,
             target: '#pc-tab-2'
         },
         {
             key: 'call-recording',
-            permission: 'call-recordings-services',
-            icon: 'ph-duotone ph-record',
-            label: 'Call Recordings',
+            permission: PERMISSIONS.CALL_RECORDINGS_SERVICES,
+            icon: ICONS.CALL_RECORDINGS,
+            label: MENU_LABELS.CALL_RECORDINGS,
             target: '#pc-tab-3'
         },
         {
             key: 'call-reports',
-            permission: 'reports-services',
-            icon: 'ph-duotone ph-file-text',
-            label: 'Reports',
+            permission: PERMISSIONS.REPORTS_SERVICES,
+            icon: ICONS.REPORTS,
+            label: MENU_LABELS.REPORTS,
             target: '#pc-tab-5'
         },
         
         {
             key: 'ai-ml',
-            permission: 'ai-ml-services',
-            icon: 'ph-duotone ph-robot',
-            label: 'Ai Insights',
+            permission: PERMISSIONS.AI_ML_SERVICES,
+            icon: ICONS.AI_INSIGHTS,
+            label: MENU_LABELS.AI_INSIGHTS,
             target: '#pc-tab-4'
         },
         {
             key: 'cti',
-            permission: 'cti-services',
-            icon: 'ph-duotone ph-phone-call',
-            label: 'Live Calls',
+            permission: PERMISSIONS.CTI_SERVICES,
+            icon: ICONS.LIVE_CALLS,
+            label: MENU_LABELS.LIVE_CALLS,
             target: '#pc-tab-9'
         },
         {
             key: 'tickets',
-            permission: 'tickets-services',
-            icon: 'ph-duotone ph-ticket',
-            label: 'Tickets',
+            permission: PERMISSIONS.TICKETS_SERVICES,
+            icon: ICONS.TICKETS,
+            label: MENU_LABELS.TICKETS,
             target: '#pc-tab-14'
         },
         {
             key: 'tms',
-            permission: 'tms-services',
-            icon: 'ph-duotone ph-link',
-            label: 'Automation',
+            permission: PERMISSIONS.TMS_SERVICES,
+            icon: ICONS.AUTOMATION,
+            label: MENU_LABELS.AUTOMATION,
             target: '#pc-tab-6'
         },
         {
@@ -455,24 +443,32 @@ const Header = ({ themeMode }: HeaderProps) => {
             target: '#pc-tab-15'
         },
         {
-            key: 'crm',
-            permission: 'crm-services',
+            key: 'accounts',
+            permission: 'accounts-services',
             icon: 'ph-duotone ph-link',
-            label: 'CRM',
+            label: 'Billing',
+            target: '#pc-tab-15'
+        },
+        {
+            key: 'crm',
+            permission: PERMISSIONS.CRM_SERVICES,
+            icon: ICONS.CRM,
+            label: MENU_LABELS.CRM,
             target: '#pc-tab-7'
         },
         {
             key: 'dncr',
-            permission: 'dncr-services',
-            icon: 'ph-duotone ph-link',
-            label: 'DNCR',
+            permission: PERMISSIONS.DNCR_SERVICES,
+            icon: ICONS.DNCR,
+            label: MENU_LABELS.DNCR,
             target: '#pc-tab-10'
         },
+
         {
             key: 'netops',
-            permission: 'netops-services',
-            icon: 'ph-duotone ph-heartbeat',
-            label: 'NetOps',
+            permission: PERMISSIONS.NETOPS_SERVICES,
+            icon: ICONS.NETOPS,
+            label: MENU_LABELS.NETOPS,
             target: '#pc-tab-16'
         }
     ], []);
@@ -481,314 +477,294 @@ const Header = ({ themeMode }: HeaderProps) => {
     const submenuSections = useMemo((): SubmenuSection[] => [
         {
             id: 'pc-tab-controlhub',
-            title: 'Control Hub',
+            title: MENU_LABELS.CONTROL_HUB,
             items: [
                 {
                     key: 'view-users',
                     permission: 'view-users',
-                    icon: 'ph-duotone ph-users',
-                    label: 'User Directory',
+                    icon: ICONS.USERS,
+                    label: SUBMENU_LABELS.USER_DIRECTORY,
                     href: '/controlhub/users',
                     pathMatch: 'controlhub/users'
                 },
                 {
                     key: 'view-ranks',
                     permission: 'view-ranks',
-                    icon: 'ph-duotone ph-users',
-                    label: 'Ranks',
+                    icon: ICONS.USERS,
+                    label: SUBMENU_LABELS.RANKS,
                     href: '/controlhub/ranks',
                     pathMatch: 'controlhub/ranks'
                 },
                 {
                     key: 'view-groups',
                     permission: 'view-groups',
-                    icon: 'ph-duotone ph-users',
-                    label: 'Groups',
+                    icon: ICONS.USERS,
+                    label: SUBMENU_LABELS.GROUPS,
                     href: '/controlhub/groups',
                     pathMatch: 'controlhub/groups'
                 },
-                {
-                    key: 'view-gsm-management',
-                    permission: 'view-gsm-management',
-                    icon: 'ph-duotone ph-list',
-                    label: 'Gsm List',
-                    href: '/gsm/list'
-                },
-                {
-                    key: 'view-gsm-assignment',
-                    permission: 'view-gsm-assignment',
-                    icon: 'ph-duotone ph-list',
-                    label: 'Company Assign',
-                    href: '/gsm/assign'
-                },
-                {
-                    key: 'view-company-po',
-                    permission: 'view-gsm-management',
-                    icon: 'ph-duotone ph-building',
-                    label: 'Company Profiling',
-                    href: '/company/po'
-                }
+                
             ]
         },
         {
             id: 'pc-tab-1',
-            title: 'Sim Gateway',
+            title: MENU_LABELS.SIM_GATEWAY,
             items: [
                 {
                     key: 'dashboard-gsm-management',
                     permission: 'dashboard-gsm-management',
-                    icon: 'ph-duotone ph-gauge',
-                    label: 'Dashboard',
+                    icon: ICONS.GAUGE,
+                    label: SUBMENU_LABELS.GSM_DASHBOARD,
                     href: '/gsm/dashboard'
                 },
                 {
                     key: 'view-gsm-management',
                     permission: 'view-gsm-management',
-                    icon: 'ph-duotone ph-list',
-                    label: 'Gsm List',
+                    icon: ICONS.LIST,
+                    label: SUBMENU_LABELS.GSM_LIST,
                     href: '/gsm/list'
                 },
                 {
                     key: 'view-gsm-assignment',
                     permission: 'view-gsm-assignment',
-                    icon: 'ph-duotone ph-list',
-                    label: 'Company Assign',
+                    icon: ICONS.LIST,
+                    label: SUBMENU_LABELS.COMPANY_ASSIGN,
                     href: '/gsm/assign'
                 },
                 {
                     key: 'view-gsm-ports',
                     permission: 'view-gsm-ports',
-                    icon: 'ph-duotone ph-list',
-                    label: 'Ports',
+                    icon: ICONS.LIST,
+                    label: SUBMENU_LABELS.PORTS,
                     href: '/gsm/ports'
                 },
                 {
                     key: 'view-gsm-inbox',
                     permission: 'view-gsm-inbox',
-                    icon: 'ph-duotone ph-envelope',
-                    label: 'Inbox',
+                    icon: ICONS.ENVELOPE,
+                    label: SUBMENU_LABELS.INBOX,
                     href: '/gsm/inbox'
                 },
                 {
                     key: 'view-gsm-sync',
                     permission: 'view-gsm-inbox',
-                    icon: 'ph-duotone ph-arrows-clockwise',
-                    label: 'Sync GSM',
+                    icon: ICONS.ARROWS_CLOCKWISE,
+                    label: SUBMENU_LABELS.SYNC_GSM,
                     href: '/gsm/sync'
                 },
                 {
                     key: 'view-company-po',
                     permission: 'view-gsm-management',
-                    icon: 'ph-duotone ph-building',
-                    label: 'Company PO',
+                    icon: ICONS.BUILDING,
+                    label: SUBMENU_LABELS.COMPANY_PO,
                     href: '/company/po'
                 }
             ]
         },
         {
             id: 'pc-tab-2',
-            title: 'Calls',
+            title: MENU_LABELS.CALL_LOGS,
             items: [
                 {
                     key: 'dashboard-call-logs',
                     permission: 'dashboard-call-logs',
-                    icon: 'ph-duotone ph-gauge',
-                    label: 'Dashboard',
+                    icon: ICONS.GAUGE,
+                    label: SUBMENU_LABELS.CALL_LOGS_DASHBOARD,
                     href: '/call-logs/dashboard'
                 },
                 {
                     key: 'view-call-logs',
                     permission: 'view-call-logs',
-                    icon: 'ph-duotone ph-gauge',
-                    label: 'Call Logs',
+                    icon: ICONS.GAUGE,
+                    label: SUBMENU_LABELS.CALL_LOGS_LIST,
                     href: '/call-logs'
                 }
             ]
         },
         {
             id: 'pc-tab-4',
-            title: 'Ai Insights',
+            title: MENU_LABELS.AI_INSIGHTS,
             items: [
                 {
                     key: 'transcriptions-analysis-aiml',
                     permission: 'transcriptions-analysis-aiml',
-                    icon: 'ti ti-file-analytics',
-                    label: 'Analysis',
+                    icon: ICONS.FILE_ANALYTICS,
+                    label: SUBMENU_LABELS.ANALYSIS,
                     href: '/ai-ml/analysis'
                 },
                 {
                     key: 'transcriptions-aiml',
                     permission: 'transcriptions-aiml',
-                    icon: 'ti ti-file-analytics',
-                    label: 'Transcription',
+                    icon: ICONS.FILE_ANALYTICS,
+                    label: SUBMENU_LABELS.TRANSCRIPTION,
                     href: '/ai-ml/transcriptions'
                 },
                 {
                     key: 'translate-aiml',
                     permission: 'translate-aiml',
-                    icon: 'ph-duotone ph-translate',
-                    label: 'Translate',
+                    icon: ICONS.TRANSLATE,
+                    label: SUBMENU_LABELS.TRANSLATE,
                     href: '/ai-ml/translate'
                 }
             ]
         },
         {
             id: 'pc-tab-8',
-            title: 'Sales',
+            title: MENU_LABELS.SALES,
             items: [
                 {
                     key: 'sales-dashboard',
                     permission: 'sales-dashboard',
-                    icon: 'ph-duotone ph-gauge',
-                    label: 'Dashboard',
+                    icon: ICONS.GAUGE,
+                    label: SUBMENU_LABELS.SALES_DASHBOARD,
                     href: '/sales'
                 },
                 {
                     key: 'sales-orders',
                     permission: 'sales-orders',
-                    icon: 'ph-duotone ph-shopping-cart',
-                    label: 'Orders',
+                    icon: ICONS.SHOPPING_CART,
+                    label: SUBMENU_LABELS.ORDERS,
                     href: '/sales/orders'
                 },
                 {
                     key: 'sales-products',
                     permission: 'sales-products',
-                    icon: 'ph-duotone ph-package',
-                    label: 'Products',
+                    icon: ICONS.PACKAGE,
+                    label: SUBMENU_LABELS.PRODUCTS,
                     href: '/sales/products'
                 },
                 {
                     key: 'sales-stages',
                     permission: 'sales-stages',
-                    icon: 'ph-duotone ph-trending-up',
-                    label: 'Order Stages',
+                    icon: ICONS.TRENDING_UP,
+                    label: SUBMENU_LABELS.ORDER_STAGES,
                     href: '/sales/stages'
                 },
                 {
                     key: 'sales-lost-reasons',
                     permission: 'sales-lost-reasons',
-                    icon: 'ph-duotone ph-x-circle',
-                    label: 'Lost Reasons',
+                    icon: ICONS.X_CIRCLE,
+                    label: SUBMENU_LABELS.LOST_REASONS,
                     href: '/sales/lost-reasons'
                 }
             ]
         },
         {
             id: 'pc-tab-9',
-            title: 'Live Calls',
+            title: MENU_LABELS.LIVE_CALLS,
             items: [
                 {
                     key: 'view-cti',
                     permission: 'view-cti',
-                    icon: 'ph-duotone ph-link',
-                    label: 'Live View',
+                    icon: ICONS.CRM,
+                    label: SUBMENU_LABELS.LIVE_VIEW,
                     href: '/cti'
                 },
                 {
                     key: 'view-cti',
                     permission: 'view-cti',
-                    icon: 'ph-duotone ph-phone-call',
-                    label: 'Call Monitoring',
+                    icon: ICONS.PHONE_CALL,
+                    label: SUBMENU_LABELS.CALL_MONITORING,
                     href: '/cti/monitoring'
                 },
                 {
                     key: 'dial-call-cti',
                     permission: 'dial-call-cti',
-                    icon: 'ph-duotone ph-link',
-                    label: 'Dialer',
+                    icon: ICONS.CRM,
+                    label: SUBMENU_LABELS.DIALER,
                     href: '/cti/dialer'
                 }
             ]
         },
         {
             id: 'pc-tab-10',
-            title: 'DNCR',
+            title: MENU_LABELS.DNCR,
             items: [
                 {
                     key: 'check-numbers-dncr',
                     permission: 'check-numbers-dncr',
-                    icon: 'ph-duotone ph-phone-call',
-                    label: 'Check Number',
+                    icon: ICONS.PHONE_CALL,
+                    label: SUBMENU_LABELS.CHECK_NUMBER,
                     href: '/dncr/check-number'
                 }
             ]
         },
         {
             id: 'pc-tab-11',
-            title: 'Web RTC',
+            title: MENU_LABELS.WEB_RTC,
             items: [
                 {
                     key: 'webrtc',
                     permission: 'webrtc',
-                    icon: 'ph-duotone ph-link',
-                    label: 'Web RTC',
+                    icon: ICONS.WEB_RTC,
+                    label: MENU_LABELS.WEB_RTC,
                     href: '/coming-soon'
                 }
             ]
         },
         {
             id: 'pc-tab-12',
-            title: 'Omni Channel',
+            title: MENU_LABELS.OMNI_CHANNEL,
             items: [
                 {
                     key: 'omni-channel',
                     permission: 'omni-channel',
-                    icon: 'ph-duotone ph-link',
-                    label: 'Omni Channel',
+                    icon: ICONS.OMNI_CHANNEL,
+                    label: MENU_LABELS.OMNI_CHANNEL,
                     href: '/coming-soon'
                 }
             ]
         },
         {
             id: 'pc-tab-13',
-            title: 'HR Services',
+            title: MENU_LABELS.HR_SERVICES,
             items: [
                 {
                     key: 'hr',
                     permission: 'hr',
-                    icon: 'ph-duotone ph-link',
-                    label: 'HR',
+                    icon: ICONS.HR_SERVICES,
+                    label: MENU_LABELS.HR_SERVICES,
                     href: '/coming-soon'
                 }
             ]
         },
         {
             id: 'pc-tab-14',
-            title: 'Tickets',
+            title: MENU_LABELS.TICKETS,
             items: [
                 {
                     key: 'dashboard-tickets',
                     permission: 'dashboard-tickets',
-                    icon: 'ph-duotone ph-link',
-                    label: 'Dashboard',
+                    icon: ICONS.TICKETS,
+                    label: SUBMENU_LABELS.TICKETS_DASHBOARD,
                     href: '/tickets/dashboard'
                 },
                 {
                     key: 'tickets-tickets',
                     permission: 'tickets-tickets',
-                    icon: 'ph-duotone ph-link',
-                    label: 'Tickets',
+                    icon: ICONS.TICKETS,
+                    label: SUBMENU_LABELS.TICKETS_LIST,
                     href: '/tickets/list'
                 },
                 {
                     key: 'ticket-statuses-tickets',
                     permission: 'ticket-statuses-tickets',
-                    icon: 'ph-duotone ph-link',
-                    label: 'Status',
+                    icon: ICONS.TICKETS,
+                    label: SUBMENU_LABELS.STATUS,
                     href: '/tickets/statuses'
                 },
                 {
                     key: 'ticket-modules-tickets',
                     permission: 'ticket-modules-tickets',
-                    icon: 'ph-duotone ph-link',
-                    label: 'Modules',
+                    icon: ICONS.TICKETS,
+                    label: SUBMENU_LABELS.MODULES,
                     href: '/tickets/modules'
                 },
                 {
                     key: 'view-ticket-types-tickets',
                     permission: 'view-ticket-types-tickets',
-                    icon: 'ph-duotone ph-link',
-                    label: 'Types',
+                    icon: ICONS.TICKETS,
+                    label: SUBMENU_LABELS.TYPES,
                     href: '/tickets/types'
                 }
             ]
@@ -819,19 +795,19 @@ const Header = ({ themeMode }: HeaderProps) => {
     // Call Recording submenu component with nested menus
     const CallRecordingSubmenu = useCallback(() => (
         <div className="tab-pane" id="pc-tab-3" role="tabpanel" aria-labelledby="pc-tab-link-3" tabIndex={1}>
-            <div className="pc-submenu-title">Call Recordings</div>
+            <div className="pc-submenu-title">{MENU_LABELS.CALL_RECORDINGS}</div>
             <ul className="pc-navbar">
                 <li className="pc-item">
                     <Link className="pc-link" href={`${BASE_URL}/call-recordings/dashboard`}>
-                        <span className="pc-micon"><i className="ph-duotone ph-gauge"></i></span>
-                        <span className="pc-mtext">Dashboard</span>
+                        <span className="pc-micon"><i className={ICONS.GAUGE}></i></span>
+                        <span className="pc-mtext">{SUBMENU_LABELS.RECORDINGS_DASHBOARD}</span>
                                                 </Link>
                                             </li>
                 
                 <li className="pc-item">
                     <Link className="pc-link" href={`${BASE_URL}/call-recordings`}>
-                        <span className="pc-micon"><i className="ph-duotone ph-play-circle"></i></span>
-                        <span className="pc-mtext">Recordings List</span>
+                        <span className="pc-micon"><i className={ICONS.PLAY_CIRCLE}></i></span>
+                        <span className="pc-mtext">{SUBMENU_LABELS.RECORDINGS_LIST}</span>
                                                 </Link>
                                             </li>
 
@@ -843,67 +819,67 @@ const Header = ({ themeMode }: HeaderProps) => {
     // Reports submenu component with nested menus
     const ReportsSubmenu = useCallback(() => (
         <div className="tab-pane" id="pc-tab-5" role="tabpanel" aria-labelledby="pc-tab-link-5" tabIndex={1}>
-            <div className="pc-submenu-title">Reports</div>
+            <div className="pc-submenu-title">{MENU_LABELS.REPORTS}</div>
             <ul className="pc-navbar">
                  
                                    
                                     <li className="pc-item">
                                         <Link className="pc-link" href={`${BASE_URL}/call-reports/stats/country`}>
-                                        <span className="pc-micon"><i className="ph-duotone ph-phone-call"></i></span>
-                                        <span className="pc-mtext">Call Stats by Country</span>
+                                        <span className="pc-micon"><i className={ICONS.PHONE_CALL}></i></span>
+                                        <span className="pc-mtext">{SUBMENU_LABELS.CALL_STATS_BY_COUNTRY}</span>
                                                 </Link>
                                             </li>
                                     
                                     <li className="pc-item">
                                         <Link className="pc-link" href={`${BASE_URL}/call-reports/stats/department`}>
-                                        <span className="pc-micon"><i className="ph-duotone ph-phone-call"></i></span>
-                                        <span className="pc-mtext">Call Stats by Department</span>
+                                        <span className="pc-micon"><i className={ICONS.PHONE_CALL}></i></span>
+                                        <span className="pc-mtext">{SUBMENU_LABELS.CALL_STATS_BY_DEPARTMENT}</span>
                                                 </Link>
                                             </li>
                                         
                                         <li className="pc-item">
                                             <Link className="pc-link" href={`${BASE_URL}/call-reports/stats/extension`}>
-                                            <span className="pc-micon"><i className="ph-duotone ph-phone-call"></i></span>
-                                            <span className="pc-mtext">Call Stats by Extension</span>
+                                            <span className="pc-micon"><i className={ICONS.PHONE_CALL}></i></span>
+                                            <span className="pc-mtext">{SUBMENU_LABELS.CALL_STATS_BY_EXTENSION}</span>
                                                 </Link>
                                             </li>
                                         
                                         <li className="pc-item">
                                             <Link className="pc-link" href={`${BASE_URL}/call-reports/incoming/country`}>
-                                        <span className="pc-micon"><i className="ph-duotone ph-phone-call"></i></span>
-                                        <span className="pc-mtext">Incoming Stats by Country</span>
+                                        <span className="pc-micon"><i className={ICONS.PHONE_CALL}></i></span>
+                                        <span className="pc-mtext">{SUBMENU_LABELS.INCOMING_STATS_BY_COUNTRY}</span>
                                                 </Link>
                                             </li>
                                         
                                         <li className="pc-item   ">
                                             <Link className="pc-link" href={`${BASE_URL}/call-reports/incoming/department`}>
-                                            <span className="pc-micon"><i className="ph-duotone ph-phone-call"></i></span>
-                                            <span className="pc-mtext">Incoming Stats by Department</span></Link>
+                                            <span className="pc-micon"><i className={ICONS.PHONE_CALL}></i></span>
+                                            <span className="pc-mtext">{SUBMENU_LABELS.INCOMING_STATS_BY_DEPARTMENT}</span></Link>
                                             </li>
                                         
                                         <li className="pc-item">
                                             <Link className="pc-link" href={`${BASE_URL}/call-reports/incoming/extension`}>
-                                        <span className="pc-micon"><i className="ph-duotone ph-phone-call"></i></span>
-                                        <span className="pc-mtext">Incoming Stats by Extension</span>
+                                        <span className="pc-micon"><i className={ICONS.PHONE_CALL}></i></span>
+                                        <span className="pc-mtext">{SUBMENU_LABELS.INCOMING_STATS_BY_EXTENSION}</span>
                                                 </Link>
                                             </li>
                                         
                                         <li className="pc-item">
                                             <Link className="pc-link" href={`${BASE_URL}/call-reports/trend/country`}>
-                                            <span className="pc-micon"><i className="ph-duotone ph-phone-call"></i></span>
-                                            <span className="pc-mtext">Call Trend by Country</span></Link>
+                                            <span className="pc-micon"><i className={ICONS.PHONE_CALL}></i></span>
+                                            <span className="pc-mtext">{SUBMENU_LABELS.CALL_TREND_BY_COUNTRY}</span></Link>
                                             </li>
                                         
                                         <li className="pc-item">
                                             <Link className="pc-link" href={`${BASE_URL}/call-reports/trend/department`}>
-                                        <span className="pc-micon"><i className="ph-duotone ph-phone-call"></i></span>
-                                        <span className="pc-mtext">Call Trend by Department</span></Link>
+                                        <span className="pc-micon"><i className={ICONS.PHONE_CALL}></i></span>
+                                        <span className="pc-mtext">{SUBMENU_LABELS.CALL_TREND_BY_DEPARTMENT}</span></Link>
                                             </li>
                                         
                                         <li className="pc-item">
                                             <Link className="pc-link" href={`${BASE_URL}/call-reports/trend/extension`}>
-                                            <span className="pc-micon"><i className="ph-duotone ph-phone-call"></i></span>
-                                            <span className="pc-mtext">Call Trend by Extension</span>
+                                            <span className="pc-micon"><i className={ICONS.PHONE_CALL}></i></span>
+                                            <span className="pc-mtext">{SUBMENU_LABELS.CALL_TREND_BY_EXTENSION}</span>
                                                 </Link>
                                             </li>
                
@@ -914,48 +890,48 @@ const Header = ({ themeMode }: HeaderProps) => {
     // CRM submenu component with nested menus
     const CrmSubmenu = useCallback(() => (
         <div className="tab-pane" id="pc-tab-7" role="tabpanel" aria-labelledby="pc-tab-link-7" tabIndex={1}>
-            <div className="pc-submenu-title">CRM</div>
+            <div className="pc-submenu-title">{MENU_LABELS.CRM}</div>
             <ul className="pc-navbar">
                                     <li className="pc-item">
                                         <Link className="pc-link" href={`${BASE_URL}/crm/dashboard`}>
-                                            <span className="pc-micon"><i className="ph-duotone ph-gauge"></i></span>
-                                            <span className="pc-mtext">Dashboard</span>
+                                            <span className="pc-micon"><i className={ICONS.GAUGE}></i></span>
+                                            <span className="pc-mtext">{SUBMENU_LABELS.CRM_DASHBOARD}</span>
                                                 </Link>
                                             </li>
                                     <li className="pc-item">
                                         <Link className="pc-link" href={`${BASE_URL}/crm/leads`}>
-                                            <span className="pc-micon"><i className="ph-duotone ph-users"></i></span>
-                                            <span className="pc-mtext">Leads</span>
+                                            <span className="pc-micon"><i className={ICONS.USERS}></i></span>
+                                            <span className="pc-mtext">{SUBMENU_LABELS.LEADS}</span>
                                                 </Link>
                                             </li>
                                     <li className="pc-item">
                                         <Link className="pc-link" href={`${BASE_URL}/crm/opportunities`}>
-                                            <span className="pc-micon"><i className="ph-duotone ph-target"></i></span>
-                                            <span className="pc-mtext">Opportunities</span>
+                                            <span className="pc-micon"><i className={ICONS.TARGET}></i></span>
+                                            <span className="pc-mtext">{SUBMENU_LABELS.OPPORTUNITIES}</span>
                                                 </Link>
                                             </li>
                                     <li className="pc-item">
                                         <Link className="pc-link" href={`${BASE_URL}/crm/stages`}>
-                                            <span className="pc-micon"><i className="ph-duotone ph-trending-up"></i></span>
-                                            <span className="pc-mtext">Stages</span>
+                                            <span className="pc-micon"><i className={ICONS.TRENDING_UP}></i></span>
+                                            <span className="pc-mtext">{SUBMENU_LABELS.STAGES}</span>
                                                 </Link>
                                             </li>
                                     <li className="pc-item">
                                         <Link className="pc-link" href={`${BASE_URL}/crm/lost-reasons`}>
-                                            <span className="pc-micon"><i className="ph-duotone ph-x-circle"></i></span>
-                                            <span className="pc-mtext">Lost Reasons</span>
+                                            <span className="pc-micon"><i className={ICONS.X_CIRCLE}></i></span>
+                                            <span className="pc-mtext">{SUBMENU_LABELS.LOST_REASONS_CRM}</span>
                                                 </Link>
                                             </li>
                                     <li className="pc-item">
                                         <Link className="pc-link" href={`${BASE_URL}/crm/data`}>
-                                            <span className="pc-micon"><i className="ph-duotone ph-database"></i></span>
-                                            <span className="pc-mtext">Data Management</span>
+                                            <span className="pc-micon"><i className={ICONS.DATABASE}></i></span>
+                                            <span className="pc-mtext">{SUBMENU_LABELS.DATA_MANAGEMENT}</span>
                                                 </Link>
                                             </li>
                                     <li className="pc-item">
                                         <Link className="pc-link" href={`${BASE_URL}/crm/campaigns`}>
-                                            <span className="pc-micon"><i className="ph-duotone ph-megaphone"></i></span>
-                                            <span className="pc-mtext">Campaigns</span>
+                                            <span className="pc-micon"><i className={ICONS.MEGAPHONE}></i></span>
+                                            <span className="pc-mtext">{SUBMENU_LABELS.CAMPAIGNS}</span>
                                         </Link>
                                     </li>
                                         </ul>
@@ -965,7 +941,7 @@ const Header = ({ themeMode }: HeaderProps) => {
     // Accounts submenu component with nested menus
     const AccountsSubmenu = useCallback(() => (
         <div className="tab-pane" id="pc-tab-15" role="tabpanel" aria-labelledby="pc-tab-link-15" tabIndex={1}>
-            <div className="pc-submenu-title">Billing</div>
+            <div className="pc-submenu-title">{MENU_LABELS.BILLING}</div>
             <ul className="pc-navbar">
                 <li className="pc-item">
                     <Link className="pc-link" href={`${BASE_URL}/accounts`} >
@@ -1028,12 +1004,12 @@ const Header = ({ themeMode }: HeaderProps) => {
     // NetOps submenu component with nested menus
     const NetOpsSubmenu = useCallback(() => (
         <div className="tab-pane" id="pc-tab-16" role="tabpanel" aria-labelledby="pc-tab-link-16" tabIndex={1}>
-            <div className="pc-submenu-title">NetOps</div>
+            <div className="pc-submenu-title">{MENU_LABELS.NETOPS}</div>
             <ul className="pc-navbar">
                                     <li className="pc-item">
                                         <Link className="pc-link" href={`${BASE_URL}/coming-soon`} >
-                                            <span className="pc-micon"><i className="ph-duotone ph-link"></i></span>
-                                            <span className="pc-mtext">NetOps</span>
+                                            <span className="pc-micon"><i className={ICONS.NETOPS}></i></span>
+                                            <span className="pc-mtext">{MENU_LABELS.NETOPS}</span>
                                         </Link>
                                     </li>
                                 </ul>                      
@@ -1043,12 +1019,12 @@ const Header = ({ themeMode }: HeaderProps) => {
     // TMS submenu component with nested menus
     const TmsSubmenu = useCallback(() => (
         <div className="tab-pane" id="pc-tab-6" role="tabpanel" aria-labelledby="pc-tab-link-6" tabIndex={1}>
-                                <div className="pc-submenu-title">Automation</div>
+                                <div className="pc-submenu-title">{MENU_LABELS.AUTOMATION}</div>
                                 <ul className="pc-navbar">
                                     <li className="pc-item">
                     <Link className="pc-link" href={`${BASE_URL}/tms`}>
-                                            <span className="pc-micon"><i className="ph-duotone ph-link"></i></span>
-                                            <span className="pc-mtext">Dashboard</span>
+                                            <span className="pc-micon"><i className={ICONS.AUTOMATION}></i></span>
+                                            <span className="pc-mtext">{SUBMENU_LABELS.TMS_DASHBOARD}</span>
                                         </Link>
                                     </li>
 
@@ -1056,66 +1032,66 @@ const Header = ({ themeMode }: HeaderProps) => {
                                     <li className="pc-item pc-hasmenu">
                                         <Link className="pc-link" href="#!">
                                             <span className="pc-micon">
-                                                <i className="ph-duotone ph-phone"></i>
+                                                <i className={ICONS.PHONE}></i>
                                             </span>
-                                            <span className="pc-mtext" data-i18n="Cisco PBX">Cisco PBX</span>
-                                            <span className="pc-arrow"><i className="ph-duotone ph-caret-right"></i></span>
+                                            <span className="pc-mtext" data-i18n={SUBMENU_LABELS.CISCO_PBX}>{SUBMENU_LABELS.CISCO_PBX}</span>
+                                            <span className="pc-arrow"><i className={ICONS.CARET_RIGHT}></i></span>
                                         </Link>
                                         <ul className="pc-submenu">
                                             <li className="pc-item">
                                 <Link className="pc-link" href={`${BASE_URL}/tms/cisco-pbx/users`}>
-                                                    <span className="pc-mtext">Users</span>
+                                                    <span className="pc-mtext">{SUBMENU_LABELS.USERS}</span>
                                                 </Link>
                                 <Link className="pc-link" href={`${BASE_URL}/tms/cisco-pbx/users-directory`}>
-                                                    <span className="pc-mtext">Users Directory</span>
+                                                    <span className="pc-mtext">{SUBMENU_LABELS.USERS_DIRECTORY}</span>
                                                 </Link>
                                 <Link className="pc-link" href={`${BASE_URL}/tms/cisco-pbx/app-users`}>
-                                                    <span className="pc-mtext">App Users</span>
+                                                    <span className="pc-mtext">{SUBMENU_LABELS.APP_USERS}</span>
                                                 </Link>
                                 <Link className="pc-link" href={`${BASE_URL}/tms/cisco-pbx/custom-users`}>
-                                                    <span className="pc-mtext">Custom Users</span>
+                                                    <span className="pc-mtext">{SUBMENU_LABELS.CUSTOM_USERS}</span>
                                                 </Link>
                                 <Link className="pc-link" href={`${BASE_URL}/tms/cisco-pbx/facilities-info`}>
-                                                    <span className="pc-mtext">Facilities Info</span>
+                                                    <span className="pc-mtext">{SUBMENU_LABELS.FACILITIES_INFO}</span>
                                                 </Link>
                                 <Link className="pc-link" href={`${BASE_URL}/tms/cisco-pbx/recording-profile`}>
-                                                    <span className="pc-mtext">Recording Profile</span>
+                                                    <span className="pc-mtext">{SUBMENU_LABELS.RECORDING_PROFILE}</span>
                                                 </Link>
                                 <Link className="pc-link" href={`${BASE_URL}/tms/cisco-pbx/remote-destination`}>
-                                                    <span className="pc-mtext">Remote Destination</span>
+                                                    <span className="pc-mtext">{SUBMENU_LABELS.REMOTE_DESTINATION}</span>
                                                 </Link>
                                 <Link className="pc-link" href={`${BASE_URL}/tms/cisco-pbx/remote-destination/profile`}>
-                                                    <span className="pc-mtext">Remote Destination Profile</span>
+                                                    <span className="pc-mtext">{SUBMENU_LABELS.REMOTE_DESTINATION_PROFILE}</span>
                                                 </Link>
                                 <Link className="pc-link" href={`${BASE_URL}/tms/cisco-pbx/line`}>
-                                                    <span className="pc-mtext">Line</span>
+                                                    <span className="pc-mtext">{SUBMENU_LABELS.LINE}</span>
                                                 </Link>
                                 <Link className="pc-link" href={`${BASE_URL}/tms/cisco-pbx/phone`}>
-                                                    <span className="pc-mtext">Phone</span>
+                                                    <span className="pc-mtext">{SUBMENU_LABELS.PHONE}</span>
                                                 </Link>
                                 <Link className="pc-link" href={`${BASE_URL}/tms/cisco-pbx/sip-trunks`}>
-                                                    <span className="pc-mtext">SIP Trunks</span>
+                                                    <span className="pc-mtext">{SUBMENU_LABELS.SIP_TRUNKS}</span>
                                                 </Link>
                                 <Link className="pc-link" href={`${BASE_URL}/tms/cisco-pbx/translation-patterns`}>
-                                                    <span className="pc-mtext">Translation Patterns</span>
+                                                    <span className="pc-mtext">{SUBMENU_LABELS.TRANSLATION_PATTERNS}</span>
                                                 </Link>
                                 <Link className="pc-link" href={`${BASE_URL}/tms/cisco-pbx/device-pool`}>
-                                                    <span className="pc-mtext">Device Pool</span>
+                                                    <span className="pc-mtext">{SUBMENU_LABELS.DEVICE_POOL}</span>
                                                 </Link>
                                 <Link className="pc-link" href={`${BASE_URL}/tms/cisco-pbx/locations`}>
-                                                    <span className="pc-mtext">Locations</span>
+                                                    <span className="pc-mtext">{SUBMENU_LABELS.LOCATIONS}</span>
                                                 </Link>
                                 <Link className="pc-link" href={`${BASE_URL}/tms/cisco-pbx/route-partitions`}>
-                                                    <span className="pc-mtext">Route Partitions</span>
+                                                    <span className="pc-mtext">{SUBMENU_LABELS.ROUTE_PARTITIONS}</span>
                                                 </Link>
                                 <Link className="pc-link" href={`${BASE_URL}/tms/cisco-pbx/css`}>
-                                                    <span className="pc-mtext">CSS</span>
+                                                    <span className="pc-mtext">{SUBMENU_LABELS.CSS}</span>
                                                 </Link>
                                 <Link className="pc-link" href={`${BASE_URL}/tms/cisco-pbx/regions`}>
-                                                    <span className="pc-mtext">Regions</span>
+                                                    <span className="pc-mtext">{SUBMENU_LABELS.REGIONS}</span>
                                                 </Link>
                                 <Link className="pc-link" href={`${BASE_URL}/tms/cisco-pbx/route-pattern`}>
-                                                    <span className="pc-mtext">Route Pattern</span>
+                                                    <span className="pc-mtext">{SUBMENU_LABELS.ROUTE_PATTERN}</span>
                                                 </Link>
                                             </li>
                                         </ul>
@@ -1125,8 +1101,8 @@ const Header = ({ themeMode }: HeaderProps) => {
                                     {(hasTmsPermission('view','unified_op') || hasTmsPermission('admin','global')) && (
                                     <li className="pc-item">
                         <Link className="pc-link" href={`${BASE_URL}/tms/unified-ops`}>
-                                            <span className="pc-micon"><i className="ph-duotone ph-link"></i></span>
-                                            <span className="pc-mtext">Unified Ops</span>
+                                            <span className="pc-micon"><i className={ICONS.AUTOMATION}></i></span>
+                                            <span className="pc-mtext">{SUBMENU_LABELS.UNIFIED_OPS}</span>
                                         </Link>
                                     </li>
                                     )}
@@ -1134,8 +1110,8 @@ const Header = ({ themeMode }: HeaderProps) => {
                                     {(hasTmsPermission('view','audit_log') || hasTmsPermission('admin','global')) && (
                                         <li className="pc-item">
                         <Link className="pc-link" href={`${BASE_URL}/tms/audit-logs`}>
-                                                <span className="pc-micon"><i className="ph-duotone ph-list"></i></span>
-                                                <span className="pc-mtext">Audit Log</span>
+                                                <span className="pc-micon"><i className={ICONS.LIST}></i></span>
+                                                <span className="pc-mtext">{SUBMENU_LABELS.AUDIT_LOG}</span>
                                             </Link>
                                         </li>
                                     )}
@@ -1146,21 +1122,21 @@ const Header = ({ themeMode }: HeaderProps) => {
                                     <li className="pc-item pc-hasmenu">
                                         <Link className="pc-link" href="#!">
                                             <span className="pc-micon">
-                                                <i className="ph-duotone ph-users"></i>
+                                                <i className={ICONS.USERS}></i>
                                             </span>
-                                            <span className="pc-mtext" data-i18n="KB Access">Users Management</span>
-                                            <span className="pc-arrow"><i className="ph-duotone ph-caret-right"></i></span>
+                                            <span className="pc-mtext" data-i18n={SUBMENU_LABELS.USERS_MANAGEMENT}>{SUBMENU_LABELS.USERS_MANAGEMENT}</span>
+                                            <span className="pc-arrow"><i className={ICONS.CARET_RIGHT}></i></span>
                                         </Link>
                                         <ul className="pc-submenu">
                                             <li className="pc-item">
                                             {(hasTmsPermission('view','user') || hasTmsPermission('update','user') || hasTmsPermission('admin','global')) && (
                                     <Link className="pc-link" href={`${BASE_URL}/tms/management/users`}>
-                                                    <span className="pc-mtext">Users</span>
+                                                    <span className="pc-mtext">{SUBMENU_LABELS.USERS}</span>
                                                 </Link>
                                                 )}
                                             {(hasTmsPermission('view','rank','admin') || hasTmsPermission('admin','global')) && (
                                     <Link className="pc-link" href={`${BASE_URL}/tms/management/rank-permissions`}>
-                                                    <span className="pc-mtext">Rank Permissions</span>
+                                                    <span className="pc-mtext">{SUBMENU_LABELS.RANK_PERMISSIONS}</span>
                                                 </Link>
                                             )}
                                             </li>
@@ -1175,36 +1151,36 @@ const Header = ({ themeMode }: HeaderProps) => {
                                     <li className="pc-item pc-hasmenu">
                                         <Link className="pc-link" href="#!">
                                             <span className="pc-micon">
-                                                <i className="ph-duotone ph-users"></i>
+                                                <i className={ICONS.USERS}></i>
                                             </span>
-                                            <span className="pc-mtext" data-i18n="Profiling">Profiling</span>
-                                            <span className="pc-arrow"><i className="ph-duotone ph-caret-right"></i></span>
+                                            <span className="pc-mtext" data-i18n={SUBMENU_LABELS.PROFILING}>{SUBMENU_LABELS.PROFILING}</span>
+                                            <span className="pc-arrow"><i className={ICONS.CARET_RIGHT}></i></span>
                                         </Link>
                                         <ul className="pc-submenu">
                                             <li className="pc-item">
                                             {(hasTmsPermission('view','company', 'admin') || hasTmsPermission('admin','global')) && (
                                     <Link className="pc-link" href={`${BASE_URL}/tms/profiling/customers`}>
-                                                    <span className="pc-mtext">Customers</span>
+                                                    <span className="pc-mtext">{SUBMENU_LABELS.CUSTOMERS}</span>
                                                 </Link>
                                                 )}
                                               {(hasTmsPermission('create','customer_profiling','admin') || hasTmsPermission('admin','global')) && (
                                     <Link className="pc-link" href={`${BASE_URL}/tms/profiling/customers/create`}>
-                                                    <span className="pc-mtext">Create Profile</span>
+                                                    <span className="pc-mtext">{SUBMENU_LABELS.CREATE_PROFILE}</span>
                                                 </Link>
                                                 )}
                                 {(hasTmsPermission('create','user') || hasTmsPermission('admin','global')) && (
                                     <Link className="pc-link" href={`${BASE_URL}/tms/profiling/user`}>
-                                                    <span className="pc-mtext">User Profiles</span>
+                                                    <span className="pc-mtext">{SUBMENU_LABELS.USER_PROFILES}</span>
                                                 </Link>
                                                 )}
                                                 {(hasTmsPermission('create','user') || hasTmsPermission('admin','global')) && (
                                     <Link className="pc-link" href={`${BASE_URL}/tms/profiling/user/create`}>
-                                                    <span className="pc-mtext">Create User Profile</span>
+                                                    <span className="pc-mtext">{SUBMENU_LABELS.CREATE_USER_PROFILE}</span>
                                                 </Link>
                                                 )}
                                                 {(hasTmsPermission('view','user_profiling_error_log') || hasTmsPermission('admin','global')) && (
                                     <Link className="pc-link" href={`${BASE_URL}/tms/profiling/logs`}>
-                                                    <span className="pc-mtext">Error Logs</span>
+                                                    <span className="pc-mtext">{SUBMENU_LABELS.ERROR_LOGS}</span>
                                                 </Link>
                                                 )}
                                             </li>
@@ -1276,9 +1252,9 @@ const Header = ({ themeMode }: HeaderProps) => {
                                                     aria-selected="false"
                                                 >
                                                 <span className="pc-micon">
-                                                    <i className="ti ti-settings"></i>
+                                                    <i className={ICONS.DASHBOARD}></i>
                                                 </span>
-                                                <span className="pc-mtext">Dashboard</span>
+                                                <span className="pc-mtext">{MENU_LABELS.DASHBOARD}</span>
                                         </Link>
                                     </li>
                                             

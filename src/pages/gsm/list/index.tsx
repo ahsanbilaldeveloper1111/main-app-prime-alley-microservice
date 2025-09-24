@@ -12,11 +12,11 @@ import { toast } from 'react-toastify';
 import { useTokenService } from 'src/hooks/useTokenService';
 import { useSession } from 'next-auth/react';
 import GsmListFilter from '@components/filters/GsmListFilter';
-import '@assets/scss/gsm-assign.scss';
-import '@assets/scss/dashboard-card.scss';
+
 import '@assets/scss/common.scss';
 
 import AnimatedNumber from '@components/AnimatedNumber';
+import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
 import { motion } from 'framer-motion';
 import imgStatus1 from '@assets/images/widget/img-status-1.svg'
 import imgStatus2 from '@assets/images/widget/img-status-2.svg'
@@ -126,6 +126,50 @@ const GsmList = () => {
         inactiveGsms: 0,
         avgLatency: 0
     });
+
+    // Create cards data for PageSummaryGrid
+    const summaryCards: SummaryCard[] = [
+        {
+            id: 'total-gsms',
+            title: 'Total GSMs',
+            value: gsmSummary.totalGsms,
+            description: 'Total devices in the system',
+            delay: 0.1,
+            showAnimatedNumber: true,
+            animationDuration: 1000,
+            fontStyle: 'style-2'
+        },
+        {
+            id: 'assigned-gsms',
+            title: 'Assigned GSMs',
+            value: gsmSummary.activeGsms,
+            description: 'GSMs linked to a company',
+            delay: 0.3,
+            showAnimatedNumber: true,
+            animationDuration: 1000,
+            fontStyle: 'style-2'
+        },
+        {
+            id: 'unassigned-gsms',
+            title: 'Unassigned GSMs',
+            value: gsmSummary.inactiveGsms,
+            description: 'GSMs awaiting assignment',
+            delay: 0.5,
+            showAnimatedNumber: true,
+            animationDuration: 1000,
+            fontStyle: 'style-2'
+        },
+        {
+            id: 'total-ports',
+            title: 'Total Ports',
+            value: 60, // This seems to be hardcoded in the original
+            description: 'Overall port capacity',
+            delay: 0.7,
+            showAnimatedNumber: true,
+            animationDuration: 1000,
+            fontStyle: 'style-2'
+        }
+    ];
 
     const fetchGsm = useCallback(async (page = 1, perPage = 15, search = "") => {
         const response = await ListGsmManagement({ page, perPage, search, filters: currentFilters });
@@ -305,7 +349,7 @@ const GsmList = () => {
                     <div className="action-buttons">
                         <div className="search-container">
                             <i className="fas fa-search search-icon"></i>
-                            <input type="text" className="search-bar" placeholder="Search GSM, Company..."/>
+                            <input type="text" className="search-bar" placeholder="Search GSM, Company..." onChange={(e) => handleFiltersChange({...currentFilters, search: e.target.value})}/>
                         </div>
                         <button className="btn btn-primary" id="new-assign-btn" onClick={() => setShowAddGsmModal(true)}>
                             <i className="fas fa-plus"></i> New Assign
@@ -326,99 +370,7 @@ const GsmList = () => {
             </Row>
 
             {/* GSM Summary Cards */}
-            <div className="dashboard-grid">
-                <motion.div 
-                    className="dashboard-card"
-                    initial={{ opacity: 0, x: -100, scale: 0.8 }}
-                    animate={{ opacity: 1, x: 0, scale: 1 }}
-                    transition={{ 
-                        duration: 0.8, 
-                        delay: 0.1,
-                        type: "spring",
-                        stiffness: 100,
-                        damping: 15
-                    }}
-                    whileHover={{ 
-                        scale: 1.05,
-                        transition: { duration: 0.2 }
-                    }}
-                >
-                    <h3>Total GSMs</h3>
-                    <div className="value" id="total-gsms-count">
-                        <AnimatedNumber value={6} duration={1000} fontStyle='style-2' />
-                    </div>
-                    <p>Total devices in the system</p>
-                </motion.div>
-                
-                <motion.div 
-                    className="dashboard-card"
-                    initial={{ opacity: 0, x: -100, scale: 0.8 }}
-                    animate={{ opacity: 1, x: 0, scale: 1 }}
-                    transition={{ 
-                        duration: 0.8, 
-                        delay: 0.3,
-                        type: "spring",
-                        stiffness: 100,
-                        damping: 15
-                    }}
-                    whileHover={{ 
-                        scale: 1.05,
-                        transition: { duration: 0.2 }
-                    }}
-                >
-                    <h3>Assigned GSMs</h3>
-                    <div className="value" id="assigned-gsms-count">
-                        <AnimatedNumber value={4} duration={1000}  fontStyle='style-2' />
-                    </div>
-                    <p>GSMs linked to a company</p>
-                </motion.div>
-                
-                <motion.div 
-                    className="dashboard-card"
-                    initial={{ opacity: 0, x: -100, scale: 0.8 }}
-                    animate={{ opacity: 1, x: 0, scale: 1 }}
-                    transition={{ 
-                        duration: 0.8, 
-                        delay: 0.5,
-                        type: "spring",
-                        stiffness: 100,
-                        damping: 15
-                    }}
-                    whileHover={{ 
-                        scale: 1.05,
-                        transition: { duration: 0.2 }
-                    }}
-                >
-                    <h3>Unassigned GSMs</h3>
-                    <div className="value" id="unassigned-gsms-count">
-                        <AnimatedNumber value={2} duration={1000}  fontStyle='style-2' />
-                    </div>
-                    <p>GSMs awaiting assignment</p>
-                </motion.div>
-                
-                <motion.div 
-                    className="dashboard-card"
-                    initial={{ opacity: 0, x: -100, scale: 0.8 }}
-                    animate={{ opacity: 1, x: 0, scale: 1 }}
-                    transition={{ 
-                        duration: 0.8, 
-                        delay: 0.7,
-                        type: "spring",
-                        stiffness: 100,
-                        damping: 15
-                    }}
-                    whileHover={{ 
-                        scale: 1.05,
-                        transition: { duration: 0.2 }
-                    }}
-                >
-                    <h3>Total Ports</h3>
-                    <div className="value" id="total-ports-count">
-                        <AnimatedNumber value={60} duration={1000} fontStyle='style-2' />
-                    </div>
-                    <p>Overall port capacity</p>
-                </motion.div>
-            </div>
+            <PageSummaryGrid cards={summaryCards} />
 
             {session?.user?.permissions?.includes('list-gsm-management') && (
                  <GenericListPage

@@ -21,7 +21,7 @@ const Loginv1 = () => {
                             <Card.Body>
                                 <div className="text-center">
                                     <Image src={authlogin} alt="images" className="img-fluid mb-3" />
-                                    <h4 className="f-w-500 mb-3">Login with your email</h4>
+                                    <h4 className="f-w-500 mb-3">Login with your email -</h4>
                                     {/* <p className="mb-3">Don&apos;t have an Account? <a href="/pages/register-v1" className="link-primary ms-1">Create Account</a></p> */}
                                 </div>
                                 <div className="form-group mb-3">

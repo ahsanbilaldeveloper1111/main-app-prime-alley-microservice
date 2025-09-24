@@ -17,6 +17,7 @@ import { Button } from 'react-bootstrap';
 import ProtectedRoute from '@components/ProtectedRoute';
 
 import AnimatedNumber from '@components/AnimatedNumber';
+import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
 import imgStatus1 from '@assets/images/widget/img-status-1.svg'
 import imgStatus2 from '@assets/images/widget/img-status-2.svg'
 import imgStatus3 from '@assets/images/widget/img-status-3.svg'
@@ -25,8 +26,7 @@ import EmptyState from '@components/EmptyState';
 import dynamic from 'next/dynamic';
 import '@assets/scss/tabs.scss'
 
-import '@assets/scss/gsm-assign.scss';
-import '@assets/scss/dashboard-card.scss';
+
 import '@assets/scss/common.scss';
 
 import { formatDateTimeToLocal, GlobalDateTimeFormat } from '@utils/Helper';
@@ -140,6 +140,50 @@ const Users = () => {
         groups: 0,
         activeUsers: 0
     });
+
+    // Create cards data for PageSummaryGrid
+    const summaryCards: SummaryCard[] = [
+        {
+            id: 'total-users',
+            title: 'Total Users',
+            value: summary?.users || 0,
+            description: 'Total users in the system',
+            delay: 0.1,
+            showAnimatedNumber: true,
+            animationDuration: 1000,
+            fontStyle: 'style-2'
+        },
+        {
+            id: 'departments',
+            title: 'Departments',
+            value: summary?.departments || 0,
+            description: 'Departments in the system',
+            delay: 0.3,
+            showAnimatedNumber: true,
+            animationDuration: 1000,
+            fontStyle: 'style-2'
+        },
+        {
+            id: 'ranks',
+            title: 'Ranks',
+            value: summary?.ranks || 0,
+            description: 'Ranks in the system',
+            delay: 0.5,
+            showAnimatedNumber: true,
+            animationDuration: 1000,
+            fontStyle: 'style-2'
+        },
+        {
+            id: 'groups',
+            title: 'Groups',
+            value: summary?.groups || 0,
+            description: 'Groups in the system',
+            delay: 0.7,
+            showAnimatedNumber: true,
+            animationDuration: 1000,
+            fontStyle: 'style-2'
+        }
+    ];
 
     const fetchUsers = useCallback(
         async (page = 1, perPage = 15, search = "") => {
@@ -738,99 +782,7 @@ React.useEffect(() => {
         </Row> */}
 
         {/* GSM Summary Cards */}
-        <div className="dashboard-grid">
-                <motion.div 
-                    className="dashboard-card"
-                    initial={{ opacity: 0, x: -100, scale: 0.8 }}
-                    animate={{ opacity: 1, x: 0, scale: 1 }}
-                    transition={{ 
-                        duration: 0.8, 
-                        delay: 0.1,
-                        type: "spring",
-                        stiffness: 100,
-                        damping: 15
-                    }}
-                    whileHover={{ 
-                        scale: 1.05,
-                        transition: { duration: 0.2 }
-                    }}
-                >
-                    <h3>Total Users</h3>
-                    <div className="value" id="total-gsms-count">
-                        <AnimatedNumber value={summary?.users} duration={1000} fontStyle='style-2' />
-                    </div>
-                    <p>Total users in the system</p>
-                </motion.div>
-                
-                <motion.div 
-                    className="dashboard-card"
-                    initial={{ opacity: 0, x: -100, scale: 0.8 }}
-                    animate={{ opacity: 1, x: 0, scale: 1 }}
-                    transition={{ 
-                        duration: 0.8, 
-                        delay: 0.3,
-                        type: "spring",
-                        stiffness: 100,
-                        damping: 15
-                    }}
-                    whileHover={{ 
-                        scale: 1.05,
-                        transition: { duration: 0.2 }
-                    }}
-                >
-                    <h3>Departments</h3>
-                    <div className="value" id="assigned-gsms-count">
-                        <AnimatedNumber value={summary?.departments} duration={1000}  fontStyle='style-2' />
-                    </div>
-                    <p>Departments in the system</p>
-                </motion.div>
-                
-                <motion.div 
-                    className="dashboard-card"
-                    initial={{ opacity: 0, x: -100, scale: 0.8 }}
-                    animate={{ opacity: 1, x: 0, scale: 1 }}
-                    transition={{ 
-                        duration: 0.8, 
-                        delay: 0.5,
-                        type: "spring",
-                        stiffness: 100,
-                        damping: 15
-                    }}
-                    whileHover={{ 
-                        scale: 1.05,
-                        transition: { duration: 0.2 }
-                    }}
-                >
-                    <h3>Ranks</h3>
-                    <div className="value" id="unassigned-gsms-count">
-                        <AnimatedNumber value={summary?.ranks} duration={1000}  fontStyle='style-2' />
-                    </div>
-                    <p>Ranks in the system</p>
-                </motion.div>
-                
-                <motion.div 
-                    className="dashboard-card"
-                    initial={{ opacity: 0, x: -100, scale: 0.8 }}
-                    animate={{ opacity: 1, x: 0, scale: 1 }}
-                    transition={{ 
-                        duration: 0.8, 
-                        delay: 0.7,
-                        type: "spring",
-                        stiffness: 100,
-                        damping: 15
-                    }}
-                    whileHover={{ 
-                        scale: 1.05,
-                        transition: { duration: 0.2 }
-                    }}
-                >
-                    <h3>Groups</h3>
-                    <div className="value" id="total-ports-count">
-                        <AnimatedNumber value={summary?.groups} duration={1000} fontStyle='style-2' />
-                    </div>
-                    <p>Groups in the system</p>
-                </motion.div>
-            </div>
+        <PageSummaryGrid cards={summaryCards} />
             
             {session?.user?.permissions?.includes('list-users') && (
                 <GenericListPage
@@ -927,99 +879,7 @@ React.useEffect(() => {
     const renderInsightTab = () => (
         <React.Fragment>
             {/* GSM Summary Cards */}
-        <div className="dashboard-grid">
-                <motion.div 
-                    className="dashboard-card"
-                    initial={{ opacity: 0, x: -100, scale: 0.8 }}
-                    animate={{ opacity: 1, x: 0, scale: 1 }}
-                    transition={{ 
-                        duration: 0.8, 
-                        delay: 0.1,
-                        type: "spring",
-                        stiffness: 100,
-                        damping: 15
-                    }}
-                    whileHover={{ 
-                        scale: 1.05,
-                        transition: { duration: 0.2 }
-                    }}
-                >
-                    <h3>Total Users</h3>
-                    <div className="value" id="total-gsms-count">
-                        <AnimatedNumber value={summary?.users} duration={1000} fontStyle='style-2' />
-                    </div>
-                    <p>Total users in the system</p>
-                </motion.div>
-                
-                <motion.div 
-                    className="dashboard-card"
-                    initial={{ opacity: 0, x: -100, scale: 0.8 }}
-                    animate={{ opacity: 1, x: 0, scale: 1 }}
-                    transition={{ 
-                        duration: 0.8, 
-                        delay: 0.3,
-                        type: "spring",
-                        stiffness: 100,
-                        damping: 15
-                    }}
-                    whileHover={{ 
-                        scale: 1.05,
-                        transition: { duration: 0.2 }
-                    }}
-                >
-                    <h3>Departments</h3>
-                    <div className="value" id="assigned-gsms-count">
-                        <AnimatedNumber value={summary?.departments} duration={1000}  fontStyle='style-2' />
-                    </div>
-                    <p>Departments in the system</p>
-                </motion.div>
-                
-                <motion.div 
-                    className="dashboard-card"
-                    initial={{ opacity: 0, x: -100, scale: 0.8 }}
-                    animate={{ opacity: 1, x: 0, scale: 1 }}
-                    transition={{ 
-                        duration: 0.8, 
-                        delay: 0.5,
-                        type: "spring",
-                        stiffness: 100,
-                        damping: 15
-                    }}
-                    whileHover={{ 
-                        scale: 1.05,
-                        transition: { duration: 0.2 }
-                    }}
-                >
-                    <h3>Ranks</h3>
-                    <div className="value" id="unassigned-gsms-count">
-                        <AnimatedNumber value={summary?.ranks} duration={1000}  fontStyle='style-2' />
-                    </div>
-                    <p>Ranks in the system</p>
-                </motion.div>
-                
-                <motion.div 
-                    className="dashboard-card"
-                    initial={{ opacity: 0, x: -100, scale: 0.8 }}
-                    animate={{ opacity: 1, x: 0, scale: 1 }}
-                    transition={{ 
-                        duration: 0.8, 
-                        delay: 0.7,
-                        type: "spring",
-                        stiffness: 100,
-                        damping: 15
-                    }}
-                    whileHover={{ 
-                        scale: 1.05,
-                        transition: { duration: 0.2 }
-                    }}
-                >
-                    <h3>Groups</h3>
-                    <div className="value" id="total-ports-count">
-                        <AnimatedNumber value={summary?.groups} duration={1000} fontStyle='style-2' />
-                    </div>
-                    <p>Groups in the system</p>
-                </motion.div>
-            </div>
+        <PageSummaryGrid cards={summaryCards} />
 
 
         <Row>

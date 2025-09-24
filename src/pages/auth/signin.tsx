@@ -12,7 +12,8 @@ import Link from "next/link";
 import { Card, Row } from "react-bootstrap";
 import dashboard from "@pages/dashboard";
 import { toast } from "react-toastify";
-import { FaEye, FaEyeSlash } from "react-icons/fa";
+import { FaEye, FaEyeSlash,FaSpinner } from "react-icons/fa";
+import '@assets/scss/login.scss';
 
 
 const Signin = () => {
@@ -77,73 +78,95 @@ const Signin = () => {
 
     return (
         <React.Fragment>
-            <div className="auth-main v1">
-                <div className="auth-wrapper">
-                    <div className="auth-form">
-                        <Card className="my-5">
-                            <Card.Body>
-                                <form onSubmit={handleSubmit}>
-                                <div className="text-center">
-                                    <Image src={authlogin} alt="images" className="img-fluid mb-3" />
-                                    <h4 className="f-w-500 mb-3">Login with your email</h4>
-                                </div>
-                                <div className="form-group mb-3">
-                                    <input 
-                                      type="email" 
-                                      name="email"
-                                      className="form-control"
-                                      id="userEmail" 
-                                      placeholder="Email Address"
-                                      value={credentials.email}
-                                      onChange={handleChange} />
-                                </div>
-                                <div className="form-group mb-3" style={{ position: "relative" }}>
-                                    <input 
-                                      type={showPassword ? "text" : "password"}
-                                      name="password"
-                                      className="form-control"
-                                      id="userPassword" 
-                                      placeholder="Password"
-                                      value={credentials.password}
-                                      onChange={handleChange} 
-                                      style={{ paddingRight: "40px" }}
-                                      />
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowPassword((prev) => !prev)}
-                                        style={{
-                                            position: "absolute",
-                                            right: "10px",
-                                            top: "50%",
-                                            transform: "translateY(-50%)",
-                                            background: "none",
-                                            border: "none",
-                                            padding: 0,
-                                            cursor: "pointer"
-                                        }}
-                                        tabIndex={-1}
-                                        aria-label={showPassword ? "Hide password" : "Show password"}
-                                    >
-                                        {showPassword ? <FaEyeSlash /> : <FaEye />}
-                                    </button>
-                                </div>
-                               
-                                <div className="d-grid mt-4">
-                                    <button type="submit"
-                                        disabled={loading} 
-                                        className="btn btn-primary"
-                                    >
-                                      {loading ? 'Signing in...' : 'Sign in'}
-                                    </button>
-                                </div>
-                                </form>
-                            </Card.Body>
-                        </Card>
-                    </div>
 
-                    
-                </div>
+<div id="particles-js"></div>
+    <div className="login-main-container">
+        <header className="login-info-panel">
+            <div className="info-panel-content">
+                <i className="fas fa-satellite-dish" style={{fontSize: '3rem', marginBottom: '20px'}}></i>
+                <h1 className="text-white">Ring Edge</h1>
+                <p>A new frontier in telecommunications and data management. Secure, efficient, and reliable.</p>
             </div>
+        </header>
+        <main className="login-form-panel">
+            <div className="login-form-card">
+                <h1 className="login-title">Welcome Back</h1>
+                <p className="login-subtitle">Sign in to your account</p>
+                
+                <form className="login-form" id="loginForm" onSubmit={handleSubmit}>
+                    <div className="input-group">
+                        <input 
+                        type="email" 
+                        id="email"
+                        placeholder=" " 
+                        required 
+                         name="email"
+                        value={credentials.email}
+                        onChange={handleChange}
+                         />
+                        <label htmlFor="email">Email Address</label>
+                        <small 
+                          className="form-error" 
+                          id="emailError">
+                          
+                          </small>
+                    </div>
+                    <div className="input-group">
+                        <input 
+                         id="password" 
+                         placeholder="" 
+                         required 
+                         name="password"
+                        type={showPassword ? "text" : "password"}
+                        value={credentials.password}
+                        onChange={handleChange} 
+                         />
+
+                        <label htmlFor="password">Password</label>
+                        <span className="toggle-password" onClick={() => setShowPassword((prev) => !prev)}>
+                            <i className="fas fa-eye" id="passwordToggleIcon"></i>
+                        </span>
+                        <small className="form-error" id="passwordError">Password must be at least 6 characters.</small>
+                    </div>
+                    {/* <div className="form-options">
+                        <label for="remember-me" className="remember-me">
+                            <input type="checkbox" id="remember-me" />
+                            Remember me
+                        </label>
+                        <a href="#" className="forgot-password">Forgot password?</a>
+                    </div> */}
+                    <button 
+                          type="submit" 
+                          className="btn-primary" 
+                          id="loginButton"
+                          disabled={loading}
+                        >
+                          {!loading && (
+                            <span className="icon-text">
+                              <i className="fas fa-sign-in-alt"></i> 
+                              Sign in
+                          </span>
+                          )}
+                        
+                          {loading && (
+                        <span className="icon-text">
+                        <FaSpinner className="fa-spin text-white" />
+                       
+                    </span>
+                          )}
+                    </button>
+                </form>
+
+                {/* <div className="or-divider">or</div>
+
+                <a href="#" className="btn-social">
+                    <i className="fab fa-google"></i> Sign in with Google
+                </a> */}
+            </div>
+        </main>
+    </div>
+
+            
         </React.Fragment>
     );
 }

@@ -17,16 +17,15 @@ import CallRecordingsFilters from '@components/filters/CallRecordingFilter';
 import AnimatedNumber from '@components/AnimatedNumber';
 import StatCard from '@components/StatCard';
 import ChartBar from '@components/ChartBar';
+import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
 import { Column } from '@components/CustomDataTable';
 import CustomDataTable from '@components/CustomDataTable';
 import AudioPlayer, { AudioPlayerRef } from '@components/AudioPlayer';
 import EmptyState from '@components/EmptyState';
 import { ModuleSlug } from '@utils/Helper';
 
-import '@assets/scss/gsm-assign.scss';
-import '@assets/scss/dashboard-card.scss';
+
 import '@assets/scss/common.scss';
-import { motion } from 'framer-motion';
 
 // Utils
 import { ListCallLogs, ExportCallLogs, DownloadCallRecording, DownloadStreamingExport } from '@utils/calls';
@@ -123,6 +122,50 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
     inbound: 0,
     outbound: 0
   });
+
+  // Create cards data for PageSummaryGrid
+  const summaryCards: SummaryCard[] = [
+    {
+      id: 'total-gsms-count',
+      title: 'Extensions',
+      value: summary?.extensions || 0,
+      description: 'Extensions in the system',
+      delay: 0.1,
+      showAnimatedNumber: true,
+      animationDuration: 1000,
+      fontStyle: 'style-2'
+    },
+    {
+      id: 'assigned-gsms-count',
+      title: 'Remote Numbers',
+      value: summary?.numbers || 0,
+      description: 'Remote numbers in the system',
+      delay: 0.3,
+      showAnimatedNumber: true,
+      animationDuration: 1000,
+      fontStyle: 'style-2'
+    },
+    {
+      id: 'unassigned-gsms-count',
+      title: 'Inbound',
+      value: summary?.inbound || 0,
+      description: 'Inbound calls in the system',
+      delay: 0.5,
+      showAnimatedNumber: true,
+      animationDuration: 1000,
+      fontStyle: 'style-2'
+    },
+    {
+      id: 'total-ports-count',
+      title: 'Outbound',
+      value: summary?.outbound || 0,
+      description: 'Outbound calls in the system',
+      delay: 0.7,
+      showAnimatedNumber: true,
+      animationDuration: 1000,
+      fontStyle: 'style-2'
+    }
+  ];
 
   const [callDirectionTwo, setCallDirectionTwo] = React.useState<{
     series: Array<{ name: string; data: number[] }>;
@@ -846,108 +889,14 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
 
     
 
-      <div className="dashboard-grid">
-                <motion.div 
-                    className="dashboard-card"
-                    initial={{ opacity: 0, x: -100, scale: 0.8 }}
-                    animate={{ opacity: 1, x: 0, scale: 1 }}
-                    transition={{ 
-                        duration: 0.8, 
-                        delay: 0.1,
-                        type: "spring",
-                        stiffness: 100,
-                        damping: 15
-                    }}
-                    whileHover={{ 
-                        scale: 1.05,
-                        transition: { duration: 0.2 }
-                    }}
-                >
-                    <h3>Extensions</h3>
-                    <div className="value" id="total-gsms-count">
-                        <AnimatedNumber value={summary?.extensions} duration={1000} fontStyle='style-2' />
-                    </div>
-                    <p>Extensions in the system</p>
-                </motion.div>
-                
-                <motion.div 
-                    className="dashboard-card"
-                    initial={{ opacity: 0, x: -100, scale: 0.8 }}
-                    animate={{ opacity: 1, x: 0, scale: 1 }}
-                    transition={{ 
-                        duration: 0.8, 
-                        delay: 0.3,
-                        type: "spring",
-                        stiffness: 100,
-                        damping: 15
-                    }}
-                    whileHover={{ 
-                        scale: 1.05,
-                        transition: { duration: 0.2 }
-                    }}
-                >
-                    <h3>Remote Numbers</h3>
-                    <div className="value" id="assigned-gsms-count">
-                        <AnimatedNumber value={summary?.numbers} duration={1000}  fontStyle='style-2' />
-                    </div>
-                    <p>Remote numbers in the system</p>
-                </motion.div>
-                
-                <motion.div 
-                    className="dashboard-card"
-                    initial={{ opacity: 0, x: -100, scale: 0.8 }}
-                    animate={{ opacity: 1, x: 0, scale: 1 }}
-                    transition={{ 
-                        duration: 0.8, 
-                        delay: 0.5,
-                        type: "spring",
-                        stiffness: 100,
-                        damping: 15
-                    }}
-                    whileHover={{ 
-                        scale: 1.05,
-                        transition: { duration: 0.2 }
-                    }}
-                >
-                    <h3>Inbound</h3>
-                    <div className="value" id="unassigned-gsms-count">
-                        <AnimatedNumber value={summary?.inbound} duration={1000}  fontStyle='style-2' />
-                    </div>
-                    <p>Inbound calls in the system</p>
-                </motion.div>
-                
-                <motion.div 
-                    className="dashboard-card"
-                    initial={{ opacity: 0, x: -100, scale: 0.8 }}
-                    animate={{ opacity: 1, x: 0, scale: 1 }}
-                    transition={{ 
-                        duration: 0.8, 
-                        delay: 0.7,
-                        type: "spring",
-                        stiffness: 100,
-                        damping: 15
-                    }}
-                    whileHover={{ 
-                        scale: 1.05,
-                        transition: { duration: 0.2 }
-                    }}
-                >
-                    <h3>Outbound</h3>
-                    <div className="value" id="total-ports-count">
-                        <AnimatedNumber value={summary?.outbound} duration={1000} fontStyle='style-2' />
-                    </div>
-                    <p>Outbound calls in the system</p>
-                </motion.div>
-            </div>
+      <PageSummaryGrid cards={summaryCards} />
 
       {/* Charts */}
       <Row className="mb-3">
         <Col md={6}>
           <Card>
             <Card.Body className='p-3'>
-              <p className="text-muted mb-0 d-flex align-items-center justify-content-between">
-                Call Duration
-              </p>
+              
 
               {!currentChartData || currentChartData.series.length === 0 || currentChartData.series.every(series => series.data.length === 0) ? (
                 <EmptyState
@@ -956,6 +905,10 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
                   className="table-empty-state"
                 />
               ) : (
+                <>
+                <h5 className="app-title-heading">Call Duration</h5>
+                
+                
                 <ChartBar
                   series={currentChartData?.series || []}
                   categories={currentChartData?.categories || []}
@@ -970,6 +923,7 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
                   onFullScreenClick={() => handleOpenChartModal(currentChartData, 'Call Duration', 'calls')}
                   useLogScale={true}
                 />
+                </>
               )}
             </Card.Body>
           </Card>
@@ -978,7 +932,7 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
         <Col md={6}>
           <Card>
             <Card.Body className='p-3'>
-              <p className="text-muted mb-0">Call Directions</p>
+            
               {!callDirectionTwo.series || callDirectionTwo.series.length === 0 || callDirectionTwo.series.every(series => series.data.length === 0) ? (
                 <EmptyState
                   title="No Call Direction Data"
@@ -986,12 +940,15 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
                   className="table-empty-state"
                 />
               ) : (
+                <>
+                <h5 className="app-title-heading">Call Directions</h5>
                 <ReactApexChart
                   options={callDirectionTwo.options}
                   series={callDirectionTwo.series}
                   type="bar"
                   height={300}
                 />
+                </>
               )}
             </Card.Body>
           </Card>

@@ -13,14 +13,14 @@ import { toast } from 'react-toastify';
 import { useTokenService } from 'src/hooks/useTokenService';
 import { useSession } from 'next-auth/react';
 import Select from 'react-select';
-import '@assets/scss/gsm-assign.scss';
-import '@assets/scss/dashboard-card.scss';
+
 import '@assets/scss/common.scss';
 import {motion} from 'framer-motion';
 
 import GsmPortFilter from '@components/filters/GsmPortFilter';
 
 import AnimatedNumber from '@components/AnimatedNumber';
+import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
 import imgStatus1 from '@assets/images/widget/img-status-1.svg'
 import imgStatus2 from '@assets/images/widget/img-status-2.svg'
 import imgStatus3 from '@assets/images/widget/img-status-3.svg'
@@ -125,6 +125,58 @@ const GsmPorts = () => {
     const [refreshKey, setRefreshKey] = useState<number>(0);
     const [currentFilters, setCurrentFilters] = useState({});
 
+    // Port Summary Data
+    const [portSummary, setPortSummary] = useState({
+        totalPorts: 6,
+        registeredPorts: 4,
+        unregisteredPorts: 2,
+        activePorts: 60
+    });
+
+    // Create cards data for PageSummaryGrid
+    const summaryCards: SummaryCard[] = [
+        {
+            id: 'total-gsms-count',
+            title: 'Total Ports',
+            value: portSummary.totalPorts,
+            description: 'Total ports in the system',
+            delay: 0.1,
+            showAnimatedNumber: true,
+            animationDuration: 1000,
+            fontStyle: 'style-2'
+        },
+        {
+            id: 'assigned-gsms-count',
+            title: 'Registered Ports',
+            value: portSummary.registeredPorts,
+            description: 'Registered ports in the system',
+            delay: 0.3,
+            showAnimatedNumber: true,
+            animationDuration: 1000,
+            fontStyle: 'style-2'
+        },
+        {
+            id: 'unassigned-gsms-count',
+            title: 'Unregistered Ports',
+            value: portSummary.unregisteredPorts,
+            description: 'Unregistered ports in the system',
+            delay: 0.5,
+            showAnimatedNumber: true,
+            animationDuration: 1000,
+            fontStyle: 'style-2'
+        },
+        {
+            id: 'total-ports-count',
+            title: 'Active Ports',
+            value: portSummary.activePorts,
+            description: 'Active ports in the system',
+            delay: 0.7,
+            showAnimatedNumber: true,
+            animationDuration: 1000,
+            fontStyle: 'style-2'
+        }
+    ];
+
     const fetchGsmPorts = async (page = 1, perPage = 15, search = "") => {
         return await ListPorts({ page, perPage, search, filters: currentFilters });
     };
@@ -183,15 +235,13 @@ const GsmPorts = () => {
 
                       
                       <div className="action-buttons">
-                        <div className="search-container">
+                        {/* <div className="search-container">
                             <i className="fas fa-search search-icon"></i>
-                            <input type="text" className="search-bar" placeholder="Search IP, ICCID, Mobile..."/>
-                        </div>
+                            <input type="text" className="search-bar" placeholder="Search IP, ICCID, Mobile..." onChange={(e) => handleFiltersChange({...currentFilters, search: e.target.value})}/>
+                        </div> */}
                         <GsmPortFilter onFiltersChange={handleFiltersChange} showExport={false} />
                         
-                        <button className="btn btn-export" id="export-btn" onClick={handleExportSuccessful}>
-                            <i className="fas fa-download"></i> Export
-                        </button>
+                       
                     </div>
                     </Col>
                   </Row>
@@ -201,105 +251,8 @@ const GsmPorts = () => {
             </Col>
             </Row>
 
-            {/* GSM Summary Cards */}
-            <div className="dashboard-grid">
-                <motion.div 
-                    className="dashboard-card"
-                    initial={{ opacity: 0, x: -100, scale: 0.8 }}
-                    animate={{ opacity: 1, x: 0, scale: 1 }}
-                    transition={{ 
-                        duration: 0.8, 
-                        delay: 0.1,
-                        type: "spring",
-                        stiffness: 100,
-                        damping: 15
-                    }}
-                    whileHover={{ 
-                        scale: 1.05,
-                        transition: { duration: 0.2 }
-                    }}
-                >
-                    <h3>Total Ports</h3>
-                    <div className="value" id="total-gsms-count">
-                        <AnimatedNumber value={6} duration={1000} fontStyle='style-2' />
-                    </div>
-                    <p>Total ports in the system</p>
-                    
-                </motion.div>
-                
-                <motion.div 
-                    className="dashboard-card"
-                    initial={{ opacity: 0, x: -100, scale: 0.8 }}
-                    animate={{ opacity: 1, x: 0, scale: 1 }}
-                    transition={{ 
-                        duration: 0.8, 
-                        delay: 0.3,
-                        type: "spring",
-                        stiffness: 100,
-                        damping: 15
-                    }}
-                    whileHover={{ 
-                        scale: 1.05,
-                        transition: { duration: 0.2 }
-                    }}
-                >
-                    <h3>Registered Ports</h3>
-                    <div className="value" id="assigned-gsms-count">
-                        <AnimatedNumber value={4} duration={1000}  fontStyle='style-2' />
-                    </div>
-                    <p>Registered ports in the system</p>
-                    
-                </motion.div>
-                
-                <motion.div 
-                    className="dashboard-card"
-                    initial={{ opacity: 0, x: -100, scale: 0.8 }}
-                    animate={{ opacity: 1, x: 0, scale: 1 }}
-                    transition={{ 
-                        duration: 0.8, 
-                        delay: 0.5,
-                        type: "spring",
-                        stiffness: 100,
-                        damping: 15
-                    }}
-                    whileHover={{ 
-                        scale: 1.05,
-                        transition: { duration: 0.2 }
-                    }}
-                >
-                    <h3>Unregistered Ports</h3>
-                    <div className="value" id="unassigned-gsms-count">
-                        <AnimatedNumber value={2} duration={1000}  fontStyle='style-2' />
-                    </div>
-                    <p>Unregistered ports in the system</p>
-                    
-                </motion.div>
-                
-                <motion.div 
-                    className="dashboard-card"
-                    initial={{ opacity: 0, x: -100, scale: 0.8 }}
-                    animate={{ opacity: 1, x: 0, scale: 1 }}
-                    transition={{ 
-                        duration: 0.8, 
-                        delay: 0.7,
-                        type: "spring",
-                        stiffness: 100,
-                        damping: 15
-                    }}
-                    whileHover={{ 
-                        scale: 1.05,
-                        transition: { duration: 0.2 }
-                    }}
-                >
-                  
-                    <h3>Active Ports</h3>
-                    <div className="value" id="total-ports-count">
-                        <AnimatedNumber value={60} duration={1000} fontStyle='style-2' />
-                    </div>
-                    <p>Active ports in the system</p>
-                    
-                </motion.div>
-            </div>
+            {/* Port Summary Cards */}
+            <PageSummaryGrid cards={summaryCards} />
 
 
             {session?.user?.permissions?.includes('list-gsm-ports') && (

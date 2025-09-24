@@ -14,10 +14,9 @@ import imgStatus6 from '@assets/images/widget/img-status-6.svg'
 import imgStatus7 from '@assets/images/widget/img-status-7.svg'
 import imgStatus8 from '@assets/images/widget/img-status-8.svg'
 import imgStatus9 from '@assets/images/widget/img-status-9.svg'
-import  '@assets/scss/gsm-dashboard.scss'
-import '@assets/scss/gsm-assign.scss';
-import '@assets/scss/dashboard-card.scss';
+import  '@assets/scss/common.scss'
 import AnimatedNumber from '@components/AnimatedNumber';
+import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
 import moment from 'moment';
 const baseUrl = '';
 
@@ -76,6 +75,50 @@ const GsmDashboard = () => {
             totalPorts: 0,
             inbox: 0,
       });
+
+      // Create cards data for PageSummaryGrid
+      const summaryCards: SummaryCard[] = [
+        {
+            id: 'total-gsms',
+            title: 'Total GSMs',
+            value: summaryData.totalGsm,
+            description: 'Total devices in the system',
+            delay: 0.1,
+            showAnimatedNumber: true,
+            animationDuration: 1000,
+            fontStyle: 'style-2'
+        },
+        {
+            id: 'assigned-gsms',
+            title: 'Assigned GSMs',
+            value: summaryData.activeCompanies,
+            description: 'GSMs linked to a company',
+            delay: 0.3,
+            showAnimatedNumber: true,
+            animationDuration: 1000,
+            fontStyle: 'style-2'
+        },
+        {
+            id: 'unassigned-gsms',
+            title: 'Unassigned GSMs',
+            value: summaryData.totalGsm - summaryData.activeCompanies,
+            description: 'GSMs awaiting assignment',
+            delay: 0.5,
+            showAnimatedNumber: true,
+            animationDuration: 1000,
+            fontStyle: 'style-2'
+        },
+        {
+            id: 'total-ports',
+            title: 'Total Ports',
+            value: summaryData.totalPorts,
+            description: 'Overall port capacity',
+            delay: 0.7,
+            showAnimatedNumber: true,
+            animationDuration: 1000,
+            fontStyle: 'style-2'
+        }
+      ];
 
       const [gsmAssigment, setGsmAssigment] = useState<GsmAssigment[]>([]);
       const [chartFreePorts, setChartFreePorts] = useState<number[]>([]);
@@ -344,187 +387,10 @@ const GsmDashboard = () => {
                         </div>
                   </Col>
             </Row>
-            {/* <Row>
-               <Col md={3}>
-               <div className="card statistics-card-1">
-                        <div className="card-body">
-                              <img src={imgStatus1.src} alt="img" className="img-fluid img-bg" />
-                              <div className="d-flex align-items-center">
-                                    <div className="avtar bg-brand-color-1 text-white me-3">
-                                    <i className="material-icons-two-tone text-white">settings_input_antenna</i>
-                                    </div>
-                                    <div>
-                                          <p className="text-muted mb-0">Total GSMs</p>
-                                          <div className="d-flex align-items-end">
-                                                {summaryData.totalGsm > 0 ? <AnimatedNumber value={summaryData.totalGsm} duration={1000} /> : <h2 className="mb-0 f-w-500">0</h2>}
-                                          </div>
-                                    </div>
-                              </div>
-                        </div>
-                  </div>
-               </Col>
-
-               <Col md={3}>
-
-               <div className="card statistics-card-1">
-                        <div className="card-body">
-                              <img src={imgStatus2.src} alt="img" className="img-fluid img-bg" />
-                              <div className="d-flex align-items-center">
-                                    <div className="avtar bg-brand-color-1 text-white me-3">
-                                    <i className="material-icons-two-tone text-white">business</i>
-                                    </div>
-                                    <div>
-                                          <p className="text-muted mb-0">Active Companies</p>
-                                          <div className="d-flex align-items-end">
-                                                {summaryData.activeCompanies > 0 ? <AnimatedNumber value={summaryData.activeCompanies} duration={1000} /> : <h2 className="mb-0 f-w-500">0</h2>}
-                                          </div>
-                                    </div>
-                              </div>
-                        </div>
-                  </div>
-
-               </Col>
-
-               <Col md={3}>
-               <div className="card statistics-card-1">
-                        <div className="card-body">
-                              <img src={imgStatus4.src} alt="img" className="img-fluid img-bg" />
-                              <div className="d-flex align-items-center">
-                                    <div className="avtar bg-brand-color-1 text-white me-3">
-                                    <i className="material-icons-two-tone text-white">sync_alt</i>
-                                    </div>
-                                    <div>
-                                          <p className="text-muted mb-0">Ports in Use</p>
-                                          <div className="d-flex align-items-end">
-                                          <h2 className="mb-0 f-w-500">{summaryData.portsInUse}/{summaryData.totalPorts}</h2>
-                                          </div>
-                                    </div>
-                              </div>
-                        </div>
-                  </div>
-                  
-               </Col>
-
-               <Col md={3}>
-               <div className="card statistics-card-1">
-                        <div className="card-body">
-                              <img src={imgStatus2.src} alt="img" className="img-fluid img-bg" />
-                              <div className="d-flex align-items-center">
-                                    <div className="avtar bg-brand-color-1 text-white me-3">
-                                    <i className="material-icons-two-tone text-white">inbox</i>
-                                    </div>
-                                    <div>
-                                          <p className="text-muted mb-0">Inbox</p>
-                                          <div className="d-flex align-items-end">
-                                                {summaryData.inbox > 0 ? <AnimatedNumber value={summaryData.inbox} /> : <h2 className="mb-0 f-w-500">0</h2>}
-                                          </div>
-                                    </div>
-                              </div>
-                        </div>
-                  </div>
-
-               </Col>
-            </Row> */}
+           
 
             {/* GSM Summary Cards */}
-            <div className="dashboard-grid">
-                <motion.div 
-                    className="dashboard-card"
-                    initial={{ opacity: 0, x: -100, scale: 0.8 }}
-                    animate={{ opacity: 1, x: 0, scale: 1 }}
-                    transition={{ 
-                        duration: 0.8, 
-                        delay: 0.1,
-                        type: "spring",
-                        stiffness: 100,
-                        damping: 15
-                    }}
-                    whileHover={{ 
-                        scale: 1.05,
-                        transition: { duration: 0.2 }
-                    }}
-                >
-                    <h3>Total GSMs</h3>
-                    <div className="value" id="total-gsms-count">
-                        <AnimatedNumber value={6} duration={1000} fontStyle='style-2' />
-                    </div>
-                    <p>Total devices in the system</p>
-                    
-                </motion.div>
-                
-                <motion.div 
-                    className="dashboard-card"
-                    initial={{ opacity: 0, x: -100, scale: 0.8 }}
-                    animate={{ opacity: 1, x: 0, scale: 1 }}
-                    transition={{ 
-                        duration: 0.8, 
-                        delay: 0.3,
-                        type: "spring",
-                        stiffness: 100,
-                        damping: 15
-                    }}
-                    whileHover={{ 
-                        scale: 1.05,
-                        transition: { duration: 0.2 }
-                    }}
-                >
-                    <h3>Assigned GSMs</h3>
-                    <div className="value" id="assigned-gsms-count">
-                        <AnimatedNumber value={4} duration={1000}  fontStyle='style-2' />
-                    </div>
-                    <p>GSMs linked to a company</p>
-                    
-                </motion.div>
-                
-                <motion.div 
-                    className="dashboard-card"
-                    initial={{ opacity: 0, x: -100, scale: 0.8 }}
-                    animate={{ opacity: 1, x: 0, scale: 1 }}
-                    transition={{ 
-                        duration: 0.8, 
-                        delay: 0.5,
-                        type: "spring",
-                        stiffness: 100,
-                        damping: 15
-                    }}
-                    whileHover={{ 
-                        scale: 1.05,
-                        transition: { duration: 0.2 }
-                    }}
-                >
-                    <h3>Unassigned GSMs</h3>
-                    <div className="value" id="unassigned-gsms-count">
-                        <AnimatedNumber value={2} duration={1000}  fontStyle='style-2' />
-                    </div>
-                    <p>GSMs awaiting assignment</p>
-                    
-                </motion.div>
-                
-                <motion.div 
-                    className="dashboard-card"
-                    initial={{ opacity: 0, x: -100, scale: 0.8 }}
-                    animate={{ opacity: 1, x: 0, scale: 1 }}
-                    transition={{ 
-                        duration: 0.8, 
-                        delay: 0.7,
-                        type: "spring",
-                        stiffness: 100,
-                        damping: 15
-                    }}
-                    whileHover={{ 
-                        scale: 1.05,
-                        transition: { duration: 0.2 }
-                    }}
-                >
-                  
-                    <h3>Total Ports</h3>
-                    <div className="value" id="total-ports-count">
-                        <AnimatedNumber value={60} duration={1000} fontStyle='style-2' />
-                    </div>
-                    <p>Overall port capacity</p>
-                    
-                </motion.div>
-            </div>
+            <PageSummaryGrid cards={summaryCards} />
 
 
             <Row>
@@ -532,7 +398,7 @@ const GsmDashboard = () => {
                         <Card>
                               
                               <Card.Body>
-                              <h3 className="appHeading">GSM Status</h3>
+                              <h5 className="app-title-heading">GSM Status</h5>
                                     <ReactApexChart options={gsmStatusChart.options as ApexOptions} series={gsmStatusChart.series} type="pie" height={200} />
                               </Card.Body>
                         </Card>
@@ -541,7 +407,7 @@ const GsmDashboard = () => {
                         <Card>
                         
                               <Card.Body>
-                              <h3 className="appHeading">Port Utilization</h3>
+                              <h5 className="app-title-heading">Port Utilization</h5>
                                     <ReactApexChart options={portUtilizationChart.options as ApexOptions} series={portUtilizationChart.series} type="pie" height={200} />
                               </Card.Body>
                         </Card>
@@ -551,7 +417,7 @@ const GsmDashboard = () => {
                         <Card>
                         
                               <Card.Body>
-                              <h3 className="appHeading">New Gsm Assignments Trend</h3>
+                              <h5    className="app-title-heading">New Gsm Assignments Trend</h5>
                                     <ReactApexChart options={gsmAssignmentsTrendChart.options as ApexOptions} series={gsmAssignmentsTrendChart.series} type="line" height={185} />
                               </Card.Body>
                         </Card>
@@ -563,9 +429,9 @@ const GsmDashboard = () => {
                         <div className="card">
                              
                               <div className="card-body dashboard-table">
-                              <h3 className="appHeading">Recent GSM Activity</h3>
+                              <h5 className="mb-3 app-title-heading">Recent GSM Activity</h5>
                                     <div>
-                                          <table className="table table-bordered table-striped table-sm">
+                                          <table className="table table-bordered table-striped table-sm custom-app-table">
                                                 <thead>
                                                       <tr>
                                                             <th>GSM IP</th>
@@ -601,7 +467,7 @@ const GsmDashboard = () => {
                              
                               
                               <div className="card-body">
-                              <h3 className="appHeading">Port Usage by GSM</h3>
+                              <h5 className="mb-3 app-title-heading">Port Usage by GSM</h5>
                               {portUsage.series.length > 0 && <ReactApexChart options={portUsage.options as ApexOptions} series={portUsage.series} type="bar" height={290} />}
                               </div>
                         </div>
@@ -614,14 +480,14 @@ const GsmDashboard = () => {
                         <div className="card">
                              
                               <div className="card-body dashboard-table">
-                              <h3 className="appHeading">Inbox Messages Feed</h3>
-                                    <table className="table table-bordered table-striped table-sm">
+                              <h5 className="mb-3 app-title-heading">Inbox Messages Feed</h5>
+                                    <table className="table table-bordered table-striped table-sm custom-app-table">
                                           <thead>
                                                 <tr>
                                                       <th>Date Time</th>
                                                       <th>Mobile Number</th>
                                                       <th>Port</th>
-                                                      <th>Message</th>
+                                                      <th >Message</th>
                                                 </tr>
                                                 </thead>
                                                 <tbody>
@@ -631,7 +497,7 @@ const GsmDashboard = () => {
                                                             <td>{moment(item.created_at).format('DD-MM-YYYY HH:mm:ss')}</td>
                                                             <td>{item.mobile_number}</td>
                                                             <td>{item.port_number}</td>
-                                                            <td className="one-line-ellipsis">{item.message}</td>
+                                                            <td className="one-line-ellipsis" title={item.message}>{item.message}</td>
                                                       </tr>
                                                       ))}
                                                 </tbody>
@@ -647,8 +513,8 @@ const GsmDashboard = () => {
                         <div className="card">
                              
                               <div className="card-body dashboard-table">
-                              <h3 className="appHeading">Companies Profilling</h3>
-                                    <table className="table table-bordered table-striped table-sm ">
+                              <h5 className="mb-3 app-title-heading">Companies Profilling</h5>
+                                    <table className="table table-bordered table-striped table-sm custom-app-table">
                                           <thead>
                                                 <tr>
                                                       <th>Company</th>
