@@ -136,10 +136,10 @@ const CallLogs = () => {
                     <Col md={8} className="d-flex justify-content-end">
                       
                     <div className="action-buttons">
-                    <div className="search-container">
+                    {/* <div className="search-container">
                             <i className="fas fa-search search-icon"></i>
                             <input type="text" className="search-bar" placeholder="Search call logs..." onChange={(e) => handleFiltersChange({...currentFilters, search: e.target.value})}/>
-                        </div>
+                        </div> */}
                     
                         <CallLogsFilters onFiltersChange={handleFiltersChange} onExport={handleExport} moduleSlug={ModuleSlug.CALL_LOGS} />
                     

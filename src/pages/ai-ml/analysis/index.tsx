@@ -1187,7 +1187,7 @@ const CallAnalysis = () => {
             </Col>
           </Row>
         ) : analysis ? (
-          <Tabs defaultActiveKey="summary" id="system-tabs" className="mb-3 tab-style-two">
+          <Tabs defaultActiveKey="summary" id="system-tabs" className="mb-3">
             <Tab eventKey="summary" title="Summary">
               {renderCustomerInfo()}
               {renderSummaryCards()}

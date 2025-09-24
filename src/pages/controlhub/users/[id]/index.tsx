@@ -564,7 +564,7 @@ const UserView = () => {
                     <Tabs
                         defaultActiveKey="overview"
                         id="system-tabs"
-                        className="mb-3 tab-style-two"
+                        className="mb-3"
                     
                     >
                         <Tab eventKey="overview" title="Overview">

@@ -825,10 +825,10 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
                     <Col md={8} className="d-flex justify-content-end">
                       
                     <div className="action-buttons">
-                    <div className="search-container">
+                    {/* <div className="search-container">
                             <i className="fas fa-search search-icon"></i>
                             <input type="text" className="search-bar" placeholder="Search call recordings..." onChange={(e) => handleFiltersChange({...currentFilters, search: e.target.value})}/>
-                        </div>
+                        </div> */}
                         <CallRecordingsFilters onFiltersChange={handleFiltersChange} onExport={handleExport} moduleSlug={ModuleSlug.CALL_RECORDINGS} />
                        
                     

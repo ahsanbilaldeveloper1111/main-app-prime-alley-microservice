@@ -651,7 +651,7 @@ const CallTrendCountry = () => {
                     <Tabs
                         defaultActiveKey="calls_chart"
                         id="system-tabs"
-                        className="mb-3 tab-style-two"
+                        className="mb-3"
                         activeKey={activeTab}
                         onSelect={handleTabChange}
                     >
