@@ -24,7 +24,11 @@ import moment from 'moment';
 import Link from 'next/link';
 import NProgress from "nprogress";
 import "nprogress/nprogress.css";
-import { motion } from "framer-motion";
+
+import '@assets/scss/gsm-assign.scss';
+import '@assets/scss/dashboard-card.scss';
+import '@assets/scss/common.scss';
+import { motion } from 'framer-motion';
 
 
 interface Summary {
@@ -441,24 +445,33 @@ const [ExtensionChart, setExtensionChart] = React.useState({
             <BreadcrumbItem mainTitle="Call Logs" mainLink="/call-logs/dashboard" subTitle="Call Dashboard" />
 
 
+
             <Row className="mb-3">
             <Col md={12}>
-                <div className="page-header-title">
-                <Row className="align-items-center">
+                <div className="page-header-title style-2">
+                <Row className="d-flex justify-content-between align-items-center">
                     <Col md={4}>
-                      <h3 className="mb-0 d-flex align-items-center">
-                        Call Dashboard
-                      </h3>
+                      
+                      <h2 className="mb-0">Call Dashboard</h2>
                     </Col>
+
+
                     <Col md={8} className="d-flex justify-content-end">
-                      <div className="d-flex align-items-center gap-2">
+                      
+                    <div className="action-buttons">
+                    <div className="d-flex align-items-center gap-2">
                           <p className="mb-0">
                           Date Range: <span className="badge bg-info">{moment(currentFilters.start_datetime).format('DD-MM-YYYY hh:mm:ss A')}</span> to <span className="badge bg-info">{moment(currentFilters.end_datetime).format('DD-MM-YYYY hh:mm:ss A')}</span>
                           </p>
                           <i className="material-icons-two-tone" style={{cursor: 'pointer'}} onClick={() => refreshData()}>refresh</i>
                         </div>
-                    </Col>
                     
+                       
+                    </div>
+
+
+
+                    </Col>
                   </Row>
                
                 
@@ -467,211 +480,192 @@ const [ExtensionChart, setExtensionChart] = React.useState({
             </Row>
 
 
-            <Row>
-                        <Col md={3}>
 
-                        <motion.div
-                          initial={{ opacity: 0, y: 30 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ duration: 0.5, delay: 0.1 * 0 }}
-                        >
-                        <div className="card statistics-card-1">
-                              <div className="card-body">
-                                    <img src={imgStatus1.src} alt="img" className="img-fluid img-bg" />
-                                    <div className="d-flex align-items-center">
-                                          <div className="avtar bg-brand-color-1 text-white me-2">
-                                          <i className="material-icons-two-tone text-white">phone</i>
-                                          </div>
-                                          <div>
-                                                <p className="text-muted mb-0">Total Calls</p>
-                                                <div className="d-flex align-items-end">
-                                                      {generalStats.totalCalls > 0 ? <AnimatedNumber value={generalStats.totalCalls} duration={1000} /> : <h2 className="mb-0 f-w-500">0</h2>}
-                                                </div>
-                                          </div>
-                                    </div>
-                              </div>
-                        </div>
-                        </motion.div>
+            <div className="dashboard-grid">
+                <motion.div 
+                    className="dashboard-card"
+                    initial={{ opacity: 0, x: -100, scale: 0.8 }}
+                    animate={{ opacity: 1, x: 0, scale: 1 }}
+                    transition={{ 
+                        duration: 0.8, 
+                        delay: 0.1,
+                        type: "spring",
+                        stiffness: 100,
+                        damping: 15
+                    }}
+                    whileHover={{ 
+                        scale: 1.05,
+                        transition: { duration: 0.2 }
+                    }}
+                >
+                    <h3>Total Calls</h3>
+                    <div className="value" id="total-gsms-count">
+                    {generalStats.totalCalls > 0 ? <AnimatedNumber value={generalStats.totalCalls} duration={1000} fontStyle='style-2'/> : <h2 className="mb-0 f-w-500 style-2" >0</h2>}
+                    </div>
+                    <p>Total calls in the system</p>
+                </motion.div>
+                
+                <motion.div 
+                    className="dashboard-card"
+                    initial={{ opacity: 0, x: -100, scale: 0.8 }}
+                    animate={{ opacity: 1, x: 0, scale: 1 }}
+                    transition={{ 
+                        duration: 0.8, 
+                        delay: 0.3,
+                        type: "spring",
+                        stiffness: 100,
+                        damping: 15
+                    }}
+                    whileHover={{ 
+                        scale: 1.05,
+                        transition: { duration: 0.2 }
+                    }}
+                >
+                    <h3>Inbound</h3>
+                    <div className="value" id="assigned-gsms-count">
+                    {generalStats.totalInbound > 0 ? <AnimatedNumber value={generalStats.totalInbound} duration={1000} fontStyle='style-2'/> : <h2 className="mb-0 f-w-500 style-2">0</h2>}
+                    </div>
+                    <p>Inbound calls in the system</p>
+                </motion.div>
+                
+                <motion.div 
+                    className="dashboard-card"
+                    initial={{ opacity: 0, x: -100, scale: 0.8 }}
+                    animate={{ opacity: 1, x: 0, scale: 1 }}
+                    transition={{ 
+                        duration: 0.8, 
+                        delay: 0.7,
+                        type: "spring",
+                        stiffness: 100,
+                        damping: 15
+                    }}
+                    whileHover={{ 
+                        scale: 1.05,
+                        transition: { duration: 0.2 }
+                    }}
+                >
+                    <h3>Outbound</h3>
+                    <div className="value" id="total-ports-count">
+                    {generalStats.totalOutbound > 0 ? <AnimatedNumber value={generalStats.totalOutbound} duration={1000} fontStyle='style-2'/> : <h2 className="mb-0 f-w-500 style-2">0</h2>}
+                    </div>
+                    <p>Outbound calls in the system</p>
+                </motion.div>
 
+                <motion.div 
+                    className="dashboard-card"
+                    initial={{ opacity: 0, x: -100, scale: 0.8 }}
+                    animate={{ opacity: 1, x: 0, scale: 1 }}
+                    transition={{ 
+                        duration: 0.8, 
+                        delay: 0.7,
+                        type: "spring",
+                        stiffness: 100,
+                        damping: 15
+                    }}
+                    whileHover={{ 
+                        scale: 1.05,
+                        transition: { duration: 0.2 }
+                    }}
+                >
+                    <h3>Missed Incoming</h3>
+                    <div className="value" id="total-ports-count">
+                    {generalStats.totalMissedIncoming > 0 ? <AnimatedNumber value={generalStats.totalMissedIncoming} duration={1000} fontStyle='style-2'/> : <h2 className="mb-0 f-w-500 style-2">0</h2>}
+                    </div>
+                    <p>Missed incoming calls in the system</p>
+                </motion.div>
 
-                        </Col>
+                <motion.div 
+                    className="dashboard-card"
+                    initial={{ opacity: 0, x: -100, scale: 0.8 }}
+                    animate={{ opacity: 1, x: 0, scale: 1 }}
+                    transition={{ 
+                        duration: 0.8, 
+                        delay: 0.7,
+                        type: "spring",
+                        stiffness: 100,
+                        damping: 15
+                    }}
+                    whileHover={{ 
+                        scale: 1.05,
+                        transition: { duration: 0.2 }
+                    }}
+                >
+                    <h3>Missed Outgoing</h3>
+                    <div className="value" id="total-ports-count">
+                    {generalStats.totalMissedOutgoing > 0 ? <AnimatedNumber value={generalStats.totalMissedOutgoing} duration={1000} fontStyle='style-2'/> : <h2 className="mb-0 f-w-500 style-2">0</h2>}
+                    </div>
+                    <p>Missed outgoing calls in the system</p>
+                </motion.div>
 
-                        <Col md={3}>
-                         <motion.div
-                          initial={{ opacity: 0, y: 30 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ duration: 0.5, delay: 0.1 * 1 }}
-                        >
-                         <div className="card statistics-card-1">
-                              <div className="card-body">
-                                    <img src={imgStatus2.src} alt="img" className="img-fluid img-bg" />
-                                    <div className="d-flex align-items-center">
-                                          <div className="avtar bg-brand-color-1 text-white me-2">
-                                          <i className="material-icons-two-tone text-white">phone_in_talk</i>
-                                          </div>
-                                          <div>
-                                                <p className="text-muted mb-0">Inbound</p>
-                                                <div className="d-flex align-items-end">
-                                                      {generalStats.totalInbound > 0 ? <AnimatedNumber value={generalStats.totalInbound} duration={1000} /> : <h2 className="mb-0 f-w-500">0</h2>}
-                                                </div>
-                                          </div>
-                                    </div>
-                              </div>
-                        </div>
-                        </motion.div>
-                        </Col> 
+                <motion.div 
+                    className="dashboard-card"
+                    initial={{ opacity: 0, x: -100, scale: 0.8 }}
+                    animate={{ opacity: 1, x: 0, scale: 1 }}
+                    transition={{ 
+                        duration: 0.8, 
+                        delay: 0.7,
+                        type: "spring",
+                        stiffness: 100,
+                        damping: 15
+                    }}
+                    whileHover={{ 
+                        scale: 1.05,
+                        transition: { duration: 0.2 }
+                    }}
+                >
+                    <h3>Avg Ring Time</h3>
+                    <div className="value" id="total-ports-count">
+                    {generalStats.totalAvgRingTime > 0 ? <AnimatedNumber value={generalStats.totalAvgRingTime} duration={1000} fontStyle='style-2'/> : <h2 className="mb-0 f-w-500 style-2">0</h2>}
+                    </div>
+                    <p>Avg ring time in the system</p>
+                </motion.div>
 
-                        <Col md={3}>
-                         <motion.div
-                          initial={{ opacity: 0, y: 30 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ duration: 0.5, delay: 0.1 * 2 }}
-                        >
-                         <div className="card statistics-card-1">
-                              <div className="card-body">
-                                    <img src={imgStatus2.src} alt="img" className="img-fluid img-bg" />
-                                    <div className="d-flex align-items-center">
-                                          <div className="avtar bg-brand-color-1 text-white me-2">
-                                          <i className="material-icons-two-tone text-white">phone_in_talk</i>
-                                          </div>
-                                          <div>
-                                                <p className="text-muted mb-0">Outbound</p>
-                                                <div className="d-flex align-items-end">
-                                                      {generalStats.totalOutbound > 0 ? <AnimatedNumber value={generalStats.totalOutbound} duration={1000} /> : <h2 className="mb-0 f-w-500">0</h2>}
-                                                </div>
-                                          </div>
-                                    </div>
-                              </div>
-                        </div>
-                        </motion.div>
-                        </Col> 
+                <motion.div 
+                    className="dashboard-card"
+                    initial={{ opacity: 0, x: -100, scale: 0.8 }}
+                    animate={{ opacity: 1, x: 0, scale: 1 }}
+                    transition={{ 
+                        duration: 0.8, 
+                        delay: 0.7,
+                        type: "spring",
+                        stiffness: 100,
+                        damping: 15
+                    }}
+                    whileHover={{ 
+                        scale: 1.05,
+                        transition: { duration: 0.2 }
+                    }}
+                >
+                    <h3>Avg Duration</h3>
+                    <div className="value" id="total-ports-count">
+                    {generalStats.totalAvgDuration > 0 ? <AnimatedNumber value={generalStats.totalAvgDuration} duration={1000} fontStyle='style-2'/> : <h2 className="mb-0 f-w-500 style-2">0</h2>}
+                    </div>
+                    <p>Avg duration in the system</p>
+                </motion.div>
 
-                        <Col md={3}>
-                        <motion.div
-                          initial={{ opacity: 0, y: 30 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ duration: 0.5, delay: 0.1 * 3 }}
-                        >
-                        <div className="card statistics-card-1">
-                              <div className="card-body">
-                                    <img src={imgStatus4.src} alt="img" className="img-fluid img-bg" />
-                                    <div className="d-flex align-items-center">
-                                          <div className="avtar bg-brand-color-1 text-white me-2">
-                                          <i className="material-icons-two-tone text-white">phone_missed</i>
-                                          </div>
-                                          <div>
-                                                <p className="text-muted mb-0">Missed Incoming</p>
-                                                <div className="d-flex align-items-end">
-                                                      {generalStats.totalMissedIncoming > 0 ? <AnimatedNumber value={generalStats.totalMissedIncoming} duration={1000} /> : <h2 className="mb-0 f-w-500">0</h2>}
-                                                </div>
-                                          </div>
-                                    </div>
-                              </div>
-                        </div>
-                        </motion.div>
-                        </Col> 
-
-                        <Col md={3}>
-                        <motion.div
-                          initial={{ opacity: 0, y: 30 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ duration: 0.5, delay: 0.1 * 4 }}
-                        >
-                        <div className="card statistics-card-1">
-                              <div className="card-body">
-                                    <img src={imgStatus4.src} alt="img" className="img-fluid img-bg" />
-                                    <div className="d-flex align-items-center">
-                                          <div className="avtar bg-brand-color-1 text-white me-2">
-                                          <i className="material-icons-two-tone text-white">phone_missed</i>
-                                          </div>
-                                          <div>
-                                                <p className="text-muted mb-0">Missed Outgoing</p>
-                                                <div className="d-flex align-items-end">
-                                                      {generalStats.totalMissedOutgoing > 0 ? <AnimatedNumber value={generalStats.totalMissedOutgoing} duration={1000} /> : <h2 className="mb-0 f-w-500">0</h2>}
-                                                </div>
-                                          </div>
-                                    </div>
-                              </div>
-                        </div>
-                        </motion.div>
-                        </Col> 
-
-                        <Col md={3}>
-                        <motion.div
-                          initial={{ opacity: 0, y: 30 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ duration: 0.5, delay: 0.1 * 5 }}
-                        >
-                        <div className="card statistics-card-1">
-                              <div className="card-body">
-                                    <img src={imgStatus4.src} alt="img" className="img-fluid img-bg" />
-                                    <div className="d-flex align-items-center">
-                                          <div className="avtar bg-brand-color-1 text-white me-2">
-                                          <i className="material-icons-two-tone text-white">phonelink_ring</i>
-                                          </div>
-                                          <div>
-                                                <p className="text-muted mb-0">Avg Ring Time</p>
-                                                <div className="d-flex align-items-end">
-                                                      {generalStats.totalAvgRingTime > 0 ? <AnimatedNumber value={generalStats.totalAvgRingTime} duration={1000} /> : <h2 className="mb-0 f-w-500">0</h2>}
-                                                </div>
-                                          </div>
-                                    </div>
-                              </div>
-                        </div>
-                        </motion.div>
-                           
-                        </Col> 
-
-                        <Col md={3}>
-                            
-                            <motion.div
-                          initial={{ opacity: 0, y: 30 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ duration: 0.5, delay: 0.1 * 6 }}
-                        >
-                            <div className="card statistics-card-1">
-                              <div className="card-body">
-                                    <img src={imgStatus4.src} alt="img" className="img-fluid img-bg" />
-                                    <div className="d-flex align-items-center">
-                                          <div className="avtar bg-brand-color-1 text-white me-2">
-                                          <i className="material-icons-two-tone text-white">timeline</i>
-                                          </div>
-                                          <div>
-                                                <p className="text-muted mb-0">Avg Duration</p>
-                                                <div className="d-flex align-items-end">
-                                                      {generalStats.totalAvgDuration > 0 ? <AnimatedNumber value={generalStats.totalAvgDuration} duration={1000} /> : <h2 className="mb-0 f-w-500">0</h2>}
-                                                </div>
-                                          </div>
-                                    </div>
-                              </div>
-                        </div>
-                        </motion.div>
-                        </Col> 
-                        <Col md={3}>
-                        <motion.div
-                          initial={{ opacity: 0, y: 30 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ duration: 0.5, delay: 0.1 * 7 }}
-                        >
-                        <div className="card statistics-card-1">
-                              <div className="card-body">
-                                    <img src={imgStatus4.src} alt="img" className="img-fluid img-bg" />
-                                    <div className="d-flex align-items-center">
-                                          <div className="avtar bg-brand-color-1 text-white me-2">
-                                          <i className="material-icons-two-tone text-white">payments</i>
-                                          </div>
-                                          <div>
-                                                <p className="text-muted mb-0">Avg Cost</p>
-                                                <div className="d-flex align-items-end">
-                                                      {generalStats.totalAvgCost > 0 ? <AnimatedNumber value={generalStats.totalAvgCost} duration={1000} /> : <h2 className="mb-0 f-w-500">0</h2>}
-                                                </div>
-                                          </div>
-                                    </div>
-                              </div>
-                        </div>
-                        </motion.div>
-                        </Col> 
-            </Row>
+                <motion.div 
+                    className="dashboard-card"
+                    initial={{ opacity: 0, x: -100, scale: 0.8 }}
+                    animate={{ opacity: 1, x: 0, scale: 1 }}
+                    transition={{ 
+                        duration: 0.8, 
+                        delay: 0.7,
+                        type: "spring",
+                        stiffness: 100,
+                        damping: 15
+                    }}
+                    whileHover={{ 
+                        scale: 1.05,
+                        transition: { duration: 0.2 }
+                    }}
+                >
+                    <h3>Avg Cost</h3>
+                    <div className="value" id="total-ports-count">
+                    {generalStats.totalAvgCost > 0 ? <AnimatedNumber value={generalStats.totalAvgCost} duration={1000} fontStyle='style-2'/> : <h2 className="mb-0 f-w-500 style-2">0</h2>}
+                    </div>
+                    <p>Avg cost in the system</p>
+                </motion.div>
+            </div>
 
             <Row>
                 {showCountryChart && (

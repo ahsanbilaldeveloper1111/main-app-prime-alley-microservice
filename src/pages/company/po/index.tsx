@@ -15,6 +15,10 @@ import { Button, Row, Col } from "react-bootstrap";
 import { useSession } from "next-auth/react";
 import moment from "moment";
 import CompanyPOFilters from "@components/filters/CompanyPOFilters";
+import  '@assets/scss/gsm-dashboard.scss'
+import '@assets/scss/gsm-assign.scss';
+import '@assets/scss/dashboard-card.scss';
+import '@assets/scss/common.scss';
 
 interface CompanyPOData {
   company_name: string;
@@ -41,12 +45,7 @@ const CompanyPO = () => {
         key: "company_name",
         name: "Company Name",
         selector: (row: CompanyPOData) => row.company_name,
-        sortable: true,
-        cell: (props: CompanyPOData) => (
-          <div>
-            <div className="fw-bold text-primary">{props.company_name}</div>
-          </div>
-        ),
+        sortable: true
       },
       {
         key: "assigned_gsms",
@@ -55,8 +54,8 @@ const CompanyPO = () => {
         sortable: true,
         cell: (props: CompanyPOData) => (
           <div>
-            <span className="badge bg-info text-wrap" style={{ maxWidth: "200px" }}>
-              {props.assigned_gsms}
+            <span className={`status-badge  text-wrap ${props.assigned_gsms ? 'success' : 'info'}`} style={{ maxWidth: "200px" }}>
+              {props.assigned_gsms ? props.assigned_gsms : 'N/A'}
             </span>
           </div>
         ),
@@ -67,7 +66,7 @@ const CompanyPO = () => {
         selector: (row: CompanyPOData) => row.gsm_count,
         sortable: true,
         cell: (props: CompanyPOData) => (
-          <span className="badge bg-primary">
+          <span className="status-badge primary">
             {props.gsm_count}
           </span>
         ),
@@ -79,8 +78,8 @@ const CompanyPO = () => {
         sortable: true,
         cell: (props: CompanyPOData) => (
           <div>
-            <span className="badge bg-success text-wrap" style={{ maxWidth: "200px" }}>
-              {props.assigned_ports}
+            <span className={`status-badge ${props.assigned_ports ? 'primary' : 'info'} text-wrap`} style={{ maxWidth: "200px" }}>
+              {props.assigned_ports ? props.assigned_ports : 'N/A'}
             </span>
           </div>
         ),
@@ -91,7 +90,7 @@ const CompanyPO = () => {
         selector: (row: CompanyPOData) => row.port_count,
         sortable: true,
         cell: (props: CompanyPOData) => (
-          <span className="badge bg-warning">
+          <span className="status-badge primary">
             {props.port_count}
           </span>
         ),
@@ -112,12 +111,12 @@ const CompanyPO = () => {
         });
         console.log("Company PO Data Response:", response);
         
-        console.log("ZEZEZE", response);          
+       // console.log("ZEZEZE", response);          
         // Check if the API returns the expected nested structure
         if (response && response.data && response.data.data) {
           // API handles pagination server-side with nested structure
           const paginationData = response.data;
-          console.log("ZEZEZE 2", paginationData);          
+         // console.log("ZEZEZE 2", paginationData);          
           return {
             data: paginationData.data || [],
             total: paginationData.total || 0,
@@ -194,24 +193,42 @@ const CompanyPO = () => {
         mainLink="/company"
         subTitle="Company PO"
       />
-      <Row className="mb-3">
-        <Col md={12}>
-          <div className="page-header-title">
-            <h2 className="mb-0 d-flex align-items-center">
-              Company PO
-              <Button
-                variant="outline-primary"
-                size="sm"
-                className="ms-3"
-                onClick={handleRefresh}
-              >
-                Refresh
-              </Button>
-              <CompanyPOFilters onFiltersChange={handleFiltersChange} />
-            </h2>
-          </div>
-        </Col>
-      </Row>
+
+
+<Row className="mb-3">
+            <Col md={12}>
+                <div className="page-header-title style-2">
+                <Row className="d-flex justify-content-between align-items-center">
+                    <Col md={5}>
+						<h2 className="mb-0">GSM Profiling</h2>
+					</Col>
+                    <Col md={7} className="d-flex justify-content-end">
+                      
+                    <div className="action-buttons">
+                        <div className="search-container">
+                            <i className="fas fa-search search-icon"></i>
+                            <input type="text" className="search-bar" placeholder="Search GSM, Company..."/>
+                        </div>
+
+                        <CompanyPOFilters onFiltersChange={handleFiltersChange}  />
+                       
+                        <button className="btn btn-export" id="export-btn" onClick={handleRefresh}>
+                            <i className="fas fa-refresh"></i> Refresh
+                        </button>
+                    </div>
+
+
+
+                    </Col>
+                  </Row>
+               
+                
+                </div>
+            </Col>
+            </Row>
+
+            
+      
 
         <GenericListPage
           columns={columns}
@@ -220,8 +237,10 @@ const CompanyPO = () => {
           searchPlaceholder="Search companies, GSMs, or ports..."
           defaultPageSize={15}
           refreshKey={refreshKey}
-          search={true}
+          search={false}
           filters={memoizedFilters}
+          tableStyle="table-style-2"
+        
         />
     </React.Fragment>
   );

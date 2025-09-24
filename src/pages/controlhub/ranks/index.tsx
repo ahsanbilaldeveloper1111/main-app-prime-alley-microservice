@@ -5,13 +5,18 @@ import BreadcrumbItem from '@common/BreadcrumbItem';
 import GenericListPage from '@components/GenericListPage';
 import { getAllRoles, ListRoles, updateRole,deleteRole,addRole } from '@utils/roles';
 import { Column } from '@components/CustomDataTable';
-import { Button, Modal, Row } from 'react-bootstrap';
+import { Button, DropdownItem, Dropdown, DropdownMenu, Modal, Row, DropdownToggle } from 'react-bootstrap';
 import { Col } from 'react-bootstrap';
 import RolesFilters from '@components/filters/RolesFilters';
 import { toast } from 'react-toastify';
 import { useTokenService } from 'src/hooks/useTokenService';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
+
+import '@assets/scss/gsm-assign.scss';
+import '@assets/scss/dashboard-card.scss';
+import '@assets/scss/common.scss';
+import { FiEdit, FiMoreVertical, FiTrash2 } from 'react-icons/fi';
 
 const Ranks = () => {
     const { data:session, status } = useSession();
@@ -42,25 +47,64 @@ const Ranks = () => {
                 sortable: false,
                 cell: (props: any) => (
                     
-                    <div className="d-flex gap-3">
+                    // <div className="d-flex gap-3">
         
-                        {session?.user?.permissions?.includes('edit-ranks')  && (
-                            <button className="btn btn-sm btn-outline-primary" onClick={() => handleEditRank(props)}>Edit Rank</button>
-                        )}  
+                    //     {session?.user?.permissions?.includes('edit-ranks')  && (
+                    //         <button className="btn btn-sm btn-outline-primary" onClick={() => handleEditRank(props)}>Edit Rank</button>
+                    //     )}  
 
-                        {session?.user?.permissions?.includes('delete-ranks')  && (
-                            <button className="btn btn-sm btn-outline-danger" onClick={() => handleDeleteRank(props)}>Delete Rank</button>
-                        )}
+                    //     {session?.user?.permissions?.includes('delete-ranks')  && (
+                    //         <button className="btn btn-sm btn-outline-danger" onClick={() => handleDeleteRank(props)}>Delete Rank</button>
+                    //     )}
 
-                        {session?.user?.permissions?.includes('view-permissions-ranks')  && (
-                            <Link href={`/controlhub/ranks/permissions/${props.id}`} className="btn btn-sm btn-outline-primary">View Permissions</Link>
-                        )}
+                    //     {session?.user?.permissions?.includes('view-permissions-ranks')  && (
+                    //         <Link href={`/controlhub/ranks/permissions/${props.id}`} className="btn btn-sm btn-outline-primary">View Permissions</Link>
+                    //     )}
                         
-                        {session?.user?.permissions?.includes('assign-permissions-ranks')  && (
-                            <Link href={`/controlhub/ranks/permissions/edit/${props.id}`} className="btn btn-sm btn-outline-danger">Assign Permissions</Link>
-                        )}
+                    //     {session?.user?.permissions?.includes('assign-permissions-ranks')  && (
+                    //         <Link href={`/controlhub/ranks/permissions/edit/${props.id}`} className="btn btn-sm btn-outline-danger">Assign Permissions</Link>
+                    //     )}
         
-                    </div>
+                    // </div>
+
+                    <Dropdown
+                className="table-action-dropdown"
+                //drop="start"
+                placement="top-start"
+            >
+                <DropdownToggle variant="outline-secondary" size="sm">
+                    <FiMoreVertical size={14} />
+                </DropdownToggle>
+                <DropdownMenu>
+                {session?.user?.permissions?.includes('edit-ranks')  && (
+                    <DropdownItem className="action-edit" onClick={() => handleEditRank(props)}>
+                        <FiEdit className="me-2" />
+                        Edit
+                    </DropdownItem>
+                )}
+
+{session?.user?.permissions?.includes('view-permissions-ranks')  && (
+                    <Link href={`/controlhub/ranks/permissions/${props.id}`} className="dropdown-item action-view">
+                        <FiEdit className="me-2" />
+                        View Permissions
+                    </Link>
+                )}
+
+{session?.user?.permissions?.includes('assign-permissions-ranks')  && (
+                    <Link href={`/controlhub/ranks/permissions/edit/${props.id}`} className="dropdown-item action-delete">
+                        <FiTrash2 className="me-2" />
+                        Assign Permissions
+                    </Link>
+                )}
+
+                    {session?.user?.permissions?.includes('delete-ranks')  && (
+                    <DropdownItem className="action-delete" onClick={() => handleDeleteRank(props)}>
+                        <FiTrash2 className="me-2" />
+                        Delete
+                    </DropdownItem>
+                    )}
+                </DropdownMenu>
+            </Dropdown>
                 ),
             },
         ];
@@ -153,7 +197,7 @@ const Ranks = () => {
     return (
         <React.Fragment>
             <BreadcrumbItem mainTitle="Controlhub" mainLink="/controlhub/ranks" subTitle="Ranks" />
-            <Row className="mb-3">
+            {/* <Row className="mb-3">
             <Col md={12}>
                 <div className="page-header-title">
                 <h2 className="mb-0 d-flex align-items-center">
@@ -165,6 +209,40 @@ const Ranks = () => {
                     <RolesFilters onFiltersChange={handleFiltersChange} onExport={handleExport} />
                     
                 </h2>
+                </div>
+            </Col>
+            </Row> */}
+
+<Row className="mb-3">
+            <Col md={12}>
+                <div className="page-header-title style-2">
+                <Row className="d-flex justify-content-between align-items-center">
+                    <Col md={4}>
+                      
+                      <h2 className="mb-0">Ranks</h2>
+                    </Col>
+
+
+                    <Col md={8} className="d-flex justify-content-end">
+                      
+                    <div className="action-buttons">
+                    <div className="search-container">
+                            <i className="fas fa-search search-icon"></i>
+                            <input type="text" className="search-bar" placeholder="Search rank..." onChange={(e) => handleFiltersChange({...currentFilters, search: e.target.value})}/>
+                        </div>
+                    
+                    {/* <RolesFilters onFiltersChange={handleFiltersChange} onExport={handleExport} /> */}
+                    {session?.user?.permissions?.includes('add-ranks') && (
+                        <Button variant="primary" size="sm"  onClick={() => setShowCreateRankModal(true)}>New Rank</Button>
+                    )}
+                    </div>
+
+
+
+                    </Col>
+                  </Row>
+               
+                
                 </div>
             </Col>
             </Row>
@@ -196,6 +274,8 @@ const Ranks = () => {
                  rowSelection={rowSelectionEnabled}
                  onSelectionChange={handleSelectionChange}
                  keyField="id"
+                 search={false}
+                 tableStyle="table-style-2"
              />
             )}
 

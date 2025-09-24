@@ -130,6 +130,7 @@ const CallStatsExtension = () => {
     };
 
     const columns: Column[] = [
+        { key: 'Extension', name: 'Extension', selector: (row: any) => row.Extension, sortable: true },
         { key: 'Answered', name: 'Answered', selector: (row: any) => row.Answered, sortable: true },
         { key: 'AvgCost', name: 'Avg Cost', selector: (row: any) => row.AvgCost, sortable: true },
         { key: 'AvgDuration', name: 'Avg Duration', selector: (row: any) => row.AvgDuration, sortable: true },

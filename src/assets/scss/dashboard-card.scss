@@ -8,7 +8,7 @@
       margin-bottom: 30px;
   }
   .dashboard-card {
-      background-color: var(--input-bg);
+      background-color: white;//var(--input-bg);
       padding: 25px;
       border-radius: var(--border-radius-sm);
       border: 1px solid var(--border-color);
@@ -16,6 +16,26 @@
       display: flex;
       flex-direction: column;
       justify-content: space-between;
+      position:relative;
+      background-image: url('../../assets/images/widget/img-status-1-new.svg');
+      background-size: contain;
+      background-position: right;
+      background-repeat: no-repeat;
+      .cardImage {
+        position: absolute;
+        top: 0;
+        right: 0;
+        z-index: 1;
+        bottom: 0;
+        vertical-align: middle;
+        display:none;
+
+        img{
+            height:100%;
+            filter: hue-rotate(200deg) saturate(1.8) brightness(0.9) contrast(1.1);
+            
+        }
+    }
   }
   .dashboard-card h3, h3.appHeading {
       font-family: 'Poppins', sans-serif;

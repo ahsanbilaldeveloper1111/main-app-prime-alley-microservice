@@ -6,7 +6,7 @@ import GenericListPage from '@components/GenericListPage';
 
 import { getAllUsers } from '@utils/users';
 import { Column } from '@components/CustomDataTable';
-import { Row } from 'react-bootstrap';
+import { Dropdown, DropdownItem, DropdownMenu, DropdownToggle, Row } from 'react-bootstrap';
 import { Col } from 'react-bootstrap';
 import UsersFilters from '@components/filters/UsersFilters';
 import { toast } from 'react-toastify';
@@ -24,7 +24,14 @@ import imgStatus4 from '@assets/images/widget/img-status-4.svg'
 import EmptyState from '@components/EmptyState';
 import dynamic from 'next/dynamic';
 import '@assets/scss/tabs.scss'
+
+import '@assets/scss/gsm-assign.scss';
+import '@assets/scss/dashboard-card.scss';
+import '@assets/scss/common.scss';
+
 import { formatDateTimeToLocal, GlobalDateTimeFormat } from '@utils/Helper';
+import { motion } from 'framer-motion';
+import { FiMoreVertical } from 'react-icons/fi';
 
 const ReactApexChart = dynamic(() => import('react-apexcharts'), { ssr: false });
 
@@ -97,11 +104,23 @@ const Users = () => {
         cell: (props: any) => (
             <div className="d-flex gap-3">
                 {session?.user?.permissions?.includes('edit-users')  && (
+                      
+                    <Dropdown
+                    className="table-action-dropdown"
+                    //drop="start"
+                    placement="top-start"
+                >
+                    <DropdownToggle variant="outline-secondary" size="sm">
+                        <FiMoreVertical size={14} />
+                    </DropdownToggle>
+                    <DropdownMenu>
                     <Link 
-                        href={`/controlhub/users/${props.encId}`} 
-                        className="btn btn-sm btn-outline-primary">
-                        Edit
-                    </Link> 
+                          href={`/controlhub/users/${props.encId}`} 
+                          className="dropdown-item action-edit">
+                          Edit
+                      </Link> 
+                    </DropdownMenu>
+                </Dropdown>
                 )}
             </div>
         ),
@@ -622,23 +641,9 @@ React.useEffect(() => {
 
     const renderOverviewTab = () => (
         <>
-            <Row className="mb-3">
-                <Col md={12}>
-                    <div className="page-header-title">
-                        <div className="align-items-center row">
-                            <div className="col-md-4">
-                                <h3 className="mb-0 d-flex align-items-center">Overview</h3>
-                            </div>
-                            <div className="d-flex justify-content-end col-md-8">
-                                <UsersFilters onFiltersChange={handleFiltersChange} onExport={handleExport} />
-                            </div>
-                        </div>
-                        
-                    </div>
-                </Col>
-            </Row>
+           
 
-            <Row>
+            {/* <Row>
            <Col md={3}>
               <div className="card statistics-card-1">
                     <div className="card-body">
@@ -730,7 +735,102 @@ React.useEffect(() => {
                     </div>
               </div>
            </Col>
-        </Row>
+        </Row> */}
+
+        {/* GSM Summary Cards */}
+        <div className="dashboard-grid">
+                <motion.div 
+                    className="dashboard-card"
+                    initial={{ opacity: 0, x: -100, scale: 0.8 }}
+                    animate={{ opacity: 1, x: 0, scale: 1 }}
+                    transition={{ 
+                        duration: 0.8, 
+                        delay: 0.1,
+                        type: "spring",
+                        stiffness: 100,
+                        damping: 15
+                    }}
+                    whileHover={{ 
+                        scale: 1.05,
+                        transition: { duration: 0.2 }
+                    }}
+                >
+                    <h3>Total Users</h3>
+                    <div className="value" id="total-gsms-count">
+                        <AnimatedNumber value={summary?.users} duration={1000} fontStyle='style-2' />
+                    </div>
+                    <p>Total users in the system</p>
+                </motion.div>
+                
+                <motion.div 
+                    className="dashboard-card"
+                    initial={{ opacity: 0, x: -100, scale: 0.8 }}
+                    animate={{ opacity: 1, x: 0, scale: 1 }}
+                    transition={{ 
+                        duration: 0.8, 
+                        delay: 0.3,
+                        type: "spring",
+                        stiffness: 100,
+                        damping: 15
+                    }}
+                    whileHover={{ 
+                        scale: 1.05,
+                        transition: { duration: 0.2 }
+                    }}
+                >
+                    <h3>Departments</h3>
+                    <div className="value" id="assigned-gsms-count">
+                        <AnimatedNumber value={summary?.departments} duration={1000}  fontStyle='style-2' />
+                    </div>
+                    <p>Departments in the system</p>
+                </motion.div>
+                
+                <motion.div 
+                    className="dashboard-card"
+                    initial={{ opacity: 0, x: -100, scale: 0.8 }}
+                    animate={{ opacity: 1, x: 0, scale: 1 }}
+                    transition={{ 
+                        duration: 0.8, 
+                        delay: 0.5,
+                        type: "spring",
+                        stiffness: 100,
+                        damping: 15
+                    }}
+                    whileHover={{ 
+                        scale: 1.05,
+                        transition: { duration: 0.2 }
+                    }}
+                >
+                    <h3>Ranks</h3>
+                    <div className="value" id="unassigned-gsms-count">
+                        <AnimatedNumber value={summary?.ranks} duration={1000}  fontStyle='style-2' />
+                    </div>
+                    <p>Ranks in the system</p>
+                </motion.div>
+                
+                <motion.div 
+                    className="dashboard-card"
+                    initial={{ opacity: 0, x: -100, scale: 0.8 }}
+                    animate={{ opacity: 1, x: 0, scale: 1 }}
+                    transition={{ 
+                        duration: 0.8, 
+                        delay: 0.7,
+                        type: "spring",
+                        stiffness: 100,
+                        damping: 15
+                    }}
+                    whileHover={{ 
+                        scale: 1.05,
+                        transition: { duration: 0.2 }
+                    }}
+                >
+                    <h3>Groups</h3>
+                    <div className="value" id="total-ports-count">
+                        <AnimatedNumber value={summary?.groups} duration={1000} fontStyle='style-2' />
+                    </div>
+                    <p>Groups in the system</p>
+                </motion.div>
+            </div>
             
             {session?.user?.permissions?.includes('list-users') && (
                 <GenericListPage
@@ -744,6 +844,8 @@ React.useEffect(() => {
                     // Feature flags - set these to true to enable functionality
                     rowClick={true}
                     showCanvas={true}
+                    search={false}
+                    tableStyle="table-style-2"
                 />
             )}
 
@@ -824,105 +926,100 @@ React.useEffect(() => {
 
     const renderInsightTab = () => (
         <React.Fragment>
-            <Row>
-           <Col md={3}>
-              <div className="card statistics-card-1">
-                    <div className="card-body">
-                          <img src={imgStatus1.src} alt="img" className="img-fluid img-bg" />
-                          <div className="d-flex align-items-center">
-                                <div className="avtar bg-brand-color-1 text-white me-3">
-                                      <i className="ph-duotone ph-users f-26"></i>
-                                </div>
-                                <div>
-                                      <p className="text-muted mb-0">Users</p>
-                                      <div className="d-flex align-items-end">
-                                        {summary?.users > 0 ? (
-                                            <AnimatedNumber value={summary?.users} duration={1000} />
-                                        ) : (
-                                            <h2 className="mb-0 f-w-500">0</h2>
-                                        )}
-                                      </div>
-                                </div>  
-                          </div>
+            {/* GSM Summary Cards */}
+        <div className="dashboard-grid">
+                <motion.div 
+                    className="dashboard-card"
+                    initial={{ opacity: 0, x: -100, scale: 0.8 }}
+                    animate={{ opacity: 1, x: 0, scale: 1 }}
+                    transition={{ 
+                        duration: 0.8, 
+                        delay: 0.1,
+                        type: "spring",
+                        stiffness: 100,
+                        damping: 15
+                    }}
+                    whileHover={{ 
+                        scale: 1.05,
+                        transition: { duration: 0.2 }
+                    }}
+                >
+                    <h3>Total Users</h3>
+                    <div className="value" id="total-gsms-count">
+                        <AnimatedNumber value={summary?.users} duration={1000} fontStyle='style-2' />
                     </div>
-              </div>
-           </Col>
-
-           <Col md={3}>
-              <div className="card statistics-card-1">
-                    <div className="card-body">
-                          <img src={imgStatus1.src} alt="img" className="img-fluid img-bg" />
-                          <div className="d-flex align-items-center">
-                                <div className="avtar bg-brand-color-1 text-white me-3">
-                                      <i className="ph-duotone ph-users f-26"></i>
-                                </div>
-                                <div>
-                                      <p className="text-muted mb-0">Active Users</p>
-                                      <div className="d-flex align-items-end">
-                                        {summary?.activeUsers > 0 ? (
-                                            <div className="d-flex align-items-end">
-                                                <AnimatedNumber value={summary?.activeUsers} duration={1000} />
-                                                <span className="ms-1">%</span>
-                                            </div>
-                                        ) : (
-                                            <h2 className="mb-0 f-w-500">0%</h2>
-                                        )}
-                                      </div>
-                                </div>  
-                          </div>
+                    <p>Total users in the system</p>
+                </motion.div>
+                
+                <motion.div 
+                    className="dashboard-card"
+                    initial={{ opacity: 0, x: -100, scale: 0.8 }}
+                    animate={{ opacity: 1, x: 0, scale: 1 }}
+                    transition={{ 
+                        duration: 0.8, 
+                        delay: 0.3,
+                        type: "spring",
+                        stiffness: 100,
+                        damping: 15
+                    }}
+                    whileHover={{ 
+                        scale: 1.05,
+                        transition: { duration: 0.2 }
+                    }}
+                >
+                    <h3>Departments</h3>
+                    <div className="value" id="assigned-gsms-count">
+                        <AnimatedNumber value={summary?.departments} duration={1000}  fontStyle='style-2' />
                     </div>
-              </div>
-           </Col>
-
-           <Col md={3}>
-              <div className="card statistics-card-1">
-                    <div className="card-body">
-                          <img src={imgStatus1.src} alt="img" className="img-fluid img-bg" />
-                          <div className="d-flex align-items-center">
-                                <div className="avtar bg-brand-color-1 text-white me-3">
-                                      <i className="ph-duotone ph-buildings f-26"></i>
-                                </div>
-                                <div>
-                                      <p className="text-muted mb-0">Departments</p>
-                                      <div className="d-flex align-items-end">
-                                        {summary?.departments > 0 ? (
-                                            <AnimatedNumber value={summary?.departments} duration={1000} />
-                                        ) : (
-                                            <h2 className="mb-0 f-w-500">0</h2>
-                                        )}
-                                      </div>
-                                </div>
-                          </div>
+                    <p>Departments in the system</p>
+                </motion.div>
+                
+                <motion.div 
+                    className="dashboard-card"
+                    initial={{ opacity: 0, x: -100, scale: 0.8 }}
+                    animate={{ opacity: 1, x: 0, scale: 1 }}
+                    transition={{ 
+                        duration: 0.8, 
+                        delay: 0.5,
+                        type: "spring",
+                        stiffness: 100,
+                        damping: 15
+                    }}
+                    whileHover={{ 
+                        scale: 1.05,
+                        transition: { duration: 0.2 }
+                    }}
+                >
+                    <h3>Ranks</h3>
+                    <div className="value" id="unassigned-gsms-count">
+                        <AnimatedNumber value={summary?.ranks} duration={1000}  fontStyle='style-2' />
                     </div>
-              </div>
-           </Col>
-
-           <Col md={3}>
-              <div className="card statistics-card-1">
-                    <div className="card-body">
-                          <img src={imgStatus1.src} alt="img" className="img-fluid img-bg" />
-                          <div className="d-flex align-items-center">
-                                <div className="avtar bg-brand-color-2 text-white me-3">
-                                      <i className="ph-duotone ph-align-center-horizontal f-26"></i>
-                                </div>
-                                <div>
-                                      <p className="text-muted mb-0">Ranks</p>
-                                      <div className="d-flex align-items-end">
-                                        {summary?.ranks > 0 ? (
-                                            <AnimatedNumber value={summary?.ranks} duration={1000} />
-                                        ) : (
-                                            <h2 className="mb-0 f-w-500">0</h2>
-                                        )}
-                                      </div>
-                                </div>
-                          </div>
+                    <p>Ranks in the system</p>
+                </motion.div>
+                
+                <motion.div 
+                    className="dashboard-card"
+                    initial={{ opacity: 0, x: -100, scale: 0.8 }}
+                    animate={{ opacity: 1, x: 0, scale: 1 }}
+                    transition={{ 
+                        duration: 0.8, 
+                        delay: 0.7,
+                        type: "spring",
+                        stiffness: 100,
+                        damping: 15
+                    }}
+                    whileHover={{ 
+                        scale: 1.05,
+                        transition: { duration: 0.2 }
+                    }}
+                >
+                    <h3>Groups</h3>
+                    <div className="value" id="total-ports-count">
+                        <AnimatedNumber value={summary?.groups} duration={1000} fontStyle='style-2' />
                     </div>
-              </div>
-           </Col>
-
-           
-        </Row>
-
+                    <p>Groups in the system</p>
+                </motion.div>
+            </div>
 
 
         <Row>
@@ -1016,11 +1113,48 @@ React.useEffect(() => {
         <ProtectedRoute requiredPermissions={['view-users']}>
             <React.Fragment>
                 <BreadcrumbItem mainTitle="Controlhub" mainLink="/controlhub/users" subTitle="Users" />
-                
+                <Row className="mb-3">
+                <Col md={12}>
+                    <div className="page-header-title style-2">
+                        {/* <div className="align-items-center row">
+                            <div className="col-md-4">
+                                <h2 className="mb-0 d-flex align-items-center">Overview</h2>
+                            </div>
+                            <div className="d-flex justify-content-end col-md-8">
+                                <UsersFilters onFiltersChange={handleFiltersChange} onExport={handleExport} />
+                            </div>
+                        </div> */}
+                        <Row className="d-flex justify-content-between align-items-center">
+                    <Col md={5}>
+                      
+                      <h2 className="mb-0">Users Directory</h2>
+
+                    </Col>
+
+
+                    <Col md={7} className="d-flex justify-content-end">
+                      
+                    <div className="action-buttons">
+                        <div className="search-container">
+                            <i className="fas fa-search search-icon"></i>
+                            <input type="text" className="search-bar" placeholder="Search users..." onChange={(e) => handleFiltersChange({...currentFilters, search: e.target.value})}/>
+                        </div>
+                        <UsersFilters onFiltersChange={handleFiltersChange} onExport={handleExport} />
+
+                        
+                    </div>
+
+
+
+                    </Col>
+                  </Row>
+                    </div>
+                </Col>
+            </Row>
                 {/* Tabs Navigation */}
                 <Row className="mb-3">
                     <Col md={12}>
-                    <ul id="system-tabs" className="mb-3 tab-style-two nav nav-tabs" role="tablist">
+                    <ul id="system-tabs" className="mb-3  nav nav-tabs" role="tablist">
                                             <li className="nav-item" role="presentation">
                                                 <button
                                                     className={`nav-link ${activeTab === 'overview' ? 'active' : ''}`}
@@ -1028,7 +1162,6 @@ React.useEffect(() => {
                                                     type="button"
                                                     role="tab"
                                                 >
-                                                    <i className="ph-duotone ph-users me-2"></i>
                                                     Overview
                                                 </button>
                                             </li>
@@ -1039,7 +1172,6 @@ React.useEffect(() => {
                                                     type="button"
                                                     role="tab"
                                                 >
-                                                    <i className="ph-duotone ph-chart-line-up me-2"></i>
                                                     Insight
                                                 </button>
                                             </li>

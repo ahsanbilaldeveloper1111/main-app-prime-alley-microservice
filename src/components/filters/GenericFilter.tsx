@@ -405,6 +405,11 @@ export default function GenericFilter({
         onFiltersChangeImmediate(updated);
       }
       
+      // Call the main filter change callback to trigger API call
+      if (onFiltersChange) {
+        onFiltersChange(updated);
+      }
+      
       return updated;
     });
     
@@ -919,7 +924,14 @@ export default function GenericFilter({
       )}
 
       {showExport && (
-        <Button variant="outline-primary" size='sm' onClick={() => handleExport('excel')}><span className="ti ti-download"></span> Export</Button>
+        // <Button variant="outline-primary" size='sm' onClick={() => handleExport('excel')}><span className="ti ti-download"></span> Export</Button>
+
+        <button className="btn btn-export" id="export-btn" onClick={() => handleExport('excel')} >
+                            <i className="fas fa-download"></i> Export
+                        </button>
+
+
+
         // <Dropdown>
         //   <Dropdown.Toggle variant="outline-primary" id="dropdown-basic" size='sm'>
         //     <span className="ti ti-download"></span>

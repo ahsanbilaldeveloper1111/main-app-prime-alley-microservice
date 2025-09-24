@@ -23,6 +23,11 @@ import AudioPlayer, { AudioPlayerRef } from '@components/AudioPlayer';
 import EmptyState from '@components/EmptyState';
 import { ModuleSlug } from '@utils/Helper';
 
+import '@assets/scss/gsm-assign.scss';
+import '@assets/scss/dashboard-card.scss';
+import '@assets/scss/common.scss';
+import { motion } from 'framer-motion';
+
 // Utils
 import { ListCallLogs, ExportCallLogs, DownloadCallRecording, DownloadStreamingExport } from '@utils/calls';
 import { GetHierarchyData } from '@utils/users';
@@ -806,82 +811,134 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
 
       <BreadcrumbItem mainTitle="" mainLink="" subTitle="Call Recordings" />
 
-      {/* Header */}
+      
       <Row className="mb-3">
-        <Col md={12}>
-          <div className="page-header-title">
-            <Row className="align-items-center">
-              <Col md={3}>
-                <h2 className="mb-0 d-flex align-items-center">
-                  Call Recordings
-                </h2>
-              </Col>
-              <Col md={9} className="d-flex justify-content-end align-items-center gap-3">
-                {/* <Button 
-                  variant="primary" 
-                  onClick={addNewRecord}
-                  className="d-flex align-items-center gap-2"
-                >
-                  <i className="ph-duotone ph-plus"></i>
-                  Add Record
-                </Button> */}
-                <CallRecordingsFilters onFiltersChange={handleFiltersChange} onExport={handleExport} moduleSlug={ModuleSlug.CALL_RECORDINGS} />
-              </Col>
+            <Col md={12}>
+                <div className="page-header-title style-2">
+                <Row className="d-flex justify-content-between align-items-center">
+                    <Col md={4}>
+                      
+                      <h2 className="mb-0">Call Recordings</h2>
+                    </Col>
+
+
+                    <Col md={8} className="d-flex justify-content-end">
+                      
+                    <div className="action-buttons">
+                    <div className="search-container">
+                            <i className="fas fa-search search-icon"></i>
+                            <input type="text" className="search-bar" placeholder="Search call recordings..." onChange={(e) => handleFiltersChange({...currentFilters, search: e.target.value})}/>
+                        </div>
+                        <CallRecordingsFilters onFiltersChange={handleFiltersChange} onExport={handleExport} moduleSlug={ModuleSlug.CALL_RECORDINGS} />
+                       
+                    
+                    </div>
+
+
+
+                    </Col>
+                  </Row>
+               
+                
+                </div>
+            </Col>
             </Row>
-          </div>
-        </Col>
-      </Row>
 
-      {/* Summary Cards */}
-      <Row>
-        <Col md={3}>
-          <StatCard
-            size="xl"
-            title="Extensions"
-            value={summary.extensions}
-            valueType="number"
-            icon="phone"
-            bgImage={imgStatus1.src}
-            delay={0}
-          />
-        </Col>
+    
 
-        <Col md={3}>
-          <StatCard
-            size="xl"
-            title="Remote Numbers"
-            value={summary.numbers}
-            valueType="number"
-            icon="phone"
-            bgImage={imgStatus1.src}
-            delay={0}
-          />
-        </Col>
-
-        <Col md={3}>
-          <StatCard
-            size="xl"
-            title="Inbound"
-            value={summary.inbound}
-            valueType="number"
-            icon="phone"
-            bgImage={imgStatus1.src}
-            delay={0}
-          />
-        </Col>
-
-        <Col md={3}>
-          <StatCard
-            size="xl"
-            title="Outbound"
-            value={summary.outbound}
-            valueType="number"
-            icon="phone"
-            bgImage={imgStatus1.src}
-            delay={0}
-          />
-        </Col>
-      </Row>
+      <div className="dashboard-grid">
+                <motion.div 
+                    className="dashboard-card"
+                    initial={{ opacity: 0, x: -100, scale: 0.8 }}
+                    animate={{ opacity: 1, x: 0, scale: 1 }}
+                    transition={{ 
+                        duration: 0.8, 
+                        delay: 0.1,
+                        type: "spring",
+                        stiffness: 100,
+                        damping: 15
+                    }}
+                    whileHover={{ 
+                        scale: 1.05,
+                        transition: { duration: 0.2 }
+                    }}
+                >
+                    <h3>Extensions</h3>
+                    <div className="value" id="total-gsms-count">
+                        <AnimatedNumber value={summary?.extensions} duration={1000} fontStyle='style-2' />
+                    </div>
+                    <p>Extensions in the system</p>
+                </motion.div>
+                
+                <motion.div 
+                    className="dashboard-card"
+                    initial={{ opacity: 0, x: -100, scale: 0.8 }}
+                    animate={{ opacity: 1, x: 0, scale: 1 }}
+                    transition={{ 
+                        duration: 0.8, 
+                        delay: 0.3,
+                        type: "spring",
+                        stiffness: 100,
+                        damping: 15
+                    }}
+                    whileHover={{ 
+                        scale: 1.05,
+                        transition: { duration: 0.2 }
+                    }}
+                >
+                    <h3>Remote Numbers</h3>
+                    <div className="value" id="assigned-gsms-count">
+                        <AnimatedNumber value={summary?.numbers} duration={1000}  fontStyle='style-2' />
+                    </div>
+                    <p>Remote numbers in the system</p>
+                </motion.div>
+                
+                <motion.div 
+                    className="dashboard-card"
+                    initial={{ opacity: 0, x: -100, scale: 0.8 }}
+                    animate={{ opacity: 1, x: 0, scale: 1 }}
+                    transition={{ 
+                        duration: 0.8, 
+                        delay: 0.5,
+                        type: "spring",
+                        stiffness: 100,
+                        damping: 15
+                    }}
+                    whileHover={{ 
+                        scale: 1.05,
+                        transition: { duration: 0.2 }
+                    }}
+                >
+                    <h3>Inbound</h3>
+                    <div className="value" id="unassigned-gsms-count">
+                        <AnimatedNumber value={summary?.inbound} duration={1000}  fontStyle='style-2' />
+                    </div>
+                    <p>Inbound calls in the system</p>
+                </motion.div>
+                
+                <motion.div 
+                    className="dashboard-card"
+                    initial={{ opacity: 0, x: -100, scale: 0.8 }}
+                    animate={{ opacity: 1, x: 0, scale: 1 }}
+                    transition={{ 
+                        duration: 0.8, 
+                        delay: 0.7,
+                        type: "spring",
+                        stiffness: 100,
+                        damping: 15
+                    }}
+                    whileHover={{ 
+                        scale: 1.05,
+                        transition: { duration: 0.2 }
+                    }}
+                >
+                    <h3>Outbound</h3>
+                    <div className="value" id="total-ports-count">
+                        <AnimatedNumber value={summary?.outbound} duration={1000} fontStyle='style-2' />
+                    </div>
+                    <p>Outbound calls in the system</p>
+                </motion.div>
+            </div>
 
       {/* Charts */}
       <Row className="mb-3">
@@ -965,6 +1022,8 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
                  defaultPageSize={15}
                  filters={currentFilters}
                  refreshKey={refreshKey}
+                 search={false}
+                 tableStyle='table-style-2'
              />
             )}
 

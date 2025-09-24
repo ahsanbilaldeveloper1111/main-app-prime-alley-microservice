@@ -23,6 +23,10 @@ import imgStatus2 from '@assets/images/widget/img-status-2.svg'
 import imgStatus3 from '@assets/images/widget/img-status-3.svg'
 import imgStatus4 from '@assets/images/widget/img-status-4.svg'
 import { FiEdit, FiTrash2,FiMoreVertical } from 'react-icons/fi';
+import AddGsmModel from '@pages/gsm/partial/AddGsmModel';
+import SuccessfulModal from '@pages/partial/SuccessfulModal';
+import ConfirmModal from '@pages/partial/ConfirmModal';
+import PortLinkUnlinkModal from '../partial/PortLinkUnlinkModal';
 
 
 const GsmAssign = () => {
@@ -301,42 +305,15 @@ const GsmAssign = () => {
     }
 
     const [showAssignGsmModal, setShowAssignGsmModal] = useState(false);
-    const [currentStep, setCurrentStep] = useState(1);
-    const [selectedGsm, setSelectedGsm] = useState('');
-    const [selectedCompany, setSelectedCompany] = useState('');
 
     const handleAssignGsm = async () => {
       setShowAssignGsmModal(true);
-      setCurrentStep(1);
-      setSelectedGsm('');
-      setSelectedCompany('');
     }
 
-    const handleNextStep = () => {
-      if (currentStep < 3) {
-        setCurrentStep(currentStep + 1);
-      }
-    }
-
-    const handleBackStep = () => {
-      if (currentStep > 1) {
-        setCurrentStep(currentStep - 1);
-      }
-    }
-
-    const [successfulAssignModal, setSuccessfulAssignModal] = useState(false);
-
-    const handleSaveAssignment = () => {
-      // Handle save logic here
-      console.log('Saving assignment:', { selectedGsm, selectedCompany });
-      setShowAssignGsmModal(false);
-      setCurrentStep(1);
-      setSelectedGsm('');
-      setSelectedCompany('');
-      setSelectedGsmCreateAssignement('');
-
-      setShowAssignGsmModal(false);
-      setSuccessfulAssignModal(true);
+    const handleAssignmentSuccess = (assignment: { selectedGsm: string; selectedCompany: string }) => {
+      console.log('Assignment successful:', assignment);
+      // Add any additional logic here if needed
+      setRefreshKey(refreshKey + 1); // Refresh the list
     }
 
     const [showExportSuccessfulModal, setShowExportSuccessfulModal] = useState(false);
@@ -585,190 +562,65 @@ const GsmAssign = () => {
             )}
 
 
-            {showAssignGsmModal && (
-              <div id="new-assign-modal" className="modal customModal" style={{display: 'flex'}}>
-              <div className="modal-content">
-                  <span className="close-btn" id="new-assign-close-btn" onClick={() => setShowAssignGsmModal(false)}><i className="fas fa-times"></i></span>
-                  <h2 id="modal-title">New GSM Assignment</h2>
-                  
-                  <div className="step-indicators">
-                      <div className={`step ${currentStep === 1 ? 'active' : ''}`} id="step-1-indicator">1</div>
-                      <div className={`step ${currentStep === 2 ? 'active' : ''}`} id="step-2-indicator">2</div>
-                      <div className={`step ${currentStep === 3 ? 'active' : ''}`} id="step-3-indicator">3</div>
-                  </div>
-      
-                  <div className="modal-body">
-                      
-                      <div className="modal-step" id="step-1" style={{display: currentStep === 1 ? 'block' : 'none'}}>
-                          <p>Select the GSM device you want to assign from the available options below.</p>
-                          <div className="form-group">
-                              <label>Select GSM</label>
-                              <select 
-                                id="gsm-select" 
-                                value={selectedGsm} 
-                                onChange={(e) => setSelectedGsm(e.target.value)}
-                              >
-                                  <option value="">-- Choose a GSM Device --</option>
-                                  <option value="Production">Production (IP: 192.168.1.100)</option>
-                                  <option value="Test Gsm">Test Gsm (IP: 192.168.1.101)</option>
-                                  <option value="Unassigned GSM">Unassigned GSM (IP: 192.168.1.102)</option>
-                              </select>
-                          </div>
-                      </div>
-      
-                      <div className="modal-step" id="step-2" style={{display: currentStep === 2 ? 'block' : 'none'}}>
-                          <p>Choose the company that will be associated with this selected GSM device.</p>
-                          <div className="form-group">
-                              <label>Select Company</label>
-                              <select 
-                                id="company-select" 
-                                value={selectedCompany} 
-                                onChange={(e) => setSelectedCompany(e.target.value)}
-                              >
-                                  <option value="">-- Choose a Company --</option>
-                                  <option value="Prime Alley Technology LLC">Prime Alley Technology LLC</option>
-                                  <option value="Fly Light Group">Fly Light Group</option>
-                                  <option value="ABC Corporation">ABC Corporation</option>
-                                  <option value="Global Solutions Inc.">Global Solutions Inc.</option>
-                              </select>
-                          </div>
-                      </div>
-                      
-                      <div className="modal-step" id="step-3" style={{display: currentStep === 3 ? 'block' : 'none'}}>
-                          <p>Review the details below to ensure all information is correct before finalizing the assignment.</p>
-                          <div className="confirmation-details">
-                              <p><strong>Selected GSM:</strong> <span id="confirm-gsm">{selectedGsm}</span></p>
-                              <p><strong>Assigned to Company:</strong> <span id="confirm-company">{selectedCompany}</span></p>
-                              <p>
-                                  <small style={{color: 'var(--light-text)'}}>
-                                      *Ports will be assigned in a subsequent step or automatically based on company policy.
-                                  </small>
-                              </p>
-                          </div>
-                      </div>
-                  </div>
-                  
-                  <div className="modal-footer">
-                      <button 
-                        className="btn btn-export" 
-                        id="back-btn" 
-                        style={{display: currentStep > 1 ? 'flex' : 'none'}}
-                        onClick={handleBackStep}
-                      >
-                          <i className="fas fa-arrow-left"></i> Back
-                      </button>
-                      <button 
-                        className="btn btn-primary" 
-                        id="next-btn" 
-                        style={{display: currentStep < 3 ? 'flex' : 'none'}}
-                        onClick={handleNextStep}
-                        disabled={currentStep === 1 && !selectedGsm}
-                      >
-                          Next <i className="fas fa-arrow-right"></i>
-                      </button>
-                      <button 
-                        className="btn btn-primary" 
-                        id="save-btn" 
-                        style={{display: currentStep === 3 ? 'flex' : 'none'}}
-                        onClick={handleSaveAssignment}
-                        disabled={!selectedGsm || !selectedCompany}
-                      >
-                          <i className="fas fa-save"></i> Save Assignment
-                      </button>
-                  </div>
-              </div>
-          </div>
-            )}
+            <AddGsmModel 
+              show={showAssignGsmModal}
+              onHide={() => setShowAssignGsmModal(false)}
+              onSuccess={handleAssignmentSuccess}
+            />
 
-            {successfulAssignModal && (
-              <div id="action-modal" className="modal customModal" style={{display: 'flex'}}>
-              <div className="modal-content">
-                  <span className="close-btn" id="action-close-btn" onClick={() => setSuccessfulAssignModal(false)}><i className="fas fa-times"></i></span>
-                  <h2 id="action-modal-title">Assignment Successful!</h2>
-                  <p id="action-modal-text">The GSM **"Production (IP: 192.168.1.100)"** has been successfully assigned to **"Prime Alley Technology LLC"**.</p>
-                  <div className="modal-footer">
-                      <button className="btn btn-export" id="action-cancel-btn" style={{display: 'none'}}>Cancel</button>
-                      <button className="btn btn-primary" id="action-confirm-btn" onClick={() => setSuccessfulAssignModal(false)}>Done</button>
-                  </div>
-              </div>
-          </div>
-            )}
 
 
 {successfulPortsModal && (
-              <div id="action-modal" className="modal customModal" style={{display: 'flex'}}>
-              <div className="modal-content">
-                  <span className="close-btn" id="action-close-btn" onClick={() => setSuccessfulPortsModal(false)}><i className="fas fa-times"></i></span>
-                  <h2 id="action-modal-title">Ports Updated!</h2>
-                  <p id="action-modal-text">The ports for **Production** have been successfully updated to: **1,2,3**.</p>
-                  <div className="modal-footer">
-                      <button className="btn btn-export" id="action-cancel-btn" style={{display: 'none'}}>Cancel</button>
-                      <button className="btn btn-primary" id="action-confirm-btn" onClick={() => setSuccessfulPortsModal(false)}>Done</button>
-                  </div>
-              </div>
-          </div>
+<>
+  <SuccessfulModal
+  show={successfulPortsModal}
+  onHide={() => setSuccessfulPortsModal(false)}
+  title="Ports Updated!"
+  description={`The ports for **${selectedCompanyAssignGsm}** have been successfully updated to: **${selectedPorts.join(', ')}**.`}
+  confirmButtonText="OK"
+  />
+
+          </>
             )}
 
              {showAssignPortsModalNew && (
-                 <div id="ports-modal" className="modal customModal" data-gsm-name={gsmName} style={{display: 'flex'}}>
-                 <div className="modal-content" style={{maxWidth: '600px'}}>
-                     <span className="close-btn" id="ports-close-btn" onClick={() => setShowAssignPortsModalNew(false)}><i className="fas fa-times"></i></span>
-                     <div className="ports-header">
-                         <h2 id="ports-modal-title">Assign Ports to {gsmName}</h2>
-                         <h3 style={{color: 'var(--primary-accent-dark)'}}>Selected Ports: <span className="count" id="assigned-count">{selectedPorts.length}</span></h3>
-                     </div>
-                     <div className="ports-modal-body">
-                         <div className="ports-list-container">
-                             {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(portNumber => (
-                                 <button 
-                                     key={portNumber}
-                                     className={`port-tag ${selectedPorts.includes(portNumber) ? 'selected' : ''}`}
-                                     data-port={portNumber}
-                                     onClick={() => handlePortToggle(portNumber)}
-                                 >
-                                     {portNumber}
-                                     <span className="checkmark">
-                                         <i className="fas fa-check-circle"></i>
-                                     </span>
-                                 </button>
-                             ))}
-                         </div>
-                     </div>
-                     <div className="modal-footer">
-                         <button className="btn btn-export" id="ports-cancel-btn" onClick={() => setShowAssignPortsModalNew(false)}>Cancel</button>
-                         <button className="btn btn-primary" id="ports-save-btn" onClick={handleSavePorts}>Save Ports</button>
-                     </div>
-                 </div>
-             </div>
+                <PortLinkUnlinkModal
+                show={showAssignPortsModalNew}
+                onHide={() => setShowAssignPortsModalNew(false)}
+                gsmName={gsmName}
+                initialSelectedPorts={selectedPorts}
+                maxPorts={32}
+                onSave={handleSavePorts}
+              />
+            
              )}
 
             {showDelinkCompanyModal && (
-              <div id="action-modal" className="modal customModal" style={{display: 'flex'}}>
-              <div className="modal-content">
-                  <span className="close-btn" id="action-close-btn" onClick={() => setShowDelinkCompanyModal(false)}><i className="fas fa-times"></i></span>
-                  <h2 id="action-modal-title">Delink Company</h2>
-                  <p id="action-modal-text">Are you sure you want to delink **Production** from **Prime Alley Technology LLC**? This action cannot be undone.</p>
-                  <div className="modal-footer">
-                      <button className="btn btn-export" id="action-cancel-btn" style={{display: 'inline-block'}}>Cancel</button>
-                      <button className="btn btn-primary" id="action-confirm-btn" onClick={handleSubmitDelinkCompany}>Confirm Delink</button>
-                  </div>
-              </div>
-          </div>
+                <>
+              <ConfirmModal
+                show={showDelinkCompanyModal}
+                onHide={() => setShowDelinkCompanyModal(false)}
+                title="Delink Company"
+                description="Are you sure you want to delink **Production** from **Prime Alley Technology LLC**? This action cannot be undone."
+                targetName="this operation"
+                confirmButtonText="Confirm Delink"
+                onConfirm={(confirmationText) => handleSubmitDelinkCompany()}
+              />
+              </>
+            
             )}
 
             {showExportSuccessfulModal && (
-              <div id="action-modal" className="modal customModal" style={{display: 'flex'}}>
-              <div className="modal-content">
-                  <span className="close-btn" id="action-close-btn" onClick={() => setShowExportSuccessfulModal(false)}><i className="fas fa-times"></i></span>
-                  <h2 id="action-modal-title">Export Successful!</h2>
-                  <p id="action-modal-text">The GSM data has been successfully exported as a JSON file.</p>
-                  <div className="modal-footer">
-                      <button className="btn btn-export" id="action-cancel-btn" style={{display: 'none'}} onClick={() => setShowExportSuccessfulModal(false)}>Cancel</button>
-                      <button className="btn btn-primary" id="action-confirm-btn" onClick={() => setShowExportSuccessfulModal(false)}>OK</button>
-                  </div>
-              </div>
-          </div>
-            )}
+              <>
+              <SuccessfulModal
+                show={showExportSuccessfulModal}
+                onHide={() => setShowExportSuccessfulModal(false)}
+                title="Export Successful!"
+                description="The GSM data has been successfully exported as a JSON file."
+                confirmButtonText="OK"
+              />
+              </>
+              )}
            
             
 

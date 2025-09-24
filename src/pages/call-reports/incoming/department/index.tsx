@@ -121,6 +121,7 @@ const CallIncomingDepartment = () => {
     };
 
     const columns: Column[] = [
+        { key: 'DepartmentName', name: 'DepartmentName', selector: (row: any) => row.DepartmentName, sortable: true },
         { key: 'Answered', name: 'Answered', selector: (row: any) => row.Answered, sortable: true },
         { key: 'AvgCost', name: 'Avg Cost', selector: (row: any) => row.AvgCost, sortable: true },
         { key: 'AvgDuration', name: 'Avg Duration', selector: (row: any) => row.AvgDuration, sortable: true },

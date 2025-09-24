@@ -130,6 +130,7 @@ const CallStatsCountry = () => {
     };
 
     const columns: Column[] = [
+        { key: 'Country', name: 'Country', selector: (row: any) => row.Country, sortable: true },
         { key: 'Answered', name: 'Answered', selector: (row: any) => row.Answered, sortable: true },
         { key: 'AvgCost', name: 'Avg Cost', selector: (row: any) => row.AvgCost, sortable: true },
         { key: 'AvgDuration', name: 'Avg Duration', selector: (row: any) => row.AvgDuration, sortable: true },

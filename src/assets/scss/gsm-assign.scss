@@ -24,7 +24,10 @@
 
   .customModal{
 
-
+.modal-content{
+    overflow-y: auto;
+    max-height: 90vh;
+}
   .btn {
       padding: 12px 28px;
       border: none;
@@ -38,6 +41,11 @@
       font-size: 0.95rem;
       text-decoration: none;
       position: relative;
+
+      &.btn-sm{
+        padding: 3px 13px;
+    font-size: 0.7rem;
+      }
   }
 
   .btn-primary {
@@ -491,4 +499,40 @@
       margin-right: 5px;
   }
 
+}
+
+
+#gsm-detail-modal{
+    .singleListItem{font-weight: 600;}
+    .listItemTitle{float:left;margin-right:5px;color:var(--main-text);}
+    .listItemValue{color:var(--primary-accent-dark);}
+    .action-button-container{
+        .btn{
+            padding:7px 10px;
+            font-size:0.65rem;
+            i{
+                font-size:0.65rem;
+            }
+        }
+    }
+    .location-container{
+        height: 150px;
+        text-align: center;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        background-color: var(--card-bg);
+        border-radius: var(--border-radius-sm);
+        border: 1px solid var(--border-color);
+        box-shadow: var(--shadow-sm);
+
+        font-size:1.8rem;
+        font-weight: 600;
+    }
+}
+.card-body{
+    &.bg-light-primary{
+        background-color: rgba(37, 131, 242, 0.1);
+        
+    }
 }

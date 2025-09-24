@@ -16,6 +16,7 @@ import Select from 'react-select';
 import '@assets/scss/gsm-assign.scss';
 import '@assets/scss/dashboard-card.scss';
 import '@assets/scss/common.scss';
+import {motion} from 'framer-motion';
 
 import GsmPortFilter from '@components/filters/GsmPortFilter';
 
@@ -199,6 +200,106 @@ const GsmPorts = () => {
                 </div>
             </Col>
             </Row>
+
+            {/* GSM Summary Cards */}
+            <div className="dashboard-grid">
+                <motion.div 
+                    className="dashboard-card"
+                    initial={{ opacity: 0, x: -100, scale: 0.8 }}
+                    animate={{ opacity: 1, x: 0, scale: 1 }}
+                    transition={{ 
+                        duration: 0.8, 
+                        delay: 0.1,
+                        type: "spring",
+                        stiffness: 100,
+                        damping: 15
+                    }}
+                    whileHover={{ 
+                        scale: 1.05,
+                        transition: { duration: 0.2 }
+                    }}
+                >
+                    <h3>Total Ports</h3>
+                    <div className="value" id="total-gsms-count">
+                        <AnimatedNumber value={6} duration={1000} fontStyle='style-2' />
+                    </div>
+                    <p>Total ports in the system</p>
+                    
+                </motion.div>
+                
+                <motion.div 
+                    className="dashboard-card"
+                    initial={{ opacity: 0, x: -100, scale: 0.8 }}
+                    animate={{ opacity: 1, x: 0, scale: 1 }}
+                    transition={{ 
+                        duration: 0.8, 
+                        delay: 0.3,
+                        type: "spring",
+                        stiffness: 100,
+                        damping: 15
+                    }}
+                    whileHover={{ 
+                        scale: 1.05,
+                        transition: { duration: 0.2 }
+                    }}
+                >
+                    <h3>Registered Ports</h3>
+                    <div className="value" id="assigned-gsms-count">
+                        <AnimatedNumber value={4} duration={1000}  fontStyle='style-2' />
+                    </div>
+                    <p>Registered ports in the system</p>
+                    
+                </motion.div>
+                
+                <motion.div 
+                    className="dashboard-card"
+                    initial={{ opacity: 0, x: -100, scale: 0.8 }}
+                    animate={{ opacity: 1, x: 0, scale: 1 }}
+                    transition={{ 
+                        duration: 0.8, 
+                        delay: 0.5,
+                        type: "spring",
+                        stiffness: 100,
+                        damping: 15
+                    }}
+                    whileHover={{ 
+                        scale: 1.05,
+                        transition: { duration: 0.2 }
+                    }}
+                >
+                    <h3>Unregistered Ports</h3>
+                    <div className="value" id="unassigned-gsms-count">
+                        <AnimatedNumber value={2} duration={1000}  fontStyle='style-2' />
+                    </div>
+                    <p>Unregistered ports in the system</p>
+                    
+                </motion.div>
+                
+                <motion.div 
+                    className="dashboard-card"
+                    initial={{ opacity: 0, x: -100, scale: 0.8 }}
+                    animate={{ opacity: 1, x: 0, scale: 1 }}
+                    transition={{ 
+                        duration: 0.8, 
+                        delay: 0.7,
+                        type: "spring",
+                        stiffness: 100,
+                        damping: 15
+                    }}
+                    whileHover={{ 
+                        scale: 1.05,
+                        transition: { duration: 0.2 }
+                    }}
+                >
+                  
+                    <h3>Active Ports</h3>
+                    <div className="value" id="total-ports-count">
+                        <AnimatedNumber value={60} duration={1000} fontStyle='style-2' />
+                    </div>
+                    <p>Active ports in the system</p>
+                    
+                </motion.div>
+            </div>
 
 
             {session?.user?.permissions?.includes('list-gsm-ports') && (

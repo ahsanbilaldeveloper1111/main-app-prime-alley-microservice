@@ -121,6 +121,10 @@ const CallTrendCountry = () => {
     };
 
     const columns: Column[] = [
+        { key: 'Country', name: 'Country', selector: (row: any) => row.Country, sortable: true },
+        { key: 'CallDate', name: 'Call Date', selector: (row: any) => row.CallDate, sortable: true },
+        { key: 'StartHour', name: 'Start Hour', selector: (row: any) => row.StartHour, sortable: true },
+
         { key: 'Answered', name: 'Answered', selector: (row: any) => row.Answered, sortable: true },
         { key: 'AvgCost', name: 'Avg Cost', selector: (row: any) => row.AvgCost, sortable: true },
         { key: 'AvgDuration', name: 'Avg Duration', selector: (row: any) => row.AvgDuration, sortable: true },

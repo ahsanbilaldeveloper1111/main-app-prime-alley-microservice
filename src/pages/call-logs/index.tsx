@@ -18,8 +18,15 @@ import imgStatus2 from '@assets/images/widget/img-status-2.svg'
 import imgStatus3 from '@assets/images/widget/img-status-3.svg'
 import imgStatus4 from '@assets/images/widget/img-status-4.svg'
 import moment from 'moment';
+
+import '@assets/scss/gsm-assign.scss';
+import '@assets/scss/dashboard-card.scss';
+import '@assets/scss/common.scss';
+import { motion } from 'framer-motion';
+
 import { convertUTCToUserTimezone, convertUTCTimeToUserTimezone, convertUTCSeparateDateTimeToUserTime, convertUTCSeparateDateTimeToUserDate, formatDuration, GlobalDateFormat, GlobalTimeFormat } from '@utils/Helper';
 import { ModuleSlug } from '@utils/Helper';
+
 
 interface Summary {
     users: number;
@@ -113,17 +120,33 @@ const CallLogs = () => {
     return (
         <React.Fragment>
             <BreadcrumbItem mainTitle="" mainLink="" subTitle="Call Logs" />
+           
+
+
             <Row className="mb-3">
             <Col md={12}>
-                <div className="page-header-title">
-                <Row className="align-items-center">
-                    <Col md={3}>
-                      <h2 className="mb-0 d-flex align-items-center">
-                      Call Logs
-                      </h2>
+                <div className="page-header-title style-2">
+                <Row className="d-flex justify-content-between align-items-center">
+                    <Col md={4}>
+                      
+                      <h2 className="mb-0">Call Logs</h2>
                     </Col>
-                    <Col md={9} className="d-flex justify-content-end">
-                      <CallLogsFilters onFiltersChange={handleFiltersChange} onExport={handleExport} moduleSlug={ModuleSlug.CALL_LOGS} />
+
+
+                    <Col md={8} className="d-flex justify-content-end">
+                      
+                    <div className="action-buttons">
+                    <div className="search-container">
+                            <i className="fas fa-search search-icon"></i>
+                            <input type="text" className="search-bar" placeholder="Search call logs..." onChange={(e) => handleFiltersChange({...currentFilters, search: e.target.value})}/>
+                        </div>
+                    
+                        <CallLogsFilters onFiltersChange={handleFiltersChange} onExport={handleExport} moduleSlug={ModuleSlug.CALL_LOGS} />
+                    
+                    </div>
+
+
+
                     </Col>
                   </Row>
                
@@ -132,84 +155,100 @@ const CallLogs = () => {
             </Col>
             </Row>
 
-            <Row>
-               <Col md={3}>
-                  <div className="card statistics-card-1">
-                        <div className="card-body">
-                              <img src={imgStatus1.src} alt="img" className="img-fluid img-bg" />
-                              <div className="d-flex align-items-center">
-                                    <div className="avtar bg-brand-color-1 text-white me-3">
-                                          <i className="ph-duotone ph-users f-26"></i>
-                                    </div>
-                                    <div>
-                                          <p className="text-muted mb-0">Users</p>
-                                          <div className="d-flex align-items-end">
-                                                <AnimatedNumber value={summary?.users} duration={1000} />
-                                          </div>
-                                    </div>
-                              </div>
-                        </div>
-                  </div>
-               </Col>
-
-               <Col md={3}>
-                  <div className="card statistics-card-1">
-                        <div className="card-body">
-                              <img src={imgStatus1.src} alt="img" className="img-fluid img-bg" />
-                              <div className="d-flex align-items-center">
-                                    <div className="avtar bg-brand-color-1 text-white me-3">
-                                          <i className="ph-duotone ph-phone-call f-26"></i>
-                                    </div>
-                                    <div>
-                                          <p className="text-muted mb-0">Extensions</p>
-                                          <div className="d-flex align-items-end">
-                                                <AnimatedNumber value={summary?.extensions} duration={1000} />
-                                          </div>
-                                    </div>
-                              </div>
-                        </div>
-                  </div>
-               </Col>
-
-               <Col md={3}>
-                  <div className="card statistics-card-1">
-                        <div className="card-body">
-                              <img src={imgStatus1.src} alt="img" className="img-fluid img-bg" />
-                              <div className="d-flex align-items-center">
-                                    <div className="avtar bg-brand-color-2 text-white me-3">
-                                          <i className="ph-duotone ph-phone-call f-26"></i>
-                                    </div>
-                                    <div>
-                                          <p className="text-muted mb-0">Inbound</p>
-                                          <div className="d-flex align-items-end">
-                                                <AnimatedNumber value={summary?.inbound} duration={1000} />
-                                          </div>
-                                    </div>
-                              </div>
-                        </div>
-                  </div>
-               </Col>
-
-               <Col md={3}>
-                  <div className="card statistics-card-1">
-                        <div className="card-body">
-                              <img src={imgStatus2.src} alt="img" className="img-fluid img-bg" />
-                              <div className="d-flex align-items-center">
-                                    <div className="avtar bg-brand-color-1 text-white me-3">
-                                          <i className="ph-duotone ph-phone-call f-26"></i>
-                                    </div>
-                                    <div>
-                                          <p className="text-muted mb-0">Outbound</p>
-                                          <div className="d-flex align-items-end">
-                                                <AnimatedNumber value={summary?.outbound} duration={1000} />
-                                          </div>
-                                    </div>
-                              </div>
-                        </div>
-                  </div>
-               </Col>
-
-            </Row>
+           
+            <div className="dashboard-grid">
+                <motion.div 
+                    className="dashboard-card"
+                    initial={{ opacity: 0, x: -100, scale: 0.8 }}
+                    animate={{ opacity: 1, x: 0, scale: 1 }}
+                    transition={{ 
+                        duration: 0.8, 
+                        delay: 0.1,
+                        type: "spring",
+                        stiffness: 100,
+                        damping: 15
+                    }}
+                    whileHover={{ 
+                        scale: 1.05,
+                        transition: { duration: 0.2 }
+                    }}
+                >
+                    <h3>Total Users</h3>
+                    <div className="value" id="total-gsms-count">
+                        <AnimatedNumber value={summary?.users} duration={1000} fontStyle='style-2' />
+                    </div>
+                    <p>Total users in the system</p>
+                </motion.div>
+                
+                <motion.div 
+                    className="dashboard-card"
+                    initial={{ opacity: 0, x: -100, scale: 0.8 }}
+                    animate={{ opacity: 1, x: 0, scale: 1 }}
+                    transition={{ 
+                        duration: 0.8, 
+                        delay: 0.3,
+                        type: "spring",
+                        stiffness: 100,
+                        damping: 15
+                    }}
+                    whileHover={{ 
+                        scale: 1.05,
+                        transition: { duration: 0.2 }
+                    }}
+                >
+                    <h3>Extensions</h3>
+                    <div className="value" id="assigned-gsms-count">
+                        <AnimatedNumber value={summary?.extensions} duration={1000}  fontStyle='style-2' />
+                    </div>
+                    <p>Extensions in the system</p>
+                </motion.div>
+                
+                <motion.div 
+                    className="dashboard-card"
+                    initial={{ opacity: 0, x: -100, scale: 0.8 }}
+                    animate={{ opacity: 1, x: 0, scale: 1 }}
+                    transition={{ 
+                        duration: 0.8, 
+                        delay: 0.5,
+                        type: "spring",
+                        stiffness: 100,
+                        damping: 15
+                    }}
+                    whileHover={{ 
+                        scale: 1.05,
+                        transition: { duration: 0.2 }
+                    }}
+                >
+                    <h3>Inbound</h3>
+                    <div className="value" id="unassigned-gsms-count">
+                        <AnimatedNumber value={summary?.inbound} duration={1000}  fontStyle='style-2' />
+                    </div>
+                    <p>Inbound calls in the system</p>
+                </motion.div>
+                
+                <motion.div 
+                    className="dashboard-card"
+                    initial={{ opacity: 0, x: -100, scale: 0.8 }}
+                    animate={{ opacity: 1, x: 0, scale: 1 }}
+                    transition={{ 
+                        duration: 0.8, 
+                        delay: 0.7,
+                        type: "spring",
+                        stiffness: 100,
+                        damping: 15
+                    }}
+                    whileHover={{ 
+                        scale: 1.05,
+                        transition: { duration: 0.2 }
+                    }}
+                >
+                    <h3>Outbound</h3>
+                    <div className="value" id="total-ports-count">
+                        <AnimatedNumber value={summary?.outbound} duration={1000} fontStyle='style-2' />
+                    </div>
+                    <p>Outbound calls in the system</p>
+                </motion.div>
+            </div>
 
             {session?.user?.permissions?.includes('list-call-logs') && (
                  <GenericListPage
@@ -220,6 +259,8 @@ const CallLogs = () => {
                  defaultPageSize={15}
                  filters={currentFilters}
                  refreshKey={refreshKey}
+                 search={false}
+                 tableStyle='table-style-2'
              />
             )}
 

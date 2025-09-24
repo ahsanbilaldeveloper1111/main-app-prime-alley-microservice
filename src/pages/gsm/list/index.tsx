@@ -6,7 +6,7 @@ import GenericListPage from '@components/GenericListPage';
 import { ListGsmManagement, addGsm, updateGsm, deleteGsm } from '@utils/GsmManagement';
 
 import { Column } from '@components/CustomDataTable';
-import { Button, Modal, Row } from 'react-bootstrap';
+import { Button, Card, Modal, Row } from 'react-bootstrap';
 import { Col } from 'react-bootstrap';
 import { toast } from 'react-toastify';
 import { useTokenService } from 'src/hooks/useTokenService';
@@ -14,6 +14,7 @@ import { useSession } from 'next-auth/react';
 import GsmListFilter from '@components/filters/GsmListFilter';
 import '@assets/scss/gsm-assign.scss';
 import '@assets/scss/dashboard-card.scss';
+import '@assets/scss/common.scss';
 
 import AnimatedNumber from '@components/AnimatedNumber';
 import { motion } from 'framer-motion';
@@ -23,6 +24,14 @@ import imgStatus3 from '@assets/images/widget/img-status-3.svg'
 import imgStatus4 from '@assets/images/widget/img-status-4.svg'
 import { Dropdown, DropdownToggle, DropdownMenu, DropdownItem } from 'react-bootstrap';
 import { FiEdit, FiMoreVertical, FiTrash2 } from 'react-icons/fi';
+
+import AddGsmModel from '@pages/gsm/partial/AddGsmModel';
+import SuccessfulModal from '@pages/partial/SuccessfulModal';
+import ConfirmModal from '@pages/partial/ConfirmModal';
+ import GsmDetailModel from '@pages/gsm/partial/GsmDetailModel';
+
+
+
 
 
 const GsmList = () => {
@@ -85,15 +94,15 @@ const GsmList = () => {
                     <FiMoreVertical size={14} />
                 </DropdownToggle>
                 <DropdownMenu>
-                    <DropdownItem className="action-edit" onClick={() => handleEditGsm(props)}>
+                    <DropdownItem className="action-edit" onClick={() => setShowAddGsmModal(true)}>
                         <FiEdit className="me-2" />
                         Edit
                     </DropdownItem>
-                    <DropdownItem className="action-view" onClick={() => handleEditGsm(props)}>
+                    <DropdownItem className="action-view" onClick={() => setShowGsmDetailsModel(true)}>
                         <FiEdit className="me-2" />
                         View
                     </DropdownItem>
-                    <DropdownItem className="action-delete" onClick={() => handleDeleteGsm(props)}>
+                    <DropdownItem className="action-delete" onClick={() => setShowDeleteGsmModal(true)}>
                         <FiTrash2 className="me-2" />
                         Delete
                     </DropdownItem>
@@ -102,6 +111,10 @@ const GsmList = () => {
           ),
       },
     ];
+
+    const [showAddGsmModal, setShowAddGsmModal] = useState(false);
+    const [showSuccessModal, setShowSuccessModal] = useState(false);
+
 
     const [refreshKey, setRefreshKey] = useState<number>(0);
     const [currentFilters, setCurrentFilters] = useState({});
@@ -239,6 +252,12 @@ const GsmList = () => {
     const handleExportSuccessful = async () => {
       setShowExportSuccessfulModal(true);
     }
+
+
+    const [successModalTitle, setSuccessModalTitle] = useState('');
+    const [successModalDescription, setSuccessModalDescription] = useState('');
+
+    const [showGsmDetailsModel, setShowGsmDetailsModel] = useState(false);
     
     return (
         <React.Fragment>
@@ -288,10 +307,10 @@ const GsmList = () => {
                             <i className="fas fa-search search-icon"></i>
                             <input type="text" className="search-bar" placeholder="Search GSM, Company..."/>
                         </div>
-                        <button className="btn btn-primary" id="new-assign-btn">
+                        <button className="btn btn-primary" id="new-assign-btn" onClick={() => setShowAddGsmModal(true)}>
                             <i className="fas fa-plus"></i> New Assign
                         </button>
-                        <button className="btn btn-export" id="export-btn">
+                        <button className="btn btn-export" id="export-btn" onClick={handleExportSuccessful}>
                             <i className="fas fa-download"></i> Export
                         </button>
                     </div>
@@ -500,44 +519,88 @@ const GsmList = () => {
             )}
 
             {showDeleteGsmModal && (
-                <Modal
-                    show={showDeleteGsmModal}
-                    onHide={() => setShowDeleteGsmModal(false)}
-                >
-                    <Modal.Header closeButton>
-                        <Modal.Title>Delete Gsm?</Modal.Title>
-                    </Modal.Header>
-                    <Modal.Body>
-                        <p>
-                            Are you sure you want to delete this <b className="text-danger">{selectedGsmName}</b> gsm?
-                        </p>
-                        <p>
-                            Type the word <b className="text-danger">delete</b> to confirm
-                        </p>
-                        <input type="text" className="form-control" id="confirmDelete" value={confirmDelete} onChange={(e) => setConfirmDelete(e.target.value)} placeholder="Type the word delete to confirm" />
-
-                    </Modal.Body>
-                    <Modal.Footer>
-                        <Button variant="secondary" onClick={() => setShowDeleteGsmModal(false)}>Close</Button>
-                        <Button variant="danger" onClick={() => handleSubmitDeleteGsm()}>Delete</Button>
-                    </Modal.Footer>
-                    
-                </Modal>
+                <>
+               <ConfirmModal
+                show={showDeleteGsmModal}
+                onHide={() => setShowDeleteGsmModal(false)}
+                title="Delete Gsm?"
+                description="Are you sure you want to proceed with {targetName}?"
+                targetName="this operation"
+                onConfirm={() => {
+                    console.log('Gsm deleted');
+                    setShowDeleteGsmModal(false);
+                    setSuccessModalTitle('Successfully Deleted');
+                    setSuccessModalDescription('The GSM data has been successfully deleted.');
+            
+                    setShowSuccessModal(true);
+                    //handleSubmitDeleteGsm();
+                }}
+                />
+                </>
             )}
 
 {showExportSuccessfulModal && (
-              <div id="action-modal" className="modal customModal" style={{display: 'flex'}}>
-              <div className="modal-content">
-                  <span className="close-btn" id="action-close-btn"><i className="fas fa-times"></i></span>
-                  <h2 id="action-modal-title">Export Successful!</h2>
-                  <p id="action-modal-text">The GSM data has been successfully exported as a JSON file.</p>
-                  <div className="modal-footer">
-                      <button className="btn btn-export" id="action-cancel-btn" style={{display: 'none'}} onClick={() => setShowExportSuccessfulModal(false)}>Cancel</button>
-                      <button className="btn btn-primary" id="action-confirm-btn" onClick={() => setShowExportSuccessfulModal(false)}>OK</button>
-                  </div>
-              </div>
-          </div>
+    <>
+              <SuccessfulModal
+                show={showExportSuccessfulModal}
+                onHide={() => setShowExportSuccessfulModal(false)}
+                title="Export Successful!"
+                description="The GSM data has been successfully exported as a JSON file."
+                confirmButtonText="OK"
+              />
+              </>
             )}
+
+          
+
+            {showAddGsmModal && (
+                <AddGsmModel
+                show={showAddGsmModal}
+                onHide={() => setShowAddGsmModal(false)}
+                onSuccess={() => {
+                    setShowAddGsmModal(false);
+                    setSuccessModalTitle('Successfully Created');
+                    setSuccessModalDescription('The GSM data has been successfully created.');
+                    setShowSuccessModal(true);
+                }}
+              />
+            )}
+
+            {showSuccessModal && (
+                <SuccessfulModal
+                show={showSuccessModal}
+                title={successModalTitle}
+                description={successModalDescription}
+                confirmButtonText="OK"
+                onHide={() => setShowSuccessModal(false)}
+              />
+            )}
+
+
+            {
+                showGsmDetailsModel && (
+                    <>
+                    <GsmDetailModel
+  show={showGsmDetailsModel}
+  onHide={() => setShowGsmDetailsModel(false)}
+  gsmData={{
+    id: "GSM001",
+    name: "Main GSM",
+    status: "Active",
+    location: "Building A",
+    ports: [1, 2, 3, 5],
+    lastSync: "2024-01-15 10:30:00",
+    description: "Primary GSM unit for building A"
+  }}
+  onEdit={(data: any) => console.log('Edit:', data)}
+  onDelete={(id: any) => console.log('Delete:', id)}
+  showEditButton={true}
+  showDeleteButton={true}
+/>
+                   
+                    </>
+                )
+            }
             
 
         

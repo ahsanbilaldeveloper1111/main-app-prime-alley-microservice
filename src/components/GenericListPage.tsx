@@ -75,7 +75,7 @@ const GenericListPage: React.FC<GenericListPageProps> = ({
     // Canvas state
     const [canvasVisible, setCanvasVisible] = useState<boolean>(false);
     const [selectedRowData, setSelectedRowData] = useState<any>(null);
-    console.log("ZEZEZE", selectedRowData);
+    //console.log("ZEZEZE", selectedRowData);
     const fetchAndSetData = useCallback(async (page = 1, perPage = defaultPageSize, search = '') => {
         setLoading(true);
         try {

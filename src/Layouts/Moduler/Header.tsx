@@ -394,7 +394,7 @@ const Header = ({ themeMode }: HeaderProps) => {
             key: 'gsm',
             permission: 'gsm-services',
             icon: 'ti ti-antenna-bars-4',
-            label: 'GSM',
+            label: 'Sim Gateway',
             target: '#pc-tab-1'
         },
         {
@@ -405,13 +405,6 @@ const Header = ({ themeMode }: HeaderProps) => {
             target: '#pc-tab-2'
         },
         {
-            key: 'call-reports',
-            permission: 'reports-services',
-            icon: 'ph-duotone ph-file-text',
-            label: 'Reports',
-            target: '#pc-tab-5'
-        },
-        {
             key: 'call-recording',
             permission: 'call-recordings-services',
             icon: 'ph-duotone ph-record',
@@ -419,17 +412,25 @@ const Header = ({ themeMode }: HeaderProps) => {
             target: '#pc-tab-3'
         },
         {
+            key: 'call-reports',
+            permission: 'reports-services',
+            icon: 'ph-duotone ph-file-text',
+            label: 'Reports',
+            target: '#pc-tab-5'
+        },
+        
+        {
             key: 'ai-ml',
             permission: 'ai-ml-services',
             icon: 'ph-duotone ph-robot',
-            label: 'Ai ML',
+            label: 'Ai Insights',
             target: '#pc-tab-4'
         },
         {
             key: 'cti',
             permission: 'cti-services',
             icon: 'ph-duotone ph-phone-call',
-            label: 'CTI',
+            label: 'Live Calls',
             target: '#pc-tab-9'
         },
         {
@@ -443,7 +444,7 @@ const Header = ({ themeMode }: HeaderProps) => {
             key: 'tms',
             permission: 'tms-services',
             icon: 'ph-duotone ph-link',
-            label: 'TMS',
+            label: 'Automation',
             target: '#pc-tab-6'
         },
         {
@@ -464,7 +465,7 @@ const Header = ({ themeMode }: HeaderProps) => {
             key: 'accounts',
             permission: 'accounts-services',
             icon: 'ph-duotone ph-link',
-            label: 'Accounts',
+            label: 'Billing',
             target: '#pc-tab-15'
         },
         {
@@ -524,14 +525,14 @@ const Header = ({ themeMode }: HeaderProps) => {
                     key: 'view-company-po',
                     permission: 'view-gsm-management',
                     icon: 'ph-duotone ph-building',
-                    label: 'Company PO',
+                    label: 'Company Profiling',
                     href: '/company/po'
                 }
             ]
         },
         {
             id: 'pc-tab-1',
-            title: 'Gsm',
+            title: 'Sim Gateway',
             items: [
                 {
                     key: 'dashboard-gsm-management',
@@ -606,7 +607,7 @@ const Header = ({ themeMode }: HeaderProps) => {
         },
         {
             id: 'pc-tab-4',
-            title: 'Ai ML',
+            title: 'Ai Insights',
             items: [
                 {
                     key: 'transcriptions-analysis-aiml',
@@ -674,13 +675,13 @@ const Header = ({ themeMode }: HeaderProps) => {
         },
         {
             id: 'pc-tab-9',
-            title: 'CTI',
+            title: 'Live Calls',
             items: [
                 {
                     key: 'view-cti',
                     permission: 'view-cti',
                     icon: 'ph-duotone ph-link',
-                    label: 'CTI',
+                    label: 'Live View',
                     href: '/cti'
                 },
                 {
@@ -964,12 +965,12 @@ const Header = ({ themeMode }: HeaderProps) => {
     // Accounts submenu component with nested menus
     const AccountsSubmenu = useCallback(() => (
         <div className="tab-pane" id="pc-tab-15" role="tabpanel" aria-labelledby="pc-tab-link-15" tabIndex={1}>
-            <div className="pc-submenu-title">Accounts</div>
+            <div className="pc-submenu-title">Billing</div>
             <ul className="pc-navbar">
                                     <li className="pc-item">
                                         <Link className="pc-link" href={`${BASE_URL}/coming-soon`} >
                                             <span className="pc-micon"><i className="ph-duotone ph-link"></i></span>
-                                            <span className="pc-mtext">Accounts</span>
+                                            <span className="pc-mtext">Billing</span>
                                         </Link>
                                     </li>
                                 </ul>                       
@@ -994,7 +995,7 @@ const Header = ({ themeMode }: HeaderProps) => {
     // TMS submenu component with nested menus
     const TmsSubmenu = useCallback(() => (
         <div className="tab-pane" id="pc-tab-6" role="tabpanel" aria-labelledby="pc-tab-link-6" tabIndex={1}>
-                                <div className="pc-submenu-title">TMS</div>
+                                <div className="pc-submenu-title">Automation</div>
                                 <ul className="pc-navbar">
                                     <li className="pc-item">
                     <Link className="pc-link" href={`${BASE_URL}/tms`}>

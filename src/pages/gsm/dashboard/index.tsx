@@ -262,7 +262,7 @@ const GsmDashboard = () => {
           
             series: [{
                 name: "GSM Assignments",
-                data: [10, 41, 35, 51, 49, 62, 69, 91, 148]
+                data: [10, 41, 25, 21, 39, 12, 69, 11, 19]
             }],
             options: {
               chart: {
@@ -449,6 +449,7 @@ const GsmDashboard = () => {
                         <AnimatedNumber value={6} duration={1000} fontStyle='style-2' />
                     </div>
                     <p>Total devices in the system</p>
+                    
                 </motion.div>
                 
                 <motion.div 
@@ -472,6 +473,7 @@ const GsmDashboard = () => {
                         <AnimatedNumber value={4} duration={1000}  fontStyle='style-2' />
                     </div>
                     <p>GSMs linked to a company</p>
+                    
                 </motion.div>
                 
                 <motion.div 
@@ -495,6 +497,7 @@ const GsmDashboard = () => {
                         <AnimatedNumber value={2} duration={1000}  fontStyle='style-2' />
                     </div>
                     <p>GSMs awaiting assignment</p>
+                    
                 </motion.div>
                 
                 <motion.div 
@@ -513,17 +516,19 @@ const GsmDashboard = () => {
                         transition: { duration: 0.2 }
                     }}
                 >
+                  
                     <h3>Total Ports</h3>
                     <div className="value" id="total-ports-count">
                         <AnimatedNumber value={60} duration={1000} fontStyle='style-2' />
                     </div>
                     <p>Overall port capacity</p>
+                    
                 </motion.div>
             </div>
 
 
             <Row>
-                  <Col md={6}>
+                  <Col md={3}>
                         <Card>
                               
                               <Card.Body>
@@ -532,7 +537,7 @@ const GsmDashboard = () => {
                               </Card.Body>
                         </Card>
                   </Col>
-                  <Col md={6}>
+                  <Col md={3}>
                         <Card>
                         
                               <Card.Body>
@@ -542,12 +547,12 @@ const GsmDashboard = () => {
                         </Card>
                   </Col>
 
-                  <Col md={12}>
+                  <Col md={6}>
                         <Card>
                         
                               <Card.Body>
                               <h3 className="appHeading">New Gsm Assignments Trend</h3>
-                                    <ReactApexChart options={gsmAssignmentsTrendChart.options as ApexOptions} series={gsmAssignmentsTrendChart.series} type="line" height={350} />
+                                    <ReactApexChart options={gsmAssignmentsTrendChart.options as ApexOptions} series={gsmAssignmentsTrendChart.series} type="line" height={185} />
                               </Card.Body>
                         </Card>
                   </Col>

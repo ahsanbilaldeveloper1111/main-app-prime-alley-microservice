@@ -9,6 +9,10 @@ import AnimatedNumber from '@components/AnimatedNumber';
 
 import GsmInboxFilter from '@components/filters/GsmInboxFilter';
 
+import  '@assets/scss/gsm-dashboard.scss'
+import '@assets/scss/gsm-assign.scss';
+import '@assets/scss/dashboard-card.scss';
+
 
 
 import 'react-tooltip/dist/react-tooltip.css';

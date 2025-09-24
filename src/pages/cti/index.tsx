@@ -17,6 +17,10 @@ import { set } from 'nprogress'
 import Link from 'next/link'
 import { clearAllLocalStorage, getLocalStorageInfo } from '../../utils/localStorageUtils'
 import { useSession } from 'next-auth/react';
+import '@assets/scss/gsm-assign.scss';
+import '@assets/scss/dashboard-card.scss';
+import '@assets/scss/common.scss';
+import { motion } from 'framer-motion'
 
 const baseUrl = ''
 const ReactApexChart = dynamic(() => import('react-apexcharts'), { ssr: false })
@@ -757,46 +761,45 @@ const CtiDashboard = () => {
       <BreadcrumbItem mainTitle="CTI" mainLink="/cti" subTitle="CTI" />
 
       {/* Header */}
-      <Row className="mb-3">
-        <Col md={12}>
-          <div className="page-header-title d-flex justify-content-between">
-            <h2 className="mb-0">CTI</h2>
-            <div className="d-flex gap-2">
-              {/* <Button
-                variant="outline-info"
-                size="sm"
-                onClick={() => setShowDebugInfo(!showDebugInfo)}
-                className="d-flex align-items-center"
-              >
-                <i className="material-icons-two-tone me-2">bug_report</i>
-                {showDebugInfo ? 'Hide Debug' : 'Show Debug'}
-              </Button> */}
-              
-              {/* <Button
-                variant="primary"
-                onClick={() => setShowDialer(true)}
-                className="d-flex align-items-center"
-              >
-                <i className="material-icons-two-tone me-2">dialpad</i>
-                Dialer
-              </Button> */}
+      
 
-              {session?.user?.permissions?.includes('dial-call-cti') && (
+
+      <Row className="mb-3">
+            <Col md={12}>
+                <div className="page-header-title style-2">
+                <Row className="d-flex justify-content-between align-items-center">
+                    <Col md={5}>
+                      
+                      <h2 className="mb-0">Live View</h2>
+                    </Col>
+
+
+                    <Col md={7} className="d-flex justify-content-end">
+                      
+                    <div className="action-buttons">
+                       
+                    {session?.user?.permissions?.includes('dial-call-cti') && (
               <Link 
                 href="/cti/dialer" 
                 target="_blank" 
                 rel="noopener noreferrer"
-                className="btn btn-outline-primary d-flex align-items-center"
+                className="btn btn-sm btn-primary d-flex align-items-center"
               >
-                <i className="material-icons-two-tone me-2">open_in_new</i>
+                <i className="material-icons-two-tone me-2 text-white">open_in_new</i>
                 Dialer
               </Link>
               )}
+                    </div>
 
-            </div>
-          </div>
-        </Col>
-      </Row>
+
+
+                    </Col>
+                  </Row>
+               
+                
+                </div>
+            </Col>
+            </Row>
 
       {/* Debug Information */}
       {showDebugInfo && (
@@ -908,7 +911,7 @@ const CtiDashboard = () => {
       )}
 
       {/* Statistics Cards */}
-      <Row>
+      {/* <Row>
         <Col md={3}>
           <div className="card statistics-card-1">
             <div className="card-body">
@@ -998,7 +1001,105 @@ const CtiDashboard = () => {
         </Col>
 
         
-      </Row>
+      </Row> */}
+
+       {/* GSM Summary Cards */}
+       <div className="dashboard-grid">
+                <motion.div 
+                    className="dashboard-card"
+                    initial={{ opacity: 0, x: -100, scale: 0.8 }}
+                    animate={{ opacity: 1, x: 0, scale: 1 }}
+                    transition={{ 
+                        duration: 0.8, 
+                        delay: 0.1,
+                        type: "spring",
+                        stiffness: 100,
+                        damping: 15
+                    }}
+                    whileHover={{ 
+                        scale: 1.05,
+                        transition: { duration: 0.2 }
+                    }}
+                >
+                    <h3>Extensions</h3>
+                    <div className="value" id="total-gsms-count">
+                        <AnimatedNumber value={summaryData.extensions} duration={1000} fontStyle='style-2' />
+                    </div>
+                    <p>Total extensions in the system</p>
+                </motion.div>
+                
+                <motion.div 
+                    className="dashboard-card"
+                    initial={{ opacity: 0, x: -100, scale: 0.8 }}
+                    animate={{ opacity: 1, x: 0, scale: 1 }}
+                    transition={{ 
+                        duration: 0.8, 
+                        delay: 0.3,
+                        type: "spring",
+                        stiffness: 100,
+                        damping: 15
+                    }}
+                    whileHover={{ 
+                        scale: 1.05,
+                        transition: { duration: 0.2 }
+                    }}
+                >
+                    <h3>Online</h3>
+                    <div className="value" id="assigned-gsms-count">
+                        <AnimatedNumber value={summaryData.online} duration={1000}  fontStyle='style-2' />
+                    </div>
+                    <p>Online devices</p>
+                </motion.div>
+                
+                <motion.div 
+                    className="dashboard-card"
+                    initial={{ opacity: 0, x: -100, scale: 0.8 }}
+                    animate={{ opacity: 1, x: 0, scale: 1 }}
+                    transition={{ 
+                        duration: 0.8, 
+                        delay: 0.5,
+                        type: "spring",
+                        stiffness: 100,
+                        damping: 15
+                    }}
+                    whileHover={{ 
+                        scale: 1.05,
+                        transition: { duration: 0.2 }
+                    }}
+                >
+                    <h3>On Hold</h3>
+                    <div className="value" id="unassigned-gsms-count">
+                        <AnimatedNumber value={summaryData.on_hold} duration={1000}  fontStyle='style-2' />
+                    </div>
+                    <p>On hold devices</p>
+                </motion.div>
+                
+                <motion.div 
+                    className="dashboard-card"
+                    initial={{ opacity: 0, x: -100, scale: 0.8 }}
+                    animate={{ opacity: 1, x: 0, scale: 1 }}
+                    transition={{ 
+                        duration: 0.8, 
+                        delay: 0.7,
+                        type: "spring",
+                        stiffness: 100,
+                        damping: 15
+                    }}
+                    whileHover={{ 
+                        scale: 1.05,
+                        transition: { duration: 0.2 }
+                    }}
+                >
+                    <h3>Connected</h3>
+                    <div className="value" id="total-ports-count">
+                        <AnimatedNumber value={summaryData.connected} duration={1000} fontStyle='style-2' />
+                    </div>
+                    <p>Connected devices</p>
+                </motion.div>
+            </div>
+
+
+
 
       {/* Notification */}
       {notification && (
