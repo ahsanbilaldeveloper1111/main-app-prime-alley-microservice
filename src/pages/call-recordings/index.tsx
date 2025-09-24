@@ -945,9 +945,7 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
         <Col md={6}>
           <Card>
             <Card.Body className='p-3'>
-              <p className="text-muted mb-0 d-flex align-items-center justify-content-between">
-                Call Duration
-              </p>
+              
 
               {!currentChartData || currentChartData.series.length === 0 || currentChartData.series.every(series => series.data.length === 0) ? (
                 <EmptyState
@@ -956,6 +954,10 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
                   className="table-empty-state"
                 />
               ) : (
+                <>
+                <h5 className="app-title-heading">Call Duration</h5>
+                
+                
                 <ChartBar
                   series={currentChartData?.series || []}
                   categories={currentChartData?.categories || []}
@@ -970,6 +972,7 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
                   onFullScreenClick={() => handleOpenChartModal(currentChartData, 'Call Duration', 'calls')}
                   useLogScale={true}
                 />
+                </>
               )}
             </Card.Body>
           </Card>
@@ -978,7 +981,7 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
         <Col md={6}>
           <Card>
             <Card.Body className='p-3'>
-              <p className="text-muted mb-0">Call Directions</p>
+            
               {!callDirectionTwo.series || callDirectionTwo.series.length === 0 || callDirectionTwo.series.every(series => series.data.length === 0) ? (
                 <EmptyState
                   title="No Call Direction Data"
@@ -986,12 +989,15 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
                   className="table-empty-state"
                 />
               ) : (
+                <>
+                <h5 className="app-title-heading">Call Directions</h5>
                 <ReactApexChart
                   options={callDirectionTwo.options}
                   series={callDirectionTwo.series}
                   type="bar"
                   height={300}
                 />
+                </>
               )}
             </Card.Body>
           </Card>

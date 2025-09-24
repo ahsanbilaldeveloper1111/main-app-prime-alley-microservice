@@ -14,6 +14,7 @@ import { useSession } from 'next-auth/react';
 import CallLogsFilters from '@components/filters/CallLogsFilters';
 import AnimatedNumber from '@components/AnimatedNumber';
 import EmptyState from '@components/EmptyState';
+
 import imgStatus1 from '@assets/images/widget/img-status-1.svg'
 import imgStatus2 from '@assets/images/widget/img-status-2.svg'
 import imgStatus3 from '@assets/images/widget/img-status-3.svg'
@@ -25,8 +26,8 @@ import Link from 'next/link';
 import NProgress from "nprogress";
 import "nprogress/nprogress.css";
 
-import '@assets/scss/gsm-assign.scss';
-import '@assets/scss/dashboard-card.scss';
+
+import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
 import '@assets/scss/common.scss';
 import { motion } from 'framer-motion';
 
@@ -89,6 +90,90 @@ const CallDashboard = () => {
         totalAvgDuration: 0,
         totalAvgCost: 0,
     });
+
+    // Create cards data for PageSummaryGrid
+    const summaryCards: SummaryCard[] = [
+        {
+            id: 'total-calls',
+            title: 'Total Calls',
+            value: generalStats.totalCalls,
+            description: 'Total calls in the system',
+            delay: 0.1,
+            showAnimatedNumber: true,
+            animationDuration: 1000,
+            fontStyle: 'style-2'
+        },
+        {
+            id: 'inbound-calls',
+            title: 'Inbound',
+            value: generalStats.totalInbound,
+            description: 'Inbound calls in the system',
+            delay: 0.3,
+            showAnimatedNumber: true,
+            animationDuration: 1000,
+            fontStyle: 'style-2'
+        },
+        {
+            id: 'outbound-calls',
+            title: 'Outbound',
+            value: generalStats.totalOutbound,
+            description: 'Outbound calls in the system',
+            delay: 0.5,
+            showAnimatedNumber: true,
+            animationDuration: 1000,
+            fontStyle: 'style-2'
+        },
+        {
+            id: 'missed-incoming',
+            title: 'Missed Incoming',
+            value: generalStats.totalMissedIncoming,
+            description: 'Missed incoming calls in the system',
+            delay: 0.7,
+            showAnimatedNumber: true,
+            animationDuration: 1000,
+            fontStyle: 'style-2'
+        },
+        {
+            id: 'missed-outgoing',
+            title: 'Missed Outgoing',
+            value: generalStats.totalMissedOutgoing,
+            description: 'Missed outgoing calls in the system',
+            delay: 0.9,
+            showAnimatedNumber: true,
+            animationDuration: 1000,
+            fontStyle: 'style-2'
+        },
+        {
+            id: 'avg-ring-time',
+            title: 'Avg Ring Time',
+            value: generalStats.totalAvgRingTime,
+            description: 'Avg ring time in the system',
+            delay: 1.1,
+            showAnimatedNumber: true,
+            animationDuration: 1000,
+            fontStyle: 'style-2'
+        },
+        {
+            id: 'avg-duration',
+            title: 'Avg Duration',
+            value: generalStats.totalAvgDuration,
+            description: 'Avg duration in the system',
+            delay: 1.3,
+            showAnimatedNumber: true,
+            animationDuration: 1000,
+            fontStyle: 'style-2'
+        },
+        {
+            id: 'avg-cost',
+            title: 'Avg Cost',
+            value: generalStats.totalAvgCost,
+            description: 'Avg cost in the system',
+            delay: 1.5,
+            showAnimatedNumber: true,
+            animationDuration: 1000,
+            fontStyle: 'style-2'
+        }
+    ];
 
     const [perPage, setPerPage] = useState(5);
     const [page, setPage] = useState(1);
@@ -481,199 +566,15 @@ const [ExtensionChart, setExtensionChart] = React.useState({
 
 
 
-            <div className="dashboard-grid">
-                <motion.div 
-                    className="dashboard-card"
-                    initial={{ opacity: 0, x: -100, scale: 0.8 }}
-                    animate={{ opacity: 1, x: 0, scale: 1 }}
-                    transition={{ 
-                        duration: 0.8, 
-                        delay: 0.1,
-                        type: "spring",
-                        stiffness: 100,
-                        damping: 15
-                    }}
-                    whileHover={{ 
-                        scale: 1.05,
-                        transition: { duration: 0.2 }
-                    }}
-                >
-                    <h3>Total Calls</h3>
-                    <div className="value" id="total-gsms-count">
-                    {generalStats.totalCalls > 0 ? <AnimatedNumber value={generalStats.totalCalls} duration={1000} fontStyle='style-2'/> : <h2 className="mb-0 f-w-500 style-2" >0</h2>}
-                    </div>
-                    <p>Total calls in the system</p>
-                </motion.div>
-                
-                <motion.div 
-                    className="dashboard-card"
-                    initial={{ opacity: 0, x: -100, scale: 0.8 }}
-                    animate={{ opacity: 1, x: 0, scale: 1 }}
-                    transition={{ 
-                        duration: 0.8, 
-                        delay: 0.3,
-                        type: "spring",
-                        stiffness: 100,
-                        damping: 15
-                    }}
-                    whileHover={{ 
-                        scale: 1.05,
-                        transition: { duration: 0.2 }
-                    }}
-                >
-                    <h3>Inbound</h3>
-                    <div className="value" id="assigned-gsms-count">
-                    {generalStats.totalInbound > 0 ? <AnimatedNumber value={generalStats.totalInbound} duration={1000} fontStyle='style-2'/> : <h2 className="mb-0 f-w-500 style-2">0</h2>}
-                    </div>
-                    <p>Inbound calls in the system</p>
-                </motion.div>
-                
-                <motion.div 
-                    className="dashboard-card"
-                    initial={{ opacity: 0, x: -100, scale: 0.8 }}
-                    animate={{ opacity: 1, x: 0, scale: 1 }}
-                    transition={{ 
-                        duration: 0.8, 
-                        delay: 0.7,
-                        type: "spring",
-                        stiffness: 100,
-                        damping: 15
-                    }}
-                    whileHover={{ 
-                        scale: 1.05,
-                        transition: { duration: 0.2 }
-                    }}
-                >
-                    <h3>Outbound</h3>
-                    <div className="value" id="total-ports-count">
-                    {generalStats.totalOutbound > 0 ? <AnimatedNumber value={generalStats.totalOutbound} duration={1000} fontStyle='style-2'/> : <h2 className="mb-0 f-w-500 style-2">0</h2>}
-                    </div>
-                    <p>Outbound calls in the system</p>
-                </motion.div>
-
-                <motion.div 
-                    className="dashboard-card"
-                    initial={{ opacity: 0, x: -100, scale: 0.8 }}
-                    animate={{ opacity: 1, x: 0, scale: 1 }}
-                    transition={{ 
-                        duration: 0.8, 
-                        delay: 0.7,
-                        type: "spring",
-                        stiffness: 100,
-                        damping: 15
-                    }}
-                    whileHover={{ 
-                        scale: 1.05,
-                        transition: { duration: 0.2 }
-                    }}
-                >
-                    <h3>Missed Incoming</h3>
-                    <div className="value" id="total-ports-count">
-                    {generalStats.totalMissedIncoming > 0 ? <AnimatedNumber value={generalStats.totalMissedIncoming} duration={1000} fontStyle='style-2'/> : <h2 className="mb-0 f-w-500 style-2">0</h2>}
-                    </div>
-                    <p>Missed incoming calls in the system</p>
-                </motion.div>
-
-                <motion.div 
-                    className="dashboard-card"
-                    initial={{ opacity: 0, x: -100, scale: 0.8 }}
-                    animate={{ opacity: 1, x: 0, scale: 1 }}
-                    transition={{ 
-                        duration: 0.8, 
-                        delay: 0.7,
-                        type: "spring",
-                        stiffness: 100,
-                        damping: 15
-                    }}
-                    whileHover={{ 
-                        scale: 1.05,
-                        transition: { duration: 0.2 }
-                    }}
-                >
-                    <h3>Missed Outgoing</h3>
-                    <div className="value" id="total-ports-count">
-                    {generalStats.totalMissedOutgoing > 0 ? <AnimatedNumber value={generalStats.totalMissedOutgoing} duration={1000} fontStyle='style-2'/> : <h2 className="mb-0 f-w-500 style-2">0</h2>}
-                    </div>
-                    <p>Missed outgoing calls in the system</p>
-                </motion.div>
-
-                <motion.div 
-                    className="dashboard-card"
-                    initial={{ opacity: 0, x: -100, scale: 0.8 }}
-                    animate={{ opacity: 1, x: 0, scale: 1 }}
-                    transition={{ 
-                        duration: 0.8, 
-                        delay: 0.7,
-                        type: "spring",
-                        stiffness: 100,
-                        damping: 15
-                    }}
-                    whileHover={{ 
-                        scale: 1.05,
-                        transition: { duration: 0.2 }
-                    }}
-                >
-                    <h3>Avg Ring Time</h3>
-                    <div className="value" id="total-ports-count">
-                    {generalStats.totalAvgRingTime > 0 ? <AnimatedNumber value={generalStats.totalAvgRingTime} duration={1000} fontStyle='style-2'/> : <h2 className="mb-0 f-w-500 style-2">0</h2>}
-                    </div>
-                    <p>Avg ring time in the system</p>
-                </motion.div>
-
-                <motion.div 
-                    className="dashboard-card"
-                    initial={{ opacity: 0, x: -100, scale: 0.8 }}
-                    animate={{ opacity: 1, x: 0, scale: 1 }}
-                    transition={{ 
-                        duration: 0.8, 
-                        delay: 0.7,
-                        type: "spring",
-                        stiffness: 100,
-                        damping: 15
-                    }}
-                    whileHover={{ 
-                        scale: 1.05,
-                        transition: { duration: 0.2 }
-                    }}
-                >
-                    <h3>Avg Duration</h3>
-                    <div className="value" id="total-ports-count">
-                    {generalStats.totalAvgDuration > 0 ? <AnimatedNumber value={generalStats.totalAvgDuration} duration={1000} fontStyle='style-2'/> : <h2 className="mb-0 f-w-500 style-2">0</h2>}
-                    </div>
-                    <p>Avg duration in the system</p>
-                </motion.div>
-
-                <motion.div 
-                    className="dashboard-card"
-                    initial={{ opacity: 0, x: -100, scale: 0.8 }}
-                    animate={{ opacity: 1, x: 0, scale: 1 }}
-                    transition={{ 
-                        duration: 0.8, 
-                        delay: 0.7,
-                        type: "spring",
-                        stiffness: 100,
-                        damping: 15
-                    }}
-                    whileHover={{ 
-                        scale: 1.05,
-                        transition: { duration: 0.2 }
-                    }}
-                >
-                    <h3>Avg Cost</h3>
-                    <div className="value" id="total-ports-count">
-                    {generalStats.totalAvgCost > 0 ? <AnimatedNumber value={generalStats.totalAvgCost} duration={1000} fontStyle='style-2'/> : <h2 className="mb-0 f-w-500 style-2">0</h2>}
-                    </div>
-                    <p>Avg cost in the system</p>
-                </motion.div>
-            </div>
+            <PageSummaryGrid 
+              cards={summaryCards} 
+            />
 
             <Row>
                 {showCountryChart && (
                 <Col md={4}>
                     <div className="card">
-                        <div className="card-header">
-                            <h5 className="mb-0">Call by Country</h5>
-                        </div>
+                        
                         <div className="card-body">
                             {countryChartData.length === 0 ? (
                                 <EmptyState
@@ -682,8 +583,12 @@ const [ExtensionChart, setExtensionChart] = React.useState({
                                     className="table-empty-state"
                                 />
                             ) : (
+                              <>
+                              <h5 className="mb-0 app-title-heading">Call by Country</h5>
                                 <ReactApexChart options={CountryChart.options as ApexOptions} series={CountryChart.series} type="bar" height={200} />
+                                  </>
                             )}
+
                         </div>
                     </div>
                 </Col>
@@ -692,9 +597,7 @@ const [ExtensionChart, setExtensionChart] = React.useState({
                 {showDepartmentChart && (
                 <Col md={4}>
                     <div className="card">
-                        <div className="card-header">
-                            <h5 className="mb-0">Call by Department</h5>
-                        </div>
+                       
                         <div className="card-body">
                             
 
@@ -705,7 +608,11 @@ const [ExtensionChart, setExtensionChart] = React.useState({
                                   className="table-empty-state"
                               />
                             ) : (
-                                <ReactApexChart options={DepartmentChart.options as ApexOptions} series={DepartmentChart.series} type="bar" height={200} />
+                              <>
+                              <h5 className="mb-0 app-title-heading">Call by Department</h5>
+                              <ReactApexChart options={DepartmentChart.options as ApexOptions} series={DepartmentChart.series} type="bar" height={200} />
+                              </>
+                               
                             )}
                         </div>
                     </div>
@@ -715,9 +622,7 @@ const [ExtensionChart, setExtensionChart] = React.useState({
                 {showExtensionChart && (
                 <Col md={4}>
                     <div className="card">
-                        <div className="card-header">
-                            <h5 className="mb-0">Call by Extension</h5>
-                        </div>
+                       
                         <div className="card-body">
                             {extensionChartData.length === 0 ? (
                                 <EmptyState
@@ -726,7 +631,11 @@ const [ExtensionChart, setExtensionChart] = React.useState({
                                     className="table-empty-state"
                                 />
                             ) : (
-                                <ReactApexChart options={ExtensionChart.options} series={ExtensionChart.series} type="bar" height={200} />
+                              <>
+                              <h5 className="mb-0 app-title-heading">Call by Extension</h5>
+                              <ReactApexChart options={ExtensionChart.options} series={ExtensionChart.series} type="bar" height={200} />
+                              </>
+                                
                             )}
                         </div>
                     </div>
@@ -738,9 +647,7 @@ const [ExtensionChart, setExtensionChart] = React.useState({
               {showStatsByExtensionTable && (
                 <Col md={6}>
                     <div className="card">
-                        <div className="card-header">
-                            <h5 className="mb-0">Call by Extension</h5>
-                        </div>
+                        
                         <div className="card-body">
 
                         {extensionData.length === 0 ? (
@@ -751,6 +658,8 @@ const [ExtensionChart, setExtensionChart] = React.useState({
                                             colSpan={6}
                                         />
                                     ) : (
+                                      <>
+                                      <h5 className="mb-0 app-title-heading">Call by Extension</h5>
                                       <div className="table-responsive">
                                         <table className="table table-bordered table-striped table-sm ">
                                       <thead>
@@ -781,6 +690,7 @@ const [ExtensionChart, setExtensionChart] = React.useState({
                                           <Link href="/call-reports/stats/extension" className="link-primary">View All</Link>
                                     </div>
                                       </div>
+                                      </>
                                     )}
 
                               
@@ -792,9 +702,7 @@ const [ExtensionChart, setExtensionChart] = React.useState({
               {showTrendByCountryTable && (
                 <Col md={6}>
                     <div className="card">
-                        <div className="card-header">
-                            <h5 className="mb-0">Call Trend by Country</h5>
-                        </div>
+                       
                         <div className="card-body">
 
                         {trendByCountryData.length === 0 ? (
@@ -805,6 +713,8 @@ const [ExtensionChart, setExtensionChart] = React.useState({
                                             colSpan={6}
                                         />
                                     ) : ( 
+                                      <>
+                                      <h5 className="mb-0 app-title-heading">Call Trend by Country</h5>
                                       <div className="table-responsive">
                                        <table className="table table-bordered table-striped table-sm ">
                                 <thead>
@@ -835,6 +745,7 @@ const [ExtensionChart, setExtensionChart] = React.useState({
                                     <Link href="/call-reports/trend/country" className="link-primary">View All</Link>
                               </div>
                                       </div>
+                                      </>
                                     )}
                           
                               

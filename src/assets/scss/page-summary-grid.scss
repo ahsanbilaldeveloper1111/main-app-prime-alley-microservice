@@ -1,0 +1,78 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@400;500;600;700&display=swap');
+/* Dashboard Styles */
+.dashboard-grid {
+      font-family: 'Poppins', sans-serif;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 25px;
+      margin-bottom: 30px;
+  }
+  .dashboard-card {
+      background-color: white;//var(--input-bg);
+      padding: 25px;
+      border-radius: var(--border-radius-sm);
+      border: 1px solid var(--border-color);
+      box-shadow: var(--shadow-sm);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      position:relative;
+      background-image: url('../../assets/images/widget/img-status-1-new.svg');
+      background-size: contain;
+      background-position: right;
+      background-repeat: no-repeat;
+      .cardImage {
+        position: absolute;
+        top: 0;
+        right: 0;
+        z-index: 1;
+        bottom: 0;
+        vertical-align: middle;
+        display:none;
+
+        img{
+            height:100%;
+            filter: hue-rotate(200deg) saturate(1.8) brightness(0.9) contrast(1.1);
+            
+        }
+    }
+  }
+  .dashboard-card h3, h3.app-title-heading,h3.appheading {
+      font-family: 'Poppins', sans-serif;
+      font-size: 1.4rem;
+      font-weight: 600;
+      margin: 0 0 10px;
+      color: var(--main-text);
+  }
+  h4.app-title-heading,h4.appheading {
+    font-family: 'Poppins', sans-serif;
+    font-size: 1.2rem;
+    font-weight: 600;
+    margin: 0 0 10px;
+    color: var(--main-text);
+}
+h5.app-title-heading,h5.appheading {
+    font-family: 'Poppins', sans-serif;
+    font-size: 1rem;
+    font-weight: 600;
+    margin: 0 0 10px;
+    color: var(--main-text);
+}
+h6.app-title-heading,h6.appheading {
+    font-family: 'Poppins', sans-serif;
+    font-size: 0.8rem;
+    font-weight: 600;
+    margin: 0 0 10px;
+    color: var(--main-text);
+}
+  .dashboard-card .value {
+      font-size: 2.5rem;
+      font-weight: 700;
+      color: var(--primary-accent-dark);
+      letter-spacing: -0.05em;
+  }
+  .dashboard-card p {
+      font-size: 0.9rem;
+      color: var(--light-text);
+      margin: 0;
+  }

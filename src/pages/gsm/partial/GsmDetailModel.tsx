@@ -259,7 +259,7 @@ const GsmDetailModel: React.FC<GsmDetailModelProps> = ({
                   <Col md={6}>
                         <Card className="mb-3">
                               <Card.Body>
-                              <h3 className="appHeading mb-3 text-center">Latency History</h3>
+                              <h3 className="app-title-heading mb-3 text-center">Latency History</h3>
                                           <div className="d-flex justify-content-center align-items-center gap-2" role="group">
                                                 <button 
                                                       type="button" 
@@ -288,7 +288,7 @@ const GsmDetailModel: React.FC<GsmDetailModelProps> = ({
 
                         <Card className="mb-3">
                               <Card.Body>
-                              <h3 className="appHeading mb-3 text-center">Data usage (MB)</h3>
+                              <h3 className="app-title-heading mb-3 text-center">Data usage (MB)</h3>
                               <ReactApexChart options={gsmDataUsageChart.options as ApexOptions} series={gsmDataUsageChart.series} type="area" height={200} />
                               </Card.Body>
                         </Card>
@@ -370,7 +370,7 @@ const GsmDetailModel: React.FC<GsmDetailModelProps> = ({
 
                        <Card className="mb-3">
                               <Card.Body>
-                                    <h3 className="appHeading mb-3 text-center">Location</h3>
+                                    <h3 className="app-title-heading mb-3 text-center">Location</h3>
                                     <div className="location-container">
                                          Location Map
                                     </div>
@@ -380,7 +380,7 @@ const GsmDetailModel: React.FC<GsmDetailModelProps> = ({
 
                         <Card className="mb-3">
                               <Card.Body>
-                                    <h3 className="appHeading mb-3 text-center">Alert History & Logs</h3>
+                                    <h3 className="app-title-heading mb-3 text-center">Alert History & Logs</h3>
                                     <div className="log-container" style={{
                                           backgroundColor: '#f8f9fa',
                                           border: '1px solid #dee2e6',
