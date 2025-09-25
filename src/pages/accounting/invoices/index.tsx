@@ -15,10 +15,13 @@ import {
   updateInvoice,
   deleteInvoice,
   getInvoice,
+  getActiveProducts,
   InvoiceData,
   InvoiceCreateUpdatePayload,
   InvoiceItemCreateUpdatePayload,
+  InvoiceItemData,
   CompanyData,
+  ProductData,
 } from "@utils/accounting";
 import { getCompanies } from "@utils/accounting";
 import { Column } from "@components/CustomDataTable";
@@ -37,6 +40,10 @@ interface SelectOption {
   label: string;
 }
 
+interface InvoiceFormData extends Omit<InvoiceData, 'items'> {
+  items: InvoiceItemCreateUpdatePayload[];
+}
+
 const InvoiceList = () => {
   const { data: session, status } = useSession();
 
@@ -44,6 +51,7 @@ const InvoiceList = () => {
   const [currentFilters, setCurrentFilters] = useState({});
 
   const [companies, setCompanies] = useState<CompanyData[]>([]);
+  const [products, setProducts] = useState<ProductData[]>([]);
 
   const columns: Column[] = useMemo(
     () => [
@@ -189,7 +197,19 @@ const InvoiceList = () => {
         console.error("Error fetching companies:", error);
       }
     };
+
+    const fetchProducts = async () => {
+      try {
+        const productsData = await getActiveProducts();
+        setProducts(productsData || []);
+        console.log("Products:", productsData);
+      } catch (error) {
+        console.error("Error fetching products:", error);
+      }
+    };
+
     fetchCompanies();
+    fetchProducts();
   }, []);
 
   const memoizedFilters = useMemo(() => currentFilters, [currentFilters]);
@@ -226,7 +246,7 @@ const InvoiceList = () => {
   }, []);
 
   // Edit Invoice Modal
-  const [selectedInvoice, setSelectedInvoice] = useState<InvoiceData | null>(
+  const [selectedInvoice, setSelectedInvoice] = useState<InvoiceFormData | null>(
     null
   );
   const [showEditInvoiceModal, setShowEditInvoiceModal] =
@@ -238,7 +258,18 @@ const InvoiceList = () => {
   const [confirmDeleteInvoice, setConfirmDeleteInvoice] = useState<string>("");
 
   const handleEditInvoice = useCallback((props: InvoiceData) => {
-    setSelectedInvoice(props);
+    // Convert API response items to form format
+    const convertedItems: InvoiceItemCreateUpdatePayload[] = props.items.map(item => ({
+      product_id: item.product_id,
+      quantity: item.quantity,
+      unit_price: item.unit_price,
+      tax_rate: item.tax_rate,
+    }));
+    
+    setSelectedInvoice({
+      ...props,
+      items: convertedItems
+    });
     setShowEditInvoiceModal(true);
   }, []);
 
@@ -249,11 +280,13 @@ const InvoiceList = () => {
       toast.error("Please select a company");
       return;
     }
-    if (
-      !selectedInvoice.subtotal ||
-      parseFloat(selectedInvoice.subtotal) <= 0
-    ) {
-      toast.error("Please enter a valid subtotal");
+    if (!selectedInvoice.items || selectedInvoice.items.length === 0) {
+      toast.error("Please add at least one item to the invoice");
+      return;
+    }
+    
+    if (selectedInvoice.items.some(item => !item.product_id)) {
+      toast.error("Please select a product for all items");
       return;
     }
     if (!selectedInvoice.due_date) {
@@ -263,6 +296,7 @@ const InvoiceList = () => {
 
     setEditingInvoice(true);
     try {
+      const totals = calculateTotals(selectedInvoice.items);
       const invoiceData: InvoiceCreateUpdatePayload = {
         company_id: selectedInvoice.company_id,
         invoice_date: selectedInvoice.invoice_date,
@@ -270,7 +304,7 @@ const InvoiceList = () => {
         payment_mode: selectedInvoice.payment_mode,
         currency_code: selectedInvoice.currency_code,
         exchange_rate: selectedInvoice.exchange_rate,
-        tax_amount: parseFloat(selectedInvoice.tax_amount),
+        tax_amount: totals.tax_amount,
         notes: selectedInvoice.notes || "",
         terms_conditions: selectedInvoice.terms_conditions || "",
         items: selectedInvoice.items.map((item) => ({
@@ -279,8 +313,8 @@ const InvoiceList = () => {
           unit_price: item.unit_price,
           tax_rate: item.tax_rate,
         })),
-        subtotal: parseFloat(selectedInvoice.subtotal),
-        total_amount: parseFloat(selectedInvoice.total_amount),
+        subtotal: totals.subtotal,
+        total_amount: totals.total_amount,
       };
 
       const response = await updateInvoice(selectedInvoice.id, invoiceData);
@@ -318,13 +352,40 @@ const InvoiceList = () => {
     total_amount: 0,
   });
 
+  // Helper function to calculate totals
+  const calculateTotals = (items: InvoiceItemCreateUpdatePayload[]) => {
+    const subtotal = items.reduce((sum, item) => {
+      const quantity = parseFloat(item.quantity) || 0;
+      const unitPrice = parseFloat(item.unit_price) || 0;
+      return sum + (quantity * unitPrice);
+    }, 0);
+    
+    const taxAmount = items.reduce((sum, item) => {
+      const quantity = parseFloat(item.quantity) || 0;
+      const unitPrice = parseFloat(item.unit_price) || 0;
+      const taxRate = parseFloat(item.tax_rate) || 0;
+      return sum + (quantity * unitPrice * taxRate / 100);
+    }, 0);
+    
+    return {
+      subtotal: parseFloat(subtotal.toFixed(2)),
+      tax_amount: parseFloat(taxAmount.toFixed(2)),
+      total_amount: parseFloat((subtotal + taxAmount).toFixed(2))
+    };
+  };
+
   const handleSubmitCreateInvoice = useCallback(async () => {
     if (!newInvoice.company_id) {
       toast.error("Please select a company");
       return;
     }
-    if (!newInvoice.subtotal || newInvoice.subtotal <= 0) {
-      toast.error("Please enter a valid subtotal");
+    if (!newInvoice.items || newInvoice.items.length === 0) {
+      toast.error("Please add at least one item to the invoice");
+      return;
+    }
+    
+    if (newInvoice.items.some(item => !item.product_id)) {
+      toast.error("Please select a product for all items");
       return;
     }
     if (!newInvoice.due_date) {
@@ -334,7 +395,12 @@ const InvoiceList = () => {
 
     setCreatingInvoice(true);
     try {
-      const response = await createInvoice(newInvoice);
+      const totals = calculateTotals(newInvoice.items);
+      const invoiceData: InvoiceCreateUpdatePayload = {
+        ...newInvoice,
+        ...totals
+      };
+      const response = await createInvoice(invoiceData);
 
       if (response) {
         setNewInvoice({
@@ -418,6 +484,125 @@ const InvoiceList = () => {
     }
   }, [confirmDeleteInvoice, selectedInvoice]);
 
+  // Invoice item management functions
+  const addNewInvoiceItem = useCallback(() => {
+    const newItem: InvoiceItemCreateUpdatePayload = {
+      product_id: "",
+      quantity: "1",
+      unit_price: "0.00",
+      tax_rate: "0.00",
+    };
+    
+    const updatedItems = [...newInvoice.items, newItem];
+    const totals = calculateTotals(updatedItems);
+    
+    setNewInvoice(prev => ({
+      ...prev,
+      items: updatedItems,
+      ...totals
+    }));
+  }, [newInvoice.items]);
+
+  const updateNewInvoiceItem = useCallback((index: number, field: keyof InvoiceItemCreateUpdatePayload, value: string) => {
+    const updatedItems = [...newInvoice.items];
+    updatedItems[index] = {
+      ...updatedItems[index],
+      [field]: value,
+    };
+    
+    // Auto-populate unit price when product is selected
+    if (field === 'product_id' && value) {
+      const selectedProduct = products.find(p => p.id.toString() === value);
+      if (selectedProduct) {
+        updatedItems[index].unit_price = selectedProduct.base_price;
+      }
+    }
+    
+    const totals = calculateTotals(updatedItems);
+    
+    setNewInvoice(prev => ({
+      ...prev,
+      items: updatedItems,
+      ...totals
+    }));
+  }, [newInvoice.items, products]);
+
+  const removeNewInvoiceItem = useCallback((index: number) => {
+    const updatedItems = newInvoice.items.filter((_, i) => i !== index);
+    const totals = calculateTotals(updatedItems);
+    
+    setNewInvoice(prev => ({
+      ...prev,
+      items: updatedItems,
+      ...totals
+    }));
+  }, [newInvoice.items]);
+
+  const addEditInvoiceItem = useCallback(() => {
+    if (!selectedInvoice) return;
+    
+    const newItem: InvoiceItemCreateUpdatePayload = {
+      product_id: "",
+      quantity: "1",
+      unit_price: "0.00",
+      tax_rate: "0.00",
+    };
+    
+    const updatedItems = [...selectedInvoice.items, newItem];
+    const totals = calculateTotals(updatedItems);
+    
+    setSelectedInvoice(prev => ({
+      ...prev!,
+      items: updatedItems,
+      subtotal: totals.subtotal.toString(),
+      tax_amount: totals.tax_amount.toString(),
+      total_amount: totals.total_amount.toString(),
+    }));
+  }, [selectedInvoice]);
+
+  const updateEditInvoiceItem = useCallback((index: number, field: keyof InvoiceItemCreateUpdatePayload, value: string) => {
+    if (!selectedInvoice) return;
+    
+    const updatedItems = [...selectedInvoice.items];
+    updatedItems[index] = {
+      ...updatedItems[index],
+      [field]: value,
+    };
+    
+    // Auto-populate unit price when product is selected
+    if (field === 'product_id' && value) {
+      const selectedProduct = products.find(p => p.id.toString() === value);
+      if (selectedProduct) {
+        updatedItems[index].unit_price = selectedProduct.base_price;
+      }
+    }
+    
+    const totals = calculateTotals(updatedItems);
+    
+    setSelectedInvoice(prev => ({
+      ...prev!,
+      items: updatedItems,
+      subtotal: totals.subtotal.toString(),
+      tax_amount: totals.tax_amount.toString(),
+      total_amount: totals.total_amount.toString(),
+    }));
+  }, [selectedInvoice, products]);
+
+  const removeEditInvoiceItem = useCallback((index: number) => {
+    if (!selectedInvoice) return;
+    
+    const updatedItems = selectedInvoice.items.filter((_, i) => i !== index);
+    const totals = calculateTotals(updatedItems);
+    
+    setSelectedInvoice(prev => ({
+      ...prev!,
+      items: updatedItems,
+      subtotal: totals.subtotal.toString(),
+      tax_amount: totals.tax_amount.toString(),
+      total_amount: totals.total_amount.toString(),
+    }));
+  }, [selectedInvoice]);
+
   // Input handlers
   const handleNewInvoiceChange = useCallback(
     (field: keyof InvoiceCreateUpdatePayload, value: any) => {
@@ -430,8 +615,8 @@ const InvoiceList = () => {
   );
 
   const handleEditInvoiceChange = useCallback(
-    (field: keyof InvoiceData, value: any) => {
-      setSelectedInvoice((prev: InvoiceData | null) => ({
+    (field: keyof InvoiceFormData, value: any) => {
+      setSelectedInvoice((prev: InvoiceFormData | null) => ({
         ...prev!,
         [field]: value,
       }));
@@ -562,8 +747,121 @@ const InvoiceList = () => {
               </div>
             </div>
 
+            {/* Invoice Items Section */}
             <div className="row">
-              <div className="col-md-6">
+              <div className="col-md-12">
+                <div className="form-group mb-3">
+                  <div className="d-flex justify-content-between align-items-center mb-2">
+                    <label>Invoice Items</label>
+                    <Button
+                      variant="outline-primary"
+                      size="sm"
+                      onClick={addNewInvoiceItem}
+                    >
+                      Add Item
+                    </Button>
+                  </div>
+                  
+                  {newInvoice.items.length === 0 ? (
+                    <div className="text-muted text-center py-3">
+                      No items added yet. Click "Add Item" to start.
+                    </div>
+                  ) : (
+                    <div className="table-responsive">
+                      <table style={{tableLayout: "fixed"}} className="table table-bordered">
+                        <thead>
+                          <tr>
+                            <th colSpan={2}>Product</th>
+                            <th>Quantity</th>
+                            <th>Unit Price</th>
+                            <th>Tax Rate (%)</th>
+                            <th>Line Total</th>
+                            <th>Action</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {newInvoice.items.map((item, index) => {
+                            const product = products.find(p => p.id.toString() === item.product_id);
+                            const quantity = parseFloat(item.quantity) || 0;
+                            const unitPrice = parseFloat(item.unit_price) || 0;
+                            const taxRate = parseFloat(item.tax_rate) || 0;
+                            const lineTotal = quantity * unitPrice;
+                            const lineTax = lineTotal * taxRate / 100;
+                            const lineTotalWithTax = lineTotal + lineTax;
+                            
+                            return (
+                              <tr key={index}>
+                                <td colSpan={2}>
+                                  <select
+                                    className="form-control form-control-sm"
+                                    value={item.product_id}
+                                    onChange={(e) => updateNewInvoiceItem(index, "product_id", e.target.value)}
+                                  >
+                                    <option value="">Select Product</option>
+                                    {products.map((product) => (
+                                      <option key={product.id} value={product.id.toString()}>
+                                        {product.name} - {product.currency_code} {product.base_price}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </td>
+                                <td>
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    className="form-control form-control-sm"
+                                    value={item.quantity}
+                                    onChange={(e) => updateNewInvoiceItem(index, "quantity", e.target.value)}
+                                    placeholder="0.00"
+                                  />
+                                </td>
+                                <td>
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    className="form-control form-control-sm"
+                                    value={item.unit_price}
+                                    onChange={(e) => updateNewInvoiceItem(index, "unit_price", e.target.value)}
+                                    placeholder="0.00"
+                                  />
+                                </td>
+                                <td>
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    className="form-control form-control-sm"
+                                    value={item.tax_rate}
+                                    onChange={(e) => updateNewInvoiceItem(index, "tax_rate", e.target.value)}
+                                    placeholder="0.00"
+                                  />
+                                </td>
+                                <td>
+                                  <span className="fw-bold">
+                                    {newInvoice.currency_code} {lineTotalWithTax.toFixed(2)}
+                                  </span>
+                                </td>
+                                <td>
+                                  <Button
+                                    variant="outline-danger"
+                                    size="sm"
+                                    onClick={() => removeNewInvoiceItem(index)}
+                                  >
+                                    Remove
+                                  </Button>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="row">
+              <div className="col-md-4">
                 <div className="form-group mb-3">
                   <label htmlFor="newInvoiceSubtotal">Subtotal</label>
                   <input
@@ -572,17 +870,12 @@ const InvoiceList = () => {
                     className="form-control"
                     id="newInvoiceSubtotal"
                     value={newInvoice.subtotal}
-                    onChange={(e) =>
-                      handleNewInvoiceChange(
-                        "subtotal",
-                        parseFloat(e.target.value) || 0
-                      )
-                    }
+                    readOnly
                     placeholder="0.00"
                   />
                 </div>
               </div>
-              <div className="col-md-6">
+              <div className="col-md-4">
                 <div className="form-group mb-3">
                   <label htmlFor="newInvoiceTaxAmount">Tax Amount</label>
                   <input
@@ -591,20 +884,12 @@ const InvoiceList = () => {
                     className="form-control"
                     id="newInvoiceTaxAmount"
                     value={newInvoice.tax_amount}
-                    onChange={(e) =>
-                      handleNewInvoiceChange(
-                        "tax_amount",
-                        parseFloat(e.target.value) || 0
-                      )
-                    }
+                    readOnly
                     placeholder="0.00"
                   />
                 </div>
               </div>
-            </div>
-
-            <div className="row">
-              <div className="col-md-6">
+              <div className="col-md-4">
                 <div className="form-group mb-3">
                   <label htmlFor="newInvoiceTotalAmount">Total Amount</label>
                   <input
@@ -613,16 +898,14 @@ const InvoiceList = () => {
                     className="form-control"
                     id="newInvoiceTotalAmount"
                     value={newInvoice.total_amount}
-                    onChange={(e) =>
-                      handleNewInvoiceChange(
-                        "total_amount",
-                        parseFloat(e.target.value) || 0
-                      )
-                    }
+                    readOnly
                     placeholder="0.00"
                   />
                 </div>
               </div>
+            </div>
+
+            <div className="row">
               <div className="col-md-6">
                 <div className="form-group mb-3">
                   <label htmlFor="newInvoiceCurrency">Currency</label>
@@ -808,8 +1091,121 @@ const InvoiceList = () => {
               </div>
             </div>
 
+            {/* Invoice Items Section */}
             <div className="row">
-              <div className="col-md-6">
+              <div className="col-md-12">
+                <div className="form-group mb-3">
+                  <div className="d-flex justify-content-between align-items-center mb-2">
+                    <label>Invoice Items</label>
+                    <Button
+                      variant="outline-primary"
+                      size="sm"
+                      onClick={addEditInvoiceItem}
+                    >
+                      Add Item
+                    </Button>
+                  </div>
+                  
+                  {selectedInvoice.items.length === 0 ? (
+                    <div className="text-muted text-center py-3">
+                      No items added yet. Click "Add Item" to start.
+                    </div>
+                  ) : (
+                    <div className="table-responsive">
+                      <table style={{tableLayout: "fixed"}} className="table table-bordered">
+                        <thead>
+                          <tr>
+                            <th colSpan={2}>Product</th>
+                            <th>Quantity</th>
+                            <th>Unit Price</th>
+                            <th>Tax Rate (%)</th>
+                            <th>Line Total</th>
+                            <th>Action</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {selectedInvoice.items.map((item, index) => {
+                            const product = products.find(p => p.id.toString() === item.product_id);
+                            const quantity = parseFloat(item.quantity) || 0;
+                            const unitPrice = parseFloat(item.unit_price) || 0;
+                            const taxRate = parseFloat(item.tax_rate) || 0;
+                            const lineTotal = quantity * unitPrice;
+                            const lineTax = lineTotal * taxRate / 100;
+                            const lineTotalWithTax = lineTotal + lineTax;
+                            
+                            return (
+                              <tr key={index}>
+                                <td colSpan={2}>
+                                  <select
+                                    className="form-control form-control-sm"
+                                    value={item.product_id}
+                                    onChange={(e) => updateEditInvoiceItem(index, "product_id", e.target.value)}
+                                  >
+                                    <option value="">Select Product</option>
+                                    {products.map((product) => (
+                                      <option key={product.id} value={product.id.toString()}>
+                                        {product.name} - {product.currency_code} {product.base_price}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </td>
+                                <td>
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    className="form-control form-control-sm"
+                                    value={item.quantity}
+                                    onChange={(e) => updateEditInvoiceItem(index, "quantity", e.target.value)}
+                                    placeholder="0.00"
+                                  />
+                                </td>
+                                <td>
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    className="form-control form-control-sm"
+                                    value={item.unit_price}
+                                    onChange={(e) => updateEditInvoiceItem(index, "unit_price", e.target.value)}
+                                    placeholder="0.00"
+                                  />
+                                </td>
+                                <td>
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    className="form-control form-control-sm"
+                                    value={item.tax_rate}
+                                    onChange={(e) => updateEditInvoiceItem(index, "tax_rate", e.target.value)}
+                                    placeholder="0.00"
+                                  />
+                                </td>
+                                <td>
+                                  <span className="fw-bold">
+                                    {selectedInvoice.currency_code} {lineTotalWithTax.toFixed(2)}
+                                  </span>
+                                </td>
+                                <td>
+                                  <Button
+                                    variant="outline-danger"
+                                    size="sm"
+                                    onClick={() => removeEditInvoiceItem(index)}
+                                  >
+                                    Remove
+                                  </Button>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="row">
+              <div className="col-md-4">
                 <div className="form-group mb-3">
                   <label htmlFor="editInvoiceSubtotal">Subtotal</label>
                   <input
@@ -818,14 +1214,12 @@ const InvoiceList = () => {
                     className="form-control"
                     id="editInvoiceSubtotal"
                     value={selectedInvoice.subtotal || ""}
-                    onChange={(e) =>
-                      handleEditInvoiceChange("subtotal", e.target.value)
-                    }
+                    readOnly
                     placeholder="0.00"
                   />
                 </div>
               </div>
-              <div className="col-md-6">
+              <div className="col-md-4">
                 <div className="form-group mb-3">
                   <label htmlFor="editInvoiceTaxAmount">Tax Amount</label>
                   <input
@@ -834,17 +1228,12 @@ const InvoiceList = () => {
                     className="form-control"
                     id="editInvoiceTaxAmount"
                     value={selectedInvoice.tax_amount || ""}
-                    onChange={(e) =>
-                      handleEditInvoiceChange("tax_amount", e.target.value)
-                    }
+                    readOnly
                     placeholder="0.00"
                   />
                 </div>
               </div>
-            </div>
-
-            <div className="row">
-              <div className="col-md-6">
+              <div className="col-md-4">
                 <div className="form-group mb-3">
                   <label htmlFor="editInvoiceTotalAmount">Total Amount</label>
                   <input
@@ -853,13 +1242,14 @@ const InvoiceList = () => {
                     className="form-control"
                     id="editInvoiceTotalAmount"
                     value={selectedInvoice.total_amount || ""}
-                    onChange={(e) =>
-                      handleEditInvoiceChange("total_amount", e.target.value)
-                    }
+                    readOnly
                     placeholder="0.00"
                   />
                 </div>
               </div>
+            </div>
+
+            <div className="row">
               <div className="col-md-6">
                 <div className="form-group mb-3">
                   <label htmlFor="editInvoiceCurrency">Currency</label>

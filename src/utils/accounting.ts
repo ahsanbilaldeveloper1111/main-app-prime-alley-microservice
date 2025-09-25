@@ -112,7 +112,7 @@ export interface InvoiceData {
   invoice_number: string;
   invoice_date: string;
   due_date: string;
-  status: 'draft' | 'sent' | 'paid' | 'overdue' | 'cancelled';
+  status: "draft" | "sent" | "paid" | "overdue" | "cancelled";
   subtotal: string;
   tax_amount: string;
   total_amount: string;
@@ -171,7 +171,7 @@ export interface ExpenseData {
   tax_amount: string;
   total_amount: string;
   payment_method: string | null;
-  payment_status: 'pending' | 'paid' | 'failed' | 'cancelled';
+  payment_status: "pending" | "paid" | "failed" | "cancelled";
   receipt_path: string | null;
   notes: string | null;
   is_billable: string;
@@ -274,7 +274,7 @@ export interface InventoryData {
   minimum_stock: number;
   maximum_stock: number;
   reorder_point: number | null;
-  status: 'in_stock' | 'low_stock' | 'out_of_stock';
+  status: "in_stock" | "low_stock" | "out_of_stock";
   notes: string | null;
   last_updated: string;
   category?: ProductCategoryData;
@@ -293,7 +293,7 @@ export interface InventoryCreateUpdatePayload {
   minimum_stock: number;
   maximum_stock: number;
   reorder_point?: number | null;
-  status: 'in_stock' | 'low_stock' | 'out_of_stock';
+  status: "in_stock" | "low_stock" | "out_of_stock";
   notes?: string | null;
 }
 
@@ -362,7 +362,7 @@ export interface InventorySupplierCreateUpdatePayload {
 
 export interface PaymentMethodData {
   id: string;
-  type: 'card' | 'bank_account';
+  type: "card" | "bank_account";
   card?: {
     brand: string;
     last4: string;
@@ -374,27 +374,115 @@ export interface PaymentMethodData {
     last4: string;
     routing_number: string;
   };
+  billing_details?: {
+    name: string;
+  };
   is_default: boolean;
   created_at: string;
 }
 
 export interface DiscountApplicabilityData {
   id: number;
-  company_id: number;
-  product_id: number;
-  discount_type: 'percentage' | 'fixed';
-  discount_value: number;
+  customer_id: number | null;
+  name: string;
+  description: string;
+  is_applicable: boolean;
+  discount_percentage: string;
+  discount_amount: string | null;
+  valid_from: string;
+  valid_until: string;
   created_at: string;
   updated_at: string;
+  discount_type: "percentage" | "fixed";
+  company_id: string;
+  product_pricings: {
+    id: number;
+    company_id: string;
+    product_id: string;
+    selling_price: string;
+    is_active: boolean;
+    created_at: string;
+    updated_at: string;
+    discount_applicability_id: string;
+    product: {
+      id: number;
+      name: string;
+      description: string;
+      currency_code: string;
+      is_active: boolean;
+      created_at: string;
+      category_id: string;
+      is_service: boolean;
+      base_price: string;
+      updated_at: string;
+      deleted_at: string | null;
+    };
+  }[];
+  company: {
+    id: number;
+    name: string;
+    parent_id: number | null;
+    organization_unit: string | null;
+    created_at: string;
+    updated_at: string;
+    reseller_id: string | null;
+    country: string;
+    phone: string;
+    email: string;
+    stripe_customer_id: string;
+  };
+}
+
+export interface DiscountApplicabilityCreateUpdatePayload {
+  name: string;
+  description: string;
+  is_applicable: boolean;
+  discount_type: "percentage" | "fixed";
+  discount_percentage: number;
+  discount_amount: number | null;
+  valid_from: string;
+  valid_until: string;
+  pricing_ids: number[];
 }
 
 export interface ProductPricingData {
   id: number;
-  company_id: number;
-  product_id: number;
-  price: number;
+  company_id: string;
+  product_id: string;
+  selling_price: string;
+  is_active: boolean;
   created_at: string;
   updated_at: string;
+  discount_applicability_id: number | null;
+  product: {
+    id: number;
+    name: string;
+    description: string | null;
+    currency_code: string;
+    is_active: boolean;
+    created_at: string;
+    category_id: string;
+    is_service: boolean;
+    base_price: string;
+    updated_at: string;
+    deleted_at: string | null;
+    category: {
+      id: number;
+      name: string;
+      description: string | null;
+      is_active: boolean;
+      parent_id: number | null;
+      created_at: string;
+      updated_at: string;
+    };
+  };
+  discount_applicability: any | null;
+}
+
+export interface ProductPricingCreateUpdatePayload {
+  product_id: string;
+  selling_price: string;
+  is_active: boolean;
 }
 
 export interface PaginationParams extends Record<string, any> {
@@ -431,13 +519,17 @@ export const getResellers = async (
   params: PaginationParams = {}
 ): Promise<PaginationWrapper<ResellerData>> => {
   try {
-    const response = await axiosInstance.get("/accounting/resellers", { params });
-    const extractedData = extractData<PaginationWrapper<ResellerData>>(response.data);
-    
+    const response = await axiosInstance.get("/accounting/resellers", {
+      params,
+    });
+    const extractedData = extractData<PaginationWrapper<ResellerData>>(
+      response.data
+    );
+
     // Transform the response to match our interface
     return {
       data: extractedData.data,
-      pagination: extractedData.pagination
+      pagination: extractedData.pagination,
     };
   } catch (error: any) {
     toast.error(error?.message || "Failed to fetch resellers");
@@ -472,7 +564,10 @@ export const updateReseller = async (
   data: Partial<ResellerData>
 ): Promise<ResellerData> => {
   try {
-    const response = await axiosInstance.put(`/accounting/resellers/${id}`, data);
+    const response = await axiosInstance.put(
+      `/accounting/resellers/${id}`,
+      data
+    );
     return extractData<ResellerData>(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to update reseller");
@@ -495,7 +590,7 @@ export const getCompanies = async (
 ): Promise<PaginationWrapper<CompanyData>> => {
   try {
     const response = await axiosInstance.get("/accounting/company", { params });
-    
+
     // Handle the actual API response structure based on your example
     if (response.data?.code === 200 && response.data?.data?.success) {
       const companiesData = response.data.data.data; // The company array
@@ -503,15 +598,16 @@ export const getCompanies = async (
         data: companiesData,
         pagination: {
           current_page: response.data.data.pagination?.page || 1,
-          per_page: response.data.data.pagination?.limit || companiesData.length,
+          per_page:
+            response.data.data.pagination?.limit || companiesData.length,
           total: response.data.data.pagination?.total || companiesData.length,
           last_page: response.data.data.pagination?.last_page || 1,
           from: response.data.data.pagination?.from || 1,
-          to: response.data.data.pagination?.to || companiesData.length
-        }
+          to: response.data.data.pagination?.to || companiesData.length,
+        },
       };
     }
-    
+
     // Fallback to extractData if structure is different
     const companiesData = extractData<CompanyData[]>(response.data);
     return {
@@ -522,8 +618,8 @@ export const getCompanies = async (
         total: companiesData.length,
         last_page: 1,
         from: 1,
-        to: companiesData.length
-      }
+        to: companiesData.length,
+      },
     };
   } catch (error: any) {
     toast.error(error?.message || "Failed to fetch companies");
@@ -534,12 +630,16 @@ export const getCompanies = async (
 export const importCompanies = async (file: File): Promise<any> => {
   try {
     const formData = new FormData();
-    formData.append('file', file);
-    const response = await axiosInstance.post("/accounting/company/import", formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
+    formData.append("file", file);
+    const response = await axiosInstance.post(
+      "/accounting/company/import",
+      formData,
+      {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      }
+    );
     return extractData<any>(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to import companies");
@@ -547,11 +647,17 @@ export const importCompanies = async (file: File): Promise<any> => {
   }
 };
 
-export const exportCompanies = async (params: PaginationParams = {}): Promise<Blob> => {
+export const exportCompanies = async (
+  params: PaginationParams = {}
+): Promise<Blob> => {
   try {
-    const response = await axiosInstance.post("/accounting/company/export", params, {
-      responseType: 'blob',
-    });
+    const response = await axiosInstance.post(
+      "/accounting/company/export",
+      params,
+      {
+        responseType: "blob",
+      }
+    );
     return response.data;
   } catch (error: any) {
     toast.error(error?.message || "Failed to export companies");
@@ -561,9 +667,12 @@ export const exportCompanies = async (params: PaginationParams = {}): Promise<Bl
 
 export const generateTemplate = async (): Promise<Blob> => {
   try {
-    const response = await axiosInstance.get("/accounting/company/generate-template", {
-      responseType: 'blob',
-    });
+    const response = await axiosInstance.get(
+      "/accounting/company/generate-template",
+      {
+        responseType: "blob",
+      }
+    );
     return response.data;
   } catch (error: any) {
     toast.error(error?.message || "Failed to generate template");
@@ -573,9 +682,12 @@ export const generateTemplate = async (): Promise<Blob> => {
 
 export const downloadTemplate = async (): Promise<Blob> => {
   try {
-    const response = await axiosInstance.get("/accounting/company/download-template", {
-      responseType: 'blob',
-    });
+    const response = await axiosInstance.get(
+      "/accounting/company/download-template",
+      {
+        responseType: "blob",
+      }
+    );
     return response.data;
   } catch (error: any) {
     toast.error(error?.message || "Failed to download template");
@@ -585,7 +697,10 @@ export const downloadTemplate = async (): Promise<Blob> => {
 
 export const createUpdateProfile = async (data: any): Promise<any> => {
   try {
-    const response = await axiosInstance.post("/accounting/company/create-update-profile", data);
+    const response = await axiosInstance.post(
+      "/accounting/company/create-update-profile",
+      data
+    );
     return extractData<any>(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to create/update profile");
@@ -595,7 +710,10 @@ export const createUpdateProfile = async (data: any): Promise<any> => {
 
 export const createUpdateCallingAccess = async (data: any): Promise<any> => {
   try {
-    const response = await axiosInstance.post("/accounting/company/create-update-calling-access", data);
+    const response = await axiosInstance.post(
+      "/accounting/company/create-update-calling-access",
+      data
+    );
     return extractData<any>(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to create/update calling access");
@@ -605,16 +723,22 @@ export const createUpdateCallingAccess = async (data: any): Promise<any> => {
 
 export const deleteCallingAccess = async (id: number): Promise<void> => {
   try {
-    await axiosInstance.delete(`/accounting/company/delete-calling-access/${id}`);
+    await axiosInstance.delete(
+      `/accounting/company/delete-calling-access/${id}`
+    );
   } catch (error: any) {
     toast.error(error?.message || "Failed to delete calling access");
     throw error;
   }
 };
 
-export const getAvailableExtensions = async (companyId: number): Promise<any[]> => {
+export const getAvailableExtensions = async (
+  companyId: number
+): Promise<any[]> => {
   try {
-    const response = await axiosInstance.get(`/accounting/company/available-extensions/${companyId}`);
+    const response = await axiosInstance.get(
+      `/accounting/company/available-extensions/${companyId}`
+    );
     return extractData<any[]>(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to fetch available extensions");
@@ -624,7 +748,10 @@ export const getAvailableExtensions = async (companyId: number): Promise<any[]> 
 
 export const generateFacCode = async (data: any): Promise<any> => {
   try {
-    const response = await axiosInstance.post("/accounting/company/generate-fac-code", data);
+    const response = await axiosInstance.post(
+      "/accounting/company/generate-fac-code",
+      data
+    );
     return extractData<any>(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to generate FAC code");
@@ -634,7 +761,10 @@ export const generateFacCode = async (data: any): Promise<any> => {
 
 export const createUpdateCompany = async (data: any): Promise<CompanyData> => {
   try {
-    const response = await axiosInstance.post("/accounting/company/create-update", data);
+    const response = await axiosInstance.post(
+      "/accounting/company/create-update",
+      data
+    );
     return extractData<CompanyData>(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to create/update company");
@@ -662,9 +792,13 @@ export const getCompany = async (id: number): Promise<CompanyData> => {
 };
 
 // Discount Applicability
-export const getDiscountApplicability = async (companyId: number): Promise<DiscountApplicabilityData[]> => {
+export const getDiscountApplicability = async (
+  companyId: number
+): Promise<DiscountApplicabilityData[]> => {
   try {
-    const response = await axiosInstance.get(`/accounting/company/${companyId}/discount-applicability`);
+    const response = await axiosInstance.get(
+      `/accounting/company/${companyId}/discount-applicability`
+    );
     return extractData<DiscountApplicabilityData[]>(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to fetch discount applicability");
@@ -674,10 +808,13 @@ export const getDiscountApplicability = async (companyId: number): Promise<Disco
 
 export const createDiscountApplicability = async (
   companyId: number,
-  data: Partial<DiscountApplicabilityData>
+  data: DiscountApplicabilityCreateUpdatePayload
 ): Promise<DiscountApplicabilityData> => {
   try {
-    const response = await axiosInstance.post(`/accounting/company/${companyId}/discount-applicability`, data);
+    const response = await axiosInstance.post(
+      `/accounting/company/${companyId}/discount-applicability`,
+      data
+    );
     return extractData<DiscountApplicabilityData>(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to create discount applicability");
@@ -688,10 +825,13 @@ export const createDiscountApplicability = async (
 export const updateDiscountApplicability = async (
   companyId: number,
   applicabilityId: number,
-  data: Partial<DiscountApplicabilityData>
+  data: DiscountApplicabilityCreateUpdatePayload
 ): Promise<DiscountApplicabilityData> => {
   try {
-    const response = await axiosInstance.put(`/accounting/company/${companyId}/discount-applicability/${applicabilityId}`, data);
+    const response = await axiosInstance.put(
+      `/accounting/company/${companyId}/discount-applicability/${applicabilityId}`,
+      data
+    );
     return extractData<DiscountApplicabilityData>(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to update discount applicability");
@@ -699,9 +839,14 @@ export const updateDiscountApplicability = async (
   }
 };
 
-export const deleteDiscountApplicability = async (companyId: number, applicabilityId: number): Promise<void> => {
+export const deleteDiscountApplicability = async (
+  companyId: number,
+  applicabilityId: number
+): Promise<void> => {
   try {
-    await axiosInstance.delete(`/accounting/company/${companyId}/discount-applicability/${applicabilityId}`);
+    await axiosInstance.delete(
+      `/accounting/company/${companyId}/discount-applicability/${applicabilityId}`
+    );
   } catch (error: any) {
     toast.error(error?.message || "Failed to delete discount applicability");
     throw error;
@@ -713,10 +858,34 @@ export const getDiscountApplicabilityList = async (
   params: PaginationParams = {}
 ): Promise<PaginationWrapper<DiscountApplicabilityData>> => {
   try {
-    const response = await axiosInstance.get(`/accounting/company/${companyId}/discount-applicability-list`, { params });
-    return extractData<PaginationWrapper<DiscountApplicabilityData>>(response.data);
+    const response = await axiosInstance.get(
+      `/accounting/company/${companyId}/discount-applicability-list`,
+      { params }
+    );
+    
+    // Handle the actual API response structure
+    if (response.data?.code === 200 && response.data?.data?.success) {
+      return {
+        data: response.data.data.data, // The discount applicability array
+        pagination: {
+          current_page: response.data.data.pagination?.page || 1,
+          per_page: response.data.data.pagination?.limit || response.data.data.data.length,
+          total: response.data.data.pagination?.total || response.data.data.data.length,
+          last_page: response.data.data.pagination?.last_page || 1,
+          from: response.data.data.pagination?.from || 1,
+          to: response.data.data.pagination?.to || response.data.data.data.length,
+        },
+      };
+    }
+    
+    // Fallback to extractData if structure is different
+    return extractData<PaginationWrapper<DiscountApplicabilityData>>(
+      response.data
+    );
   } catch (error: any) {
-    toast.error(error?.message || "Failed to fetch discount applicability list");
+    toast.error(
+      error?.message || "Failed to fetch discount applicability list"
+    );
     throw error;
   }
 };
@@ -727,7 +896,32 @@ export const getProductPricingList = async (
   params: PaginationParams = {}
 ): Promise<PaginationWrapper<ProductPricingData>> => {
   try {
-    const response = await axiosInstance.get(`/accounting/company/${companyId}/product-pricing-list`, { params });
+    const response = await axiosInstance.get(
+      `/accounting/company/${companyId}/product-pricing-list`,
+      { params: { ...params, load_product: true } }
+    );
+
+    // Handle the actual API response structure
+    if (response.data?.code === 200 && response.data?.data?.success) {
+      return {
+        data: response.data.data.data, // The product pricing array
+        pagination: {
+          current_page: response.data.data.pagination?.page || 1,
+          per_page:
+            response.data.data.pagination?.limit ||
+            response.data.data.data.length,
+          total:
+            response.data.data.pagination?.total ||
+            response.data.data.data.length,
+          last_page: response.data.data.pagination?.last_page || 1,
+          from: response.data.data.pagination?.from || 1,
+          to:
+            response.data.data.pagination?.to || response.data.data.data.length,
+        },
+      };
+    }
+
+    // Fallback to extractData if structure is different
     return extractData<PaginationWrapper<ProductPricingData>>(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to fetch product pricing list");
@@ -735,9 +929,13 @@ export const getProductPricingList = async (
   }
 };
 
-export const getProductPricing = async (companyId: number): Promise<ProductPricingData[]> => {
+export const getProductPricing = async (
+  companyId: number
+): Promise<ProductPricingData[]> => {
   try {
-    const response = await axiosInstance.get(`/accounting/company/${companyId}/product-pricing`);
+    const response = await axiosInstance.get(
+      `/accounting/company/${companyId}/product-pricing`
+    );
     return extractData<ProductPricingData[]>(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to fetch product pricing");
@@ -747,10 +945,13 @@ export const getProductPricing = async (companyId: number): Promise<ProductPrici
 
 export const updateProductPricing = async (
   companyId: number,
-  data: Partial<ProductPricingData>
+  data: ProductPricingCreateUpdatePayload
 ): Promise<ProductPricingData> => {
   try {
-    const response = await axiosInstance.post(`/accounting/company/${companyId}/product-pricing`, data);
+    const response = await axiosInstance.post(
+      `/accounting/company/${companyId}/product-pricing`,
+      data
+    );
     return extractData<ProductPricingData>(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to update product pricing");
@@ -760,10 +961,13 @@ export const updateProductPricing = async (
 
 export const bulkUpdateProductPricing = async (
   companyId: number,
-  data: ProductPricingData[]
+  data: ProductPricingCreateUpdatePayload[]
 ): Promise<ProductPricingData[]> => {
   try {
-    const response = await axiosInstance.post(`/accounting/company/${companyId}/product-pricing/bulk-update`, data);
+    const response = await axiosInstance.post(
+      `/accounting/company/${companyId}/product-pricing/bulk-update`,
+      data
+    );
     return extractData<ProductPricingData[]>(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to bulk update product pricing");
@@ -771,9 +975,14 @@ export const bulkUpdateProductPricing = async (
   }
 };
 
-export const deleteProductPricing = async (companyId: number, productId: number): Promise<void> => {
+export const deleteProductPricing = async (
+  companyId: number,
+  productId: string
+): Promise<void> => {
   try {
-    await axiosInstance.delete(`/accounting/company/${companyId}/product-pricing/${productId}`);
+    await axiosInstance.delete(
+      `/accounting/company/${companyId}/product-pricing/${productId}`
+    );
   } catch (error: any) {
     toast.error(error?.message || "Failed to delete product pricing");
     throw error;
@@ -785,8 +994,10 @@ export const getInvoices = async (
   params: PaginationParams = {}
 ): Promise<PaginationWrapper<InvoiceData>> => {
   try {
-    const response = await axiosInstance.get("/accounting/invoices", { params });
-    
+    const response = await axiosInstance.get("/accounting/invoices", {
+      params,
+    });
+
     // Handle the nested response structure
     if (response.data?.code === 200 && response.data?.data?.success) {
       return {
@@ -798,10 +1009,10 @@ export const getInvoices = async (
           last_page: response.data.data.pagination.last_page,
           from: response.data.data.pagination.from,
           to: response.data.data.pagination.to,
-        }
+        },
       };
     }
-    
+
     // Fallback to extractData if structure is different
     return extractData<PaginationWrapper<InvoiceData>>(response.data);
   } catch (error: any) {
@@ -810,7 +1021,9 @@ export const getInvoices = async (
   }
 };
 
-export const createInvoice = async (data: InvoiceCreateUpdatePayload): Promise<InvoiceData> => {
+export const createInvoice = async (
+  data: InvoiceCreateUpdatePayload
+): Promise<InvoiceData> => {
   try {
     const response = await axiosInstance.post("/accounting/invoices", data);
     return extractData<InvoiceData>(response.data);
@@ -832,7 +1045,9 @@ export const getInvoice = async (id: number): Promise<InvoiceData> => {
 
 export const getInvoiceDetails = async (id: number): Promise<any> => {
   try {
-    const response = await axiosInstance.get(`/accounting/invoices/${id}/details`);
+    const response = await axiosInstance.get(
+      `/accounting/invoices/${id}/details`
+    );
     return extractData<any>(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to fetch invoice details");
@@ -843,7 +1058,7 @@ export const getInvoiceDetails = async (id: number): Promise<any> => {
 export const generateInvoicePdf = async (id: number): Promise<Blob> => {
   try {
     const response = await axiosInstance.get(`/accounting/invoices/${id}/pdf`, {
-      responseType: 'blob',
+      responseType: "blob",
     });
     return response.data;
   } catch (error: any) {
@@ -857,7 +1072,10 @@ export const updateInvoice = async (
   data: InvoiceCreateUpdatePayload
 ): Promise<InvoiceData> => {
   try {
-    const response = await axiosInstance.put(`/accounting/invoices/${id}`, data);
+    const response = await axiosInstance.put(
+      `/accounting/invoices/${id}`,
+      data
+    );
     return extractData<InvoiceData>(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to update invoice");
@@ -879,8 +1097,10 @@ export const getExpenses = async (
   params: PaginationParams = {}
 ): Promise<PaginationWrapper<ExpenseData>> => {
   try {
-    const response = await axiosInstance.get("/accounting/expenses", { params });
-    
+    const response = await axiosInstance.get("/accounting/expenses", {
+      params,
+    });
+
     // Handle the actual API response structure
     if (response.data?.code === 200 && response.data?.data?.success) {
       return {
@@ -892,10 +1112,10 @@ export const getExpenses = async (
           last_page: response.data.data.data.last_page,
           from: response.data.data.data.from,
           to: response.data.data.data.to,
-        }
+        },
       };
     }
-    
+
     // Fallback to extractData if structure is different
     return extractData<PaginationWrapper<ExpenseData>>(response.data);
   } catch (error: any) {
@@ -904,7 +1124,9 @@ export const getExpenses = async (
   }
 };
 
-export const createExpense = async (data: ExpenseCreateUpdatePayload): Promise<ExpenseData> => {
+export const createExpense = async (
+  data: ExpenseCreateUpdatePayload
+): Promise<ExpenseData> => {
   try {
     const response = await axiosInstance.post("/accounting/expenses", data);
     return extractData<ExpenseData>(response.data);
@@ -929,7 +1151,10 @@ export const updateExpense = async (
   data: ExpenseCreateUpdatePayload
 ): Promise<ExpenseData> => {
   try {
-    const response = await axiosInstance.put(`/accounting/expenses/${id}`, data);
+    const response = await axiosInstance.put(
+      `/accounting/expenses/${id}`,
+      data
+    );
     return extractData<ExpenseData>(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to update expense");
@@ -948,9 +1173,12 @@ export const deleteExpense = async (id: number): Promise<void> => {
 
 export const downloadReceipt = async (id: number): Promise<Blob> => {
   try {
-    const response = await axiosInstance.get(`/accounting/expenses/${id}/receipt`, {
-      responseType: 'blob',
-    });
+    const response = await axiosInstance.get(
+      `/accounting/expenses/${id}/receipt`,
+      {
+        responseType: "blob",
+      }
+    );
     return response.data;
   } catch (error: any) {
     toast.error(error?.message || "Failed to download receipt");
@@ -958,11 +1186,17 @@ export const downloadReceipt = async (id: number): Promise<Blob> => {
   }
 };
 
-export const downloadFile = async (id: number, fileIndex: number): Promise<Blob> => {
+export const downloadFile = async (
+  id: number,
+  fileIndex: number
+): Promise<Blob> => {
   try {
-    const response = await axiosInstance.get(`/accounting/expenses/${id}/files/${fileIndex}`, {
-      responseType: 'blob',
-    });
+    const response = await axiosInstance.get(
+      `/accounting/expenses/${id}/files/${fileIndex}`,
+      {
+        responseType: "blob",
+      }
+    );
     return response.data;
   } catch (error: any) {
     toast.error(error?.message || "Failed to download file");
@@ -975,8 +1209,10 @@ export const getExpenseCategories = async (
   params: PaginationParams = {}
 ): Promise<PaginationWrapper<ExpenseCategoryData>> => {
   try {
-    const response = await axiosInstance.get("/accounting/expense-categories", { params });
-    
+    const response = await axiosInstance.get("/accounting/expense-categories", {
+      params,
+    });
+
     // Handle the actual API response structure
     if (response.data?.code === 200 && response.data?.data?.success) {
       return {
@@ -988,10 +1224,10 @@ export const getExpenseCategories = async (
           last_page: response.data.data.pagination.last_page,
           from: response.data.data.pagination.from,
           to: response.data.data.pagination.to,
-        }
+        },
       };
     }
-    
+
     // Fallback to extractData if structure is different
     return extractData<PaginationWrapper<ExpenseCategoryData>>(response.data);
   } catch (error: any) {
@@ -1000,9 +1236,14 @@ export const getExpenseCategories = async (
   }
 };
 
-export const createExpenseCategory = async (data: ExpenseCategoryCreateUpdatePayload): Promise<ExpenseCategoryData> => {
+export const createExpenseCategory = async (
+  data: ExpenseCategoryCreateUpdatePayload
+): Promise<ExpenseCategoryData> => {
   try {
-    const response = await axiosInstance.post("/accounting/expense-categories", data);
+    const response = await axiosInstance.post(
+      "/accounting/expense-categories",
+      data
+    );
     return extractData<ExpenseCategoryData>(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to create expense category");
@@ -1010,9 +1251,13 @@ export const createExpenseCategory = async (data: ExpenseCategoryCreateUpdatePay
   }
 };
 
-export const getExpenseCategory = async (id: number): Promise<ExpenseCategoryData> => {
+export const getExpenseCategory = async (
+  id: number
+): Promise<ExpenseCategoryData> => {
   try {
-    const response = await axiosInstance.get(`/accounting/expense-categories/${id}`);
+    const response = await axiosInstance.get(
+      `/accounting/expense-categories/${id}`
+    );
     return extractData<ExpenseCategoryData>(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to fetch expense category");
@@ -1025,7 +1270,10 @@ export const updateExpenseCategory = async (
   data: ExpenseCategoryCreateUpdatePayload
 ): Promise<ExpenseCategoryData> => {
   try {
-    const response = await axiosInstance.put(`/accounting/expense-categories/${id}`, data);
+    const response = await axiosInstance.put(
+      `/accounting/expense-categories/${id}`,
+      data
+    );
     return extractData<ExpenseCategoryData>(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to update expense category");
@@ -1044,7 +1292,9 @@ export const deleteExpenseCategory = async (id: number): Promise<void> => {
 
 export const softDeleteExpenseCategory = async (id: number): Promise<void> => {
   try {
-    await axiosInstance.post(`/accounting/expense-categories/${id}/soft-delete`);
+    await axiosInstance.post(
+      `/accounting/expense-categories/${id}/soft-delete`
+    );
   } catch (error: any) {
     toast.error(error?.message || "Failed to soft delete expense category");
     throw error;
@@ -1065,8 +1315,10 @@ export const getProducts = async (
   params: PaginationParams = {}
 ): Promise<PaginationWrapper<ProductData>> => {
   try {
-    const response = await axiosInstance.get("/accounting/products", { params });
-    
+    const response = await axiosInstance.get("/accounting/products", {
+      params,
+    });
+
     // Handle the actual API response structure
     if (response.data?.code === 200 && response.data?.data?.success) {
       const productsData = response.data.data.data; // The product array
@@ -1078,11 +1330,11 @@ export const getProducts = async (
           total: response.data.data.pagination?.total || productsData.length,
           last_page: response.data.data.pagination?.last_page || 1,
           from: response.data.data.pagination?.from || 1,
-          to: response.data.data.pagination?.to || productsData.length
-        }
+          to: response.data.data.pagination?.to || productsData.length,
+        },
       };
     }
-    
+
     // Fallback to extractData if structure is different
     const productsData = extractData<ProductData[]>(response.data);
     return {
@@ -1093,8 +1345,8 @@ export const getProducts = async (
         total: productsData.length,
         last_page: 1,
         from: 1,
-        to: productsData.length
-      }
+        to: productsData.length,
+      },
     };
   } catch (error: any) {
     toast.error(error?.message || "Failed to fetch products");
@@ -1116,15 +1368,22 @@ export const getProductsWithCompanyPricing = async (
   params: PaginationParams = {}
 ): Promise<PaginationWrapper<ProductData>> => {
   try {
-    const response = await axiosInstance.get("/accounting/products/with-company-pricing", { params });
+    const response = await axiosInstance.get(
+      "/accounting/products/with-company-pricing",
+      { params }
+    );
     return extractData<PaginationWrapper<ProductData>>(response.data);
   } catch (error: any) {
-    toast.error(error?.message || "Failed to fetch products with company pricing");
+    toast.error(
+      error?.message || "Failed to fetch products with company pricing"
+    );
     throw error;
   }
 };
 
-export const createProduct = async (data: ProductCreateUpdatePayload): Promise<ProductData> => {
+export const createProduct = async (
+  data: ProductCreateUpdatePayload
+): Promise<ProductData> => {
   try {
     const response = await axiosInstance.post("/accounting/products", data);
     return extractData<ProductData>(response.data);
@@ -1134,9 +1393,13 @@ export const createProduct = async (data: ProductCreateUpdatePayload): Promise<P
   }
 };
 
-export const getProductCategoriesList = async (): Promise<ProductCategoryData[]> => {
+export const getProductCategoriesList = async (): Promise<
+  ProductCategoryData[]
+> => {
   try {
-    const response = await axiosInstance.get("/accounting/products/categories-list");
+    const response = await axiosInstance.get(
+      "/accounting/products/categories-list"
+    );
     return extractData<ProductCategoryData[]>(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to fetch product categories list");
@@ -1144,9 +1407,14 @@ export const getProductCategoriesList = async (): Promise<ProductCategoryData[]>
   }
 };
 
-export const createProductCategory = async (data: ProductCategoryCreateUpdatePayload): Promise<ProductCategoryData> => {
+export const createProductCategory = async (
+  data: ProductCategoryCreateUpdatePayload
+): Promise<ProductCategoryData> => {
   try {
-    const response = await axiosInstance.post("/accounting/products/categories", data);
+    const response = await axiosInstance.post(
+      "/accounting/products/categories",
+      data
+    );
     return extractData<ProductCategoryData>(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to create product category");
@@ -1159,7 +1427,10 @@ export const updateProductCategory = async (
   data: ProductCategoryCreateUpdatePayload
 ): Promise<ProductCategoryData> => {
   try {
-    const response = await axiosInstance.put(`/accounting/products/categories/${id}`, data);
+    const response = await axiosInstance.put(
+      `/accounting/products/categories/${id}`,
+      data
+    );
     return extractData<ProductCategoryData>(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to update product category");
@@ -1178,7 +1449,9 @@ export const deleteProductCategory = async (id: number): Promise<void> => {
 
 export const softDeleteProductCategory = async (id: number): Promise<void> => {
   try {
-    await axiosInstance.post(`/accounting/products/categories/${id}/soft-delete`);
+    await axiosInstance.post(
+      `/accounting/products/categories/${id}/soft-delete`
+    );
   } catch (error: any) {
     toast.error(error?.message || "Failed to soft delete product category");
     throw error;
@@ -1209,7 +1482,10 @@ export const updateProduct = async (
   data: ProductCreateUpdatePayload
 ): Promise<ProductData> => {
   try {
-    const response = await axiosInstance.put(`/accounting/products/${id}`, data);
+    const response = await axiosInstance.put(
+      `/accounting/products/${id}`,
+      data
+    );
     return extractData<ProductData>(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to update product");
@@ -1244,9 +1520,14 @@ export const restoreProduct = async (id: number): Promise<void> => {
   }
 };
 
-export const getProductWithPricing = async (productId: number, companyId: number): Promise<ProductData> => {
+export const getProductWithPricing = async (
+  productId: number,
+  companyId: number
+): Promise<ProductData> => {
   try {
-    const response = await axiosInstance.get(`/accounting/products/${productId}/pricing/${companyId}`);
+    const response = await axiosInstance.get(
+      `/accounting/products/${productId}/pricing/${companyId}`
+    );
     return extractData<ProductData>(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to fetch product with pricing");
@@ -1259,8 +1540,10 @@ export const getProductCategories = async (
   params: PaginationParams = {}
 ): Promise<PaginationWrapper<ProductCategoryData>> => {
   try {
-    const response = await axiosInstance.get("/accounting/product-categories", { params });
-    
+    const response = await axiosInstance.get("/accounting/product-categories", {
+      params,
+    });
+
     // Handle the actual API response structure
     if (response.data?.code === 200 && response.data?.data?.success) {
       const categoriesData = response.data.data.data; // The category array
@@ -1268,15 +1551,16 @@ export const getProductCategories = async (
         data: categoriesData,
         pagination: {
           current_page: response.data.data.pagination?.page || 1,
-          per_page: response.data.data.pagination?.limit || categoriesData.length,
+          per_page:
+            response.data.data.pagination?.limit || categoriesData.length,
           total: response.data.data.pagination?.total || categoriesData.length,
           last_page: response.data.data.pagination?.last_page || 1,
           from: response.data.data.pagination?.from || 1,
-          to: response.data.data.pagination?.to || categoriesData.length
-        }
+          to: response.data.data.pagination?.to || categoriesData.length,
+        },
       };
     }
-    
+
     // Fallback to extractData if structure is different
     const categoriesData = extractData<ProductCategoryData[]>(response.data);
     return {
@@ -1287,8 +1571,8 @@ export const getProductCategories = async (
         total: categoriesData.length,
         last_page: 1,
         from: 1,
-        to: categoriesData.length
-      }
+        to: categoriesData.length,
+      },
     };
   } catch (error: any) {
     toast.error(error?.message || "Failed to fetch product categories");
@@ -1296,9 +1580,14 @@ export const getProductCategories = async (
   }
 };
 
-export const createProductCategoryDirect = async (data: ProductCategoryCreateUpdatePayload): Promise<ProductCategoryData> => {
+export const createProductCategoryDirect = async (
+  data: ProductCategoryCreateUpdatePayload
+): Promise<ProductCategoryData> => {
   try {
-    const response = await axiosInstance.post("/accounting/product-categories", data);
+    const response = await axiosInstance.post(
+      "/accounting/product-categories",
+      data
+    );
     return extractData<ProductCategoryData>(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to create product category");
@@ -1306,9 +1595,13 @@ export const createProductCategoryDirect = async (data: ProductCategoryCreateUpd
   }
 };
 
-export const getProductCategory = async (id: number): Promise<ProductCategoryData> => {
+export const getProductCategory = async (
+  id: number
+): Promise<ProductCategoryData> => {
   try {
-    const response = await axiosInstance.get(`/accounting/product-categories/${id}`);
+    const response = await axiosInstance.get(
+      `/accounting/product-categories/${id}`
+    );
     return extractData<ProductCategoryData>(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to fetch product category");
@@ -1321,7 +1614,10 @@ export const updateProductCategoryDirect = async (
   data: ProductCategoryCreateUpdatePayload
 ): Promise<ProductCategoryData> => {
   try {
-    const response = await axiosInstance.put(`/accounting/product-categories/${id}`, data);
+    const response = await axiosInstance.put(
+      `/accounting/product-categories/${id}`,
+      data
+    );
     return extractData<ProductCategoryData>(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to update product category");
@@ -1329,7 +1625,9 @@ export const updateProductCategoryDirect = async (
   }
 };
 
-export const deleteProductCategoryDirect = async (id: number): Promise<void> => {
+export const deleteProductCategoryDirect = async (
+  id: number
+): Promise<void> => {
   try {
     await axiosInstance.delete(`/accounting/product-categories/${id}`);
   } catch (error: any) {
@@ -1339,9 +1637,48 @@ export const deleteProductCategoryDirect = async (id: number): Promise<void> => 
 };
 
 // Stripe Payment Methods
-export const getPaymentMethods = async (profileId: number): Promise<PaymentMethodData[]> => {
+export const getPaymentMethods = async (
+  profileId: number
+): Promise<PaymentMethodData[]> => {
   try {
-    const response = await axiosInstance.get(`/accounting/stripe/payment-methods/${profileId}`);
+    const response = await axiosInstance.get(
+      `/accounting/stripe/payment-methods/${profileId}`
+    );
+
+    // Handle the actual API response structure
+    if (response.data?.code === 200 && response.data?.data?.success) {
+      const paymentMethods = response.data.data.data.payment_methods || [];
+
+      // Transform the response to match our PaymentMethodData interface
+      return paymentMethods.map((pm: any) => ({
+        id: pm.id,
+        type: pm.type,
+        card: pm.card
+          ? {
+              brand: pm.card.brand,
+              last4: pm.card.last4,
+              exp_month: pm.card.exp_month,
+              exp_year: pm.card.exp_year,
+            }
+          : undefined,
+        bank_account: pm.bank_account
+          ? {
+              bank_name: pm.bank_account.bank_name,
+              last4: pm.bank_account.last4,
+              routing_number: pm.bank_account.routing_number,
+            }
+          : undefined,
+        billing_details: pm.billing_details
+          ? {
+              name: pm.billing_details.name,
+            }
+          : undefined,
+        is_default: pm.is_default,
+        created_at: new Date(pm.created * 1000).toISOString(), // Convert Unix timestamp to ISO string
+      }));
+    }
+
+    // Fallback to extractData if structure is different
     return extractData<PaymentMethodData[]>(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to fetch payment methods");
@@ -1354,7 +1691,10 @@ export const createPaymentMethod = async (
   data: any
 ): Promise<PaymentMethodData> => {
   try {
-    const response = await axiosInstance.post(`/accounting/stripe/payment-methods/${profileId}`, data);
+    const response = await axiosInstance.post(
+      `/accounting/stripe/payment-methods/${profileId}`,
+      data
+    );
     return extractData<PaymentMethodData>(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to create payment method");
@@ -1367,7 +1707,10 @@ export const updatePaymentMethod = async (
   data: any
 ): Promise<PaymentMethodData> => {
   try {
-    const response = await axiosInstance.put(`/accounting/stripe/payment-methods/${paymentMethodId}`, data);
+    const response = await axiosInstance.put(
+      `/accounting/stripe/payment-methods/${paymentMethodId}`,
+      data
+    );
     return extractData<PaymentMethodData>(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to update payment method");
@@ -1375,18 +1718,27 @@ export const updatePaymentMethod = async (
   }
 };
 
-export const deletePaymentMethod = async (paymentMethodId: string): Promise<void> => {
+export const deletePaymentMethod = async (
+  paymentMethodId: string
+): Promise<void> => {
   try {
-    await axiosInstance.delete(`/accounting/stripe/payment-methods/${paymentMethodId}`);
+    await axiosInstance.delete(
+      `/accounting/stripe/payment-methods/${paymentMethodId}`
+    );
   } catch (error: any) {
     toast.error(error?.message || "Failed to delete payment method");
     throw error;
   }
 };
 
-export const setDefaultPaymentMethod = async (profileId: number, paymentMethodId: string): Promise<void> => {
+export const setDefaultPaymentMethod = async (
+  profileId: number,
+  paymentMethodId: string
+): Promise<void> => {
   try {
-    await axiosInstance.post(`/accounting/stripe/set-default/${profileId}`, { payment_method_id: paymentMethodId });
+    await axiosInstance.post(`/accounting/stripe/set-default/${profileId}`, {
+      payment_method_id: paymentMethodId,
+    });
   } catch (error: any) {
     toast.error(error?.message || "Failed to set default payment method");
     throw error;
@@ -1395,7 +1747,10 @@ export const setDefaultPaymentMethod = async (profileId: number, paymentMethodId
 
 export const validateCard = async (data: any): Promise<any> => {
   try {
-    const response = await axiosInstance.post("/accounting/stripe/validate-card", data);
+    const response = await axiosInstance.post(
+      "/accounting/stripe/validate-card",
+      data
+    );
     return extractData<any>(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to validate card");
@@ -1405,7 +1760,9 @@ export const validateCard = async (data: any): Promise<any> => {
 
 export const testCardValidation = async (): Promise<any> => {
   try {
-    const response = await axiosInstance.get("/accounting/stripe/test-card-validation");
+    const response = await axiosInstance.get(
+      "/accounting/stripe/test-card-validation"
+    );
     return extractData<any>(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to test card validation");
@@ -1418,10 +1775,15 @@ export const createPaymentMethodWithElements = async (
   data: any
 ): Promise<PaymentMethodData> => {
   try {
-    const response = await axiosInstance.post(`/accounting/stripe/create-payment-method/${profileId}`, data);
+    const response = await axiosInstance.post(
+      `/accounting/stripe/create-payment-method/${profileId}`,
+      data
+    );
     return extractData<PaymentMethodData>(response.data);
   } catch (error: any) {
-    toast.error(error?.message || "Failed to create payment method with elements");
+    toast.error(
+      error?.message || "Failed to create payment method with elements"
+    );
     throw error;
   }
 };
@@ -1431,17 +1793,62 @@ export const createAndConfirmPaymentMethod = async (
   data: any
 ): Promise<PaymentMethodData> => {
   try {
-    const response = await axiosInstance.post(`/accounting/stripe/create-and-confirm-payment-method/${profileId}`, data);
+    const response = await axiosInstance.post(
+      `/accounting/stripe/create-and-confirm-payment-method/${profileId}`,
+      data
+    );
+
+    // Handle the actual API response structure
+    if (response.data?.code === 200 && response.data?.data?.success) {
+      const pm = response.data.data.data;
+
+      // Transform the response to match our PaymentMethodData interface
+      return {
+        id: pm.id,
+        type: pm.type,
+        card: pm.card
+          ? {
+              brand: pm.card.brand,
+              last4: pm.card.last4,
+              exp_month: pm.card.exp_month,
+              exp_year: pm.card.exp_year,
+            }
+          : undefined,
+        bank_account: pm.bank_account
+          ? {
+              bank_name: pm.bank_account.bank_name,
+              last4: pm.bank_account.last4,
+              routing_number: pm.bank_account.routing_number,
+            }
+          : undefined,
+        billing_details: pm.billing_details
+          ? {
+              name: pm.billing_details.name,
+            }
+          : undefined,
+        is_default: pm.is_default,
+        created_at: new Date(pm.created * 1000).toISOString(), // Convert Unix timestamp to ISO string
+      };
+    }
+
+    // Fallback to extractData if structure is different
     return extractData<PaymentMethodData>(response.data);
   } catch (error: any) {
-    toast.error(error?.message || "Failed to create and confirm payment method");
+    toast.error(
+      error?.message || "Failed to create and confirm payment method"
+    );
     throw error;
   }
 };
 
-export const savePaymentMethod = async (data: any): Promise<PaymentMethodData> => {
+export const savePaymentMethod = async (
+  data: any
+): Promise<PaymentMethodData> => {
   try {
-    const response = await axiosInstance.post("/accounting/stripe/save-payment-method", data);
+    const response = await axiosInstance.post(
+      "/accounting/stripe/save-payment-method",
+      data
+    );
     return extractData<PaymentMethodData>(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to save payment method");
@@ -1451,7 +1858,9 @@ export const savePaymentMethod = async (data: any): Promise<PaymentMethodData> =
 
 export const getPublishableKey = async (): Promise<string> => {
   try {
-    const response = await axiosInstance.get("/accounting/stripe/publishable-key");
+    const response = await axiosInstance.get(
+      "/accounting/stripe/publishable-key"
+    );
     return extractData<string>(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to get publishable key");
@@ -1464,8 +1873,10 @@ export const getInventories = async (
   params: PaginationParams = {}
 ): Promise<PaginationWrapper<InventoryData>> => {
   try {
-    const response = await axiosInstance.get("/accounting/inventory", { params });
-    
+    const response = await axiosInstance.get("/accounting/inventory", {
+      params,
+    });
+
     // Handle the actual API response structure
     if (response.data?.code === 200 && response.data?.data?.success) {
       return {
@@ -1477,10 +1888,10 @@ export const getInventories = async (
           last_page: response.data.data.pagination.last_page,
           from: response.data.data.pagination.from,
           to: response.data.data.pagination.to,
-        }
+        },
       };
     }
-    
+
     // Fallback to extractData if structure is different
     return extractData<PaginationWrapper<InventoryData>>(response.data);
   } catch (error: any) {
@@ -1489,7 +1900,9 @@ export const getInventories = async (
   }
 };
 
-export const createInventory = async (data: InventoryCreateUpdatePayload): Promise<InventoryData> => {
+export const createInventory = async (
+  data: InventoryCreateUpdatePayload
+): Promise<InventoryData> => {
   try {
     const response = await axiosInstance.post("/accounting/inventory", data);
     return extractData<InventoryData>(response.data);
@@ -1529,9 +1942,13 @@ export const getInventoryStats = async (): Promise<any> => {
   }
 };
 
-export const searchInventories = async (params: PaginationParams = {}): Promise<PaginationWrapper<InventoryData>> => {
+export const searchInventories = async (
+  params: PaginationParams = {}
+): Promise<PaginationWrapper<InventoryData>> => {
   try {
-    const response = await axiosInstance.get("/accounting/inventory/search", { params });
+    const response = await axiosInstance.get("/accounting/inventory/search", {
+      params,
+    });
     return extractData<PaginationWrapper<InventoryData>>(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to search inventories");
@@ -1541,7 +1958,9 @@ export const searchInventories = async (params: PaginationParams = {}): Promise<
 
 export const getInventoryCategories = async (): Promise<any[]> => {
   try {
-    const response = await axiosInstance.get("/accounting/inventory/categories");
+    const response = await axiosInstance.get(
+      "/accounting/inventory/categories"
+    );
     return extractData<any[]>(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to fetch inventory categories");
@@ -1549,9 +1968,13 @@ export const getInventoryCategories = async (): Promise<any[]> => {
   }
 };
 
-export const getInventoryByCategory = async (category: string): Promise<InventoryData[]> => {
+export const getInventoryByCategory = async (
+  category: string
+): Promise<InventoryData[]> => {
   try {
-    const response = await axiosInstance.get(`/accounting/inventory/category/${category}`);
+    const response = await axiosInstance.get(
+      `/accounting/inventory/category/${category}`
+    );
     return extractData<InventoryData[]>(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to fetch inventory by category");
@@ -1569,9 +1992,13 @@ export const getInventory = async (id: number): Promise<InventoryData> => {
   }
 };
 
-export const getInventoryWithItems = async (id: number): Promise<InventoryData> => {
+export const getInventoryWithItems = async (
+  id: number
+): Promise<InventoryData> => {
   try {
-    const response = await axiosInstance.get(`/accounting/inventory/${id}/items`);
+    const response = await axiosInstance.get(
+      `/accounting/inventory/${id}/items`
+    );
     return extractData<InventoryData>(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to fetch inventory with items");
@@ -1584,7 +2011,10 @@ export const updateInventory = async (
   data: InventoryCreateUpdatePayload
 ): Promise<InventoryData> => {
   try {
-    const response = await axiosInstance.put(`/accounting/inventory/${id}`, data);
+    const response = await axiosInstance.put(
+      `/accounting/inventory/${id}`,
+      data
+    );
     return extractData<InventoryData>(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to update inventory");
@@ -1606,7 +2036,10 @@ export const getAllInventoryItems = async (
   params: PaginationParams = {}
 ): Promise<PaginationWrapper<InventoryItemData>> => {
   try {
-    const response = await axiosInstance.get("/accounting/inventory/items/all", { params });
+    const response = await axiosInstance.get(
+      "/accounting/inventory/items/all",
+      { params }
+    );
     return extractData<PaginationWrapper<InventoryItemData>>(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to fetch all inventory items");
@@ -1614,9 +2047,13 @@ export const getAllInventoryItems = async (
   }
 };
 
-export const getItemsByInventory = async (inventoryId: number): Promise<InventoryItemData[]> => {
+export const getItemsByInventory = async (
+  inventoryId: number
+): Promise<InventoryItemData[]> => {
   try {
-    const response = await axiosInstance.get(`/accounting/inventory/items/inventory/${inventoryId}`);
+    const response = await axiosInstance.get(
+      `/accounting/inventory/items/inventory/${inventoryId}`
+    );
     return extractData<InventoryItemData[]>(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to fetch items by inventory");
@@ -1626,7 +2063,10 @@ export const getItemsByInventory = async (inventoryId: number): Promise<Inventor
 
 export const attachItem = async (data: any): Promise<any> => {
   try {
-    const response = await axiosInstance.post("/accounting/inventory/items/attach", data);
+    const response = await axiosInstance.post(
+      "/accounting/inventory/items/attach",
+      data
+    );
     return extractData<any>(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to attach item");
@@ -1634,18 +2074,28 @@ export const attachItem = async (data: any): Promise<any> => {
   }
 };
 
-export const detachItem = async (inventoryId: number, itemId: number): Promise<void> => {
+export const detachItem = async (
+  inventoryId: number,
+  itemId: number
+): Promise<void> => {
   try {
-    await axiosInstance.delete(`/accounting/inventory/items/${inventoryId}/${itemId}`);
+    await axiosInstance.delete(
+      `/accounting/inventory/items/${inventoryId}/${itemId}`
+    );
   } catch (error: any) {
     toast.error(error?.message || "Failed to detach item");
     throw error;
   }
 };
 
-export const createInventoryItem = async (data: Partial<InventoryItemData>): Promise<InventoryItemData> => {
+export const createInventoryItem = async (
+  data: Partial<InventoryItemData>
+): Promise<InventoryItemData> => {
   try {
-    const response = await axiosInstance.post("/accounting/inventory/items", data);
+    const response = await axiosInstance.post(
+      "/accounting/inventory/items",
+      data
+    );
     return extractData<InventoryItemData>(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to create inventory item");
@@ -1655,7 +2105,9 @@ export const createInventoryItem = async (data: Partial<InventoryItemData>): Pro
 
 export const getInventoryItemsSummary = async (): Promise<any> => {
   try {
-    const response = await axiosInstance.get("/accounting/inventory/items/summary");
+    const response = await axiosInstance.get(
+      "/accounting/inventory/items/summary"
+    );
     return extractData<any>(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to fetch inventory items summary");
@@ -1665,7 +2117,9 @@ export const getInventoryItemsSummary = async (): Promise<any> => {
 
 export const getLowStockItems = async (): Promise<InventoryItemData[]> => {
   try {
-    const response = await axiosInstance.get("/accounting/inventory/items/low-stock");
+    const response = await axiosInstance.get(
+      "/accounting/inventory/items/low-stock"
+    );
     return extractData<InventoryItemData[]>(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to fetch low stock items");
@@ -1675,7 +2129,9 @@ export const getLowStockItems = async (): Promise<InventoryItemData[]> => {
 
 export const getOutOfStockItems = async (): Promise<InventoryItemData[]> => {
   try {
-    const response = await axiosInstance.get("/accounting/inventory/items/out-of-stock");
+    const response = await axiosInstance.get(
+      "/accounting/inventory/items/out-of-stock"
+    );
     return extractData<InventoryItemData[]>(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to fetch out of stock items");
@@ -1685,7 +2141,9 @@ export const getOutOfStockItems = async (): Promise<InventoryItemData[]> => {
 
 export const getReorderReport = async (): Promise<any> => {
   try {
-    const response = await axiosInstance.get("/accounting/inventory/items/reorder-report");
+    const response = await axiosInstance.get(
+      "/accounting/inventory/items/reorder-report"
+    );
     return extractData<any>(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to fetch reorder report");
@@ -1695,7 +2153,10 @@ export const getReorderReport = async (): Promise<any> => {
 
 export const createItemMovement = async (data: any): Promise<any> => {
   try {
-    const response = await axiosInstance.post("/accounting/inventory/items/movements", data);
+    const response = await axiosInstance.post(
+      "/accounting/inventory/items/movements",
+      data
+    );
     return extractData<any>(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to create item movement");
@@ -1707,7 +2168,10 @@ export const getItemMovements = async (
   params: PaginationParams = {}
 ): Promise<PaginationWrapper<any>> => {
   try {
-    const response = await axiosInstance.get("/accounting/inventory/items/movements", { params });
+    const response = await axiosInstance.get(
+      "/accounting/inventory/items/movements",
+      { params }
+    );
     return extractData<PaginationWrapper<any>>(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to fetch item movements");
@@ -1717,7 +2181,10 @@ export const getItemMovements = async (
 
 export const bulkAdjustment = async (data: any): Promise<any> => {
   try {
-    const response = await axiosInstance.post("/accounting/inventory/items/bulk-adjustment", data);
+    const response = await axiosInstance.post(
+      "/accounting/inventory/items/bulk-adjustment",
+      data
+    );
     return extractData<any>(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to perform bulk adjustment");
@@ -1725,9 +2192,13 @@ export const bulkAdjustment = async (data: any): Promise<any> => {
   }
 };
 
-export const getInventoryItem = async (id: number): Promise<InventoryItemData> => {
+export const getInventoryItem = async (
+  id: number
+): Promise<InventoryItemData> => {
   try {
-    const response = await axiosInstance.get(`/accounting/inventory/items/${id}`);
+    const response = await axiosInstance.get(
+      `/accounting/inventory/items/${id}`
+    );
     return extractData<InventoryItemData>(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to fetch inventory item");
@@ -1740,7 +2211,10 @@ export const updateInventoryItem = async (
   data: Partial<InventoryItemData>
 ): Promise<InventoryItemData> => {
   try {
-    const response = await axiosInstance.put(`/accounting/inventory/items/${id}`, data);
+    const response = await axiosInstance.put(
+      `/accounting/inventory/items/${id}`,
+      data
+    );
     return extractData<InventoryItemData>(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to update inventory item");
@@ -1762,8 +2236,11 @@ export const getInventoryLocations = async (
   params: PaginationParams = {}
 ): Promise<PaginationWrapper<InventoryLocationData>> => {
   try {
-    const response = await axiosInstance.get("/accounting/inventory/locations", { params });
-    
+    const response = await axiosInstance.get(
+      "/accounting/inventory/locations",
+      { params }
+    );
+
     // Handle the actual API response structure
     if (response.data?.code === 200 && response.data?.data?.success) {
       return {
@@ -1775,10 +2252,10 @@ export const getInventoryLocations = async (
           last_page: response.data.data.pagination.last_page,
           from: response.data.data.pagination.from,
           to: response.data.data.pagination.to,
-        }
+        },
       };
     }
-    
+
     // Fallback to extractData if structure is different
     return extractData<PaginationWrapper<InventoryLocationData>>(response.data);
   } catch (error: any) {
@@ -1787,9 +2264,14 @@ export const getInventoryLocations = async (
   }
 };
 
-export const createInventoryLocation = async (data: InventoryLocationCreateUpdatePayload): Promise<InventoryLocationData> => {
+export const createInventoryLocation = async (
+  data: InventoryLocationCreateUpdatePayload
+): Promise<InventoryLocationData> => {
   try {
-    const response = await axiosInstance.post("/accounting/inventory/locations", data);
+    const response = await axiosInstance.post(
+      "/accounting/inventory/locations",
+      data
+    );
     return extractData<InventoryLocationData>(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to create inventory location");
@@ -1797,9 +2279,13 @@ export const createInventoryLocation = async (data: InventoryLocationCreateUpdat
   }
 };
 
-export const getInventoryLocation = async (id: number): Promise<InventoryLocationData> => {
+export const getInventoryLocation = async (
+  id: number
+): Promise<InventoryLocationData> => {
   try {
-    const response = await axiosInstance.get(`/accounting/inventory/locations/${id}`);
+    const response = await axiosInstance.get(
+      `/accounting/inventory/locations/${id}`
+    );
     return extractData<InventoryLocationData>(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to fetch inventory location");
@@ -1812,7 +2298,10 @@ export const updateInventoryLocation = async (
   data: InventoryLocationCreateUpdatePayload
 ): Promise<InventoryLocationData> => {
   try {
-    const response = await axiosInstance.put(`/accounting/inventory/locations/${id}`, data);
+    const response = await axiosInstance.put(
+      `/accounting/inventory/locations/${id}`,
+      data
+    );
     return extractData<InventoryLocationData>(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to update inventory location");
@@ -1829,9 +2318,13 @@ export const deleteInventoryLocation = async (id: number): Promise<void> => {
   }
 };
 
-export const getLocationInventory = async (id: number): Promise<InventoryData[]> => {
+export const getLocationInventory = async (
+  id: number
+): Promise<InventoryData[]> => {
   try {
-    const response = await axiosInstance.get(`/accounting/inventory/locations/${id}/inventory`);
+    const response = await axiosInstance.get(
+      `/accounting/inventory/locations/${id}/inventory`
+    );
     return extractData<InventoryData[]>(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to fetch location inventory");
@@ -1844,8 +2337,11 @@ export const getInventorySuppliers = async (
   params: PaginationParams = {}
 ): Promise<PaginationWrapper<InventorySupplierData>> => {
   try {
-    const response = await axiosInstance.get("/accounting/inventory/suppliers", { params });
-    
+    const response = await axiosInstance.get(
+      "/accounting/inventory/suppliers",
+      { params }
+    );
+
     // Handle the actual API response structure
     if (response.data?.code === 200 && response.data?.data?.success) {
       return {
@@ -1857,10 +2353,10 @@ export const getInventorySuppliers = async (
           last_page: response.data.data.pagination.last_page,
           from: response.data.data.pagination.from,
           to: response.data.data.pagination.to,
-        }
+        },
       };
     }
-    
+
     // Fallback to extractData if structure is different
     return extractData<PaginationWrapper<InventorySupplierData>>(response.data);
   } catch (error: any) {
@@ -1869,9 +2365,14 @@ export const getInventorySuppliers = async (
   }
 };
 
-export const createInventorySupplier = async (data: InventorySupplierCreateUpdatePayload): Promise<InventorySupplierData> => {
+export const createInventorySupplier = async (
+  data: InventorySupplierCreateUpdatePayload
+): Promise<InventorySupplierData> => {
   try {
-    const response = await axiosInstance.post("/accounting/inventory/suppliers", data);
+    const response = await axiosInstance.post(
+      "/accounting/inventory/suppliers",
+      data
+    );
     return extractData<InventorySupplierData>(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to create inventory supplier");
@@ -1879,9 +2380,13 @@ export const createInventorySupplier = async (data: InventorySupplierCreateUpdat
   }
 };
 
-export const getInventorySupplier = async (id: number): Promise<InventorySupplierData> => {
+export const getInventorySupplier = async (
+  id: number
+): Promise<InventorySupplierData> => {
   try {
-    const response = await axiosInstance.get(`/accounting/inventory/suppliers/${id}`);
+    const response = await axiosInstance.get(
+      `/accounting/inventory/suppliers/${id}`
+    );
     return extractData<InventorySupplierData>(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to fetch inventory supplier");
@@ -1894,7 +2399,10 @@ export const updateInventorySupplier = async (
   data: InventorySupplierCreateUpdatePayload
 ): Promise<InventorySupplierData> => {
   try {
-    const response = await axiosInstance.put(`/accounting/inventory/suppliers/${id}`, data);
+    const response = await axiosInstance.put(
+      `/accounting/inventory/suppliers/${id}`,
+      data
+    );
     return extractData<InventorySupplierData>(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to update inventory supplier");
@@ -1911,9 +2419,13 @@ export const deleteInventorySupplier = async (id: number): Promise<void> => {
   }
 };
 
-export const getSupplierProducts = async (id: number): Promise<ProductData[]> => {
+export const getSupplierProducts = async (
+  id: number
+): Promise<ProductData[]> => {
   try {
-    const response = await axiosInstance.get(`/accounting/inventory/suppliers/${id}/products`);
+    const response = await axiosInstance.get(
+      `/accounting/inventory/suppliers/${id}/products`
+    );
     return extractData<ProductData[]>(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to fetch supplier products");

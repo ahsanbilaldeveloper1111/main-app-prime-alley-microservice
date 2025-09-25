@@ -26,6 +26,8 @@
     "@reduxjs/toolkit": "^2.8.2",
     "@south-paw/react-vector-maps": "^3.2.0",
     "@stomp/stompjs": "^7.1.1",
+    "@stripe/react-stripe-js": "^4.0.2",
+    "@stripe/stripe-js": "^7.9.0",
     "@tanstack/match-sorter-utils": "^8.19.4",
     "@tanstack/react-table": "^8.21.3",
     "@tinymce/tinymce-react": "^6.2.1",
