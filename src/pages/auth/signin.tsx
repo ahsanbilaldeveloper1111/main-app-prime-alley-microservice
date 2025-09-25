@@ -1,9 +1,10 @@
 import NonLayout from "@layout/NonLayout";
 import Image from "next/image";
-import React, { ReactElement ,useState} from "react";
+import React, { ReactElement ,useState, useEffect} from "react";
 import { signIn, getSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import { GetServerSideProps } from 'next';
+import Head from 'next/head';
 
 import authlogin from "@assets/images/authentication/img-auth-login.png";
 import logodark from "@assets/images/logo-dark.svg";
@@ -14,6 +15,8 @@ import dashboard from "@pages/dashboard";
 import { toast } from "react-toastify";
 import { FaEye, FaEyeSlash,FaSpinner } from "react-icons/fa";
 import '@assets/scss/login.scss';
+import LogoBlackBlue from "@assets/images/ringedge-logo-black-n-blue.png";
+import Logo from "@assets/images/ringedge-logo.png";
 
 
 const Signin = () => {
@@ -75,22 +78,131 @@ const Signin = () => {
     });
   };
 
+  // Initialize particles.js
+  useEffect(() => {
+    const initParticles = () => {
+      if (typeof window !== 'undefined' && window.particlesJS) {
+        window.particlesJS('particles-js', {
+          "particles": {
+            "number": {
+              "value":40,
+              "density": {
+                "enable": true,
+                "value_area": 800
+              }
+            },
+            "color": {
+              "value": "#1e70e3"
+            },
+            "shape": {
+              "type": "circle"
+            },
+            "opacity": {
+              "value": 1,
+              "random": false
+            },
+            "size": {
+              "value": 3,
+              "random": true
+            },
+            "line_linked": {
+              "enable": true,
+              "distance": 150,
+              "color": "#1e70e3",
+              "opacity": 0.2,
+              "width": 1
+            },
+            "move": {
+              "enable": true,
+              "speed": 3,
+              "direction": "none",
+              "random": false,
+              "straight": false,
+              "out_mode": "out",
+              "bounce": false
+            }
+          },
+          "interactivity": {
+            "detect_on": "canvas",
+            "events": {
+              "onhover": {
+                "enable": true,
+                "mode": "grab"
+              },
+              "onclick": {
+                "enable": true,
+                "mode": "push"
+              },
+              "resize": true
+            },
+            "modes": {
+              "grab": {
+                "distance": 140,
+                "line_linked": {
+                  "opacity": 0.8
+                }
+              },
+              "push": {
+                "particles_nb": 2
+              }
+            }
+          },
+          "retina_detect": true
+        });
+      }
+    };
+
+    // Check if particles.js is already loaded
+    if (typeof window !== 'undefined' && typeof window.particlesJS === 'function') {
+      initParticles();
+    } else {
+      // Wait for the script to load
+      const checkParticles = setInterval(() => {
+        if (typeof window !== 'undefined' && typeof window.particlesJS === 'function') {
+          initParticles();
+          clearInterval(checkParticles);
+        }
+      }, 100);
+
+      // Cleanup interval after 10 seconds
+      setTimeout(() => clearInterval(checkParticles), 10000);
+    }
+
+    // Cleanup function
+    return () => {
+      if (typeof window !== 'undefined' && window.pJSDom) {
+        window.pJSDom.forEach((pJS) => {
+          if (pJS.pJS && pJS.pJS.fn && pJS.pJS.fn.vendors && pJS.pJS.fn.vendors.destroy) {
+            pJS.pJS.fn.vendors.destroy();
+          }
+        });
+      }
+    };
+  }, []);
+
 
     return (
         <React.Fragment>
-
-<div id="particles-js"></div>
+            <Head>
+                <script src="https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js"></script>
+            </Head>
+            <div id="particles-js"></div>
     <div className="login-main-container">
         <header className="login-info-panel">
             <div className="info-panel-content">
                 <i className="fas fa-satellite-dish" style={{fontSize: '3rem', marginBottom: '20px'}}></i>
                 <h1 className="text-white">Ring Edge</h1>
+               
+                {/* <br />
+                <Image src={Logo} alt="Ring Edge" /> */}
+
                 <p>A new frontier in telecommunications and data management. Secure, efficient, and reliable.</p>
             </div>
         </header>
         <main className="login-form-panel">
             <div className="login-form-card">
                 <h1 className="login-title">Welcome Back</h1>
+
                 <p className="login-subtitle">Sign in to your account</p>
                 
                 <form className="login-form" id="loginForm" onSubmit={handleSubmit}>

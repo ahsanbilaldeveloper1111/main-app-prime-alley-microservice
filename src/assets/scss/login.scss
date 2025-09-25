@@ -82,7 +82,7 @@
       flex-direction: column;
       justify-content: center;
       align-items: center;
-      padding: 40px;
+      padding: 40px !important;
       position: relative;
       overflow: hidden;
       color: white;
@@ -393,8 +393,15 @@
           display: none;
       }
       .login-main-container {
-          width: 90%;
-          height: auto;
-          padding: 20px;
+        width: 100%;
+        height: auto;
+        background: none;
+        padding: 20px;
+        box-shadow: none;
+      }
+      .login-form-panel{
+        background: white;
+        box-shadow: var(--shadow-md);
+        border-radius: var(--border-radius-md);
       }
   }

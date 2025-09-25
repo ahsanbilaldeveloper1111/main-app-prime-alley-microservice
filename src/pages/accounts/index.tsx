@@ -19,8 +19,8 @@ const Accounts = () => {
     return (
         <React.Fragment>
             <ComingSoon 
-                title="Accounts"
-                description="Account management features are under development and will be available soon."
+                title="Billing"
+                description="Billing features are under development and will be available soon."
                 icon="ph-duotone ph-users"
             />
         </React.Fragment>
