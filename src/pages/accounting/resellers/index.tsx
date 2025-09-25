@@ -18,7 +18,7 @@ import {
   ResellerData,
 } from "@utils/accounting";
 import { Column } from "@components/CustomDataTable";
-import { Button, Modal, Row, Col, DropdownItem, DropdownMenu, Dropdown, DropdownToggle } from "react-bootstrap";
+import { Button, Modal, Row, Col, DropdownItem, DropdownMenu, Dropdown, DropdownToggle, Card } from "react-bootstrap";
 import { toast } from "react-toastify";
 import { useSession } from "next-auth/react";
 
@@ -32,6 +32,11 @@ import SuccessfulModal from "@pages/partial/SuccessfulModal";
 import { FiEdit, FiEye, FiMoreVertical, FiTrash2 } from "react-icons/fi";
 import { Link } from "feather-icons-react";
 import FormModal from "@pages/partial/FormModal";
+
+import dynamic from 'next/dynamic';
+import { ApexOptions } from 'apexcharts';
+const ReactApexChart = dynamic(() => import('react-apexcharts'), { ssr: false });
+import EmptyState from '@components/EmptyState';
 
 interface Summary {
   total_resellers: number;
@@ -99,6 +104,7 @@ const ResellerList = () => {
   });
 
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isChartLoading, setIsChartLoading] = useState<boolean>(true);
   const [currentFilters, setCurrentFilters] = useState<{search?: string}>({});
 
   // Table columns
@@ -128,7 +134,7 @@ const ResellerList = () => {
         selector: (row: any) => row.parent_id,
         sortable: true,
         cell: (props: any) => (
-          <span className="text-muted">{props.parent_id || "N/A"}</span>
+          <span className="status-badge primary">{props.parent_id || "N/A"}</span>
         ),
       },
       {
@@ -137,7 +143,16 @@ const ResellerList = () => {
         selector: (row: any) => row.organization_unit,
         sortable: true,
         cell: (props: any) => (
-          <span className="text-muted">{props.organization_unit || "N/A"}</span>
+          <span className="status-badge primary">{props.organization_unit || "N/A"}</span>
+        ),
+      },
+      {
+        key: "status",
+        name: "Status",
+        selector: (row: any) => row.status,
+        sortable: true,
+        cell: (props: any) => (
+          <div className={`status-badge ${props.status==="active" ? "success" : "danger"}`}>{props.status || "N/A"}</div>
         ),
       },
       {
@@ -347,6 +362,60 @@ const ResellerList = () => {
     }));
   }, []);
 
+  const [chartVisible, setChartVisible] = React.useState(false);
+  
+  useEffect(() => {
+    // Start with both states false
+    setIsChartLoading(true);
+    setChartVisible(false);
+    
+    // After a brief delay, show the chart and hide loading
+    const timer = setTimeout(() => {
+      setChartVisible(true);
+      setIsChartLoading(false);
+    }, 1000);
+    
+    return () => clearTimeout(timer);
+  }, []);
+
+  const [trendsChart, setTrendsChart] = React.useState<{
+    series: {name: string, data: number[]}[];
+    options: ApexOptions;
+  }>({
+    series: [{
+      name: "Usage & Revenue Trends",
+      data: [100, 300, 100, 400, 500, 600, 700, 500, 900, 200, 600, 100]
+    }],
+    options: {
+      chart: {
+        type: 'area',
+        height: 350,
+        zoom: {
+          enabled: false
+        },
+        toolbar: {
+          show: false
+        }
+      },
+      dataLabels: {
+        enabled: false
+      },
+      stroke: {
+        curve: 'straight'
+      },
+      
+      xaxis: {
+        categories: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+      },
+      yaxis: {
+        opposite: false
+      },
+      legend: {
+        horizontalAlign: 'left'
+      }
+    },
+});
+
   return (
     <React.Fragment>
       <BreadcrumbItem
@@ -356,7 +425,7 @@ const ResellerList = () => {
       />
 
 
-<PageHeader
+    <PageHeader
         title="Resellers"
         showSearch={true}
         searchPlaceholder="Search reseller..."
@@ -374,6 +443,32 @@ const ResellerList = () => {
       />
 
     <PageSummaryGrid cards={summaryCards} />
+
+      <Card>
+        <Card.Body>
+          
+          <div style={{ position: 'relative', minHeight: '350px' }}>
+            {isChartLoading && (
+              <div style={{ position: 'absolute', width: '100%', height: '100%' }}>
+                <EmptyState
+                  title="Loading..."
+                  description="Loading usage and revenue trends..."
+                  className="table-empty-state"
+                />
+              </div>
+            )}
+            <div style={{ opacity: chartVisible ? 1 : 0, transition: 'opacity 0.3s ease' }}>
+            <h5 className="app-title-heading">Usage & Revenue Trends</h5>
+              <ReactApexChart
+                options={trendsChart.options}
+                series={trendsChart.series}
+                type="area"
+                height={350}
+              />
+            </div>
+          </div>
+        </Card.Body>
+      </Card>
       
 
       <GenericListPage

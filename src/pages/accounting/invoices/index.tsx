@@ -30,10 +30,19 @@ import { Col } from "react-bootstrap";
 import { toast } from "react-toastify";
 import { useSession } from "next-auth/react";
 import moment from "moment";
-import "@assets/scss/gsm-assign.scss";
-import "@assets/scss/dashboard-card.scss";
+
 import "@assets/scss/common.scss";
+
+import "@assets/scss/tabs.scss";
+import PageHeader from "@components/PageHeader";
+import PageSummaryGrid from "@components/PageSummaryGrid";
+import FormModal from "../../partial/FormModal";
+import ConfirmModal from "@pages/partial/ConfirmModal";
+import SuccessfulModal from "@pages/partial/SuccessfulModal";
+
 import { motion } from "framer-motion";
+import { FiEdit, FiTrash2 } from "react-icons/fi";
+import TableAction from "@components/TableAction";
 
 interface SelectOption {
   value: number;
@@ -48,7 +57,7 @@ const InvoiceList = () => {
   const { data: session, status } = useSession();
 
   const [refreshKey, setRefreshKey] = useState<number>(0);
-  const [currentFilters, setCurrentFilters] = useState({});
+  const [currentFilters, setCurrentFilters] = useState<{search?: string}>({});
 
   const [companies, setCompanies] = useState<CompanyData[]>([]);
   const [products, setProducts] = useState<ProductData[]>([]);
@@ -72,7 +81,7 @@ const InvoiceList = () => {
         selector: (row: InvoiceData) => row.company?.name,
         sortable: true,
         cell: (props: InvoiceData) => (
-          <span className="badge bg-info">
+          <span className="status-badge primary">
             {props.company?.name || "Unknown Company"}
           </span>
         ),
@@ -167,20 +176,25 @@ const InvoiceList = () => {
         selector: (row: InvoiceData) => row.id,
         sortable: false,
         cell: (props: InvoiceData) => (
-          <div className="action-buttons-container">
-            <button
-              className="btn btn-sm btn-outline-primary me-1"
-              onClick={() => handleEditInvoice(props)}
-            >
-              Edit
-            </button>
-            <button
-              className="btn btn-sm btn-outline-danger"
-              onClick={() => handleDeleteInvoice(props)}
-            >
-              Delete
-            </button>
-          </div>
+          <>  
+          <TableAction
+                    actions={[
+                        {
+                            label: 'Edit',
+                            icon: FiEdit,
+                            onClick: () => handleEditInvoice(props),
+                            variant: 'edit'
+                        },
+                        {
+                            label: 'Delete',
+                            icon: FiTrash2,
+                            onClick: () => handleDeleteInvoice(props),
+                            variant: 'delete'
+                        },
+                    ]}
+                />
+          </>
+          
         ),
       },
     ],
@@ -624,33 +638,23 @@ const InvoiceList = () => {
     []
   );
 
+
   return (
     <React.Fragment>
       <BreadcrumbItem mainTitle="" mainLink="" subTitle="Call Logs" />
 
-      <Row className="mb-3">
-        <Col md={12}>
-          <div className="page-header-title style-2">
-            <Row className="d-flex justify-content-between align-items-center">
-              <Col md={4}>
-                <h2 className="mb-0">Invoices</h2>
-              </Col>
+      <PageHeader
+        title="Invoices"
+        showSearch={true}
+        searchPlaceholder="Search invoices..."
+        searchValue={currentFilters.search || ""}
+        onSearchChange={(value) => handleFiltersChange({...currentFilters, search: value})}
+        buttons={
+          <Button variant="primary" size="sm" onClick={openCreateInvoiceModal}>New Invoice</Button>
+        }
+      />
 
-              <Col md={8} className="d-flex justify-content-end">
-                <div className="action-buttons">
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    onClick={openCreateInvoiceModal}
-                  >
-                    New Invoice
-                  </Button>
-                </div>
-              </Col>
-            </Row>
-          </div>
-        </Col>
-      </Row>
+      
      
 
       <GenericListPage

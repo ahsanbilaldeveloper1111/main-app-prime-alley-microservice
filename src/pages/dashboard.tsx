@@ -7,12 +7,49 @@ import Link from 'next/link';
 import { Button, Col, Row } from 'react-bootstrap';
 import AnimatedNumber from '@components/AnimatedNumber';
 import "@assets/scss/dashboard.scss";
+import "@assets/scss/common.scss";
+import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
+
+interface Summary {
+    online_agents: number;
+    calls_handled: number;
+    active_calls: number;
+}
 
 const Dashboard = () => {
     const { data: session, status } = useSession();
     const router = useRouter();
     const [permissions, setPermissions] = useState<string[]>([]);
     const [isAdmin, setIsAdmin] = useState(false);
+
+    const [summary, setSummary] = useState<Summary>({
+        online_agents: 22,
+        calls_handled: 550,
+        active_calls: 150,
+    });
+    const [summaryCards, setSummaryCards] = useState<SummaryCard[]>([
+        {
+            id: 'online-agents',
+            title: 'Online Agents',
+            value: summary.online_agents,
+            description: 'Online agents in the system',
+            delay: 0.1,
+        },
+        {
+            id: 'calls-handled',
+            title: 'Calls Handled',
+            value: summary.calls_handled,
+            description: 'Calls handled in the system',
+            delay: 0.2,
+        },
+        {
+            id: 'active-calls',
+            title: 'Active Calls',
+            value: summary.active_calls,
+            description: 'Active calls in the system',
+            delay: 0.3,
+        },
+    ]);
 
     useEffect(() => {
         if (status !== "loading") {
@@ -188,35 +225,8 @@ const Dashboard = () => {
                         <h2 className="mb-4 f-w-600">Your Insights</h2>
                     </Col>
                     
-                    <Col md={4} sm={4} xs={4} className="mb-2">
-                        <div className="card text-center">
-                            <div className="card-body insights-box">
-                                <AnimatedNumber value={100} duration={1000} />
-                                <p>Card Text</p>
-                            </div>
-                        </div>
-                    </Col>
-
-                    <Col md={4} sm={4} xs={4} className="mb-2">
-                        <div className="card text-center">
-                            <div className="card-body insights-box">
-                                <AnimatedNumber value={100} duration={1000} />
-                                <p>Issue Pending</p>
-                            </div>
-                        </div>
-                    </Col>
-
-                    <Col md={4} sm={4} xs={4} className="mb-2">
-                        <div className="card text-center">
-                            <div className="card-body insights-box">
-                                <AnimatedNumber value={100} duration={1000} />
-                                <p>Uptime (this week)</p>
-                            </div>
-                        </div>
-                    </Col>
-
-                   
                 </Row>
+                <PageSummaryGrid cards={summaryCards} />
 
                 {/* Service Cards Grid */}
                 <div className="row g-4 mt-2">

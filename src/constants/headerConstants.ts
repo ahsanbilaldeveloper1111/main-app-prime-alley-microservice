@@ -21,7 +21,7 @@ export const HEADER_CONSTANTS = {
   
   // Menu Labels
   MENU_LABELS: {
-    DASHBOARD: 'Dashboard',
+    DASHBOARD: 'Home',
     CONTROL_HUB: 'Control Hub',
     SIM_GATEWAY: 'Sim Gateway',
     CALL_LOGS: 'Call Logs',

@@ -30,6 +30,16 @@ import { toast } from "react-toastify";
 import { useRouter } from "next/router";
 import moment from "moment";
 
+import PageHeader from "@components/PageHeader";
+import '@assets/scss/common.scss';
+import '@assets/scss/tabs.scss'
+import PageSummaryGrid from "@components/PageSummaryGrid";
+import FormModal from '../../../partial/FormModal';
+import ConfirmModal from "@pages/partial/ConfirmModal";
+import SuccessfulModal from "@pages/partial/SuccessfulModal";
+import { FiEdit, FiTrash2 } from "react-icons/fi";
+import TableAction from "@components/TableAction";
+
 const CompanyProductPricing = () => {
   const router = useRouter();
   const { companyId } = router.query;
@@ -141,7 +151,7 @@ const CompanyProductPricing = () => {
         selector: (row: any) => row.is_active,
         sortable: true,
         cell: (props: any) => (
-          <span className={`badge ${props.is_active ? "bg-success" : "bg-secondary"}`}>
+          <span className={`status-badge ${props.is_active ? "success" : "  secondary"}`}>
             {props.is_active ? "Active" : "Inactive"}
           </span>
         ),
@@ -163,23 +173,28 @@ const CompanyProductPricing = () => {
         selector: (row: any) => row.id,
         sortable: false,
         cell: (props: any) => (
-          <div className="action-buttons-container">
-            <Button
-              variant="outline-primary"
-              size="sm"
-              className="me-1"
-              onClick={() => handleEditPricing(props)}
-            >
-              Edit
-            </Button>
-            <Button
-              variant="outline-danger"
-              size="sm"
-              onClick={() => handleDeletePricing(props)}
-            >
-              Delete
-            </Button>
-          </div>
+          <>
+          <TableAction
+                    actions={[
+                        {
+                            label: 'Edit',
+                            icon: FiEdit,
+                            onClick: () => handleEditPricing(props),
+                           // permission: 'edit-companies',
+                            variant: 'edit'
+                        },
+                        {
+                            label: 'Delete',
+                            icon: FiTrash2,
+                            onClick: () => handleDeletePricing(props),
+                            //permission: 'delete-companies',
+                            variant: 'delete'
+                        },
+                    ]}
+                    
+                />
+          </>
+
         ),
       },
     ],
@@ -224,7 +239,7 @@ const CompanyProductPricing = () => {
         selector: (row: any) => row.discount_type,
         sortable: true,
         cell: (props: any) => (
-          <span className={`badge ${props.discount_type === 'percentage' ? 'bg-info' : 'bg-warning'}`}>
+          <span className="status-badge primary">
             {props.discount_type === 'percentage' ? 'Percentage' : 'Fixed Amount'}
           </span>
         ),
@@ -270,7 +285,7 @@ const CompanyProductPricing = () => {
         selector: (row: any) => row.is_applicable,
         sortable: true,
         cell: (props: any) => (
-          <span className={`badge ${props.is_applicable ? "bg-success" : "bg-secondary"}`}>
+          <span className={`status-badge ${props.is_applicable ? "success" : "secondary"}`}>
             {props.is_applicable ? "Active" : "Inactive"}
           </span>
         ),
@@ -281,23 +296,27 @@ const CompanyProductPricing = () => {
         selector: (row: any) => row.id,
         sortable: false,
         cell: (props: any) => (
-          <div className="action-buttons-container">
-            <Button
-              variant="outline-primary"
-              size="sm"
-              className="me-1"
-              onClick={() => handleEditDiscount(props)}
-            >
-              Edit
-            </Button>
-            <Button
-              variant="outline-danger"
-              size="sm"
-              onClick={() => handleDeleteDiscount(props)}
-            >
-              Delete
-            </Button>
-          </div>
+          <>  
+          <TableAction
+                    actions={[
+                        {
+                            label: 'Edit',
+                            icon: FiEdit,
+                            onClick: () => handleEditDiscount(props),
+                            //permission: 'edit-companies',
+                            variant: 'edit'
+                        },
+                        {
+                            label: 'Delete',
+                            icon: FiTrash2,
+                            onClick: () => handleDeleteDiscount(props),
+                            //permission: 'delete-companies',
+                            variant: 'delete'
+                        },
+                    ]}
+                />
+          </>
+
         ),
       },
     ],
@@ -660,6 +679,15 @@ const CompanyProductPricing = () => {
     }));
   }, []);
 
+  interface TableFilters {
+    search?: string;
+  }
+
+  const [currentFilters, setCurrentFilters] = useState<TableFilters>({});
+  const handleFiltersChange = useCallback((filters: TableFilters) => {
+    setCurrentFilters(filters);
+  }, []);
+
   if (!companyId) {
     return (
       <div className="text-center py-5">
@@ -681,29 +709,11 @@ const CompanyProductPricing = () => {
         mainLink="/accounting/companies"
         subTitle="Companies"
       />
-      
-      <Row className="mb-3">
-        <Col md={12}>
-          <div className="page-header-title">
-            <h2 className="mb-0 d-flex align-items-center">
-              Product Pricing & Discounts
-              <div className="ms-3 d-flex gap-2">
-                <Button
-                  variant="outline-secondary"
-                  size="sm"
-                  onClick={() => router.push("/accounting/companies")}
-                >
-                  Back to Companies
-                </Button>
-              </div>
-            </h2>
-          </div>
-        </Col>
-      </Row>
+
 
       <Row className="mb-3">
         <Col md={12}>
-          <ul className="nav nav-tabs" id="pricingTabs" role="tablist">
+          <ul id="system-tabs" className="nav nav-tabs"  role="tablist">
             <li className="nav-item" role="presentation">
               <button
                 className={`nav-link ${activeTab === "pricing" ? "active" : ""}`}
@@ -733,19 +743,17 @@ const CompanyProductPricing = () => {
       <div className="tab-content" id="pricingTabsContent">
         {/* Product Pricing Tab */}
         <div className={`tab-pane fade ${activeTab === "pricing" ? "show active" : ""}`} id="pricing" role="tabpanel" aria-labelledby="pricing-tab">
-          <Row className="mb-3">
-            <Col md={12}>
-              <div className="d-flex justify-content-end">
-                <Button
-                  variant="outline-primary"
-                  size="sm"
-                  onClick={openCreateModal}
-                >
-                  Add Product Pricing
-                </Button>
-              </div>
-            </Col>
-          </Row>
+        <PageHeader
+        title="Product Pricing"
+        showSearch={true}
+        searchPlaceholder="Search product pricing..."
+        searchValue={currentFilters.search || ""}
+        onSearchChange={(value) => handleFiltersChange({...currentFilters, search: value})}
+        buttons={
+          <Button variant="primary" size="sm" onClick={openCreateModal}>Add Product Pricing</Button>
+        }
+      />
+          
           <GenericListPage
             columns={columns}
             fetchData={fetchProductPricing}
@@ -753,26 +761,26 @@ const CompanyProductPricing = () => {
             searchPlaceholder="Search product pricing..."
             defaultPageSize={15}
             refreshKey={refreshKey}
-            search={true}
+            search={false}
             filters={filters}
+            tableStyle="table-style-2"
+
           />
         </div>
 
         {/* Discount Applicability Tab */}
         <div className={`tab-pane fade ${activeTab === "discounts" ? "show active" : ""}`} id="discounts" role="tabpanel" aria-labelledby="discounts-tab">
-          <Row className="mb-3">
-            <Col md={12}>
-              <div className="d-flex justify-content-end">
-                <Button
-                  variant="outline-primary"
-                  size="sm"
-                  onClick={openCreateDiscountModal}
-                >
-                  Add Discount Applicability
-                </Button>
-              </div>
-            </Col>
-          </Row>
+          <PageHeader
+            title="Discount Applicability"
+            showSearch={true}
+            searchPlaceholder="Search discount applicability..."
+            searchValue={currentFilters.search || ""}
+            onSearchChange={(value) => handleFiltersChange({...currentFilters, search: value})}
+            buttons={
+              <Button variant="primary" size="sm" onClick={openCreateDiscountModal}>Add Discount Applicability</Button>
+            }
+          />
+          
           <GenericListPage
             columns={discountColumns}
             fetchData={fetchDiscountApplicability}
@@ -780,8 +788,9 @@ const CompanyProductPricing = () => {
             searchPlaceholder="Search discount applicability..."
             defaultPageSize={15}
             refreshKey={refreshKey}
-            search={true}
+            search={false}
             filters={filters}
+            tableStyle="table-style-2"
           />
         </div>
       </div>

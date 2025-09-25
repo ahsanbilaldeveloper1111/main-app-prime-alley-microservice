@@ -23,15 +23,21 @@ import { Col } from "react-bootstrap";
 import { toast } from "react-toastify";
 import { useSession } from "next-auth/react";
 import moment from "moment";
-import "@assets/scss/gsm-assign.scss";
-import "@assets/scss/dashboard-card.scss";
-import "@assets/scss/common.scss";
 
+import "@assets/scss/common.scss";
+import "@assets/scss/tabs.scss";
+import PageHeader from "@components/PageHeader";
+import PageSummaryGrid from "@components/PageSummaryGrid";
+import FormModal from "../../partial/FormModal";
+import ConfirmModal from "@pages/partial/ConfirmModal";
+import SuccessfulModal from "@pages/partial/SuccessfulModal";
+import { FiEdit, FiTrash2 } from "react-icons/fi";
+import TableAction from "@components/TableAction";
 const SupplierList = () => {
   const { data: session, status } = useSession();
 
   const [refreshKey, setRefreshKey] = useState<number>(0);
-  const [currentFilters, setCurrentFilters] = useState({});
+  const [currentFilters, setCurrentFilters] = useState<{search?: string}>({});
 
   // Supplier Management
   const [selectedSupplier, setSelectedSupplier] = useState<InventorySupplierData | null>(null);
@@ -133,20 +139,25 @@ const SupplierList = () => {
         selector: (row: InventorySupplierData) => row.id,
         sortable: false,
         cell: (props: InventorySupplierData) => (
-          <div className="action-buttons-container">
-            <button
-              className="btn btn-sm btn-outline-primary me-1"
-              onClick={() => handleEditSupplier(props)}
-            >
-              Edit
-            </button>
-            <button
-              className="btn btn-sm btn-outline-danger"
-              onClick={() => handleDeleteSupplier(props)}
-            >
-              Delete
-            </button>
-          </div>
+          <>  
+          <TableAction
+                    actions={[
+                        {
+                            label: 'Edit',
+                            icon: FiEdit,
+                            onClick: () => handleEditSupplier(props),
+                            variant: 'edit'
+                        },
+                        {
+                            label: 'Delete',
+                            icon: FiTrash2,
+                            onClick: () => handleDeleteSupplier(props),
+                            variant: 'delete'
+                        },
+                    ]}
+                />
+          </>
+
         ),
       },
     ],
@@ -336,29 +347,17 @@ const SupplierList = () => {
     <React.Fragment>
       <BreadcrumbItem mainTitle="" mainLink="" subTitle="Suppliers" />
 
-      <Row className="mb-3">
-        <Col md={12}>
-          <div className="page-header-title style-2">
-            <Row className="d-flex justify-content-between align-items-center">
-              <Col md={4}>
-                <h2 className="mb-0">Suppliers</h2>
-              </Col>
+      <PageHeader
+        title="Suppliers"
+        showSearch={true}
+        searchPlaceholder="Search suppliers..."
+        searchValue={currentFilters.search || ""}
+        onSearchChange={(value) => handleFiltersChange({...currentFilters, search: value})}
+        buttons={
+          <Button variant="primary" size="sm" onClick={openCreateSupplierModal}>New Supplier</Button>
+        }
+      />
 
-              <Col md={8} className="d-flex justify-content-end">
-                <div className="action-buttons">
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    onClick={openCreateSupplierModal}
-                  >
-                    New Supplier
-                  </Button>
-                </div>
-              </Col>
-            </Row>
-          </div>
-        </Col>
-      </Row>
 
       <GenericListPage
         columns={columns}

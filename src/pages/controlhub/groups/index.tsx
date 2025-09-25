@@ -12,7 +12,8 @@ import { toast } from 'react-toastify';
 import { useTokenService } from 'src/hooks/useTokenService';
 import { useSession } from 'next-auth/react';
 import '@assets/scss/common.scss';
-import { FiEdit, FiMoreVertical, FiTrash2 } from 'react-icons/fi';
+import { FiEdit, FiTrash2 } from 'react-icons/fi';
+import TableAction from '@components/TableAction';
 import { Link } from 'feather-icons-react';
 
 const Groups = () => {
@@ -27,31 +28,25 @@ const Groups = () => {
             sortable: false,
             cell: (props: any) => (
 
-                <Dropdown
-                className="table-action-dropdown"
-                //drop="start"
-                placement="top-start"
-            >
-                <DropdownToggle variant="outline-secondary" size="sm">
-                    <FiMoreVertical size={14} />
-                </DropdownToggle>
-                <DropdownMenu>
-                {session?.user?.permissions?.includes('edit-groups')  && (
-                    <DropdownItem className="action-edit" onClick={() => handleEditGroup(props)}>
-                        <FiEdit className="me-2" />
-                        Edit
-                    </DropdownItem>
-                )}
-
-{session?.user?.permissions?.includes('delete-groups')   && (
-                    <DropdownItem className="action-delete" onClick={() => handleDeleteGroup(props)}>
-                        <FiTrash2 className="me-2" />
-                        Delete
-                    </DropdownItem>
-                    )}
-                </DropdownMenu>
-
-            </Dropdown>
+                <TableAction
+                    actions={[
+                        {
+                            label: 'Edit',
+                            icon: FiEdit,
+                            onClick: () => handleEditGroup(props),
+                            permission: 'edit-groups',
+                            variant: 'edit'
+                        },
+                        {
+                            label: 'Delete',
+                            icon: FiTrash2,
+                            onClick: () => handleDeleteGroup(props),
+                            permission: 'delete-groups',
+                            variant: 'delete'
+                        }
+                    ]}
+                    userPermissions={session?.user?.permissions}
+                />
                 
                
             ),
