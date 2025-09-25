@@ -389,68 +389,6 @@ const ResellerList = () => {
 
       />
 
-      {/* Create Modal */}
-      {/* <Modal show={showCreateModal} onHide={closeCreateModal} size="lg">
-        <Modal.Header closeButton>
-          <Modal.Title>Create New Reseller</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <div className="row">
-            <div className="col-md-6">
-              <div className="form-group mb-3">
-                <label htmlFor="createName">Name *</label>
-                <input
-                  type="text" 
-                  className="form-control"
-                  id="createName"
-                  value={formData.name}
-                  onChange={(e) => handleInputChange("name", e.target.value)}
-                  placeholder="Enter reseller name"
-                />
-              </div>
-            </div>
-            <div className="col-md-6">
-              <div className="form-group mb-3">
-                <label htmlFor="createParentId">Parent ID</label>
-                <input
-                  type="number"
-                  className="form-control"
-                  id="createParentId"
-                  value={formData.parent_id || ""}
-                  onChange={(e) => handleInputChange("parent_id", e.target.value ? parseInt(e.target.value) : null)}
-                  placeholder="Enter parent ID (optional)"
-                />
-              </div>
-            </div>
-          </div>
-          
-          <div className="form-group mb-3">
-            <label htmlFor="createOrganizationUnit">Organization Unit</label>
-            <input
-              type="text"
-              className="form-control"
-              id="createOrganizationUnit"
-              value={formData.organization_unit}
-              onChange={(e) => handleInputChange("organization_unit", e.target.value)}
-              placeholder="Enter organization unit (optional)"
-            />
-          </div>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={closeCreateModal}>
-            Cancel
-          </Button>
-          <Button
-            variant="primary"
-            onClick={handleCreateReseller}
-            disabled={isLoading}
-          >
-            {isLoading ? "Creating..." : "Create Reseller"}
-          </Button>
-        </Modal.Footer>
-      </Modal> */}
-
-
       {showCreateModal && (
         <FormModal
         show={showCreateModal}
@@ -512,21 +450,17 @@ const ResellerList = () => {
         cancelButtonText="Cancel"
         onSubmit={handleCreateReseller}
       />
-      
       )}
-      
+
 
 {showEditModal && (
-        <div id="action-modal" className="modal customModal" style={{display: 'flex'}}>
-        <div className="modal-content">
-            
-            <span className="close-btn" id="action-close-btn" onClick={closeEditModal}>
-              <i className="fas fa-times"></i>
-            </span>
-          
-          <h2 id="action-modal-title">Edit Reseller #{selectedReseller?.id}</h2>
-          <p id="action-modal-text" className="mb-4 text-center">Please fill in the details below to edit the reseller.</p>
-
+        <FormModal
+        show={showEditModal}
+        onHide={() => closeEditModal()}
+        title={`Edit Reseller #${selectedReseller?.id}`}
+        desc="Please fill in the details below to edit the reseller."
+        formHtml={
+          <>
           <div className="row">
             <div className="col-md-6">
               <div className="form-group mb-3">
@@ -574,40 +508,23 @@ const ResellerList = () => {
             />
             
           </div>
-
-          <div className="modal-footer">
-            
-              <button 
-                className="btn btn-export" 
-                id="action-cancel-btn" 
-                onClick={closeEditModal}
-              >
-                Cancel
-              </button>
-            
-            <button 
-              className="btn btn-primary" 
-              id="action-confirm-btn" 
-              onClick={handleUpdateReseller}
-              disabled={isLoading}
-            >
-              {isLoading ? "Updating..." : "Update Reseller"}
-            </button>
-          </div>
-        </div>
-      </div>
+          </>
+        }
+        submitButtonText="Submit"
+        cancelButtonText="Cancel"
+        onSubmit={handleUpdateReseller}
+      />
       )}
 
-      {showViewAsResellerModal && (
-        <div id="action-modal" className="modal customModal" style={{display: 'flex'}}>
-          <div className="modal-content">
-            <span className="close-btn" id="action-close-btn" onClick={() => setShowViewAsResellerModal(false)}>
-              <i className="fas fa-times"></i>
-            </span>
-            <h2 id="action-modal-title">View As Reseller #{selectedReseller?.id}</h2>
-            
 
-             <table className="table table-bordered">
+      {showViewAsResellerModal && (
+        <FormModal
+        show={showViewAsResellerModal}
+        onHide={() => setShowViewAsResellerModal(false)}
+        title={`View As Reseller #${selectedReseller?.id}`}
+        desc="Your form description"
+        formHtml={
+          <table className="table table-bordered">
               <thead> 
                 <tr>
                   <th>Reseller Name</th>
@@ -623,20 +540,11 @@ const ResellerList = () => {
                 </tr>
               </tbody>
              </table>
-         
-        
-
-          <div className="modal-footer">
-            <button 
-              className="btn btn-export" 
-              id="action-cancel-btn" 
-              onClick={() => setShowViewAsResellerModal(false)}
-            >
-              Cancel
-            </button>
-          </div>
-          </div>
-        </div>
+        }
+        submitButtonText="Submit"
+        cancelButtonText="Cancel"
+        onSubmit={() => setShowViewAsResellerModal(false)}
+      />
       )}
 
       {showDeleteModal && (
@@ -660,33 +568,7 @@ const ResellerList = () => {
         />
       )}
 
-      {/* Delete Modal */}
-      {/* <Modal show={showDeleteModal} onHide={closeDeleteModal}>
-        <Modal.Header closeButton>
-          <Modal.Title>Delete Reseller</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <p>
-            Are you sure you want to delete the reseller{" "}
-            <strong className="text-danger">{selectedReseller?.name}</strong>?
-          </p>
-          <p className="text-muted">
-            This action cannot be undone.
-          </p>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={closeDeleteModal}>
-            Cancel
-          </Button>
-          <Button
-            variant="danger"
-            onClick={handleConfirmDelete}
-            disabled={isLoading}
-          >
-            {isLoading ? "Deleting..." : "Delete Reseller"}
-          </Button>
-        </Modal.Footer>
-      </Modal> */}
+      
     </React.Fragment>
   );
 };
