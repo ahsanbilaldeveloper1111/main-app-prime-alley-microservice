@@ -688,7 +688,7 @@ const TicketList = () => {
     }
     formData.append("priority", newTicketPriority || "0");
 
-    formData.append("created_by", "321");
+    formData.append("created_by", session?.user?.phone || "");
     if (newTicketDueDate) {
       formData.append("due_date", newTicketDueDate);
     }

@@ -187,6 +187,7 @@ button.nav-tab-link {
 }
 .Toastify {
     position: absolute;
+    z-index: 9999999;
 }
 body .nextjs-toast{
     display: none !important;

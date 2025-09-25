@@ -177,7 +177,7 @@ export const HEADER_CONSTANTS = {
     TRANSLATE: 'ph-duotone ph-translate',
     SHOPPING_CART: 'ph-duotone ph-shopping-cart',
     PACKAGE: 'ph-duotone ph-package',
-    TRENDING_UP: 'ph-duotone ph-trending-up',
+    TRENDING_UP: 'ph-duotone ph-trend-up',
     X_CIRCLE: 'ph-duotone ph-x-circle',
     PHONE_CALL: 'ph-duotone ph-phone-call',
     PLAY_CIRCLE: 'ph-duotone ph-play-circle',
