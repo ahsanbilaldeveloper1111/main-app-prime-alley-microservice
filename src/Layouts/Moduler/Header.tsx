@@ -119,6 +119,12 @@ const Header = ({ themeMode }: HeaderProps) => {
         tabPane.style.opacity = '1';
         tabPane.style.visibility = 'visible';
         
+        // Reset scroll position to top for the navbar
+        const navbar = tabPane.querySelector('.pc-navbar') as HTMLElement;
+        if (navbar) {
+            navbar.scrollTop = 0;
+        }
+        
         setTimeout(() => updateSubmenuHeight(tabPane), TIMING.HEIGHT_UPDATE_DELAY);
     }, [updateSubmenuHeight]);
 
@@ -163,8 +169,13 @@ const Header = ({ themeMode }: HeaderProps) => {
                         const targetId = target.getAttribute('data-bs-target');
                         const tabPane = targetId ? document.querySelector(targetId) as HTMLElement : null;
                         if (tabPane) {
-                showTabPane(tabPane);
-            }
+                            // Reset scroll position before showing tab pane
+                            const navbar = tabPane.querySelector('.pc-navbar') as HTMLElement;
+                            if (navbar) {
+                                navbar.scrollTop = 0;
+                            }
+                            showTabPane(tabPane);
+                        }
         };
     }, [showTabPane]);
 
@@ -226,8 +237,13 @@ const Header = ({ themeMode }: HeaderProps) => {
                     submenuPopup.classList.add('active');
                         const activeTabPane = submenuPopup.querySelector('.tab-pane.active') as HTMLElement;
                         if (activeTabPane) {
-                        setTimeout(() => updateSubmenuHeight(activeTabPane), TIMING.HEIGHT_UPDATE_DELAY);
-                    }
+                            // Reset scroll position for the active navbar
+                            const navbar = activeTabPane.querySelector('.pc-navbar') as HTMLElement;
+                            if (navbar) {
+                                navbar.scrollTop = 0;
+                            }
+                            setTimeout(() => updateSubmenuHeight(activeTabPane), TIMING.HEIGHT_UPDATE_DELAY);
+                        }
                 };
                 
                 const submenuLeaveHandler = () => {
@@ -313,6 +329,11 @@ const Header = ({ themeMode }: HeaderProps) => {
                             setTimeout(() => {
                                 const activeTabPane = document.querySelector('.tab-pane.active') as HTMLElement;
                                 if (activeTabPane) {
+                                    // Reset scroll position for the active navbar
+                                    const navbar = activeTabPane.querySelector('.pc-navbar') as HTMLElement;
+                                    if (navbar) {
+                                        navbar.scrollTop = 0;
+                                    }
                                     updateSubmenuHeight(activeTabPane);
                                 }
                             }, TIMING.HEIGHT_UPDATE_DELAY);
@@ -953,7 +974,7 @@ const Header = ({ themeMode }: HeaderProps) => {
                 </li>
                 <li className="pc-item">
                     <Link className="pc-link" href={`${BASE_URL}/accounting/companies`} >
-                        <span className="pc-micon"><i className="ph-duotone ph-building"></i></span>
+                        <span className="pc-micon"><i className="ph-duotone ph-buildings"></i></span>
                         <span className="pc-mtext">Companies</span>
                     </Link>
                 </li>
