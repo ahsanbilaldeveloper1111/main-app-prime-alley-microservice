@@ -565,7 +565,7 @@ export const createTicketFiltersConfig = (hierarchyData?: any): FilterTab[] => {
           label: 'Extensions',
           options: hierarchyData?.extensions?.map((ext: { id: string; name: string,display_name: string }) => ({
             value: ext.id,
-            label: ext.display_name+ ' ('+ext.name+')'
+            label: ext.display_name
           })) || []
         },
         
