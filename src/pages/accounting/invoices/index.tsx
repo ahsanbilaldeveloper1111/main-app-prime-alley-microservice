@@ -41,8 +41,17 @@ import ConfirmModal from "@pages/partial/ConfirmModal";
 import SuccessfulModal from "@pages/partial/SuccessfulModal";
 
 import { motion } from "framer-motion";
-import { FiEdit, FiTrash2 } from "react-icons/fi";
+import { FiEdit, FiTrash2, FiPrinter, FiDownload } from "react-icons/fi";
 import TableAction from "@components/TableAction";
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+
+// Extend jsPDF type to include autoTable
+declare module 'jspdf' {
+  interface jsPDF {
+    autoTable: (options: any) => jsPDF;
+  }
+}
 
 interface SelectOption {
   value: number;
@@ -184,6 +193,12 @@ const InvoiceList = () => {
                             icon: FiEdit,
                             onClick: () => handleEditInvoice(props),
                             variant: 'edit'
+                        },
+                        {
+                            label: 'Download PDF',
+                            icon: FiDownload,
+                            onClick: () => handleDownloadPDF(props),
+                            variant: 'default'
                         },
                         {
                             label: 'Delete',
@@ -637,6 +652,212 @@ const InvoiceList = () => {
     },
     []
   );
+
+
+  const generateInvoiceHTML = useCallback((invoice: InvoiceData) => {
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Invoice ${invoice.invoice_number}</title>
+        <style>
+          body { font-family: Arial, sans-serif; margin: 0; padding: 20px; }
+          .invoice-header { display: flex; justify-content: space-between; margin-bottom: 30px; }
+          .invoice-title { font-size: 24px; font-weight: bold; color: #2c3e50; }
+          .invoice-details { text-align: right; }
+          .invoice-details div { margin-bottom: 5px; }
+          .company-info { margin-bottom: 30px; }
+          .invoice-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+          .invoice-table th, .invoice-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+          .invoice-table th { background-color: #4285f4; color: white; font-weight: bold; }
+          .invoice-table tr:nth-child(even) { background-color: #f9f9f9; }
+          .totals { text-align: right; margin-top: 20px; }
+          .totals div { margin-bottom: 5px; }
+          .total-amount { font-size: 18px; font-weight: bold; color: #2c3e50; }
+          .notes-section { margin-top: 30px; }
+          .notes-section h4 { margin-bottom: 10px; color: #2c3e50; }
+          @media print {
+            body { margin: 0; padding: 15px; }
+            .no-print { display: none; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="invoice-header">
+          <div class="invoice-title">INVOICE</div>
+          <div class="invoice-details">
+            <div><strong>Invoice #:</strong> ${invoice.invoice_number}</div>
+            <div><strong>Date:</strong> ${moment(invoice.invoice_date).format('DD/MM/YYYY')}</div>
+            <div><strong>Due Date:</strong> ${invoice.due_date ? moment(invoice.due_date).format('DD/MM/YYYY') : 'N/A'}</div>
+            <div><strong>Status:</strong> ${invoice.status.toUpperCase()}</div>
+          </div>
+        </div>
+
+        <div class="company-info">
+          <h3>Bill To:</h3>
+          <div><strong>${invoice.company?.name || 'N/A'}</strong></div>
+        </div>
+
+        <table class="invoice-table">
+          <thead>
+            <tr>
+              <th>Product</th>
+              <th>Quantity</th>
+              <th>Unit Price</th>
+              <th>Tax Rate</th>
+              <th>Line Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${invoice.items.map(item => {
+              const product = products.find(p => p.id.toString() === item.product_id.toString());
+              const lineTotal = parseFloat(item.quantity) * parseFloat(item.unit_price);
+              return `
+                <tr>
+                  <td>${product?.name || 'Unknown Product'}</td>
+                  <td>${item.quantity}</td>
+                  <td>${invoice.currency_code} ${parseFloat(item.unit_price).toFixed(2)}</td>
+                  <td>${item.tax_rate}%</td>
+                  <td>${invoice.currency_code} ${lineTotal.toFixed(2)}</td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+
+        <div class="totals">
+          <div><strong>Subtotal:</strong> ${invoice.currency_code} ${parseFloat(invoice.subtotal || '0').toFixed(2)}</div>
+          <div><strong>Tax Amount:</strong> ${invoice.currency_code} ${parseFloat(invoice.tax_amount || '0').toFixed(2)}</div>
+          <div class="total-amount"><strong>Total Amount:</strong> ${invoice.currency_code} ${parseFloat(invoice.total_amount || '0').toFixed(2)}</div>
+        </div>
+
+        ${invoice.notes ? `
+          <div class="notes-section">
+            <h4>Notes:</h4>
+            <p>${invoice.notes}</p>
+          </div>
+        ` : ''}
+
+        ${invoice.terms_conditions ? `
+          <div class="notes-section">
+            <h4>Terms & Conditions:</h4>
+            <p>${invoice.terms_conditions}</p>
+          </div>
+        ` : ''}
+      </body>
+      </html>
+    `;
+  }, [products]);
+
+  // Print and PDF functions
+  const handlePrintInvoice = useCallback((invoice: InvoiceData) => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    const invoiceContent = generateInvoiceHTML(invoice);
+    printWindow.document.write(invoiceContent);
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
+  }, [generateInvoiceHTML]);
+
+  const handleDownloadPDF = useCallback((invoice: InvoiceData) => {
+    try {
+      const doc = new jsPDF();
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      let yPosition = 20;
+
+      // Add company header
+      doc.setFontSize(20);
+      doc.setFont('helvetica', 'bold');
+      doc.text('INVOICE', pageWidth - 60, yPosition);
+      yPosition += 10;
+
+      // Invoice details
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Invoice #: ${invoice.invoice_number}`, 20, yPosition);
+      yPosition += 8;
+      doc.text(`Date: ${moment(invoice.invoice_date).format('DD/MM/YYYY')}`, 20, yPosition);
+      yPosition += 8;
+      doc.text(`Due Date: ${invoice.due_date ? moment(invoice.due_date).format('DD/MM/YYYY') : 'N/A'}`, 20, yPosition);
+      yPosition += 8;
+      doc.text(`Status: ${(invoice.status || '').toUpperCase()}`, 20, yPosition);
+      yPosition += 8;
+      doc.text(`Company: ${invoice.company?.name || 'N/A'}`, 20, yPosition);
+      yPosition += 15;
+
+      // Invoice items table
+      const tableData = invoice.items.map(item => {
+        const product = products.find(p => p.id.toString() === item.product_id.toString());
+        return [
+          product?.name || 'Unknown Product',
+          item.quantity,
+          `${invoice.currency_code} ${parseFloat(item.unit_price).toFixed(2)}`,
+          `${item.tax_rate}%`,
+          `${invoice.currency_code} ${(parseFloat(item.quantity) * parseFloat(item.unit_price)).toFixed(2)}`
+        ];
+      });
+
+      autoTable(doc, {
+        head: [['Product', 'Quantity', 'Unit Price', 'Tax Rate', 'Line Total']],
+        body: tableData,
+        startY: yPosition,
+        styles: {
+          fontSize: 10,
+          cellPadding: 3,
+        },
+        headStyles: {
+          fillColor: [66, 139, 202],
+          textColor: 255,
+          fontStyle: 'bold',
+        },
+        columnStyles: {
+          0: { cellWidth: 60 },
+          1: { cellWidth: 20, halign: 'center' },
+          2: { cellWidth: 30, halign: 'right' },
+          3: { cellWidth: 20, halign: 'center' },
+          4: { cellWidth: 30, halign: 'right' },
+        },
+      });
+
+      const finalY = (doc as any).lastAutoTable?.finalY || yPosition + (tableData.length * 10) + 50;
+
+      // Totals
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`Subtotal: ${invoice.currency_code} ${parseFloat(invoice.subtotal || '0').toFixed(2)}`, pageWidth - 60, finalY + 10);
+      doc.text(`Tax Amount: ${invoice.currency_code} ${parseFloat(invoice.tax_amount || '0').toFixed(2)}`, pageWidth - 60, finalY + 20);
+      doc.text(`Total Amount: ${invoice.currency_code} ${parseFloat(invoice.total_amount || '0').toFixed(2)}`, pageWidth - 60, finalY + 30);
+
+      // Notes and terms
+      if (invoice.notes) {
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(10);
+        doc.text('Notes:', 20, finalY + 50);
+        const splitNotes = doc.splitTextToSize(invoice.notes || '', pageWidth - 40);
+        doc.text(splitNotes, 20, finalY + 60);
+      }
+
+      if (invoice.terms_conditions) {
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(10);
+        doc.text('Terms & Conditions:', 20, finalY + 80);
+        const splitTerms = doc.splitTextToSize(invoice.terms_conditions || '', pageWidth - 40);
+        doc.text(splitTerms, 20, finalY + 90);
+      }
+
+      // Save PDF
+      doc.save(`invoice-${invoice.invoice_number}.pdf`);
+      toast.success('PDF downloaded successfully');
+    } catch (error) {
+      console.error('PDF generation error:', error);
+      toast.error('Failed to generate PDF');
+    }
+  }, [products]);
+
+
 
 
   return (
