@@ -1985,6 +1985,27 @@ const CrmDataManagement = () => {
                 </Col>
               </Row>
 
+              {/* Custom Data Fields Section */}
+              {selectedDataItem.data && Object.keys(selectedDataItem.data).length > 0 && (
+                <div className="mt-4">
+                  <h6 className="mb-3">Custom Data Fields</h6>
+                  <Row>
+                    {Object.entries(selectedDataItem.data).map(([key, value]) => (
+                      <Col className="mb-3" md={6} key={key}>
+                        <strong>{key.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())}:</strong>{" "}
+                        <span className="text-muted">
+                          {value !== null && value !== undefined 
+                            ? (typeof value === 'object' 
+                                ? JSON.stringify(value) 
+                                : String(value))
+                            : "N/A"}
+                        </span>
+                      </Col>
+                    ))}
+                  </Row>
+                </div>
+              )}
+
               {/* Call History Section */}
               <div className="mt-4">
                 <h6 className="mb-3">Call History</h6>
