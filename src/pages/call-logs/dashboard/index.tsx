@@ -151,7 +151,8 @@ const CallDashboard = () => {
             delay: 1.1,
             showAnimatedNumber: true,
             animationDuration: 1000,
-            fontStyle: 'style-2'
+            fontStyle: 'style-2',
+            suffix: ' sec',
         },
         {
             id: 'avg-duration',
@@ -161,7 +162,8 @@ const CallDashboard = () => {
             delay: 1.3,
             showAnimatedNumber: true,
             animationDuration: 1000,
-            fontStyle: 'style-2'
+            fontStyle: 'style-2',
+            suffix: ' sec',
         },
         {
             id: 'avg-cost',
@@ -171,7 +173,8 @@ const CallDashboard = () => {
             delay: 1.5,
             showAnimatedNumber: true,
             animationDuration: 1000,
-            fontStyle: 'style-2'
+            fontStyle: 'style-2',
+            prefix: '$',
         }
     ];
 

@@ -267,7 +267,7 @@ const CrmDashboard = () => {
                         </p>
                       </div>
                       <Link
-                        href={`/crm/leads/${lead.id}`}
+                        href={`/crm/leads/${lead.id}/edit`}
                         className="btn btn-sm btn-outline-secondary"
                       >
                         <FiEye size={14} />
@@ -314,7 +314,7 @@ const CrmDashboard = () => {
                         </p>
                       </div>
                       <Link
-                        href={`/crm/opportunities/${opportunity.id}`}
+                        href={`/crm/leads/${opportunity.id}/edit`}
                         className="btn btn-sm btn-outline-secondary"
                       >
                         <FiEye size={14} />

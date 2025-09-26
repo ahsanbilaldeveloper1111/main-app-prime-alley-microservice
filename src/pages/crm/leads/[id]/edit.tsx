@@ -91,6 +91,7 @@ const EditLead = () => {
     status: "scheduled",
     extensions: [""],
   });
+  const [isOpportunity, setIsOpportunity] = useState(false);
   const [extensions, setExtensions] = useState<any[]>([]);
   const [campaigns, setCampaigns] = useState<CampaignData[]>([]);
   const [crmData, setCrmData] = useState<CrmDataItem[]>([]);
@@ -137,8 +138,8 @@ const EditLead = () => {
   const fetchLeadData = async () => {
     try {
       const leadData = await getLead(Number(id));
-      console.log("ZE LEAD DATA", leadData);
-
+      
+      setIsOpportunity(leadData.type === "opportunity");
       // Ensure campaign_field_values is properly initialized
       const processedLeadData = {
         ...leadData,
@@ -553,18 +554,18 @@ const EditLead = () => {
           <div className="col-12">
             <div className="d-flex justify-content-between align-items-center">
               <div>
-                <h1 className="h3 mb-0">Edit Lead: {lead.name}</h1>
+                <h1 className="h3 mb-0">Edit {isOpportunity ? "Opportunity" : "Lead"}: {lead.name}</h1>
                 <p className="text-muted">
                   Update lead information and manage meetings
                 </p>
               </div>
               <div>
                 <Link
-                  href="/crm/leads"
+                  href={isOpportunity ? "/crm/opportunities" : "/crm/leads"}
                   className="btn btn-outline-secondary me-2"
                 >
                   <FiArrowLeft className="me-2" />
-                  Back to Leads
+                  Back to {isOpportunity ? "Opportunities" : "Leads"}
                 </Link>
               </div>
             </div>

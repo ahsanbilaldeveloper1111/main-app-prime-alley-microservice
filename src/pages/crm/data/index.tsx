@@ -1050,6 +1050,21 @@ const CrmDataManagement = () => {
   const columns: Column[] = useMemo(
     () => [
       {
+        key: "name",
+        name: "Name",
+        selector: (row: any) => row.name,
+        sortable: true,
+        cell: (props: any) => (
+          <div>
+            {props.name ? (
+              <span className="text-muted">{props.name}</span>
+            ) : (
+              <span className="text-muted">N/A</span>
+            )}
+          </div>
+        ),
+      },
+      {
         key: "phone",
         name: "Phone",
         selector: (row: any) => row.phone,
@@ -1928,6 +1943,9 @@ const CrmDataManagement = () => {
           {selectedDataItem && (
             <div>
               <Row>
+                <Col className="mb-3" md={6}>
+                  <strong>Name:</strong> {selectedDataItem.name || "N/A"}
+                </Col>
                 <Col className="mb-3" md={6}>
                   <strong>Phone:</strong> {selectedDataItem.phone || "N/A"}
                 </Col>

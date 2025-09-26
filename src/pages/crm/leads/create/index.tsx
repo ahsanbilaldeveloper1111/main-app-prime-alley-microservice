@@ -31,6 +31,7 @@ const CreateLead = () => {
   const [selectedCrmData, setSelectedCrmData] = useState<CrmDataItem | null>(null);
   const [selectedCampaign, setSelectedCampaign] = useState<CampaignData | null>(null);
   const [loading, setLoading] = useState(false);
+  const [isOpportunity, setIsOpportunity] = useState(false);
 
   // Fetch stages and extensions on component mount
   useEffect(() => {
@@ -42,6 +43,13 @@ const CreateLead = () => {
 
   // Fetch specific CRM data record if crm_data_id is in URL
   useEffect(() => {
+    if(router.query?.type === "opportunity") {
+      setFormData(prev => ({
+        ...prev,
+        type: "opportunity",
+      }));
+    }
+    setIsOpportunity(router.query?.type === "opportunity");
     const fetchCrmDataRecord = async () => {
       if (router.isReady && router.query.crm_data_id) {
         try {
@@ -333,9 +341,9 @@ const CreateLead = () => {
                 </p>
               </div>
               <div>
-                <Link href="/crm/leads" className="btn btn-outline-secondary">
+                <Link href={isOpportunity ? "/crm/opportunities" : "/crm/leads"} className="btn btn-outline-secondary">
                   <FiArrowLeft className="me-2" />
-                  Back to Leads
+                  Back to {isOpportunity ? "Opportunities" : "Leads"}
                 </Link>
               </div>
             </div>

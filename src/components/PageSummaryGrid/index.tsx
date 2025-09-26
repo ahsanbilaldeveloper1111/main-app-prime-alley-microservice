@@ -13,6 +13,7 @@ export interface SummaryCard {
   animationDuration?: number;
   fontStyle?: string;
   textColor?: string;
+  prefix?: string;
   suffix?: string;
   valueType?: string;
   size?: string;
@@ -62,11 +63,12 @@ const PageSummaryGrid: React.FC<PageSummaryGridProps> = ({
                 fontStyle={card.fontStyle ?? 'style-2'}
                 textColor={card.textColor ?? ''}
                 suffix={card.suffix ?? ''}
+                prefix={card.prefix ?? ''}
                 valueType={card.valueType ?? ''}
                 size={card.size ?? ''}
               />
             ) : (
-              <h2 className="mb-0 f-w-500 style-2">0</h2>
+              <h2 className="mb-0 f-w-500 style-2">{card?.prefix ?? ''}{card.value ?? 0}{card?.suffix ?? ''}</h2>
             )}
           </div>
           <p>{card.description}</p>

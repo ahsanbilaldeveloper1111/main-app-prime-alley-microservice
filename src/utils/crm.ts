@@ -614,6 +614,7 @@ export const deleteOpportunity = async (id: number): Promise<void> => {
 export interface CrmDataItem {
   id: number;
   phone: string | null;
+  name: string | null;
   data: Record<string, any>;
   user_extension: string | null;
   is_viewed: boolean;

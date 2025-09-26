@@ -5,12 +5,13 @@ interface AnimatedNumberProps {
   duration?: number;
   textColor?: string;
   suffix?: string;
+  prefix?: string;
   valueType?: string;
   size?: string;
   fontStyle?: string;
 }
 
-const AnimatedNumber = ({ value, duration = 1000, textColor = '', suffix = '', valueType = '', size = '', fontStyle = '' }: AnimatedNumberProps) => {
+const AnimatedNumber = ({ value, duration = 1000, textColor = '', suffix = '', prefix = '', valueType = '', size = '', fontStyle = '' }: AnimatedNumberProps) => {
   const [displayValue, setDisplayValue] = useState(0);
 
   // Function to format seconds as "1m 23s"
@@ -69,18 +70,18 @@ const AnimatedNumber = ({ value, duration = 1000, textColor = '', suffix = '', v
   };
 
   if(size === 'sm'){
-    return <h5 className={`mb-0 f-w-500 ${textColor}`}>{getFormattedValue()}{suffix}</h5>;
+    return <h5 className={`mb-0 f-w-500 ${textColor}`}>{prefix}{getFormattedValue()}{suffix}</h5>;
   }
   if(size === 'md'){
-    return <h4 className={`mb-0 f-w-500 ${textColor}`}>{getFormattedValue()}{suffix}</h4>;
+    return <h4 className={`mb-0 f-w-500 ${textColor}`}>{prefix}{getFormattedValue()}{suffix}</h4>;
   }
   if(size === 'lg'){
-    return <h5 className={`mb-0 f-w-500 ${textColor}`}>{getFormattedValue()}{suffix}</h5>;
+    return <h5 className={`mb-0 f-w-500 ${textColor}`}>{prefix}{getFormattedValue()}{suffix}</h5>;
   }
   if(size === 'xl'){
-    return <h6 className={`mb-0 f-w-500 ${textColor}`}>{getFormattedValue()}{suffix}</h6>;
+    return <h6 className={`mb-0 f-w-500 ${textColor}`}>{prefix}{getFormattedValue()}{suffix}</h6>;
   }
-  return <h2 className={`mb-0 f-w-500 ${textColor} ${fontStyle}`}>{getFormattedValue()}{suffix}</h2>;
+  return <h2 className={`mb-0 f-w-500 ${textColor} ${fontStyle}`}>{prefix}{getFormattedValue()}{suffix}</h2>;
 };
 
 export default AnimatedNumber;

@@ -289,7 +289,7 @@ const CrmOpportunities = () => {
             <div>
               <Button
                 variant="success"
-                href="/crm/leads/create"
+                href="/crm/leads/create?type=opportunity"
                 className="d-flex align-items-center"
               >
                 <FiPlus className="me-2" />
