@@ -30,10 +30,18 @@ import { Col } from "react-bootstrap";
 import { toast } from "react-toastify";
 import { useSession } from "next-auth/react";
 import moment from "moment";
-import "@assets/scss/gsm-assign.scss";
-import "@assets/scss/dashboard-card.scss";
+
 import "@assets/scss/common.scss";
+import "@assets/scss/tabs.scss";
+import PageHeader from "@components/PageHeader";
+import PageSummaryGrid from "@components/PageSummaryGrid";
+import FormModal from "../../partial/FormModal";
+import ConfirmModal from "@pages/partial/ConfirmModal";
+import SuccessfulModal from "@pages/partial/SuccessfulModal";
+
 import { motion } from "framer-motion";
+import { FiEdit, FiTrash2 } from "react-icons/fi";
+import TableAction from "@components/TableAction";
 
 interface SelectOption {
   value: number;
@@ -44,7 +52,7 @@ const ExpenseList = () => {
   const { data: session, status } = useSession();
 
   const [refreshKey, setRefreshKey] = useState<number>(0);
-  const [currentFilters, setCurrentFilters] = useState({});
+  const [currentFilters, setCurrentFilters] = useState<{search?: string}>({});
 
   const [categories, setCategories] = useState<ExpenseCategoryData[]>([]);
 
@@ -149,7 +157,7 @@ const ExpenseList = () => {
           };
           return (
             <span
-              className={`status-badge ${
+              className={`status-badge text-uppercase ${
                 statusColors[props.payment_status as keyof typeof statusColors] ||
                 "secondary"
               }`}
@@ -176,20 +184,29 @@ const ExpenseList = () => {
         selector: (row: ExpenseData) => row.id,
         sortable: false,
         cell: (props: ExpenseData) => (
-          <div className="action-buttons-container">
-            <button
-              className="btn btn-sm btn-outline-primary"
-              onClick={() => handleEditExpense(props)}
-            >
-              Edit
-            </button>
-            <button
-              className="btn btn-sm btn-outline-danger"
-              onClick={() => handleDeleteExpense(props)}
-            >
-              Delete
-            </button>
-          </div>
+
+          <>
+          <TableAction
+                    actions={[
+                        {
+                            label: 'Edit',
+                            icon: FiEdit,
+                            onClick: () => handleEditExpense(props),
+                           // permission: 'edit-expenses',
+                            variant: 'edit'
+                        },
+                        {
+                            label: 'Delete',
+                            icon: FiTrash2,
+                            onClick: () => handleDeleteExpense(props),
+                           // permission: 'delete-expenses',
+                            variant: 'delete'
+                        }
+                    ]}
+                />
+
+          
+          </>
         ),
       },
     ],
@@ -553,37 +570,27 @@ const ExpenseList = () => {
     <React.Fragment>
       <BreadcrumbItem mainTitle="" mainLink="" subTitle="Expenses" />
 
-      <Row className="mb-3">
-        <Col md={12}>
-          <div className="page-header-title style-2">
-            <Row className="d-flex justify-content-between align-items-center">
-              <Col md={4}>
-                <h2 className="mb-0">Expenses</h2>
-              </Col>
+      <PageHeader
+        title="Expenses"
+        leftGrid={3}
+        rightGrid={9}
+        showSearch={true}
+        searchPlaceholder="Search expenses..."
+        searchValue={currentFilters.search || ""}
+        onSearchChange={(value) => handleFiltersChange({...currentFilters, search: value})}
+        buttons={
+          <>
+          
+          <Button variant="primary" size="sm" 
+          onClick={openCreateExpenseModal}>New Expense</Button>
 
-              <Col md={8} className="d-flex justify-content-end">
-                <div className="action-buttons">
-                  <Button
-                    variant="outline-secondary"
-                    size="sm"
-                    className="me-2"
-                    onClick={openCategoryModal}
-                  >
-                    Manage Categories
-                  </Button>
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    onClick={openCreateExpenseModal}
-                  >
-                    New Expense
-                  </Button>
-                </div>
-              </Col>
-            </Row>
-          </div>
-        </Col>
-      </Row>
+<Button variant="secondary" size="sm" 
+          onClick={openCategoryModal}>Categories</Button>
+          </>
+
+        }
+      />
+
 
       <GenericListPage
         columns={columns}
@@ -593,7 +600,7 @@ const ExpenseList = () => {
         defaultPageSize={15}
         filters={memoizedFilters}
         refreshKey={refreshKey}
-        search={true}
+        search={false}
         tableStyle="table-style-2"
       />
 

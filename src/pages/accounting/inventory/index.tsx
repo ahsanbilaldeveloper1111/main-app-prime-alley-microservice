@@ -30,16 +30,23 @@ import { Col } from "react-bootstrap";
 import { toast } from "react-toastify";
 import { useSession } from "next-auth/react";
 import moment from "moment";
-import "@assets/scss/gsm-assign.scss";
-import "@assets/scss/dashboard-card.scss";
+
 import "@assets/scss/common.scss";
+
 import { motion } from "framer-motion";
+import { FiEdit, FiTrash2 } from "react-icons/fi";
+import TableAction from "@components/TableAction";
+import PageHeader from "@components/PageHeader";
+import PageSummaryGrid from "@components/PageSummaryGrid";
+import FormModal from "../../partial/FormModal";
+import ConfirmModal from "@pages/partial/ConfirmModal";
+import SuccessfulModal from "@pages/partial/SuccessfulModal";
 
 const InventoryList = () => {
   const { data: session, status } = useSession();
 
   const [refreshKey, setRefreshKey] = useState<number>(0);
-  const [currentFilters, setCurrentFilters] = useState({});
+  const [currentFilters, setCurrentFilters] = useState<{search?: string}>({});
 
   const [categories, setCategories] = useState<ProductCategoryData[]>([]);
   const [locations, setLocations] = useState<InventoryLocationData[]>([]);
@@ -149,20 +156,27 @@ const InventoryList = () => {
         selector: (row: InventoryData) => row.id,
         sortable: false,
         cell: (props: InventoryData) => (
-          <div className="action-buttons-container">
-            <button
-              className="btn btn-sm btn-outline-primary me-1"
-              onClick={() => handleEditInventory(props)}
-            >
-              Edit
-            </button>
-            <button
-              className="btn btn-sm btn-outline-danger"
-              onClick={() => handleDeleteInventory(props)}
-            >
-              Delete
-            </button>
-          </div>
+          <>
+          <TableAction
+                    actions={[
+                        {
+                            label: 'Edit',
+                            icon: FiEdit,
+                            onClick: () => handleEditInventory(props),
+                            variant: 'edit'
+                        },
+                        {
+                            label: 'Delete',
+                            icon: FiTrash2,
+                            onClick: () => handleDeleteInventory(props),
+                            variant: 'delete'
+                        },
+                    ]}
+                />
+          </>
+
+
+
         ),
       },
     ],
@@ -429,29 +443,18 @@ const InventoryList = () => {
     <React.Fragment>
       <BreadcrumbItem mainTitle="" mainLink="" subTitle="Inventory" />
 
-      <Row className="mb-3">
-        <Col md={12}>
-          <div className="page-header-title style-2">
-            <Row className="d-flex justify-content-between align-items-center">
-              <Col md={4}>
-                <h2 className="mb-0">Inventory</h2>
-              </Col>
+      <PageHeader
+        title="Inventory"
+        showSearch={true}
+        searchPlaceholder="Search inventory..."
+        searchValue={currentFilters.search || ""}
+        onSearchChange={(value) => handleFiltersChange({...currentFilters, search: value})}
+        buttons={
+          <Button variant="primary" size="sm" onClick={openCreateInventoryModal}>New Inventory Item</Button>
+        }
+      />
 
-              <Col md={8} className="d-flex justify-content-end">
-                <div className="action-buttons">
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    onClick={openCreateInventoryModal}
-                  >
-                    New Inventory Item
-                  </Button>
-                </div>
-              </Col>
-            </Row>
-          </div>
-        </Col>
-      </Row>
+     
 
       <GenericListPage
         columns={columns}
@@ -461,7 +464,7 @@ const InventoryList = () => {
         defaultPageSize={15}
         filters={memoizedFilters}
         refreshKey={refreshKey}
-        search={true}
+        search={false}
         tableStyle="table-style-2"
       />
 

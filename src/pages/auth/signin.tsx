@@ -5,6 +5,7 @@ import { signIn, getSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import { GetServerSideProps } from 'next';
 import Head from 'next/head';
+import Script from 'next/script';
 
 import authlogin from "@assets/images/authentication/img-auth-login.png";
 import logodark from "@assets/images/logo-dark.svg";
@@ -78,97 +79,8 @@ const Signin = () => {
     });
   };
 
-  // Initialize particles.js
+  // Cleanup particles on component unmount
   useEffect(() => {
-    const initParticles = () => {
-      if (typeof window !== 'undefined' && window.particlesJS) {
-        window.particlesJS('particles-js', {
-          "particles": {
-            "number": {
-              "value":40,
-              "density": {
-                "enable": true,
-                "value_area": 800
-              }
-            },
-            "color": {
-              "value": "#1e70e3"
-            },
-            "shape": {
-              "type": "circle"
-            },
-            "opacity": {
-              "value": 1,
-              "random": false
-            },
-            "size": {
-              "value": 3,
-              "random": true
-            },
-            "line_linked": {
-              "enable": true,
-              "distance": 150,
-              "color": "#1e70e3",
-              "opacity": 0.2,
-              "width": 1
-            },
-            "move": {
-              "enable": true,
-              "speed": 3,
-              "direction": "none",
-              "random": false,
-              "straight": false,
-              "out_mode": "out",
-              "bounce": false
-            }
-          },
-          "interactivity": {
-            "detect_on": "canvas",
-            "events": {
-              "onhover": {
-                "enable": true,
-                "mode": "grab"
-              },
-              "onclick": {
-                "enable": true,
-                "mode": "push"
-              },
-              "resize": true
-            },
-            "modes": {
-              "grab": {
-                "distance": 140,
-                "line_linked": {
-                  "opacity": 0.8
-                }
-              },
-              "push": {
-                "particles_nb": 2
-              }
-            }
-          },
-          "retina_detect": true
-        });
-      }
-    };
-
-    // Check if particles.js is already loaded
-    if (typeof window !== 'undefined' && typeof window.particlesJS === 'function') {
-      initParticles();
-    } else {
-      // Wait for the script to load
-      const checkParticles = setInterval(() => {
-        if (typeof window !== 'undefined' && typeof window.particlesJS === 'function') {
-          initParticles();
-          clearInterval(checkParticles);
-        }
-      }, 100);
-
-      // Cleanup interval after 10 seconds
-      setTimeout(() => clearInterval(checkParticles), 10000);
-    }
-
-    // Cleanup function
     return () => {
       if (typeof window !== 'undefined' && window.pJSDom) {
         window.pJSDom.forEach((pJS) => {
@@ -184,8 +96,84 @@ const Signin = () => {
     return (
         <React.Fragment>
             <Head>
-                <script src="https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js"></script>
+                <title>Sign In - Ring Edge</title>
             </Head>
+            <Script 
+                src="https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js"
+                strategy="afterInteractive"
+                onLoad={() => {
+                    // Initialize particles after script loads
+                    if (typeof window !== 'undefined' && window.particlesJS) {
+                        window.particlesJS('particles-js', {
+                            "particles": {
+                                "number": {
+                                    "value":40,
+                                    "density": {
+                                        "enable": true,
+                                        "value_area": 800
+                                    }
+                                },
+                                "color": {
+                                    "value": "#1e70e3"
+                                },
+                                "shape": {
+                                    "type": "circle"
+                                },
+                                "opacity": {
+                                    "value": 1,
+                                    "random": false
+                                },
+                                "size": {
+                                    "value": 3,
+                                    "random": true
+                                },
+                                "line_linked": {
+                                    "enable": true,
+                                    "distance": 150,
+                                    "color": "#1e70e3",
+                                    "opacity": 0.2,
+                                    "width": 1
+                                },
+                                "move": {
+                                    "enable": true,
+                                    "speed": 3,
+                                    "direction": "none",
+                                    "random": false,
+                                    "straight": false,
+                                    "out_mode": "out",
+                                    "bounce": false
+                                }
+                            },
+                            "interactivity": {
+                                "detect_on": "canvas",
+                                "events": {
+                                    "onhover": {
+                                        "enable": true,
+                                        "mode": "grab"
+                                    },
+                                    "onclick": {
+                                        "enable": true,
+                                        "mode": "push"
+                                    },
+                                    "resize": true
+                                },
+                                "modes": {
+                                    "grab": {
+                                        "distance": 140,
+                                        "line_linked": {
+                                            "opacity": 0.8
+                                        }
+                                    },
+                                    "push": {
+                                        "particles_nb": 2
+                                    }
+                                }
+                            },
+                            "retina_detect": true
+                        });
+                    }
+                }}
+            />
             <div id="particles-js"></div>
     <div className="login-main-container">
         <header className="login-info-panel">

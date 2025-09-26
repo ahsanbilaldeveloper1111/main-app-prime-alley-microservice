@@ -38,6 +38,18 @@ import moment from "moment";
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements, CardElement, useStripe, useElements } from "@stripe/react-stripe-js";
 
+import PageHeader from "@components/PageHeader";
+import '@assets/scss/common.scss';
+import '@assets/scss/tabs.scss'
+import PageSummaryGrid from "@components/PageSummaryGrid";
+import FormModal from '../../partial/FormModal';
+import ConfirmModal from "@pages/partial/ConfirmModal";
+import SuccessfulModal from "@pages/partial/SuccessfulModal";
+import { FiEdit, FiTrash2 } from "react-icons/fi";
+import TableAction from "@components/TableAction";
+
+
+
 // Stripe Card Form Component
 const StripeCardForm = ({ 
   cardData, 
@@ -385,31 +397,35 @@ const CompanyList = () => {
         selector: (row: any) => row.id,
         sortable: false,
         cell: (props: any) => (
-          <div className="action-buttons-container">
-            <Button
-              variant="outline-primary"
-              size="sm"
-              className="me-1"
-              onClick={() => handleEditCompany(props)}
-            >
-              Edit
-            </Button>
-            <Button
-              variant="outline-info"
-              size="sm"
-              className="me-1"
-              onClick={() => router.push(`/accounting/companies/product-pricing?companyId=${props.id}`)}
-            >
-              Pricing
-            </Button>
-            <Button
-              variant="outline-danger"
-              size="sm"
-              onClick={() => handleDeleteCompany(props)}
-            >
-              Delete
-            </Button>
-          </div>
+          <>
+          <TableAction
+                    actions={[
+                        {
+                            label: 'Edit',
+                            icon: FiEdit,
+                            onClick: () => handleEditCompany(props),
+                          //  permission: 'edit-companies',
+                            variant: 'edit'
+                        },
+                        {
+                            label: 'Pricing',
+                            icon: FiEdit,
+                            onClick: () => router.push(`/accounting/companies/product-pricing?companyId=${props.id}`),
+                          //  permission: 'edit-companies',
+                            variant: 'edit'
+                        },
+                        {
+                            label: 'Delete',
+                            icon: FiTrash2,
+                            onClick: () => handleDeleteCompany(props),
+                          //  permission: 'delete-companies',
+                            variant: 'delete'
+                        },
+                    ]}
+                />
+
+          </>
+          
         ),
       },
     ],
@@ -580,6 +596,10 @@ const CompanyList = () => {
     setShowDeleteModal(true);
   }, []);
 
+  const [successModalTitle, setSuccessModalTitle] = useState<string>("");
+  const [successModalDescription, setSuccessModalDescription] = useState<string>("");
+  const [showExportSuccessfulModal, setShowExportSuccessfulModal] = useState<boolean>(false);
+
   // Handle confirm delete
   const handleConfirmDelete = useCallback(async () => {
     if (!selectedCompany) return;
@@ -590,6 +610,11 @@ const CompanyList = () => {
       toast.success("Company deleted successfully");
       setShowDeleteModal(false);
       setSelectedCompany(null);
+      setSuccessModalTitle("Successfully Deleted");
+      setSuccessModalDescription("The company data has been successfully deleted.");
+      setShowExportSuccessfulModal(true);
+
+
       setRefreshKey((prev) => prev + 1);
     } catch (error) {
       console.error("Error deleting company:", error);
@@ -800,6 +825,11 @@ const CompanyList = () => {
     }
   }, [selectedCompany, loadPaymentMethods]);
 
+  const [currentFilters, setCurrentFilters] = useState<any>({});
+  const handleFiltersChange = useCallback((filters: any) => {
+    setCurrentFilters(filters);
+  }, []);
+
   return (
     <React.Fragment>
       <BreadcrumbItem
@@ -807,25 +837,19 @@ const CompanyList = () => {
         mainLink="/accounting/companies"
         subTitle="Companies"
       />
+
+      <PageHeader 
+      title="Companies"
+      showSearch={true}
+      searchPlaceholder="Search companies..."
+      searchValue={currentFilters.search || ""}
+      onSearchChange={(value) => handleFiltersChange({...currentFilters, search: value})}
+      buttons={
+        <Button variant="primary" size="sm" onClick={openCreateModal}>New Company</Button>
+      }
+      />
       
-      <Row className="mb-3">
-        <Col md={12}>
-          <div className="page-header-title">
-            <h2 className="mb-0 d-flex align-items-center">
-              Companies
-              <div className="ms-3 d-flex gap-2">
-                <Button
-                  variant="outline-primary"
-                  size="sm"
-                  onClick={openCreateModal}
-                >
-                  New Company
-                </Button>
-              </div>
-            </h2>
-          </div>
-        </Col>
-      </Row>
+      
 
       <GenericListPage
         columns={columns}
@@ -834,19 +858,21 @@ const CompanyList = () => {
         searchPlaceholder="Search companies..."
         defaultPageSize={15}
         refreshKey={refreshKey}
-        search={true}
+        search={false}
         filters={filters}
+        tableStyle="table-style-2"
       />
 
       {/* Create Modal */}
-      <Modal show={showCreateModal} onHide={closeCreateModal} size="xl">
-        <Modal.Header closeButton>
-          <Modal.Title>Create New Company</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <div className="row">
+      <FormModal
+        show={showCreateModal}
+        onHide={closeCreateModal}
+        title="Create New Company"
+        desc="Please fill in the details below to create a new company."
+        formHtml={<>
+        <div className="row">
             <div className="col-12">
-              <ul className="nav nav-tabs" id="createCompanyTabs" role="tablist">
+              <ul className="nav nav-tabs" id="system-tabs" role="tablist">
                 <li className="nav-item" role="presentation">
                   <button
                     className={`nav-link ${activeTab === "basic-info" ? "active" : ""}`}
@@ -1270,28 +1296,20 @@ const CompanyList = () => {
               </div>
             </div>
           </div>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={closeCreateModal}>
-            Cancel
-          </Button>
-          <Button
-            variant="primary"
-            onClick={handleCreateCompany}
-            disabled={isLoading}
-          >
-            {isLoading ? "Creating..." : "Create Company"}
-          </Button>
-        </Modal.Footer>
-      </Modal>
+        </>}
+        submitButtonText="Submit"
+        cancelButtonText="Cancel"
+        onSubmit={handleCreateCompany}
+      />
 
       {/* Edit Modal */}
-      <Modal show={showEditModal} onHide={closeEditModal} size="xl">
-        <Modal.Header closeButton>
-          <Modal.Title>Edit Company #{selectedCompany?.id}</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          {isLoadingCompany ? (
+      <FormModal
+        show={showEditModal}
+        onHide={closeEditModal}
+        title={`Edit Company #${selectedCompany?.id}`}
+        desc="Please fill in the details below to edit the company."
+        formHtml={<>
+        {isLoadingCompany ? (
             <div className="text-center py-4">
               <Spinner animation="border" className="me-2" />
               <span>Loading company data...</span>
@@ -1884,6 +1902,17 @@ const CompanyList = () => {
             </div>
           </div>
           )}
+        </>}
+        submitButtonText="Submit"
+        cancelButtonText="Cancel"
+        onSubmit={handleUpdateCompany}
+      />
+      <Modal show={showEditModal} onHide={closeEditModal} size="xl">
+        <Modal.Header closeButton>
+          <Modal.Title>Edit Company #{selectedCompany?.id}</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          
         </Modal.Body>
         <Modal.Footer>
           <Button variant="secondary" onClick={closeEditModal} disabled={isLoadingCompany}>
@@ -1900,32 +1929,25 @@ const CompanyList = () => {
       </Modal>
 
       {/* Delete Modal */}
-      <Modal show={showDeleteModal} onHide={closeDeleteModal}>
-        <Modal.Header closeButton>
-          <Modal.Title>Delete Company</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <p>
-            Are you sure you want to delete the company{" "}
-            <strong className="text-danger">{selectedCompany?.name}</strong>?
-          </p>
-          <p className="text-muted">
-            This action cannot be undone.
-          </p>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={closeDeleteModal}>
-            Cancel
-          </Button>
-          <Button
-            variant="danger"
-            onClick={handleConfirmDelete}
-            disabled={isLoading}
-          >
-            {isLoading ? "Deleting..." : "Delete Company"}
-          </Button>
-        </Modal.Footer>
-      </Modal>
+      <ConfirmModal
+          show={showDeleteModal}
+          onHide={closeDeleteModal}
+          title="Delete Company"
+          description="Are you sure you want to delete this company?"
+          targetName={selectedCompany?.name || ""}
+          onConfirm={handleConfirmDelete}
+        />
+      
+
+      {showExportSuccessfulModal && (
+        <SuccessfulModal
+
+          show={showExportSuccessfulModal}
+          onHide={() => setShowExportSuccessfulModal(false)}
+          title={successModalTitle}
+          description={successModalDescription}
+        />
+      )}
 
       {/* Import Modal */}
       <Modal show={showImportModal} onHide={closeImportModal} size="lg">

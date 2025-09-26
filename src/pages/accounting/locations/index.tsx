@@ -23,15 +23,22 @@ import { Col } from "react-bootstrap";
 import { toast } from "react-toastify";
 import { useSession } from "next-auth/react";
 import moment from "moment";
-import "@assets/scss/gsm-assign.scss";
-import "@assets/scss/dashboard-card.scss";
+
 import "@assets/scss/common.scss";
+import "@assets/scss/tabs.scss";
+import PageHeader from "@components/PageHeader";
+import PageSummaryGrid from "@components/PageSummaryGrid";
+import FormModal from "../../partial/FormModal";
+import ConfirmModal from "@pages/partial/ConfirmModal";
+import SuccessfulModal from "@pages/partial/SuccessfulModal";
+import { FiEdit, FiTrash2 } from "react-icons/fi";
+import TableAction from "@components/TableAction";
 
 const LocationList = () => {
   const { data: session, status } = useSession();
 
   const [refreshKey, setRefreshKey] = useState<number>(0);
-  const [currentFilters, setCurrentFilters] = useState({});
+  const [currentFilters, setCurrentFilters] = useState<{search?: string}>({});
 
   // Location Management
   const [selectedLocation, setSelectedLocation] = useState<InventoryLocationData | null>(null);
@@ -109,20 +116,26 @@ const LocationList = () => {
         selector: (row: InventoryLocationData) => row.id,
         sortable: false,
         cell: (props: InventoryLocationData) => (
-          <div className="action-buttons-container">
-            <button
-              className="btn btn-sm btn-outline-primary me-1"
-              onClick={() => handleEditLocation(props)}
-            >
-              Edit
-            </button>
-            <button
-              className="btn btn-sm btn-outline-danger"
-              onClick={() => handleDeleteLocation(props)}
-            >
-              Delete
-            </button>
-          </div>
+          <>
+          <TableAction
+                    actions={[
+                        {
+                            label: 'Edit',
+                            icon: FiEdit,
+                            onClick: () => handleEditLocation(props),
+                            variant: 'edit'
+                        },
+                        {
+                            label: 'Delete',
+                            icon: FiTrash2,
+                            onClick: () => handleDeleteLocation(props),
+                            variant: 'delete'
+                        },
+                    ]}
+                />
+          </>
+
+
         ),
       },
     ],
@@ -156,7 +169,7 @@ const LocationList = () => {
     [memoizedFilters]
   );
 
-  const handleFiltersChange = useCallback((filters: any) => {
+  const handleFiltersChange = useCallback((filters: {search?: string}) => {
     setCurrentFilters(filters);
   }, []);
 
@@ -316,29 +329,18 @@ const LocationList = () => {
     <React.Fragment>
       <BreadcrumbItem mainTitle="" mainLink="" subTitle="Locations" />
 
-      <Row className="mb-3">
-        <Col md={12}>
-          <div className="page-header-title style-2">
-            <Row className="d-flex justify-content-between align-items-center">
-              <Col md={4}>
-                <h2 className="mb-0">Locations</h2>
-              </Col>
+      <PageHeader
+        title="Locations"
+        showSearch={true}
+        searchPlaceholder="Search locations..."
+        searchValue={currentFilters.search || ""}
+        onSearchChange={(value) => handleFiltersChange({...currentFilters, search: value})}
+        buttons={
+          <Button variant="primary" size="sm" onClick={openCreateLocationModal}>New Location</Button>
+        }
+      />
 
-              <Col md={8} className="d-flex justify-content-end">
-                <div className="action-buttons">
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    onClick={openCreateLocationModal}
-                  >
-                    New Location
-                  </Button>
-                </div>
-              </Col>
-            </Row>
-          </div>
-        </Col>
-      </Row>
+     
 
       <GenericListPage
         columns={columns}
@@ -348,7 +350,7 @@ const LocationList = () => {
         defaultPageSize={15}
         filters={memoizedFilters}
         refreshKey={refreshKey}
-        search={true}
+        search={false}
         tableStyle="table-style-2"
       />
 

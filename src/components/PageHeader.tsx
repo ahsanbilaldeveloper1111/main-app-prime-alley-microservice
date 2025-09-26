@@ -10,6 +10,8 @@ interface PageHeaderProps {
   buttons?: React.ReactNode;
   filters?: React.ReactNode;
   className?: string;
+  leftGrid?: number;
+  rightGrid?: number;
 }
 
 const PageHeader: React.FC<PageHeaderProps> = ({
@@ -20,7 +22,9 @@ const PageHeader: React.FC<PageHeaderProps> = ({
   onSearchChange,
   buttons,
   filters,
-  className = ""
+  className = "",
+  leftGrid = 5,
+  rightGrid = 7
 }) => {
   return (
     <>
@@ -28,11 +32,11 @@ const PageHeader: React.FC<PageHeaderProps> = ({
         <Col md={12}>
           <div className="page-header-title style-2">
             <Row className="d-flex justify-content-between align-items-center">
-              <Col md={4}>
+              <Col md={leftGrid}>
                 <h2 className="mb-0">{title}</h2>
               </Col>
 
-              <Col md={8} className="d-flex justify-content-end">
+              <Col md={rightGrid} className="d-flex justify-content-end">
                 <div className="action-buttons">
                   {showSearch && (
                     <div className="search-container">
@@ -46,18 +50,12 @@ const PageHeader: React.FC<PageHeaderProps> = ({
                       />
                     </div>
                   )}
+
+{filters}
+
+{buttons}
                   
-                  {filters && (
-                    <div className="ms-3">
-                      {filters}
-                    </div>
-                  )}
-                  
-                  {buttons && (
-                    <div className="ms-3">
-                      {buttons}
-                    </div>
-                  )}
+                
                 </div>
               </Col>
             </Row>
