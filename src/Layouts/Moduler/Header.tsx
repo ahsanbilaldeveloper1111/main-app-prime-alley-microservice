@@ -915,6 +915,18 @@ const Header = ({ themeMode }: HeaderProps) => {
                                             <span className="pc-mtext">{SUBMENU_LABELS.CRM_DASHBOARD}</span>
                                                 </Link>
                                             </li>
+                                            <li className="pc-item">
+                                        <Link className="pc-link" href={`${BASE_URL}/crm/campaigns`}>
+                                            <span className="pc-micon"><i className={ICONS.MEGAPHONE}></i></span>
+                                            <span className="pc-mtext">{SUBMENU_LABELS.CAMPAIGNS}</span>
+                                        </Link>
+                                    </li>
+                                    <li className="pc-item">
+                                        <Link className="pc-link" href={`${BASE_URL}/crm/data`}>
+                                            <span className="pc-micon"><i className={ICONS.DATABASE}></i></span>
+                                            <span className="pc-mtext">{SUBMENU_LABELS.DATA_MANAGEMENT}</span>
+                                                </Link>
+                                            </li>
                                     <li className="pc-item">
                                         <Link className="pc-link" href={`${BASE_URL}/crm/leads`}>
                                             <span className="pc-micon"><i className={ICONS.USERS}></i></span>
@@ -939,18 +951,8 @@ const Header = ({ themeMode }: HeaderProps) => {
                                             <span className="pc-mtext">{SUBMENU_LABELS.LOST_REASONS_CRM}</span>
                                                 </Link>
                                             </li>
-                                    <li className="pc-item">
-                                        <Link className="pc-link" href={`${BASE_URL}/crm/data`}>
-                                            <span className="pc-micon"><i className={ICONS.DATABASE}></i></span>
-                                            <span className="pc-mtext">{SUBMENU_LABELS.DATA_MANAGEMENT}</span>
-                                                </Link>
-                                            </li>
-                                    <li className="pc-item">
-                                        <Link className="pc-link" href={`${BASE_URL}/crm/campaigns`}>
-                                            <span className="pc-micon"><i className={ICONS.MEGAPHONE}></i></span>
-                                            <span className="pc-mtext">{SUBMENU_LABELS.CAMPAIGNS}</span>
-                                        </Link>
-                                    </li>
+                                
+                                   
                                         </ul>
                                     </div>
     ), []);
