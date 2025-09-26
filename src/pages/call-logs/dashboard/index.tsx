@@ -77,7 +77,7 @@ const CallDashboard = () => {
     
     const [refreshKey, setRefreshKey] = useState<number>(0);
     const [currentFilters, setCurrentFilters] = useState({
-      start_datetime: moment().subtract(24, 'hours').format('YYYY-MM-DD hh:mm:ss A'),
+      start_datetime: moment().startOf("week").format('YYYY-MM-DD hh:mm:ss A'),
       end_datetime: moment().format('YYYY-MM-DD hh:mm:ss A'),
     });
     const [generalStats, setGeneralStats] = useState<GeneralStats>({

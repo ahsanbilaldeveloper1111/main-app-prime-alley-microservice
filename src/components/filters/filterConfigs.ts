@@ -166,70 +166,70 @@ export const createCallLogsFiltersConfig = (hierarchyData?: any, isVisibleCallDi
         }
       ]
     },
-    {
-      id: 'call-duration',
-      title: 'Call Duration',
-      icon: 'ti ti-clock',
-      fields: [
+    // {
+    //   id: 'call-duration',
+    //   title: 'Call Duration',
+    //   icon: 'ti ti-clock',
+    //   fields: [
        
-        {
-          type: 'number',
-          name: 'duration',
-          min:1,
-          label: 'Type Call Duration',
-          placeholder: 'Enter Call Duration'
-        }
-      ]
-    },
-    {
-      id: 'call-ring-time',
-      title: 'Ring Time',
-      icon: 'ti ti-clock',
-      fields: [
+    //     {
+    //       type: 'number',
+    //       name: 'duration',
+    //       min:1,
+    //       label: 'Type Call Duration',
+    //       placeholder: 'Enter Call Duration'
+    //     }
+    //   ]
+    // },
+    // {
+    //   id: 'call-ring-time',
+    //   title: 'Ring Time',
+    //   icon: 'ti ti-clock',
+    //   fields: [
        
-        {
-          type: 'number',
-          name: 'ring_time',
-          min:1,
-          label: 'Type Ring Time',
-          placeholder: 'Enter Ring Time'
-        }
-      ]
-    },
-    {
-      id: 'duration-operator',
-      title: 'Duration Operator',
-      icon: 'ti ti-operator',
-      fields: [
+    //     {
+    //       type: 'number',
+    //       name: 'ring_time',
+    //       min:1,
+    //       label: 'Type Ring Time',
+    //       placeholder: 'Enter Ring Time'
+    //     }
+    //   ]
+    // },
+    // {
+    //   id: 'duration-operator',
+    //   title: 'Duration Operator',
+    //   icon: 'ti ti-operator',
+    //   fields: [
        
-        {
-          type: 'select',
-          name: 'duration_operator',
-          label: 'Duration Operator',
-          options: [
-            { value: 'lte', label: 'Less than or equal' },
-            { value: 'gte', label: 'Greater than or equal' }
-          ]
-        }
-      ]
-    },
-    {
-      id: 'ring-time-operator',
-      title: 'Ring Time Operator',
-      icon: 'ti ti-operator',
-      fields: [
+    //     {
+    //       type: 'select',
+    //       name: 'duration_operator',
+    //       label: 'Duration Operator',
+    //       options: [
+    //         { value: 'lte', label: 'Less than or equal' },
+    //         { value: 'gte', label: 'Greater than or equal' }
+    //       ]
+    //     }
+    //   ]
+    // },
+    // {
+    //   id: 'ring-time-operator',
+    //   title: 'Ring Time Operator',
+    //   icon: 'ti ti-operator',
+    //   fields: [
        
-        {
-          type: 'select',
-          name: 'ring_time_operator',
-          label: 'Ring Time Operator',
-          options: [
-            { value: 'lte', label: 'Less than or equal' },
-            { value: 'gte', label: 'Greater than or equal' }
-          ]
-        }
-      ]
-    },
+    //     {
+    //       type: 'select',
+    //       name: 'ring_time_operator',
+    //       label: 'Ring Time Operator',
+    //       options: [
+    //         { value: 'lte', label: 'Less than or equal' },
+    //         { value: 'gte', label: 'Greater than or equal' }
+    //       ]
+    //     }
+    //   ]
+    // },
     {
       id: 'called-numbers',
       title: 'Called Numbers',
@@ -242,24 +242,6 @@ export const createCallLogsFiltersConfig = (hierarchyData?: any, isVisibleCallDi
           label: 'Called Numbers',
           // isMulti: true,
           options: []
-        }
-      ]
-    },
-    {
-      id: 'called-user',
-      title: 'Called User',
-      icon: 'ti ti-user',
-      fields: [
-       
-        {
-          type: 'select',
-          name: 'called_user',
-          label: 'Called User',
-          isMulti: true,
-          options: hierarchyData?.users?.map((user: { id: string; name: string }) => ({
-            value: user.id,
-            label: user.name
-          })) || []
         }
       ]
     },
