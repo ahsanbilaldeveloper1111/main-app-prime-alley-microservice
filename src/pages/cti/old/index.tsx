@@ -2,7 +2,7 @@ import React, { ReactElement, useEffect, useState, useCallback } from 'react'
 import Layout from '@layout/index'
 import BreadcrumbItem from '@common/BreadcrumbItem'
 import { Button, Card, Col, Form, Modal, Row, Dropdown } from 'react-bootstrap'
-import DeviceSelectionModal from '../../components/DeviceSelectionModal'
+import DeviceSelectionModal from '../../../components/DeviceSelectionModal'
 import { DashboardData } from '@utils/GsmManagement'
 import { toast } from 'react-toastify'
 import imgStatus1 from '@assets/images/widget/img-status-1.svg'
@@ -12,18 +12,17 @@ import '@assets/scss/gsm-dashboard.scss'
 import AnimatedNumber from '@components/AnimatedNumber'
 import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid'
 import moment from 'moment'
-import useCtiStomp from '../../hooks/useCtiStomp'
+import useCtiStomp from '../../../hooks/useCtiStomp'
 import dynamic from 'next/dynamic'
 import { ApexOptions } from 'apexcharts'
 import { set } from 'nprogress'
 import Link from 'next/link'
-import { clearAllLocalStorage, getLocalStorageInfo } from '../../utils/localStorageUtils'
+import { clearAllLocalStorage, getLocalStorageInfo } from '../../../utils/localStorageUtils'
 import { useSession } from 'next-auth/react';
 import { startMonitoring, stopMonitoring as stopMonitoringAPI, startBargeInMonitoring, stopBargeInMonitoring as stopBargeInMonitoringAPI } from '@utils/dialer'
 
 
 import '@assets/scss/common.scss';
-import '@assets/scss/cti-dashboard.scss';
 
 
 const baseUrl = ''
@@ -999,7 +998,7 @@ const CtiDashboard = () => {
   if (!isInitialized) {
     return (
       <div className="alert alert-info m-3">
-        Connecting to server...
+        Connecting to CTI server...
       </div>
     )
   }
@@ -1112,7 +1111,7 @@ const CtiDashboard = () => {
                         <Col md={12}>
                           <h6>Persisted Call Details</h6>
                           <div className="table-responsive">
-                              <table className="table table-sm">
+                            <table className="table table-sm">
                               <thead>
                                 <tr>
                                   <th>Call ID</th>
@@ -1159,6 +1158,98 @@ const CtiDashboard = () => {
         </Row>
       )}
 
+      {/* Statistics Cards */}
+      {/* <Row>
+        <Col md={3}>
+          <div className="card statistics-card-1">
+            <div className="card-body">
+              <img src={imgStatus1.src} alt="img" className="img-fluid img-bg" />
+              <div className="d-flex align-items-center">
+                <div className="avtar bg-brand-color-1 text-white me-3">
+                  <i className="material-icons-two-tone text-white">call</i>
+                </div>
+                <div>
+                  <p className="text-muted mb-0">Extensions</p>
+                  <div className="d-flex align-items-end">
+                    {summaryData.extensions > 0 ? (
+                      <AnimatedNumber value={summaryData.extensions} duration={1000} />
+                    ) : (
+                      <h2 className="mb-0 f-w-500">0</h2>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </Col>
+
+        <Col md={3}>
+          <div className="card statistics-card-1">
+            <div className="card-body">
+              <img src={imgStatus2.src} alt="img" className="img-fluid img-bg" />
+              <div className="d-flex align-items-center">
+                <div className="avtar bg-brand-color-1 text-white me-3">
+                  <i className="material-icons-two-tone text-white">call</i>
+                </div>
+                <div>
+                  <p className="text-muted mb-0">Online Devices</p>
+                  <div className="d-flex align-items-end">
+                    {summaryData.online > 0 ? (
+                      <AnimatedNumber value={summaryData.online} duration={1000} />
+                    ) : (
+                      <h2 className="mb-0 f-w-500">0</h2>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </Col>
+
+        <Col md={3}>
+          <div className="card statistics-card-1">
+            <div className="card-body">
+              <img src={imgStatus4.src} alt="img" className="img-fluid img-bg" />
+              <div className="d-flex align-items-center">
+                <div className="avtar bg-brand-color-1 text-white me-3">
+                  <i className="material-icons-two-tone text-white">call</i>
+                </div>
+                <div>
+                  <p className="text-muted mb-0">On Hold</p>
+                  <div className="d-flex align-items-end">
+                    <h2 className="mb-0 f-w-500">{summaryData.on_hold}</h2>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </Col>
+
+        <Col md={3}>
+          <div className="card statistics-card-1">
+            <div className="card-body">
+              <img src={imgStatus2.src} alt="img" className="img-fluid img-bg" />
+              <div className="d-flex align-items-center">
+                <div className="avtar bg-brand-color-1 text-white me-3">
+                  <i className="material-icons-two-tone text-white">call</i>
+                </div>
+                <div>
+                  <p className="text-muted mb-0">Connected</p>
+                  <div className="d-flex align-items-end">
+                    {summaryData.connected > 0 ? (
+                      <AnimatedNumber value={summaryData.connected} />
+                    ) : (
+                      <h2 className="mb-0 f-w-500">0</h2>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </Col>
+
+        
+      </Row> */}
 
        {/* CTI Summary Cards */}
        <PageSummaryGrid 
@@ -1228,144 +1319,225 @@ const CtiDashboard = () => {
             <div className="card-header">
               <h5>
                 <i className="material-icons-two-tone me-2">table_chart</i>
-                Live View 
+                CTI Extensions
               </h5>
             </div>
             <div className="card-body p-0">
-              <div className="container-fluid pt-3 pb-3">
-                <div className="row g-3 justify-content-center align-items-center">
-                  {Object.values(dnsMap)
-                    .filter(({ dn }) => dn !== userAddress) // Filter out user's own extension
-                    .map(({ dn, devices }) => {
-                    const deviceList = Object.values(devices || {})
-                    const call = getDnCallState(dn)
-                    const active = hasActiveCalls(dn)
-                    const cls = getCardLevelStatus(deviceList)
-                    const callColor = active && call ? getColor(
-                      call.currentState || '',
-                      call.isConference || false,
-                      call.isOneToOne || false,
-                      call.role || '',
-                      call.parties || [],
-                      dn,
-                      cls
-                    ) : '#6b7280'
+              <div className="table-responsive">
+                <table className="table cti-table">
+                  <thead>
+                    <tr>
+                      <th className="text-center">Extension</th>
+                      <th className="text-center">Status</th>
+                      <th className="text-center">Call Status</th>
+                      <th className="text-center">Devices</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Object.values(dnsMap).map(({ dn, devices }) => {
+                      const deviceList = Object.values(devices || {})
+                      const call = getDnCallState(dn)
+                      const active = hasActiveCalls(dn)
+                      const cls = getCardLevelStatus(deviceList)
 
-                    return (
-                      <div key={dn} className="col-6 col-sm-4 col-md-3 col-lg-2">
-                        <div className="card-wrapper position-relative">
-                          <div 
-                            className={`card text-white ${cls} shadow-sm position-relative`}
-                            style={{
-                              ['--call-border-color' as string]: callColor,
-                              ['--call-shadow-color' as string]: `${callColor}40`,
-                              height: '100%',
-                              minHeight: '120px'
-                            }}
-                          >
-                            <div className="card-body d-flex align-items-center p-2">
+                      return (
+                        <tr key={dn} className={cls}>
+                          <td className="text-center">
+                            <div className="extension-number">
                               <i className="material-icons-two-tone extension-icon">phone</i>
-                              <div className="flex-grow-1 ms-2 text-truncate">
-                                <h6 className="mb-1" title={dn}>{dn}</h6>
-                                <p className="small mb-0">
-                                  {cls === 'registered'
-                                    ? 'Online'
-                                    : cls === 'unregistered'
-                                      ? 'Offline'
-                                      : 'Stale'
-                                  }
-                                </p>
-                                {active && call && (
-                                  <p className="small mb-0" style={{ color: callColor }}>
-                                    {getText(
+                              <strong>{dn}</strong>
+                            </div>
+                          </td>
+                          <td className="text-center">
+                            <span
+                              className={`badge ${
+                                cls === 'registered'
+                                  ? 'bg-success'
+                                  : cls === 'unregistered'
+                                    ? 'bg-danger'
+                                    : 'bg-warning'
+                              }`}
+                            >
+                              {cls === 'registered'
+                                ? 'ONLINE'
+                                : cls === 'unregistered'
+                                  ? 'OFFLINE'
+                                  : 'STALE'
+                              }
+                            </span>
+                          </td>
+                          <td className="text-center">
+                            {active && call ? (
+                              <div className="call-status-container">
+                                <div
+                                  className="call-status-text"
+                                  style={{
+                                    color: getColor(
                                       call.currentState || '',
                                       call.isConference || false,
                                       call.isOneToOne || false,
+                                      call.role || '',
                                       call.parties || [],
-                                      dn
-                                    )}
-                                  </p>
-                                )}
+                                      dn,
+                                      cls
+                                    )
+                                  }}
+                                >
+                                  {getText(
+                                    call.currentState || '',
+                                    call.isConference || false,
+                                    call.isOneToOne || false,
+                                    call.parties || [],
+                                    dn
+                                  )}
+                                </div>
+                                {/* Show "from extension" for incoming calls */}
+                                {getText(
+                                  call.currentState || '',
+                                  call.isConference || false,
+                                  call.isOneToOne || false,
+                                  call.parties || [],
+                                  dn
+                                ) === 'Incoming' &&
+                                  call.parties &&
+                                  call.parties.length > 0 && (
+                                    <div className="call-details small text-muted mt-1">
+                                      Caller:{' '}
+                                      <b>
+                                        {call.parties.find(p => p.calledAddress === dn)?.callingAddress || 'Unknown'}
+                                      </b>
+                                    </div>
+                                  )}
+                                {/* Show "from extension" for call started (RETRIEVED) calls */}
+                                {getText(
+                                  call.currentState || '',
+                                  call.isConference || false,
+                                  call.isOneToOne || false,
+                                  call.parties || [],
+                                  dn
+                                ) === 'Call Started' &&
+                                  call.parties &&
+                                  call.parties.length > 0 && (
+                                    <div className="call-details small text-muted mt-1">
+                                      Caller:{' '}
+                                      <b>
+                                        {call.parties.find(p => p.calledAddress === dn)?.callingAddress || 'Unknown'}
+                                      </b>
+                                    </div>
+                                  )}
                               </div>
+                            ) : (
+                              <span className="badge bg-secondary">IDLE</span>
+                            )}
+                          </td>
+                          <td className="text-center">
+                            <div className="device-grid">
+                              {deviceList
+                               // .filter(device => device.terminalState !== 'STALE')
+                                .map(({ deviceName, deviceType, terminalState }) => {
+                                  const iconClass = getDeviceIconClass(deviceType)
+                                  const dotColor =
+                                    terminalState === 'REGISTERED'
+                                      ? '#10b981'
+                                      : terminalState === 'UNREGISTERED'
+                                        ? '#ef4444'
+                                        : terminalState === 'STALE'
+                                          ? '#f59e0b'
+                                          : '#6b7280'
+
+                                  const deviceCall = getCallStateForDevice(dn, deviceName)
+                                  const isDeviceActiveCall =
+                                    deviceCall &&
+                                    ['CONNECTED', 'ON_HOLD', 'ANSWERED','RETRIEVED'].includes(deviceCall.currentState || '')
+                                    //console.log('deviceCall', deviceCall)
+
+                                  return (
+                                    <div key={deviceName} className="d-flex align-items-center">
+                                      <div
+                                        className={`device-icon ${isDeviceActiveCall ? 'active' : ''} ${
+                                          activeMonitoring.dn === dn && activeMonitoring.type && activeMonitoring.deviceName === deviceName ? 'monitoring' : ''
+                                        }`}
+                                        title={`${deviceName} (${terminalState})`}
+                                        onClick={() => { //terminalState !== 'STALE' &&
+                                          if ( isDeviceActiveCall) {
+                                            console.log('Opening popup for:', dn, deviceName)
+                                            setShowPopup({ dn: dn, deviceName })
+                                            handleMonitorSelect(dn, 'SILENT', Object.values(dnsMap[dn]?.devices || {}))
+                                          } else if (terminalState === 'STALE') {
+                                            console.log('Device is STALE, popup disabled')
+                                          } else {
+                                            console.log('Device not in active call, popup disabled')
+                                          }
+                                        }}
+                                      >
+                                        <i
+                                          className={iconClass}
+                                          style={{
+                                            fontSize: '1.2rem',
+                                            color: dotColor
+                                          }}
+                                        >
+                                          {deviceType === 'SOFT'
+                                            ? 'headset_mic'
+                                            : deviceType === 'HARD'
+                                              ? 'phone'
+                                              : deviceType === 'ANDROID'
+                                                ? 'android'
+                                                : deviceType === 'IOS'
+                                                  ? 'phone_iphone'
+                                                  : 'device_unknown'
+                                          }
+                                        </i>
+                                        <span
+                                          className="device-status-dot"
+                                          style={{ backgroundColor: dotColor }}
+                                        />
+                                        
+                                        
+                                      </div>
+                                      
+                                      {/* Individual Stop Button for Monitored Device */}
+                                      {activeMonitoring.dn === dn && activeMonitoring.type && activeMonitoring.deviceName === deviceName && (
+                                        <Button
+                                          variant="outline-danger"
+                                          size="sm"
+                                          onClick={() => stopMonitoring(dn, activeMonitoring.type!)}
+                                          className="ms-1 device-stop-btn"
+                                          title={`Stop ${activeMonitoring.type === 'SILENT' ? 'Silent' : 
+                                                   activeMonitoring.type === 'WHISPER' ? 'Whisper' : 
+                                                   'Barge In'} Monitoring`}
+                                        >
+                                         
+                                          <span className="device-stop-label">
+                                            Stop {activeMonitoring.type === 'SILENT' ? 'Silent' : 
+                                             activeMonitoring.type === 'WHISPER' ? 'Whisper' : 
+                                             'Barge In'} Monitoring
+                                          </span>
+                                        </Button>
+                                      )}
+                                    </div>
+                                  )
+                                })}
                             </div>
-                            <div className="device-icons d-flex flex-wrap gap-1 px-2 pb-2">
-                              {deviceList.map(({ deviceName, deviceType, terminalState }) => {
-                                const iconClass = getDeviceIconClass(deviceType)
-                                const dotColor =
-                                  terminalState === 'REGISTERED'
-                                    ? '#10b981'
-                                    : terminalState === 'UNREGISTERED'
-                                      ? '#ef4444'
-                                      : terminalState === 'STALE'
-                                        ? '#f59e0b'
-                                        : '#6b7280'
-
-                                const deviceCall = getCallStateForDevice(dn, deviceName)
-                                const isDeviceActiveCall =
-                                  deviceCall &&
-                                  ['CONNECTED', 'ON_HOLD', 'ANSWERED','RETRIEVED'].includes(deviceCall.currentState || '')
-
-                                return (
-                                  <div 
-                                    key={deviceName}
-                                    className={`device-icon-wrapper position-relative ${isDeviceActiveCall ? 'active' : ''} ${
-                                      activeMonitoring.dn === dn && activeMonitoring.type && activeMonitoring.deviceName === deviceName ? 'monitoring' : ''
-                                    }`}
-                                    title={`${deviceName} (${terminalState})`}
-                                    onClick={() => {
-                                      if (isDeviceActiveCall) {
-                                        console.log('Opening popup for:', dn, deviceName)
-                                        setShowPopup({ dn: dn, deviceName })
-                                        handleMonitorSelect(dn, 'SILENT', Object.values(dnsMap[dn]?.devices || {}))
-                                      } else if (terminalState === 'STALE') {
-                                        console.log('Device is STALE, popup disabled')
-                                      } else {
-                                        console.log('Device not in active call, popup disabled')
-                                      }
-                                    }}
-                                    style={{ borderColor: 'black' }}
-                                  >
-                                    <i
-                                      className={iconClass}
-                                      style={{
-                                        fontSize: '1.3rem',
-                                        color: dotColor
-                                      }}
-                                    >
-                                      {deviceType === 'SOFT'
-                                        ? 'headset_mic'
-                                        : deviceType === 'HARD'
-                                          ? 'phone'
-                                          : deviceType === 'ANDROID'
-                                            ? 'android'
-                                            : deviceType === 'IOS'
-                                              ? 'phone_iphone'
-                                              : 'device_unknown'
-                                      }
-                                    </i>
-                                    <span
-                                      className="device-status-dot"
-                                      style={{ backgroundColor: dotColor }}
-                                    />
-                                  </div>
-                                )
-                              })}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                    {loading && (
+                      <tr>
+                        <td colSpan={4} className="text-center">
+                          <div className="loading-spinner">
+                            <div className="spinner-border" role="status">
+                              <span className="visually-hidden">Loading...</span>
                             </div>
                           </div>
-                        </div>
-                      </div>
-                    )
-                  })}
-                  {loading && (
-                    <div className="col-12 text-center">
-                      <div className="loading-spinner">
-                        <div className="spinner-border" role="status">
-                          <span className="visually-hidden">Loading...</span>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
+                        </td>
+                      </tr>
+                    )}
+                    
+                    
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>
