@@ -969,18 +969,6 @@ const Header = ({ themeMode }: HeaderProps) => {
                     </Link>
                 </li>
                 <li className="pc-item">
-                    <Link className="pc-link" href={`${BASE_URL}/accounting/resellers`} >
-                        <span className="pc-micon"><i className="ph-duotone ph-users"></i></span>
-                        <span className="pc-mtext">Resellers</span>
-                    </Link>
-                </li>
-                <li className="pc-item">
-                    <Link className="pc-link" href={`${BASE_URL}/accounting/companies`} >
-                        <span className="pc-micon"><i className="ph-duotone ph-buildings"></i></span>
-                        <span className="pc-mtext">Companies</span>
-                    </Link>
-                </li>
-                <li className="pc-item">
                     <Link className="pc-link" href={`${BASE_URL}/accounting/invoices`} >
                         <span className="pc-micon"><i className="ph-duotone ph-file-text"></i></span>
                         <span className="pc-mtext">Invoices</span>
@@ -1002,6 +990,18 @@ const Header = ({ themeMode }: HeaderProps) => {
                     <Link className="pc-link" href={`${BASE_URL}/accounting/inventory`} >
                         <span className="pc-micon"><i className="ph-duotone ph-warehouse"></i></span>
                         <span className="pc-mtext">Inventory</span>
+                    </Link>
+                </li>
+                <li className="pc-item">
+                    <Link className="pc-link" href={`${BASE_URL}/accounting/companies`} >
+                        <span className="pc-micon"><i className="ph-duotone ph-buildings"></i></span>
+                        <span className="pc-mtext">Companies</span>
+                    </Link>
+                </li>
+                <li className="pc-item">
+                    <Link className="pc-link" href={`${BASE_URL}/accounting/resellers`} >
+                        <span className="pc-micon"><i className="ph-duotone ph-users"></i></span>
+                        <span className="pc-mtext">Resellers</span>
                     </Link>
                 </li>
                 <li className="pc-item">
