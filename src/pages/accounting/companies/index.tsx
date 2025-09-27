@@ -52,6 +52,7 @@ import ConfirmModal from "@pages/partial/ConfirmModal";
 import SuccessfulModal from "@pages/partial/SuccessfulModal";
 import { FiEdit, FiTrash2 } from "react-icons/fi";
 import TableAction from "@components/TableAction";
+import CompaniesFilters from "@components/filters/CompaniesFilters";
 
 // Stripe Card Form Component
 const StripeCardForm = ({
@@ -684,23 +685,6 @@ const CompanyList = () => {
     }
   }, [importFile]);
 
-  // Handle export companies
-  const handleExportCompanies = useCallback(async () => {
-    try {
-      const blob = await exportCompanies();
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `companies-export-${moment().format("YYYY-MM-DD")}.xlsx`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-      toast.success("Companies exported successfully");
-    } catch (error) {
-      console.error("Error exporting companies:", error);
-    }
-  }, []);
 
   // Handle download template
   const handleDownloadTemplate = useCallback(async () => {
@@ -878,20 +862,47 @@ const CompanyList = () => {
   );
 
   const [currentFilters, setCurrentFilters] = useState<any>({});
-   // Fetch companies function
-   const fetchCompanies = useCallback(
+  
+  const handleFiltersChange = useCallback((filters: any) => {
+    setCurrentFilters(filters);
+  }, [setCurrentFilters]);
+
+  // Handle export companies
+  const handleExportCompanies = useCallback(async (exportType: string, filters: Record<string, any> = {}) => {
+    try {
+      const exportFilters = {
+        ...currentFilters,
+        ...filters
+      };
+      const blob = await exportCompanies(exportFilters);
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `companies-export-${moment().format("YYYY-MM-DD")}.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      toast.success("Companies exported successfully");
+    } catch (error) {
+      console.error("Error exporting companies:", error);
+    }
+  }, [currentFilters]);
+
+  // Fetch companies function
+  const fetchCompanies = useCallback(
     async (page = 1, perPage = 15, search = "") => {
       return await getCompanies({
         page,
         per_page: perPage,
         search: search || currentFilters?.search,
+        reseller_id: currentFilters?.reseller_id,
+        phone: currentFilters?.phone,
+        email: currentFilters?.email,
       });
     },
     [currentFilters]
   );
-  const handleFiltersChange = useCallback((filters: any) => {
-    setCurrentFilters(filters);
-  }, [setCurrentFilters]);
 
   return (
     <React.Fragment>
@@ -910,9 +921,17 @@ const CompanyList = () => {
           handleFiltersChange({ ...currentFilters, search: value })
         }
         buttons={
-          <Button variant="primary" size="sm" onClick={openCreateModal}>
-            New Company
-          </Button>
+          <div className="d-flex align-items-center gap-2">
+            <CompaniesFilters
+              onFiltersChange={handleFiltersChange}
+              showFilters={true}
+              showExport={true}
+              onExport={handleExportCompanies}
+            />
+            <Button variant="primary" size="sm" onClick={openCreateModal}>
+              New Company
+            </Button>
+          </div>
         }
       />
 

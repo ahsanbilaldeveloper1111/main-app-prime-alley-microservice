@@ -114,6 +114,8 @@ const ResellerList = () => {
   // Form states
   const [formData, setFormData] = useState({
     name: "",
+    email: "",
+    phone: "",
     parent_id: null as number | null,
     organization_unit: "",
   });
@@ -142,41 +144,18 @@ const ResellerList = () => {
         cell: (props: any) => <div className="">{props.name}</div>,
       },
       {
-        key: "parent_id",
-        name: "Parent ID",
-        selector: (row: any) => row.parent_id,
+        key: "email",
+        name: "Email",
+        selector: (row: any) => row.email,
         sortable: true,
-        cell: (props: any) => (
-          <span className="status-badge primary">
-            {props.parent_id || "N/A"}
-          </span>
-        ),
+        cell: (props: any) => <div className="">{props.email || '-'}</div>,
       },
       {
-        key: "organization_unit",
-        name: "Organization Unit",
-        selector: (row: any) => row.organization_unit,
+        key: "phone",
+        name: "Phone",
+        selector: (row: any) => row.phone,
         sortable: true,
-        cell: (props: any) => (
-          <span className="status-badge primary">
-            {props.organization_unit || "N/A"}
-          </span>
-        ),
-      },
-      {
-        key: "status",
-        name: "Status",
-        selector: (row: any) => row.status,
-        sortable: true,
-        cell: (props: any) => (
-          <div
-            className={`status-badge ${
-              props.status === "active" ? "success" : "danger"
-            }`}
-          >
-            {props.status || "N/A"}
-          </div>
-        ),
+        cell: (props: any) => <div className="">{props.phone || '-'}</div>,
       },
       {
         key: "created_at",
@@ -253,6 +232,8 @@ const ResellerList = () => {
   const resetFormData = useCallback(() => {
     setFormData({
       name: "",
+      email: "",
+      phone: "",
       parent_id: null,
       organization_unit: "",
     });
@@ -268,6 +249,14 @@ const ResellerList = () => {
   const handleCreateReseller = useCallback(async () => {
     if (!formData.name.trim()) {
       toast.error("Please enter a reseller name");
+      return;
+    }
+    if (!formData.email.trim()) {
+      toast.error("Please enter an email address");
+      return;
+    }
+    if (!formData.phone.trim()) {
+      toast.error("Please enter a phone number");
       return;
     }
 
@@ -295,6 +284,8 @@ const ResellerList = () => {
     setSelectedReseller(reseller);
     setFormData({
       name: reseller.name,
+      email: reseller.email || "",
+      phone: reseller.phone || "",
       parent_id: reseller.parent_id,
       organization_unit: reseller.organization_unit || "",
     });
@@ -315,6 +306,14 @@ const ResellerList = () => {
 
     if (!formData.name.trim()) {
       toast.error("Please enter a reseller name");
+      return;
+    }
+    if (!formData.email.trim()) {
+      toast.error("Please enter an email address");
+      return;
+    }
+    if (!formData.phone.trim()) {
+      toast.error("Please enter a phone number");
       return;
     }
 
@@ -567,6 +566,46 @@ const ResellerList = () => {
                     />
                   </div>
                 </div>
+                <div className="col-md-12">
+                  <div className="form-group mb-3">
+                    <label htmlFor="createEmail" className="mb-0">
+                      Email Address *
+                    </label>
+                    <p className="text-muted mb-3">
+                      Enter the email address of the reseller
+                    </p>
+                    <input
+                      type="email"
+                      className="form-control"
+                      id="createEmail"
+                      value={formData.email}
+                      onChange={(e) =>
+                        handleInputChange("email", e.target.value)
+                      }
+                      placeholder="Enter email address"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-12">
+                  <div className="form-group mb-3">
+                    <label htmlFor="createPhone" className="mb-0">
+                      Phone Number *
+                    </label>
+                    <p className="text-muted mb-3">
+                      Enter the phone number of the reseller
+                    </p>
+                    <input
+                      type="tel"
+                      className="form-control"
+                      id="createPhone"
+                      value={formData.phone}
+                      onChange={(e) =>
+                        handleInputChange("phone", e.target.value)
+                      }
+                      placeholder="Enter phone number"
+                    />
+                  </div>
+                </div>
               </div>
             </>
           }
@@ -596,12 +635,52 @@ const ResellerList = () => {
                     <input
                       type="text"
                       className="form-control"
-                      id="createName"
+                      id="editName"
                       value={formData.name}
                       onChange={(e) =>
                         handleInputChange("name", e.target.value)
                       }
                       placeholder="Enter reseller name"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-12">
+                  <div className="form-group mb-3">
+                    <label htmlFor="editEmail" className="mb-0">
+                      Email Address *
+                    </label>
+                    <p className="text-muted mb-3">
+                      Enter the email address of the reseller
+                    </p>
+                    <input
+                      type="email"
+                      className="form-control"
+                      id="editEmail"
+                      value={formData.email}
+                      onChange={(e) =>
+                        handleInputChange("email", e.target.value)
+                      }
+                      placeholder="Enter email address"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-12">
+                  <div className="form-group mb-3">
+                    <label htmlFor="editPhone" className="mb-0">
+                      Phone Number *
+                    </label>
+                    <p className="text-muted mb-3">
+                      Enter the phone number of the reseller
+                    </p>
+                    <input
+                      type="tel"
+                      className="form-control"
+                      id="editPhone"
+                      value={formData.phone}
+                      onChange={(e) =>
+                        handleInputChange("phone", e.target.value)
+                      }
+                      placeholder="Enter phone number"
                     />
                   </div>
                 </div>
@@ -625,6 +704,8 @@ const ResellerList = () => {
               <thead>
                 <tr>
                   <th>Reseller Name</th>
+                  <th>Email</th>
+                  <th>Phone</th>
                   <th>Reseller ID</th>
                   <th>Reseller Organization Unit</th>
                 </tr>
@@ -632,6 +713,8 @@ const ResellerList = () => {
               <tbody>
                 <tr>
                   <td>{selectedReseller?.name}</td>
+                  <td>{selectedReseller?.email || '-'}</td>
+                  <td>{selectedReseller?.phone || '-'}</td>
                   <td>{selectedReseller?.parent_id}</td>
                   <td>{selectedReseller?.organization_unit}</td>
                 </tr>
