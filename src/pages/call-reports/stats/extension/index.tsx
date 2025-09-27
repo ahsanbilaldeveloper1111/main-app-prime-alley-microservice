@@ -691,7 +691,7 @@ const CallStatsExtension = () => {
                                             value: summary.avg_ring_time,
                                             valueType: "seconds",
                                             description: "Average ring time for calls",
-                                            delay: 1
+                                            delay: 0.3
                                         },
                                         {
                                             id: "avg-duration",
@@ -699,7 +699,7 @@ const CallStatsExtension = () => {
                                             value: summary.avg_duration,
                                             valueType: "seconds",
                                             description: "Average call duration",
-                                            delay: 2
+                                            delay: 0.6
                                         },
                                         {
                                             id: "total-cost",
@@ -707,8 +707,8 @@ const CallStatsExtension = () => {
                                             value: summary.total_cost,
                                             valueType: "cost",
                                             description: "Total cost of calls",
-                                            delay: 3,
-                                            suffix: "$"
+                                            delay: 0.9,
+                                            prefix: "$"
                                         }
                                     ]}
                                     
@@ -751,7 +751,7 @@ const CallStatsExtension = () => {
                                     series={simpleDonut.series} 
                                     labels={simpleDonut.labels}
                                     dataType="calls"
-                                    height={180}
+                                    height={250}
                                     width={500}
                                     showDataLabels={true}
                                     dataLabelsFormatter={(value) => `${value.toFixed(0)}%`}
