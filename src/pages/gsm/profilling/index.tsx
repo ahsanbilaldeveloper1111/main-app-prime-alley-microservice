@@ -24,7 +24,7 @@ const DataTable = dynamic(() => import("react-data-table-component"), {
 
 const paginationComponentOptions = {
       rowsPerPageText: "Data per page",
-      rangeSeparatorText: "to",
+      rangeSeparatorText: "of",
       selectAllRowsItem: true,
       selectAllRowsItemText: ""
 };
