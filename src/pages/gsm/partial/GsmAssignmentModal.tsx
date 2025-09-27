@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 
-interface AddGsmModelProps {
+interface GsmAssignmentModalProps {
   show: boolean;
   onHide: () => void;
   onSuccess?: (assignment: { selectedGsm: string; selectedCompany: string }) => void;
 }
 
-const AddGsmModel: React.FC<AddGsmModelProps> = ({ show, onHide, onSuccess }) => {
+const GsmAssignmentModal: React.FC<GsmAssignmentModalProps> = ({ show, onHide, onSuccess }) => {
   const [currentStep, setCurrentStep] = useState(1);
   const [selectedGsm, setSelectedGsm] = useState('');
   const [selectedCompany, setSelectedCompany] = useState('');
@@ -178,4 +178,4 @@ const AddGsmModel: React.FC<AddGsmModelProps> = ({ show, onHide, onSuccess }) =>
   );
 };
 
-export default AddGsmModel;
+export default GsmAssignmentModal;

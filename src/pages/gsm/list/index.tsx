@@ -25,7 +25,7 @@ import imgStatus4 from '@assets/images/widget/img-status-4.svg'
 import { Dropdown, DropdownToggle, DropdownMenu, DropdownItem } from 'react-bootstrap';
 import { FiEdit, FiMoreVertical, FiTrash2 } from 'react-icons/fi';
 
-import AddGsmModel from '@pages/gsm/partial/AddGsmModel';
+import AddGsmModal from '@pages/gsm/partial/AddGsmModal';
 import SuccessfulModal from '@pages/partial/SuccessfulModal';
 import ConfirmModal from '@pages/partial/ConfirmModal';
  import GsmDetailModel from '@pages/gsm/partial/GsmDetailModel';
@@ -206,26 +206,6 @@ const GsmList = () => {
         // }
     };
 
-    const [showCreateGsmModal, setShowCreateGsmModal] = useState(false);
-    const [newGsmName, setNewGsmName] = useState('');
-    const [newGsmIpAddress, setNewGsmIpAddress] = useState('');
-    const [newGsmUsername, setNewGsmUsername] = useState('');
-    const [newGsmPassword, setNewGsmPassword] = useState('');
-    const handleSubmitCreateGsm = async () => {
-      if(newGsmName == '' || newGsmIpAddress == '' || newGsmUsername == '' || newGsmPassword == ''){
-        toast.error('Please fill all the fields');
-        return;
-      }
-      const response = await addGsm(newGsmName, newGsmIpAddress, newGsmUsername, newGsmPassword);
-      if(response){
-          setShowCreateGsmModal(false);
-          setNewGsmName('');
-          setNewGsmIpAddress('');
-          setNewGsmUsername('');
-          setNewGsmPassword('');
-          setRefreshKey(refreshKey + 1);
-      }
-    };
 
     const [showEditGsmModal, setShowEditGsmModal] = useState(false);
     const [editGsmId, setEditGsmId] = useState('');
@@ -385,51 +365,13 @@ const GsmList = () => {
                  tableStyle="table-style-2"
                  onFiltersClick={() => console.log('Filters clicked')}
                  onExportClick={handleExportSuccessful}
-                 onNewClick={() => setShowCreateGsmModal(true)}
+                 onNewClick={() => setShowAddGsmModal(true)}
                  filtersText="Filters"
                  exportText="Export"
                  newText="New GSM"
              />
             )}
 
-            {showCreateGsmModal && (
-                 <Modal id="create-gsm-modal"
-                 className="customModal"
-                 show={showCreateGsmModal}
-                 onHide={() => setShowCreateGsmModal(false)}
-             >
-                 
-                 <Modal.Body>
-                 <span className="close-btn" id="action-close-btn"><i className="fas fa-times"></i></span>
-                 <h2 id="action-modal-title">New Gsm</h2>
-                     <div className="form-group">
-                         <label htmlFor="newGsmName" className="mb-0">Gsm Name</label>
-                         <input type="text" className="form-control" id="newGsmName"  value={newGsmName} onChange={(e) => setNewGsmName(e.target.value)} placeholder="Gsm Name" required/>
-                     </div>
-
-                     <div className="form-group"> 
-                        <label htmlFor="newGsmIpAddress" className="mb-0">Ip Address</label>
-                        <input type="text" className="form-control" id="newGsmIpAddress"  value={newGsmIpAddress} onChange={(e) => setNewGsmIpAddress(e.target.value)} placeholder="Gsm Ip Address" required/>
-                     </div>
-
-                     <div className="form-group"> 
-                        <label htmlFor="newGsmUsername" className="mb-0">Username</label>
-                        <input type="text" className="form-control" id="newGsmUsername"  value={newGsmUsername} onChange={(e) => setNewGsmUsername(e.target.value)} placeholder="Gsm Username" required/>
-                     </div>
-
-                     <div className="form-group"> 
-                        <label htmlFor="newGsmPassword" className="mb-0">Password</label>
-                        <input type="password" className="form-control" id="newGsmPassword"  value={newGsmPassword} onChange={(e) => setNewGsmPassword(e.target.value)} placeholder="Gsm Password" required/>
-                     </div>
-                     
-
-                 </Modal.Body>
-                 <Modal.Footer className="mt-0">
-                     <Button variant="secondary" onClick={() => setShowCreateGsmModal(false)}>Close</Button>
-                     <Button variant="primary" onClick={() => handleSubmitCreateGsm()}>Create</Button>
-                 </Modal.Footer>
-             </Modal>
-            )}
 
 
             {showEditGsmModal && (
@@ -506,14 +448,15 @@ const GsmList = () => {
           
 
             {showAddGsmModal && (
-                <AddGsmModel
+                <AddGsmModal
                 show={showAddGsmModal}
                 onHide={() => setShowAddGsmModal(false)}
                 onSuccess={() => {
                     setShowAddGsmModal(false);
                     setSuccessModalTitle('Successfully Created');
-                    setSuccessModalDescription('The GSM data has been successfully created.');
+                    setSuccessModalDescription('The GSM device has been successfully created.');
                     setShowSuccessModal(true);
+                    setRefreshKey(refreshKey + 1);
                 }}
               />
             )}

@@ -22,7 +22,7 @@ import imgStatus2 from '@assets/images/widget/img-status-2.svg'
 import imgStatus3 from '@assets/images/widget/img-status-3.svg'
 import imgStatus4 from '@assets/images/widget/img-status-4.svg'
 import { FiEdit, FiTrash2,FiMoreVertical } from 'react-icons/fi';
-import AddGsmModel from '@pages/gsm/partial/AddGsmModel';
+import GsmAssignmentModal from '@pages/gsm/partial/GsmAssignmentModal';
 import SuccessfulModal from '@pages/partial/SuccessfulModal';
 import ConfirmModal from '@pages/partial/ConfirmModal';
 import PortLinkUnlinkModal from '../partial/PortLinkUnlinkModal';
@@ -561,7 +561,7 @@ const GsmAssign = () => {
             )}
 
 
-            <AddGsmModel 
+            <GsmAssignmentModal 
               show={showAssignGsmModal}
               onHide={() => setShowAssignGsmModal(false)}
               onSuccess={handleAssignmentSuccess}
