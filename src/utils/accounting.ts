@@ -28,6 +28,8 @@ interface PaginationWrapper<T> {
 export interface ResellerData {
   id: number;
   name: string;
+  email: string;
+  phone: string;
   parent_id: number | null;
   organization_unit: string | null;
   created_at: string;
@@ -74,6 +76,8 @@ export interface CompanyData {
   reseller?: {
     id: number;
     name: string;
+    email: string;
+    phone: string;
     parent_id: number | null;
     organization_unit: string | null;
     created_at: string;
