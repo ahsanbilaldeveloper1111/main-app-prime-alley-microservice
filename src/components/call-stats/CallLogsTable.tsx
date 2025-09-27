@@ -1,7 +1,7 @@
 import React from 'react';
-import { Col, Row } from 'react-bootstrap';
-import { useSession } from 'next-auth/react';
+import { Row, Col } from 'react-bootstrap';
 import GenericListPage from '@components/GenericListPage';
+import { useSession } from 'next-auth/react';
 import { Column } from '@components/CustomDataTable';
 
 interface Summary {
@@ -17,13 +17,13 @@ interface Summary {
 interface CallLogsTableProps {
   columns: Column[];
   fetchCallLogs: (page?: number, perPage?: number, search?: string) => Promise<any>;
-  currentFilters: Record<string, any>;
+  currentFilters: any;
   refreshKey: number;
   summary: Summary;
   dataLoaded: boolean;
 }
 
-const CallLogsTable: React.FC<CallLogsTableProps> = ({
+export const CallLogsTable: React.FC<CallLogsTableProps> = ({
   columns,
   fetchCallLogs,
   currentFilters,
@@ -38,7 +38,6 @@ const CallLogsTable: React.FC<CallLogsTableProps> = ({
   }
 
   if (!dataLoaded) {
-    // Loading state for the list
     return (
       <Row>
         <Col md={12}>
@@ -59,7 +58,6 @@ const CallLogsTable: React.FC<CallLogsTableProps> = ({
   }
 
   if (dataLoaded && summary.total_calls === 0) {
-    // Empty state when no data is available
     return (
       <Row>
         <Col md={12}>
@@ -78,7 +76,6 @@ const CallLogsTable: React.FC<CallLogsTableProps> = ({
     );
   }
 
-  // Normal GenericListPage when data is available
   return (
     <GenericListPage
       columns={columns}
@@ -88,11 +85,7 @@ const CallLogsTable: React.FC<CallLogsTableProps> = ({
       defaultPageSize={15}
       filters={currentFilters}
       refreshKey={refreshKey}
-      key={refreshKey} 
-      search={false}
-      tableStyle='table-style-2'
+      key={refreshKey}
     />
   );
 };
-
-export default CallLogsTable;

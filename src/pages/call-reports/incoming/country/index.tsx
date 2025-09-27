@@ -582,9 +582,9 @@ const CallIncomingCountry = () => {
                         />
 
                         <StatCard
-                            title="Cost"
-                            value={summary.total_cost}
-                            valueType="cost"
+                            title="Duration"
+                            value={summary.total_duration}
+                            valueType="seconds"
                             icon="payment"
                             bgImage={imgStatus1.src}
                             delay={3}

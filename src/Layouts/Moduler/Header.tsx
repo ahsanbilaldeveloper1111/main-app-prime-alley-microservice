@@ -881,7 +881,7 @@ const Header = ({ themeMode }: HeaderProps) => {
                                                 </Link>
                                             </li>
                                         
-                                        <li className="pc-item">
+                                        {/* <li className="pc-item">
                                             <Link className="pc-link" href={`${BASE_URL}/call-reports/trend/country`}>
                                             <span className="pc-micon"><i className={ICONS.PHONE_CALL}></i></span>
                                             <span className="pc-mtext">{SUBMENU_LABELS.CALL_TREND_BY_COUNTRY}</span></Link>
@@ -898,7 +898,7 @@ const Header = ({ themeMode }: HeaderProps) => {
                                             <span className="pc-micon"><i className={ICONS.PHONE_CALL}></i></span>
                                             <span className="pc-mtext">{SUBMENU_LABELS.CALL_TREND_BY_EXTENSION}</span>
                                                 </Link>
-                                            </li>
+                                            </li> */}
                
             </ul>
         </div>

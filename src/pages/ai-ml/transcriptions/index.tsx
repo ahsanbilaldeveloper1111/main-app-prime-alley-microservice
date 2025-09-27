@@ -264,7 +264,7 @@ const CallTranscriptions = () => {
                     <div className="card">
                         <div className="card-body">
                           
-                            <h5 className="card-title">Transcriptions List</h5>
+                           
                             <Tabs
                                  defaultActiveKey="calls_chart"
                                  id="system-tabs"

@@ -345,6 +345,21 @@ export const GlobalDateFormat = 'DD-MM-YYYY';
 export const GlobalTimeFormat = 'hh:mm:ss A';
 export const GlobalDateTimeFormat = 'DD-MM-YYYY hh:mm:ss A';
 
+/**
+ * Format seconds into minutes and seconds (e.g., "1m 20s")
+ * @param seconds - Duration in seconds
+ * @returns Formatted duration string (e.g., "1m 20s", "20s")
+ */
+export const formatMinutesAndSeconds = (seconds: number): string => {
+  if (!seconds || seconds < 0) return '0s';
+  
+  const minutes = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60);
+  
+  if (minutes === 0) return `${secs}s`;
+  return `${minutes}m ${secs}s`;
+};
+
 export const ModuleSlug = {
   CALL_REPORTS: 'call-reports',
   CALL_LOGS: 'call-logs',
@@ -353,3 +368,13 @@ export const ModuleSlug = {
   CRM:'crm',
   REPORTS:'reports'
 }
+
+export const formatCurrency = (amount: number | null): string => {
+  if (amount === null || amount === 0) {
+    return '$0.00';
+  }
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD'
+  }).format(amount);
+};
