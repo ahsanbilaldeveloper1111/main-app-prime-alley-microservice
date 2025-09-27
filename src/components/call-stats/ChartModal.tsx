@@ -9,7 +9,12 @@ interface ChartModalProps {
   title: string;
 }
 
-const ChartModal: React.FC<ChartModalProps> = ({ show, onHide, chartData, title }) => {
+export const ChartModal: React.FC<ChartModalProps> = ({
+  show,
+  onHide,
+  chartData,
+  title
+}) => {
   return (
     <Modal 
       show={show} 
@@ -29,7 +34,6 @@ const ChartModal: React.FC<ChartModalProps> = ({ show, onHide, chartData, title 
               categories={chartData.categories}
               height={500}
               dataType="custom"
-              useLogScale={true}
             />
           </div>
         ) : (
@@ -43,5 +47,3 @@ const ChartModal: React.FC<ChartModalProps> = ({ show, onHide, chartData, title 
     </Modal>
   );
 };
-
-export default ChartModal;

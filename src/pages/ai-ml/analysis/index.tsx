@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
-import { Row, Col, Card, Button, Spinner, Alert, Form } from 'react-bootstrap';
+import { Row, Col, Card, Button, Spinner, Alert, Form, InputGroup } from 'react-bootstrap';
 import { toast } from 'react-toastify';
 import moment from 'moment';
 import Tab from 'react-bootstrap/Tab';
@@ -15,7 +15,7 @@ import BreadcrumbItem from '@common/BreadcrumbItem';
 import AudioPlayer, { AudioPlayerRef } from '@components/AudioPlayer';
 
 // Utils
-import { GetCallAnalysis } from '@utils/aiml';
+import { GetCallAnalysis, GetTranscriptions, GetTranslations } from '@utils/aiml';
 import axiosInstance from '@utils/axios';
 
 // Assets
@@ -390,6 +390,7 @@ const CallAnalysis = () => {
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     handleGetCallAnalysis();
+    handleGetTranslations();
   };
 
 
@@ -1140,6 +1141,82 @@ const CallAnalysis = () => {
     </Row>
   );
 
+
+
+  const [target, setTarget] = useState('');
+  const [translations, setTranslations] = useState<any | null>(null);
+  const [isError, setIsError] = useState(false);
+  const [activeTab, setActiveTab] = useState('summary');
+  const [subActiveTab, setSubActiveTab] = useState('en');
+
+  useEffect(() => {
+    handleGetTranslations();
+  }, [uuid]);
+
+  const handleGetTranslations = async () => {
+    try {
+      const response = await GetTranscriptions(uuid);
+      setTranslations(response);
+      console.log(response);
+
+  } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+      console.error('Error fetching transcription:', err);
+  } finally {
+      setLoading(false);
+  }
+}
+
+  
+  const renderTranslate = () => (
+    <Row>
+      <Col md={12}>
+    
+
+            {translations && (
+            <Row>
+                <Col md={12}>
+                    {isError && (
+                        <div className="alert alert-danger">
+                            {error}
+                        </div>
+                    )}
+
+                    {!isError && translations && (
+                      <>
+                     
+                       <Tabs
+                       defaultActiveKey="calls_chart"
+                       id="system-tabs"
+                       className="mb-3 justify-content-center"
+                       activeKey={subActiveTab}
+                       onSelect={(k) => setSubActiveTab(k || 'en')}
+                  >
+                      <Tab eventKey="en" title="English">
+                          <p>{translations?.transcription}</p>
+                      </Tab>
+                      <Tab eventKey="ar" title="Arabic">
+                          <p>{translations?.transcription_ar}</p>
+                      </Tab>
+                      <Tab eventKey="ur" title="Urdu">
+                          <p>{translations?.transcription_ur}</p>
+                      </Tab>
+                      <Tab eventKey="hi" title="Hindi">
+                          <p>{translations?.transcription_hi}</p>
+                      </Tab>
+                      </Tabs>
+                      </>
+                    )}
+                   
+                    
+                        
+                </Col>
+            </Row>
+            )}
+      </Col>
+    </Row>
+  );
+
   return (
     <React.Fragment>
       <BreadcrumbItem mainTitle="" mainLink="" subTitle="Call Analysis" />
@@ -1187,7 +1264,7 @@ const CallAnalysis = () => {
             </Col>
           </Row>
         ) : analysis ? (
-          <Tabs defaultActiveKey="summary" id="system-tabs" className="mb-3">
+          <Tabs activeKey={activeTab} onSelect={(k) => setActiveTab(k || 'summary')} id="system-tabs" className="mb-3">
             <Tab eventKey="summary" title="Summary">
               {renderCustomerInfo()}
               {renderSummaryCards()}
@@ -1197,6 +1274,12 @@ const CallAnalysis = () => {
             <Tab eventKey="transcript" title="Transcript">
               {renderTranscript()}
             </Tab>
+
+            <Tab eventKey="translate" title="Translate">
+              {renderTranslate()}
+            </Tab>
+
+
           </Tabs>
         ) : (
           <Row>

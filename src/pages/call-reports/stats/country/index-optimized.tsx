@@ -18,11 +18,11 @@ import { useCallStatsCharts } from '@hooks/useCallStatsCharts';
 import { useCallStatsFilters } from '@hooks/useCallStatsFilters';
 
 // Components
-import SummaryCards from '@components/call-stats/SummaryCards';
-import DonutChart from '@components/call-stats/DonutChart';
-import ChartsTabs from '@components/call-stats/ChartsTabs';
-import CallLogsTable from '@components/call-stats/CallLogsTable';
-import ChartModal from '@components/call-stats/ChartModal';
+import { SummaryCards } from '@components/call-stats/SummaryCards';
+import { DonutChart } from '@components/call-stats/DonutChart';
+import { ChartsTabs } from '@components/call-stats/ChartsTabs';
+import { CallLogsTable } from '@components/call-stats/CallLogsTable';
+import { ChartModal } from '@components/call-stats/ChartModal';
 
 const CallStatsCountry = () => {
   const [showChartModal, setShowChartModal] = useState(false);

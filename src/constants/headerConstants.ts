@@ -27,7 +27,7 @@ export const HEADER_CONSTANTS = {
     CALL_LOGS: 'Call Logs',
     CALL_RECORDINGS: 'Call Recordings',
     REPORTS: 'Reports',
-    AI_INSIGHTS: 'Ai Insights',
+    AI_INSIGHTS: 'AI Insights',
     LIVE_CALLS: 'Live Calls',
     TICKETS: 'Tickets',
     AUTOMATION: 'Automation',

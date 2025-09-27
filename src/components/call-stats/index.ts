@@ -1,5 +1,5 @@
-export { default as SummaryCards } from './SummaryCards';
-export { default as DonutChart } from './DonutChart';
-export { default as ChartsTabs } from './ChartsTabs';
-export { default as CallLogsTable } from './CallLogsTable';
-export { default as ChartModal } from './ChartModal';
+export { SummaryCards } from './SummaryCards';
+export { DonutChart } from './DonutChart';
+export { ChartsTabs } from './ChartsTabs';
+export { CallLogsTable } from './CallLogsTable';
+export { ChartModal } from './ChartModal';
