@@ -264,7 +264,7 @@ const CrmLeads = () => {
       },
       {
         key: "contact",
-        name: "Contact",
+        name: "Extension & Type",
         selector: (row: any) => row.user_extension,
         sortable: true,
         cell: (props: any) => (

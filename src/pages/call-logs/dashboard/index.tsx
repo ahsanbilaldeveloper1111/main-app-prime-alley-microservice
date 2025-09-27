@@ -14,6 +14,8 @@ import { useSession } from 'next-auth/react';
 import CallLogsFilters from '@components/filters/CallLogsFilters';
 import AnimatedNumber from '@components/AnimatedNumber';
 import EmptyState from '@components/EmptyState';
+import { formatDateTimeToLocal, GlobalDateTimeFormat } from '@utils/Helper';
+import '@assets/scss/common.scss';
 
 import imgStatus1 from '@assets/images/widget/img-status-1.svg'
 import imgStatus2 from '@assets/images/widget/img-status-2.svg'
@@ -28,7 +30,6 @@ import "nprogress/nprogress.css";
 
 
 import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
-import '@assets/scss/common.scss';
 import { motion } from 'framer-motion';
 
 
@@ -152,7 +153,7 @@ const CallDashboard = () => {
             showAnimatedNumber: true,
             animationDuration: 1000,
             fontStyle: 'style-2',
-            suffix: ' sec',
+            valueType: 'seconds',
         },
         {
             id: 'avg-duration',
@@ -163,7 +164,7 @@ const CallDashboard = () => {
             showAnimatedNumber: true,
             animationDuration: 1000,
             fontStyle: 'style-2',
-            suffix: ' sec',
+            valueType: 'seconds',
         },
         {
             id: 'avg-cost',
@@ -189,6 +190,9 @@ const CallDashboard = () => {
     const [departmentChartData, setDepartmentChartData] = useState<any[]>([]);
     const [extensionChartData, setExtensionChartData] = useState<any[]>([]);
 
+    const [startDateTime, setStartDateTime] = useState<string>('');
+    const [endDateTime, setEndDateTime] = useState<string>('');
+
     useEffect(() => {
         fetchGeneralStats();
     }, []);
@@ -197,6 +201,7 @@ const CallDashboard = () => {
 
       if(response.success){
         const responseData = response.data;
+        const dataFilters = response?.filters;
       
       setGeneralStats({
           totalCalls: responseData.total_calls,
@@ -208,6 +213,10 @@ const CallDashboard = () => {
           totalAvgDuration: responseData.avg_duration,
           totalAvgCost: responseData.avg_cost,
       });
+
+      setStartDateTime(dataFilters?.start_datetime);
+      setEndDateTime(dataFilters?.end_datetime);
+      console.log(dataFilters?.start_datetime, dataFilters?.end_datetime);
 
       // Extract and map chart data
       const chartExtension = responseData?.chart_data?.extension;
@@ -549,8 +558,8 @@ const [ExtensionChart, setExtensionChart] = React.useState({
                     <div className="action-buttons">
                     <div className="d-flex align-items-center gap-2">
                           <p className="mb-0">
-                          Date Range: <span className="badge bg-info">{moment(currentFilters.start_datetime).format('DD-MM-YYYY hh:mm:ss A')}</span> to <span className="badge bg-info">{moment(currentFilters.end_datetime).format('DD-MM-YYYY hh:mm:ss A')}</span>
-                          </p>
+                          Date Range: <span className="status-badge primary">{formatDateTimeToLocal(startDateTime, GlobalDateTimeFormat)}</span> to <span className="status-badge primary">{formatDateTimeToLocal(endDateTime, GlobalDateTimeFormat)}</span>
+                          </p>  
                           <i className="material-icons-two-tone" style={{cursor: 'pointer'}} onClick={() => refreshData()}>refresh</i>
                         </div>
                     

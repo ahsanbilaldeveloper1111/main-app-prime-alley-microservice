@@ -193,7 +193,7 @@ const Signin = () => {
 
                 <p className="login-subtitle">Sign in to your account</p>
                 
-                <form className="login-form" id="loginForm" onSubmit={handleSubmit}>
+                <form className="login-form" id="loginForm" onSubmit={handleSubmit}>  
                     <div className="input-group">
                         <input 
                         type="email" 
