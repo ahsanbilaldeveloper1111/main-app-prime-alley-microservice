@@ -263,7 +263,7 @@ const CrmDashboard = () => {
                       <div className="flex-grow-1 ms-3">
                         <h6 className="mb-1">{lead.name || "Unnamed Lead"}</h6>
                         <p className="text-muted mb-0 small">
-                          {lead.company || "No Company"}
+                          {lead.stage?.name || "No Stage"}
                         </p>
                       </div>
                       <Link
@@ -307,10 +307,10 @@ const CrmDashboard = () => {
                           {opportunity.name || "Unnamed Opportunity"}
                         </h6>
                         <p className="text-muted mb-0 small">
-                          $
-                          {opportunity.value
-                            ? opportunity.value.toLocaleString()
-                            : "0"}
+                          
+                          {opportunity.stage?.name
+                            ? opportunity.stage?.name
+                            : "No Stage"}
                         </p>
                       </div>
                       <Link

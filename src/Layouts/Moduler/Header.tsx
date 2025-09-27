@@ -814,13 +814,13 @@ const Header = ({ themeMode }: HeaderProps) => {
         <div className="tab-pane" id="pc-tab-3" role="tabpanel" aria-labelledby="pc-tab-link-3" tabIndex={1}>
             <div className="pc-submenu-title">{MENU_LABELS.CALL_RECORDINGS}</div>
             <ul className="pc-navbar">
-                <li className="pc-item">
+                {/* <li className="pc-item">
                     <Link className="pc-link" href={`${BASE_URL}/call-recordings/dashboard`}>
                         <span className="pc-micon"><i className={ICONS.GAUGE}></i></span>
                         <span className="pc-mtext">{SUBMENU_LABELS.RECORDINGS_DASHBOARD}</span>
                                                 </Link>
                                             </li>
-                
+                 */}
                 <li className="pc-item">
                     <Link className="pc-link" href={`${BASE_URL}/call-recordings`}>
                         <span className="pc-micon"><i className={ICONS.PLAY_CIRCLE}></i></span>
