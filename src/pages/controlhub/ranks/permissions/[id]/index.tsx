@@ -110,14 +110,14 @@ const ViewRolePermission = () => {
                                                     <span className="mb-2" style={{ float: "left" }}>
                                                         <h6>{group.group}</h6>
                                                     </span>
-                                                    <label className="enableSwitch" style={{ float: "right" }}>
+                                                    {/* <label className="enableSwitch" style={{ float: "right" }}>
                                                         <Form.Check
                                                             type="switch"
                                                             label="Enable All"
                                                             readOnly
                                                             checked={group.enableAll}
                                                         />
-                                                    </label>
+                                                    </label> */}
                                                     <div className="clearfix"></div>
                                                 </div>
 

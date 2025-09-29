@@ -679,9 +679,9 @@ const ProfileView = () => {
                             </Row>
                         </Tab>
 
-                        <Tab eventKey="update-profile" title="Update Profile">
+                        {/* <Tab eventKey="update-profile" title="Update Profile">
 
-                        </Tab>
+                        </Tab> */}
                         
                         {/* <Tab eventKey="linked-users" title="Linked Users">
                         
@@ -689,6 +689,7 @@ const ProfileView = () => {
                     </Tabs>
                 </Col>
             </Row>
+
         </React.Fragment>
     )
 }

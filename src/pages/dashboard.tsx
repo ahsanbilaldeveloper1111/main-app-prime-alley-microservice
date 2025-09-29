@@ -67,7 +67,8 @@ const Dashboard = () => {
             // subtitle: 'System Control',
             description: 'Centralized control and management of all system services and configurations.',
             icon: <i className="ph-duotone ph-gear"></i>,
-            gradient: 'from-blue-500 to-indigo-600'
+            gradient: 'from-blue-500 to-indigo-600',
+            link: '/controlhub/users'
         },
         // {
         //     id: 'gsm-services',
@@ -83,15 +84,17 @@ const Dashboard = () => {
             // subtitle: 'Call Logs',
             description: 'Track and manage all incoming and outgoing call activities.',
             icon: <i className="ph-duotone ph-phone"></i>,
-            gradient: 'from-purple-500 to-violet-600'
+            gradient: 'from-purple-500 to-violet-600',
+            link: '/call-logs'
         },
         {
             id: 'call-recordings-services',
-            title: 'Voice Records',
+            title: 'Call Recordings',
             // subtitle: 'Voice Records',
             description: 'Access and manage recorded calls for quality assurance and compliance.',
             icon: <i className="ph-duotone ph-microphone"></i>,
-            gradient: 'from-orange-500 to-red-600'
+            gradient: 'from-orange-500 to-red-600',
+            link: '/call-recordings'
         },
         // {
         //     id: 'ai-ml-services',
@@ -129,15 +132,15 @@ const Dashboard = () => {
         // },
         // {
         //     id: 'cti-services',
-        //     title: 'CTI',
+        //     title: 'Live Calls',
         //     // subtitle: 'Computer Telephony Integration',
         //     description: 'Connect your calls with applications for quick access and context.',
         //     icon: <i className="ph-duotone ph-brain"></i>,
         //     gradient: 'from-pink-500 to-rose-600',
-        //     link: '/coming-soon'
+        //     link: '/cti'
         // },
         // {
-        //     id: 'dncr-services',
+        //     id: 'dncr-servicess',
         //     title: 'Do Not Call Registry',
         //     // subtitle: 'Do Not Call Registry',
         //     description: 'Keep your outreach compliant and protected.',
@@ -154,15 +157,15 @@ const Dashboard = () => {
         //     gradient: 'from-pink-500 to-rose-600',
         //     link: '/coming-soon'
         // },
-        {
-            id: 'omni-channel-servicess',
-            title: 'Omni Channel',
-            // subtitle: 'Omni Channel',
-            description: 'Voice, chat, email, and social, all connected in one window.',
-            icon: <i className="ph-duotone ph-brain"></i>,
-            gradient: 'from-pink-500 to-rose-600',
-            link: '/coming-soon'
-        },
+        // {
+        //     id: 'omni-channel-servicess',
+        //     title: 'Omni Channel',
+        //     // subtitle: 'Omni Channel',
+        //     description: 'Voice, chat, email, and social, all connected in one window.',
+        //     icon: <i className="ph-duotone ph-brain"></i>,
+        //     gradient: 'from-pink-500 to-rose-600',
+        //     link: '/coming-soon'
+        // },
         // {
         //     id: 'hr-servicess',
         //     title: 'Human Resources',
@@ -174,12 +177,12 @@ const Dashboard = () => {
         // },
         {
             id: 'accounts-servicess',
-            title: 'Accounts',
+            title: 'Billing',
             // subtitle: 'Accounts',
             description: 'Manage your accounts, payroll, and benefits with ease.',
             icon: <i className="ph-duotone ph-brain"></i>,
             gradient: 'from-pink-500 to-rose-600',
-            link: '/coming-soon'
+            link: '/accounts'
         },
         
         

@@ -408,6 +408,13 @@ const Header = ({ themeMode }: HeaderProps) => {
             target: '#pc-tab-7'
         },
         {
+            key: 'cti',
+            permission: PERMISSIONS.CTI_SERVICES,
+            icon: ICONS.LIVE_CALLS,
+            label: MENU_LABELS.LIVE_CALLS,
+            target: '#pc-tab-9'
+        },
+        {
             key: 'call-logs',
             permission: PERMISSIONS.CALL_LOGS_SERVICES,
             icon: ICONS.CALL_LOGS,
@@ -437,25 +444,26 @@ const Header = ({ themeMode }: HeaderProps) => {
             target: '#pc-tab-4'
         },
         {
-            key: 'cti',
-            permission: PERMISSIONS.CTI_SERVICES,
-            icon: ICONS.LIVE_CALLS,
-            label: MENU_LABELS.LIVE_CALLS,
-            target: '#pc-tab-9'
+            key: 'dncr',
+            permission: PERMISSIONS.DNCR_SERVICES,
+            icon: ICONS.DNCR,
+            label: MENU_LABELS.DNCR,
+            target: '#pc-tab-10'
         },
+        {
+            key: 'accounts',
+            permission: 'accounts-services',
+            icon: 'ph-duotone ph-link',
+            label: 'Billing',
+            target: '#pc-tab-15'
+        },
+        
         {
             key: 'tickets',
             permission: PERMISSIONS.TICKETS_SERVICES,
             icon: ICONS.TICKETS,
             label: MENU_LABELS.TICKETS,
             target: '#pc-tab-14'
-        },
-        {
-            key: 'tms',
-            permission: PERMISSIONS.TMS_SERVICES,
-            icon: ICONS.AUTOMATION,
-            label: MENU_LABELS.AUTOMATION,
-            target: '#pc-tab-6'
         },
         {
             key: 'gsm',
@@ -465,22 +473,13 @@ const Header = ({ themeMode }: HeaderProps) => {
             target: '#pc-tab-1'
         },
         {
-            key: 'accounts',
-            permission: 'accounts-services',
-            icon: 'ph-duotone ph-link',
-            label: 'Billing',
-            target: '#pc-tab-15'
+            key: 'tms',
+            permission: PERMISSIONS.TMS_SERVICES,
+            icon: ICONS.AUTOMATION,
+            label: MENU_LABELS.AUTOMATION,
+            target: '#pc-tab-6'
         },
-       
-        
-        {
-            key: 'dncr',
-            permission: PERMISSIONS.DNCR_SERVICES,
-            icon: ICONS.DNCR,
-            label: MENU_LABELS.DNCR,
-            target: '#pc-tab-10'
-        },
-
+    
         {
             key: 'netops',
             permission: PERMISSIONS.NETOPS_SERVICES,
@@ -609,13 +608,13 @@ const Header = ({ themeMode }: HeaderProps) => {
                     label: SUBMENU_LABELS.ANALYSIS,
                     href: '/ai-ml/analysis'
                 },
-                {
-                    key: 'transcriptions-aiml',
-                    permission: 'transcriptions-aiml',
-                    icon: ICONS.FILE_ANALYTICS,
-                    label: SUBMENU_LABELS.TRANSCRIPTION,
-                    href: '/ai-ml/transcriptions'
-                },
+                // {
+                //     key: 'transcriptions-aiml',
+                //     permission: 'transcriptions-aiml',
+                //     icon: ICONS.FILE_ANALYTICS,
+                //     label: SUBMENU_LABELS.TRANSCRIPTION,
+                //     href: '/ai-ml/transcriptions'
+                // },
                 {
                     key: 'translate-aiml',
                     permission: 'translate-aiml',
@@ -839,7 +838,10 @@ const Header = ({ themeMode }: HeaderProps) => {
             <div className="pc-submenu-title">{MENU_LABELS.REPORTS}</div>
             <ul className="pc-navbar">
                  
+
+                 {userState.permissions.includes('call-reports-by-statistics-reports') && (
                                    
+                                    <>
                                     <li className="pc-item">
                                         <Link className="pc-link" href={`${BASE_URL}/call-reports/stats/country`}>
                                         <span className="pc-micon"><i className={ICONS.PHONE_CALL}></i></span>
@@ -860,7 +862,12 @@ const Header = ({ themeMode }: HeaderProps) => {
                                             <span className="pc-mtext">{SUBMENU_LABELS.CALL_STATS_BY_EXTENSION}</span>
                                                 </Link>
                                             </li>
+                                    </>
+)}
+
+{userState.permissions.includes('call-reports-by-call-incoming-reports') && (
                                         
+                                        <>
                                         <li className="pc-item">
                                             <Link className="pc-link" href={`${BASE_URL}/call-reports/incoming/country`}>
                                         <span className="pc-micon"><i className={ICONS.PHONE_CALL}></i></span>
@@ -880,7 +887,13 @@ const Header = ({ themeMode }: HeaderProps) => {
                                         <span className="pc-mtext">{SUBMENU_LABELS.INCOMING_STATS_BY_EXTENSION}</span>
                                                 </Link>
                                             </li>
+                                        </>
+
+)}
+
+{userState.permissions.includes('call-reports-by-call-trend-reports') && (
                                         
+                                        <>
                                         {/* <li className="pc-item">
                                             <Link className="pc-link" href={`${BASE_URL}/call-reports/trend/country`}>
                                             <span className="pc-micon"><i className={ICONS.PHONE_CALL}></i></span>
@@ -899,6 +912,9 @@ const Header = ({ themeMode }: HeaderProps) => {
                                             <span className="pc-mtext">{SUBMENU_LABELS.CALL_TREND_BY_EXTENSION}</span>
                                                 </Link>
                                             </li> */}
+                                        </>
+
+)}
                
             </ul>
         </div>
