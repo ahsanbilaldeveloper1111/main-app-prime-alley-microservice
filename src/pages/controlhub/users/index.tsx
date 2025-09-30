@@ -51,9 +51,11 @@ const Users = () => {
     // Memoize base columns to prevent recreation on every render
     const baseColumns: Column[] = useMemo(() => [
         //{ key: 'ID', name: 'id', selector: (row: any) => row.id, sortable: true },
+        
         // ...(session?.user?.permissions?.includes('show-ldap-uuid-users') ? [
         //     { key: 'ldap_uid', name: 'User ID', selector: (row: any) => row.ldap_uid, sortable: true }
         // ] : []),
+
         { key: 'name', name: 'Display Name', selector: (row: any) => row.name, sortable: true },
         { key: 'username', name: 'User Name', selector: (row: any) => row.username, sortable: true },
         { key: 'phone', name: 'Extension', selector: (row: any) => row.phone, sortable: true,

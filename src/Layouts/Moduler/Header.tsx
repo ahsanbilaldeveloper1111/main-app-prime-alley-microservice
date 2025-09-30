@@ -66,14 +66,23 @@ const Header = ({ themeMode }: HeaderProps) => {
 
     // Session management effect
     useEffect(() => {
-        if (status === "loading") return;
+        // console.log('Session Status:', status);
+        // console.log('Session Data:', session);
+        // console.log('User Data:', userData);
+        
+        if (status === "loading") {
+           // console.log('Session is still loading...');
+            return;
+        }
 
         if (session && status === "authenticated" && userData) {
+            //console.log('Setting user state with permissions:', userData.permissions);
             setUserState(userData);
                 if (typeof window !== "undefined") {
                     tokenService.initializeFromSession(session);
                 }
             } else if (status === "unauthenticated") {
+                //console.log('Session is unauthenticated');
                 tokenService.clearTokens();
                 router.push('/auth/signin');
             }
@@ -789,7 +798,7 @@ const Header = ({ themeMode }: HeaderProps) => {
 
     // Reusable submenu item component
     const SubmenuItem = useCallback(({ item }: { item: SubmenuItem }) => {
-        if (!userState.permissions.includes(item.permission)) return null;
+        if (!session?.user?.permissions?.includes(item.permission)) return null;
         
         const isActive = item.pathMatch ? router.asPath.includes(item.pathMatch) : false;
         
@@ -832,15 +841,17 @@ const Header = ({ themeMode }: HeaderProps) => {
         </div>
     ), []);
 
+
     // Reports submenu component with nested menus
     const ReportsSubmenu = useCallback(() => (
         <div className="tab-pane" id="pc-tab-5" role="tabpanel" aria-labelledby="pc-tab-link-5" tabIndex={1}>
             <div className="pc-submenu-title">{MENU_LABELS.REPORTS}</div>
             <ul className="pc-navbar">
                  
+             
 
-                 {userState.permissions.includes('call-reports-by-statistics-reports') && (
-                                   
+                 {session?.user?.permissions?.includes('call-reports-by-statistics-reports') && (
+                    
                                     <>
                                     <li className="pc-item">
                                         <Link className="pc-link" href={`${BASE_URL}/call-reports/stats/country`}>
@@ -863,9 +874,9 @@ const Header = ({ themeMode }: HeaderProps) => {
                                                 </Link>
                                             </li>
                                     </>
-)}
+                 )}
 
-{userState.permissions.includes('call-reports-by-call-incoming-reports') && (
+ {session?.user?.permissions?.includes('call-reports-by-call-incoming-reports') && (
                                         
                                         <>
                                         <li className="pc-item">
@@ -891,7 +902,7 @@ const Header = ({ themeMode }: HeaderProps) => {
 
 )}
 
-{userState.permissions.includes('call-reports-by-call-trend-reports') && (
+{/* {session?.user?.permissions?.includes('call-reports-by-trend-reports') && ( */}
                                         
                                         <>
                                         {/* <li className="pc-item">
@@ -914,7 +925,7 @@ const Header = ({ themeMode }: HeaderProps) => {
                                             </li> */}
                                         </>
 
-)}
+{/* )} */}
                
             </ul>
         </div>
@@ -1296,9 +1307,7 @@ const Header = ({ themeMode }: HeaderProps) => {
                                             {/* Dynamic Navigation Items */}
                                             {navigationItems.map((item) => {
                                                 // Special handling for Accounts and NetOps - show if user has any permissions or is admin
-                                                const shouldShow = item.key === 'accounts' || item.key === 'netops' 
-                                                    ? (userState.permissions.includes(item.permission) || userState.isAdmin || userState.permissions.length > 0)
-                                                    : userState.permissions.includes(item.permission);
+                                                const shouldShow =  session?.user?.permissions?.includes(item.permission);
                                                 
                                                 return shouldShow && (
                                                     <li key={item.key} className="pc-item nav-item" role="presentation">
@@ -1354,15 +1363,15 @@ const Header = ({ themeMode }: HeaderProps) => {
                             <div className="d-flex align-items-center">
                                 <div className="flex-shrink-0">
                                     <span className="user-avtar bg rounded-circle text-white sidebar-user-icon">
-                                        {userState.name.split(' ')[0][0]}
+                                        {session?.user?.name?.split(' ')[0][0]}
                                     </span>
                                 </div>
                                 <div className="flex-grow-1 ms-2">
                                     <div className="dropdown">
                                     <div className="d-flex align-items-center">
                                                 <div className="flex-grow-1 me-2">
-                                                <h6 className="mb-0 username-ellipsis">{userState.name}</h6>
-                                                <small>{userState.role}</small>
+                                                <h6 className="mb-0 username-ellipsis">{session?.user?.name}</h6>
+                                                <small>{session?.user?.role}</small>
                                                 </div>
                                                 <div className="">
                                                     <div className="sidebar-logout-icon" onClick={handleLogout}>

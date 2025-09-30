@@ -25,10 +25,23 @@ const refreshToken = async () => {
         return null;
       }
 
-      const response = await axios.post(`${process.env.NEXT_PUBLIC_BACKEND_URL}auth/refreshToken`, {
-        refresh_token: refreshToken
+      console.log('=== REFRESH TOKEN DEBUG ===');
+      console.log('Refresh Token:', refreshToken);
+      console.log('Base URL:', axiosInstance.defaults.baseURL);
+      console.log('Full URL will be:', `${axiosInstance.defaults.baseURL}/auth/refreshToken`);
+      
+      // Create form data for refresh token request
+      const formData = new URLSearchParams();
+      formData.append('refresh_token', refreshToken);
+      console.log('Form Data:', formData.toString());
+
+      // Debug request before sending
+      console.log('Making refresh token request to:', '/auth/refreshToken');
+      
+      const response = await axiosInstance.get('/auth/refreshToken', {
+        params: formData
       });
-      //console.log('response token', response);
+      console.log('response token', response);
 
       if(response.data.code===200){
         if (response.data.data && response.data.data.access_token) {
@@ -106,14 +119,21 @@ axiosInstance.interceptors.request.use(
     const MAX_RETRY = 3;
     let retryCount = 0;
 
+    // Debug logging for all requests
+    console.log('=== AXIOS REQUEST INTERCEPTOR ===');
+    console.log('Request URL:', config.url);
+    console.log('Full URL:', `${config.baseURL || ''}${config.url}`);
+    console.log('Method:', config.method);
+    console.log('Headers:', config.headers);
+
     // Debug logging for FormData requests
     if (config.data instanceof FormData) {
       console.log('=== AXIOS INTERCEPTOR DEBUG ===');
       console.log('FormData request detected');
       console.log('URL:', config.url);
       console.log('Method:', config.method);
-      console.log('Base URL:', config.baseURL);
-      console.log('Full URL:', `${config.baseURL}${config.url}`);
+      console.log('Base URL:', config.baseURL || '');
+      console.log('Full URL:', `${config.baseURL || ''}${config.url}`);
       console.log('Headers before interceptor:', config.headers);
       console.log('FormData entries count:', Array.from(config.data.entries()).length);
     }

@@ -137,7 +137,7 @@ export const authOptions: NextAuthOptions = {
           if (jsonData.code === 400) { 
             return null;
           }
-          console.log("jsonData", jsonData)
+          //console.log("jsonData", jsonData)
           if (!jsonData?.data?.token?.access_token) {
             return null;
           }
@@ -177,6 +177,7 @@ export const authOptions: NextAuthOptions = {
 
   pages: {
     signIn: '/auth/signin',
+    signOut: '/auth/signout',
   },
 
   callbacks: {

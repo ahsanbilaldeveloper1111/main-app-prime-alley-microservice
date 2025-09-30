@@ -11,6 +11,7 @@ import { useSession } from "next-auth/react";
 import { authAPI } from "../../utils/api";
 import { useAuth } from "../../hooks/useAuth";
 
+
 interface HeaderProps {
     themeMode?: string; // Define the type for themeMode
     changeThemeMode?: any; // Define the type for changeThemeMode function
