@@ -203,7 +203,7 @@ export const HEADER_CONSTANTS = {
     CRM_SERVICES: 'crm-services',
     DNCR_SERVICES: 'dncr-services',
     ACCOUNTS_SERVICES: 'accounts-services',
-    NETOPS_SERVICES: 'netops-services'
+    NETOPS_SERVICES: 'health-care-services'
   } as const
 } as const;
 

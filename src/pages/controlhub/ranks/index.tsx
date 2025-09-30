@@ -1,5 +1,5 @@
 import '@assets/scss/datatable-style.scss';
-import React, { ReactElement, useState, useCallback, useMemo } from 'react';
+import React, { ReactElement, useState, useCallback, useMemo, useEffect } from 'react';
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
 import GenericListPage from '@components/GenericListPage';
@@ -12,6 +12,7 @@ import { toast } from 'react-toastify';
 import { useTokenService } from 'src/hooks/useTokenService';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
+import { useRouter } from 'next/router';
 
 
 import '@assets/scss/common.scss';
@@ -19,7 +20,10 @@ import { FiEdit, FiMoreVertical, FiTrash2, FiEye } from 'react-icons/fi';
 
 const Ranks = () => {
     const { data:session, status } = useSession();
-   
+    const router = useRouter();
+    
+    // We don't need the redirect effect anymore since we're showing the message on page
+
     const [refreshKey, setRefreshKey] = useState<number>(0);
     const [currentFilters, setCurrentFilters] = useState({});
     const [selectedRows, setSelectedRows] = useState<any[]>([]);
@@ -305,7 +309,6 @@ const Ranks = () => {
                     </Modal.Footer>
                 </Modal>
             )}
-        
         </React.Fragment>
     );
 };
