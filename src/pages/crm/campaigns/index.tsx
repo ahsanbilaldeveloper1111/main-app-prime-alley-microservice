@@ -344,17 +344,6 @@ const CrmCampaigns = () => {
         ),
       },
       {
-        key: "fields_count",
-        name: "Fields",
-        selector: (row: any) => row.fields?.length || 0,
-        sortable: false,
-        cell: (props: any) => (
-          <Badge bg="info">
-            {props.fields?.length || 0} field{(props.fields?.length || 0) !== 1 ? 's' : ''}
-          </Badge>
-        ),
-      },
-      {
         key: "created_at",
         name: "Created",
         selector: (row: any) => row.created_at,
@@ -583,9 +572,9 @@ const CrmCampaigns = () => {
                       value={newField.field_type}
                       onChange={(e) => setNewField({...newField, field_type: e.target.value})}
                     >
-                      <option value="string">String</option>
-                      <option value="text">Text</option>
-                      <option value="integer">Integer</option>
+                      <option value="string">Text</option>
+                      <option value="text">Long Text</option>
+                      <option value="integer">Number</option>
                       <option value="date">Date</option>
                       <option value="email">Email</option>
                       <option value="dropdown">Dropdown</option>
@@ -621,9 +610,9 @@ const CrmCampaigns = () => {
                         value={field.field_type}
                         onChange={(e) => handleFieldTypeChange(index, e.target.value)}
                       >
-                        <option value="string">String</option>
-                        <option value="text">Text</option>
-                        <option value="integer">Integer</option>
+                        <option value="string">Text</option>
+                        <option value="text">Long Text</option>
+                        <option value="integer">Number</option>
                         <option value="date">Date</option>
                         <option value="email">Email</option>
                         <option value="dropdown">Dropdown</option>

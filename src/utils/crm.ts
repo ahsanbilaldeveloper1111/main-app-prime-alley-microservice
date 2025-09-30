@@ -67,6 +67,9 @@ export interface LeadData {
   user_extension: string | null;
   type: "lead" | "opportunity";
   description: string | null;
+  company_name: string | null;
+  company_contact: string | null;
+  company_description: string | null;
   status: string;
   stage_id: number | null;
   lost_reason_id: number | null;

@@ -109,7 +109,7 @@ const CrmDataManagement = () => {
   const [assignmentDistribution, setAssignmentDistribution] = useState<
     "equal" | "custom"
   >("equal");
-  const [totalRecordsToAssign, setTotalRecordsToAssign] = useState(0);
+  const [totalEntriesToAssign, setTotalEntriesToAssign] = useState(0);
   const [customDistribution, setCustomDistribution] = useState<
     Record<string, number>
   >({});
@@ -150,7 +150,7 @@ const CrmDataManagement = () => {
 
   // Schedule modal state
   const [showScheduleModal, setShowScheduleModal] = useState(false);
-  const [selectedRecordForSchedule, setSelectedRecordForSchedule] =
+  const [selectedEntryForSchedule, setSelectedEntryForSchedule] =
     useState<any>(null);
   const [scheduleData, setScheduleData] = useState({
     date: "",
@@ -164,8 +164,8 @@ const CrmDataManagement = () => {
     callsInNextHour: 0,
     callsInNext24Hours: 0,
     overdueCalls: 0,
-    assignedRecords: 0,
-    unassignedRecords: 0,
+    assignedEntries: 0,
+    unassignedEntries: 0,
   });
 
   // Static tags data
@@ -196,7 +196,7 @@ const CrmDataManagement = () => {
   ];
 
   // Static call history data with varied information
-  const getCallHistory = (recordId: number) => {
+  const getCallHistory = (entryId: number) => {
     const histories = [
       {
         id: 1,
@@ -250,8 +250,8 @@ const CrmDataManagement = () => {
       },
     ];
 
-    // Return different histories based on recordId for variety
-    return histories.slice(0, (recordId % 3) + 2);
+    // Return different histories based on entryId for variety
+    return histories.slice(0, (entryId % 3) + 2);
   };
 
   // History data state
@@ -341,8 +341,8 @@ const CrmDataManagement = () => {
         callsInNextHour: counts.scheduled_calls?.next_hour || 0,
         callsInNext24Hours: counts.scheduled_calls?.next_24_hours || 0,
         overdueCalls: counts.scheduled_calls?.overdue || 0,
-        assignedRecords: counts.summary.assigned_records,
-        unassignedRecords: counts.summary.unassigned_records,
+        assignedEntries: counts.summary.assigned_records,
+        unassignedEntries: counts.summary.unassigned_records,
       };
     } catch (error) {
       console.error("Failed to get dashboard stats:", error);
@@ -351,8 +351,8 @@ const CrmDataManagement = () => {
         callsInNextHour: 0,
         callsInNext24Hours: 0,
         overdueCalls: 0,
-        assignedRecords: 0,
-        unassignedRecords: 0,
+        assignedEntries: 0,
+        unassignedEntries: 0,
       };
     }
   }, [currentFilters]);
@@ -675,8 +675,8 @@ const CrmDataManagement = () => {
     }
   }, [itemToDelete]);
 
-  // Calculate filtered record counts using API
-  const calculateRecordCounts = useCallback(async () => {
+  // Calculate filtered entry counts using API
+  const calculateEntryCounts = useCallback(async () => {
     try {
       const campaignIds = Array.from(assignmentFilters.selectedCampaigns).map(
         (campaign) => parseInt(campaign.value)
@@ -693,7 +693,7 @@ const CrmDataManagement = () => {
         unassigned: counts.summary.unassigned_records,
       };
     } catch (error) {
-      console.error("Failed to get record counts:", error);
+      console.error("Failed to get entry counts:", error);
       // Fallback to static data
       return {
         total: 5000,
@@ -711,9 +711,9 @@ const CrmDataManagement = () => {
         assignmentFilters.selectedTags.length > 0
       ) {
         try {
-          const counts = await calculateRecordCounts();
+          const counts = await calculateEntryCounts();
           setAssignmentCounts(counts);
-          setTotalRecordsToAssign(counts.unassigned);
+          setTotalEntriesToAssign(counts.unassigned);
         } catch (error) {
           console.error("Failed to refetch counts:", error);
         }
@@ -724,34 +724,34 @@ const CrmDataManagement = () => {
   }, [
     assignmentFilters.selectedCampaigns,
     assignmentFilters.selectedTags,
-    calculateRecordCounts,
+    calculateEntryCounts,
   ]);
 
   // Handle data assignment
   const handleDataAssignment = useCallback(async () => {
     try {
-      const counts = await calculateRecordCounts();
+      const counts = await calculateEntryCounts();
       setAssignmentCounts(counts);
-      setTotalRecordsToAssign(counts.unassigned);
+      setTotalEntriesToAssign(counts.unassigned);
       setShowDataAssignmentModal(true);
     } catch (error) {
-      console.error("Failed to get record counts:", error);
+      console.error("Failed to get entry counts:", error);
       // Fallback to static data
       setAssignmentCounts({ total: 5000, assigned: 2000, unassigned: 3000 });
-      setTotalRecordsToAssign(3000);
+      setTotalEntriesToAssign(3000);
       setShowDataAssignmentModal(true);
     }
-  }, [calculateRecordCounts]);
+  }, [calculateEntryCounts]);
 
   // Handle data assignment directly (no second dialog)
   const handleDataAssignmentSubmit = useCallback(async () => {
     if (assignmentCampaign.length === 0) {
-      toast.error("Please select at least one campaign to assign records to");
+      toast.error("Please select at least one campaign to assign entries to");
       return;
     }
 
-    if (totalRecordsToAssign === 0) {
-      toast.error("Please specify how many records to assign");
+    if (totalEntriesToAssign === 0) {
+      toast.error("Please specify how many entries to assign");
       return;
     }
 
@@ -761,9 +761,9 @@ const CrmDataManagement = () => {
         (sum, count) => sum + count,
         0
       );
-      if (totalCustomAllocation !== totalRecordsToAssign) {
+      if (totalCustomAllocation !== totalEntriesToAssign) {
         toast.error(
-          `Custom allocation must equal total records to assign (${totalRecordsToAssign}). Current total: ${totalCustomAllocation}`
+          `Custom allocation must equal total entries to assign (${totalEntriesToAssign}). Current total: ${totalCustomAllocation}`
         );
         return;
       }
@@ -788,7 +788,7 @@ const CrmDataManagement = () => {
         // Equal distribution - single API call
         result = await assignCrmDataAdvanced(
           campaignIds,
-          totalRecordsToAssign,
+          totalEntriesToAssign,
           campaignFilterIds,
           tagIds,
           "equal"
@@ -806,7 +806,7 @@ const CrmDataManagement = () => {
 
         result = await assignCrmDataAdvanced(
           campaignIds,
-          totalRecordsToAssign,
+          totalEntriesToAssign,
           campaignFilterIds,
           tagIds,
           "custom",
@@ -824,7 +824,7 @@ const CrmDataManagement = () => {
       });
       setAssignmentCampaign([]);
       setAssignmentDistribution("equal");
-      setTotalRecordsToAssign(0);
+      setTotalEntriesToAssign(0);
       setCustomDistribution({});
       setRefreshKey((prev) => prev + 1);
     } catch (error: any) {
@@ -832,7 +832,7 @@ const CrmDataManagement = () => {
     }
   }, [
     assignmentCampaign,
-    totalRecordsToAssign,
+    totalEntriesToAssign,
     assignmentFilters,
     assignmentDistribution,
     customDistribution,
@@ -852,7 +852,7 @@ const CrmDataManagement = () => {
   const handleCallAction = useCallback((action: string, item: CrmDataItem) => {
     const phone = item.phone;
     if (!phone) {
-      toast.error("No phone number available for this record");
+      toast.error("No phone number available for this entry");
       return;
     }
 
@@ -884,7 +884,7 @@ const CrmDataManagement = () => {
   const handleCallClick = useCallback((item: CrmDataItem) => {
     const phone = item.phone;
     if (!phone) {
-      toast.error("No phone number available for this record");
+      toast.error("No phone number available for this entry");
       return;
     }
     window.open(`tel:${phone}`, "_self");
@@ -906,7 +906,7 @@ const CrmDataManagement = () => {
     });
     setAssignmentCampaign([]);
     setAssignmentDistribution("equal");
-    setTotalRecordsToAssign(0);
+    setTotalEntriesToAssign(0);
     setCustomDistribution({});
   }, []);
 
@@ -955,8 +955,8 @@ const CrmDataManagement = () => {
   }, [afterCallData, selectedDataItem, handleAfterCallModalClose]);
 
   // Schedule/Unschedule call handlers
-  const handleScheduleCall = useCallback((record: any) => {
-    setSelectedRecordForSchedule(record);
+  const handleScheduleCall = useCallback((entry: any) => {
+    setSelectedEntryForSchedule(entry);
     setScheduleData({
       date: "",
       time: "",
@@ -966,10 +966,10 @@ const CrmDataManagement = () => {
   }, []);
 
   const handleUnscheduleCall = useCallback(
-    async (record: any) => {
+    async (entry: any) => {
       try {
         const userExtension = (session?.user as any)?.extension || "default";
-        await unscheduleCall(record.id, userExtension);
+        await unscheduleCall(entry.id, userExtension);
         setRefreshKey((prev) => prev + 1);
       } catch (error) {
         console.error("Failed to unschedule call:", error);
@@ -981,7 +981,7 @@ const CrmDataManagement = () => {
   // Schedule modal handlers
   const handleScheduleModalClose = useCallback(() => {
     setShowScheduleModal(false);
-    setSelectedRecordForSchedule(null);
+    setSelectedEntryForSchedule(null);
     setScheduleData({
       date: "",
       time: "",
@@ -1006,7 +1006,7 @@ const CrmDataManagement = () => {
       ).toISOString();
 
       await scheduleCall(
-        selectedRecordForSchedule.id,
+        selectedEntryForSchedule.id,
         scheduledDateTime,
         userExtension
       );
@@ -1017,7 +1017,7 @@ const CrmDataManagement = () => {
     }
   }, [
     scheduleData,
-    selectedRecordForSchedule,
+    selectedEntryForSchedule,
     handleScheduleModalClose,
     session,
   ]);
@@ -1213,8 +1213,31 @@ const CrmDataManagement = () => {
         selector: (row: any) => row.last_called_at,
         sortable: true,
         cell: (props: any) => {
-          // Static data for now
-          const lastCalled = "2024-01-15T10:30:00Z";
+          // Randomize: 30% chance of no call, 70% chance of call in last week
+          const hasCall = Math.random() > 0.3;
+          
+          if (!hasCall) {
+            return (
+              <div className="d-flex align-items-center">
+                <FiClock className="me-1 text-muted" size={12} />
+                <span className="small text-muted">-</span>
+              </div>
+            );
+          }
+          
+          // Generate random date within last week
+          const now = moment();
+          const oneWeekAgo = moment().subtract(7, 'days');
+          const randomDays = Math.floor(Math.random() * 7);
+          const randomHours = Math.floor(Math.random() * 24);
+          const randomMinutes = Math.floor(Math.random() * 60);
+          
+          const lastCalled = oneWeekAgo
+            .add(randomDays, 'days')
+            .add(randomHours, 'hours')
+            .add(randomMinutes, 'minutes')
+            .toISOString();
+            
           return (
             <div className="d-flex align-items-center">
               <FiClock className="me-1" size={12} />
@@ -1366,16 +1389,6 @@ const CrmDataManagement = () => {
                 </Dropdown.Menu>
               </Dropdown>
             </>
-            {!props.is_viewed && (
-              <Button
-                variant="outline-success"
-                size="sm"
-                onClick={() => handleMarkAsViewed(props)}
-                title="Mark as Viewed"
-              >
-                <FiCheck size={14} />
-              </Button>
-            )}
             {props.scheduled_call_at ? (
               <Button
                 variant="outline-warning"
@@ -1399,7 +1412,7 @@ const CrmDataManagement = () => {
               variant="outline-danger"
               size="sm"
               onClick={() => handleDeleteData(props)}
-              title="Delete Record"
+              title="Delete Entry"
             >
               <FiTrash2 size={14} />
             </Button>
@@ -1569,11 +1582,11 @@ const CrmDataManagement = () => {
                 <div className="d-flex align-items-center justify-content-center mb-2">
                   <FiUser className="text-success me-2" size={24} />
                   <h4 className="mb-0 text-success">
-                    {dashboardStats.assignedRecords.toLocaleString()}
+                    {dashboardStats.assignedEntries.toLocaleString()}
                   </h4>
                 </div>
                 <p className="mb-0 small text-muted">
-                  Assigned Records
+                  Assigned Entries
                   {(currentFilters.campaign_id?.length > 0 ||
                     currentFilters.tags?.length > 0) && (
                     <span className="text-primary"> (Filtered)</span>
@@ -1588,11 +1601,11 @@ const CrmDataManagement = () => {
                 <div className="d-flex align-items-center justify-content-center mb-2">
                   <FiAlertCircle className="text-warning me-2" size={24} />
                   <h4 className="mb-0 text-warning">
-                    {dashboardStats.unassignedRecords.toLocaleString()}
+                    {dashboardStats.unassignedEntries.toLocaleString()}
                   </h4>
                 </div>
                 <p className="mb-0 small text-muted">
-                  Unassigned Records
+                  Unassigned Entries
                   {(currentFilters.campaign_id?.length > 0 ||
                     currentFilters.tags?.length > 0) && (
                     <span className="text-primary"> (Filtered)</span>
@@ -1607,7 +1620,7 @@ const CrmDataManagement = () => {
         <div className="row mb-3">
           <div className="col-md-4">
             <Form.Group>
-              <Form.Label>Search Records</Form.Label>
+              <Form.Label>Search Entries</Form.Label>
               <Form.Control
                 type="text"
                 placeholder="Search by phone number..."
@@ -2140,10 +2153,10 @@ const CrmDataManagement = () => {
           </Modal.Title>
         </Modal.Header>
         <Modal.Body>
-          <p>Are you sure you want to delete this CRM data record?</p>
+          <p>Are you sure you want to delete this CRM data entry?</p>
           {itemToDelete && (
             <div className="alert alert-warning">
-              <strong>Record ID:</strong> #{itemToDelete.id}
+              <strong>Entry ID:</strong> #{itemToDelete.id}
               <br />
               <strong>Phone:</strong> {itemToDelete.phone || "N/A"}
               <br />
@@ -2169,7 +2182,7 @@ const CrmDataManagement = () => {
             Cancel
           </Button>
           <Button variant="danger" onClick={confirmDelete}>
-            Delete Record
+            Delete Entry
           </Button>
         </Modal.Footer>
       </Modal>
@@ -2193,7 +2206,7 @@ const CrmDataManagement = () => {
               <h6 className="mb-0">Step 1: Filter Your Data</h6>
             </div>
             <p className="text-muted small mb-3">
-              Choose which records to assign by filtering by tags and campaigns.
+              Choose which entries to assign by filtering by tags and campaigns.
             </p>
             <Row>
               <Col md={6}>
@@ -2209,7 +2222,7 @@ const CrmDataManagement = () => {
                       }))
                     }
                     options={availableTags}
-                    placeholder="Select tags to filter records..."
+                    placeholder="Select tags to filter entries..."
                     styles={{
                       control: (base) => ({
                         ...base,
@@ -2220,7 +2233,7 @@ const CrmDataManagement = () => {
                     }}
                   />
                   <Form.Text className="text-muted">
-                    Only records with these tags will be considered for
+                    Only entries with these tags will be considered for
                     assignment.
                   </Form.Text>
                 </Form.Group>
@@ -2238,7 +2251,7 @@ const CrmDataManagement = () => {
                       }))
                     }
                     options={availableCampaigns}
-                    placeholder="Select campaigns to filter records..."
+                    placeholder="Select campaigns to filter entries..."
                     styles={{
                       control: (base) => ({
                         ...base,
@@ -2249,7 +2262,7 @@ const CrmDataManagement = () => {
                     }}
                   />
                   <Form.Text className="text-muted">
-                    Only records from these campaigns will be considered for
+                    Only entries from these campaigns will be considered for
                     assignment.
                   </Form.Text>
                 </Form.Group>
@@ -2260,7 +2273,7 @@ const CrmDataManagement = () => {
           <div className="mb-4">
             <div className="d-flex align-items-center mb-3">
               <FiDatabase className="me-2 text-info" />
-              <h6 className="mb-0">Step 2: Review Available Records</h6>
+              <h6 className="mb-0">Step 2: Review Available Entries</h6>
             </div>
             <p className="text-muted small mb-3">
               Based on your filters, here's what's available for assignment.
@@ -2272,7 +2285,7 @@ const CrmDataManagement = () => {
                     <h4 className="text-primary">
                       {assignmentCounts.total.toLocaleString()}
                     </h4>
-                    <p className="mb-0 small">Total Records</p>
+                    <p className="mb-0 small">Total Entries</p>
                     <small className="text-muted">Matching your filters</small>
                   </div>
                 </div>
@@ -2306,9 +2319,9 @@ const CrmDataManagement = () => {
             <p className="text-muted small mb-3">
               You have{" "}
               <strong>{assignmentCounts.unassigned.toLocaleString()}</strong>{" "}
-              records ready for assignment out of{" "}
+              entries ready for assignment out of{" "}
               <strong>{assignmentCounts.total.toLocaleString()}</strong> total
-              matching records.
+              matching entries.
             </p>
 
             <Form.Group className="mb-3">
@@ -2318,7 +2331,7 @@ const CrmDataManagement = () => {
                 value={assignmentCampaign}
                 onChange={(selected) => setAssignmentCampaign(selected || [])}
                 options={availableCampaigns}
-                placeholder="Choose which campaigns to assign records to..."
+                placeholder="Choose which campaigns to assign entries to..."
                 styles={{
                   control: (base) => ({
                     ...base,
@@ -2329,7 +2342,7 @@ const CrmDataManagement = () => {
                 }}
               />
               <Form.Text className="text-muted">
-                <strong>Smart Distribution:</strong> Records will be
+                <strong>Smart Distribution:</strong> Entries will be
                 automatically distributed among users in the selected campaigns
                 based on their workload and availability.
               </Form.Text>
@@ -2341,15 +2354,15 @@ const CrmDataManagement = () => {
                 type="number"
                 min="0"
                 max={assignmentCounts.unassigned}
-                value={totalRecordsToAssign}
+                value={totalEntriesToAssign}
                 onChange={(e) =>
-                  setTotalRecordsToAssign(parseInt(e.target.value) || 0)
+                  setTotalEntriesToAssign(parseInt(e.target.value) || 0)
                 }
-                placeholder="How many records to assign?"
+                placeholder="How many entries to assign?"
               />
               <Form.Text className="text-muted">
                 <strong>Maximum:</strong>{" "}
-                {assignmentCounts.unassigned.toLocaleString()} records
+                {assignmentCounts.unassigned.toLocaleString()} entries
                 available. Start with a smaller batch to test the assignment
                 process.
               </Form.Text>
@@ -2379,8 +2392,8 @@ const CrmDataManagement = () => {
                 />
               </div>
               <Form.Text className="text-muted">
-                <strong>Auto-balance:</strong> Records are distributed evenly.{" "}
-                <strong>Custom:</strong> You specify exactly how many records
+                <strong>Auto-balance:</strong> Entries are distributed evenly.{" "}
+                <strong>Custom:</strong> You specify exactly how many entries
                 each campaign gets.
               </Form.Text>
             </Form.Group>
@@ -2397,10 +2410,10 @@ const CrmDataManagement = () => {
                       size="sm"
                       onClick={() => {
                         const equalDistribution = Math.floor(
-                          totalRecordsToAssign / assignmentCampaign.length
+                          totalEntriesToAssign / assignmentCampaign.length
                         );
                         const remainder =
-                          totalRecordsToAssign % assignmentCampaign.length;
+                          totalEntriesToAssign % assignmentCampaign.length;
                         const newCustomDistribution: Record<string, number> =
                           {};
 
@@ -2419,7 +2432,7 @@ const CrmDataManagement = () => {
                   </div>
                   <div className="border rounded p-3 bg-light">
                     <p className="small text-muted mb-3">
-                      Total to assign: <strong>{totalRecordsToAssign}</strong> |
+                      Total to assign: <strong>{totalEntriesToAssign}</strong> |
                       Allocated:{" "}
                       <strong>
                         {Object.values(customDistribution).reduce(
@@ -2429,7 +2442,7 @@ const CrmDataManagement = () => {
                       </strong>{" "}
                       | Remaining:{" "}
                       <strong>
-                        {totalRecordsToAssign -
+                        {totalEntriesToAssign -
                           Object.values(customDistribution).reduce(
                             (sum, count) => sum + count,
                             0
@@ -2448,7 +2461,7 @@ const CrmDataManagement = () => {
                             <Form.Control
                               type="number"
                               min="0"
-                              max={totalRecordsToAssign}
+                              max={totalEntriesToAssign}
                               value={customDistribution[campaign.value] || 0}
                               onChange={(e) =>
                                 setCustomDistribution((prev) => ({
@@ -2468,9 +2481,9 @@ const CrmDataManagement = () => {
               )}
 
             <Alert variant="info" className="mt-3">
-              <strong>Assignment Info:</strong> Records will be automatically
+              <strong>Assignment Info:</strong> Entries will be automatically
               assigned to users within the selected campaigns based on their
-              campaign user extensions. The system will distribute records
+              campaign user extensions. The system will distribute entries
               equally among users in each campaign.
             </Alert>
           </div>
@@ -2482,10 +2495,10 @@ const CrmDataManagement = () => {
           <Button
             variant="success"
             disabled={
-              totalRecordsToAssign === 0 ||
+              totalEntriesToAssign === 0 ||
               assignmentCampaign.length === 0 ||
               (assignmentDistribution === "custom" &&
-                totalRecordsToAssign -
+                totalEntriesToAssign -
                   Object.values(customDistribution).reduce(
                     (sum, count) => sum + count,
                     0
@@ -2494,7 +2507,7 @@ const CrmDataManagement = () => {
             }
             onClick={handleDataAssignmentSubmit}
           >
-            Assign Records
+            Assign Entries
           </Button>
         </Modal.Footer>
       </Modal>
@@ -2675,21 +2688,21 @@ const CrmDataManagement = () => {
           </Modal.Title>
         </Modal.Header>
         <Modal.Body>
-          {selectedRecordForSchedule && (
+          {selectedEntryForSchedule && (
             <div className="mb-3">
               <h6>Schedule Call For:</h6>
               <div className="bg-light p-3 rounded">
                 <div>
                   <strong>Name:</strong>{" "}
-                  {selectedRecordForSchedule.name || "N/A"}
+                  {selectedEntryForSchedule.name || "N/A"}
                 </div>
                 <div>
                   <strong>Phone:</strong>{" "}
-                  {selectedRecordForSchedule.phone || "N/A"}
+                  {selectedEntryForSchedule.phone || "N/A"}
                 </div>
                 <div>
                   <strong>Email:</strong>{" "}
-                  {selectedRecordForSchedule.email || "N/A"}
+                  {selectedEntryForSchedule.email || "N/A"}
                 </div>
               </div>
             </div>
@@ -2851,7 +2864,7 @@ const CrmDataManagement = () => {
                         <div>
                           <div className="mb-1">
                             <strong>
-                              Uploaded {activity.total_records || 0} records
+                              Uploaded {activity.total_records || 0} entries
                             </strong>
                           </div>
                           <div className="small text-muted">
@@ -2869,7 +2882,7 @@ const CrmDataManagement = () => {
                         <div>
                           <div className="mb-1">
                             <strong>
-                              Assigned {activity.total_records || 0} records
+                              Assigned {activity.total_records || 0} entries
                             </strong>
                           </div>
                           <div className="small text-muted">
@@ -3088,11 +3101,11 @@ const CrmDataManagement = () => {
         <Modal.Body>
           <p>
             Are you sure you want to delete {selectedItems.length} selected CRM
-            data records?
+            data entries?
           </p>
           <div className="alert alert-warning">
             <strong>Warning:</strong> This action cannot be undone. All selected
-            records will be permanently deleted.
+            entries will be permanently deleted.
           </div>
         </Modal.Body>
         <Modal.Footer>
@@ -3103,7 +3116,7 @@ const CrmDataManagement = () => {
             Cancel
           </Button>
           <Button variant="danger" onClick={handleBulkDelete}>
-            Delete {selectedItems.length} Records
+            Delete {selectedItems.length} Entries
           </Button>
         </Modal.Footer>
       </Modal>

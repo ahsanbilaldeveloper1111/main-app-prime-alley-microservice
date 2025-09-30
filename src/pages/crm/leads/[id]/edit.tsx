@@ -15,6 +15,7 @@ import {
   CampaignData,
   getCrmData,
   CrmDataItem,
+  LeadData,
 } from "@utils/crm";
 import { GetHierarchyData } from "@utils/users";
 import {
@@ -104,13 +105,16 @@ const EditLead = () => {
   useEffect(() => {
     if (id) {
       fetchLeadData();
-      fetchStages();
       fetchMeetings();
+    }
+  }, [id]);
+
+  useEffect(() => {
+      fetchStages();
       fetchExtensions();
       fetchCampaigns();
       fetchCrmData();
-    }
-  }, [id]);
+  }, []);
 
   // Set selected campaign when lead data is available
   useEffect(() => {
@@ -140,10 +144,13 @@ const EditLead = () => {
       const leadData = await getLead(Number(id));
       
       setIsOpportunity(leadData.type === "opportunity");
-      // Ensure campaign_field_values is properly initialized
+      // Ensure campaign_field_values is properly initialized and add company fields
       const processedLeadData = {
         ...leadData,
         campaign_field_values: leadData.campaign_field_values || {},
+        company_name: leadData.company_name || '',
+        company_contact: leadData.company_contact || '',
+        company_description: leadData.company_description || '',
       };
 
       setLead(processedLeadData);
@@ -217,6 +224,9 @@ const EditLead = () => {
         user_extension: lead.user_extension,
         type: lead.type,
         description: lead.description,
+        company_name: lead.company_name,
+        company_contact: lead.company_contact,
+        company_description: lead.company_description,
         stage_id: lead.stage_id,
         campaign_id: lead.campaign_id,
         crm_data_id: lead.crm_data_id,
@@ -670,6 +680,51 @@ const EditLead = () => {
                     />
                   </Form.Group>
 
+                  {/* Company Information Section */}
+                  <div className="border-top pt-3 mt-4">
+                    <h6 className="mb-3">Company Information</h6>
+                    <Row>
+                      <Col md={6}>
+                        <Form.Group className="mb-3">
+                          <Form.Label>Company Name</Form.Label>
+                          <Form.Control
+                            type="text"
+                            value={lead.company_name || ""}
+                            onChange={(e) =>
+                              setLead({ ...lead, company_name: e.target.value })
+                            }
+                            placeholder="Enter company name"
+                          />
+                        </Form.Group>
+                      </Col>
+                      <Col md={6}>
+                        <Form.Group className="mb-3">
+                          <Form.Label>Contact Information</Form.Label>
+                          <Form.Control
+                            type="text"
+                            value={lead.company_contact || ""}
+                            onChange={(e) =>
+                              setLead({ ...lead, company_contact: e.target.value })
+                            }
+                            placeholder="Enter phone or email"
+                          />
+                        </Form.Group>
+                      </Col>
+                    </Row>
+                    <Form.Group className="mb-3">
+                      <Form.Label>Additional Contact Information</Form.Label>
+                      <Form.Control
+                        as="textarea"
+                        rows={3}
+                        value={lead.company_description || ""}
+                        onChange={(e) =>
+                          setLead({ ...lead, company_description: e.target.value })
+                        }
+                        placeholder="Enter additional company contact details"
+                      />
+                    </Form.Group>
+                  </div>
+
                   <Row>
                     <Col md={6}>
                       <Form.Group className="mb-3">
@@ -821,7 +876,12 @@ const EditLead = () => {
                               <div>
                                 <strong>{meeting.name}</strong>
                                 <br />
-                                <small className="text-muted">
+                                <small className="text-muted " style={{
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                  whiteSpace: "nowrap",
+                                  maxWidth: "150px",
+                                }}>
                                   {meeting.title}
                                 </small>
                               </div>
