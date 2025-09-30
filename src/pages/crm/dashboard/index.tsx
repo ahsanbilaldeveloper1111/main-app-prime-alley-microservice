@@ -388,7 +388,7 @@ const CrmDashboard = () => {
                   </div>
                   <div className="col-md-4">
                     <Link
-                      href="/crm/opportunities/create"
+                      href="/crm/leads/create?type=opportunity"
                       className="btn btn-outline-success w-100"
                     >
                       <FiPlus className="me-2" />

@@ -18,6 +18,9 @@ const CreateLead = () => {
     user_extension: null as string | null,
     type: "lead" as "lead" | "opportunity",
     description: "",
+    company_name: "",
+    company_contact: "",
+    company_description: "",
     stage_id: undefined as number | undefined,
     campaign_id: undefined as number | undefined,
     crm_data_id: undefined as number | undefined,
@@ -65,6 +68,9 @@ const CreateLead = () => {
             campaign_id: Number(crmDataRecord.campaign_id) || undefined,
             name: crmDataRecord.data?.name || crmDataRecord.data?.full_name || crmDataRecord.data?.first_name || crmDataRecord.phone || '',
             description: crmDataRecord.data?.description || crmDataRecord.data?.notes || crmDataRecord.data?.comments || '',
+            company_name: crmDataRecord.data?.company_name || crmDataRecord.data?.company || '',
+            company_contact: crmDataRecord.data?.company_contact || crmDataRecord.data?.contact || crmDataRecord.phone || '',
+            company_description: crmDataRecord.data?.company_description || crmDataRecord.data?.company_notes || '',
           }));
         } catch (error) {
           console.error("Failed to fetch CRM data record:", error);
@@ -326,7 +332,7 @@ const CreateLead = () => {
       <BreadcrumbItem
         mainTitle="CRM"
         mainLink="/crm/dashboard"
-        subTitle="Create Lead"
+        subTitle={isOpportunity ? "Create Opportunity" : "Create Lead"}
       />
 
       <div className="container-fluid">
@@ -335,9 +341,9 @@ const CreateLead = () => {
           <div className="col-12">
             <div className="d-flex justify-content-between align-items-center">
               <div>
-                <h1 className="h3 mb-0">Create New Lead</h1>
+                <h1 className="h3 mb-0">Create New {isOpportunity ? "Opportunity" : "Lead"}</h1>
                 <p className="text-muted">
-                  Add a new lead to your CRM pipeline
+                  Add a new {isOpportunity ? "opportunity" : "lead"} to your CRM pipeline
                 </p>
               </div>
               <div>
@@ -356,7 +362,7 @@ const CreateLead = () => {
             <Card className="border-0 shadow-sm">
               <Card.Header>
                 <div className="d-flex justify-content-between align-items-center">
-                  <h5 className="mb-0">Lead Information</h5>
+                  <h5 className="mb-0">{isOpportunity ? "Opportunity" : "Lead"} Information</h5>
                   {selectedCrmData && (
                     <Badge bg="info" className="d-flex align-items-center">
                       <FiDatabase className="me-1" size={14} />
@@ -370,7 +376,7 @@ const CreateLead = () => {
                   <Row>
                     <Col md={6}>
                       <Form.Group className="mb-3">
-                        <Form.Label>Lead Name *</Form.Label>
+                        <Form.Label>{isOpportunity ? "Opportunity" : "Lead"} Name *</Form.Label>
                         <Form.Control
                           type="text"
                           value={formData.name}
@@ -522,6 +528,51 @@ const CreateLead = () => {
                     />
                   </Form.Group>
 
+                  {/* Company Information Section */}
+                  <div className="border-top pt-3 mt-4">
+                    <h6 className="mb-3">Company Information</h6>
+                    <Row>
+                      <Col md={6}>
+                        <Form.Group className="mb-3">
+                          <Form.Label>Company Name</Form.Label>
+                          <Form.Control
+                            type="text"
+                            value={formData.company_name}
+                            onChange={(e) =>
+                              handleInputChange("company_name", e.target.value)
+                            }
+                            placeholder="Enter company name"
+                          />
+                        </Form.Group>
+                      </Col>
+                      <Col md={6}>
+                        <Form.Group className="mb-3">
+                          <Form.Label>Contact Information</Form.Label>
+                          <Form.Control
+                            type="text"
+                            value={formData.company_contact}
+                            onChange={(e) =>
+                              handleInputChange("company_contact", e.target.value)
+                            }
+                            placeholder="Enter phone or email"
+                          />
+                        </Form.Group>
+                      </Col>
+                    </Row>
+                    <Form.Group className="mb-3">
+                      <Form.Label>Additional Contact Information</Form.Label>
+                      <Form.Control
+                        as="textarea"
+                        rows={3}
+                        value={formData.company_description}
+                        onChange={(e) =>
+                          handleInputChange("company_description", e.target.value)
+                        }
+                        placeholder="Enter additional company contact details"
+                      />
+                    </Form.Group>
+                  </div>
+
                   {/* Campaign Custom Fields */}
                   {selectedCampaign && selectedCampaign.fields && selectedCampaign.fields.length > 0 && (
                     <div className="border-top pt-3 mt-4">
@@ -607,7 +658,7 @@ const CreateLead = () => {
                       ) : (
                         <>
                           <FiSave className="me-2" />
-                          Create Lead
+                          Create {isOpportunity ? "Opportunity" : "Lead"}
                         </>
                       )}
                     </Button>

@@ -109,17 +109,13 @@ const CrmOpportunities = () => {
         ),
       },
       {
-        key: "contact",
-        name: "Extension & Type",
-        selector: (row: any) => row.user_extension,
+        key: "company_name",
+        name: "Company",
+        selector: (row: any) => row.company_name,
         sortable: true,
         cell: (props: any) => (
           <div>
-            <div>Extension: {extensions.find(
-              (extension: any) =>
-                extension.id.toString() === props.user_extension?.toString()
-            )?.display_name || props.user_extension || "No Extension"}</div>
-            <small className="text-muted">Type: {props.type || "lead"}</small>
+              <div>{props.company_name || "No Company"}</div>
           </div>
         ),
       },
