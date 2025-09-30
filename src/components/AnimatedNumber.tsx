@@ -36,20 +36,29 @@ const AnimatedNumber = ({ value, duration = 1000, textColor = '', suffix = '', p
     }
 
     let start = 0;
-    const end = parseInt(value.toString(), 10);
+    
+    // For cost type, handle special string values
+    if (valueType === 'cost' && typeof value === 'string' && value.startsWith('.')) {
+      setDisplayValue(0);
+      return;
+    }
+    
+    const end = Number(value);
     if (isNaN(end)) {
       setDisplayValue(0);
       return;
     }
 
-    const increment = end / (duration / 10);
+    // For cost type, multiply by 100 to handle decimals properly
+    const scaledEnd = valueType === 'cost' ? Math.round(end * 100) : end;
+    const increment = scaledEnd / (duration / 10);
     const interval = setInterval(() => {
       start += increment;
-      if (start >= end) {
+      if (start >= scaledEnd) {
         clearInterval(interval);
-        setDisplayValue(end);
+        setDisplayValue(valueType === 'cost' ? end : scaledEnd);
       } else {
-        setDisplayValue(Math.floor(start));
+        setDisplayValue(valueType === 'cost' ? start / 100 : Math.floor(start));
       }
     }, 10);
 
@@ -58,15 +67,17 @@ const AnimatedNumber = ({ value, duration = 1000, textColor = '', suffix = '', p
 
   // Format the display value based on valueType
   const getFormattedValue = () => {
-    //console.log('getFormattedValue - valueType:', valueType, 'displayValue:', displayValue);
     if (valueType === 'second' || valueType === 'seconds') {
-      const result = formatSeconds(displayValue);
-      console.log('Using seconds formatter, result:', result);
-      return result;
+      return formatSeconds(displayValue);
     }
-    const result = displayValue.toLocaleString();
-    //console.log('Using default formatter, result:', result);
-    return result;
+    if (valueType === 'cost') {
+      // Handle string values like ".00000" directly
+      if (typeof value === 'string' && value.startsWith('.')) {
+        return '0.00';
+      }
+      return Number(displayValue).toFixed(2);
+    }
+    return displayValue.toLocaleString();
   };
 
   if(size === 'sm'){

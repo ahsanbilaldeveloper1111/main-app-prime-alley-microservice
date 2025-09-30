@@ -15,7 +15,7 @@ import CallLogsFilters from '@components/filters/CallLogsFilters';
 import AnimatedNumber from '@components/AnimatedNumber';
 import ChartBar from '@components/ChartBar';
 import ChartDonut from '@components/ChartDonut';
-import StatCard from '@components/StatCard';
+import PageSummaryGrid from '@components/PageSummaryGrid';
 import imgStatus1 from '@assets/images/widget/img-status-1.svg'
 import imgStatus2 from '@assets/images/widget/img-status-2.svg'
 import imgStatus3 from '@assets/images/widget/img-status-3.svg'
@@ -58,7 +58,7 @@ interface ChartData {
 
 import dynamic from 'next/dynamic';
 import { ApexOptions } from 'apexcharts';
-import { ModuleSlug } from '@utils/Helper';
+import { formatMinutesAndSeconds, formatCurrency, ModuleSlug } from '@utils/Helper';
 const ReactApexChart = dynamic(() => import('react-apexcharts'), { ssr: false });
 
 const CallIncomingDepartment = () => {
@@ -122,18 +122,30 @@ const CallIncomingDepartment = () => {
 
     const columns: Column[] = [
         { key: 'DepartmentName', name: 'DepartmentName', selector: (row: any) => row.DepartmentName, sortable: true },
-        { key: 'Answered', name: 'Answered', selector: (row: any) => row.Answered, sortable: true },
-        { key: 'AvgCost', name: 'Avg Cost', selector: (row: any) => row.AvgCost, sortable: true },
-        { key: 'AvgDuration', name: 'Avg Duration', selector: (row: any) => row.AvgDuration, sortable: true },
-        { key: 'AvgRingTime', name: 'Avg Ring Time', selector: (row: any) => row.AvgRingTime, sortable: true },
-        { key: 'Calls', name: 'Calls', selector: (row: any) => row.Calls, sortable: true },
-        { key: 'Cost', name: 'Cost', selector: (row: any) => row.Cost, sortable: true },
-        { key: 'Country', name: 'Country', selector: (row: any) => row.Country, sortable: true },
-        { key: 'Duration', name: 'Duration', selector: (row: any) => row.Duration, sortable: true },
-        { key: 'MaxRingTime', name: 'Max Ring Time', selector: (row: any) => row.MaxRingTime, sortable: true },
-        { key: 'TotalDuration', name: 'Total Duration', selector: (row: any) => row.TotalDuration, sortable: true },
-        { key: 'Unanswered', name: 'Un Answered', selector: (row: any) => row.Unanswered, sortable: true },
-        
+        { key: 'Calls', name: 'Total Calls', selector: (row: any) => row.Calls, sortable: true },
+    { key: 'Answered', name: 'Answered', selector: (row: any) => row.Answered, sortable: true },
+    { key: 'Unanswered', name: 'Un Answered', selector: (row: any) => row.Unanswered, sortable: true },
+
+    { key: 'AvgRingTime', name: 'Avg Ring Time', selector: (row: any) => row.AvgRingTime, sortable: true,
+      cell: (row: any) => formatMinutesAndSeconds(row.AvgRingTime)
+     },
+    { key: 'MaxRingTime', name: 'Max Ring Time', selector: (row: any) => row.MaxRingTime, sortable: true,
+      cell: (row: any) => formatMinutesAndSeconds(row.MaxRingTime)
+     },
+
+    { key: 'Duration', name: 'Total Duration', selector: (row: any) => row.Duration, sortable: true,
+      cell: (row: any) => formatMinutesAndSeconds(row.Duration)
+     },
+    { key: 'AvgDuration', name: 'Avg Duration', selector: (row: any) => row.AvgDuration, sortable: true,
+      cell: (row: any) => formatMinutesAndSeconds(row.AvgDuration)
+     },
+
+    { key: 'Cost', name: 'Total Cost', selector: (row: any) => row.Cost, sortable: true,
+      cell: (row: any) => formatCurrency(row.Cost)
+     },
+    { key: 'AvgCost', name: 'Avg Cost', selector: (row: any) => row['Avg Cost'], sortable: true,
+      cell: (row: any) => formatCurrency(Number(row['Avg Cost']))
+     },
     ];
 
     const [refreshKey, setRefreshKey] = useState<number>(0);
@@ -561,40 +573,49 @@ const CallIncomingDepartment = () => {
             <Row>
                 <Col md={6}>
                     <Row>
-                        <StatCard
-                            title="Total Calls"
-                            value={summary.total_calls}
-                            valueType="number"
-                            icon="phone"
-                            bgImage={imgStatus1.src}
-                            delay={0}
-                        />
-
-                        <StatCard
-                            title="Avg Ring Time"
-                            value={summary.avg_ring_time}
-                            valueType="seconds"
-                            icon="phone_in_talk"
-                            bgImage={imgStatus1.src}
-                            delay={1}
-                        />
-
-                        <StatCard
-                            title="Avg Duration"
-                            value={summary.avg_duration}
-                            valueType="seconds"
-                            icon="info"
-                            bgImage={imgStatus1.src}
-                            delay={2}
-                        />
-
-                        <StatCard
-                            title="Cost"
-                            value={summary.total_cost}
-                            valueType="cost"
-                            icon="payment"
-                            bgImage={imgStatus1.src}
-                            delay={3}
+                        <PageSummaryGrid
+                            cards={[
+                                {
+                                    id: 'total-calls',
+                                    title: 'Total Calls',
+                                    value: summary.total_calls,
+                                    description: 'Number of calls received',
+                                    valueType: 'number',
+                                    delay: 0.1,
+                                    animationDuration: 1000,
+                                    fontStyle: 'style-2'
+                                },
+                                {
+                                    id: 'avg-ring-time',
+                                    title: 'Avg Ring Time',
+                                    value: summary.avg_ring_time,
+                                    description: 'Average time before answer',
+                                    valueType: 'seconds',
+                                    delay: 0.3,
+                                    animationDuration: 1000,
+                                    fontStyle: 'style-2'
+                                },
+                                {
+                                    id: 'avg-duration',
+                                    title: 'Avg Duration',
+                                    value: summary.avg_duration,
+                                    description: 'Average call duration',
+                                    valueType: 'seconds',
+                                    delay: 0.5,
+                                    animationDuration: 1000,
+                                    fontStyle: 'style-2'
+                                },
+                                {
+                                    id: 'total-duration',
+                                    title: 'Duration',
+                                    value: summary.total_duration,
+                                    description: 'Total call duration',
+                                    valueType: 'seconds',
+                                    delay: 0.7,
+                                    animationDuration: 1000,
+                                    fontStyle: 'style-2'
+                                }
+                            ]}
                         />
                     </Row>
                 </Col>
@@ -623,7 +644,7 @@ const CallIncomingDepartment = () => {
                                     series={simpleDonut.series} 
                                     labels={simpleDonut.labels}
                                     dataType="calls"
-                                    height={180}
+                                    height={250}
                                     width={500}
                                     showDataLabels={true}
                                     dataLabelsFormatter={(value) => `${value.toFixed(0)}%`}
@@ -847,6 +868,8 @@ const CallIncomingDepartment = () => {
                  defaultPageSize={15}
                  filters={currentFilters}
                  refreshKey={refreshKey}
+                 tableStyle='table-style-2'
+                 search={false} 
              />
             )}
 

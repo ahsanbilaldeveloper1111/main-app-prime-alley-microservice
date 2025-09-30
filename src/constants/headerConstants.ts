@@ -23,7 +23,7 @@ export const HEADER_CONSTANTS = {
   MENU_LABELS: {
     DASHBOARD: 'Home',
     CONTROL_HUB: 'Control Hub',
-    SIM_GATEWAY: 'Sim Gateway',
+    SIM_GATEWAY: 'SIM Gateway',
     CALL_LOGS: 'Call Logs',
     CALL_RECORDINGS: 'Call Recordings',
     REPORTS: 'Reports',

@@ -6,14 +6,12 @@ import GenericListPage from '@components/GenericListPage';
 
 import { getAllUsers } from '@utils/users';
 import { Column } from '@components/CustomDataTable';
-import { Dropdown, DropdownItem, DropdownMenu, DropdownToggle, Row } from 'react-bootstrap';
-import { Col } from 'react-bootstrap';
+import { Dropdown, DropdownItem, DropdownMenu, DropdownToggle, Row, Modal, Table, Col, Button } from 'react-bootstrap';
 import UsersFilters from '@components/filters/UsersFilters';
 import { toast } from 'react-toastify';
 import { useTokenService } from 'src/hooks/useTokenService';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
-import { Button } from 'react-bootstrap';
 import ProtectedRoute from '@components/ProtectedRoute';
 
 import AnimatedNumber from '@components/AnimatedNumber';
@@ -53,46 +51,54 @@ const Users = () => {
     // Memoize base columns to prevent recreation on every render
     const baseColumns: Column[] = useMemo(() => [
         //{ key: 'ID', name: 'id', selector: (row: any) => row.id, sortable: true },
-        ...(session?.user?.permissions?.includes('show-ldap-uuid-users') ? [
-            { key: 'ldap_uid', name: 'User ID', selector: (row: any) => row.ldap_uid, sortable: true }
-        ] : []),
+        
+        // ...(session?.user?.permissions?.includes('show-ldap-uuid-users') ? [
+        //     { key: 'ldap_uid', name: 'User ID', selector: (row: any) => row.ldap_uid, sortable: true }
+        // ] : []),
+
         { key: 'name', name: 'Display Name', selector: (row: any) => row.name, sortable: true },
-        { key: 'Email', name: 'email', selector: (row: any) => row.email, sortable: true },
-        { key: 'Username', name: 'username', selector: (row: any) => row.username, sortable: true },
+        { key: 'username', name: 'User Name', selector: (row: any) => row.username, sortable: true },
         { key: 'phone', name: 'Extension', selector: (row: any) => row.phone, sortable: true,
           cell: (props: any) => {
             return props.phone || '---';
           }
          },
-        ...(session?.user?.permissions?.includes('show-ou-users') ? [
-            { key: 'OU', name: 'ou', selector: (row: any) => row.ou, sortable: true,
-              cell: (props: any) => {
-                return props.ou || '---';
-              }
-             }
-        ] : []),
-        { key: 'Department', name: 'department', selector: (row: any) => row.department, sortable: true,
-            cell: (props: any) => {
-                return props.department?.name || '---';
-            }
-         },
-        { key: 'Company', name: 'company', selector: (row: any) => row.company, sortable: true,
-            cell: (props: any) => {
-                return props.company?.name || '---';
-            }
-         },
+         { key: 'Department', name: 'department', selector: (row: any) => row.department, sortable: true,
+          cell: (props: any) => {
+              return props.department?.name || '---';
+          }
+       },
         { key: 'Role', name: 'role', selector: (row: any) => row.role, sortable: true },
         { key: 'Group', name: 'group', selector: (row: any) => row.group, sortable: true ,
           cell: (props: any) => {
             return props.group || '---';
           }
         },
-        { key: 'Status', name: 'status', selector: (row: any) => row.status, sortable: true },
-        { key: 'last_synced_at', name: 'Last Synced', selector: (row: any) => row.last_synced_at, sortable: true,
-          cell: (props: any) => {
-            return formatDateTimeToLocal(props.last_synced_at, GlobalDateTimeFormat);
-          }
+
+        { key: 'Email', name: 'email', selector: (row: any) => row.email, sortable: true },
+        
+        
+        // ...(session?.user?.permissions?.includes('show-ou-users') ? [
+        //     { key: 'OU', name: 'ou', selector: (row: any) => row.ou, sortable: true,
+        //       cell: (props: any) => {
+        //         return props.ou || '---';
+        //       }
+        //      }
+        // ] : []),
+       
+        { key: 'Company', name: 'company', selector: (row: any) => row.company, sortable: true,
+            cell: (props: any) => {
+                return props.company?.name || '---';
+            }
          },
+        
+        // { key: 'Status', name: 'status', selector: (row: any) => row.status, sortable: true },
+        
+        // { key: 'last_synced_at', name: 'Last Synced', selector: (row: any) => row.last_synced_at, sortable: true,
+        //   cell: (props: any) => {
+        //     return formatDateTimeToLocal(props.last_synced_at, GlobalDateTimeFormat);
+        //   }
+        //  },
     ], [session?.user?.permissions]);
 
     // Action column kept last
@@ -270,16 +276,34 @@ const Users = () => {
     }>({
           
         series: [{
-          name: 'series1',
-          data: [31, 40, 28, 51, 42, 109]
+          name: 'Sales',
+          data: [10, 15, 20, 25, 30, 35]
+        },
+        {
+          name: 'Support',
+          data: [5, 8, 12, 18, 22, 25]
+        },
+        {
+          name: 'IT',
+          data: [2, 3, 8, 15, 15, 18]
         }],
         options: {
+          colors: ['#FFB800', '#00E396', '#008FFB'],
           chart: {
             height: 250,
-            type: 'area',
+            type: 'line',
             toolbar: {
               show: false
+            },
+            zoom: {
+              enabled: false
             }
+          },
+          grid: {
+            show: true,
+            borderColor: '#f1f1f1',
+            strokeDashArray: 0,
+            position: 'back'
           },
           dataLabels: {
             enabled: false
@@ -287,9 +311,37 @@ const Users = () => {
           stroke: {
             curve: 'smooth'
           },
+          legend: {
+            show: true,
+            position: 'bottom',
+            horizontalAlign: 'center',
+            offsetY: 8,
+            itemMargin: {
+              horizontal: 16
+            },
+            markers: {
+              width: 16,
+              height: 16,
+              radius: 2,
+              offsetX: 0
+            },
+            onItemClick: {
+              toggleDataSeries: true
+            },
+            onItemHover: {
+              highlightDataSeries: true
+            }
+          },
           xaxis: {
             type: 'category',
+            
             categories: ["Jan", "Feb", "Mar", "Apr", "May", "Jun"]
+          },
+          yaxis: {
+            show: true,
+            title: {
+              text: 'Users'
+            }
           },
           tooltip: {
             x: {
@@ -399,37 +451,72 @@ const Users = () => {
 
 
 
+  const [showUserModal, setShowUserModal] = React.useState(false);
+  const [selectedUsers, setSelectedUsers] = React.useState<Array<{
+    name: string;
+    extension: string;
+    lastLogin: string;
+  }>>([]);
+
   const [FailedLoginAttemptsChart, setFailedLoginAttemptsChart] = React.useState<{
-    series: {name: string, data: number[]}[];
+    series: {name: string, data: number[], color?: string}[];
     options: any;
   }>({
-          
-    series: [{
-      name: 'Failed Login Attempts',
-      data: [44, 55, 57, 56, 61, 58, 63]
-    }],
+    series: [
+      {
+        name: 'Successful Login',
+        data: [30, 25, 35, 28, 32, 27, 29],
+        color: '#28a745' // Green
+      },
+      {
+        name: 'Failed Login',
+        data: [15, 18, 12, 14, 16, 13, 15],
+        color: '#dc3545' // Yellow
+      }
+      
+    ],
     options: {
       chart: {
         type: 'bar',
         height: 350,
+        stacked: true,
         toolbar: {
           show: false
-        }
-      },
-
-      toolbar: {
-        show: false
+        },
+        fontFamily: 'inherit',
+        background: 'transparent',
+        // events: {
+        //   dataPointSelection: (event: any, chartContext: any, config: any) => {
+        //     const dayIndex = config.dataPointIndex;
+        //     const seriesIndex = config.seriesIndex;
+        //     const userTypes = ['Active', 'Idle', 'Dormant'];
+        //     const userType = userTypes[seriesIndex];
+            
+        //     // Mock data - replace with actual API call
+        //     const mockUsers = [
+        //       { name: 'John Doe', extension: '1001', lastLogin: '2025-09-29 10:30:00' },
+        //       { name: 'Jane Smith', extension: '1002', lastLogin: '2025-09-29 09:15:00' },
+        //       { name: 'Bob Johnson', extension: '1003', lastLogin: '2025-09-29 08:45:00' }
+        //     ];
+            
+        //     setSelectedUsers(mockUsers);
+        //     setShowUserModal(true);
+        //   }
+        // }
       },
       plotOptions: {
         bar: {
           horizontal: false,
           columnWidth: '55%',
-          borderRadius: 5,
+          borderRadius: 0,
           borderRadiusApplication: 'end'
         },
       },
       dataLabels: {
-        enabled: false
+        enabled: true,
+        formatter: function (val: number) {
+          return val.toString();
+        }
       },
       stroke: {
         show: true,
@@ -438,17 +525,135 @@ const Users = () => {
       },
       xaxis: {
         categories: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+        title: {
+          text: ''
+        }
       },
       yaxis: {
         title: {
-         
+          text: 'Number of Login',
+         fontWeight: 'normal'
         }
       },
-      fill: {
-        opacity: 1,
-        colors: ['#dc3545']
+      tooltip: {
+        y: {
+          formatter: function(val: number) {
+            return val + " users"
+          }
+        }
       },
+      legend: {
+        position: 'bottom'
+      }
     },
+});
+
+
+  const [userActivityChart, setUserActivityChart] = React.useState<{
+   series: {name: string, data: number[], color?: string}[];
+   options: any;
+ }>({
+   series: [
+     {
+       name: 'New Users',
+       data: [5, 9, 10, 7, 10, 6],
+       color: '#28a745' // Green
+     },
+     {
+       name: 'Deactivated Users',
+       data: [2, 4, 3, 5, 6, 3],
+       color: '#dc3545' // Red
+     }
+   ],
+   options: {
+     chart: {
+       type: 'bar',
+       height: 350,
+       toolbar: {
+         show: false
+       },
+       fontFamily: 'inherit',
+       background: 'transparent',
+      //  events: {
+      //    dataPointSelection: (event: any, chartContext: any, config: any) => {
+      //      const monthIndex = config.dataPointIndex;
+      //      const seriesIndex = config.seriesIndex;
+      //      const userTypes = ['New', 'Deactivated'];
+      //      const userType = userTypes[seriesIndex];
+           
+      //      // Mock data - replace with actual API call
+      //      const mockUsers = [
+      //        { name: 'John Doe', extension: '1001', lastLogin: '2025-09-29 10:30:00' },
+      //        { name: 'Jane Smith', extension: '1002', lastLogin: '2025-09-29 09:15:00' },
+      //        { name: 'Bob Johnson', extension: '1003', lastLogin: '2025-09-29 08:45:00' }
+      //      ];
+           
+      //      setSelectedUsers(mockUsers);
+      //      setShowUserModal(true);
+      //    }
+      //  }
+     },
+     plotOptions: {
+       bar: {
+         horizontal: false,
+         columnWidth: '55%',
+         borderRadius: 0
+       },
+     },
+     dataLabels: {
+       enabled: false,
+       formatter: function (val: number) {
+         return val.toString();
+       }
+     },
+     stroke: {
+       show: true,
+       width: 2,
+       colors: ['transparent']
+     },
+     grid: {
+       borderColor: '#f1f1f1',
+       strokeDashArray: 0,
+       xaxis: {
+         lines: {
+           show: false
+         }
+       },
+       yaxis: {
+         lines: {
+           show: true
+         }
+       }
+     },
+     xaxis: {
+       categories: ['Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep'],
+       title: {
+         text: ''
+       },
+       axisBorder: {
+         show: false
+       },
+       axisTicks: {
+         show: false
+       }
+     },
+       yaxis: {
+         title: {
+           text: 'Number of Users',
+           fontWeight: 'normal'
+         }
+     },
+     tooltip: {
+       y: {
+         formatter: function(val: number) {
+           return val + " users"
+         }
+       }
+     },
+     legend: {
+       position: 'bottom'
+     }
+   },
 });
 
 const [departmentGrowthChart, setDepartmentGrowthChart] = React.useState<{
@@ -462,45 +667,117 @@ const [departmentGrowthChart, setDepartmentGrowthChart] = React.useState<{
   {
     name: 'Role',
     data: [17, 15, 41, 55, 44, 34]
-  }
-  ],
+  }],
   options: {
     chart: {
-      type: 'donut',
+      type: 'area',
+      height: 350,
       toolbar: {
         show: false
       }
     },
-    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May','Jun'],
-    legend: {
-      position: 'bottom',
-      markers: {
-        shape: 'rect',
-        
-      }
+    dataLabels: {
+      enabled: false
+    },
+    stroke: {
+      curve: 'smooth'
+    },
+    xaxis: {
+      categories: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun']
+    },
+    tooltip: {
+      x: {
+        format: 'dd/MM/yy HH:mm'
+      },
+    },
+  },
+});
+
+const [userLocationChart, setUserLocationChart] = React.useState<{
+  series: {name: string, data: number[]}[];
+  options: any;
+}>({
+  series: [
+    {
+      name: 'Active Users',
+      data: [120, 80, 60, 45, 30],
+     
+    }
+  ],
+  options: {
+    chart: {
+      type: 'bar',
+      height: 350,
+      toolbar: {
+        show: false
+      },
+      fontFamily: 'inherit',
+      background: 'transparent'
     },
     plotOptions: {
-      pie: {
-        donut: {
-          size: '40%'
+      bar: {
+        horizontal: true,
+        columnWidth: '55%',
+        borderRadius: 0,
+        dataLabels: {
+          position: 'top'
         }
       }
     },
     dataLabels: {
       enabled: false,
+      formatter: function (val: number) {
+        return val.toString();
+      },
+      offsetX: 30,
+      style: {
+        fontWeight: 'normal'
+      }
     },
-    responsive: [{
-      breakpoint: 480,
-      options: {
-        chart: {
-          width: 200
-        },
-        legend: {
-          position: 'bottom'
+    stroke: {
+      show: true,
+      width: 2,
+      colors: ['transparent']
+    },
+    xaxis: {
+      categories: ['United States', 'United Kingdom', 'Canada', 'Australia', 'Germany'],
+      title: {
+        text: 'Number of Users',
+        fontWeight: 'normal'
+      }
+    },
+    yaxis: {
+      title: {
+        text: '',
+        fontWeight: 'normal'
+      }
+    },
+    grid: {
+      borderColor: '#f1f1f1',
+      strokeDashArray: 0,
+      xaxis: {
+        lines: {
+          show: true
+        }
+      },
+      yaxis: {
+        lines: {
+          show: false
         }
       }
-    }]
-  },
+    },
+    tooltip: {
+      y: {
+        formatter: function(val: number) {
+          return val + " users"
+        }
+      }
+    },
+    legend: {
+      show: true,
+      position: 'bottom'
+    }
+  }
 });
 
 const [loginHeatMapChart, setLoginHeatMapChart] = React.useState<{
@@ -543,10 +820,33 @@ const [loginHeatMapChart, setLoginHeatMapChart] = React.useState<{
       height: 350,
       toolbar: {
         show: false
+      },
+      fontFamily: 'inherit',
+      background: 'transparent',
+      events: {
+        dataPointSelection: (event: any, chartContext: any, config: any) => {
+          const monthIndex = config.dataPointIndex;
+          const seriesIndex = config.seriesIndex;
+          const userTypes = ['New', 'Deactivated'];
+          const userType = userTypes[seriesIndex];
+          
+          // Mock data - replace with actual API call
+          const mockUsers = [
+            { name: 'John Doe', extension: '1001', lastLogin: '2025-09-29 10:30:00' },
+            { name: 'Jane Smith', extension: '1002', lastLogin: '2025-09-29 09:15:00' },
+            { name: 'Bob Johnson', extension: '1003', lastLogin: '2025-09-29 08:45:00' }
+          ];
+          
+          setSelectedUsers(mockUsers);
+          setShowUserModal(true);
+        }
       }
     },
     dataLabels: {
       enabled: false
+    },
+    legend: {
+      position: 'bottom'
     },
     colors: ['#008FFB'],
     xaxis: {
@@ -806,7 +1106,7 @@ React.useEffect(() => {
               <Col md={7} className="mb-3">
                 <div className="card">
                   <div className="card-body">
-                    <h5>User Growwth (Last 6 Months)</h5>
+                    <h5>User Growth (Last 6 Months)</h5>
                     <ReactApexChart
               options={growthChart.options}
               series={growthChart.series}
@@ -888,9 +1188,9 @@ React.useEffect(() => {
               <div className="card-body">
                 <h5>Active vs Inactive Users</h5>
                 <ReactApexChart
-              options={ActiveInactiveChart.options}
-              series={ActiveInactiveChart.series}
-              type="area"
+              options={userActivityChart.options}
+              series={userActivityChart.series}
+              type="bar"
               height={300}
             />
               </div>
@@ -899,7 +1199,7 @@ React.useEffect(() => {
           <Col md={4}>
             <div className="card">
               <div className="card-body">
-                <h5>Failed Login Attempts</h5>
+                <h5>Login Activity Breakdown</h5>
                 <ReactApexChart
               options={FailedLoginAttemptsChart.options}
               series={FailedLoginAttemptsChart.series}
@@ -949,18 +1249,65 @@ React.useEffect(() => {
                   options={loginHeatMapChart.options}
                   series={loginHeatMapChart.series}
                   type="heatmap"
-                  height={350}
+                  height={420}
                 />
               </div>
             </div>
           </Col>
 
           <Col md={4}>
+
+          <PageSummaryGrid cards={
+            [
+              {
+                id: 'peak-activity',
+                title: 'Peak Activity ',
+                value: 100,
+                description: 'Peak activity hours/day(s)',
+                delay: 0.1,
+                showAnimatedNumber: true,
+                animationDuration: 1000,
+                fontStyle: 'style-2'
+              },
+              {
+                id: 'lowest-activity',
+                title: 'Lowest Activity',
+                value: 100,
+                description: 'Lowest activity (hours/days)',
+                delay: 0.1,
+                showAnimatedNumber: true,
+                animationDuration: 1000,
+                fontStyle: 'style-2'
+              },
+              {
+                id: 'weekend-activity',
+                title: 'Total Weekend Login',
+                value: 100,
+                description: 'Total Weekend Logins',
+                delay: 0.1,
+                showAnimatedNumber: true,
+                animationDuration: 1000,
+                fontStyle: 'style-2'
+              }
+            ]
+          } />
+
+
+
+
+
+
             <div className="card">
-              <div className="card-body">
-                <h5>Geo Map of Login</h5>
+                <div className="card-body">
+                  <h5>Active user location</h5>
+                  <ReactApexChart
+                    options={userLocationChart.options}
+                    series={userLocationChart.series}
+                    type="bar"
+                    height={350}
+                  />
+                </div>
               </div>
-            </div>
           </Col>
         </Row>
 
@@ -1052,6 +1399,38 @@ React.useEffect(() => {
                         </div>
                     )}
                 </div>
+
+                {/* User Details Modal */}
+                <Modal show={showUserModal} onHide={() => setShowUserModal(false)}>
+                    <Modal.Header closeButton>
+                        <Modal.Title>User Details</Modal.Title>
+                    </Modal.Header>
+                    <Modal.Body>
+                        <Table striped bordered hover>
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Extension</th>
+                                    <th>Last Login</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {selectedUsers.map((user, index) => (
+                                    <tr key={index}>
+                                        <td>{user.name}</td>
+                                        <td>{user.extension}</td>
+                                        <td>{user.lastLogin}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </Table>
+                    </Modal.Body>
+                    <Modal.Footer>
+                        <Button variant="secondary" onClick={() => setShowUserModal(false)}>
+                            Close
+                        </Button>
+                    </Modal.Footer>
+                </Modal>
             </React.Fragment>
         </ProtectedRoute>
     );

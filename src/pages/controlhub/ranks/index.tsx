@@ -15,7 +15,7 @@ import Link from 'next/link';
 
 
 import '@assets/scss/common.scss';
-import { FiEdit, FiMoreVertical, FiTrash2 } from 'react-icons/fi';
+import { FiEdit, FiMoreVertical, FiTrash2, FiEye } from 'react-icons/fi';
 
 const Ranks = () => {
     const { data:session, status } = useSession();
@@ -64,14 +64,14 @@ const Ranks = () => {
 
 {session?.user?.permissions?.includes('view-permissions-ranks')  && (
                     <Link href={`/controlhub/ranks/permissions/${props.id}`} className="dropdown-item action-view">
-                        <FiEdit className="me-2" />
+                        <FiEye className="me-2" />
                         View Permissions
                     </Link>
                 )}
 
 {session?.user?.permissions?.includes('assign-permissions-ranks')  && (
-                    <Link href={`/controlhub/ranks/permissions/edit/${props.id}`} className="dropdown-item action-delete">
-                        <FiTrash2 className="me-2" />
+                    <Link href={`/controlhub/ranks/permissions/edit/${props.id}`} className="dropdown-item action-assign">
+                        <FiEdit className="me-2" />
                         Assign Permissions
                     </Link>
                 )}

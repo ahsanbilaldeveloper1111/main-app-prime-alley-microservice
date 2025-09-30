@@ -72,7 +72,7 @@ const AddGsmModal: React.FC<AddGsmModalProps> = ({ show, onHide, onSuccess }) =>
     <Modal
       show={show}
       onHide={handleClose}
-      size="md"
+      size="lg"
       centered
       className="customModal"
     >

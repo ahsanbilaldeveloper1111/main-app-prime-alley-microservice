@@ -163,7 +163,7 @@ const CtiMonitoring = () => {
 
 
 
-  const [selectedCompaign, setSelectedCompaign] = useState('All Compaigns');
+  const [selectedCompaign, setSelectedCompaign] = useState('All campaigns');
   const [currentCampaignIndex, setCurrentCampaignIndex] = useState(0);
   const [isAutoCycling, setIsAutoCycling] = useState(true);
   const [isSliding, setIsSliding] = useState(false);
@@ -312,7 +312,7 @@ const CtiMonitoring = () => {
 
   // Get current campaign to display
   const getCurrentCampaign = () => {
-    if (selectedCompaign === 'All Compaigns') {
+    if (selectedCompaign === 'All campaigns') {
       return campaigns[currentCampaignIndex] || campaigns[0];
     }
     return campaigns.find(campaign => campaign.name === selectedCompaign) || campaigns[0];
@@ -322,7 +322,7 @@ const CtiMonitoring = () => {
 
   // Auto-cycle through campaigns
   useEffect(() => {
-    if (isAutoCycling && selectedCompaign === 'All Compaigns' && campaigns.length > 1) {
+    if (isAutoCycling && selectedCompaign === 'All campaigns' && campaigns.length > 1) {
       intervalRef.current = setInterval(() => {
         const nextIndex = (currentCampaignIndex + 1) % campaigns.length;
         handleCampaignIndexChange(nextIndex);
@@ -348,7 +348,7 @@ const CtiMonitoring = () => {
       setIsSliding(true);
       setTimeout(() => {
         setSelectedCompaign(campaignName);
-        if (campaignName === 'All Compaigns') {
+        if (campaignName === 'All campaigns') {
           setIsAutoCycling(true);
         } else {
           setIsAutoCycling(false);
@@ -371,7 +371,7 @@ const CtiMonitoring = () => {
 
   // Toggle auto-cycling
   const toggleAutoCycle = () => {
-    if (selectedCompaign === 'All Compaigns') {
+    if (selectedCompaign === 'All campaigns') {
       setIsAutoCycling(!isAutoCycling);
     }
   };
@@ -401,18 +401,18 @@ const CtiMonitoring = () => {
                       {selectedCompaign}
                     </Dropdown.Toggle>
                     <Dropdown.Menu>
-                      <Dropdown.Item onClick={() => handleCampaignSelect('All Compaigns')}>All Compaigns</Dropdown.Item>
+                      <Dropdown.Item onClick={() => handleCampaignSelect('All campaigns')}>All campaigns</Dropdown.Item>
                       <Dropdown.Item onClick={() => handleCampaignSelect('Compaign 1')}>Compaign 1</Dropdown.Item>
                       <Dropdown.Item onClick={() => handleCampaignSelect('Compaign 2')}>Compaign 2</Dropdown.Item>
                       <Dropdown.Item onClick={() => handleCampaignSelect('Compaign 3')}>Compaign 3</Dropdown.Item>
                     </Dropdown.Menu>
                   </Dropdown>
 
-                  {selectedCompaign !== 'All Compaigns' && (
+                  {selectedCompaign !== 'All campaigns' && (
                     <Button
                       variant="outline-secondary"
                       size="sm"
-                      onClick={() => handleCampaignSelect('All Compaigns')}
+                      onClick={() => handleCampaignSelect('All campaigns')}
                       className=""
                       title="Reset to show all campaigns"
                     >
@@ -424,7 +424,7 @@ const CtiMonitoring = () => {
                   
 
                   
-                  {/* {selectedCompaign === 'All Compaigns' && (
+                  {/* {selectedCompaign === 'All campaigns' && (
                     <>
                       <Button
                         variant={isAutoCycling ? "success" : "outline-secondary"}
@@ -443,7 +443,7 @@ const CtiMonitoring = () => {
                     </>
                   )} */}
 
-                  {/* {selectedCompaign !== 'All Compaigns' && (
+                  {/* {selectedCompaign !== 'All campaigns' && (
                     <span className="badge bg-primary ms-2">
                       <i className="ti ti-eye me-1"></i>
                       Manual Selection
@@ -473,12 +473,12 @@ const CtiMonitoring = () => {
                 {currentCampaign.name} - Live Metrics
               </h5>
               <div className="d-flex align-items-center gap-2">
-                {selectedCompaign === 'All Compaigns' && (
+                {selectedCompaign === 'All campaigns' && (
                   <span className=" small text-white">
-                    Showing {currentCampaignIndex + 1} of {campaigns.length} compaigns
+                    Showing {currentCampaignIndex + 1} of {campaigns.length} campaigns
                   </span>
                 )}
-                {/* {isAutoCycling && selectedCompaign === 'All Compaigns' && (
+                {/* {isAutoCycling && selectedCompaign === 'All campaigns' && (
                   <span className="badge bg-success">
                     <i className="ti ti-rotate-clockwise me-1"></i>
                     Auto-cycling every 5s
@@ -622,7 +622,7 @@ const CtiMonitoring = () => {
 
                 <Col md={12}>
                 {/* Navigation Dots for Campaigns */}
-                {selectedCompaign === 'All Compaigns' && (
+                {selectedCompaign === 'All campaigns' && (
                     <div className="campaign-navigation d-flex align-items-center gap-2">
                       {/* <Button
                         variant="outline-light"

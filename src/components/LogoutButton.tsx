@@ -15,11 +15,10 @@ export default function LogoutButton({
   className = ''
 }: LogoutButtonProps) {
   const handleLogout = () => {
-    signOut();
-    // Simple redirect to login page
-    if (typeof window !== 'undefined') {
-      window.location.href = '/auth/signin';
-    }
+    signOut({ 
+      callbackUrl: '/auth/signin',
+      redirect: true
+    });
   };
 
   return (

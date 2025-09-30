@@ -410,7 +410,7 @@ const CallStatsCountry = () => {
                       value: summary.avg_ring_time,
                       description: 'Average ring time per call',
                       valueType: 'seconds',
-                      delay: 0.1
+                      delay: 0.3
                     },
                     {
                       id: 'avg-duration',
@@ -418,7 +418,7 @@ const CallStatsCountry = () => {
                       value: summary.avg_duration,
                       description: 'Average call duration',
                       valueType: 'seconds',
-                      delay: 0.2
+                      delay: 0.6
                     },
                     {
                       id: 'total-cost',
@@ -426,7 +426,8 @@ const CallStatsCountry = () => {
                       value: summary.total_cost,
                       description: 'Total cost of calls',
                       valueType: 'cost',
-                      delay: 0.3
+                      prefix: '$',
+                      delay: 0.9
                     }
                   ]}
                 />
@@ -468,7 +469,7 @@ const CallStatsCountry = () => {
                     series={simpleDonut.series} 
                     labels={simpleDonut.labels}
                     dataType="calls"
-                    height={180}
+                    height={250}
                     width={500}
                     showDataLabels={true}
                     dataLabelsFormatter={(value) => `${value.toFixed(0)}%`}

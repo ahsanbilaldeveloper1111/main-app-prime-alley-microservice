@@ -607,21 +607,29 @@ const UserView = () => {
                                            <Row>
                                             <Col md={6}>
 
-                                            <p className="mb-0  small text-primary"><b>Last Synced</b></p>
-                                            <p className="mb-2 text-capitalize">{currentUser?.last_synced_at ? formatDateTimeToLocal(currentUser?.last_synced_at, GlobalDateTimeFormat) : 'N/A'}</p>
+                                            {/* <p className="mb-0  small text-primary"><b>Last Synced</b></p>
+                                            <p className="mb-2 text-capitalize">{currentUser?.last_synced_at ? formatDateTimeToLocal(currentUser?.last_synced_at, GlobalDateTimeFormat) : 'N/A'}</p> */}
 
                                             
-                                            {session?.user?.permissions?.includes('show-ou-users')  && (
+                                            {/* {session?.user?.permissions?.includes('show-ou-users')  && (
                                             <div>
                                             <p className="mb-0  small text-primary"><b>OU</b></p>
                                             <p className="mb-2 text-capitalize">
                                                 {currentUser?.ou && currentUser?.ou !== 'N/A' ? currentUser?.ou : 'N/A'}
                                             </p>
                                             </div>
-                                            )}
+                                            )} */}
 
                                            
 
+<p className="mb-0  small text-primary"><b>Status</b></p>
+                                                <p className="mb-2 text-capitalize  d-flex justify-content-between">
+                                                    {currentUser?.status}
+                                                    <span>
+                                                    <i className="ti ti-edit" style={{cursor: 'pointer'}}></i>
+                                                    </span>
+                                                    </p>
+                                                    
                                                 <p className="mb-0  small text-primary"><b>Department</b></p>
                                                 <p className="mb-2 text-capitalize">
                                                     {currentUser?.department && currentUser?.department !== 'N/A' ? currentUser?.department : 'N/A'}
@@ -637,13 +645,7 @@ const UserView = () => {
 
                                             </Col>
                                             <Col md={6}>
-                                                <p className="mb-0  small text-primary"><b>Status</b></p>
-                                                <p className="mb-2 text-capitalize  d-flex justify-content-between">
-                                                    {currentUser?.status}
-                                                    <span>
-                                                    <i className="ti ti-edit" style={{cursor: 'pointer'}}></i>
-                                                    </span>
-                                                    </p>
+                                                
 
                                                 <p className="mb-0  small text-primary"><b>Rank</b></p>
                                                 <p className="mb-2 text-capitalize d-flex justify-content-between">

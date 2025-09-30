@@ -74,7 +74,11 @@ interface TrendByCountry {
 
 const CallDashboard = () => {
     const { data:session, status } = useSession();
+    const [showCountryChartModal, setShowCountryChartModal] = useState(false);
+    const [showDepartmentChartModal, setShowDepartmentChartModal] = useState(false);
+    const [showExtensionChartModal, setShowExtensionChartModal] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [showDateRange, setShowDateRange] = useState(false);
     
     const [refreshKey, setRefreshKey] = useState<number>(0);
     const [currentFilters, setCurrentFilters] = useState({
@@ -202,6 +206,7 @@ const CallDashboard = () => {
       if(response.success){
         const responseData = response.data;
         const dataFilters = response?.filters;
+        setShowDateRange(true);
       
       setGeneralStats({
           totalCalls: responseData.total_calls,
@@ -304,12 +309,25 @@ const CallDashboard = () => {
         
         // Map country data to chart format
         const countryLabels = chartCountry.map((item: any) => item.label || 'Unknown');
+        const shortestData = chartCountry.map((item: any) => item.shortest ? parseInt(item.shortest) : 0);
+        const longestData = chartCountry.map((item: any) => item.longest ? parseInt(item.longest) : 0);
         const averageData = chartCountry.map((item: any) => item.average ? parseInt(item.average) : 0);
         
         setCountryChart({
-          series: [{
-            data: averageData
-          }],
+          series: [
+            {
+              name: 'Shortest',
+              data: shortestData
+            },
+            {
+              name: 'Average',
+              data: averageData
+            },
+            {
+              name: 'Longest',
+              data: longestData
+            }
+          ],
           options: {
             ...CountryChart.options,
             xaxis: {
@@ -326,6 +344,7 @@ const CallDashboard = () => {
   const [CountryChart, setCountryChart] = React.useState({
           
     series: [{
+      name: '',
       data: [] as number[]
     }],
     options: {
@@ -345,7 +364,8 @@ const CallDashboard = () => {
         }
       },
       legend: {
-        show: false
+        show: true,
+        position: 'bottom'
       },
       dataLabels: {
         enabled: false
@@ -399,7 +419,7 @@ const [DepartmentChart, setDepartmentChart] = React.useState({
           labels: {
             show: true,
             style: {
-              fontSize: '8px',
+              // fontSize: '8px',
              
             }
           }
@@ -557,10 +577,14 @@ const [ExtensionChart, setExtensionChart] = React.useState({
                       
                     <div className="action-buttons">
                     <div className="d-flex align-items-center gap-2">
-                          <p className="mb-0">
-                          Date Range: <span className="status-badge primary">{formatDateTimeToLocal(startDateTime, GlobalDateTimeFormat)}</span> to <span className="status-badge primary">{formatDateTimeToLocal(endDateTime, GlobalDateTimeFormat)}</span>
-                          </p>  
+                          {showDateRange && (
+                            <>
+                            <p className="mb-0">
+                            Date Range: <span className="status-badge primary">{formatDateTimeToLocal(startDateTime, GlobalDateTimeFormat)}</span> to <span className="status-badge primary">{formatDateTimeToLocal(endDateTime, GlobalDateTimeFormat)}</span>
+                            </p>
                           <i className="material-icons-two-tone" style={{cursor: 'pointer'}} onClick={() => refreshData()}>refresh</i>
+                            </>
+                          )}
                         </div>
                     
                        
@@ -590,14 +614,27 @@ const [ExtensionChart, setExtensionChart] = React.useState({
                         <div className="card-body">
                             {countryChartData.length === 0 ? (
                                 <EmptyState
-                                    title="No Call by Country Data"
+                                    title="No Calls by Country Data"
                                     description="Chart data will appear here when available."
                                     className="table-empty-state"
                                 />
                             ) : (
                               <>
-                              <h5 className="mb-0 app-title-heading">Call by Country</h5>
-                                <ReactApexChart options={CountryChart.options as ApexOptions} series={CountryChart.series} type="bar" height={200} />
+                              <div className="d-flex justify-content-between align-items-center mb-3">
+                                <h5 className="mb-0 app-title-heading">Calls by Country</h5>
+                                <button 
+                                  className="btn btn-sm btn-light"
+                                  onClick={() => setShowCountryChartModal(true)}
+                                >
+                                  <i className="material-icons-two-tone">open_in_full</i>
+                                </button>
+                              </div>
+                              <ReactApexChart 
+                                options={CountryChart.options as ApexOptions} 
+                                series={CountryChart.series} 
+                                type="bar" 
+                                height={200} 
+                              />
                                   </>
                             )}
 
@@ -615,14 +652,27 @@ const [ExtensionChart, setExtensionChart] = React.useState({
 
                             {departmentChartData.length === 0 ? (
                                 <EmptyState
-                                  title="No Call by Department Data"
+                                  title="No Calls by Department Data"
                                   description="Chart data will appear here when available."
                                   className="table-empty-state"
                               />
                             ) : (
                               <>
-                              <h5 className="mb-0 app-title-heading">Call by Department</h5>
-                              <ReactApexChart options={DepartmentChart.options as ApexOptions} series={DepartmentChart.series} type="bar" height={200} />
+                              <div className="d-flex justify-content-between align-items-center mb-3">
+                                <h5 className="mb-0 app-title-heading">Call by Department</h5>
+                                <button 
+                                  className="btn btn-sm btn-light"
+                                  onClick={() => setShowDepartmentChartModal(true)}
+                                >
+                                  <i className="material-icons-two-tone">open_in_full</i>
+                                </button>
+                              </div>
+                              <ReactApexChart 
+                                options={DepartmentChart.options as ApexOptions} 
+                                series={DepartmentChart.series} 
+                                type="bar" 
+                                height={200} 
+                              />
                               </>
                                
                             )}
@@ -638,14 +688,27 @@ const [ExtensionChart, setExtensionChart] = React.useState({
                         <div className="card-body">
                             {extensionChartData.length === 0 ? (
                                 <EmptyState
-                                    title="No Call by Extension Data"
+                                    title="No Calls by Extension Data"
                                     description="Chart data will appear here when available."
                                     className="table-empty-state"
                                 />
                             ) : (
                               <>
-                              <h5 className="mb-0 app-title-heading">Call by Extension</h5>
-                              <ReactApexChart options={ExtensionChart.options} series={ExtensionChart.series} type="bar" height={200} />
+                              <div className="d-flex justify-content-between align-items-center mb-3">
+                                <h5 className="mb-0 app-title-heading">Call by Extension</h5>
+                                <button 
+                                  className="btn btn-sm btn-light"
+                                  onClick={() => setShowExtensionChartModal(true)}
+                                >
+                                  <i className="material-icons-two-tone">open_in_full</i>
+                                </button>
+                              </div>
+                              <ReactApexChart 
+                                options={ExtensionChart.options} 
+                                series={ExtensionChart.series} 
+                                type="bar" 
+                                height={200} 
+                              />
                               </>
                                 
                             )}
@@ -766,8 +829,102 @@ const [ExtensionChart, setExtensionChart] = React.useState({
                 </Col>
               )}
             </Row>
-            
 
+            {/* Country Chart Modal */}
+            <Modal 
+                show={showCountryChartModal} 
+                onHide={() => setShowCountryChartModal(false)}
+                size="xl"
+                centered
+                className="chart-modal"
+            >
+                <Modal.Header closeButton>
+                    <Modal.Title>Calls by Country</Modal.Title>
+                </Modal.Header>
+                <Modal.Body>
+                    <div className="chart-container" style={{ minHeight: '500px' }}>
+                        <ReactApexChart 
+                            options={{
+                                ...CountryChart.options as ApexOptions,
+                                chart: {
+                                    ...CountryChart.options.chart,
+                                    height: 500,
+                                    toolbar: {
+                                        show: true
+                                    }
+                                }
+                            }} 
+                            series={CountryChart.series} 
+                            type="bar" 
+                            height={500} 
+                        />
+                    </div>
+                </Modal.Body>
+            </Modal>
+
+            {/* Department Chart Modal */}
+            <Modal 
+                show={showDepartmentChartModal} 
+                onHide={() => setShowDepartmentChartModal(false)}
+                size="xl"
+                centered
+                className="chart-modal"
+            >
+                <Modal.Header closeButton>
+                    <Modal.Title>Calls by Department</Modal.Title>
+                </Modal.Header>
+                <Modal.Body>
+                    <div className="chart-container" style={{ minHeight: '500px' }}>
+                        <ReactApexChart 
+                            options={{
+                                ...DepartmentChart.options as ApexOptions,
+                                chart: {
+                                    ...DepartmentChart.options.chart as ApexChart,
+                                    height: 500,
+                                    toolbar: {
+                                        show: true
+                                    }
+                                }
+                            }} 
+                            series={DepartmentChart.series} 
+                            type="bar" 
+                            height={500} 
+                        />
+                    </div>
+                </Modal.Body>
+            </Modal>
+
+            {/* Extension Chart Modal */}
+            <Modal 
+                show={showExtensionChartModal} 
+                onHide={() => setShowExtensionChartModal(false)}
+                size="xl"
+                centered
+                className="chart-modal"
+            >
+                <Modal.Header closeButton>
+                    <Modal.Title>Calls by Extension</Modal.Title>
+                </Modal.Header>
+                <Modal.Body>
+                    <div className="chart-container" style={{ minHeight: '500px' }}>
+                        <ReactApexChart 
+                            options={{
+                                ...ExtensionChart.options,
+                                chart: {
+                                    ...ExtensionChart.options.chart as ApexChart,
+                                    height: 500,
+                                    toolbar: {
+                                        show: true
+                                    }
+                                }
+                            }} 
+                            series={ExtensionChart.series} 
+                            type="bar" 
+                            height={500} 
+                        />
+                    </div>
+                </Modal.Body>
+            </Modal>
         
         </React.Fragment>
     );

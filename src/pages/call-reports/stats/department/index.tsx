@@ -412,7 +412,7 @@ const CallStatsDepartment = () => {
                     title: 'Avg Ring Time',
                     value: summary.avg_ring_time,
                     description: 'Average ring time in seconds',
-                    delay: 1,
+                    delay: 0.3,
                     valueType: 'seconds',
                     showAnimatedNumber: true
                   },
@@ -421,7 +421,7 @@ const CallStatsDepartment = () => {
                     title: 'Avg Duration',
                     value: summary.avg_duration,
                     description: 'Average call duration',
-                    delay: 2,
+                    delay: 0.6,
                     valueType: 'seconds',
                     showAnimatedNumber: true
                   },
@@ -430,10 +430,10 @@ const CallStatsDepartment = () => {
                     title: 'Cost',
                     value: summary.total_cost,
                     description: 'Total cost of calls',
-                    delay: 3,
+                    delay: 0.9,
                     valueType: 'cost',
                     showAnimatedNumber: true,
-                    suffix: '$',
+                    prefix: '$',
                   }
                 ]}
               
@@ -475,7 +475,7 @@ const CallStatsDepartment = () => {
                     series={simpleDonut.series} 
                     labels={simpleDonut.labels}
                     dataType="calls"
-                    height={180}
+                    height={250}
                     width={500}
                     showDataLabels={true}
                     dataLabelsFormatter={(value) => `${value.toFixed(0)}%`}
