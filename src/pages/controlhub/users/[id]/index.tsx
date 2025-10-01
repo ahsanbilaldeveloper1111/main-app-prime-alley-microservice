@@ -18,6 +18,9 @@ import '@assets/scss/tabs.scss'
 
 import imgStatus1 from '@assets/images/user/avatar-2.jpg'
 import { formatDateTimeToLocal, GlobalDateTimeFormat } from '@utils/Helper';
+import FormModal from "@pages/partial/FormModal";
+import '@assets/scss/common.scss';
+import SuccessfulModal from '@pages/partial/SuccessfulModal'
 
 
 
@@ -167,6 +170,13 @@ const UserView = () => {
         setShowResetPasswordModal(false)
     }
 
+    const [showSuccessfulModal, setShowSuccessfulModal] = useState(false)
+    const [successModalTitle, setSuccessModalTitle] = useState('')
+    const [successModalDescription, setSuccessModalDescription] = useState('')
+    const handleCloseSuccessfulModal = () => {
+        setShowSuccessfulModal(false)
+    }
+
     const handlePasswordChange = () => {
       Swal.fire({
             title: 'Are you sure?',
@@ -191,6 +201,12 @@ const UserView = () => {
         const response = await assignGroupToUser(id as string, updatedGroup);
         if(response){
             setShowChangeGroupModal(false);
+            setSuccessModalTitle('Group Changed');
+            setSuccessModalDescription('The group has been changed successfully');
+            setTimeout(() => {
+              setShowSuccessfulModal(true);
+              console.log('Modal state updated:', true);
+            }, 100);
             fetchUser();
         }
     }
@@ -201,8 +217,16 @@ const UserView = () => {
     }
     const handleSubmitChangeRole = async () => {
         const assignRole = await assignRoleToUser(id as string, updatedRole);
-        setShowChangeRoleModal(false)
-        fetchUser();
+        if(assignRole){
+        setShowChangeRoleModal(false);
+        setSuccessModalTitle('Rank Changed');
+            setSuccessModalDescription('The rank has been changed successfully');
+            setTimeout(() => {
+              setShowSuccessfulModal(true);
+              console.log('Modal state updated:', true);
+            }, 100);
+            fetchUser();
+        }
     }
 
     const [updatedStatus, setUpdatedStatus] = useState<string>('');
@@ -279,6 +303,12 @@ const UserView = () => {
         if(response){
             fetchCustomFields();
             toast.success('Custom field added successfully');
+            setSuccessModalTitle('Custom Field Added');
+            setSuccessModalDescription('The custom field has been added successfully');
+            setTimeout(() => {
+              setShowSuccessfulModal(true);
+              console.log('Modal state updated:', true);
+            }, 100);
             setShowAddCustomFieldModal(false)
         }
         
@@ -306,6 +336,12 @@ const UserView = () => {
         if(response){
             fetchCustomFields();
             toast.success('Custom field edited successfully');
+            setSuccessModalTitle('Custom Field Edited');
+            setSuccessModalDescription('The custom field has been edited successfully');
+            setTimeout(() => {
+              setShowSuccessfulModal(true);
+              console.log('Modal state updated:', true);
+            }, 100);
             setShowEditCustomFieldModal(false)
         }
     }
@@ -375,6 +411,10 @@ const UserView = () => {
         if(response){
             setShowAddLinkedUserModal(false);
             fetchUser();
+            
+            setSuccessModalTitle('Linked User Added');
+            setSuccessModalDescription('The user has been linked successfully');
+            setShowSuccessfulModal(true);
         }
     }
 
@@ -422,20 +462,30 @@ const UserView = () => {
         const response = await MarkAsCompanyAdmin(id as string, isCompanyAdmin);
         if(response){
             setShowChangeCompanyAdminModal(false);
+            setSuccessModalTitle('Company Admin Changed');
+            setSuccessModalDescription('The company admin has been changed successfully');
+            setTimeout(() => {
+              setShowSuccessfulModal(true);
+              console.log('Modal state updated:', true);
+            }, 100);
             fetchUser();
         }
     }
 
+    
+
     return (
         <React.Fragment>
-                 
-                 {showChangeGroupModal && (
-                    <Modal show={showChangeGroupModal} onHide={handleCloseChangeGroupModal}>
-                        <Modal.Header closeButton>
-                            <Modal.Title>Change Group</Modal.Title>
-                        </Modal.Header>
-                    <Modal.Body>
-                        <div className="form-group">
+               
+
+                <FormModal
+                        show={showChangeGroupModal}
+                        onHide={handleCloseChangeGroupModal}
+                        title="Change Group"
+                        desc="Please select the group to change"
+                        formHtml={
+                            <>
+                            <div className="form-group">
                             <label htmlFor="group">Group</label>
                             <select className="form-control" id="group" 
                             onChange={(e) => {
@@ -452,26 +502,23 @@ const UserView = () => {
                                 ))}
                             </select>
                         </div>
-                    </Modal.Body>
-                    <Modal.Footer>
-                        <Button variant="secondary" onClick={handleCloseChangeGroupModal}>
-                            Close
-                        </Button>
-                        <Button variant="primary" onClick={handleSubmitChangeGroup}>
-                            Change Group
-                        </Button>
-                    </Modal.Footer>
-                </Modal>
-                )}
+                            </>
+                        }
+                        submitButtonText="Change Group"
+                        cancelButtonText="Cancel"
+                        onSubmit={handleSubmitChangeGroup}
+                        onCancel={handleCloseChangeGroupModal}
+                    />
 
 
-                {showChangeRoleModal && (
-                    <Modal show={showChangeRoleModal} onHide={handleCloseChangeRoleModal}>
-                        <Modal.Header closeButton>
-                            <Modal.Title>Change Rank</Modal.Title>
-                        </Modal.Header>
-                    <Modal.Body>
-                        <div className="form-group">
+                <FormModal
+                        show={showChangeRoleModal}
+                        onHide={handleCloseChangeRoleModal}
+                        title="Change Rank"
+                        desc="Please select the rank to change"
+                        formHtml={
+                            <>
+                             <div className="form-group">
                             <label htmlFor="role">Role</label>
                            
                            
@@ -500,17 +547,14 @@ const UserView = () => {
 
                             
                         </div>
-                    </Modal.Body>
-                    <Modal.Footer>
-                        <Button variant="secondary" onClick={handleCloseChangeRoleModal}>
-                            Close
-                        </Button>
-                        <Button variant="primary" onClick={handleSubmitChangeRole}>
-                            Change Rank
-                        </Button>
-                    </Modal.Footer>
-                </Modal>
-                )}
+                            </>
+                        }
+                        submitButtonText="Change Rank"
+                        cancelButtonText="Cancel"
+                        onSubmit={handleSubmitChangeRole}
+                        onCancel={handleCloseChangeRoleModal}
+                    />
+                
 
 
                 {showChangeStatusModal && (
@@ -626,7 +670,7 @@ const UserView = () => {
                                                 <p className="mb-2 text-capitalize  d-flex justify-content-between">
                                                     {currentUser?.status}
                                                     <span>
-                                                    <i className="ti ti-edit" style={{cursor: 'pointer'}}></i>
+                                                    {/* <i className="ti ti-edit" style={{cursor: 'pointer'}}></i> */}
                                                     </span>
                                                     </p>
                                                     
@@ -735,15 +779,15 @@ const UserView = () => {
                                 </Col>
                             </Row>
 
-                            {showChangeCompanyAdminModal && (
-                                
-                                <Modal show={showChangeCompanyAdminModal} onHide={handleCloseChangeCompanyAdminModal}>
-                                    <Modal.Header closeButton>
-                                        <Modal.Title>Mark as Company Admin</Modal.Title>
-                                    </Modal.Header>
-                                
-                                    <Modal.Body>
-                                        <div className="form-group">
+
+                            <FormModal
+                                show={showChangeCompanyAdminModal}
+                                onHide={handleCloseChangeCompanyAdminModal}
+                                title="Mark as Company Admin"
+                                desc="Please select the company admin to change"
+                                formHtml={
+                                    <>
+                                    <div className="form-group">
                                             <label htmlFor="companyAdmin">Mark as Company Admin</label>
                                             <select className="form-control" id="companyAdmin" 
                                             onChange={(e) => 
@@ -753,18 +797,13 @@ const UserView = () => {
                                                 <option value="0" selected={isCompanyAdmin === false}>No</option>
                                             </select>
                                         </div>
-                                    </Modal.Body>
-                                    <Modal.Footer>
-                                        <Button variant="secondary" onClick={handleCloseChangeCompanyAdminModal}>
-                                            Close
-                                        </Button>
-                                        <Button variant="primary" onClick={handleSubmitChangeCompanyAdmin}>
-                                            Mark as Company Admin
-                                        </Button>
-                                    </Modal.Footer>
-                            </Modal>
-                            
-                            )}
+                                        </>
+                                }
+                                submitButtonText="Mark as Company Admin"
+                                cancelButtonText="Cancel"
+                                onSubmit={handleSubmitChangeCompanyAdmin}
+                                onCancel={handleCloseChangeCompanyAdminModal}
+                            />
                         </Tab>
 
 
@@ -899,14 +938,15 @@ const UserView = () => {
 
                  <Col md={12}>
 
-                    {showAddLinkedUserModal && (
-                        <Modal show={showAddLinkedUserModal} onHide={handleCloseAddLinkedUserModal}>
-                            <Modal.Header closeButton>
-                                <Modal.Title>Add Linked User</Modal.Title>
-                            </Modal.Header>
-                            <Modal.Body>
-                              
-                              <div className="form-group">
+               
+                    <FormModal
+                         show={showAddLinkedUserModal}
+                         onHide={handleCloseAddLinkedUserModal}
+                         title="Add Linked User"
+                         desc="Please select the user and module to add a linked user."
+                         formHtml={
+                            <>
+                            <div className="form-group">
                                 <label htmlFor="linkedUser">Select User</label>
                                 <Select
                                     className="basic-single"
@@ -943,18 +983,17 @@ const UserView = () => {
                                     placeholder="Select Module"
                                 />
                               </div>
-                              
-                            </Modal.Body>
-                            <Modal.Footer>
-                              <Button variant="secondary" onClick={handleCloseAddLinkedUserModal}>
-                                Close
-                              </Button>
-                              <Button variant="primary" onClick={handleSubmitAddLinkedUser}>
-                                Add Linked User
-                              </Button>
-                            </Modal.Footer>
-                        </Modal>
-                    )}
+                            </>
+                         }
+                         submitButtonText="Add Linked User"
+                         cancelButtonText="Cancel"
+                         onSubmit={handleSubmitAddLinkedUser}
+                         onCancel={handleCloseAddLinkedUserModal}
+                    />
+
+    
+        
+      
 
                     {showEditLinkedUserModal && (
                         <Modal show={showEditLinkedUserModal} onHide={handleCloseEditLinkedUserModal}>
@@ -1051,12 +1090,15 @@ const UserView = () => {
                         <Tab eventKey="custom-fields-users" title="Custom Fields">
                         {session?.user?.is_admin && session?.user?.permissions?.includes('custom-field-users') && (
             <Row>
-                {showAddCustomFieldModal && (   
-                    <Modal show={showAddCustomFieldModal} onHide={handleCloseAddCustomFieldModal}>
-                        <Modal.Header closeButton>
-                            <Modal.Title>Add Custom Field</Modal.Title>
-                        </Modal.Header>
-                        <Modal.Body>
+              
+
+                <FormModal
+                        show={showAddCustomFieldModal}
+                        onHide={handleCloseAddCustomFieldModal}
+                        title="Add Custom Field"
+                        desc="Please fill in the details below to add a custom field."
+                        formHtml={
+                            <>
                             <div className="form-group mb-3">
                                 <label htmlFor="customFieldName" className="form-label">Field Name</label>
                                 <input type="text" className="form-control" id="customFieldName"  onChange={(e) => setAddFieldName(e.target.value)} />
@@ -1065,26 +1107,25 @@ const UserView = () => {
                                 <label htmlFor="customFieldValue" className="form-label">Field Value</label>
                                 <input type="text" className="form-control" id="customFieldValue"  onChange={(e) => setAddFieldValue(e.target.value)} />
                             </div>
-                        </Modal.Body>
-                        <Modal.Footer>
-                            <Button variant="secondary" onClick={handleCloseAddCustomFieldModal}>
-                                Close
-                            </Button>
-                            <Button variant="primary" onClick={handleSubmitAddCustomField}>
-                                Add Custom Field
-                            </Button>
-                        </Modal.Footer>
-                    </Modal>
-                )}
+                            </>
+                        }
+                        submitButtonText="Add Custom Field"
+                        cancelButtonText="Cancel"
+                        onSubmit={handleSubmitAddCustomField}
+                        onCancel={handleCloseAddCustomFieldModal}
+                    />
 
 
-{showEditCustomFieldModal && (   
-                    <Modal show={showEditCustomFieldModal} onHide={handleCloseEditCustomFieldModal}>
-                        <Modal.Header closeButton>
-                            <Modal.Title>Edit Custom Field</Modal.Title>
-                        </Modal.Header>
-                        <Modal.Body>
-                            <input type="hidden" className="form-control" id="customFieldId"
+
+
+                <FormModal
+                        show={showEditCustomFieldModal}
+                        onHide={handleCloseEditCustomFieldModal}
+                        title="Edit Custom Field"
+                        desc="Please fill in the details below to edit a custom field."
+                        formHtml={
+                            <>
+                             <input type="hidden" className="form-control" id="customFieldId"
                                 value={edit_field_id}
                                 onChange={(e) => setEditFieldId(e.target.value)} />
 
@@ -1100,17 +1141,13 @@ const UserView = () => {
                                 value={edit_field_value}
                                 onChange={(e) => setEditFieldValue(e.target.value)} />
                             </div>
-                        </Modal.Body>
-                        <Modal.Footer>
-                            <Button variant="secondary" onClick={handleCloseEditCustomFieldModal}>
-                                Close
-                            </Button>
-                            <Button variant="primary" onClick={handleSubmitEditCustomField}>
-                                Edit Custom Field
-                            </Button>
-                        </Modal.Footer>
-                    </Modal>
-                )}
+                            </>
+                        }
+                        submitButtonText="Edit Custom Field"
+                        cancelButtonText="Cancel"
+                        onSubmit={handleSubmitEditCustomField}
+                        onCancel={handleCloseEditCustomFieldModal}
+                    />
 
                  <Col md={12}>
                     <Card>
@@ -1182,6 +1219,13 @@ const UserView = () => {
 
                 </Col>
             </Row>
+
+            <SuccessfulModal
+          show={showSuccessfulModal}
+          onHide={() => setShowSuccessfulModal(false)}
+          title={successModalTitle}
+          description={successModalDescription}
+        />
         </React.Fragment>
     )
 }

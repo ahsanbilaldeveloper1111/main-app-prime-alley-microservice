@@ -8,7 +8,8 @@
               border-radius: var(--border-radius-md);
               box-shadow: var(--shadow-md);
               transition: var(--transition-speed);
-              overflow-x: auto;
+              overflow-x: visible;
+              overflow-y: visible;
               color: #2c3e50
                !important;
 
