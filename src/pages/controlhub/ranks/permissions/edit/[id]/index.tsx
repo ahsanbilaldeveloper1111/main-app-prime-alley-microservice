@@ -202,10 +202,11 @@ const EditRolePermission = () => {
                     <Col md={6} className="d-flex justify-content-end">
                       
                     <div className="action-buttons">
-                    <div className="search-container">
+                         <div className="search-container">
                             <i className="fas fa-search search-icon"></i>
                             <input type="text" className="search-bar" placeholder="Search permissions..." onChange={(e) => setSearchTerm(e.target.value)}/>
                         </div>
+                        <Button variant="primary" size='sm' onClick={handleUpdateRole}>Update Permissions</Button>
                     
                     </div>
 

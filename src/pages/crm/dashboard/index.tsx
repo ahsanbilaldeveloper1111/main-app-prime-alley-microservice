@@ -27,6 +27,14 @@ import {
 } from "react-icons/fi";
 import Link from "next/link";
 
+import "@assets/scss/common.scss";
+import "@assets/scss/tabs.scss";
+import PageHeader from "@components/PageHeader";
+import FormModal from "../../partial/FormModal";
+import ConfirmModal from "@pages/partial/ConfirmModal";
+import SuccessfulModal from "@pages/partial/SuccessfulModal";
+import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
+
 const CrmDashboard = () => {
   const [dashboardData, setDashboardData] = useState<CrmDashboardData>(
     {} as CrmDashboardData
@@ -105,6 +113,17 @@ const CrmDashboard = () => {
         mainLink="/crm/dashboard"
         subTitle="Dashboard"
       />
+
+{/* <PageHeader
+        title="CRM Dashboard"
+        showSearch={true}
+        searchPlaceholder="Search invoices..."
+        searchValue={currentFilters.search || ""}
+        onSearchChange={(value) => handleFiltersChange({...currentFilters, search: value})}
+        buttons={
+          <Button variant="primary" size="sm" onClick={openCreateInvoiceModal}>New Invoice</Button>
+        }
+      /> */}
 
       <div className="container-fluid">
         {/* Header */}
