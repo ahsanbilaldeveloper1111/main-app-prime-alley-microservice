@@ -142,6 +142,7 @@ export const assignRoleToUser = async (id: string, role_id: string) => {
       
       if(responseData.code === 200){
         toast.success('Rank updated successfully');
+        return true;
       }else{
         toast.error(responseData.message);
       }

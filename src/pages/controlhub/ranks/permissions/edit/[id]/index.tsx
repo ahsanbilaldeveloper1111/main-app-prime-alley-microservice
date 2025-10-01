@@ -7,6 +7,7 @@ import { toast } from 'react-toastify'
 import permissionsData from '@common/JsonData/PermissionsData'
 import { useRouter } from 'next/router'
 import { viewRank, assignPermissions } from '@utils/roles'
+import '@assets/scss/common.scss';
 
 interface Permission {
     id: number;
@@ -165,7 +166,7 @@ const EditRolePermission = () => {
         <React.Fragment>
             <BreadcrumbItem mainTitle="Controlhub" mainLink="controlhub/roles" subTitle="Permissions"  />
 
-            <Row className='mb-3'>
+            {/* <Row className='mb-3'>
                   <Col md={8}>
                         <div className="page-header-title d-flex justify-content-between">
                         <h2 className="mb-0 ">
@@ -187,6 +188,33 @@ const EditRolePermission = () => {
                         <Button variant="outline-primary" size='sm' onClick={handleUpdateRole}>Update Permissions</Button>
                         </div>
                     </Col>
+            </Row> */}
+            <Row className="mb-3">
+            <Col md={12}>
+                <div className="page-header-title style-2">
+                <Row className="d-flex justify-content-between align-items-center">
+                    <Col md={6}>
+                      
+                      <h2 className="mb-0">Assign Rank Permission</h2>
+                    </Col>
+
+
+                    <Col md={6} className="d-flex justify-content-end">
+                      
+                    <div className="action-buttons">
+                    <div className="search-container">
+                            <i className="fas fa-search search-icon"></i>
+                            <input type="text" className="search-bar" placeholder="Search permissions..." onChange={(e) => setSearchTerm(e.target.value)}/>
+                        </div>
+                    
+                    </div>
+
+
+
+                    </Col>
+                  </Row>
+                </div>
+            </Col>
             </Row>
 
 

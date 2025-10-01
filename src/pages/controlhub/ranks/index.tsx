@@ -1,11 +1,11 @@
 import '@assets/scss/datatable-style.scss';
-import React, { ReactElement, useState, useCallback, useMemo, useEffect } from 'react';
+import React, { ReactElement, useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
 import GenericListPage from '@components/GenericListPage';
 import { getAllRoles, ListRoles, updateRole,deleteRole,addRole,BulkDeleteRoles } from '@utils/roles';
 import { Column } from '@components/CustomDataTable';
-import { Button, DropdownItem, Dropdown, DropdownMenu, Modal, Row, DropdownToggle } from 'react-bootstrap';
+import { Button, Overlay, Popover, Modal, Row } from 'react-bootstrap';
 import { Col } from 'react-bootstrap';
 import RolesFilters from '@components/filters/RolesFilters';
 import { toast } from 'react-toastify';
@@ -14,8 +14,11 @@ import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 
-
 import '@assets/scss/common.scss';
+import SuccessfulModal from '@pages/partial/SuccessfulModal'
+import FormModal from '@pages/partial/FormModal'
+import ConfirmModal from '@pages/partial/ConfirmModal'
+
 import { FiEdit, FiMoreVertical, FiTrash2, FiEye } from 'react-icons/fi';
 
 const Ranks = () => {
@@ -41,65 +44,84 @@ const Ranks = () => {
         setClearSelectedRows(false);
     };
 
-    const columns: Column[] = useMemo(() => {
-        const baseColumns: Column[] = [
-            { key: 'Name', name: 'name', selector: (row: any) => row.name, sortable: true},
+    const columns = useMemo((): Column[] => {
+        return [
+            { key: 'Name', name: 'name', selector: (row: any) => row.name, sortable: true },
 
             ...(session?.user?.is_admin === "1" ? [
                 { key: 'Company', name: 'company', selector: (row: any) => row.company, sortable: true }
             ] : []),
 
 
-            {
-                key: 'Action',
-                name: 'ACTION',
-                selector: (row: any) => row.id,
-                sortable: false,
-                cell: (props: any) => (
+            ...(session?.user?.permissions?.includes('delete-ranks') || session?.user?.permissions?.includes('edit-ranks') || session?.user?.permissions?.includes('view-permissions-ranks') || session?.user?.permissions?.includes('assign-permissions-ranks') ? [
+                {
+                    key: 'Action',
+                    name: 'ACTION',
+                    selector: (row: any) => row.id,
+                    sortable: false,
+                    
+                    cell: (props: any) => {
+                        const [show, setShow] = useState(false);
+                        const target = useRef(null);
+                        
+                        return (
+                            <div className="table-action-dropdown">
+                                <Button
+                                    ref={target}
+                                    variant="outline-secondary"
+                                    size="sm"
+                                    onClick={() => setShow(!show)}
+                                >
+                                    <FiMoreVertical size={14} />
+                                </Button>
 
-                    <Dropdown
-                className="table-action-dropdown"
-                //drop="start"
-                placement="top-start"
-            >
-                <DropdownToggle variant="outline-secondary" size="sm">
-                    <FiMoreVertical size={14} />
-                </DropdownToggle>
-                <DropdownMenu>
-                {session?.user?.permissions?.includes('edit-ranks')  && (
-                    <DropdownItem className="action-edit" onClick={() => handleEditRank(props)}>
-                        <FiEdit className="me-2" />
-                        Edit
-                    </DropdownItem>
-                )}
+                                <Overlay
+                                    show={show}
+                                    target={target.current}
+                                    placement="left"
+                                    rootClose
+                                    onHide={() => setShow(false)}
+                                >
+                                    <Popover className="action-menu-popover">
+                                        <Popover.Body className="p-0">
+                                            <div className="action-menu">
+                                                {session?.user?.permissions?.includes('edit-ranks') && (
+                                                    <button className="action-item action-edit" onClick={() => { handleEditRank(props); setShow(false); }}>
+                                                        <FiEdit className="me-2" />
+                                                        Edit
+                                                    </button>
+                                                )}
 
-{session?.user?.permissions?.includes('view-permissions-ranks')  && (
-                    <Link href={`/controlhub/ranks/permissions/${props.id}`} className="dropdown-item action-view">
-                        <FiEye className="me-2" />
-                        View Permissions
-                    </Link>
-                )}
+                                                {session?.user?.permissions?.includes('view-permissions-ranks') && (
+                                                    <Link href={`/controlhub/ranks/permissions/${props.id}`} className="action-item action-view" onClick={() => setShow(false)}>
+                                                        <FiEye className="me-2" />
+                                                        View Permissions
+                                                    </Link>
+                                                )}
 
-{session?.user?.permissions?.includes('assign-permissions-ranks')  && (
-                    <Link href={`/controlhub/ranks/permissions/edit/${props.id}`} className="dropdown-item action-assign">
-                        <FiEdit className="me-2" />
-                        Assign Permissions
-                    </Link>
-                )}
+                                                {session?.user?.permissions?.includes('assign-permissions-ranks') && (
+                                                    <Link href={`/controlhub/ranks/permissions/edit/${props.id}`} className="action-item action-assign" onClick={() => setShow(false)}>
+                                                        <FiEdit className="me-2" />
+                                                        Assign Permissions
+                                                    </Link>
+                                                )}
 
-                    {session?.user?.permissions?.includes('delete-ranks')  && (
-                    <DropdownItem className="action-delete" onClick={() => handleDeleteRank(props)}>
-                        <FiTrash2 className="me-2" />
-                        Delete
-                    </DropdownItem>
-                    )}
-                </DropdownMenu>
-            </Dropdown>
-                ),
-            },
+                                                {session?.user?.permissions?.includes('delete-ranks') && (
+                                                    <button className="action-item text-danger" onClick={() => { handleDeleteRank(props); setShow(false); }}>
+                                                        <FiTrash2 className="me-2" />
+                                                        Delete
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </Popover.Body>
+                                    </Popover>
+                                </Overlay>
+                            </div>
+                        );
+                    }
+                }
+            ] : [])
         ];
-        
-        return baseColumns;
     }, [rowSelectionEnabled, session?.user?.is_admin, session?.user?.permissions]);
 
     const fetchRoles = useCallback(
@@ -141,6 +163,12 @@ const Ranks = () => {
             setSelectedRank(null);
             setSelectedRankName(null);
             setShowEditRankModal(false);
+            setSuccessModalTitle('Rank Updated');
+            setSuccessModalDescription('The rank has been updated successfully');
+            setTimeout(() => {
+              setShowSuccessfulModal(true);
+              console.log('Modal state updated:', true);
+            }, 100);
             setRefreshKey(prev => prev + 1); // Trigger refresh
         }
 
@@ -149,7 +177,6 @@ const Ranks = () => {
 
     const [showDeleteRankModal, setShowDeleteRankModal] = useState<boolean>(false);
     const [showBulkDeleteModal, setShowBulkDeleteModal] = useState<boolean>(false);
-    const [confirmDelete, setConfirmDelete] = useState<string>("");
 
     const handleDeleteRank = (props: any) => {
         setSelectedRank(props.id);
@@ -157,45 +184,42 @@ const Ranks = () => {
         setShowDeleteRankModal(true);
     };
 
-    const handleSubmitDeleteRank = async () => {
-        const confirmDeleteValue = confirmDelete.trim().toLowerCase();
-        if(confirmDeleteValue == "delete"){
-            const response = await deleteRole(selectedRank);
-            if(response){
-                setSelectedRank(null);
-                setSelectedRankName(null);
-                setShowDeleteRankModal(false);
-                setConfirmDelete("");
-                setRefreshKey(prev => prev + 1); // Trigger refresh
-            }
-        }else{
-            toast.error('Please type the word delete to confirm');
+    const handleSubmitDeleteRank = async (confirmationText: string) => {
+        const response = await deleteRole(selectedRank);
+        if(response){
+            setSelectedRank(null);
+            setSelectedRankName(null);
+            setShowDeleteRankModal(false);
+            setSuccessModalTitle('Rank Deleted');
+            setSuccessModalDescription('The rank has been deleted successfully');
+            setTimeout(() => {
+              setShowSuccessfulModal(true);
+              console.log('Modal state updated:', true);
+            }, 100);
+            setRefreshKey(prev => prev + 1); // Trigger refresh
         }
     };
 
     const [deleteRankResponse, setDeleteRankResponse] = useState<any>(null);
     const [showBulkDeleteSummaryModal, setShowBulkDeleteSummaryModal] = useState<boolean>(false);
-    const handleBulkDelete = async () => {
-        const confirmDeleteValue = confirmDelete.trim().toLowerCase();
-        if(confirmDeleteValue !== "delete") {
-            toast.error('Please type the word delete to confirm');
-            return;
-        }
-
+    const handleBulkDelete = async (confirmationText: string) => {
         try {
-           
             const selectedIds = selectedRows.map((row: any) => row.id);
-            console.log(selectedIds);
             const response = await BulkDeleteRoles(selectedIds);
            
             if(response){
                 setDeleteRankResponse(response);
                 setShowBulkDeleteSummaryModal(true);
                 setShowBulkDeleteModal(false);
-                setConfirmDelete("");
-                
+                // setSuccessModalTitle('Ranks Deleted');
+                // setSuccessModalDescription('The ranks have been deleted successfully');
+                // setTimeout(() => {
+                //   setShowSuccessfulModal(true);
+                //   console.log('Modal state updated:', true);
+                // }, 100);
                 // Reset selection and refresh table
                 setSelectedRows([]);
+
                 setClearSelectedRows(true);
                 setRefreshKey(prev => prev + 1);
             }else{
@@ -205,13 +229,19 @@ const Ranks = () => {
             // Reset state
             setSelectedRows([]);
             setShowBulkDeleteModal(false);
-            setConfirmDelete("");
             setRefreshKey(prev => prev + 1); // Trigger refresh
         } catch (error) {
             console.error('Bulk delete error:', error);
             toast.error('An error occurred during bulk delete');
         }
     };
+
+    const [showSuccessfulModal, setShowSuccessfulModal] = useState(false)
+    const [successModalTitle, setSuccessModalTitle] = useState('')
+    const [successModalDescription, setSuccessModalDescription] = useState('')
+    const handleCloseSuccessfulModal = () => {
+        setShowSuccessfulModal(false)
+    }
 
     const [showCreateRankModal, setShowCreateRankModal] = useState<boolean>(false);
     const [newRankName, setNewRankName] = useState<string>("");
@@ -221,6 +251,12 @@ const Ranks = () => {
         if(response){
             setNewRankName("");
             setShowCreateRankModal(false);
+            setSuccessModalTitle('Rank Created');
+            setSuccessModalDescription('The rank has been created successfully');
+            setTimeout(() => {
+              setShowSuccessfulModal(true);
+              console.log('Modal state updated:', true);
+            }, 100);
             setRefreshKey(prev => prev + 1); // Trigger refresh
         }
     };
@@ -297,25 +333,28 @@ const Ranks = () => {
              />
             )}
 
-            {showEditRankModal && (
-                <Modal
-                    show={showEditRankModal}
-                    onHide={() => setShowEditRankModal(false)}
-                >
-                    <Modal.Header closeButton>
-                        <Modal.Title>Edit Rank</Modal.Title>
-                    </Modal.Header>
-                    <Modal.Body>
-                        <input className="form-control" type="text" value={selectedRankName} onChange={(e) => setSelectedRankName(e.target.value)} />
-                    </Modal.Body>
-                    <Modal.Footer>
-                        <Button variant="secondary" onClick={() => setShowEditRankModal(false)}>Close</Button>
-                        <Button variant="primary" onClick={() => handleSubmitEditRank()}>Save changes</Button>
-                    </Modal.Footer>
-                </Modal>
-            )}
+           
 
-            {showDeleteRankModal && (
+            <FormModal
+                show={showEditRankModal}
+                onHide={() => setShowEditRankModal(false)}
+                title="Edit Rank"
+                desc="Please fill in the details below to edit the rank."
+                formHtml={
+                    <>
+                        <div className="form-group mb-3">
+                            <label htmlFor="editRankName" className="form-label">Rank Name</label>
+                            <input className="form-control" type="text" value={selectedRankName} onChange={(e) => setSelectedRankName(e.target.value)} />
+                        </div>
+                    </>
+                }
+                submitButtonText="Save changes"
+                cancelButtonText="Cancel"
+                onSubmit={handleSubmitEditRank}
+                onCancel={() => setShowEditRankModal(false)}
+            />
+
+            {/* {showDeleteRankModal && (
                 <Modal
                     show={showDeleteRankModal}
                     onHide={() => setShowDeleteRankModal(false)}
@@ -339,64 +378,55 @@ const Ranks = () => {
                     </Modal.Footer>
                     
                 </Modal>
-            )}
+            )} */}
 
-            {showCreateRankModal && (
-                <Modal
-                    show={showCreateRankModal}
-                    onHide={() => setShowCreateRankModal(false)}
-                >
-                    <Modal.Header closeButton>
-                        <Modal.Title>New Rank</Modal.Title>
-                    </Modal.Header>
-                    <Modal.Body>
-                        <input type="text" className="form-control" id="newRankName"  value={newRankName} onChange={(e) => setNewRankName(e.target.value)} placeholder="Rank Name" />
-                    </Modal.Body>
-                    <Modal.Footer>
-                        <Button variant="secondary" onClick={() => setShowCreateRankModal(false)}>Close</Button>
-                        <Button variant="primary" onClick={() => handleSubmitCreateRank()}>Create</Button>
-                    </Modal.Footer>
-                </Modal>
-            )}
+<ConfirmModal
+        show={showDeleteRankModal}
+        onHide={() => setShowDeleteRankModal(false)}
+        title="Delete Rank"
+        description="Are you sure you want to delete this rank?"
+        targetName={selectedRankName || ""}
+        onConfirm={handleSubmitDeleteRank}
+        confirmButtonText="Delete"
+        confirmButtonVariant="danger"
+        requireTextConfirmation={true}
+        requiredConfirmationText="delete"
+      />
 
-            {showBulkDeleteModal && (
-                <Modal
-                    show={showBulkDeleteModal}
-                    onHide={() => setShowBulkDeleteModal(false)}
-                >
-                    <Modal.Header closeButton>
-                        <Modal.Title>Bulk Delete Ranks</Modal.Title>
-                    </Modal.Header>
-                    <Modal.Body>
-                        <p>
-                            Are you sure you want to delete the selected ranks?
-                        </p>
-                        <div className="selected-ranks-list mb-3">
-                           
-                            <ul className="list-unstyled">
-                                {selectedRows.map((row, index) => (
-                                    <li key={row.id} className="text-danger">
-                                        {row.name}
-                                    </li>
-                                ))}
-                            </ul>
+
+            <FormModal
+                show={showCreateRankModal}
+                onHide={() => setShowCreateRankModal(false)}
+                title="New Rank"
+                desc="Please fill in the details below to create a new rank."
+                formHtml={
+                    <>
+                        <div className="form-group mb-3">
+                            <label htmlFor="newRankName" className="form-label">Rank Name</label>
+                            <input type="text" className="form-control" id="newRankName"  value={newRankName} onChange={(e) => setNewRankName(e.target.value)} placeholder="Rank Name" />
                         </div>
-                        <p>
-                            Type the word <b className="text-danger">delete</b> to confirm
-                        </p>
-                        <input type="text" className="form-control" value={confirmDelete} onChange={(e) => setConfirmDelete(e.target.value)} placeholder="Type the word delete to confirm" />
-                    </Modal.Body>
-                    <Modal.Footer>
-                        <Button variant="secondary" onClick={() => {
-                            setShowBulkDeleteModal(false);
-                            setConfirmDelete("");
-                        }}>Close</Button>
-                        <Button variant="danger" onClick={handleBulkDelete}>Delete</Button>
-                    </Modal.Footer>
-                </Modal>
-            )}
+                    </>
+                }
+                submitButtonText="Create"
+                cancelButtonText="Cancel"
+                onSubmit={handleSubmitCreateRank}
+                onCancel={() => setShowCreateRankModal(false)}
+            />
 
-            {showBulkDeleteSummaryModal && (
+            <ConfirmModal
+                show={showBulkDeleteModal}
+                onHide={() => setShowBulkDeleteModal(false)}
+                title="Bulk Delete Ranks"
+                description={`Are you sure you want to delete the following ranks?`}
+                targetName={``}
+                onConfirm={handleBulkDelete}
+                confirmButtonText="Delete"
+                confirmButtonVariant="danger"
+                requireTextConfirmation={true}
+                requiredConfirmationText="delete"
+            />
+
+            {/* {showBulkDeleteSummaryModal && (
                 <Modal
                     show={showBulkDeleteSummaryModal}
                     onHide={() => setShowBulkDeleteSummaryModal(false)}
@@ -419,7 +449,39 @@ const Ranks = () => {
                         <Button variant="secondary" onClick={() => setShowBulkDeleteSummaryModal(false)}>Close</Button>
                     </Modal.Footer>
                 </Modal>
-            )}
+            )} */}
+
+
+            <FormModal
+                show={showBulkDeleteSummaryModal}
+                onHide={() => setShowBulkDeleteSummaryModal(false)}
+                title="Bulk Delete Summary"
+                desc="Please find the details below to bulk delete the ranks."
+                formHtml={
+                    <>
+                        <div className="d">
+                        {deleteRankResponse && deleteRankResponse.map((item: any) => (
+                        <div className="form-group alert alert-primary" key={item.id}>
+                           Rank: {item.name}
+                           <br />
+                           Message: {item.message}
+                        </div>
+                    ))}
+                        </div>
+                    </>
+                }
+                submitButtonText="Close"
+                cancelButtonText="Cancel"
+                onSubmit={() => setShowBulkDeleteSummaryModal(false)}
+                onCancel={() => setShowBulkDeleteSummaryModal(false)}
+            />
+
+<SuccessfulModal
+          show={showSuccessfulModal}
+          onHide={() => setShowSuccessfulModal(false)}
+          title={successModalTitle}
+          description={successModalDescription}
+        />
         </React.Fragment>
     );
 };
