@@ -408,7 +408,13 @@ const Header = ({ themeMode }: HeaderProps) => {
             label: MENU_LABELS.CONTROL_HUB,
             target: '#pc-tab-controlhub'
         },
-        
+        {
+            key: 'netops',
+            permission: PERMISSIONS.NETOPS_SERVICES,
+            icon: ICONS.NETOPS,
+            label: MENU_LABELS.NETOPS,
+            target: '#pc-tab-16'
+        },
         {
             key: 'crm',
             permission: PERMISSIONS.CRM_SERVICES,
@@ -488,14 +494,9 @@ const Header = ({ themeMode }: HeaderProps) => {
             label: MENU_LABELS.AUTOMATION,
             target: '#pc-tab-6'
         },
+      
     
-        {
-            key: 'netops',
-            permission: PERMISSIONS.NETOPS_SERVICES,
-            icon: ICONS.NETOPS,
-            label: MENU_LABELS.NETOPS,
-            target: '#pc-tab-16'
-        }
+        
     ], []);
 
     // Memoized submenu sections data
@@ -1052,14 +1053,38 @@ const Header = ({ themeMode }: HeaderProps) => {
         <div className="tab-pane" id="pc-tab-16" role="tabpanel" aria-labelledby="pc-tab-link-16" tabIndex={1}>
             <div className="pc-submenu-title">{MENU_LABELS.NETOPS}</div>
             <ul className="pc-navbar">
-                                    <li className="pc-item">
-                                        <Link className="pc-link" href={`${BASE_URL}/coming-soon`} >
-                                            <span className="pc-micon"><i className={ICONS.NETOPS}></i></span>
-                                            <span className="pc-mtext">{MENU_LABELS.NETOPS}</span>
-                                        </Link>
-                                    </li>
-                                </ul>                      
-                            </div>
+                <li className="pc-item">
+                    <Link className="pc-link" href={`${BASE_URL}/netops/dashboard`}>
+                        <span className="pc-micon"><i className={ICONS.GAUGE}></i></span>
+                        <span className="pc-mtext">Dashboard</span>
+                    </Link>
+                </li>
+                <li className="pc-item">
+                    <Link className="pc-link" href={`${BASE_URL}/netops/devices`}>
+                        <span className="pc-micon"><i className="ph-duotone ph-devices"></i></span>
+                        <span className="pc-mtext">Devices</span>
+                    </Link>
+                </li>
+                <li className="pc-item">
+                    <Link className="pc-link" href={`${BASE_URL}/netops/services`}>
+                        <span className="pc-micon"><i className="ph-duotone ph-gear"></i></span>
+                        <span className="pc-mtext">Services</span>
+                    </Link>
+                </li>
+                <li className="pc-item">
+                    <Link className="pc-link" href={`${BASE_URL}/netops/alerts`}>
+                        <span className="pc-micon"><i className="ph-duotone ph-warning-circle"></i></span>
+                        <span className="pc-mtext">Alerts</span>
+                    </Link>
+                </li>
+                <li className="pc-item">
+                    <Link className="pc-link" href={`${BASE_URL}/netops/uptime-sla`}>
+                        <span className="pc-micon"><i className="ph-duotone ph-chart-line-up"></i></span>
+                        <span className="pc-mtext">Uptime & SLA Monitoring</span>
+                    </Link>
+                </li>
+            </ul>                      
+        </div>
     ), []);
 
     // TMS submenu component with nested menus

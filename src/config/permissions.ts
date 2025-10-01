@@ -20,6 +20,33 @@ export const routePermissions: RoutePermission[] = [
         path: '/coming-soon',
         permissions: ['']
     },
+    {
+        path: '/netops',
+        permissions: [PERMISSIONS.CONTROL_HUB_SERVICES],
+        children: [
+            {
+                path: '/dashboard',
+                permissions: [PERMISSIONS.CONTROL_HUB_SERVICES]
+            },
+            {
+                path: '/devices',
+                permissions: [PERMISSIONS.CONTROL_HUB_SERVICES]
+            },
+            {
+                path: '/services',
+                permissions: [PERMISSIONS.CONTROL_HUB_SERVICES]
+            },
+            {
+                path: '/alerts',
+                permissions: [PERMISSIONS.CONTROL_HUB_SERVICES]
+            },
+            {
+                path: '/uptime-sla',
+                permissions: [PERMISSIONS.CONTROL_HUB_SERVICES]
+            },
+        ]
+    },
+     
     
     //controlhub services start
     {
@@ -392,6 +419,15 @@ export const routePermissions: RoutePermission[] = [
                 ]
             }
 
+        ]
+    },
+
+    //netops services start
+    {
+        path: '/netops',
+        permissions: [PERMISSIONS.NETOPS_SERVICES],
+        children: [
+            { path: '/test',permissions: [PERMISSIONS.NETOPS_SERVICES]}
         ]
     }
 ];
