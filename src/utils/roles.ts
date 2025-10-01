@@ -234,6 +234,21 @@ export const updateRole = async (id: string, name: string) => {
   };
   
  
-  
+
+  export const BulkDeleteRoles = async (ids: string[]) => {
+    try {
+      const response = await axiosInstance.post(`ranks/bulk-delete`, { ids });
+      const responseData = response.data;
+      if(responseData.code == 200){
+        return responseData.data;
+      }else{
+        toast.error(responseData.message);
+        return false;
+      }
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  };
 
   

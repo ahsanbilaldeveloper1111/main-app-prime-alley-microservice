@@ -13,7 +13,7 @@ import CompanyLogo2 from "@assets/images/ringedge-logo-black-n-blue.png";
 import { authAPI } from "@utils/api";
 import { useAuth } from "../../hooks/useAuth";
 import { useTmsPermissions } from "../../hooks/useTmsPermissions";
-import { HEADER_CONSTANTS } from "../../constants/headerConstants";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
 
 // Destructure constants for easier use
 const { BASE_URL, DOM_SELECTORS, TIMING, MENU_LABELS, SUBMENU_LABELS, ICONS, PERMISSIONS } = HEADER_CONSTANTS;
@@ -572,17 +572,17 @@ const Header = ({ themeMode }: HeaderProps) => {
                 },
                 {
                     key: 'view-gsm-sync',
-                    permission: 'view-gsm-inbox',
+                    permission: 'view-gsm-port-sync',
                     icon: ICONS.ARROWS_CLOCKWISE,
                     label: SUBMENU_LABELS.SYNC_GSM,
                     href: '/gsm/sync'
                 },
                 {
                     key: 'view-company-po',
-                    permission: 'view-gsm-management',
+                    permission: 'view-gsm-company-profilling',
                     icon: ICONS.BUILDING,
                     label: SUBMENU_LABELS.COMPANY_PO,
-                    href: '/company/po'
+                    href: '/gsm/company/po'
                 }
             ]
         },

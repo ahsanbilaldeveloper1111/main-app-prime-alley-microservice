@@ -4,7 +4,7 @@ import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
 import TicketDashboard from '@components/tickets/TicketDashboard';
 
-const TicketsDashboard = () => {
+const TicketsPage = () => {
     return (
         <React.Fragment>
             <BreadcrumbItem mainTitle="Tickets" mainLink="/tickets/list" subTitle="Tickets" />
@@ -13,8 +13,8 @@ const TicketsDashboard = () => {
     );
 };
 
-TicketsDashboard.getLayout = (page: ReactElement) => {
+TicketsPage.getLayout = (page: ReactElement) => {
     return <Layout>{page}</Layout>;
 };
 
-export default TicketsDashboard;
+export default TicketsPage;

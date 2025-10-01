@@ -3,7 +3,7 @@ import React, { ReactElement, useState, useCallback, useMemo, useEffect } from '
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
 import GenericListPage from '@components/GenericListPage';
-import { getAllRoles, ListRoles, updateRole,deleteRole,addRole } from '@utils/roles';
+import { getAllRoles, ListRoles, updateRole,deleteRole,addRole,BulkDeleteRoles } from '@utils/roles';
 import { Column } from '@components/CustomDataTable';
 import { Button, DropdownItem, Dropdown, DropdownMenu, Modal, Row, DropdownToggle } from 'react-bootstrap';
 import { Col } from 'react-bootstrap';
@@ -27,11 +27,18 @@ const Ranks = () => {
     const [refreshKey, setRefreshKey] = useState<number>(0);
     const [currentFilters, setCurrentFilters] = useState({});
     const [selectedRows, setSelectedRows] = useState<any[]>([]);
-    const [rowSelectionEnabled, setRowSelectionEnabled] = useState<boolean>(true);
+    const [rowSelectionEnabled, setRowSelectionEnabled] = useState<boolean>(false);
+    const [clearSelectedRows, setClearSelectedRows] = useState<boolean>(false);
+
+    useEffect(() => {
+        if(session?.user?.permissions?.includes('bulk-delete-ranks')){
+            setRowSelectionEnabled(true);
+        }
+    }, [session?.user?.permissions]);
 
     const handleSelectionChange = (selectedRows: any[]) => {
         setSelectedRows(selectedRows);
-        console.log('Selected rows:', selectedRows);
+        setClearSelectedRows(false);
     };
 
     const columns: Column[] = useMemo(() => {
@@ -141,6 +148,7 @@ const Ranks = () => {
     };
 
     const [showDeleteRankModal, setShowDeleteRankModal] = useState<boolean>(false);
+    const [showBulkDeleteModal, setShowBulkDeleteModal] = useState<boolean>(false);
     const [confirmDelete, setConfirmDelete] = useState<string>("");
 
     const handleDeleteRank = (props: any) => {
@@ -162,6 +170,46 @@ const Ranks = () => {
             }
         }else{
             toast.error('Please type the word delete to confirm');
+        }
+    };
+
+    const [deleteRankResponse, setDeleteRankResponse] = useState<any>(null);
+    const [showBulkDeleteSummaryModal, setShowBulkDeleteSummaryModal] = useState<boolean>(false);
+    const handleBulkDelete = async () => {
+        const confirmDeleteValue = confirmDelete.trim().toLowerCase();
+        if(confirmDeleteValue !== "delete") {
+            toast.error('Please type the word delete to confirm');
+            return;
+        }
+
+        try {
+           
+            const selectedIds = selectedRows.map((row: any) => row.id);
+            console.log(selectedIds);
+            const response = await BulkDeleteRoles(selectedIds);
+           
+            if(response){
+                setDeleteRankResponse(response);
+                setShowBulkDeleteSummaryModal(true);
+                setShowBulkDeleteModal(false);
+                setConfirmDelete("");
+                
+                // Reset selection and refresh table
+                setSelectedRows([]);
+                setClearSelectedRows(true);
+                setRefreshKey(prev => prev + 1);
+            }else{
+                toast.error('Failed to delete ranks');
+            }
+
+            // Reset state
+            setSelectedRows([]);
+            setShowBulkDeleteModal(false);
+            setConfirmDelete("");
+            setRefreshKey(prev => prev + 1); // Trigger refresh
+        } catch (error) {
+            console.error('Bulk delete error:', error);
+            toast.error('An error occurred during bulk delete');
         }
     };
 
@@ -224,7 +272,7 @@ const Ranks = () => {
                                 <strong>{selectedRows.length}</strong> Selected
                             </div>
                             <div className="btn-group">
-                                <Button variant="outline-danger" size="sm" onClick={() => console.log('Bulk delete selected rows:', selectedRows)}>Bulk Delete</Button>
+                                <Button variant="outline-danger" size="sm" onClick={() => setShowBulkDeleteModal(true)}>Bulk Delete</Button>
                             </div>
                         </div>
                     </Col>
@@ -242,6 +290,7 @@ const Ranks = () => {
                  refreshKey={refreshKey}
                  rowSelection={rowSelectionEnabled}
                  onSelectionChange={handleSelectionChange}
+                 clearSelectedRows={clearSelectedRows}
                  keyField="id"
                  search={false}
                  tableStyle="table-style-2"
@@ -306,6 +355,68 @@ const Ranks = () => {
                     <Modal.Footer>
                         <Button variant="secondary" onClick={() => setShowCreateRankModal(false)}>Close</Button>
                         <Button variant="primary" onClick={() => handleSubmitCreateRank()}>Create</Button>
+                    </Modal.Footer>
+                </Modal>
+            )}
+
+            {showBulkDeleteModal && (
+                <Modal
+                    show={showBulkDeleteModal}
+                    onHide={() => setShowBulkDeleteModal(false)}
+                >
+                    <Modal.Header closeButton>
+                        <Modal.Title>Bulk Delete Ranks</Modal.Title>
+                    </Modal.Header>
+                    <Modal.Body>
+                        <p>
+                            Are you sure you want to delete the selected ranks?
+                        </p>
+                        <div className="selected-ranks-list mb-3">
+                           
+                            <ul className="list-unstyled">
+                                {selectedRows.map((row, index) => (
+                                    <li key={row.id} className="text-danger">
+                                        {row.name}
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                        <p>
+                            Type the word <b className="text-danger">delete</b> to confirm
+                        </p>
+                        <input type="text" className="form-control" value={confirmDelete} onChange={(e) => setConfirmDelete(e.target.value)} placeholder="Type the word delete to confirm" />
+                    </Modal.Body>
+                    <Modal.Footer>
+                        <Button variant="secondary" onClick={() => {
+                            setShowBulkDeleteModal(false);
+                            setConfirmDelete("");
+                        }}>Close</Button>
+                        <Button variant="danger" onClick={handleBulkDelete}>Delete</Button>
+                    </Modal.Footer>
+                </Modal>
+            )}
+
+            {showBulkDeleteSummaryModal && (
+                <Modal
+                    show={showBulkDeleteSummaryModal}
+                    onHide={() => setShowBulkDeleteSummaryModal(false)}
+                >
+                    <Modal.Header closeButton>
+                        <Modal.Title>Bulk Delete Summary</Modal.Title>
+                    </Modal.Header>
+                    <Modal.Body>
+                      
+                    {deleteRankResponse.length > 0 && deleteRankResponse.map((item: any) => (
+                        <div className="form-group alert alert-primary" key={item.id}>
+                           Rank: {item.name}
+                           <br />
+                           Message: {item.message}
+                        </div>
+                    ))}
+                        
+                    </Modal.Body>
+                    <Modal.Footer>
+                        <Button variant="secondary" onClick={() => setShowBulkDeleteSummaryModal(false)}>Close</Button>
                     </Modal.Footer>
                 </Modal>
             )}

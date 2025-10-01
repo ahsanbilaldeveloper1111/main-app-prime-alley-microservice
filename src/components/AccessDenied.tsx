@@ -1,25 +1,28 @@
 import React from 'react';
 import Link from 'next/link';
-import { FiLock, FiArrowLeft } from 'react-icons/fi';
+import { FiLock, FiArrowLeft, FiAlertCircle } from 'react-icons/fi';
 
 interface AccessDeniedProps {
     title?: string;
     message?: string;
     buttonText?: string;
     buttonLink?: string;
+    icon?: 'lock' | '404';
+    hideCallback?: boolean;
 }
 
 const AccessDenied: React.FC<AccessDeniedProps> = ({
     title = "Access Denied",
     message = "You don't have permission to access this page.",
     buttonText = "Back to Home",
-    buttonLink = "/dashboard"
+    buttonLink = "/dashboard",
+    icon = 'lock'
 }) => {
     return (
         <div className="access-denied-wrapper">
             <div className="access-denied-content">
-                <div className="access-denied-icon">
-                    <FiLock size={40} />
+                <div className={`access-denied-icon ${icon === '404' ? 'not-found' : ''}`}>
+                    {icon === 'lock' ? <FiLock size={40} /> : <FiAlertCircle size={40} />}
                 </div>
                 <h2>{title}</h2>
                 <p>{message}</p>
@@ -58,6 +61,11 @@ const AccessDenied: React.FC<AccessDeniedProps> = ({
                     justify-content: center;
                     margin: 0 auto 24px;
                     color: #dc2626;
+                }
+
+                .access-denied-icon.not-found {
+                    background: #dbeafe;
+                    color: #2563eb;
                 }
                 
                 h2 {

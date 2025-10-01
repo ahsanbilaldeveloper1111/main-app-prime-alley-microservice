@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getToken } from 'next-auth/jwt';
-import { getRequiredPermissions } from './config/permissions';
+import { getRequiredPermissions, isProtectedPath } from './config/permissions';
 
 export async function middleware(request: NextRequest) {
     const path = request.nextUrl.pathname;
@@ -25,9 +25,19 @@ export async function middleware(request: NextRequest) {
     // Get required permissions for this route
     const requiredPermissions = getRequiredPermissions(path);
 
-    // If route is not defined in permissions config, redirect to access denied
-    if (requiredPermissions.length === 0 && !isPublicRoute(path)) {
-        return NextResponse.rewrite(new URL('/access-denied', request.url));
+    // Check if it's a protected route
+    if (!isPublicRoute(path)) {
+        if (isProtectedPath(path)) {
+            // For protected paths, check if permissions are defined
+            if (requiredPermissions.length === 0) {
+                // No permissions defined for this path, show 404
+                // This covers both non-existent pages and undefined routes
+                return NextResponse.rewrite(new URL('/404', request.url));
+            }
+        } else {
+            // Path is not under any protected route structure
+            return NextResponse.rewrite(new URL('/404', request.url));
+        }
     }
 
     // Get the session token
@@ -37,25 +47,25 @@ export async function middleware(request: NextRequest) {
     });
 
     if (!token) {
-        // Store the current URL to redirect back after login
-        const searchParams = new URLSearchParams({
-            callbackUrl: request.nextUrl.pathname + request.nextUrl.search
-        });
-        
         // Redirect to login
         return NextResponse.redirect(
-            new URL(`/auth/signin?${searchParams.toString()}`, request.url)
+            new URL('/auth/signin', request.url)
         );
     }
 
     // Check if user has all required permissions
+    // If requiredPermissions is empty or only contains empty string, bypass permission check
+    if (requiredPermissions.length === 0 || (requiredPermissions.length === 1 && requiredPermissions[0] === '')) {
+        return NextResponse.next();
+    }
+
     const userPermissions = token.permissions as string[] || [];
     const hasAllPermissions = requiredPermissions.every(permission => 
         userPermissions.includes(permission)
     );
 
     if (!hasAllPermissions) {
-        // Create response with access denied page
+        // Redirect to access-denied without query params
         return NextResponse.rewrite(new URL('/access-denied', request.url));
     }
 
@@ -79,6 +89,7 @@ export const config = {
     matcher: [
         // Add paths that should be protected
         '/controlhub/:path*',
+        '/ai-ml/analysis/:path*',
         // Add other protected paths
         '/dashboard/:path*',
         // Exclude paths that don't need permission checks

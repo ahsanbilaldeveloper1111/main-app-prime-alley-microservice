@@ -5,19 +5,10 @@ import { signIn, getSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import { GetServerSideProps } from 'next';
 import Head from 'next/head';
-import Script from 'next/script';
-
-import authlogin from "@assets/images/authentication/img-auth-login.png";
-import logodark from "@assets/images/logo-dark.svg";
-
-import Link from "next/link";
-import { Card, Row } from "react-bootstrap";
-import dashboard from "@pages/dashboard";
+import Script from 'next/script';import dashboard from "@pages/dashboard";
 import { toast } from "react-toastify";
-import { FaEye, FaEyeSlash,FaSpinner } from "react-icons/fa";
+import { FaSpinner } from "react-icons/fa";
 import '@assets/scss/login.scss';
-import LogoBlackBlue from "@assets/images/ringedge-logo-black-n-blue.png";
-import Logo from "@assets/images/ringedge-logo.png";
 
 
 const Signin = () => {
@@ -99,7 +90,7 @@ const Signin = () => {
                 <title>Sign In - Ring Edge</title>
             </Head>
             <Script 
-                src="https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js"
+                src="@/assets/js/particles.min.js"
                 strategy="afterInteractive"
                 onLoad={() => {
                     // Initialize particles after script loads
@@ -279,7 +270,7 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
   // console.log('getServerSideProps - callbackUrl:', context.query.callbackUrl);
 
   if (session) {
-    // If there's a callback URL, redirect to it, otherwise go to dashboard
+    // If there's a callback URL, redirect to it, otherwise go to home
     const callbackUrl = context.query.callbackUrl as string;
     const redirectUrl = callbackUrl ? decodeURIComponent(callbackUrl) : '/dashboard';
     
