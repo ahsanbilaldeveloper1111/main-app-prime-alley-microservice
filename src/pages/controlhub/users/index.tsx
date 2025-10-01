@@ -1,12 +1,12 @@
 import '@assets/scss/datatable-style.scss';
-import React, { ReactElement, useState, useCallback, useMemo } from 'react';
+import React, { ReactElement, useState, useCallback, useMemo, useRef } from 'react';
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
 import GenericListPage from '@components/GenericListPage';
 
 import { getAllUsers } from '@utils/users';
 import { Column } from '@components/CustomDataTable';
-import { Dropdown, DropdownItem, DropdownMenu, DropdownToggle, Row, Modal, Table, Col, Button } from 'react-bootstrap';
+import { Row, Modal, Table, Col, Button, Overlay, Popover } from 'react-bootstrap';
 import UsersFilters from '@components/filters/UsersFilters';
 import { toast } from 'react-toastify';
 import { useTokenService } from 'src/hooks/useTokenService';
@@ -29,7 +29,7 @@ import '@assets/scss/common.scss';
 
 import { formatDateTimeToLocal, GlobalDateTimeFormat } from '@utils/Helper';
 import { motion } from 'framer-motion';
-import { FiMoreVertical } from 'react-icons/fi';
+import { FiMoreVertical, FiEdit } from 'react-icons/fi';
 
 const ReactApexChart = dynamic(() => import('react-apexcharts'), { ssr: false });
 
@@ -111,22 +111,48 @@ const Users = () => {
             <div className="d-flex gap-3">
                 {session?.user?.permissions?.includes('edit-users')  && (
                       
-                    <Dropdown
-                    className="table-action-dropdown"
-                    //drop="start"
-                    placement="top-start"
-                >
-                    <DropdownToggle variant="outline-secondary" size="sm">
-                        <FiMoreVertical size={14} />
-                    </DropdownToggle>
-                    <DropdownMenu>
-                    <Link 
-                          href={`/controlhub/users/${props.encId}`} 
-                          className="dropdown-item action-edit">
-                          Edit
-                      </Link> 
-                    </DropdownMenu>
-                </Dropdown>
+                    <div className="table-action-dropdown">
+                        {(() => {
+                            const [show, setShow] = useState(false);
+                            const target = useRef(null);
+                            
+                            return (
+                                <>
+                                    <Button
+                                        ref={target}
+                                        variant="outline-secondary"
+                                        size="sm"
+                                        onClick={() => setShow(!show)}
+                                    >
+                                        <FiMoreVertical size={14} />
+                                    </Button>
+
+                                    <Overlay
+                                        show={show}
+                                        target={target.current}
+                                        placement="left"
+                                        rootClose
+                                        onHide={() => setShow(false)}
+                                    >
+                                        <Popover className="action-menu-popover">
+                                            <Popover.Body className="p-0">
+                                                <div className="action-menu">
+                                                    <Link 
+                                                        href={`/controlhub/users/${props.encId}`} 
+                                                        className="action-item"
+                                                        onClick={() => setShow(false)}
+                                                    >
+                                                        <FiEdit className="me-2" />
+                                                        Edit
+                                                    </Link>
+                                                </div>
+                                            </Popover.Body>
+                                        </Popover>
+                                    </Overlay>
+                                </>
+                            );
+                        })()}
+                    </div>
                 )}
             </div>
         ),

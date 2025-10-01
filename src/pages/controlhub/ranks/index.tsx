@@ -1,11 +1,11 @@
 import '@assets/scss/datatable-style.scss';
-import React, { ReactElement, useState, useCallback, useMemo, useEffect } from 'react';
+import React, { ReactElement, useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
 import GenericListPage from '@components/GenericListPage';
 import { getAllRoles, ListRoles, updateRole,deleteRole,addRole,BulkDeleteRoles } from '@utils/roles';
 import { Column } from '@components/CustomDataTable';
-import { Button, DropdownItem, Dropdown, DropdownMenu, Modal, Row, DropdownToggle } from 'react-bootstrap';
+import { Button, Overlay, Popover, Modal, Row } from 'react-bootstrap';
 import { Col } from 'react-bootstrap';
 import RolesFilters from '@components/filters/RolesFilters';
 import { toast } from 'react-toastify';
@@ -44,9 +44,9 @@ const Ranks = () => {
         setClearSelectedRows(false);
     };
 
-    const columns: Column[] = useMemo(() => {
-        const baseColumns: Column[] = [
-            { key: 'Name', name: 'name', selector: (row: any) => row.name, sortable: true},
+    const columns = useMemo((): Column[] => {
+        return [
+            { key: 'Name', name: 'name', selector: (row: any) => row.name, sortable: true },
 
             ...(session?.user?.is_admin === "1" ? [
                 { key: 'Company', name: 'company', selector: (row: any) => row.company, sortable: true }
@@ -59,54 +59,69 @@ const Ranks = () => {
                     name: 'ACTION',
                     selector: (row: any) => row.id,
                     sortable: false,
-                    cell: (props: any) => (
-    
-                        <Dropdown
-                    className="table-action-dropdown"
-                    //drop="start"
-                    placement="top-start"
-                >
-                    <DropdownToggle variant="outline-secondary" size="sm">
-                        <FiMoreVertical size={14} />
-                    </DropdownToggle>
-                    <DropdownMenu>
-                    {session?.user?.permissions?.includes('edit-ranks')  && (
-                        <DropdownItem className="action-edit" onClick={() => handleEditRank(props)}>
-                            <FiEdit className="me-2" />
-                            Edit
-                        </DropdownItem>
-                    )}
-    
-    {session?.user?.permissions?.includes('view-permissions-ranks')  && (
-                        <Link href={`/controlhub/ranks/permissions/${props.id}`} className="dropdown-item action-view">
-                            <FiEye className="me-2" />
-                            View Permissions
-                        </Link>
-                    )}
-    
-    {session?.user?.permissions?.includes('assign-permissions-ranks')  && (
-                        <Link href={`/controlhub/ranks/permissions/edit/${props.id}`} className="dropdown-item action-assign">
-                            <FiEdit className="me-2" />
-                            Assign Permissions
-                        </Link>
-                    )}
-    
-                        {session?.user?.permissions?.includes('delete-ranks')  && (
-                        <DropdownItem className="action-delete" onClick={() => handleDeleteRank(props)}>
-                            <FiTrash2 className="me-2" />
-                            Delete
-                        </DropdownItem>
-                        )}
-                    </DropdownMenu>
-                </Dropdown>
-                    ),
-                },
-            ] : []),
+                    
+                    cell: (props: any) => {
+                        const [show, setShow] = useState(false);
+                        const target = useRef(null);
+                        
+                        return (
+                            <div className="table-action-dropdown">
+                                <Button
+                                    ref={target}
+                                    variant="outline-secondary"
+                                    size="sm"
+                                    onClick={() => setShow(!show)}
+                                >
+                                    <FiMoreVertical size={14} />
+                                </Button>
 
-            
+                                <Overlay
+                                    show={show}
+                                    target={target.current}
+                                    placement="left"
+                                    rootClose
+                                    onHide={() => setShow(false)}
+                                >
+                                    <Popover className="action-menu-popover">
+                                        <Popover.Body className="p-0">
+                                            <div className="action-menu">
+                                                {session?.user?.permissions?.includes('edit-ranks') && (
+                                                    <button className="action-item action-edit" onClick={() => { handleEditRank(props); setShow(false); }}>
+                                                        <FiEdit className="me-2" />
+                                                        Edit
+                                                    </button>
+                                                )}
+
+                                                {session?.user?.permissions?.includes('view-permissions-ranks') && (
+                                                    <Link href={`/controlhub/ranks/permissions/${props.id}`} className="action-item action-view" onClick={() => setShow(false)}>
+                                                        <FiEye className="me-2" />
+                                                        View Permissions
+                                                    </Link>
+                                                )}
+
+                                                {session?.user?.permissions?.includes('assign-permissions-ranks') && (
+                                                    <Link href={`/controlhub/ranks/permissions/edit/${props.id}`} className="action-item action-assign" onClick={() => setShow(false)}>
+                                                        <FiEdit className="me-2" />
+                                                        Assign Permissions
+                                                    </Link>
+                                                )}
+
+                                                {session?.user?.permissions?.includes('delete-ranks') && (
+                                                    <button className="action-item text-danger" onClick={() => { handleDeleteRank(props); setShow(false); }}>
+                                                        <FiTrash2 className="me-2" />
+                                                        Delete
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </Popover.Body>
+                                    </Popover>
+                                </Overlay>
+                            </div>
+                        );
+                    }
+                }
+            ] : [])
         ];
-        
-        return baseColumns;
     }, [rowSelectionEnabled, session?.user?.is_admin, session?.user?.permissions]);
 
     const fetchRoles = useCallback(

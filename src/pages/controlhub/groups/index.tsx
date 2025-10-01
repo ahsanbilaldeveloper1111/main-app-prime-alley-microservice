@@ -1,56 +1,87 @@
 import '@assets/scss/datatable-style.scss';
-import React, { ReactElement, useState } from 'react';
+import React, { ReactElement, useRef, useState } from 'react';
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
 import GenericListPage from '@components/GenericListPage';
 import { getAllGroups, ListGroups, updateGroup,deleteGroup,addGroup } from '@utils/groups';
 import { Column } from '@components/CustomDataTable';
-import { Button, DropdownItem, DropdownToggle, Dropdown, DropdownMenu, Modal, Row } from 'react-bootstrap';
+import { Button, DropdownItem, DropdownToggle, Dropdown, DropdownMenu, Modal, Row, Popover, Overlay } from 'react-bootstrap';
 import { Col } from 'react-bootstrap';
 import GroupsFilters from '@components/filters/GroupsFilters';
 import { toast } from 'react-toastify';
 import { useTokenService } from 'src/hooks/useTokenService';
 import { useSession } from 'next-auth/react';
 import '@assets/scss/common.scss';
-import { FiEdit, FiTrash2 } from 'react-icons/fi';
+import { FiEdit, FiMoreVertical, FiTrash2 } from 'react-icons/fi';
 import TableAction from '@components/TableAction';
 import { Link } from 'feather-icons-react';
+import FormModal from "@pages/partial/FormModal";
+import '@assets/scss/common.scss';
+import SuccessfulModal from '@pages/partial/SuccessfulModal';
+import ConfirmModal from '@pages/partial/ConfirmModal';
+
 
 const Groups = () => {
     const { data:session, status } = useSession();
    
     const columns: Column[] = [
         { key: 'Name', name: 'NAME', selector: (row: any) => row.name, sortable: true },
-        {
-            key: 'Action',
-            name: 'ACTION',
-            selector: (row: any) => row.id,
-            sortable: false,
-            cell: (props: any) => (
+       
 
-                <TableAction
-                    actions={[
-                        {
-                            label: 'Edit',
-                            icon: FiEdit,
-                            onClick: () => handleEditGroup(props),
-                            permission: 'edit-groups',
-                            variant: 'edit'
-                        },
-                        {
-                            label: 'Delete',
-                            icon: FiTrash2,
-                            onClick: () => handleDeleteGroup(props),
-                            permission: 'delete-groups',
-                            variant: 'delete'
-                        }
-                    ]}
-                    userPermissions={session?.user?.permissions}
-                />
+        ...(session?.user?.permissions?.includes('edit-groups') || session?.user?.permissions?.includes('delete-groups') ? [
+            {
+                key: 'Action',
+                name: 'ACTION',
+                selector: (row: any) => row.id,
+                sortable: false,
                 
-               
-            ),
-        },
+                cell: (props: any) => {
+                    const [show, setShow] = useState(false);
+                    const target = useRef(null);
+                    
+                    return (
+                        <div className="table-action-dropdown">
+                            <Button
+                                ref={target}
+                                variant="outline-secondary"
+                                size="sm"
+                                onClick={() => setShow(!show)}
+                            >
+                                <FiMoreVertical size={14} />
+                            </Button>
+
+                            <Overlay
+                                show={show}
+                                target={target.current}
+                                placement="left"
+                                rootClose
+                                onHide={() => setShow(false)}
+                            >
+                                <Popover className="action-menu-popover">
+                                    <Popover.Body className="p-0">
+                                        <div className="action-menu">
+                                            {session?.user?.permissions?.includes('edit-groups') && (
+                                                <button className="action-item action-edit" onClick={() => { handleEditGroup(props); setShow(false); }}>
+                                                    <FiEdit className="me-2" />
+                                                    Edit
+                                                </button>
+                                            )}
+
+                                            {session?.user?.permissions?.includes('delete-groups') && (
+                                                <button className="action-item text-danger" onClick={() => { handleDeleteGroup(props); setShow(false); }}>
+                                                    <FiTrash2 className="me-2" />
+                                                    Delete
+                                                </button>
+                                            )}
+                                        </div>
+                                    </Popover.Body>
+                                </Popover>
+                            </Overlay>
+                        </div>
+                    );
+                }
+            }
+        ] : [])
     ];
 
     const [refreshKey, setRefreshKey] = useState<number>(0);
@@ -59,6 +90,12 @@ const Groups = () => {
     const fetchGroups = async (page = 1, perPage = 15, search = "") => {
         return await ListGroups({ page, perPage, search, filters: currentFilters });
     };
+    const [showSuccessfulModal, setShowSuccessfulModal] = useState(false)
+    const [successModalTitle, setSuccessModalTitle] = useState('')
+    const [successModalDescription, setSuccessModalDescription] = useState('')
+    const handleCloseSuccessfulModal = () => {
+        setShowSuccessfulModal(false)
+    }
 
     const handleFiltersChange = (filters: any) => {
         //console.log('Filters changed:', filters);
@@ -92,6 +129,11 @@ const Groups = () => {
             setSelectedGroup(null);
             setSelectedGroupName(null);
             setShowEditGroupModal(false);
+            setSuccessModalTitle('Group Updated')
+            setSuccessModalDescription('Group has been updated successfully');
+            setTimeout(() => {
+                setShowSuccessfulModal(true);
+            }, 100);
             setRefreshKey(prev => prev + 1); // Trigger refresh
         }
 
@@ -108,18 +150,18 @@ const Groups = () => {
     };
 
     const handleSubmitDeleteGroup = async () => {
-        const confirmDeleteValue = confirmDelete.trim().toLowerCase();
-        if(confirmDeleteValue == "delete"){
-            const response = await deleteGroup(selectedGroup);
-            if(response){
-                setSelectedGroup(null);
-                setSelectedGroupName(null);
-                setShowDeleteGroupModal(false);
-                setConfirmDelete("");
-                setRefreshKey(prev => prev + 1); // Trigger refresh
-            }
-        }else{
-            toast.error('Please type the word delete to confirm');
+        const response = await deleteGroup(selectedGroup);
+        if(response){
+            setSelectedGroup(null);
+            setSelectedGroupName(null);
+            setShowDeleteGroupModal(false);
+            setConfirmDelete("");
+            setSuccessModalTitle('Group Deleted')
+            setSuccessModalDescription('Group has been deleted successfully');
+            setTimeout(() => {
+                setShowSuccessfulModal(true);
+            }, 100);
+            setRefreshKey(prev => prev + 1); // Trigger refresh
         }
     };
 
@@ -131,6 +173,13 @@ const Groups = () => {
         if(response){
             setNewGroupName("");
             setShowCreateGroupModal(false);
+            
+            setSuccessModalTitle('Group Created')
+            setSuccessModalDescription('New Group has been added successfully');
+            setTimeout(() => {
+                setShowSuccessfulModal(true);
+            }, 100);
+
             setRefreshKey(prev => prev + 1); // Trigger refresh
         }
     };
@@ -192,68 +241,59 @@ const Groups = () => {
              />
             )}
 
-            {showEditGroupModal && (
-                <Modal
-                    show={showEditGroupModal}
-                    onHide={() => setShowEditGroupModal(false)}
-                >
-                    <Modal.Header closeButton>
-                        <Modal.Title>Edit Group</Modal.Title>
-                    </Modal.Header>
-                    <Modal.Body>
+            <FormModal
+                show={showEditGroupModal}
+                onHide={() => setShowEditGroupModal(false)}
+                title="Edit Group"
+                desc="Please type to add new change"
+                formHtml={
+                    <>
                         <input className="form-control" type="text" value={selectedGroupName} onChange={(e) => setSelectedGroupName(e.target.value)} />
-                    </Modal.Body>
-                    <Modal.Footer>
-                        <Button variant="secondary" onClick={() => setShowEditGroupModal(false)}>Close</Button>
-                        <Button variant="primary" onClick={() => handleSubmitEditGroup()}>Save changes</Button>
-                    </Modal.Footer>
-                </Modal>
-            )}
+                    </>
+                }
+                submitButtonText="Save changes"
+                cancelButtonText="Cancel"
+                onSubmit={handleSubmitEditGroup}
+                onCancel={() => setShowEditGroupModal(false)}
+            />
 
-            {showDeleteGroupModal && (
-                <Modal
-                    show={showDeleteGroupModal}
-                    onHide={() => setShowDeleteGroupModal(false)}
-                >
-                    <Modal.Header closeButton>
-                        <Modal.Title>Delete Group?</Modal.Title>
-                    </Modal.Header>
-                    <Modal.Body>
-                        <p>
-                            Are you sure you want to delete this <b className="text-danger">{selectedGroupName}</b> group?
-                        </p>
-                        <p>
-                            Type the word <b className="text-danger">delete</b> to confirm
-                        </p>
-                        <input type="text" className="form-control" id="confirmDelete" value={confirmDelete} onChange={(e) => setConfirmDelete(e.target.value)} placeholder="Type the word delete to confirm" />
 
-                    </Modal.Body>
-                    <Modal.Footer>
-                        <Button variant="secondary" onClick={() => setShowDeleteGroupModal(false)}>Close</Button>
-                        <Button variant="danger" onClick={() => handleSubmitDeleteGroup()}>Delete</Button>
-                    </Modal.Footer>
-                    
-                </Modal>
-            )}
+            <ConfirmModal
+                show={showDeleteGroupModal}
+                onHide={() => setShowDeleteGroupModal(false)}
+                title="Delete Group"
+                description={`Are you sure you want to delete the following group?`}
+                targetName={`${selectedGroupName}`}
+                onConfirm={handleSubmitDeleteGroup}
+                confirmButtonText="Delete"
+                confirmButtonVariant="danger"
+                requireTextConfirmation={true}
+                requiredConfirmationText="delete"
+            />
 
-            {showCreateGroupModal && (
-                <Modal
-                    show={showCreateGroupModal}
-                    onHide={() => setShowCreateGroupModal(false)}
-                >
-                    <Modal.Header closeButton>
-                        <Modal.Title>New Group</Modal.Title>
-                    </Modal.Header>
-                    <Modal.Body>
-                        <input type="text" className="form-control" id="newGroupName"  value={newGroupName} onChange={(e) => setNewGroupName(e.target.value)} placeholder="Group Name" />
-                    </Modal.Body>
-                    <Modal.Footer>
-                        <Button variant="secondary" onClick={() => setShowCreateGroupModal(false)}>Close</Button>
-                        <Button variant="primary" onClick={() => handleSubmitCreateGroup()}>Create</Button>
-                    </Modal.Footer>
-                </Modal>
-            )}
-        
+<FormModal
+                        show={showCreateGroupModal}
+                        onHide={()=>setShowCreateGroupModal(false)}
+                        title="New Group"
+                        desc="Please type to add new change"
+                        formHtml={
+                            <>
+                            <input type="text" className="form-control" id="newGroupName"  value={newGroupName} onChange={(e) => setNewGroupName(e.target.value)} placeholder="Group Name" />
+                            </>
+                        }
+                        submitButtonText="Change Group"
+                        cancelButtonText="Cancel"
+                        onSubmit={handleSubmitCreateGroup}
+                        onCancel={()=>setShowCreateGroupModal(false)}
+                    />
+
+           
+        <SuccessfulModal
+          show={showSuccessfulModal}
+          onHide={() => setShowSuccessfulModal(false)}
+          title={successModalTitle}
+          description={successModalDescription}
+        />
         </React.Fragment>
     );
 };
