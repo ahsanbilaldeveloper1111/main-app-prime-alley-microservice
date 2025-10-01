@@ -66,23 +66,23 @@ export const userFiltersConfig: FilterTab[] = [
       },
     ]
   },
-  {
-    id: 'user-status',
-    title: 'User Status',
-    icon: 'ti ti-users',
-    fields: [
+  // {
+  //   id: 'user-status',
+  //   title: 'User Status',
+  //   icon: 'ti ti-users',
+  //   fields: [
       
-      {
-        type: 'select',
-        name: 'status',
-        label: 'Status',
-        options: [
-          { value: 'Active', label: 'Active' },
-          { value: 'InActive', label: 'In-Active' }
-        ]
-      }
-    ]
-  }
+  //     {
+  //       type: 'select',
+  //       name: 'status',
+  //       label: 'Status',
+  //       options: [
+  //         { value: 'Active', label: 'Active' },
+  //         { value: 'InActive', label: 'In-Active' }
+  //       ]
+  //     }
+  //   ]
+  // }
 ];
 
 // Role Filters Configuration

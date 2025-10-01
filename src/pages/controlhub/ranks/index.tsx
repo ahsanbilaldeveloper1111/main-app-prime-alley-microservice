@@ -50,53 +50,57 @@ const Ranks = () => {
             ] : []),
 
 
-            {
-                key: 'Action',
-                name: 'ACTION',
-                selector: (row: any) => row.id,
-                sortable: false,
-                cell: (props: any) => (
-
-                    <Dropdown
-                className="table-action-dropdown"
-                //drop="start"
-                placement="top-start"
-            >
-                <DropdownToggle variant="outline-secondary" size="sm">
-                    <FiMoreVertical size={14} />
-                </DropdownToggle>
-                <DropdownMenu>
-                {session?.user?.permissions?.includes('edit-ranks')  && (
-                    <DropdownItem className="action-edit" onClick={() => handleEditRank(props)}>
-                        <FiEdit className="me-2" />
-                        Edit
-                    </DropdownItem>
-                )}
-
-{session?.user?.permissions?.includes('view-permissions-ranks')  && (
-                    <Link href={`/controlhub/ranks/permissions/${props.id}`} className="dropdown-item action-view">
-                        <FiEye className="me-2" />
-                        View Permissions
-                    </Link>
-                )}
-
-{session?.user?.permissions?.includes('assign-permissions-ranks')  && (
-                    <Link href={`/controlhub/ranks/permissions/edit/${props.id}`} className="dropdown-item action-assign">
-                        <FiEdit className="me-2" />
-                        Assign Permissions
-                    </Link>
-                )}
-
-                    {session?.user?.permissions?.includes('delete-ranks')  && (
-                    <DropdownItem className="action-delete" onClick={() => handleDeleteRank(props)}>
-                        <FiTrash2 className="me-2" />
-                        Delete
-                    </DropdownItem>
+            ...(session?.user?.permissions?.includes('delete-ranks') || session?.user?.permissions?.includes('edit-ranks') || session?.user?.permissions?.includes('view-permissions-ranks') || session?.user?.permissions?.includes('assign-permissions-ranks') ? [
+                {
+                    key: 'Action',
+                    name: 'ACTION',
+                    selector: (row: any) => row.id,
+                    sortable: false,
+                    cell: (props: any) => (
+    
+                        <Dropdown
+                    className="table-action-dropdown"
+                    //drop="start"
+                    placement="top-start"
+                >
+                    <DropdownToggle variant="outline-secondary" size="sm">
+                        <FiMoreVertical size={14} />
+                    </DropdownToggle>
+                    <DropdownMenu>
+                    {session?.user?.permissions?.includes('edit-ranks')  && (
+                        <DropdownItem className="action-edit" onClick={() => handleEditRank(props)}>
+                            <FiEdit className="me-2" />
+                            Edit
+                        </DropdownItem>
                     )}
-                </DropdownMenu>
-            </Dropdown>
-                ),
-            },
+    
+    {session?.user?.permissions?.includes('view-permissions-ranks')  && (
+                        <Link href={`/controlhub/ranks/permissions/${props.id}`} className="dropdown-item action-view">
+                            <FiEye className="me-2" />
+                            View Permissions
+                        </Link>
+                    )}
+    
+    {session?.user?.permissions?.includes('assign-permissions-ranks')  && (
+                        <Link href={`/controlhub/ranks/permissions/edit/${props.id}`} className="dropdown-item action-assign">
+                            <FiEdit className="me-2" />
+                            Assign Permissions
+                        </Link>
+                    )}
+    
+                        {session?.user?.permissions?.includes('delete-ranks')  && (
+                        <DropdownItem className="action-delete" onClick={() => handleDeleteRank(props)}>
+                            <FiTrash2 className="me-2" />
+                            Delete
+                        </DropdownItem>
+                        )}
+                    </DropdownMenu>
+                </Dropdown>
+                    ),
+                },
+            ] : []),
+
+            
         ];
         
         return baseColumns;
