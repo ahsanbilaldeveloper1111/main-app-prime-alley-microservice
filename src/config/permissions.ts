@@ -94,13 +94,11 @@ export const routePermissions: RoutePermission[] = [
             {
                 path: '/',
                 permissions: ['view-call-logs'],
-                children: [
-                    {
-                        path: '/dashboard',
-                        permissions: ['dashboard-call-logs']
-                    }
-                ]
             },
+            {
+                path: '/dashboard',
+                permissions: ['dashboard-call-logs']
+            }
         ]
     },
 
