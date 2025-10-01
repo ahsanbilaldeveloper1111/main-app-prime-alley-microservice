@@ -290,7 +290,7 @@ const Groups = () => {
                             <input type="text" className="form-control" id="newGroupName"  value={newGroupName} onChange={(e) => setNewGroupName(e.target.value)} placeholder="Group Name" />
                             </>
                         }
-                        submitButtonText="Change Group"
+                        submitButtonText="Add Group"
                         cancelButtonText="Cancel"
                         onSubmit={handleSubmitCreateGroup}
                         onCancel={()=>setShowCreateGroupModal(false)}

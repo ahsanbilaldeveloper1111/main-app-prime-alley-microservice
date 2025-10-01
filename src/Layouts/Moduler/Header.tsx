@@ -408,13 +408,7 @@ const Header = ({ themeMode }: HeaderProps) => {
             label: MENU_LABELS.CONTROL_HUB,
             target: '#pc-tab-controlhub'
         },
-        {
-            key: 'netops',
-            permission: PERMISSIONS.NETOPS_SERVICES,
-            icon: ICONS.NETOPS,
-            label: MENU_LABELS.NETOPS,
-            target: '#pc-tab-16'
-        },
+       
         {
             key: 'crm',
             permission: PERMISSIONS.CRM_SERVICES,
@@ -494,7 +488,13 @@ const Header = ({ themeMode }: HeaderProps) => {
             label: MENU_LABELS.AUTOMATION,
             target: '#pc-tab-6'
         },
-      
+        {
+            key: 'netops',
+            permission: PERMISSIONS.NETOPS_SERVICES,
+            icon: ICONS.NETOPS,
+            label: MENU_LABELS.NETOPS,
+            target: '#pc-tab-16'
+        },
     
         
     ], []);

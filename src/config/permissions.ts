@@ -20,6 +20,8 @@ export const routePermissions: RoutePermission[] = [
         path: '/coming-soon',
         permissions: ['']
     },
+
+    //netops services start
     {
         path: '/netops',
         permissions: [PERMISSIONS.CONTROL_HUB_SERVICES],
@@ -428,6 +430,18 @@ export const routePermissions: RoutePermission[] = [
         permissions: [PERMISSIONS.NETOPS_SERVICES],
         children: [
             { path: '/test',permissions: [PERMISSIONS.NETOPS_SERVICES]}
+        ]
+    },
+
+    //cti services start
+    {
+        path: '/cti',
+        permissions: [PERMISSIONS.CTI_SERVICES],
+        children: [
+            { path: '/',permissions: ['view-cti']},
+            { path: '/monitoring',permissions: ['view-cti']},
+            { path: '/dialer',permissions: ['dial-call-cti']},
+
         ]
     }
 ];
