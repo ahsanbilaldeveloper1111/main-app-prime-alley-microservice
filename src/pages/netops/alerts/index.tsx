@@ -1,4 +1,5 @@
 import "@assets/scss/datatable-style.scss";
+import '@assets/scss/common.scss';
 import React, { ReactElement, useEffect, useState, useCallback } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
@@ -8,9 +9,11 @@ import { Button, Modal, Row, Col } from "react-bootstrap";
 import { toast } from "react-toastify";
 import { useSession } from "next-auth/react";
 import PageSummaryGrid, { SummaryCard } from "@components/PageSummaryGrid";
+import AlertsFilters from "@components/filters/AlertsFilters";
 import {
   getAlerts,
   getMonitoringDashboard,
+  resolveAlert,
   Alert,
   MonitoringDashboardResponse,
 } from "@utils/netops";
@@ -128,18 +131,12 @@ const Alerts = () => {
       selector: (row: any) => row.created_at,
       sortable: true,
       cell: (props: any) => {
-        const formattedDate = convertUTCToUserTimezone(
-          props.created_at,
-          {
-            outputFormat: 'DD-MM-YYYY hh:mm:ss A'
-          }
-        );
-        const formattedTime = convertUTCToUserTimezone(
-          props.created_at,
-          {
-            outputFormat: 'hh:mm:ss A'
-          }
-        );
+        const formattedDate = convertUTCToUserTimezone(props.created_at, {
+          outputFormat: "DD-MM-YYYY hh:mm:ss A",
+        });
+        const formattedTime = convertUTCToUserTimezone(props.created_at, {
+          outputFormat: "hh:mm:ss A",
+        });
         return (
           <div>
             <div>{formattedDate}</div>
@@ -155,18 +152,12 @@ const Alerts = () => {
       sortable: true,
       cell: (props: any) => {
         if (!props.resolved_at) return <span className="text-muted">N/A</span>;
-        const formattedDate = convertUTCToUserTimezone(
-          props.resolved_at,
-          {
-            outputFormat: 'DD-MM-YYYY hh:mm:ss A'
-          }
-        );
-        const formattedTime = convertUTCToUserTimezone(
-          props.resolved_at,
-          {
-            outputFormat: 'hh:mm:ss A'
-          }
-        );
+        const formattedDate = convertUTCToUserTimezone(props.resolved_at, {
+          outputFormat: "DD-MM-YYYY hh:mm:ss A",
+        });
+        const formattedTime = convertUTCToUserTimezone(props.resolved_at, {
+          outputFormat: "hh:mm:ss A",
+        });
         return (
           <div>
             <div>{formattedDate}</div>
@@ -184,35 +175,70 @@ const Alerts = () => {
         if (props.is_resolved && props.resolved_at) {
           const created = new Date(props.created_at);
           const resolved = new Date(props.resolved_at);
-          const duration = Math.floor((resolved.getTime() - created.getTime()) / (1000 * 60)); // minutes
-          
+          const duration = Math.floor(
+            (resolved.getTime() - created.getTime()) / (1000 * 60)
+          ); // minutes
+
           if (duration < 60) {
             return `${duration}m`;
           } else if (duration < 1440) {
             return `${Math.floor(duration / 60)}h ${duration % 60}m`;
           } else {
-            return `${Math.floor(duration / 1440)}d ${Math.floor((duration % 1440) / 60)}h`;
+            return `${Math.floor(duration / 1440)}d ${Math.floor(
+              (duration % 1440) / 60
+            )}h`;
           }
         } else if (!props.is_resolved) {
           const created = new Date(props.created_at);
           const now = new Date();
-          const duration = Math.floor((now.getTime() - created.getTime()) / (1000 * 60)); // minutes
-          
+          const duration = Math.floor(
+            (now.getTime() - created.getTime()) / (1000 * 60)
+          ); // minutes
+
           if (duration < 60) {
             return `${duration}m`;
           } else if (duration < 1440) {
             return `${Math.floor(duration / 60)}h ${duration % 60}m`;
           } else {
-            return `${Math.floor(duration / 1440)}d ${Math.floor((duration % 1440) / 60)}h`;
+            return `${Math.floor(duration / 1440)}d ${Math.floor(
+              (duration % 1440) / 60
+            )}h`;
           }
         }
         return <span className="text-muted">N/A</span>;
       },
     },
+    {
+      key: "actions",
+      name: "Actions",
+      selector: (row: any) => row.id,
+      sortable: false,
+      cell: (props: any) => {
+        return (
+          <div className="d-flex gap-2">
+            {!props.is_resolved && (
+              <Button
+                variant="outline-success"
+                size="sm"
+                onClick={() => handleResolveAlert(props.id)}
+                disabled={resolvingAlertId === props.id}
+                title="Resolve Alert"
+              >
+                {resolvingAlertId === props.id ? (
+                  <i className="fas fa-spinner fa-spin"></i>
+                ) : (
+                  <i className="fas fa-check"></i>
+                )}
+              </Button>
+            )}
+          </div>
+        );
+      },
+    },
   ];
 
   const [refreshKey, setRefreshKey] = useState<number>(0);
-  const [currentFilters, setCurrentFilters] = useState({});
+  const [currentFilters, setCurrentFilters] = useState<Record<string, any>>({});
   const [summary, setSummary] = useState<Summary>({
     total_alerts: 0,
     critical_alerts: 0,
@@ -220,6 +246,7 @@ const Alerts = () => {
     medium_alerts: 0,
     low_alerts: 0,
   });
+  const [resolvingAlertId, setResolvingAlertId] = useState<number | null>(null);
 
   // Create cards data for PageSummaryGrid
   const summaryCards: SummaryCard[] = [
@@ -269,7 +296,13 @@ const Alerts = () => {
     async (page = 1, perPage = 15, search = "") => {
       try {
         const [alertsResponse, dashboardResponse] = await Promise.all([
-          getAlerts({ page, perPage, limit: perPage, search, ...currentFilters }),
+          getAlerts({
+            page,
+            perPage,
+            limit: perPage,
+            search,
+            ...currentFilters,
+          }),
           getMonitoringDashboard(),
         ]);
 
@@ -319,6 +352,21 @@ const Alerts = () => {
     setCurrentFilters(filters);
   };
 
+  const handleResolveAlert = async (alertId: number) => {
+    try {
+      setResolvingAlertId(alertId);
+      await resolveAlert(alertId);
+      toast.success("Alert resolved successfully");
+      // Refresh the data
+      setRefreshKey((prev) => prev + 1);
+    } catch (error) {
+      console.error("Error resolving alert:", error);
+      toast.error("Failed to resolve alert");
+    } finally {
+      setResolvingAlertId(null);
+    }
+  };
+
   const handleExport = async (
     exportType: string,
     filters: Record<string, any>
@@ -334,11 +382,7 @@ const Alerts = () => {
 
   return (
     <React.Fragment>
-      <BreadcrumbItem
-        mainTitle="NetOps"
-        mainLink="/netops/dashboard"
-        subTitle="Alerts"
-      />
+      <BreadcrumbItem mainTitle="" mainLink="" subTitle="Call Logs" />
 
       <Row className="mb-3">
         <Col md={12}>
@@ -347,15 +391,19 @@ const Alerts = () => {
               <Col md={4}>
                 <h2 className="mb-0">Alerts</h2>
               </Col>
+
               <Col md={8} className="d-flex justify-content-end">
                 <div className="action-buttons">
-                  <Button
-                    variant="outline-primary"
-                    onClick={() => setRefreshKey((prev) => prev + 1)}
-                    className="me-2"
-                  >
-                    <i className="fas fa-sync-alt"></i> Refresh
-                  </Button>
+                  {/* <div className="search-container">
+                           <i className="fas fa-search search-icon"></i>
+                           <input type="text" className="search-bar" placeholder="Search call logs..." onChange={(e) => handleFiltersChange({...currentFilters, search: e.target.value})}/>
+                       </div> */}
+
+                  <AlertsFilters
+                    onFiltersChange={handleFiltersChange}
+                    onExport={handleExport}
+                    moduleSlug="alerts"
+                  />
                 </div>
               </Col>
             </Row>

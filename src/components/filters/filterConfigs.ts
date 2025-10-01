@@ -1388,4 +1388,51 @@ export const createCampaignFiltersConfig = (): FilterTab[] => {
       ]
     }
   ];
+};
+
+// Alerts Filters Configuration
+export const createAlertsFiltersConfig = (devices: any[] = []): FilterTab[] => {
+  // Convert devices to select options
+  const deviceOptions = devices.map(device => ({
+    value: device.id.toString(),
+    label: `${device.hostname} (${device.ip_address})`
+  }));
+
+  return [
+    {
+      id: 'alert-severity',
+      title: 'Alert Severity',
+      icon: 'ti ti-alert-triangle',
+      fields: [
+        {
+          type: 'select',
+          name: 'severity',
+          label: 'Choose Severity',
+          options: [
+            { value: '', label: 'All Severities' },
+            { value: 'CRITICAL', label: 'Critical' },
+            { value: 'HIGH', label: 'High' },
+            { value: 'MEDIUM', label: 'Medium' },
+            { value: 'LOW', label: 'Low' }
+          ]
+        }
+      ]
+    },
+    {
+      id: 'alert-device',
+      title: 'Device',
+      icon: 'ti ti-device-desktop',
+      fields: [
+        {
+          type: 'select',
+          name: 'device_id',
+          label: 'Choose Device',
+          options: [
+            { value: '', label: 'All Devices' },
+            ...deviceOptions
+          ]
+        }
+      ]
+    }
+  ];
 }; 

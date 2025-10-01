@@ -415,3 +415,15 @@ export const testAllGetEndpoints = async (): Promise<TestResults> => {
     throw error;
   }
 };
+
+export const resolveAlert = async (alertId: string | number): Promise<void> => {
+  try {
+    const response = await axiosInstance.post<NetOpsApiResponse<void>>(`/netops/alerts/${alertId}/resolve`);
+    console.log("Resolve alert response:", response.data);
+    return extractData<void>(response.data);
+  } catch (error: any) {
+    console.error("Failed to resolve alert:", error);
+    toast.error(error?.message || "Failed to resolve alert");
+    throw error;
+  }
+};

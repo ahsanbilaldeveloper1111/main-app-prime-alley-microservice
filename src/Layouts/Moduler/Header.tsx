@@ -408,7 +408,13 @@ const Header = ({ themeMode }: HeaderProps) => {
             label: MENU_LABELS.CONTROL_HUB,
             target: '#pc-tab-controlhub'
         },
-        
+        {
+            key: 'netops',
+            permission: PERMISSIONS.NETOPS_SERVICES,
+            icon: ICONS.NETOPS,
+            label: MENU_LABELS.NETOPS,
+            target: '#pc-tab-16'
+        },
         {
             key: 'crm',
             permission: PERMISSIONS.CRM_SERVICES,
@@ -488,13 +494,7 @@ const Header = ({ themeMode }: HeaderProps) => {
             label: MENU_LABELS.AUTOMATION,
             target: '#pc-tab-6'
         },
-        {
-            key: 'netops',
-            permission: PERMISSIONS.NETOPS_SERVICES,
-            icon: ICONS.NETOPS,
-            label: MENU_LABELS.NETOPS,
-            target: '#pc-tab-16'
-        }
+      
     
         
     ], []);
@@ -1075,6 +1075,12 @@ const Header = ({ themeMode }: HeaderProps) => {
                     <Link className="pc-link" href={`${BASE_URL}/netops/alerts`}>
                         <span className="pc-micon"><i className="ph-duotone ph-warning-circle"></i></span>
                         <span className="pc-mtext">Alerts</span>
+                    </Link>
+                </li>
+                <li className="pc-item">
+                    <Link className="pc-link" href={`${BASE_URL}/netops/uptime-sla`}>
+                        <span className="pc-micon"><i className="ph-duotone ph-chart-line-up"></i></span>
+                        <span className="pc-mtext">Uptime & SLA Monitoring</span>
                     </Link>
                 </li>
             </ul>                      

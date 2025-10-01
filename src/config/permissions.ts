@@ -40,6 +40,10 @@ export const routePermissions: RoutePermission[] = [
                 path: '/alerts',
                 permissions: [PERMISSIONS.CONTROL_HUB_SERVICES]
             },
+            {
+                path: '/uptime-sla',
+                permissions: [PERMISSIONS.CONTROL_HUB_SERVICES]
+            },
         ]
     },
      
