@@ -21,6 +21,67 @@ import ConfirmModal from '@pages/partial/ConfirmModal'
 
 import { FiEdit, FiMoreVertical, FiTrash2, FiEye } from 'react-icons/fi';
 
+// Action Cell Component
+const ActionCell = ({ props, onEdit, onDelete, onViewPermissions, onAssignPermissions, session }: any) => {
+    const [show, setShow] = useState(false);
+    const target = useRef(null);
+    
+    return (
+        <div className="table-action-dropdown">
+            <Button
+                ref={target}
+                variant="outline-secondary"
+                size="sm"
+                onClick={() => setShow(!show)}
+            >
+                <FiMoreVertical size={14} />
+            </Button>
+
+            <Overlay
+                show={show}
+                target={target.current}
+                placement="left"
+                rootClose
+                onHide={() => setShow(false)}
+            >
+                <Popover className="action-menu-popover">
+                    <Popover.Body className="p-0">
+                        <div className="action-menu">
+                            {session?.user?.permissions?.includes('edit-ranks') && (
+                                <button className="action-item action-edit" onClick={() => { onEdit(props); setShow(false); }}>
+                                    <FiEdit className="me-2" />
+                                    Edit
+                                </button>
+                            )}
+
+                            {session?.user?.permissions?.includes('view-permissions-ranks') && (
+                                <Link href={`/controlhub/ranks/permissions/${props.id}`} className="action-item action-view" onClick={() => setShow(false)}>
+                                    <FiEye className="me-2" />
+                                    View Permissions
+                                </Link>
+                            )}
+
+                            {session?.user?.permissions?.includes('assign-permissions-ranks') && (
+                                <Link href={`/controlhub/ranks/permissions/edit/${props.id}`} className="action-item action-assign" onClick={() => setShow(false)}>
+                                    <FiEdit className="me-2" />
+                                    Assign Permissions
+                                </Link>
+                            )}
+
+                            {session?.user?.permissions?.includes('delete-ranks') && (
+                                <button className="action-item text-danger" onClick={() => { onDelete(props); setShow(false); }}>
+                                    <FiTrash2 className="me-2" />
+                                    Delete
+                                </button>
+                            )}
+                        </div>
+                    </Popover.Body>
+                </Popover>
+            </Overlay>
+        </div>
+    );
+};
+
 const Ranks = () => {
     const { data:session, status } = useSession();
     const router = useRouter();
@@ -59,66 +120,14 @@ const Ranks = () => {
                     name: 'ACTION',
                     selector: (row: any) => row.id,
                     sortable: false,
-                    
-                    cell: (props: any) => {
-                        const [show, setShow] = useState(false);
-                        const target = useRef(null);
-                        
-                        return (
-                            <div className="table-action-dropdown">
-                                <Button
-                                    ref={target}
-                                    variant="outline-secondary"
-                                    size="sm"
-                                    onClick={() => setShow(!show)}
-                                >
-                                    <FiMoreVertical size={14} />
-                                </Button>
-
-                                <Overlay
-                                    show={show}
-                                    target={target.current}
-                                    placement="left"
-                                    rootClose
-                                    onHide={() => setShow(false)}
-                                >
-                                    <Popover className="action-menu-popover">
-                                        <Popover.Body className="p-0">
-                                            <div className="action-menu">
-                                                {session?.user?.permissions?.includes('edit-ranks') && (
-                                                    <button className="action-item action-edit" onClick={() => { handleEditRank(props); setShow(false); }}>
-                                                        <FiEdit className="me-2" />
-                                                        Edit
-                                                    </button>
-                                                )}
-
-                                                {session?.user?.permissions?.includes('view-permissions-ranks') && (
-                                                    <Link href={`/controlhub/ranks/permissions/${props.id}`} className="action-item action-view" onClick={() => setShow(false)}>
-                                                        <FiEye className="me-2" />
-                                                        View Permissions
-                                                    </Link>
-                                                )}
-
-                                                {session?.user?.permissions?.includes('assign-permissions-ranks') && (
-                                                    <Link href={`/controlhub/ranks/permissions/edit/${props.id}`} className="action-item action-assign" onClick={() => setShow(false)}>
-                                                        <FiEdit className="me-2" />
-                                                        Assign Permissions
-                                                    </Link>
-                                                )}
-
-                                                {session?.user?.permissions?.includes('delete-ranks') && (
-                                                    <button className="action-item text-danger" onClick={() => { handleDeleteRank(props); setShow(false); }}>
-                                                        <FiTrash2 className="me-2" />
-                                                        Delete
-                                                    </button>
-                                                )}
-                                            </div>
-                                        </Popover.Body>
-                                    </Popover>
-                                </Overlay>
-                            </div>
-                        );
-                    }
+                    cell: (props: any) => (
+                        <ActionCell 
+                            props={props} 
+                            onEdit={handleEditRank} 
+                            onDelete={handleDeleteRank} 
+                            session={session} 
+                        />
+                    )
                 }
             ] : [])
         ];

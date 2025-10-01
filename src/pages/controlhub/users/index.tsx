@@ -33,6 +33,48 @@ import { FiMoreVertical, FiEdit } from 'react-icons/fi';
 
 const ReactApexChart = dynamic(() => import('react-apexcharts'), { ssr: false });
 
+// Action Cell Component
+const ActionCell = ({ props, session }: any) => {
+    const [show, setShow] = useState(false);
+    const target = useRef(null);
+    
+    return (
+        <div className="table-action-dropdown">
+            <Button
+                ref={target}
+                variant="outline-secondary"
+                size="sm"
+                onClick={() => setShow(!show)}
+            >
+                <FiMoreVertical size={14} />
+            </Button>
+
+            <Overlay
+                show={show}
+                target={target.current}
+                placement="left"
+                rootClose
+                onHide={() => setShow(false)}
+            >
+                <Popover className="action-menu-popover">
+                    <Popover.Body className="p-0">
+                        <div className="action-menu">
+                            <Link 
+                                href={`/controlhub/users/${props.encId}`} 
+                                className="action-item"
+                                onClick={() => setShow(false)}
+                            >
+                                <FiEdit className="me-2" />
+                                Edit
+                            </Link>
+                        </div>
+                    </Popover.Body>
+                </Popover>
+            </Overlay>
+        </div>
+    );
+};
+
 interface Summary {
     users: number;
     departments: number;
@@ -109,50 +151,8 @@ const Users = () => {
         sortable: false,
         cell: (props: any) => (
             <div className="d-flex gap-3">
-                {session?.user?.permissions?.includes('edit-users')  && (
-                      
-                    <div className="table-action-dropdown">
-                        {(() => {
-                            const [show, setShow] = useState(false);
-                            const target = useRef(null);
-                            
-                            return (
-                                <>
-                                    <Button
-                                        ref={target}
-                                        variant="outline-secondary"
-                                        size="sm"
-                                        onClick={() => setShow(!show)}
-                                    >
-                                        <FiMoreVertical size={14} />
-                                    </Button>
-
-                                    <Overlay
-                                        show={show}
-                                        target={target.current}
-                                        placement="left"
-                                        rootClose
-                                        onHide={() => setShow(false)}
-                                    >
-                                        <Popover className="action-menu-popover">
-                                            <Popover.Body className="p-0">
-                                                <div className="action-menu">
-                                                    <Link 
-                                                        href={`/controlhub/users/${props.encId}`} 
-                                                        className="action-item"
-                                                        onClick={() => setShow(false)}
-                                                    >
-                                                        <FiEdit className="me-2" />
-                                                        Edit
-                                                    </Link>
-                                                </div>
-                                            </Popover.Body>
-                                        </Popover>
-                                    </Overlay>
-                                </>
-                            );
-                        })()}
-                    </div>
+                {session?.user?.permissions?.includes('edit-users') && (
+                    <ActionCell props={props} session={session} />
                 )}
             </div>
         ),

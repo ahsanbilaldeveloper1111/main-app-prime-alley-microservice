@@ -20,6 +20,53 @@ import '@assets/scss/common.scss';
 import SuccessfulModal from '@pages/partial/SuccessfulModal';
 import ConfirmModal from '@pages/partial/ConfirmModal';
 
+// Action Cell Component
+const ActionCell = ({ props, onEdit, onDelete, session }: any) => {
+    const [show, setShow] = useState(false);
+    const target = useRef(null);
+    
+    return (
+        <div className="table-action-dropdown">
+            <Button
+                ref={target}
+                variant="outline-secondary"
+                size="sm"
+                onClick={() => setShow(!show)}
+            >
+                <FiMoreVertical size={14} />
+            </Button>
+
+            <Overlay
+                show={show}
+                target={target.current}
+                placement="left"
+                rootClose
+                onHide={() => setShow(false)}
+            >
+                <Popover className="action-menu-popover">
+                    <Popover.Body className="p-0">
+                        <div className="action-menu">
+                            {session?.user?.permissions?.includes('edit-groups') && (
+                                <button className="action-item action-edit" onClick={() => { onEdit(props); setShow(false); }}>
+                                    <FiEdit className="me-2" />
+                                    Edit
+                                </button>
+                            )}
+
+                            {session?.user?.permissions?.includes('delete-groups') && (
+                                <button className="action-item text-danger" onClick={() => { onDelete(props); setShow(false); }}>
+                                    <FiTrash2 className="me-2" />
+                                    Delete
+                                </button>
+                            )}
+                        </div>
+                    </Popover.Body>
+                </Popover>
+            </Overlay>
+        </div>
+    );
+};
+
 
 const Groups = () => {
     const { data:session, status } = useSession();
@@ -34,52 +81,14 @@ const Groups = () => {
                 name: 'ACTION',
                 selector: (row: any) => row.id,
                 sortable: false,
-                
-                cell: (props: any) => {
-                    const [show, setShow] = useState(false);
-                    const target = useRef(null);
-                    
-                    return (
-                        <div className="table-action-dropdown">
-                            <Button
-                                ref={target}
-                                variant="outline-secondary"
-                                size="sm"
-                                onClick={() => setShow(!show)}
-                            >
-                                <FiMoreVertical size={14} />
-                            </Button>
-
-                            <Overlay
-                                show={show}
-                                target={target.current}
-                                placement="left"
-                                rootClose
-                                onHide={() => setShow(false)}
-                            >
-                                <Popover className="action-menu-popover">
-                                    <Popover.Body className="p-0">
-                                        <div className="action-menu">
-                                            {session?.user?.permissions?.includes('edit-groups') && (
-                                                <button className="action-item action-edit" onClick={() => { handleEditGroup(props); setShow(false); }}>
-                                                    <FiEdit className="me-2" />
-                                                    Edit
-                                                </button>
-                                            )}
-
-                                            {session?.user?.permissions?.includes('delete-groups') && (
-                                                <button className="action-item text-danger" onClick={() => { handleDeleteGroup(props); setShow(false); }}>
-                                                    <FiTrash2 className="me-2" />
-                                                    Delete
-                                                </button>
-                                            )}
-                                        </div>
-                                    </Popover.Body>
-                                </Popover>
-                            </Overlay>
-                        </div>
-                    );
-                }
+                cell: (props: any) => (
+                    <ActionCell 
+                        props={props} 
+                        onEdit={handleEditGroup} 
+                        onDelete={handleDeleteGroup} 
+                        session={session} 
+                    />
+                )
             }
         ] : [])
     ];
