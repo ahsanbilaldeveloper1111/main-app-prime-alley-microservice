@@ -1255,6 +1255,40 @@ export const createCrmDataFiltersConfig = (
       ]
     },
     {
+      id: 'campaigns',
+      title: 'Campaigns',
+      icon: 'ti ti-target',
+      fields: [
+        {
+          type: 'select',
+          isMulti: true,
+          name: 'campaign_id',
+          label: 'Filter by Campaigns',
+          options: campaigns.map((campaign: { id: string; name: string }) => ({
+            value: campaign.id,
+            label: campaign.name
+          })) || []
+        }
+      ]
+    },
+    {
+      id: 'tags',
+      title: 'Tags',
+      icon: 'ti ti-tag',
+      fields: [
+        {
+          type: 'select',
+          isMulti: true,
+          name: 'tags',
+          label: 'Filter by Tags',
+          options: staticTags.map((tag: { value: string; label: string }) => ({
+            value: tag.value,
+            label: tag.label
+          })) || []
+        }
+      ]
+    },
+    {
       id: 'date-range',
       title: 'Date Range',
       icon: 'ti ti-calendar',

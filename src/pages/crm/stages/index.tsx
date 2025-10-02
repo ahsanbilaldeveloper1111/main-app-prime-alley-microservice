@@ -20,6 +20,15 @@ import {
   FiSave,
 } from "react-icons/fi";
 import { toast } from "react-toastify";
+import "@assets/scss/common.scss";
+import "@assets/scss/tabs.scss";
+import PageHeader from "@components/PageHeader";
+import FormModal from "../../partial/FormModal";
+import ConfirmModal from "@pages/partial/ConfirmModal";
+import SuccessfulModal from "@pages/partial/SuccessfulModal";
+import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
+import DatatableActionButton from "@components/DatatableActionButton";
+
 
 interface Stage {
   id: number;
@@ -53,16 +62,22 @@ const StagesManagement = () => {
     active: true,
   });
 
+  const [currentFilters, setCurrentFilters] = useState({search: ""});
+  const handleFiltersChange = (filters: any) => {
+    setCurrentFilters(filters);
+  };
+
 
 
   const fetchStagesForTable = useCallback(
     async (page = 1, perPage = 15, search = "") => {
       try {
         const stagesData = await getStages();
+        const searchTerm = currentFilters.search || search;
         const filteredStages = stagesData.filter((stage) => {
-          if (!search) return true;
-          return !!stage.name.toLowerCase().includes(search.toLowerCase()) ||
-                 !!stage.description?.toLowerCase().includes(search.toLowerCase());
+          if (!searchTerm) return true;
+          return !!stage.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                 !!stage.description?.toLowerCase().includes(searchTerm.toLowerCase());
         });
         
         return {
@@ -87,7 +102,7 @@ const StagesManagement = () => {
         };
       }
     },
-    []
+    [currentFilters]
   );
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -108,12 +123,22 @@ const StagesManagement = () => {
         is_default: false,
         active: true,
       });
+      setShowSuccessfulModal(true);
+      setSuccessModalTitle("Stage Created");
+      setSuccessModalDescription("Stage created successfully!");
       setRefreshKey((oldKey) => oldKey + 1);
     } catch (error) {
       toast.error("Failed to create stage");
       console.error("Create stage error:", error);
     }
   };
+
+  const [showSuccessfulModal, setShowSuccessfulModal] = useState(false)
+  const [successModalTitle, setSuccessModalTitle] = useState('')
+  const [successModalDescription, setSuccessModalDescription] = useState('')
+  const handleCloseSuccessfulModal = () => {
+      setShowSuccessfulModal(false)
+  }
 
   const handleDeleteStage = async () => {
     if (!stageToDelete) return;
@@ -123,6 +148,9 @@ const StagesManagement = () => {
       toast.success("Stage deleted successfully!");
       setShowDeleteModal(false);
       setStageToDelete(null);
+      setShowSuccessfulModal(true);
+      setSuccessModalTitle("Stage Deleted");
+      setSuccessModalDescription("Stage deleted successfully!");
       setRefreshKey((oldKey) => oldKey + 1);
     } catch (error) {
       toast.error("Failed to delete stage");
@@ -139,15 +167,15 @@ const StagesManagement = () => {
 
   const getStatusBadge = (stage: Stage) => {
     if (stage.is_won) {
-      return <Badge bg="success">Won</Badge>;
+      return <span className="status-badge success">Won</span>;
     }
     if (stage.fold) {
-      return <Badge bg="danger">Fold</Badge>;
+      return <span className="status-badge danger">Fold</span>;
     }
     if (stage.is_default) {
-      return <Badge bg="primary">Default</Badge>;
+      return <span className="status-badge primary">Default</span>;
     }
-    return <Badge bg="secondary">Active</Badge>;
+    return <span className="status-badge success">Active</span>;
   };
 
   // Memoized columns for the table
@@ -157,21 +185,7 @@ const StagesManagement = () => {
         key: "name",
         name: "Stage",
         selector: (row: Stage) => row.name,
-        sortable: true,
-        cell: (props: Stage) => (
-          <div className="d-flex align-items-center">
-            <div
-              className="me-2"
-              style={{
-                width: "12px",
-                height: "12px",
-                backgroundColor: props.color,
-                borderRadius: "50%"
-              }}
-            />
-            <strong>{props.name}</strong>
-          </div>
-        ),
+        sortable: true
       },
       {
         key: "sequence",
@@ -179,7 +193,7 @@ const StagesManagement = () => {
         selector: (row: Stage) => row.sequence,
         sortable: true,
         cell: (props: Stage) => (
-          <Badge bg="secondary">{props.sequence}</Badge>
+          <span className="status-badge info">{props.sequence}</span>
         ),
       },
       {
@@ -198,7 +212,7 @@ const StagesManagement = () => {
                 borderRadius: "4px"
               }}
             />
-            <small className="text-muted">{props.color}</small>
+            <span className="status-badge info">{props.color}</span>
           </div>
         ),
       },
@@ -215,9 +229,9 @@ const StagesManagement = () => {
         selector: (row: Stage) => row.description || "",
         sortable: true,
         cell: (props: Stage) => (
-          <small className="text-muted">
-            {props.description || "No description"}
-          </small>
+          
+            <p>{props.description || "No description"}</p>
+         
         ),
       },
       {
@@ -226,9 +240,9 @@ const StagesManagement = () => {
         selector: (row: Stage) => row.created_at,
         sortable: true,
         cell: (props: Stage) => (
-          <small className="text-muted">
+          <p>
             {new Date(props.created_at).toLocaleDateString()}
-          </small>
+          </p>
         ),
       },
       {
@@ -237,17 +251,19 @@ const StagesManagement = () => {
         selector: (row: Stage) => row.id,
         sortable: false,
         cell: (props: Stage) => (
-          <Button
-            variant="outline-danger"
-            size="sm"
-            onClick={() => {
-              setStageToDelete(props);
-              setShowDeleteModal(true);
-            }}
-            disabled={props.is_default}
-          >
-            <FiTrash2 />
-          </Button>
+          <DatatableActionButton
+            actions={[
+              {
+                label: 'Delete',
+                icon: <FiTrash2 />,
+                onClick: () => {
+                  setStageToDelete(props);
+                  setShowDeleteModal(true);
+                },
+                className: 'text-danger',
+              },
+            ]}
+          />
         ),
       },
     ],
@@ -264,25 +280,22 @@ const StagesManagement = () => {
         subTitle="Stages"
       />
 
-      <div className="container-fluid">
-        {/* Header */}
-        <div className="row mb-4">
-          <div className="col-12">
-            <div className="d-flex justify-content-between align-items-center">
-              <div>
-                <h1 className="h3 mb-0">Stages Management</h1>
-                <p className="text-muted">Manage your CRM pipeline stages</p>
-              </div>
-              <div>
-                <Button variant="primary" onClick={() => setShowCreateModal(true)}>
-                  <FiPlus className="me-2" />
-                  New Stage
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
+      <PageHeader
+        title="Stages"
+        showSearch={true}
+        searchPlaceholder="Search stages..."
+        searchValue={currentFilters.search || ""}
+        onSearchChange={(value) => handleFiltersChange({...currentFilters, search: value})}
+        buttons={
+          <Button variant="primary" onClick={() => setShowCreateModal(true)}>
+            <FiPlus className="me-2" />
+            New Stage
+          </Button>
+        }
+      />
 
+      <div className="container-fluid">
+        
         {/* Stages List */}
         <div className="row">
           <div className="col-12">
@@ -294,19 +307,43 @@ const StagesManagement = () => {
               defaultPageSize={15}
               refreshKey={refreshKey}
               filters={filters}
-              pagination={false}
+              search={false}
+              tableStyle="table-style-2"
+             
             />
           </div>
         </div>
       </div>
 
       {/* Create Stage Modal */}
-      <Modal show={showCreateModal} onHide={() => setShowCreateModal(false)} size="lg">
+      {/* <Modal show={showCreateModal} onHide={() => setShowCreateModal(false)} size="lg">
         <Modal.Header closeButton>
           <Modal.Title>Create New Stage</Modal.Title>
         </Modal.Header>
         <Modal.Body>
-          <Form onSubmit={handleSubmit}>
+          
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowCreateModal(false)}>
+            Cancel
+          </Button>
+          <Button type="submit" variant="primary" onClick={handleSubmit}>
+            <FiSave className="me-2" />
+            Create Stage
+          </Button>
+        </Modal.Footer>
+      </Modal> */}
+
+
+
+      <FormModal
+        show={showCreateModal}
+        onHide={() => setShowCreateModal(false)}
+        title="Create Stage"
+        desc="Please fill in the details below to create a new stage."
+        formHtml={
+         <>
+         <Form onSubmit={handleSubmit}>
             <Row>
               <Col md={6}>
                 <Form.Group className="mb-3">
@@ -394,44 +431,44 @@ const StagesManagement = () => {
               />
             </Form.Group>
           </Form>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={() => setShowCreateModal(false)}>
-            Cancel
-          </Button>
-          <Button type="submit" variant="primary" onClick={handleSubmit}>
-            <FiSave className="me-2" />
-            Create Stage
-          </Button>
-        </Modal.Footer>
-      </Modal>
+         </>
+        }
+        submitButtonText="Create Stage"
+        cancelButtonText="Cancel"
+        onSubmit={() => {
+          const mockEvent = { preventDefault: () => {} } as React.FormEvent;
+          handleSubmit(mockEvent);
+        }}
+        onCancel={() => setShowCreateModal(false)}
+        submitButtonVariant="primary"
+        cancelButtonVariant="secondary"
+      />
 
       {/* Delete Confirmation Modal */}
-      <Modal show={showDeleteModal} onHide={() => setShowDeleteModal(false)}>
-        <Modal.Header closeButton>
-          <Modal.Title>Delete Stage</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <Alert variant="warning">
-            <strong>Warning!</strong> Deleting this stage will affect all leads and opportunities currently assigned to it.
-          </Alert>
-          <p>
-            Are you sure you want to delete the stage <strong>{stageToDelete?.name}</strong>?
-          </p>
-          <p className="text-muted">
-            This action cannot be undone.
-          </p>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={() => setShowDeleteModal(false)}>
-            Cancel
-          </Button>
-          <Button variant="danger" onClick={handleDeleteStage}>
-            <FiTrash2 className="me-2" />
-            Delete Stage
-          </Button>
-        </Modal.Footer>
-      </Modal>
+      <ConfirmModal
+        show={showDeleteModal}
+        onHide={() => setShowDeleteModal(false)}
+        title="Delete Stage"
+        description="Are you sure you want to delete this stage?"
+        targetName={stageToDelete?.name || ""}
+        onConfirm={handleDeleteStage}
+        confirmButtonText="Delete"
+        confirmButtonVariant="danger"
+        requireTextConfirmation={true}
+        requiredConfirmationText="delete"
+      />
+
+
+	
+<SuccessfulModal
+          show={showSuccessfulModal}
+          onHide={() => setShowSuccessfulModal(false)}
+          title={successModalTitle}
+          description={successModalDescription}
+        />
+		
+
+
     </React.Fragment>
   );
 };

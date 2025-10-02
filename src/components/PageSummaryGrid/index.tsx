@@ -25,6 +25,9 @@ export interface PageSummaryGridProps {
   cardClassName?: string;
   animationStagger?: number;
   baseDelay?: number;
+  gridColumns?: 2 | 3 | 4;
+  cardHeading?: 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6';
+  gridTextAlign?: 'left' | 'center' | 'right';
 }
 
 const PageSummaryGrid: React.FC<PageSummaryGridProps> = ({
@@ -32,14 +35,25 @@ const PageSummaryGrid: React.FC<PageSummaryGridProps> = ({
   className = "dashboard-grid",
   cardClassName = "dashboard-card",
   animationStagger = 0.2,
-  baseDelay = 0.1
+  baseDelay = 0.1,
+  gridColumns,
+  cardHeading = 'h3',
+  gridTextAlign = 'left'
 }) => {
+  const getGridClassName = () => {
+    if (gridColumns) {
+      return `${className} grid-${gridColumns}-columns`;
+    }
+    return className;
+  };
+
   return (
-    <div className={className}>
+    <div className={getGridClassName()}>
       {cards.map((card, index) => (
         <motion.div
           key={card.id}
           className={cardClassName}
+          style={{ textAlign: gridTextAlign }}
           initial={{ opacity: 0, x: -100, scale: 0.8 }}
           animate={{ opacity: 1, x: 0, scale: 1 }}
           transition={{
@@ -54,7 +68,7 @@ const PageSummaryGrid: React.FC<PageSummaryGridProps> = ({
             transition: { duration: 0.2 }
           }}
         >
-          <h3>{card.title}</h3>
+          {React.createElement(cardHeading, null, card.title)}
           <div className="value" id={`${card.id}-count`}>
             {card.value > 0 && card.showAnimatedNumber !== false ? (
               <AnimatedNumber 

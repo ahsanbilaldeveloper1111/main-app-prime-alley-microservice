@@ -43,6 +43,16 @@ import { toast } from "react-toastify";
 import CampaignFilters from "@components/filters/CampaignFilters";
 import Select from "react-select";
 import { GetHierarchyData } from "@utils/users";
+import DatatableActionButton from "@components/DatatableActionButton";
+import "@assets/scss/common.scss";
+import "@assets/scss/tabs.scss";
+
+import FormModal from "@pages/partial/FormModal";
+import '@assets/scss/common.scss';
+import SuccessfulModal from '@pages/partial/SuccessfulModal'
+import PageHeader from "@components/PageHeader";
+import ConfirmModal from "@pages/partial/ConfirmModal";
+import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
 
 const CrmCampaigns = () => {
   const [refreshKey, setRefreshKey] = useState(0);
@@ -311,9 +321,9 @@ const CrmCampaigns = () => {
         cell: (props: any) => {
           const status = props.status || "inactive";
           return (
-            <Badge bg={status === "active" ? "success" : "secondary"}>
+            <span className={`status-badge ${status === "active" ? "success" : "danger"}`}>
               {status.charAt(0).toUpperCase() + status.slice(1)}
-            </Badge>
+            </span>
           );
         },
       },
@@ -362,29 +372,26 @@ const CrmCampaigns = () => {
         selector: (row: any) => row.id,
         sortable: false,
         cell: (props: any) => (
-          <Dropdown>
-            <Dropdown.Toggle variant="outline-secondary" size="sm">
-              Actions
-            </Dropdown.Toggle>
-            <Dropdown.Menu>
-              <Dropdown.Item onClick={() => handleViewCampaign(props)}>
-                <FiEye className="me-2" />
-                View
-              </Dropdown.Item>
-              <Dropdown.Item onClick={() => handleEditCampaign(props)}>
-                <FiEdit className="me-2" />
-                Edit
-              </Dropdown.Item>
-              <Dropdown.Divider />
-              <Dropdown.Item
-                onClick={() => handleDeleteCampaign(props)}
-                className="text-danger"
-              >
-                <FiTrash2 className="me-2" />
-                Delete
-              </Dropdown.Item>
-            </Dropdown.Menu>
-          </Dropdown>
+          <DatatableActionButton
+            actions={[
+              {
+                label: 'View',
+                icon: <FiEye className="me-2" />,
+                onClick: () => handleViewCampaign(props),
+              },
+              {
+                label: 'Edit',
+                icon: <FiEdit className="me-2" />,
+                onClick: () => handleEditCampaign(props),
+              },
+              {
+                label: 'Delete',
+                icon: <FiTrash2 className="me-2" />,
+                onClick: () => handleDeleteCampaign(props),
+                className: 'text-danger',
+              },
+            ]}
+          />
         ),
       },
     ],
@@ -399,29 +406,30 @@ const CrmCampaigns = () => {
         subTitle="Campaigns"
       />
 
-      <div className="container-fluid">
-        {/* Header */}
-        <div className="row mb-4">
-          <div className="col-12">
-            <div className="d-flex justify-content-between align-items-center">
-              <div>
-                <h1 className="h3 mb-0">Campaign Management</h1>
-                <p className="text-muted">Manage and track your marketing campaigns</p>
-              </div>
-              <div>
-                <Button onClick={handleCreateCampaign} className="btn btn-primary">
-                  <FiPlus className="me-2" />
-                  New Campaign
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Campaign Filters */}
-        <div className="row mb-3">
+      <PageHeader
+        title="Campaigns"
+        showSearch={true}
+        searchPlaceholder="Search campaigns..."
+        searchValue={currentFilters.search || ""}
+        onSearchChange={(value) => handleFiltersChange({...currentFilters, search: value})}
+        
+        buttons={
+          <>
+          
           <CampaignFilters onFiltersChange={handleFiltersChange} />
-        </div>
+          
+          <Button onClick={handleCreateCampaign} className="btn btn-primary">
+            <FiPlus className="me-2" />
+            New Campaign
+          </Button>
+          </>
+        }
+      />
+
+      <div className="container-fluid">
+        
+
+      
 
         {/* Campaigns List */}
         <div className="row">
@@ -436,6 +444,8 @@ const CrmCampaigns = () => {
                   defaultPageSize={15}
                   filters={memoizedFilters}
                   refreshKey={refreshKey}
+                  search={false}
+                  tableStyle="table-style-2"
                 />
               </Card.Body>
             </Card>
@@ -444,23 +454,22 @@ const CrmCampaigns = () => {
       </div>
 
       {/* Create/Edit Campaign Modal */}
-      <Modal 
-        show={showCreateModal || showEditModal} 
+     
+
+
+      <FormModal
+         show={showCreateModal || showEditModal} 
         onHide={() => {
           setShowCreateModal(false);
           setShowEditModal(false);
           setSelectedCampaign(null);
           setCampaignUsers([]);
         }}
-        size="xl"
-      >
-        <Modal.Header closeButton>
-          <Modal.Title>
-            {showEditModal ? `Edit Campaign: ${selectedCampaign?.name}` : "Create New Campaign"}
-          </Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <Row>
+        title= {showEditModal ? `Edit Campaign: ${selectedCampaign?.name}` : "Create New Campaign"}
+        desc="Please fill the details below to create the campaign."
+        formHtml={
+          <>
+           <Row>
             <Col md={6}>
               <Form.Group className="mb-3">
                 <Form.Label>Campaign Name *</Form.Label>
@@ -549,10 +558,10 @@ const CrmCampaigns = () => {
           <div className="border-top pt-3">
             <div className="d-flex justify-content-between align-items-center mb-3">
               <h5>Campaign Fields</h5>
-              <Button variant="outline-primary" size="sm" onClick={handleAddField}>
+              {/* <Button variant="outline-primary" size="sm" onClick={handleAddField}>
                 <FiPlus className="me-1" />
                 Add Field
-              </Button>
+              </Button> */}
             </div>
 
             {/* Add New Field Form */}
@@ -581,7 +590,7 @@ const CrmCampaigns = () => {
                     </Form.Select>
                   </Col>
                   <Col md={3}>
-                    <Button variant="success" size="sm" onClick={handleAddField}>
+                    <Button variant="success" className="app-button" onClick={handleAddField}>
                       Add Field
                     </Button>
                   </Col>
@@ -594,7 +603,7 @@ const CrmCampaigns = () => {
               <Card key={index} className="mb-2">
                 <Card.Body>
                   <Row className="align-items-center">
-                    <Col md={3}>
+                    <Col md={4}>
                       <Form.Control
                         type="text"
                         value={field.field_name}
@@ -605,7 +614,7 @@ const CrmCampaigns = () => {
                         }}
                       />
                     </Col>
-                    <Col md={2}>
+                    <Col md={3}>
                       <Form.Select
                         value={field.field_type}
                         onChange={(e) => handleFieldTypeChange(index, e.target.value)}
@@ -618,11 +627,25 @@ const CrmCampaigns = () => {
                         <option value="dropdown">Dropdown</option>
                       </Form.Select>
                     </Col>
-                    <Col md={4}>
-                      {field.field_type === "dropdown" && (
+                    
+                  
+                    <Col md={1}>
+                      <Button
+                        variant="danger"
+                        className="app-button"
+                        onClick={() => handleRemoveField(index)}
+                      >
+                        <FiTrash2 /> Delete
+                      </Button>
+                    </Col>
+
+                    <Col md={12} className="mt-3">
+                    {field.field_type === "dropdown" && (
+
                         <div>
                           {field.field_options?.map((option: string, optionIndex: number) => (
-                            <div key={optionIndex} className="d-flex mb-1">
+                            <div key={optionIndex} className="d-flex mb-3 row align-items-center justify-content-left">
+                              <Col md={5}>
                               <Form.Control
                                 type="text"
                                 size="sm"
@@ -630,18 +653,23 @@ const CrmCampaigns = () => {
                                 onChange={(e) => handleFieldOptionChange(index, optionIndex, e.target.value)}
                                 placeholder="Option value"
                               />
+                              </Col>
+                              <Col md={5}>
                               <Button
-                                variant="outline-danger"
+                                variant="danger"
                                 size="sm"
-                                className="ms-1"
+                                className="app-button"
                                 onClick={() => handleRemoveFieldOption(index, optionIndex)}
-                              >
-                                <FiX />
-                              </Button>
+                              >Remove Option</Button>
+                              </Col>
+                            
                             </div>
                           ))}
+
+
                           <Button
-                            variant="outline-primary"
+                            variant="primary"
+                            className="app-button"
                             size="sm"
                             onClick={() => handleAddFieldOption(index)}
                           >
@@ -650,15 +678,7 @@ const CrmCampaigns = () => {
                         </div>
                       )}
                     </Col>
-                    <Col md={1}>
-                      <Button
-                        variant="outline-danger"
-                        size="sm"
-                        onClick={() => handleRemoveField(index)}
-                      >
-                        <FiTrash2 />
-                      </Button>
-                    </Col>
+
                   </Row>
                 </Card.Body>
               </Card>
@@ -670,50 +690,41 @@ const CrmCampaigns = () => {
               </Alert>
             )}
           </div>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button 
-            variant="secondary" 
-            onClick={() => {
-              setShowCreateModal(false);
-              setShowEditModal(false);
-              setSelectedCampaign(null);
-              setCampaignUsers([]);
-            }}
-          >
-            Cancel
-          </Button>
-          <Button 
-            variant="primary" 
-            onClick={handleFormSubmit}
-            disabled={loading}
-          >
-            {loading ? "Saving..." : showEditModal ? "Update Campaign" : "Create Campaign"}
-          </Button>
-        </Modal.Footer>
-      </Modal>
+          </>
+        }
+        submitButtonText="Create Campaign"
+        cancelButtonText="Cancel"
+        onSubmit={() => handleFormSubmit()}
+        onCancel={() => {
+          setShowCreateModal(false);
+          setShowEditModal(false);
+          setSelectedCampaign(null);
+          setCampaignUsers([]);
+        }}
+      />
 
       {/* View Campaign Modal */}
-      <Modal 
-        show={showViewModal} 
+      
+
+
+      <FormModal
+        show={showViewModal}
         onHide={() => {
           setShowViewModal(false);
           setSelectedCampaign(null);
         }}
-        size="lg"
-      >
-        <Modal.Header closeButton>
-          <Modal.Title>Campaign Details: {selectedCampaign?.name}</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          {selectedCampaign && (
+        title={`View Campaign: ${selectedCampaign?.name}`}
+        desc="Please find the details for the campaign."
+        formHtml={
+          <>
+           {selectedCampaign && (
             <div>
               <Row className="mb-3">
                 <Col md={6}>
                   <strong>Status:</strong> 
-                  <Badge bg={selectedCampaign.status === "active" ? "success" : "secondary"} className="ms-2">
+                  <span className ={`status-badge text-uppercase ${selectedCampaign.status === "active" ? "success" : "secondary"}`}>
                     {selectedCampaign.status}
-                  </Badge>
+                  </span>
                 </Col>
                 <Col md={6}>
                   <strong>Created:</strong> 
@@ -755,10 +766,10 @@ const CrmCampaigns = () => {
               )}
 
               <div className="border-top pt-3">
-                <h6>Campaign Fields ({selectedCampaign.fields?.length || 0})</h6>
+                <h4 className="mb-3 app-heading">Campaign Fields ({selectedCampaign.fields?.length || 0})</h4>
                 {selectedCampaign.fields && selectedCampaign.fields.length > 0 ? (
                   <div className="table-responsive">
-                    <table className="table table-sm">
+                    <table className="table table-bordered">
                       <thead>
                         <tr>
                           <th>Field Name</th>
@@ -771,19 +782,19 @@ const CrmCampaigns = () => {
                           <tr key={index}>
                             <td>{field.field_name}</td>
                             <td>
-                              <Badge bg="info">{field.field_type}</Badge>
+                              <span className="status-badge primary text-capitalize">{field.field_type}</span>
                             </td>
                             <td>
                               {field.field_type === "dropdown" && field.field_options ? (
                                 <div>
                                   {field.field_options.map((option: string, optIndex: number) => (
-                                    <Badge key={optIndex} bg="light" text="dark" className="me-1">
+                                    <span key={optIndex} className="status-badge info me-1">
                                       {option}
-                                    </Badge>
+                                    </span>
                                   ))}
                                 </div>
                               ) : (
-                                <span className="text-muted">-</span>
+                                <span className="status-badge info">N/A</span>
                               )}
                             </td>
                           </tr>
@@ -797,31 +808,36 @@ const CrmCampaigns = () => {
               </div>
             </div>
           )}
-        </Modal.Body>
-        <Modal.Footer>
-          <Button 
-            variant="secondary" 
-            onClick={() => {
-              setShowViewModal(false);
-              setSelectedCampaign(null);
-            }}
-          >
-            Close
-          </Button>
-          <Button 
-            variant="primary" 
-            onClick={() => {
-              setShowViewModal(false);
-              handleEditCampaign(selectedCampaign);
-            }}
-          >
-            Edit Campaign
-          </Button>
-        </Modal.Footer>
-      </Modal>
+          </>
+        }
+        submitButtonText="Edit Campaign"
+        cancelButtonText="Close"
+        onSubmit={() => {
+          setShowViewModal(false);
+          handleEditCampaign(selectedCampaign);
+        }}
+        onCancel={() => {
+          setShowViewModal(false);
+          setSelectedCampaign(null);
+        }}
+      />
+
+
+
+
+
+
+
+     
+
+
+
+
+
+
 
       {/* Delete Confirmation Modal */}
-      <Modal show={showDeleteModal} onHide={() => setShowDeleteModal(false)}>
+      {/* <Modal show={showDeleteModal} onHide={() => setShowDeleteModal(false)}>
         <Modal.Header closeButton>
           <Modal.Title>Delete Campaign</Modal.Title>
         </Modal.Header>
@@ -837,7 +853,28 @@ const CrmCampaigns = () => {
             {loading ? "Deleting..." : "Delete"}
           </Button>
         </Modal.Footer>
-      </Modal>
+      </Modal> */}
+
+
+      <ConfirmModal
+        show={showDeleteModal}
+        onHide={() => setShowDeleteModal(false)}
+          title="Delete Campaign"
+          description={`Are you sure you want to delete the campaign ${selectedCampaign?.name}?`}
+        onConfirm={confirmDeleteCampaign}
+        targetName={selectedCampaign?.name}
+        confirmButtonText="Delete"
+        confirmButtonVariant="danger"
+        requireTextConfirmation={true}
+        requiredConfirmationText="delete"
+      />
+
+
+
+
+
+
+
     </React.Fragment>
   );
 };
