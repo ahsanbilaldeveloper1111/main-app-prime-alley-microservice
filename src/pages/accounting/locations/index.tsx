@@ -87,19 +87,6 @@ const LocationList = () => {
         ),
       },
       {
-        key: "contact",
-        name: "Contact",
-        selector: (row: InventoryLocationData) => row.phone,
-        sortable: true,
-        cell: (props: InventoryLocationData) => (
-          <div className="text-muted small">
-            {props.phone && <div>Phone: {props.phone}</div>}
-            {props.email && <div>Email: {props.email}</div>}
-            {!props.phone && !props.email && "No contact info"}
-          </div>
-        ),
-      },
-      {
         key: "created_at",
         name: "Created",
         selector: (row: InventoryLocationData) => row.created_at,

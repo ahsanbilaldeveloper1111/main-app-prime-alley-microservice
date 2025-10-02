@@ -16,12 +16,16 @@ import {
   deleteInvoice,
   getInvoice,
   getActiveProducts,
+  getPaymentMethods,
+  payInvoice,
   InvoiceData,
   InvoiceCreateUpdatePayload,
   InvoiceItemCreateUpdatePayload,
   InvoiceItemData,
   CompanyData,
   ProductData,
+  PaymentMethodData,
+  InvoicePaymentPayload,
 } from "@utils/accounting";
 import { getCompanies } from "@utils/accounting";
 import { Column } from "@components/CustomDataTable";
@@ -41,10 +45,11 @@ import ConfirmModal from "@pages/partial/ConfirmModal";
 import SuccessfulModal from "@pages/partial/SuccessfulModal";
 
 import { motion } from "framer-motion";
-import { FiEdit, FiTrash2, FiPrinter, FiDownload } from "react-icons/fi";
+import { FiEdit, FiTrash2, FiPrinter, FiDownload, FiCreditCard, FiDollarSign } from "react-icons/fi";
 import TableAction from "@components/TableAction";
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { Spinner } from "react-bootstrap";
 
 // Extend jsPDF type to include autoTable
 declare module 'jspdf' {
@@ -62,6 +67,192 @@ interface InvoiceFormData extends Omit<InvoiceData, 'items'> {
   items: InvoiceItemCreateUpdatePayload[];
 }
 
+// Payment Cards Component for Display
+const PaymentCardsDisplay = ({ 
+  paymentMethods, 
+  isLoadingPaymentMethods 
+}: { 
+  paymentMethods: PaymentMethodData[]; 
+  isLoadingPaymentMethods: boolean; 
+}) => {
+  console.log("PaymentCardsDisplay - paymentMethods:", paymentMethods);
+  console.log("PaymentCardsDisplay - isLoadingPaymentMethods:", isLoadingPaymentMethods);
+
+  if (isLoadingPaymentMethods) {
+    return (
+      <div className="text-center py-3">
+        <Spinner animation="border" size="sm" className="me-2" />
+        <span>Loading payment methods...</span>
+      </div>
+    );
+  }
+
+  if (paymentMethods.length === 0) {
+    return (
+      <div className="text-center py-3 text-muted">
+        <FiCreditCard size={24} className="mb-2" />
+        <div>No payment methods available</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="row">
+      {paymentMethods.map((method) => (
+        <div key={method.id} className="col-md-6 mb-3">
+          <div className="card h-100">
+            <div className="card-body">
+              <div className="d-flex justify-content-between align-items-start mb-2">
+                <div className="d-flex align-items-center">
+                  <FiCreditCard className="me-2 text-primary" />
+                  <span className="badge bg-primary">
+                    {method.type === "card" ? "Card" : "Bank Account"}
+                  </span>
+                  {method.is_default && (
+                    <span className="badge bg-success ms-2">Default</span>
+                  )}
+                </div>
+              </div>
+              
+              {method.type === "card" && method.card ? (
+                <div>
+                  <div className="fw-bold mb-1">
+                    {method.card.brand.toUpperCase()} •••• {method.card.last4}
+                  </div>
+                  <div className="text-muted small mb-2">
+                    Expires {method.card.exp_month}/{method.card.exp_year}
+                  </div>
+                  {method.billing_details?.name && (
+                    <div className="text-info small">
+                      <i className="fas fa-user me-1"></i>
+                      {method.billing_details.name}
+                    </div>
+                  )}
+                </div>
+              ) : method.type === "bank_account" && method.bank_account ? (
+                <div>
+                  <div className="fw-bold mb-1">
+                    {method.bank_account.bank_name} •••• {method.bank_account.last4}
+                  </div>
+                  <div className="text-muted small mb-2">
+                    Routing: {method.bank_account.routing_number}
+                  </div>
+                  {method.billing_details?.name && (
+                    <div className="text-info small">
+                      <i className="fas fa-user me-1"></i>
+                      {method.billing_details.name}
+                    </div>
+                  )}
+                </div>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+// Payment Selection Component for Payment Modal
+const PaymentMethodSelector = ({ 
+  paymentMethods, 
+  selectedPaymentMethod,
+  onPaymentMethodSelect,
+  isLoadingPaymentMethods 
+}: { 
+  paymentMethods: PaymentMethodData[]; 
+  selectedPaymentMethod: string;
+  onPaymentMethodSelect: (methodId: string) => void;
+  isLoadingPaymentMethods: boolean; 
+}) => {
+  if (isLoadingPaymentMethods) {
+    return (
+      <div className="text-center py-3">
+        <Spinner animation="border" size="sm" className="me-2" />
+        <span>Loading payment methods...</span>
+      </div>
+    );
+  }
+
+  if (paymentMethods.length === 0) {
+    return (
+      <div className="text-center py-3 text-muted">
+        <FiCreditCard size={24} className="mb-2" />
+        <div>No payment methods available for this company</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="row">
+      {paymentMethods.map((method) => (
+        <div key={method.id} className="col-md-6 mb-3">
+          <div 
+            className={`card h-100 cursor-pointer ${selectedPaymentMethod === method.id ? 'border-primary bg-light' : ''}`}
+            onClick={() => onPaymentMethodSelect(method.id)}
+            style={{ cursor: 'pointer' }}
+          >
+            <div className="card-body">
+              <div className="d-flex justify-content-between align-items-start mb-2">
+                <div className="d-flex align-items-center">
+                  <FiCreditCard className="me-2 text-primary" />
+                  <span className="badge bg-primary">
+                    {method.type === "card" ? "Card" : "Bank Account"}
+                  </span>
+                  {method.is_default && (
+                    <span className="badge bg-success ms-2">Default</span>
+                  )}
+                </div>
+                <div className="form-check">
+                  <input
+                    className="form-check-input"
+                    type="radio"
+                    name="paymentMethod"
+                    checked={selectedPaymentMethod === method.id}
+                    onChange={() => onPaymentMethodSelect(method.id)}
+                  />
+                </div>
+              </div>
+              
+              {method.type === "card" && method.card ? (
+                <div>
+                  <div className="fw-bold mb-1">
+                    {method.card.brand.toUpperCase()} •••• {method.card.last4}
+                  </div>
+                  <div className="text-muted small mb-2">
+                    Expires {method.card.exp_month}/{method.card.exp_year}
+                  </div>
+                  {method.billing_details?.name && (
+                    <div className="text-info small">
+                      <i className="fas fa-user me-1"></i>
+                      {method.billing_details.name}
+                    </div>
+                  )}
+                </div>
+              ) : method.type === "bank_account" && method.bank_account ? (
+                <div>
+                  <div className="fw-bold mb-1">
+                    {method.bank_account.bank_name} •••• {method.bank_account.last4}
+                  </div>
+                  <div className="text-muted small mb-2">
+                    Routing: {method.bank_account.routing_number}
+                  </div>
+                  {method.billing_details?.name && (
+                    <div className="text-info small">
+                      <i className="fas fa-user me-1"></i>
+                      {method.billing_details.name}
+                    </div>
+                  )}
+                </div>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
 const InvoiceList = () => {
   const { data: session, status } = useSession();
 
@@ -70,6 +261,15 @@ const InvoiceList = () => {
 
   const [companies, setCompanies] = useState<CompanyData[]>([]);
   const [products, setProducts] = useState<ProductData[]>([]);
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethodData[]>([]);
+  const [isLoadingPaymentMethods, setIsLoadingPaymentMethods] = useState<boolean>(false);
+  
+  // Payment modal states
+  const [showPaymentModal, setShowPaymentModal] = useState<boolean>(false);
+  const [selectedInvoiceForPayment, setSelectedInvoiceForPayment] = useState<InvoiceData | null>(null);
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>("");
+  const [paymentNotes, setPaymentNotes] = useState<string>("");
+  const [isProcessingPayment, setIsProcessingPayment] = useState<boolean>(false);
 
   const columns: Column[] = useMemo(
     () => [
@@ -184,37 +384,70 @@ const InvoiceList = () => {
         name: "ACTION",
         selector: (row: InvoiceData) => row.id,
         sortable: false,
-        cell: (props: InvoiceData) => (
-          <>  
-          <TableAction
-                    actions={[
-                        {
-                            label: 'Edit',
-                            icon: FiEdit,
-                            onClick: () => handleEditInvoice(props),
-                            variant: 'edit'
-                        },
-                        {
-                            label: 'Download PDF',
-                            icon: FiDownload,
-                            onClick: () => handleDownloadPDF(props),
-                            variant: 'default'
-                        },
-                        {
-                            label: 'Delete',
-                            icon: FiTrash2,
-                            onClick: () => handleDeleteInvoice(props),
-                            variant: 'delete'
-                        },
-                    ]}
-                />
-          </>
-          
-        ),
+        cell: (props: InvoiceData) => {
+          const isUnpaid = props.status === 'draft' || props.status === 'sent' || props.status === 'overdue';
+          const actions = [
+            {
+              label: 'Edit',
+              icon: FiEdit,
+              onClick: () => handleEditInvoice(props),
+              variant: 'edit'
+            },
+            {
+              label: 'Download PDF',
+              icon: FiDownload,
+              onClick: () => handleDownloadPDF(props),
+              variant: 'default'
+            }
+          ];
+
+          // Add Pay action for unpaid invoices
+          if (isUnpaid) {
+            actions.push({
+              label: 'Pay',
+              icon: FiDollarSign,
+              onClick: () => handlePayInvoice(props),
+              variant: 'success'
+            });
+          }
+
+          // Add Delete action
+          actions.push({
+            label: 'Delete',
+            icon: FiTrash2,
+            onClick: () => handleDeleteInvoice(props),
+            variant: 'delete'
+          });
+
+          return (
+            <TableAction actions={actions} />
+          );
+        },
       },
     ],
     [session?.user?.permissions]
   );
+
+  // Load payment methods for a company
+  const loadPaymentMethods = useCallback(async (companyId: number) => {
+    if (!companyId) {
+      console.log("No company ID provided to loadPaymentMethods");
+      return;
+    }
+
+    console.log("Loading payment methods for company ID:", companyId);
+    setIsLoadingPaymentMethods(true);
+    try {
+      const methods = await getPaymentMethods(companyId);
+      console.log("Payment methods loaded:", methods);
+      setPaymentMethods(methods);
+    } catch (error) {
+      console.error("Error loading payment methods:", error);
+      setPaymentMethods([]);
+    } finally {
+      setIsLoadingPaymentMethods(false);
+    }
+  }, []);
 
   useEffect(() => {
     const fetchCompanies = async () => {
@@ -300,7 +533,13 @@ const InvoiceList = () => {
       items: convertedItems
     });
     setShowEditInvoiceModal(true);
-  }, []);
+    
+    // Load payment methods for the company when editing
+    if (props.company_id) {
+      console.log("Loading payment methods for edit invoice company:", props.company_id);
+      loadPaymentMethods(parseInt(props.company_id));
+    }
+  }, [loadPaymentMethods]);
 
   const handleSubmitEditInvoice = useCallback(async () => {
     if (!selectedInvoice) return;
@@ -479,17 +718,76 @@ const InvoiceList = () => {
       subtotal: 0,
       total_amount: 0,
     });
+    setPaymentMethods([]);
   }, []);
 
   const closeEditInvoiceModal = useCallback(() => {
     setShowEditInvoiceModal(false);
     setSelectedInvoice(null);
+    setPaymentMethods([]);
   }, []);
 
   // Delete Invoice Handlers
   const handleDeleteInvoice = useCallback((props: InvoiceData) => {
     setSelectedInvoice(props);
     setShowDeleteInvoiceModal(true);
+  }, []);
+
+  // Payment handlers
+  const handlePayInvoice = useCallback(async (invoice: InvoiceData) => {
+    setSelectedInvoiceForPayment(invoice);
+    setShowPaymentModal(true);
+    
+    // Load payment methods for the company
+    if (invoice.company_id) {
+      console.log("Loading payment methods for payment:", invoice.company_id);
+      await loadPaymentMethods(parseInt(invoice.company_id));
+    }
+  }, [loadPaymentMethods]);
+
+  const handleProcessPayment = useCallback(async () => {
+    if (!selectedInvoiceForPayment || !selectedPaymentMethod) {
+      toast.error("Please select a payment method");
+      return;
+    }
+
+    setIsProcessingPayment(true);
+    try {
+      const paymentPayload: InvoicePaymentPayload = {
+        invoice_id: selectedInvoiceForPayment.id,
+        payment_method: "stripe",
+        payment_mode: "one_time",
+        amount: parseFloat(selectedInvoiceForPayment.total_amount),
+        payment_method_id: selectedPaymentMethod,
+        notes: paymentNotes || `Payment for invoice ${selectedInvoiceForPayment.invoice_number}`
+      };
+
+      await payInvoice(paymentPayload);
+      toast.success("Payment processed successfully");
+      
+      // Close modal and reset state
+      setShowPaymentModal(false);
+      setSelectedInvoiceForPayment(null);
+      setSelectedPaymentMethod("");
+      setPaymentNotes("");
+      setPaymentMethods([]);
+      
+      // Refresh the invoice list
+      setRefreshKey((prev) => prev + 1);
+    } catch (error) {
+      console.error("Error processing payment:", error);
+      toast.error("Failed to process payment");
+    } finally {
+      setIsProcessingPayment(false);
+    }
+  }, [selectedInvoiceForPayment, selectedPaymentMethod, paymentNotes]);
+
+  const closePaymentModal = useCallback(() => {
+    setShowPaymentModal(false);
+    setSelectedInvoiceForPayment(null);
+    setSelectedPaymentMethod("");
+    setPaymentNotes("");
+    setPaymentMethods([]);
   }, []);
 
   const handleSubmitDeleteInvoice = useCallback(async () => {
@@ -639,8 +937,14 @@ const InvoiceList = () => {
         ...prev,
         [field]: value,
       }));
+      
+      // Load payment methods when company is selected
+      if (field === 'company_id' && value) {
+        console.log("Company selected in create modal:", value);
+        loadPaymentMethods(parseInt(value));
+      }
     },
-    []
+    [loadPaymentMethods]
   );
 
   const handleEditInvoiceChange = useCallback(
@@ -649,8 +953,14 @@ const InvoiceList = () => {
         ...prev!,
         [field]: value,
       }));
+      
+      // Load payment methods when company is selected
+      if (field === 'company_id' && value) {
+        console.log("Company selected in edit modal:", value);
+        loadPaymentMethods(parseInt(value));
+      }
     },
-    []
+    [loadPaymentMethods]
   );
 
 
@@ -1152,6 +1462,21 @@ const InvoiceList = () => {
               </div>
             </div>
 
+            {/* Payment Methods Section */}
+            {newInvoice.company_id && (
+              <div className="row">
+                <div className="col-md-12">
+                  <div className="form-group mb-3">
+                    <label>Payment Methods</label>
+                    <PaymentCardsDisplay 
+                      paymentMethods={paymentMethods}
+                      isLoadingPaymentMethods={isLoadingPaymentMethods}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="row">
               <div className="col-md-6">
                 <div className="form-group mb-3">
@@ -1496,6 +1821,21 @@ const InvoiceList = () => {
               </div>
             </div>
 
+            {/* Payment Methods Section */}
+            {selectedInvoice.company_id && (
+              <div className="row">
+                <div className="col-md-12">
+                  <div className="form-group mb-3">
+                    <label>Payment Methods</label>
+                    <PaymentCardsDisplay 
+                      paymentMethods={paymentMethods}
+                      isLoadingPaymentMethods={isLoadingPaymentMethods}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="row">
               <div className="col-md-6">
                 <div className="form-group mb-3">
@@ -1607,6 +1947,90 @@ const InvoiceList = () => {
             </Button>
             <Button variant="danger" onClick={handleSubmitDeleteInvoice}>
               Delete
+            </Button>
+          </Modal.Footer>
+        </Modal>
+      )}
+
+      {/* Payment Modal */}
+      {showPaymentModal && selectedInvoiceForPayment && (
+        <Modal
+          show={showPaymentModal}
+          onHide={closePaymentModal}
+          size="lg"
+        >
+          <Modal.Header closeButton>
+            <Modal.Title>
+              <FiDollarSign className="me-2" />
+              Process Payment - Invoice #{selectedInvoiceForPayment.invoice_number}
+            </Modal.Title>
+          </Modal.Header>
+          <Modal.Body>
+            {/* Invoice Summary */}
+            <div className="card mb-4">
+              <div className="card-header">
+                <h6 className="mb-0">Invoice Summary</h6>
+              </div>
+              <div className="card-body">
+                <div className="row">
+                  <div className="col-md-6">
+                    <p><strong>Company:</strong> {selectedInvoiceForPayment.company?.name}</p>
+                    <p><strong>Invoice Date:</strong> {moment(selectedInvoiceForPayment.invoice_date).format('DD/MM/YYYY')}</p>
+                    <p><strong>Due Date:</strong> {selectedInvoiceForPayment.due_date ? moment(selectedInvoiceForPayment.due_date).format('DD/MM/YYYY') : 'N/A'}</p>
+                  </div>
+                  <div className="col-md-6">
+                    <p><strong>Subtotal:</strong> {selectedInvoiceForPayment.currency_code} {parseFloat(selectedInvoiceForPayment.subtotal || '0').toFixed(2)}</p>
+                    <p><strong>Tax Amount:</strong> {selectedInvoiceForPayment.currency_code} {parseFloat(selectedInvoiceForPayment.tax_amount || '0').toFixed(2)}</p>
+                    <p><strong className="text-primary">Total Amount:</strong> {selectedInvoiceForPayment.currency_code} {parseFloat(selectedInvoiceForPayment.total_amount || '0').toFixed(2)}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Payment Method Selection */}
+            <div className="mb-4">
+              <h6 className="mb-3">Select Payment Method</h6>
+              <PaymentMethodSelector
+                paymentMethods={paymentMethods}
+                selectedPaymentMethod={selectedPaymentMethod}
+                onPaymentMethodSelect={setSelectedPaymentMethod}
+                isLoadingPaymentMethods={isLoadingPaymentMethods}
+              />
+            </div>
+
+            {/* Payment Notes */}
+            <div className="mb-3">
+              <label htmlFor="paymentNotes" className="form-label">Payment Notes (Optional)</label>
+              <textarea
+                className="form-control"
+                id="paymentNotes"
+                value={paymentNotes}
+                onChange={(e) => setPaymentNotes(e.target.value)}
+                rows={3}
+                placeholder="Add any notes about this payment..."
+              />
+            </div>
+          </Modal.Body>
+          <Modal.Footer>
+            <Button variant="secondary" onClick={closePaymentModal}>
+              Cancel
+            </Button>
+            <Button
+              variant="success"
+              onClick={handleProcessPayment}
+              disabled={!selectedPaymentMethod || isProcessingPayment}
+            >
+              {isProcessingPayment ? (
+                <>
+                  <Spinner animation="border" size="sm" className="me-2" />
+                  Processing...
+                </>
+              ) : (
+                <>
+                  <FiDollarSign className="me-2" />
+                  Process Payment
+                </>
+              )}
             </Button>
           </Modal.Footer>
         </Modal>

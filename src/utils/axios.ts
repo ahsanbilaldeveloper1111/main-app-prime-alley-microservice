@@ -162,7 +162,9 @@ axiosInstance.interceptors.request.use(
     // FormData needs to set its own content type with boundary
     if (!config.headers['Content-Type'] && !(config.data instanceof FormData)) {
       config.headers['Content-Type'] = 'application/json';
-      config.headers['Accept'] = 'application/json';
+      if(!config.headers['Accept']) {
+        config.headers['Accept'] = 'application/json';
+      }
     }
 
     if (config.data instanceof FormData) {

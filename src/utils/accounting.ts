@@ -173,6 +173,7 @@ export interface ExpenseData {
   currency_code: string;
   exchange_rate: string;
   tax_amount: string;
+  tax_type: "amount" | "percentage";
   total_amount: string;
   payment_method: string | null;
   payment_status: "pending" | "paid" | "failed" | "cancelled";
@@ -182,10 +183,17 @@ export interface ExpenseData {
   service_id: number | null;
   created_at: string;
   updated_at: string;
-  files: string[] | null;
+  files: {
+    name: string;
+    path: string;
+    size: number;
+    type: string;
+    uploaded_at: string;
+  }[];
   vendor: any | null;
   category: ExpenseCategoryData;
   service: any | null;
+  currency: string;
 }
 
 export interface ExpenseCategoryData {
@@ -208,7 +216,9 @@ export interface ExpenseCreateUpdatePayload {
   description: string;
   amount: string;
   tax_amount: string;
+  tax_type: "amount" | "percentage";
   total_amount: string;
+  currency: string;
 }
 
 export interface ExpenseCategoryCreateUpdatePayload {
@@ -866,22 +876,27 @@ export const getDiscountApplicabilityList = async (
       `/accounting/company/${companyId}/discount-applicability-list`,
       { params }
     );
-    
+
     // Handle the actual API response structure
     if (response.data?.code === 200 && response.data?.data?.success) {
       return {
         data: response.data.data.data, // The discount applicability array
         pagination: {
           current_page: response.data.data.pagination?.page || 1,
-          per_page: response.data.data.pagination?.limit || response.data.data.data.length,
-          total: response.data.data.pagination?.total || response.data.data.data.length,
+          per_page:
+            response.data.data.pagination?.limit ||
+            response.data.data.data.length,
+          total:
+            response.data.data.pagination?.total ||
+            response.data.data.data.length,
           last_page: response.data.data.pagination?.last_page || 1,
           from: response.data.data.pagination?.from || 1,
-          to: response.data.data.pagination?.to || response.data.data.data.length,
+          to:
+            response.data.data.pagination?.to || response.data.data.data.length,
         },
       };
     }
-    
+
     // Fallback to extractData if structure is different
     return extractData<PaginationWrapper<DiscountApplicabilityData>>(
       response.data
@@ -1046,6 +1061,24 @@ export const getInvoice = async (id: number): Promise<InvoiceData> => {
     throw error;
   }
 };
+export interface InvoicePaymentPayload {
+  invoice_id: number;
+  payment_method: "stripe" | "bank_transfer" | "cash" | "check";
+  payment_mode: "one_time" | "recurring";
+  amount: number;
+  payment_method_id: string;
+  notes?: string;
+}
+
+export const payInvoice = async (payload: InvoicePaymentPayload): Promise<any> => {
+  try {
+    const response = await axiosInstance.post(`/accounting/invoices/pay`, payload);
+    return response.data;
+  } catch (error: any) {
+    toast.error(error?.message || "Failed to process payment");
+    throw error;
+  }
+};
 
 export const getInvoiceDetails = async (id: number): Promise<any> => {
   try {
@@ -1129,10 +1162,15 @@ export const getExpenses = async (
 };
 
 export const createExpense = async (
-  data: ExpenseCreateUpdatePayload
+  data: ExpenseCreateUpdatePayload | FormData
 ): Promise<ExpenseData> => {
   try {
-    const response = await axiosInstance.post("/accounting/expenses", data);
+    const response = await axiosInstance.post("/accounting/expenses", data, {
+      headers:
+        data instanceof FormData
+          ? { "Content-Type": "multipart/form-data" }
+          : {},
+    });
     return extractData<ExpenseData>(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to create expense");
@@ -1152,12 +1190,18 @@ export const getExpense = async (id: number): Promise<ExpenseData> => {
 
 export const updateExpense = async (
   id: number,
-  data: ExpenseCreateUpdatePayload
+  data: ExpenseCreateUpdatePayload | FormData
 ): Promise<ExpenseData> => {
   try {
-    const response = await axiosInstance.put(
+    const response = await axiosInstance.post(
       `/accounting/expenses/${id}`,
-      data
+      data,
+      {
+        headers:
+          data instanceof FormData
+            ? { "Content-Type": "multipart/form-data" }
+            : {},
+      }
     );
     return extractData<ExpenseData>(response.data);
   } catch (error: any) {
@@ -1193,15 +1237,33 @@ export const downloadReceipt = async (id: number): Promise<Blob> => {
 export const downloadFile = async (
   id: number,
   fileIndex: number
-): Promise<Blob> => {
+): Promise<{ blob: Blob; filename: string }> => {
   try {
     const response = await axiosInstance.get(
       `/accounting/expenses/${id}/files/${fileIndex}`,
       {
         responseType: "blob",
+        headers: {
+          Accept: "blob",
+        },
       }
     );
-    return response.data;
+    
+    // Extract filename from content-disposition header
+    const contentDisposition = response.headers['content-disposition'];
+    let filename = `receipt_${id}_${fileIndex}`;
+    
+    if (contentDisposition) {
+      const filenameMatch = contentDisposition.match(/filename="(.+)"/);
+      if (filenameMatch) {
+        filename = filenameMatch[1];
+      }
+    }
+    
+    return {
+      blob: response.data,
+      filename: filename
+    };
   } catch (error: any) {
     toast.error(error?.message || "Failed to download file");
     throw error;
@@ -1908,7 +1970,10 @@ export const createInventory = async (
   data: InventoryCreateUpdatePayload
 ): Promise<InventoryData> => {
   try {
-    const response = await axiosInstance.post("/accounting/inventory", data);
+    const response = await axiosInstance.post(
+      "/accounting/inventory/create",
+      data
+    );
     return extractData<InventoryData>(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to create inventory");

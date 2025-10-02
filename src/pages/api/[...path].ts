@@ -177,7 +177,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     console.log('Final request data type:', typeof requestData);
-    console.log('Making request to backend:', targetUrl);
+    console.log('Making request to backend:', targetUrl, req.headers['accept']);
 
     // Make the request to the backend
     const response = await axios({
@@ -208,6 +208,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Handle different response types
     if (isAudioDownload || response.data instanceof Buffer || response.data instanceof ArrayBuffer) {
       // For binary data (audio files, blobs, etc.)
+      console.log("SENDING BINARY RESPONSE", typeof response.data);
       if (response.data instanceof Buffer) {
         res.send(response.data);
       } else if (response.data instanceof ArrayBuffer) {
@@ -220,6 +221,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       console.log('Sending text response');
       res.send(response.data);
     } else {
+      console.log("SENDING JSON RESPONSE");
       // For JSON responses
       res.json(response.data);
     }
