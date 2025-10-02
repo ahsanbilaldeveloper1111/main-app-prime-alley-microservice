@@ -250,6 +250,7 @@ export const routePermissions: RoutePermission[] = [
             },
             { path: '/lost-reasons',permissions: [PERMISSIONS.CRM_SERVICES]},
             { path: '/opportunities',permissions: [PERMISSIONS.CRM_SERVICES]},
+            { path: '/opportunities/create',permissions: [PERMISSIONS.CRM_SERVICES]},
             { path: '/stages',permissions: [PERMISSIONS.CRM_SERVICES]},
         ]
     },
