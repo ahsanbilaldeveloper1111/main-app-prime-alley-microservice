@@ -990,12 +990,12 @@ const Header = ({ themeMode }: HeaderProps) => {
         <div className="tab-pane" id="pc-tab-15" role="tabpanel" aria-labelledby="pc-tab-link-15" tabIndex={1}>
             <div className="pc-submenu-title">{MENU_LABELS.BILLING}</div>
             <ul className="pc-navbar">
-                <li className="pc-item">
+                {/* <li className="pc-item">
                     <Link className="pc-link" href={`${BASE_URL}/accounts`} >
                         <span className="pc-micon"><i className="ph-duotone ph-gauge"></i></span>
                         <span className="pc-mtext">Dashboard</span>
                     </Link>
-                </li>
+                </li> */}
                 <li className="pc-item">
                     <Link className="pc-link" href={`${BASE_URL}/accounting/invoices`} >
                         <span className="pc-micon"><i className="ph-duotone ph-file-text"></i></span>

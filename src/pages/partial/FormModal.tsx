@@ -11,7 +11,8 @@ interface FormModalProps {
   onSubmit: () => void;
   onCancel?: () => void;
   submitButtonVariant?: 'primary' | 'danger' | 'warning' | 'success';
-  cancelButtonVariant?: 'secondary' | 'export' | 'outline-secondary';
+  cancelButtonVariant?: 'secondary' | 'export' | 'outline-secondary' | 'primary';
+  ShowSubmitButton?: boolean;
 }
 
 const FormModal: React.FC<FormModalProps> = ({
@@ -25,7 +26,9 @@ const FormModal: React.FC<FormModalProps> = ({
   onSubmit,
   onCancel,
   submitButtonVariant = 'primary',
-  cancelButtonVariant = 'export'
+  cancelButtonVariant = 'export',
+  ShowSubmitButton = true
+
 }) => {
   const handleSubmit = () => {
     onSubmit();
@@ -71,13 +74,15 @@ const FormModal: React.FC<FormModalProps> = ({
           >
             {cancelButtonText}
           </button>
-          <button 
+          {ShowSubmitButton && (
+            <button 
             className={`btn btn-${submitButtonVariant}`} 
             id="form-submit-btn" 
             onClick={handleSubmit}
           >
             {submitButtonText}
           </button>
+          )}
         </div>
       </div>
     </div>

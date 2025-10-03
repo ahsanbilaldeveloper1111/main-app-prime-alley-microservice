@@ -32,17 +32,18 @@ import { useSession } from "next-auth/react";
 import moment from "moment";
 
 import "@assets/scss/common.scss";
-
 import "@assets/scss/tabs.scss";
 import PageHeader from "@components/PageHeader";
-import PageSummaryGrid from "@components/PageSummaryGrid";
 import FormModal from "../../partial/FormModal";
 import ConfirmModal from "@pages/partial/ConfirmModal";
 import SuccessfulModal from "@pages/partial/SuccessfulModal";
+import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
+import DatatableActionButton from "@components/DatatableActionButton";
+
 
 import { motion } from "framer-motion";
 import { FiEdit, FiTrash2, FiPrinter, FiDownload } from "react-icons/fi";
-import TableAction from "@components/TableAction";
+
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
@@ -80,7 +81,7 @@ const InvoiceList = () => {
         sortable: true,
         cell: (props: InvoiceData) => (
           <div>
-            <div className="fw-bold text-primary">#{props.invoice_number}</div>
+            <div className="">{props.invoice_number}</div>
           </div>
         ),
       },
@@ -90,7 +91,7 @@ const InvoiceList = () => {
         selector: (row: InvoiceData) => row.company?.name,
         sortable: true,
         cell: (props: InvoiceData) => (
-          <span className="status-badge primary">
+          <span className="">
             {props.company?.name || "Unknown Company"}
           </span>
         ),
@@ -101,7 +102,7 @@ const InvoiceList = () => {
         selector: (row: InvoiceData) => row.subtotal,
         sortable: true,
         cell: (props: InvoiceData) => (
-          <span className="fw-bold text-success">
+          <span className="">
             {props.currency_code} {parseFloat(props.subtotal || "0").toFixed(2)}
           </span>
         ),
@@ -112,7 +113,7 @@ const InvoiceList = () => {
         selector: (row: InvoiceData) => row.tax_amount,
         sortable: true,
         cell: (props: InvoiceData) => (
-          <span className="text-warning">
+          <span className="">
             {props.currency_code}{" "}
             {parseFloat(props.tax_amount || "0").toFixed(2)}
           </span>
@@ -124,7 +125,7 @@ const InvoiceList = () => {
         selector: (row: InvoiceData) => row.total_amount,
         sortable: true,
         cell: (props: InvoiceData) => (
-          <span className="fw-bold text-primary">
+          <span className="">
             {props.currency_code}{" "}
             {parseFloat(props.total_amount || "0").toFixed(2)}
           </span>
@@ -147,8 +148,8 @@ const InvoiceList = () => {
             <span
               className={`status-badge ${
                 statusColors[props.status as keyof typeof statusColors] ||
-                "bg-secondary"
-              } text-uppercase`}
+                ""
+              } text-capitalize`}
             >
               {props.status}
             </span>
@@ -186,25 +187,25 @@ const InvoiceList = () => {
         sortable: false,
         cell: (props: InvoiceData) => (
           <>  
-          <TableAction
+          <DatatableActionButton
                     actions={[
                         {
                             label: 'Edit',
-                            icon: FiEdit,
+                            icon: <FiEdit />,
                             onClick: () => handleEditInvoice(props),
-                            variant: 'edit'
+                            className: 'gap-2'
                         },
                         {
                             label: 'Download PDF',
-                            icon: FiDownload,
+                            icon: <FiDownload />,
                             onClick: () => handleDownloadPDF(props),
-                            variant: 'default'
+                            className:'gap-2'
                         },
                         {
                             label: 'Delete',
-                            icon: FiTrash2,
+                            icon: <FiTrash2 />  ,
                             onClick: () => handleDeleteInvoice(props),
-                            variant: 'delete'
+                            className: 'text-danger gap-2'
                         },
                     ]}
                 />
@@ -494,22 +495,17 @@ const InvoiceList = () => {
 
   const handleSubmitDeleteInvoice = useCallback(async () => {
     if (!selectedInvoice) return;
-
-    const confirmDeleteValue = confirmDeleteInvoice.trim();
-    if (confirmDeleteValue === "DELETE") {
-      try {
-        await deleteInvoice(selectedInvoice.id);
-        setSelectedInvoice(null);
-        setShowDeleteInvoiceModal(false);
-        setConfirmDeleteInvoice("");
-        setRefreshKey((prev) => prev + 1);
-        toast.success("Invoice deleted successfully");
-      } catch (error) {
-        console.error("Error deleting invoice:", error);
-        toast.error("Failed to delete invoice");
-      }
-    } else {
-      toast.error("Please type the word DELETE to confirm");
+console.log("Selected Invoice", selectedInvoice);
+    try {
+      await deleteInvoice(selectedInvoice.id);
+      setSelectedInvoice(null);
+      setShowDeleteInvoiceModal(false);
+      setConfirmDeleteInvoice("");
+      setRefreshKey((prev) => prev + 1);
+      toast.success("Invoice deleted successfully");
+    } catch (error) {
+      console.error("Error deleting invoice:", error);
+      toast.error("Failed to delete invoice");
     }
   }, [confirmDeleteInvoice, selectedInvoice]);
 
@@ -891,16 +887,13 @@ const InvoiceList = () => {
       />
 
       {/* Create Invoice Modal */}
-      {showCreateInvoiceModal && (
-        <Modal
-          show={showCreateInvoiceModal}
-          onHide={closeCreateInvoiceModal}
-          size="lg"
-        >
-          <Modal.Header closeButton>
-            <Modal.Title>Create New Invoice</Modal.Title>
-          </Modal.Header>
-          <Modal.Body>
+      <FormModal
+        show={showCreateInvoiceModal}
+        onHide={closeCreateInvoiceModal}
+        title="Create New Invoice"
+        desc="Fill in the details below to create a new invoice"
+        formHtml={
+          <>
             <div className="row">
               <div className="col-md-6">
                 <div className="form-group mb-3">
@@ -1206,410 +1199,373 @@ const InvoiceList = () => {
                 </div>
               </div>
             </div>
-          </Modal.Body>
-          <Modal.Footer>
-            <Button variant="secondary" onClick={closeCreateInvoiceModal}>
-              Close
-            </Button>
-            <Button
-              variant="primary"
-              onClick={handleSubmitCreateInvoice}
-              disabled={creatingInvoice}
-            >
-              {creatingInvoice ? "Creating..." : "Create Invoice"}
-            </Button>
-          </Modal.Footer>
-        </Modal>
-      )}
+          </>
+        }
+        submitButtonText={creatingInvoice ? "Creating..." : "Create Invoice"}
+        cancelButtonText="Close"
+        onSubmit={handleSubmitCreateInvoice}
+        onCancel={closeCreateInvoiceModal}
+        submitButtonVariant="primary"
+        cancelButtonVariant="secondary"
+      />
 
       {/* Edit Invoice Modal */}
       {showEditInvoiceModal && selectedInvoice && (
-        <Modal
+        <FormModal
           show={showEditInvoiceModal}
           onHide={closeEditInvoiceModal}
-          size="lg"
-        >
-          <Modal.Header closeButton>
-            <Modal.Title>
-              Edit Invoice #{selectedInvoice.invoice_number}
-            </Modal.Title>
-          </Modal.Header>
-          <Modal.Body>
-            <div className="row">
-              <div className="col-md-6">
-                <div className="form-group mb-3">
-                  <label htmlFor="editInvoiceCompany">Company</label>
-                  <select
-                    className="form-control"
-                    id="editInvoiceCompany"
-                    value={selectedInvoice.company_id || ""}
-                    onChange={(e) =>
-                      handleEditInvoiceChange("company_id", e.target.value)
-                    }
-                  >
-                    <option value="">Select Company</option>
-                    {companies.map((company: CompanyData) => (
-                      <option key={company.id} value={company.id}>
-                        {company.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              <div className="col-md-6">
-                <div className="form-group mb-3">
-                  <label htmlFor="editInvoiceDate">Invoice Date</label>
-                  <input
-                    type="date"
-                    className="form-control"
-                    id="editInvoiceDate"
-                    value={
-                      selectedInvoice.invoice_date
-                        ? moment(selectedInvoice.invoice_date).format(
-                            "YYYY-MM-DD"
-                          )
-                        : ""
-                    }
-                    onChange={(e) =>
-                      handleEditInvoiceChange("invoice_date", e.target.value)
-                    }
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="row">
-              <div className="col-md-6">
-                <div className="form-group mb-3">
-                  <label htmlFor="editInvoiceDueDate">Due Date</label>
-                  <input
-                    type="date"
-                    className="form-control"
-                    id="editInvoiceDueDate"
-                    value={
-                      selectedInvoice.due_date
-                        ? moment(selectedInvoice.due_date).format("YYYY-MM-DD")
-                        : ""
-                    }
-                    onChange={(e) =>
-                      handleEditInvoiceChange("due_date", e.target.value)
-                    }
-                    min={moment().format("YYYY-MM-DD")}
-                  />
-                </div>
-              </div>
-              <div className="col-md-6">
-                <div className="form-group mb-3">
-                  <label htmlFor="editInvoicePaymentMode">Payment Mode</label>
-                  <select
-                    className="form-control"
-                    id="editInvoicePaymentMode"
-                    value={selectedInvoice.payment_mode || "one_time"}
-                    onChange={(e) =>
-                      handleEditInvoiceChange("payment_mode", e.target.value)
-                    }
-                  >
-                    <option value="one_time">One Time</option>
-                    <option value="recurring">Recurring</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            {/* Invoice Items Section */}
-            <div className="row">
-              <div className="col-md-12">
-                <div className="form-group mb-3">
-                  <div className="d-flex justify-content-between align-items-center mb-2">
-                    <label>Invoice Items</label>
-                    <Button
-                      variant="outline-primary"
-                      size="sm"
-                      onClick={addEditInvoiceItem}
+          title={`Edit Invoice #${selectedInvoice.invoice_number}`}
+          desc="Update the invoice details below"
+          formHtml={
+            <>
+              <div className="row">
+                <div className="col-md-6">
+                  <div className="form-group mb-3">
+                    <label htmlFor="editInvoiceCompany">Company</label>
+                    <select
+                      className="form-control"
+                      id="editInvoiceCompany"
+                      value={selectedInvoice.company_id || ""}
+                      onChange={(e) =>
+                        handleEditInvoiceChange("company_id", e.target.value)
+                      }
                     >
-                      Add Item
-                    </Button>
+                      <option value="">Select Company</option>
+                      {companies.map((company: CompanyData) => (
+                        <option key={company.id} value={company.id}>
+                          {company.name}
+                        </option>
+                      ))}
+                    </select>
                   </div>
-                  
-                  {selectedInvoice.items.length === 0 ? (
-                    <div className="text-muted text-center py-3">
-                      No items added yet. Click "Add Item" to start.
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group mb-3">
+                    <label htmlFor="editInvoiceDate">Invoice Date</label>
+                    <input
+                      type="date"
+                      className="form-control"
+                      id="editInvoiceDate"
+                      value={
+                        selectedInvoice.invoice_date
+                          ? moment(selectedInvoice.invoice_date).format(
+                              "YYYY-MM-DD"
+                            )
+                          : ""
+                      }
+                      onChange={(e) =>
+                        handleEditInvoiceChange("invoice_date", e.target.value)
+                      }
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="row">
+                <div className="col-md-6">
+                  <div className="form-group mb-3">
+                    <label htmlFor="editInvoiceDueDate">Due Date</label>
+                    <input
+                      type="date"
+                      className="form-control"
+                      id="editInvoiceDueDate"
+                      value={
+                        selectedInvoice.due_date
+                          ? moment(selectedInvoice.due_date).format("YYYY-MM-DD")
+                          : ""
+                      }
+                      onChange={(e) =>
+                        handleEditInvoiceChange("due_date", e.target.value)
+                      }
+                      min={moment().format("YYYY-MM-DD")}
+                    />
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group mb-3">
+                    <label htmlFor="editInvoicePaymentMode">Payment Mode</label>
+                    <select
+                      className="form-control"
+                      id="editInvoicePaymentMode"
+                      value={selectedInvoice.payment_mode || "one_time"}
+                      onChange={(e) =>
+                        handleEditInvoiceChange("payment_mode", e.target.value)
+                      }
+                    >
+                      <option value="one_time">One Time</option>
+                      <option value="recurring">Recurring</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Invoice Items Section */}
+              <div className="row">
+                <div className="col-md-12">
+                  <div className="form-group mb-3">
+                    <div className="d-flex justify-content-between align-items-center mb-2">
+                      <label>Invoice Items</label>
+                      <Button
+                        variant="outline-primary"
+                        size="sm"
+                        onClick={addEditInvoiceItem}
+                      >
+                        Add Item
+                      </Button>
                     </div>
-                  ) : (
-                    <div className="table-responsive">
-                      <table style={{tableLayout: "fixed"}} className="table table-bordered">
-                        <thead>
-                          <tr>
-                            <th colSpan={2}>Product</th>
-                            <th>Quantity</th>
-                            <th>Unit Price</th>
-                            <th>Tax Rate (%)</th>
-                            <th>Line Total</th>
-                            <th>Action</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {selectedInvoice.items.map((item, index) => {
-                            const product = products.find(p => p.id.toString() === item.product_id);
-                            const quantity = parseFloat(item.quantity) || 0;
-                            const unitPrice = parseFloat(item.unit_price) || 0;
-                            const taxRate = parseFloat(item.tax_rate) || 0;
-                            const lineTotal = quantity * unitPrice;
-                            const lineTax = lineTotal * taxRate / 100;
-                            const lineTotalWithTax = lineTotal + lineTax;
-                            
-                            return (
-                              <tr key={index}>
-                                <td colSpan={2}>
-                                  <select
-                                    className="form-control form-control-sm"
-                                    value={item.product_id}
-                                    onChange={(e) => updateEditInvoiceItem(index, "product_id", e.target.value)}
-                                  >
-                                    <option value="">Select Product</option>
-                                    {products.map((product) => (
-                                      <option key={product.id} value={product.id.toString()}>
-                                        {product.name} - {product.currency_code} {product.base_price}
-                                      </option>
-                                    ))}
-                                  </select>
-                                </td>
-                                <td>
-                                  <input
-                                    type="number"
-                                    step="0.01"
-                                    className="form-control form-control-sm"
-                                    value={item.quantity}
-                                    onChange={(e) => updateEditInvoiceItem(index, "quantity", e.target.value)}
-                                    placeholder="0.00"
-                                  />
-                                </td>
-                                <td>
-                                  <input
-                                    type="number"
-                                    step="0.01"
-                                    className="form-control form-control-sm"
-                                    value={item.unit_price}
-                                    onChange={(e) => updateEditInvoiceItem(index, "unit_price", e.target.value)}
-                                    placeholder="0.00"
-                                  />
-                                </td>
-                                <td>
-                                  <input
-                                    type="number"
-                                    step="0.01"
-                                    className="form-control form-control-sm"
-                                    value={item.tax_rate}
-                                    onChange={(e) => updateEditInvoiceItem(index, "tax_rate", e.target.value)}
-                                    placeholder="0.00"
-                                  />
-                                </td>
-                                <td>
-                                  <span className="fw-bold">
-                                    {selectedInvoice.currency_code} {lineTotalWithTax.toFixed(2)}
-                                  </span>
-                                </td>
-                                <td>
-                                  <Button
-                                    variant="outline-danger"
-                                    size="sm"
-                                    onClick={() => removeEditInvoiceItem(index)}
-                                  >
-                                    Remove
-                                  </Button>
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
+                    
+                    {selectedInvoice.items.length === 0 ? (
+                      <div className="text-muted text-center py-3">
+                        No items added yet. Click "Add Item" to start.
+                      </div>
+                    ) : (
+                      <div className="table-responsive">
+                        <table style={{tableLayout: "fixed"}} className="table table-bordered">
+                          <thead>
+                            <tr>
+                              <th colSpan={2}>Product</th>
+                              <th>Quantity</th>
+                              <th>Unit Price</th>
+                              <th>Tax Rate (%)</th>
+                              <th>Line Total</th>
+                              <th>Action</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {selectedInvoice.items.map((item, index) => {
+                              const product = products.find(p => p.id.toString() === item.product_id);
+                              const quantity = parseFloat(item.quantity) || 0;
+                              const unitPrice = parseFloat(item.unit_price) || 0;
+                              const taxRate = parseFloat(item.tax_rate) || 0;
+                              const lineTotal = quantity * unitPrice;
+                              const lineTax = lineTotal * taxRate / 100;
+                              const lineTotalWithTax = lineTotal + lineTax;
+                              
+                              return (
+                                <tr key={index}>
+                                  <td colSpan={2}>
+                                    <select
+                                      className="form-control form-control-sm"
+                                      value={item.product_id}
+                                      onChange={(e) => updateEditInvoiceItem(index, "product_id", e.target.value)}
+                                    >
+                                      <option value="">Select Product</option>
+                                      {products.map((product) => (
+                                        <option key={product.id} value={product.id.toString()}>
+                                          {product.name} - {product.currency_code} {product.base_price}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </td>
+                                  <td>
+                                    <input
+                                      type="number"
+                                      step="0.01"
+                                      className="form-control form-control-sm"
+                                      value={item.quantity}
+                                      onChange={(e) => updateEditInvoiceItem(index, "quantity", e.target.value)}
+                                      placeholder="0.00"
+                                    />
+                                  </td>
+                                  <td>
+                                    <input
+                                      type="number"
+                                      step="0.01"
+                                      className="form-control form-control-sm"
+                                      value={item.unit_price}
+                                      onChange={(e) => updateEditInvoiceItem(index, "unit_price", e.target.value)}
+                                      placeholder="0.00"
+                                    />
+                                  </td>
+                                  <td>
+                                    <input
+                                      type="number"
+                                      step="0.01"
+                                      className="form-control form-control-sm"
+                                      value={item.tax_rate}
+                                      onChange={(e) => updateEditInvoiceItem(index, "tax_rate", e.target.value)}
+                                      placeholder="0.00"
+                                    />
+                                  </td>
+                                  <td>
+                                    <span className="fw-bold">
+                                      {selectedInvoice.currency_code} {lineTotalWithTax.toFixed(2)}
+                                    </span>
+                                  </td>
+                                  <td>
+                                    <Button
+                                      variant="outline-danger"
+                                      size="sm"
+                                      onClick={() => removeEditInvoiceItem(index)}
+                                    >
+                                      Remove
+                                    </Button>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div className="row">
-              <div className="col-md-4">
-                <div className="form-group mb-3">
-                  <label htmlFor="editInvoiceSubtotal">Subtotal</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    className="form-control"
-                    id="editInvoiceSubtotal"
-                    value={selectedInvoice.subtotal || ""}
-                    readOnly
-                    placeholder="0.00"
-                  />
+              <div className="row">
+                <div className="col-md-4">
+                  <div className="form-group mb-3">
+                    <label htmlFor="editInvoiceSubtotal">Subtotal</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      className="form-control"
+                      id="editInvoiceSubtotal"
+                      value={selectedInvoice.subtotal || ""}
+                      readOnly
+                      placeholder="0.00"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-4">
+                  <div className="form-group mb-3">
+                    <label htmlFor="editInvoiceTaxAmount">Tax Amount</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      className="form-control"
+                      id="editInvoiceTaxAmount"
+                      value={selectedInvoice.tax_amount || ""}
+                      readOnly
+                      placeholder="0.00"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-4">
+                  <div className="form-group mb-3">
+                    <label htmlFor="editInvoiceTotalAmount">Total Amount</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      className="form-control"
+                      id="editInvoiceTotalAmount"
+                      value={selectedInvoice.total_amount || ""}
+                      readOnly
+                      placeholder="0.00"
+                    />
+                  </div>
                 </div>
               </div>
-              <div className="col-md-4">
-                <div className="form-group mb-3">
-                  <label htmlFor="editInvoiceTaxAmount">Tax Amount</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    className="form-control"
-                    id="editInvoiceTaxAmount"
-                    value={selectedInvoice.tax_amount || ""}
-                    readOnly
-                    placeholder="0.00"
-                  />
-                </div>
-              </div>
-              <div className="col-md-4">
-                <div className="form-group mb-3">
-                  <label htmlFor="editInvoiceTotalAmount">Total Amount</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    className="form-control"
-                    id="editInvoiceTotalAmount"
-                    value={selectedInvoice.total_amount || ""}
-                    readOnly
-                    placeholder="0.00"
-                  />
-                </div>
-              </div>
-            </div>
 
-            <div className="row">
-              <div className="col-md-6">
-                <div className="form-group mb-3">
-                  <label htmlFor="editInvoiceCurrency">Currency</label>
-                  <select
-                    className="form-control"
-                    id="editInvoiceCurrency"
-                    value={selectedInvoice.currency_code || "USD"}
-                    onChange={(e) =>
-                      handleEditInvoiceChange("currency_code", e.target.value)
-                    }
-                  >
-                    <option value="USD">USD</option>
-                    <option value="AED">AED</option>
-                    <option value="PKR">PKR</option>
-                    <option value="EUR">EUR</option>
-                    <option value="GBP">GBP</option>
-                  </select>
+              <div className="row">
+                <div className="col-md-6">
+                  <div className="form-group mb-3">
+                    <label htmlFor="editInvoiceCurrency">Currency</label>
+                    <select
+                      className="form-control"
+                      id="editInvoiceCurrency"
+                      value={selectedInvoice.currency_code || "USD"}
+                      onChange={(e) =>
+                        handleEditInvoiceChange("currency_code", e.target.value)
+                      }
+                    >
+                      <option value="USD">USD</option>
+                      <option value="AED">AED</option>
+                      <option value="PKR">PKR</option>
+                      <option value="EUR">EUR</option>
+                      <option value="GBP">GBP</option>
+                    </select>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div className="row">
-              <div className="col-md-6">
-                <div className="form-group mb-3">
-                  <label htmlFor="editInvoiceExchangeRate">Exchange Rate</label>
-                  <input
-                    type="number"
-                    step="0.000001"
-                    className="form-control"
-                    id="editInvoiceExchangeRate"
-                    value={selectedInvoice.exchange_rate || "1.000000"}
-                    onChange={(e) =>
-                      handleEditInvoiceChange("exchange_rate", e.target.value)
-                    }
-                    placeholder="1.000000"
-                  />
+              <div className="row">
+                <div className="col-md-6">
+                  <div className="form-group mb-3">
+                    <label htmlFor="editInvoiceExchangeRate">Exchange Rate</label>
+                    <input
+                      type="number"
+                      step="0.000001"
+                      className="form-control"
+                      id="editInvoiceExchangeRate"
+                      value={selectedInvoice.exchange_rate || "1.000000"}
+                      onChange={(e) =>
+                        handleEditInvoiceChange("exchange_rate", e.target.value)
+                      }
+                      placeholder="1.000000"
+                    />
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div className="row">
-              <div className="col-md-12">
-                <div className="form-group mb-3">
-                  <label htmlFor="editInvoiceNotes">Notes</label>
-                  <textarea
-                    className="form-control"
-                    id="editInvoiceNotes"
-                    value={selectedInvoice.notes || ""}
-                    onChange={(e) =>
-                      handleEditInvoiceChange("notes", e.target.value)
-                    }
-                    rows={3}
-                    placeholder="Additional notes..."
-                  />
+              <div className="row">
+                <div className="col-md-12">
+                  <div className="form-group mb-3">
+                    <label htmlFor="editInvoiceNotes">Notes</label>
+                    <textarea
+                      className="form-control"
+                      id="editInvoiceNotes"
+                      value={selectedInvoice.notes || ""}
+                      onChange={(e) =>
+                        handleEditInvoiceChange("notes", e.target.value)
+                      }
+                      rows={3}
+                      placeholder="Additional notes..."
+                    />
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div className="row">
-              <div className="col-md-12">
-                <div className="form-group mb-3">
-                  <label htmlFor="editInvoiceTerms">Terms & Conditions</label>
-                  <textarea
-                    className="form-control"
-                    id="editInvoiceTerms"
-                    value={selectedInvoice.terms_conditions || ""}
-                    onChange={(e) =>
-                      handleEditInvoiceChange(
-                        "terms_conditions",
-                        e.target.value
-                      )
-                    }
-                    rows={3}
-                    placeholder="Terms and conditions..."
-                  />
+              <div className="row">
+                <div className="col-md-12">
+                  <div className="form-group mb-3">
+                    <label htmlFor="editInvoiceTerms">Terms & Conditions</label>
+                    <textarea
+                      className="form-control"
+                      id="editInvoiceTerms"
+                      value={selectedInvoice.terms_conditions || ""}
+                      onChange={(e) =>
+                        handleEditInvoiceChange(
+                          "terms_conditions",
+                          e.target.value
+                        )
+                      }
+                      rows={3}
+                      placeholder="Terms and conditions..."
+                    />
+                  </div>
                 </div>
               </div>
-            </div>
-          </Modal.Body>
-          <Modal.Footer>
-            <Button variant="secondary" onClick={closeEditInvoiceModal}>
-              Close
-            </Button>
-            <Button
-              variant="primary"
-              onClick={handleSubmitEditInvoice}
-              disabled={editingInvoice}
-            >
-              {editingInvoice ? "Updating..." : "Update Invoice"}
-            </Button>
-          </Modal.Footer>
-        </Modal>
+            </>
+          }
+          submitButtonText={editingInvoice ? "Updating..." : "Update Invoice"}
+          cancelButtonText="Close"
+          onSubmit={handleSubmitEditInvoice}
+          onCancel={closeEditInvoiceModal}
+          submitButtonVariant="primary"
+          cancelButtonVariant="secondary"
+        />
       )}
 
       {/* Delete Invoice Modal */}
       {showDeleteInvoiceModal && selectedInvoice && (
-        <Modal
+        <ConfirmModal
           show={showDeleteInvoiceModal}
           onHide={() => setShowDeleteInvoiceModal(false)}
-        >
-          <Modal.Header closeButton>
-            <Modal.Title>Delete Invoice?</Modal.Title>
-          </Modal.Header>
-          <Modal.Body>
-            <p>
-              Are you sure you want to delete invoice{" "}
-              <b className="text-danger">#{selectedInvoice.invoice_number}</b>?
-            </p>
-            <p>
-              This action cannot be undone.
-            </p>
-            <p>
-              Type the word <b className="text-danger">DELETE</b> to confirm
-            </p>
-            <input
-              type="text"
-              className="form-control"
-              id="confirmDeleteInvoice"
-              value={confirmDeleteInvoice}
-              onChange={(e) => setConfirmDeleteInvoice(e.target.value)}
-              placeholder="Type the word DELETE to confirm"
-            />
-          </Modal.Body>
-          <Modal.Footer>
-            <Button
-              variant="secondary"
-              onClick={() => setShowDeleteInvoiceModal(false)}
-            >
-              Close
-            </Button>
-            <Button variant="danger" onClick={handleSubmitDeleteInvoice}>
-              Delete
-            </Button>
-          </Modal.Footer>
-        </Modal>
+          title="Delete Invoice?"
+          description="Are you sure you want to delete invoice {targetName}? This action cannot be undone."
+          targetName={`#${selectedInvoice.invoice_number}`}
+          confirmButtonText="Delete"
+          cancelButtonText="Close"
+          onConfirm={handleSubmitDeleteInvoice}
+          onCancel={() => setShowDeleteInvoiceModal(false)}
+          confirmButtonVariant="danger"
+          cancelButtonVariant="secondary"
+          requireTextConfirmation={true}
+          confirmationPlaceholder="Type the word DELETE to confirm"
+          confirmationLabel=""
+          requiredConfirmationText="DELETE"
+        />
       )}
     </React.Fragment>
   );
