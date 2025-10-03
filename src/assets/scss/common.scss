@@ -35,9 +35,18 @@
             margin-bottom: 20px;
             margin-top: 20px;
             font-family: 'Poppins', sans-serif;
+
+            h1{
+                  font-family: 'Poppins', sans-serif;
+                  font-size: 2.4rem;
+                  font-weight: 700;
+                  color: var(--main-text);
+                  letter-spacing: -0.04em;
+                  margin:0;
+            }
             h2{
                   font-family: 'Poppins', sans-serif;
-                  font-size: 2.5rem;
+                  font-size: 2.2rem;
                   font-weight: 700;
                   color: var(--main-text);
                   letter-spacing: -0.04em;
@@ -95,6 +104,7 @@
                         transition: var(--transition-speed);
                         display: flex;
                         align-items: center;
+                        justify-content: center;
                         gap: 8px;
                         // font-size: 0.95rem;
                         font-size: 0.7rem;
@@ -187,13 +197,13 @@
                     }
 
             
-                    .btn-export {
+                    .btn-export, .btn-default {
                         background-color: var(--card-bg);
                         color: var(--main-text);
                         border: 1px solid var(--border-color);
                         box-shadow: var(--shadow-sm);
                     }
-                    .btn-export:hover {
+                    .btn-export:hover, .btn-default:hover {
                         background-color: var(--input-bg);
                         transform: translateY(-2px);
                         box-shadow: var(--shadow-md);
@@ -306,7 +316,7 @@
       display: inline-flex;
       align-items: center;
       font-weight: 600;
-      font-size: 0.85rem;
+    //   font-size: 0.85rem;
       padding: 6px 12px;
       border-radius: 20px;
       gap: 6px;

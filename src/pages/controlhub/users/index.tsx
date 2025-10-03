@@ -1358,14 +1358,14 @@ React.useEffect(() => {
                             </div>
                         </div> */}
                         <Row className="d-flex justify-content-between align-items-center">
-                    <Col md={5}>
+                    <Col md={3}>
                       
                       <h2 className="mb-0">Users Directory</h2>
 
                     </Col>
 
 
-                    <Col md={7} className="d-flex justify-content-end">
+                    <Col md={9} className="d-flex justify-content-end">
                       
                     <div className="action-buttons">
                         <div className="search-container">

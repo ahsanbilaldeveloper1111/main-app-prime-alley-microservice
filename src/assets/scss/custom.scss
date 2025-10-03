@@ -435,7 +435,10 @@ button#sidebar-hide {
 h2.react-datepicker__current-month, .react-datepicker-time__header{
     font-size: 12px !important;
 }
-
+.activeFiltersList{
+    max-height: 350px;
+    overflow-y: auto;
+}
 @media (max-width: 480px) {
     .pc-sidebar .pc-submenu-popup.active{width:100% !important;}
     .pc-sidebar .pc-link{padding:14px 10px !important;font-size:12px !important;}

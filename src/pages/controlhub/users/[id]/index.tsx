@@ -54,6 +54,7 @@ interface Permission {
     name: string;
     slug: string;
     module: string;
+    module_name?: string;
 }
 
 interface Role {
@@ -813,15 +814,20 @@ const UserView = () => {
 
 
                         <Tab eventKey="permissions" title="Permissions">
-                        <Row>
+                            <Tabs
+                                defaultActiveKey="extended"
+                                id="system-tabs"
+                                className="mb-3 justify-content-center"
+                            >
                 {session?.user?.is_admin && session?.user?.permissions?.includes('extend-permission-users') && (
-                    <>
-                <Col md={6}>
+                                    <Tab eventKey="extended" title="Extended Permissions">
+                                        <Row>
+                <Col md={12}>
                     <Card>
-                        <Card.Header className="p-3 bg-primary text-white">
-                        <Row className="d-flex justify-content-between align-items-center">
+                        <Card.Header className="p-3 ">
+                        <Row className="d-flex justify-content-between align-items-center ">
                                     <Col md={6}>
-                                        <h5 className="text-white">
+                                        <h5 className="text-capitalize app-title-heading text-primary">
                                             Extended Permissions
                                         </h5>
                                     </Col>
@@ -838,50 +844,76 @@ const UserView = () => {
                         </Card.Header>
                         <Card.Body>
                               <div className="permissions-box">
-                                   
                                           <div className="mb-2">
-
-                                          <ul className="viewUser-list-group list-group">
                                           {allPermission && allPermission.length > 0 ? (
-                                                allPermission
-                                                      .filter((perm) => perm && perm.name.toLowerCase().includes(searchTerm.toLowerCase()))
-                                                      .map((perm) => (
-                                                          <li key={perm.id} className="list-group-item">
-                                                              <input
-                                                                  type="checkbox"
-                                                                  checked={extended.includes((perm.id))}
-                                                                  onChange={() => toggleExtendedPermission(perm.id)}
-                                                              />{" "}
-                                                              {perm.name}
-                                                          </li>
-                                                      ))
-                                          ) : (
-                                                <li className="list-group-item">No permissions available</li>
-                                          )}
-                                          </ul>
+                                                                    (() => {
+                                                                        // Group permissions by module_id
+                                                                        const filteredPermissions = allPermission.filter((perm) => 
+                                                                            perm && perm.name.toLowerCase().includes(searchTerm.toLowerCase())
+                                                                        );
+                                                                        
+                                                                        const groupedPermissions = filteredPermissions.reduce((groups, perm) => {
+                                                                            const moduleId = perm.module_name || 'Other';
+                                                                            if (!groups[moduleId]) {
+                                                                                groups[moduleId] = [];
+                                                                            }
+                                                                            groups[moduleId].push(perm);
+                                                                            return groups;
+                                                                        }, {} as Record<string, any[]>);
 
+                                                                        return Object.entries(groupedPermissions).map(([moduleId, permissions]) => (
+                                                                            <div key={moduleId} className="mb-4">
+                                                                                <h5 className="mb-3 text-primary border-bottom pb-2">
+                                                                                    {moduleId === 'Other' ? 'Other Permissions' : `${moduleId}`}
+                                                                                </h5>
+                                                                                <Row className="g-3">
+                                                                                    {permissions.map((perm) => (
+                                                                                        <Col key={perm.id} md={6} lg={4} className="d-flex align-items-center justify-content-between">
+                                                                                            <div className="form-check form-switch">
+                                                                                                <input className="form-check-input" type="checkbox" id={`permission-${perm.id}`} checked={extended.includes(perm.id)} onChange={() => toggleExtendedPermission(perm.id)} />
+                                                                                            </div>
+                                                                                            <div className="flex-grow-1">
+                                                                                                <h6 className="mb-1">{perm.name}</h6>
+                                                                                            </div>
+                                                                                        </Col>
+                                                                                    ))}
+                                                                                </Row>
+                                                                            </div>
+                                                                        ));
+                                                                    })()
+                                                                ) : (
+                                                                    <Row>
+                                                                        <Col md={12}>
+                                                                            <Card>
+                                                                                <Card.Body className="text-center text-muted">
+                                                                                    No permissions available
+                                                                                </Card.Body>
+                                                                            </Card>
+                                                                        </Col>
+                                                                    </Row>
+                                                                )}
                                           </div>
 
-                                     <div className="d-flex justify-content-end">
-                                    <Button size="sm" variant="outline-primary" onClick={updateExtendedPermissions}>Update Extended Permissions</Button>
+                                                            <div className="d-flex justify-content-end sticky-bottom bg-white p-3 border-top" style={{position: 'sticky', bottom: 0, zIndex: 10}}>
+                                                                <Button variant="primary" className="app-button" onClick={updateExtendedPermissions}>Update Extended Permissions</Button>
                                      </div>
                               </div>
                         </Card.Body>
                     </Card>
                 </Col>
-                </>
+                                        </Row>
+                                    </Tab>
                 )}
                 
                 {session?.user?.is_admin && session?.user?.permissions?.includes('block-permission-users') && (
-                    <>
-
-                <Col md={6}>
+                                    <Tab eventKey="blocked" title="Blocked Permissions">
+                                        <Row>
+                <Col md={12}>
                     <Card>
-
-                        <Card.Header className="p-3 bg-danger text-white">
+                        <Card.Header className="p-3 ">
                         <Row className="d-flex justify-content-between align-items-center">
                                     <Col md={6}>
-                                        <h5 className="text-white">
+                                        <h5 className="text-capitalize app-title-heading text-danger">
                                             Blocked Permissions
                                         </h5>
                                     </Col>
@@ -899,36 +931,66 @@ const UserView = () => {
                         <Card.Body>
                               <div className="permissions-box">
                                          <div className="mb-2">
-                                         <ul className="viewUser-list-group list-group">
                                                 {rolePermission && rolePermission.length > 0 ? (
-                                                      rolePermission
-                                                            .filter((perm) => perm.name && perm.name.toLowerCase().includes(searchTermBlocked.toLowerCase()))
-                                                            .map((perm) => (
-                                                                <li key={perm.id} className="list-group-item">
-                                                                    <input
-                                                                        type="checkbox"
-                                                                        checked={blocked.includes(perm.id)}
-                                                                        onChange={() => toggleBlockedPermission(perm.id)}
-                                                                    />{" "}
-                                                                    {perm.name}
-                                                                </li>
-                                                            ))
-                                                ) : (
-                                                      <li className="list-group-item">No permissions available</li>
-                                                )}
-                                          </ul>
+                                                                    (() => {
+                                                                        // Group permissions by module_name
+                                                                        const filteredPermissions = rolePermission.filter((perm) => 
+                                                                            perm && perm.name && perm.name.toLowerCase().includes(searchTermBlocked.toLowerCase())
+                                                                        );
+                                                                        
+                                                                        const groupedPermissions = filteredPermissions.reduce((groups, perm) => {
+                                                                            const moduleId = perm.module_name || 'Other';
+                                                                            if (!groups[moduleId]) {
+                                                                                groups[moduleId] = [];
+                                                                            }
+                                                                            groups[moduleId].push(perm);
+                                                                            return groups;
+                                                                        }, {} as Record<string, any[]>);
+
+                                                                        return Object.entries(groupedPermissions).map(([moduleId, permissions]) => (
+                                                                            <div key={moduleId} className="mb-4">
+                                                                                <h5 className="mb-3 text-danger border-bottom pb-2">
+                                                                                    {moduleId === 'Other' ? 'Other Permissions' : `${moduleId}`}
+                                                                                </h5>
+                                                                                <Row className="g-3">
+                                                                                    {permissions.map((perm) => (
+                                                                                        <Col key={perm.id} md={6} lg={4} className="d-flex align-items-center justify-content-between">
+                                                                                            <div className="form-check form-switch">
+                                                                                                <input className="form-check-input" type="checkbox" id={`blocked-permission-${perm.id}`} checked={blocked.includes(perm.id)} onChange={() => toggleBlockedPermission(perm.id)} />
+                                                                                            </div>
+                                                                                            <div className="flex-grow-1">
+                                                                                                <h6 className="mb-1">{perm.name}</h6>
+                                                                                            </div>
+                                                                                        </Col>
+                                                                                    ))}
+                                                                                </Row>
+                                                                            </div>
+                                                                        ));
+                                                                    })()
+                                                                ) : (
+                                                                    <Row>
+                                                                        <Col md={12}>
+                                                                            <Card>
+                                                                                <Card.Body className="text-center text-muted">
+                                                                                    No permissions available
+                                                                                </Card.Body>
+                                                                            </Card>
+                                                                        </Col>
+                                                                    </Row>
+                                                                )}
                                          </div>
 
-                                    <div className="d-flex justify-content-end">
-                                    <Button size="sm" variant="outline-danger" onClick={updateBlockedPermissions}>Update Blocked Permissions</Button>
+                                                            <div className="d-flex justify-content-end sticky-bottom bg-white p-3 border-top" style={{position: 'sticky', bottom: 0, zIndex: 10}}>
+                                    <Button variant="danger" className="app-button" onClick={updateBlockedPermissions}>Update Blocked Permissions</Button>
                                     </div>
                               </div>
                         </Card.Body>
                     </Card>
                 </Col>
-                </>
-                )}
             </Row>
+                                    </Tab>
+                                )}
+                            </Tabs>
                         </Tab>
 
 

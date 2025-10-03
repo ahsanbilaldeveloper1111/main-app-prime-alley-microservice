@@ -1101,7 +1101,7 @@ export const createCrmFiltersConfig = (
           type: 'select',
           name: 'is_lost',
           label: 'Lead/Opportunity Status',
-          value: 'false',
+          // value: 'false',
           options: [
             { value: 'false', label: 'Active' },
             { value: 'true', label: 'Lost' }

@@ -129,7 +129,7 @@ const CrmDashboard = () => {
           New Lead
         </Link>
         <Link
-          href="/crm/opportunities/create"
+          href="/crm/leads/create?type=opportunity"
           className="btn btn-primary me-2"
         >
           <FiPlus className="me-2" />
