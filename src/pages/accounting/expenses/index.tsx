@@ -539,22 +539,17 @@ const ExpenseList = () => {
   const handleSubmitDeleteCategory = useCallback(async () => {
     if (!selectedCategory) return;
 
-    const confirmDeleteValue = confirmDeleteCategory.trim();
-    if (confirmDeleteValue === "DELETE") {
-      try {
-        await deleteExpenseCategory(selectedCategory.id);
-        setSelectedCategory(null);
-        setShowDeleteCategoryModal(false);
-        setConfirmDeleteCategory("");
-        await openCategoryModal(); // Refresh the list
-        await fetchCategories(); // Refresh the dropdown
-        toast.success("Category deleted successfully");
-      } catch (error) {
-        console.error("Error deleting category:", error);
-        toast.error("Failed to delete category");
-      }
-    } else {
-      toast.error("Please type the word DELETE to confirm");
+    try {
+      await deleteExpenseCategory(selectedCategory.id);
+      setSelectedCategory(null);
+      setShowDeleteCategoryModal(false);
+      setConfirmDeleteCategory("");
+      await openCategoryModal(); // Refresh the list
+      await fetchCategories(); // Refresh the dropdown
+      toast.success("Category deleted successfully");
+    } catch (error) {
+      console.error("Error deleting category:", error);
+      toast.error("Failed to delete category");
     }
   }, [confirmDeleteCategory, selectedCategory, openCategoryModal]);
 
@@ -943,96 +938,101 @@ const ExpenseList = () => {
 
       {/* Edit Category Modal */}
       {showEditCategoryModal && selectedCategory && (
-        <Modal
+        <FormModal
           show={showEditCategoryModal}
           onHide={() => setShowEditCategoryModal(false)}
-          size="lg"
-        >
-          <Modal.Header closeButton>
-            <Modal.Title>Edit Category: {selectedCategory.name}</Modal.Title>
-          </Modal.Header>
-          <Modal.Body>
-            <div className="form-group mb-3">
-              <label htmlFor="editCategoryName">Category Name</label>
-              <input
-                type="text"
-                className="form-control"
-                id="editCategoryName"
-                value={selectedCategory.name || ""}
-                onChange={(e) =>
-                  setSelectedCategory({
-                    ...selectedCategory,
-                    name: e.target.value,
-                  })
-                }
-                placeholder="Enter category name"
-              />
-            </div>
-            <div className="form-group mb-3">
-              <label htmlFor="editCategoryDescription">Description</label>
-              <textarea
-                className="form-control"
-                id="editCategoryDescription"
-                value={selectedCategory.description || ""}
-                onChange={(e) =>
-                  setSelectedCategory({
-                    ...selectedCategory,
-                    description: e.target.value,
-                  })
-                }
-                rows={3}
-                placeholder="Enter category description..."
-              />
-            </div>
-            <div className="form-group mb-3">
-              <label htmlFor="editCategoryColor">Color</label>
-              <input
-                type="color"
-                className="form-control"
-                id="editCategoryColor"
-                value={selectedCategory.color || "#000000"}
-                onChange={(e) =>
-                  setSelectedCategory({
-                    ...selectedCategory,
-                    color: e.target.value,
-                  })
-                }
-              />
-            </div>
-            <div className="form-group mb-3">
-              <label htmlFor="editCategoryStatus">Status</label>
-              <select
-                className="form-control"
-                id="editCategoryStatus"
-                value={selectedCategory.is_active ? "active" : "inactive"}
-                onChange={(e) =>
-                  setSelectedCategory({
-                    ...selectedCategory,
-                    is_active: e.target.value === "active",
-                  })
-                }
-              >
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-              </select>
-            </div>
-          </Modal.Body>
-          <Modal.Footer>
-            <Button
-              variant="secondary"
-              onClick={() => setShowEditCategoryModal(false)}
-            >
-              Close
-            </Button>
-            <Button
-              variant="primary"
-              onClick={handleSubmitEditCategory}
-              disabled={editingCategory}
-            >
-              {editingCategory ? "Updating..." : "Update Category"}
-            </Button>
-          </Modal.Footer>
-        </Modal>
+          title={`Edit Category: ${selectedCategory.name}`}
+          desc="Update the category details below"
+          formHtml={
+            <>
+              <div className="form-group mb-3">
+                <label htmlFor="editCategoryName">Category Name</label>
+                <input
+                  type="text"
+                  className="form-control"
+                  id="editCategoryName"
+                  value={selectedCategory.name || ""}
+                  onChange={(e) =>
+                    setSelectedCategory({
+                      ...selectedCategory,
+                      name: e.target.value,
+                    })
+                  }
+                  placeholder="Enter category name"
+                />
+              </div>
+              <div className="form-group mb-3">
+                <label htmlFor="editCategoryDescription">Description</label>
+                <textarea
+                  className="form-control"
+                  id="editCategoryDescription"
+                  value={selectedCategory.description || ""}
+                  onChange={(e) =>
+                    setSelectedCategory({
+                      ...selectedCategory,
+                      description: e.target.value,
+                    })
+                  }
+                  rows={3}
+                  placeholder="Enter category description..."
+                />
+              </div>
+              <div className="form-group mb-3">
+                <label htmlFor="editCategoryColor">Color</label>
+                <div className="d-flex align-items-center">
+                  <input
+                    type="color"
+                    className="form-control me-2"
+                    id="editCategoryColor"
+                    value={selectedCategory.color || "#000000"}
+                    onChange={(e) =>
+                      setSelectedCategory({
+                        ...selectedCategory,
+                        color: e.target.value,
+                      })
+                    }
+                    style={{ width: "60px", height: "38px" }}
+                  />
+                  <input
+                    type="text"
+                    className="form-control"
+                    value={selectedCategory.color || "#000000"}
+                    onChange={(e) =>
+                      setSelectedCategory({
+                        ...selectedCategory,
+                        color: e.target.value,
+                      })
+                    }
+                    placeholder="#000000"
+                  />
+                </div>
+              </div>
+              <div className="form-group mb-3">
+                <label htmlFor="editCategoryStatus">Status</label>
+                <select
+                  className="form-control"
+                  id="editCategoryStatus"
+                  value={selectedCategory.is_active ? "active" : "inactive"}
+                  onChange={(e) =>
+                    setSelectedCategory({
+                      ...selectedCategory,
+                      is_active: e.target.value === "active",
+                    })
+                  }
+                >
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                </select>
+              </div>
+            </>
+          }
+          submitButtonText={editingCategory ? "Updating..." : "Update Category"}
+          cancelButtonText="Close"
+          onSubmit={handleSubmitEditCategory}
+          onCancel={() => setShowEditCategoryModal(false)}
+          submitButtonVariant="primary"
+          cancelButtonVariant="secondary"
+        />
       )}
 
       {/* Delete Category Modal */}
@@ -1050,9 +1050,6 @@ const ExpenseList = () => {
           confirmButtonVariant="danger"
           cancelButtonVariant="secondary"
           requireTextConfirmation={true}
-          confirmationPlaceholder="Type the word DELETE to confirm"
-          confirmationLabel=""
-          requiredConfirmationText="DELETE"
         />
       )}
 
@@ -1071,9 +1068,6 @@ const ExpenseList = () => {
           confirmButtonVariant="danger"
           cancelButtonVariant="secondary"
           requireTextConfirmation={true}
-          confirmationPlaceholder="Type the word DELETE to confirm"
-          confirmationLabel=""
-          requiredConfirmationText="DELETE"
         />
       )}
 

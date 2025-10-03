@@ -38,8 +38,19 @@ import {
 } from "@utils/ticket-module";
 import Select from "react-select";
 import TicketsFilters from "@components/filters/TicketFilters";
-import { Tooltip } from "react-tooltip";
 import { ModuleSlug } from '@utils/Helper';
+
+import "@assets/scss/common.scss";
+import "@assets/scss/tabs.scss";
+import PageHeader from "@components/PageHeader";
+import FormModal from "../../partial/FormModal";
+import ConfirmModal from "@pages/partial/ConfirmModal";
+import SuccessfulModal from "@pages/partial/SuccessfulModal";
+import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
+import DatatableActionButton from "@components/DatatableActionButton";
+import { FiEdit, FiTrash2, FiEye,FiPlus } from "react-icons/fi";
+
+
 
 interface SelectOption {
   value: number;
@@ -50,7 +61,7 @@ const TicketList = () => {
   const { data: session, status } = useSession();
 
   const [refreshKey, setRefreshKey] = useState<number>(0);
-  const [currentFilters, setCurrentFilters] = useState({});
+  const [currentFilters, setCurrentFilters] = useState({search: ""});
 
   const [statuses, setStatuses] = useState<any>([]);
   const [modules, setModules] = useState<any>([]);
@@ -97,7 +108,7 @@ const TicketList = () => {
           const typeName = props?.type?.name;
 
           return (
-            <span className="badge bg-primary text-uppercase">{typeName}</span>
+            <span className="status-badge info text-capitalize">{typeName}</span>
           );
         },
       },
@@ -122,10 +133,11 @@ const TicketList = () => {
         selector: (row: any) => row.user_extension,
         sortable: true,
         cell: (props: any) => (
-          <span className="badge bg-info">
+          <span className="status-badge primary">
             {extensions.find(
               (extension: any) => extension.id == props.user_extension
             )?.display_name || props.user_extension}
+            {!props.user_extension && "Not assigned"}
           </span>
         ),
       },
@@ -135,7 +147,7 @@ const TicketList = () => {
         selector: (row: any) => row.created_by,
         sortable: true,
         cell: (props: any) => (
-          <span className="badge bg-info">
+          <span className="status-badge warning">
             {extensions.find(
               (extension: any) => extension.id == props.created_by
             )?.display_name || props.created_by}
@@ -187,9 +199,9 @@ const TicketList = () => {
           ];
           return (
             <span
-              className={`badge ${
-                priorityColors[props.priority] || "bg-secondary"
-              } text-uppercase`}
+              className={`status-badge text-white ${
+                priorityColors[props.priority] || "secondary"
+              } text-capitalize`}
             >
               {priorityLabels[props.priority] || "Unknown"}
             </span>
@@ -226,42 +238,28 @@ const TicketList = () => {
         selector: (row: any) => row.id,
         sortable: false,
         cell: (props: any) => (
-          <div className="action-buttons-container">
-            {session?.user?.permissions?.includes("view-ticket-tickets") && (
-              <button
-                className="btn btn-sm btn-outline-primary"
-                onClick={() => handleViewTicket(props)}
-              >
-                View
-              </button>
-            )}
-            {session?.user?.permissions?.includes("edit-ticket-tickets") && (
-              <button
-                className="btn btn-sm btn-outline-primary"
-                onClick={() => handleEditTicket(props)}
-              >
-                Edit
-              </button>
-            )}
-
-            <Tooltip id="delete-ticket-tooltip" />
-            {session?.user?.permissions?.includes("delete-ticket-tickets") && (
-              <div
-                data-tooltip-id="delete-ticket-tooltip"
-                data-tooltip-content={
-                  props.user_extension ? "Assigned to User" : "Delete"
-                }
-              >
-                <button
-                  className="btn btn-sm btn-outline-danger"
-                  onClick={() => handleDeleteTicket(props)}
-                  disabled={props.user_extension}
-                >
-                  Delete
-                </button>
-              </div>
-            )}
-          </div>
+          <DatatableActionButton
+            actions={[
+              ...(session?.user?.permissions?.includes("view-ticket-tickets") ? [{
+                label: 'View',
+                icon: <FiEye />,
+                onClick: () => handleViewTicket(props),
+                className: 'gap-2'
+              }] : []),
+              ...(session?.user?.permissions?.includes("edit-ticket-tickets") ? [{
+                label: 'Edit',
+                icon: <FiEdit />,
+                onClick: () => handleEditTicket(props),
+                className: 'gap-2'
+              }] : []),
+              ...(session?.user?.permissions?.includes("delete-ticket-tickets") ? [{
+                label: props.user_extension ? 'Delete (Assigned)' : 'Delete',
+                icon: <FiTrash2 />,
+                onClick: () => props.user_extension ? null : handleDeleteTicket(props),
+                className: props.user_extension ? 'text-muted gap-2' : 'text-danger gap-2'
+              }] : [])
+            ]}
+          />
         ),
       },
     ],
@@ -313,12 +311,12 @@ const TicketList = () => {
       return await ListTickets({
         page,
         perPage,
-        search,
+        search:currentFilters.search || search,
         filters: memoizedFilters,
         moduleSlug: ModuleSlug.TICKET
       });
     },
-    [memoizedFilters]
+    [memoizedFilters, currentFilters]
   );
 
   const handleFiltersChange = useCallback((filters: any) => {
@@ -591,7 +589,6 @@ const TicketList = () => {
     }
   }, [selectedTicket, selectedTicketTitle, selectedTicketDescription]);
 
-  const [confirmDelete, setConfirmDelete] = useState<string>("");
 
   const handleDeleteTicket = useCallback((props: any) => {
     setSelectedTicket(props.id);
@@ -600,20 +597,14 @@ const TicketList = () => {
   }, []);
 
   const handleSubmitDeleteTicket = useCallback(async () => {
-    const confirmDeleteValue = confirmDelete.trim();
-    if (confirmDeleteValue === "DELETE") {
-      const response = await DeleteTicket(selectedTicket);
-      if (response) {
-        setSelectedTicket(null);
-        setSelectedTicketTitle(null);
-        setShowDeleteTicketModal(false);
-        setConfirmDelete("");
-        setRefreshKey((prev) => prev + 1); // Trigger refresh
-      }
-    } else {
-      toast.error("Please type the word DELETE to confirm");
+    const response = await DeleteTicket(selectedTicket);
+    if (response) {
+      setSelectedTicket(null);
+      setSelectedTicketTitle(null);
+      setShowDeleteTicketModal(false);
+      setRefreshKey((prev) => prev + 1); // Trigger refresh
     }
-  }, [confirmDelete, selectedTicket]);
+  }, [selectedTicket]);
 
   const [showCreateTicketModal, setShowCreateTicketModal] =
     useState<boolean>(false);
@@ -831,11 +822,6 @@ const TicketList = () => {
       setSelectedTicketDescription(e.target.value),
     []
   );
-  const handleConfirmDeleteChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) =>
-      setConfirmDelete(e.target.value),
-    []
-  );
 
   const handleImageClick = useCallback((imageUrl: string) => {
     setSelectedImage(imageUrl);
@@ -924,28 +910,23 @@ const TicketList = () => {
         mainLink="/tickets/list"
         subTitle="Tickets"
       />
-      <Row className="mb-3">
-        <Col md={12}>
-          <div className="page-header-title">
-            <h2 className="mb-0 d-flex align-items-center">
-              Tickets
-              {session?.user?.permissions?.includes(
-                "create-ticket-tickets"
-              ) && (
-                <Button
-                  variant="outline-primary"
-                  size="sm"
-                  className="ms-3"
-                  onClick={openCreateTicketModal}
-                >
-                  New Ticket
-                </Button>
-              )}
-              <TicketsFilters onFiltersChange={handleFiltersChange} moduleSlug={ModuleSlug.TICKET} />
-            </h2>
-          </div>
-        </Col>
-      </Row>
+
+      <PageHeader
+        title="Tickets"
+        showSearch={true}
+        searchPlaceholder="Search tickets..."
+        searchValue={currentFilters.search || ""}
+        onSearchChange={(value) => handleFiltersChange({...currentFilters, search: value})}
+        filters={
+          <TicketsFilters onFiltersChange={handleFiltersChange} moduleSlug={ModuleSlug.TICKET} /> 
+        }
+        buttons={
+          <Button variant="primary" size="sm" onClick={openCreateTicketModal}>New Ticket</Button>
+        }
+        leftGrid={3}
+        rightGrid={9}
+
+      />
 
       {session?.user?.permissions?.includes("tickets-tickets") && (
         <GenericListPage
@@ -956,22 +937,18 @@ const TicketList = () => {
           defaultPageSize={15}
           filters={memoizedFilters}
           refreshKey={refreshKey}
-          search={session?.user?.permissions?.includes(
-            "search-ticket-tickets"
-          )}
+          search={false}
+          tableStyle="table-style-2"
         />
       )}
 
-      {showEditTicketModal && (
-        <Modal
-          show={showEditTicketModal}
-          onHide={closeEditTicketModal}
-          size="lg"
-        >
-          <Modal.Header closeButton>
-            <Modal.Title>Edit Ticket #{selectedTicket?.id}</Modal.Title>
-          </Modal.Header>
-          <Modal.Body>
+      <FormModal
+        show={showEditTicketModal}
+        onHide={closeEditTicketModal}
+        title={`Edit Ticket #${selectedTicket?.id}`}
+        desc="Update the ticket details below"
+        formHtml={
+          <>
             <div className="row">
               <div className="col-md-6">
                 <div className="form-group mb-3">
@@ -1213,61 +1190,35 @@ const TicketList = () => {
                 isSearchable
               />
             </div>
-          </Modal.Body>
-          <Modal.Footer>
-            <Button variant="secondary" onClick={closeEditTicketModal}>
-              Close
-            </Button>
-            <Button variant="primary" onClick={() => handleSubmitEditTicket()}>
-              Save changes
-            </Button>
-          </Modal.Footer>
-        </Modal>
-      )}
+          </>
+        }
+        submitButtonText="Save changes"
+        cancelButtonText="Cancel"
+        onSubmit={handleSubmitEditTicket}
+        onCancel={closeEditTicketModal}
+        submitButtonVariant="primary"
+        cancelButtonVariant="secondary"
+      />
 
-      {showDeleteTicketModal && (
-        <Modal show={showDeleteTicketModal} onHide={closeDeleteTicketModal}>
-          <Modal.Header closeButton>
-            <Modal.Title>Delete Ticket?</Modal.Title>
-          </Modal.Header>
-          <Modal.Body>
-            <p>
-              Are you sure you want to delete this{" "}
-              <b className="text-danger">{selectedTicketTitle}</b> ticket?
-            </p>
-            <p>
-              Type the word <b className="text-danger">DELETE</b> to confirm
-            </p>
-            <input
-              type="text"
-              className="form-control"
-              id="confirmDelete"
-              value={confirmDelete}
-              onChange={handleConfirmDeleteChange}
-              placeholder="Type the word DELETE to confirm"
-            />
-          </Modal.Body>
-          <Modal.Footer>
-            <Button variant="secondary" onClick={closeDeleteTicketModal}>
-              Close
-            </Button>
-            <Button variant="danger" onClick={() => handleSubmitDeleteTicket()}>
-              Delete
-            </Button>
-          </Modal.Footer>
-        </Modal>
-      )}
+      <ConfirmModal
+        show={showDeleteTicketModal}
+        onHide={closeDeleteTicketModal}
+        title="Delete Ticket?"
+        description="Are you sure you want to delete ticket {targetName}? This action cannot be undone."
+        targetName={selectedTicketTitle || ""}
+        confirmButtonText="Delete"
+        cancelButtonText="Cancel"
+        onConfirm={handleSubmitDeleteTicket}
+        onCancel={closeDeleteTicketModal}
+      />
 
-      {showCreateTicketModal && (
-        <Modal
-          show={showCreateTicketModal}
-          onHide={closeCreateTicketModal}
-          size="lg"
-        >
-          <Modal.Header closeButton>
-            <Modal.Title>New Ticket</Modal.Title>
-          </Modal.Header>
-          <Modal.Body>
+      <FormModal
+        show={showCreateTicketModal}
+        onHide={closeCreateTicketModal}
+        title="New Ticket"
+        desc="Fill in the details below to create a new ticket"
+        formHtml={
+          <>
             <div className="row">
               <div className="col-md-6">
                 <div className="form-group mb-3">
@@ -1488,32 +1439,23 @@ const TicketList = () => {
                 </small>
               </div>
             </div>
-          </Modal.Body>
-          <Modal.Footer>
-            <Button variant="secondary" onClick={closeCreateTicketModal}>
-              Close
-            </Button>
-            <Button
-              variant="primary"
-              onClick={() => handleSubmitCreateTicket()}
-              disabled={creatingTicket}
-            >
-              {creatingTicket ? "Creating..." : "Create"}
-            </Button>
-          </Modal.Footer>
-        </Modal>
-      )}
+          </>
+        }
+        submitButtonText={creatingTicket ? "Creating..." : "Create"}
+        cancelButtonText="Cancel"
+        onSubmit={handleSubmitCreateTicket}
+        onCancel={closeCreateTicketModal}
+        submitButtonVariant="primary"
+        cancelButtonVariant="secondary"
+      />
 
-      {showViewTicketModal && (
-        <Modal
-          show={showViewTicketModal}
-          onHide={closeViewTicketModal}
-          size="lg"
-        >
-          <Modal.Header closeButton>
-            <Modal.Title>Ticket #{viewTicketData?.id} Information</Modal.Title>
-          </Modal.Header>
-          <Modal.Body>
+      <FormModal
+        show={showViewTicketModal}
+        onHide={closeViewTicketModal}
+        title={`Ticket #${viewTicketData?.id} Information`}
+        desc="View ticket details and comments"
+        formHtml={
+          <>
             <table
               className="table table-bordered"
               style={{
@@ -2047,14 +1989,14 @@ const TicketList = () => {
                 </div>
               )}
             </div>
-          </Modal.Body>
-          <Modal.Footer>
-            <Button variant="secondary" onClick={closeViewTicketModal}>
-              Close
-            </Button>
-          </Modal.Footer>
-        </Modal>
-      )}
+          </>
+        }
+        submitButtonText="Close"
+        ShowSubmitButton={false}
+        cancelButtonText="Close"
+        onSubmit={closeViewTicketModal}
+        onCancel={() => {closeViewTicketModal()}}
+      />
 
       {showImageModal && (
         <Modal

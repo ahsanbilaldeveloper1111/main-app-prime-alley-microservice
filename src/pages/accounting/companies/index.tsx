@@ -43,14 +43,17 @@ import {
   useElements,
 } from "@stripe/react-stripe-js";
 
-import PageHeader from "@components/PageHeader";
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
-import PageSummaryGrid from "@components/PageSummaryGrid";
+import PageHeader from "@components/PageHeader";
 import FormModal from "../../partial/FormModal";
 import ConfirmModal from "@pages/partial/ConfirmModal";
 import SuccessfulModal from "@pages/partial/SuccessfulModal";
-import { FiEdit, FiTrash2 } from "react-icons/fi";
+import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
+import DatatableActionButton from "@components/DatatableActionButton";
+import { FiEdit, FiTrash2, FiEye,FiPlus } from "react-icons/fi";
+
+
 import TableAction from "@components/TableAction";
 import CompaniesFilters from "@components/filters/CompaniesFilters";
 
@@ -363,21 +366,21 @@ const CompanyList = () => {
   // Table columns
   const columns: Column[] = useMemo(
     () => [
-      {
-        key: "id",
-        name: "ID",
-        selector: (row: any) => row.id,
-        sortable: true,
-        cell: (props: any) => (
-          <span className="fw-bold text-primary">#{props.id}</span>
-        ),
-      },
+      // {
+      //   key: "id",
+      //   name: "ID",
+      //   selector: (row: any) => row.id,
+      //   sortable: true,
+      //   cell: (props: any) => (
+      //     <span className="fw-bold text-primary">#{props.id}</span>
+      //   ),
+      // },
       {
         key: "name",
         name: "Company Name",
         selector: (row: any) => row.name,
         sortable: true,
-        cell: (props: any) => <div className="fw-bold">{props.name}</div>,
+        cell: (props: any) => <div>{props.name}</div>,
       },
       {
         key: "email",
@@ -424,31 +427,31 @@ const CompanyList = () => {
         sortable: false,
         cell: (props: any) => (
           <>
-            <TableAction
+            <DatatableActionButton
               actions={[
                 {
                   label: "Edit",
-                  icon: FiEdit,
+                  icon: <FiEdit />,
                   onClick: () => handleEditCompany(props),
                   //  permission: 'edit-companies',
-                  variant: "edit",
+                  className: "gap-2",
                 },
                 {
                   label: "Pricing",
-                  icon: FiEdit,
+                  icon: <FiEdit />,
                   onClick: () =>
                     router.push(
                       `/accounting/companies/product-pricing?companyId=${props.id}`
                     ),
                   //  permission: 'edit-companies',
-                  variant: "edit",
+                  className: "gap-2",
                 },
                 {
                   label: "Delete",
-                  icon: FiTrash2,
+                  icon: <FiTrash2 />,
                   onClick: () => handleDeleteCompany(props),
                   //  permission: 'delete-companies',
-                  variant: "delete",
+                  className: "text-danger gap-2",
                 },
               ]}
             />
@@ -925,7 +928,7 @@ const CompanyList = () => {
             <CompaniesFilters
               onFiltersChange={handleFiltersChange}
               showFilters={true}
-              showExport={true}
+              showExport={false}
               onExport={handleExportCompanies}
             />
             <Button variant="primary" size="sm" onClick={openCreateModal}>

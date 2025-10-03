@@ -27,11 +27,13 @@ import moment from "moment";
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import PageHeader from "@components/PageHeader";
-import PageSummaryGrid from "@components/PageSummaryGrid";
 import FormModal from "../../partial/FormModal";
 import ConfirmModal from "@pages/partial/ConfirmModal";
 import SuccessfulModal from "@pages/partial/SuccessfulModal";
-import { FiEdit, FiTrash2 } from "react-icons/fi";
+import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
+import DatatableActionButton from "@components/DatatableActionButton";
+import { FiEdit, FiTrash2, FiEye,FiPlus } from "react-icons/fi";
+
 import TableAction from "@components/TableAction";
 const SupplierList = () => {
   const { data: session, status } = useSession();
@@ -57,7 +59,7 @@ const SupplierList = () => {
         sortable: true,
         cell: (props: InventorySupplierData) => (
           <div>
-            <div className="fw-bold text-primary">{props.name}</div>
+            <div>{props.name}</div>
             {props.contact_person && (
               <div className="text-muted small">Contact: {props.contact_person}</div>
             )}
@@ -70,7 +72,7 @@ const SupplierList = () => {
         selector: (row: InventorySupplierData) => row.email,
         sortable: true,
         cell: (props: InventorySupplierData) => (
-          <span className="text-muted">
+          <span>
             {props.email || "No email"}
           </span>
         ),
@@ -81,7 +83,7 @@ const SupplierList = () => {
         selector: (row: InventorySupplierData) => row.phone,
         sortable: true,
         cell: (props: InventorySupplierData) => (
-          <span className="text-muted">
+          <span>
             {props.phone || "No phone"}
           </span>
         ),
@@ -92,7 +94,7 @@ const SupplierList = () => {
         selector: (row: InventorySupplierData) => row.address,
         sortable: true,
         cell: (props: InventorySupplierData) => (
-          <div className="text-muted small">
+          <div>
             {props.address ? (
               <div>
                 <div>{props.address}</div>
@@ -114,7 +116,7 @@ const SupplierList = () => {
         sortable: true,
         cell: (props: InventorySupplierData) => (
           <span
-            className={`status-badge ${
+            className={`status-badge text-capitalize ${
               props.is_active ? "success" : "danger"
             }`}
           >
@@ -140,19 +142,19 @@ const SupplierList = () => {
         sortable: false,
         cell: (props: InventorySupplierData) => (
           <>  
-          <TableAction
+          <DatatableActionButton
                     actions={[
                         {
                             label: 'Edit',
-                            icon: FiEdit,
+                            icon: <FiEdit />,
                             onClick: () => handleEditSupplier(props),
-                            variant: 'edit'
+                            className: 'gap-2'
                         },
                         {
                             label: 'Delete',
-                            icon: FiTrash2,
+                            icon: <FiTrash2 />,
                             onClick: () => handleDeleteSupplier(props),
-                            variant: 'delete'
+                            className: 'text-danger gap-2'
                         },
                     ]}
                 />
@@ -326,20 +328,16 @@ const SupplierList = () => {
     if (!selectedSupplier) return;
 
     const confirmDeleteValue = confirmDeleteSupplier.trim();
-    if (confirmDeleteValue === "DELETE") {
-      try {
-        await deleteInventorySupplier(selectedSupplier.id);
-        setSelectedSupplier(null);
-        setShowDeleteSupplierModal(false);
-        setConfirmDeleteSupplier("");
-        setRefreshKey((prev) => prev + 1);
-        toast.success("Supplier deleted successfully");
-      } catch (error) {
-        console.error("Error deleting supplier:", error);
-        toast.error("Failed to delete supplier");
-      }
-    } else {
-      toast.error("Please type the word DELETE to confirm");
+    try {
+      await deleteInventorySupplier(selectedSupplier.id);
+      setSelectedSupplier(null);
+      setShowDeleteSupplierModal(false);
+      setConfirmDeleteSupplier("");
+      setRefreshKey((prev) => prev + 1);
+      toast.success("Supplier deleted successfully");
+    } catch (error) {
+      console.error("Error deleting supplier:", error);
+      toast.error("Failed to delete supplier");
     }
   }, [confirmDeleteSupplier, selectedSupplier]);
 
@@ -373,269 +371,225 @@ const SupplierList = () => {
 
       {/* Create Supplier Modal */}
       {showCreateSupplierModal && (
-        <Modal
+        <FormModal
           show={showCreateSupplierModal}
           onHide={closeCreateSupplierModal}
-          size="lg"
-        >
-          <Modal.Header closeButton>
-            <Modal.Title>Create New Supplier</Modal.Title>
-          </Modal.Header>
-          <Modal.Body>
-            <div className="row">
-              <div className="col-md-6">
-                <div className="form-group mb-3">
-                  <label htmlFor="newSupplierName">Supplier Name *</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    id="newSupplierName"
-                    value={newSupplier.name}
-                    onChange={(e) =>
-                      handleNewSupplierChange("name", e.target.value)
-                    }
-                    placeholder="Enter supplier name"
-                  />
+          title="Create New Supplier"
+          desc="Fill in the details below to create a new supplier"
+          formHtml={
+            <>
+              <div className="row">
+                <div className="col-md-6">
+                  <div className="form-group mb-3">
+                    <label htmlFor="newSupplierName">Supplier Name *</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      id="newSupplierName"
+                      value={newSupplier.name}
+                      onChange={(e) =>
+                        handleNewSupplierChange("name", e.target.value)
+                      }
+                      placeholder="Enter supplier name"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group mb-3">
+                    <label htmlFor="newSupplierEmail">Email</label>
+                    <input
+                      type="email"
+                      className="form-control"
+                      id="newSupplierEmail"
+                      value={newSupplier.email}
+                      onChange={(e) =>
+                        handleNewSupplierChange("email", e.target.value)
+                      }
+                      placeholder="Enter email address"
+                    />
+                  </div>
                 </div>
               </div>
-              <div className="col-md-6">
-                <div className="form-group mb-3">
-                  <label htmlFor="newSupplierEmail">Email</label>
-                  <input
-                    type="email"
-                    className="form-control"
-                    id="newSupplierEmail"
-                    value={newSupplier.email}
-                    onChange={(e) =>
-                      handleNewSupplierChange("email", e.target.value)
-                    }
-                    placeholder="Enter email address"
-                  />
-                </div>
-              </div>
-            </div>
 
-            <div className="row">
-              <div className="col-md-6">
-                <div className="form-group mb-3">
-                  <label htmlFor="newSupplierPhone">Phone</label>
-                  <input
-                    type="tel"
-                    className="form-control"
-                    id="newSupplierPhone"
-                    value={newSupplier.phone}
-                    onChange={(e) =>
-                      handleNewSupplierChange("phone", e.target.value)
-                    }
-                    placeholder="Enter phone number"
-                  />
+              <div className="row">
+                <div className="col-md-6">
+                  <div className="form-group mb-3">
+                    <label htmlFor="newSupplierPhone">Phone</label>
+                    <input
+                      type="tel"
+                      className="form-control"
+                      id="newSupplierPhone"
+                      value={newSupplier.phone}
+                      onChange={(e) =>
+                        handleNewSupplierChange("phone", e.target.value)
+                      }
+                      placeholder="Enter phone number"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group mb-3">
+                    <label htmlFor="newSupplierStatus">Status</label>
+                    <select
+                      className="form-control"
+                      id="newSupplierStatus"
+                      value={newSupplier.is_active ? "active" : "inactive"}
+                      onChange={(e) =>
+                        handleNewSupplierChange("is_active", e.target.value === "active")
+                      }
+                    >
+                      <option value="active">Active</option>
+                      <option value="inactive">Inactive</option>
+                    </select>
+                  </div>
                 </div>
               </div>
-              <div className="col-md-6">
-                <div className="form-group mb-3">
-                  <label htmlFor="newSupplierStatus">Status</label>
-                  <select
-                    className="form-control"
-                    id="newSupplierStatus"
-                    value={newSupplier.is_active ? "active" : "inactive"}
-                    onChange={(e) =>
-                      handleNewSupplierChange("is_active", e.target.value === "active")
-                    }
-                  >
-                    <option value="active">Active</option>
-                    <option value="inactive">Inactive</option>
-                  </select>
-                </div>
-              </div>
-            </div>
 
-            <div className="row">
-              <div className="col-md-12">
-                <div className="form-group mb-3">
-                  <label htmlFor="newSupplierAddress">Address</label>
-                  <textarea
-                    className="form-control"
-                    id="newSupplierAddress"
-                    value={newSupplier.address}
-                    onChange={(e) =>
-                      handleNewSupplierChange("address", e.target.value)
-                    }
-                    rows={3}
-                    placeholder="Enter address..."
-                  />
+              <div className="row">
+                <div className="col-md-12">
+                  <div className="form-group mb-3">
+                    <label htmlFor="newSupplierAddress">Address</label>
+                    <textarea
+                      className="form-control"
+                      id="newSupplierAddress"
+                      value={newSupplier.address}
+                      onChange={(e) =>
+                        handleNewSupplierChange("address", e.target.value)
+                      }
+                      rows={3}
+                      placeholder="Enter address..."
+                    />
+                  </div>
                 </div>
               </div>
-            </div>
-          </Modal.Body>
-          <Modal.Footer>
-            <Button variant="secondary" onClick={closeCreateSupplierModal}>
-              Close
-            </Button>
-            <Button
-              variant="primary"
-              onClick={handleSubmitCreateSupplier}
-              disabled={creatingSupplier}
-            >
-              {creatingSupplier ? "Creating..." : "Create Supplier"}
-            </Button>
-          </Modal.Footer>
-        </Modal>
+            </>
+          }
+          submitButtonText={creatingSupplier ? "Creating..." : "Create Supplier"}
+          cancelButtonText="Close"
+          onSubmit={handleSubmitCreateSupplier}
+          onCancel={closeCreateSupplierModal}
+          submitButtonVariant="primary"
+          cancelButtonVariant="secondary"
+        />
       )}
 
       {/* Edit Supplier Modal */}
       {showEditSupplierModal && selectedSupplier && (
-        <Modal
+        <FormModal
           show={showEditSupplierModal}
           onHide={closeEditSupplierModal}
-          size="lg"
-        >
-          <Modal.Header closeButton>
-            <Modal.Title>
-              Edit Supplier: {selectedSupplier.name}
-            </Modal.Title>
-          </Modal.Header>
-          <Modal.Body>
-            <div className="row">
-              <div className="col-md-6">
-                <div className="form-group mb-3">
-                  <label htmlFor="editSupplierName">Supplier Name *</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    id="editSupplierName"
-                    value={selectedSupplier.name || ""}
-                    onChange={(e) =>
-                      handleEditSupplierChange("name", e.target.value)
-                    }
-                    placeholder="Enter supplier name"
-                  />
+          title={`Edit Supplier: ${selectedSupplier.name}`}
+          desc="Update the supplier details below"
+          formHtml={
+            <>
+              <div className="row">
+                <div className="col-md-6">
+                  <div className="form-group mb-3">
+                    <label htmlFor="editSupplierName">Supplier Name *</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      id="editSupplierName"
+                      value={selectedSupplier.name || ""}
+                      onChange={(e) =>
+                        handleEditSupplierChange("name", e.target.value)
+                      }
+                      placeholder="Enter supplier name"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group mb-3">
+                    <label htmlFor="editSupplierEmail">Email</label>
+                    <input
+                      type="email"
+                      className="form-control"
+                      id="editSupplierEmail"
+                      value={selectedSupplier.email || ""}
+                      onChange={(e) =>
+                        handleEditSupplierChange("email", e.target.value)
+                      }
+                      placeholder="Enter email address"
+                    />
+                  </div>
                 </div>
               </div>
-              <div className="col-md-6">
-                <div className="form-group mb-3">
-                  <label htmlFor="editSupplierEmail">Email</label>
-                  <input
-                    type="email"
-                    className="form-control"
-                    id="editSupplierEmail"
-                    value={selectedSupplier.email || ""}
-                    onChange={(e) =>
-                      handleEditSupplierChange("email", e.target.value)
-                    }
-                    placeholder="Enter email address"
-                  />
-                </div>
-              </div>
-            </div>
 
-            <div className="row">
-              <div className="col-md-6">
-                <div className="form-group mb-3">
-                  <label htmlFor="editSupplierPhone">Phone</label>
-                  <input
-                    type="tel"
-                    className="form-control"
-                    id="editSupplierPhone"
-                    value={selectedSupplier.phone || ""}
-                    onChange={(e) =>
-                      handleEditSupplierChange("phone", e.target.value)
-                    }
-                    placeholder="Enter phone number"
-                  />
+              <div className="row">
+                <div className="col-md-6">
+                  <div className="form-group mb-3">
+                    <label htmlFor="editSupplierPhone">Phone</label>
+                    <input
+                      type="tel"
+                      className="form-control"
+                      id="editSupplierPhone"
+                      value={selectedSupplier.phone || ""}
+                      onChange={(e) =>
+                        handleEditSupplierChange("phone", e.target.value)
+                      }
+                      placeholder="Enter phone number"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group mb-3">
+                    <label htmlFor="editSupplierStatus">Status</label>
+                    <select
+                      className="form-control"
+                      id="editSupplierStatus"
+                      value={selectedSupplier.is_active ? "active" : "inactive"}
+                      onChange={(e) =>
+                        handleEditSupplierChange("is_active", e.target.value === "active")
+                      }
+                    >
+                      <option value="active">Active</option>
+                      <option value="inactive">Inactive</option>
+                    </select>
+                  </div>
                 </div>
               </div>
-              <div className="col-md-6">
-                <div className="form-group mb-3">
-                  <label htmlFor="editSupplierStatus">Status</label>
-                  <select
-                    className="form-control"
-                    id="editSupplierStatus"
-                    value={selectedSupplier.is_active ? "active" : "inactive"}
-                    onChange={(e) =>
-                      handleEditSupplierChange("is_active", e.target.value === "active")
-                    }
-                  >
-                    <option value="active">Active</option>
-                    <option value="inactive">Inactive</option>
-                  </select>
-                </div>
-              </div>
-            </div>
 
-            <div className="row">
-              <div className="col-md-12">
-                <div className="form-group mb-3">
-                  <label htmlFor="editSupplierAddress">Address</label>
-                  <textarea
-                    className="form-control"
-                    id="editSupplierAddress"
-                    value={selectedSupplier.address || ""}
-                    onChange={(e) =>
-                      handleEditSupplierChange("address", e.target.value)
-                    }
-                    rows={3}
-                    placeholder="Enter address..."
-                  />
+              <div className="row">
+                <div className="col-md-12">
+                  <div className="form-group mb-3">
+                    <label htmlFor="editSupplierAddress">Address</label>
+                    <textarea
+                      className="form-control"
+                      id="editSupplierAddress"
+                      value={selectedSupplier.address || ""}
+                      onChange={(e) =>
+                        handleEditSupplierChange("address", e.target.value)
+                      }
+                      rows={3}
+                      placeholder="Enter address..."
+                    />
+                  </div>
                 </div>
               </div>
-            </div>
-          </Modal.Body>
-          <Modal.Footer>
-            <Button variant="secondary" onClick={closeEditSupplierModal}>
-              Close
-            </Button>
-            <Button
-              variant="primary"
-              onClick={handleSubmitEditSupplier}
-              disabled={editingSupplier}
-            >
-              {editingSupplier ? "Updating..." : "Update Supplier"}
-            </Button>
-          </Modal.Footer>
-        </Modal>
+            </>
+          }
+          submitButtonText={editingSupplier ? "Updating..." : "Update Supplier"}
+          cancelButtonText="Close"
+          onSubmit={handleSubmitEditSupplier}
+          onCancel={closeEditSupplierModal}
+          submitButtonVariant="primary"
+          cancelButtonVariant="secondary"
+        />
       )}
 
       {/* Delete Supplier Modal */}
       {showDeleteSupplierModal && selectedSupplier && (
-        <Modal
+        <ConfirmModal
           show={showDeleteSupplierModal}
           onHide={() => setShowDeleteSupplierModal(false)}
-        >
-          <Modal.Header closeButton>
-            <Modal.Title>Delete Supplier?</Modal.Title>
-          </Modal.Header>
-          <Modal.Body>
-            <p>
-              Are you sure you want to delete supplier{" "}
-              <b className="text-danger">{selectedSupplier.name}</b>?
-            </p>
-            <p>
-              This action cannot be undone.
-            </p>
-            <p>
-              Type the word <b className="text-danger">DELETE</b> to confirm
-            </p>
-            <input
-              type="text"
-              className="form-control"
-              id="confirmDeleteSupplier"
-              value={confirmDeleteSupplier}
-              onChange={(e) => setConfirmDeleteSupplier(e.target.value)}
-              placeholder="Type the word DELETE to confirm"
-            />
-          </Modal.Body>
-          <Modal.Footer>
-            <Button
-              variant="secondary"
-              onClick={() => setShowDeleteSupplierModal(false)}
-            >
-              Close
-            </Button>
-            <Button variant="danger" onClick={handleSubmitDeleteSupplier}>
-              Delete
-            </Button>
-          </Modal.Footer>
-        </Modal>
+          title="Delete Supplier?"
+          description="Are you sure you want to delete supplier {targetName}? This action cannot be undone."
+          targetName={selectedSupplier.name}
+          confirmButtonText="Delete"
+          cancelButtonText="Close"
+          onConfirm={handleSubmitDeleteSupplier}
+          onCancel={() => setShowDeleteSupplierModal(false)}
+        />
       )}
     </React.Fragment>
   );

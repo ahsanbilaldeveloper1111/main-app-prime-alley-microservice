@@ -31,16 +31,19 @@ import { toast } from "react-toastify";
 import { useSession } from "next-auth/react";
 import moment from "moment";
 
-import "@assets/scss/common.scss";
-
 import { motion } from "framer-motion";
-import { FiEdit, FiTrash2 } from "react-icons/fi";
-import TableAction from "@components/TableAction";
+
+import "@assets/scss/common.scss";
+import "@assets/scss/tabs.scss";
 import PageHeader from "@components/PageHeader";
-import PageSummaryGrid from "@components/PageSummaryGrid";
 import FormModal from "../../partial/FormModal";
 import ConfirmModal from "@pages/partial/ConfirmModal";
 import SuccessfulModal from "@pages/partial/SuccessfulModal";
+import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
+import DatatableActionButton from "@components/DatatableActionButton";
+import { FiEdit, FiTrash2, FiEye,FiPlus } from "react-icons/fi";
+
+
 
 const InventoryList = () => {
   const { data: session, status } = useSession();
@@ -70,7 +73,7 @@ const InventoryList = () => {
         sortable: true,
         cell: (props: InventoryData) => (
           <div>
-            <div className="fw-bold text-primary">{props.name}</div>
+            <div >{props.name}</div>
             {props.description && (
               <div 
                 className="text-muted small" 
@@ -86,7 +89,7 @@ const InventoryList = () => {
         selector: (row: InventoryData) => row.category?.name,
         sortable: true,
         cell: (props: InventoryData) => (
-          <span className="badge bg-info">
+          <span className="status-badge info">
             {props.category?.name || "No Category"}
           </span>
         ),
@@ -98,7 +101,7 @@ const InventoryList = () => {
         sortable: true,
         cell: (props: InventoryData) => (
           <div>
-            <div className="fw-bold">{props.current_stock}</div>
+            <div>Items: {props.current_stock}</div>
             <div className="text-muted small">
               Min: {props.minimum_stock} | Max: {props.maximum_stock}
             </div>
@@ -111,7 +114,7 @@ const InventoryList = () => {
         selector: (row: InventoryData) => row.base_price,
         sortable: true,
         cell: (props: InventoryData) => (
-          <span className="fw-bold text-success">
+          <span>
             ${parseFloat(props.base_price || "0").toFixed(2)}
           </span>
         ),
@@ -129,12 +132,12 @@ const InventoryList = () => {
           };
           return (
             <span
-              className={`status-badge ${
+              className={`text-capitalize status-badge ${
                 statusColors[props.status as keyof typeof statusColors] ||
                 "secondary"
               }`}
             >
-              {props.status.replace('_', ' ').toUpperCase()}
+              {props.status.replace('_', ' ')}
             </span>
           );
         },
@@ -157,20 +160,20 @@ const InventoryList = () => {
         sortable: false,
         cell: (props: InventoryData) => (
           <>
-          <TableAction
+          <DatatableActionButton
                     actions={[
                         {
                             label: 'Edit',
-                            icon: FiEdit,
+                            icon: <FiEdit />,
                             onClick: () => handleEditInventory(props),
-                            variant: 'edit'
+                            className: 'gap-2'
                         },
                         {
                             label: 'Delete',
-                            icon: FiTrash2,
+                            icon: <FiTrash2 />,
                             onClick: () => handleDeleteInventory(props),
-                            variant: 'delete'
-                        },
+                            className: 'text-danger gap-2'
+                        }
                     ]}
                 />
           </>
@@ -422,20 +425,16 @@ const InventoryList = () => {
     if (!selectedInventory) return;
 
     const confirmDeleteValue = confirmDeleteInventory.trim();
-    if (confirmDeleteValue === "DELETE") {
-      try {
-        await deleteInventory(selectedInventory.id);
-        setSelectedInventory(null);
-        setShowDeleteInventoryModal(false);
-        setConfirmDeleteInventory("");
-        setRefreshKey((prev) => prev + 1);
-        toast.success("Inventory deleted successfully");
-      } catch (error) {
-        console.error("Error deleting inventory:", error);
-        toast.error("Failed to delete inventory");
-      }
-    } else {
-      toast.error("Please type the word DELETE to confirm");
+    try {
+      await deleteInventory(selectedInventory.id);
+      setSelectedInventory(null);
+      setShowDeleteInventoryModal(false);
+      setConfirmDeleteInventory("");
+      setRefreshKey((prev) => prev + 1);
+      toast.success("Inventory deleted successfully");
+    } catch (error) {
+      console.error("Error deleting inventory:", error);
+      toast.error("Failed to delete inventory");
     }
   }, [confirmDeleteInventory, selectedInventory]);
 
@@ -469,16 +468,13 @@ const InventoryList = () => {
       />
 
       {/* Create Inventory Modal */}
-      {showCreateInventoryModal && (
-        <Modal
-          show={showCreateInventoryModal}
-          onHide={closeCreateInventoryModal}
-          size="lg"
-        >
-          <Modal.Header closeButton>
-            <Modal.Title>Create New Inventory Item</Modal.Title>
-          </Modal.Header>
-          <Modal.Body>
+      <FormModal
+        show={showCreateInventoryModal}
+        onHide={closeCreateInventoryModal}
+        title="Create New Inventory Item"
+        desc="Fill in the details below to create a new inventory item"
+        formHtml={
+          <>
             <div className="row">
               <div className="col-md-6">
                 <div className="form-group mb-3">
@@ -694,307 +690,268 @@ const InventoryList = () => {
                 </div>
               </div>
             </div>
-          </Modal.Body>
-          <Modal.Footer>
-            <Button variant="secondary" onClick={closeCreateInventoryModal}>
-              Close
-            </Button>
-            <Button
-              variant="primary"
-              onClick={handleSubmitCreateInventory}
-              disabled={creatingInventory}
-            >
-              {creatingInventory ? "Creating..." : "Create Inventory Item"}
-            </Button>
-          </Modal.Footer>
-        </Modal>
-      )}
+          </>
+        }
+        submitButtonText={creatingInventory ? "Creating..." : "Create Inventory Item"}
+        cancelButtonText="Close"
+        onSubmit={handleSubmitCreateInventory}
+        onCancel={closeCreateInventoryModal}
+        submitButtonVariant="primary"
+        cancelButtonVariant="secondary"
+      />
 
       {/* Edit Inventory Modal */}
       {showEditInventoryModal && selectedInventory && (
-        <Modal
+        <FormModal
           show={showEditInventoryModal}
           onHide={closeEditInventoryModal}
-          size="lg"
-        >
-          <Modal.Header closeButton>
-            <Modal.Title>
-              Edit Inventory: {selectedInventory.name}
-            </Modal.Title>
-          </Modal.Header>
-          <Modal.Body>
-            <div className="row">
-              <div className="col-md-6">
-                <div className="form-group mb-3">
-                  <label htmlFor="editInventoryName">Name</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    id="editInventoryName"
-                    value={selectedInventory.name || ""}
-                    onChange={(e) =>
-                      handleEditInventoryChange("name", e.target.value)
-                    }
-                    placeholder="Enter inventory item name"
-                  />
+          title={`Edit Inventory: ${selectedInventory.name}`}
+          desc="Update the inventory item details below"
+          formHtml={
+            <>
+              <div className="row">
+                <div className="col-md-6">
+                  <div className="form-group mb-3">
+                    <label htmlFor="editInventoryName">Name</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      id="editInventoryName"
+                      value={selectedInventory.name || ""}
+                      onChange={(e) =>
+                        handleEditInventoryChange("name", e.target.value)
+                      }
+                      placeholder="Enter inventory item name"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group mb-3">
+                    <label htmlFor="editInventoryCategory">Category</label>
+                    <select
+                      className="form-control"
+                      id="editInventoryCategory"
+                      value={selectedInventory.category_id || ""}
+                      onChange={(e) =>
+                        handleEditInventoryChange("category_id", e.target.value)
+                      }
+                    >
+                      <option value="">Select Category</option>
+                      {categories.map((category: ProductCategoryData) => (
+                        <option key={category.id} value={category.id}>
+                          {category.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
               </div>
-              <div className="col-md-6">
-                <div className="form-group mb-3">
-                  <label htmlFor="editInventoryCategory">Category</label>
-                  <select
-                    className="form-control"
-                    id="editInventoryCategory"
-                    value={selectedInventory.category_id || ""}
-                    onChange={(e) =>
-                      handleEditInventoryChange("category_id", e.target.value)
-                    }
-                  >
-                    <option value="">Select Category</option>
-                    {categories.map((category: ProductCategoryData) => (
-                      <option key={category.id} value={category.id}>
-                        {category.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            </div>
 
-            <div className="row">
-              <div className="col-md-12">
-                <div className="form-group mb-3">
-                  <label htmlFor="editInventoryDescription">Description</label>
-                  <textarea
-                    className="form-control"
-                    id="editInventoryDescription"
-                    value={selectedInventory.description || ""}
-                    onChange={(e) =>
-                      handleEditInventoryChange("description", e.target.value)
-                    }
-                    rows={3}
-                    placeholder="Enter description..."
-                  />
+              <div className="row">
+                <div className="col-md-12">
+                  <div className="form-group mb-3">
+                    <label htmlFor="editInventoryDescription">Description</label>
+                    <textarea
+                      className="form-control"
+                      id="editInventoryDescription"
+                      value={selectedInventory.description || ""}
+                      onChange={(e) =>
+                        handleEditInventoryChange("description", e.target.value)
+                      }
+                      rows={3}
+                      placeholder="Enter description..."
+                    />
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div className="row">
-              <div className="col-md-4">
-                <div className="form-group mb-3">
-                  <label htmlFor="editInventoryBasePrice">Base Price</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    className="form-control"
-                    id="editInventoryBasePrice"
-                    value={selectedInventory.base_price || ""}
-                    onChange={(e) =>
-                      handleEditInventoryChange("base_price", e.target.value)
-                    }
-                    placeholder="0.00"
-                  />
+              <div className="row">
+                <div className="col-md-4">
+                  <div className="form-group mb-3">
+                    <label htmlFor="editInventoryBasePrice">Base Price</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      className="form-control"
+                      id="editInventoryBasePrice"
+                      value={selectedInventory.base_price || ""}
+                      onChange={(e) =>
+                        handleEditInventoryChange("base_price", e.target.value)
+                      }
+                      placeholder="0.00"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-4">
+                  <div className="form-group mb-3">
+                    <label htmlFor="editInventoryCurrentStock">Current Stock</label>
+                    <input
+                      type="number"
+                      className="form-control"
+                      id="editInventoryCurrentStock"
+                      value={selectedInventory.current_stock || ""}
+                      onChange={(e) =>
+                        handleEditInventoryChange("current_stock", parseInt(e.target.value) || 0)
+                      }
+                      placeholder="0"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-4">
+                  <div className="form-group mb-3">
+                    <label htmlFor="editInventoryStatus">Status</label>
+                    <select
+                      className="form-control"
+                      id="editInventoryStatus"
+                      value={selectedInventory.status || ""}
+                      onChange={(e) =>
+                        handleEditInventoryChange("status", e.target.value)
+                      }
+                    >
+                      <option value="in_stock">In Stock</option>
+                      <option value="low_stock">Low Stock</option>
+                      <option value="out_of_stock">Out of Stock</option>
+                    </select>
+                  </div>
                 </div>
               </div>
-              <div className="col-md-4">
-                <div className="form-group mb-3">
-                  <label htmlFor="editInventoryCurrentStock">Current Stock</label>
-                  <input
-                    type="number"
-                    className="form-control"
-                    id="editInventoryCurrentStock"
-                    value={selectedInventory.current_stock || ""}
-                    onChange={(e) =>
-                      handleEditInventoryChange("current_stock", parseInt(e.target.value) || 0)
-                    }
-                    placeholder="0"
-                  />
-                </div>
-              </div>
-              <div className="col-md-4">
-                <div className="form-group mb-3">
-                  <label htmlFor="editInventoryStatus">Status</label>
-                  <select
-                    className="form-control"
-                    id="editInventoryStatus"
-                    value={selectedInventory.status || ""}
-                    onChange={(e) =>
-                      handleEditInventoryChange("status", e.target.value)
-                    }
-                  >
-                    <option value="in_stock">In Stock</option>
-                    <option value="low_stock">Low Stock</option>
-                    <option value="out_of_stock">Out of Stock</option>
-                  </select>
-                </div>
-              </div>
-            </div>
 
-            <div className="row">
-              <div className="col-md-4">
-                <div className="form-group mb-3">
-                  <label htmlFor="editInventoryMinStock">Minimum Stock</label>
-                  <input
-                    type="number"
-                    className="form-control"
-                    id="editInventoryMinStock"
-                    value={selectedInventory.minimum_stock || ""}
-                    onChange={(e) =>
-                      handleEditInventoryChange("minimum_stock", parseInt(e.target.value) || 0)
-                    }
-                    placeholder="0"
-                  />
+              <div className="row">
+                <div className="col-md-4">
+                  <div className="form-group mb-3">
+                    <label htmlFor="editInventoryMinStock">Minimum Stock</label>
+                    <input
+                      type="number"
+                      className="form-control"
+                      id="editInventoryMinStock"
+                      value={selectedInventory.minimum_stock || ""}
+                      onChange={(e) =>
+                        handleEditInventoryChange("minimum_stock", parseInt(e.target.value) || 0)
+                      }
+                      placeholder="0"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-4">
+                  <div className="form-group mb-3">
+                    <label htmlFor="editInventoryMaxStock">Maximum Stock</label>
+                    <input
+                      type="number"
+                      className="form-control"
+                      id="editInventoryMaxStock"
+                      value={selectedInventory.maximum_stock || ""}
+                      onChange={(e) =>
+                        handleEditInventoryChange("maximum_stock", parseInt(e.target.value) || 0)
+                      }
+                      placeholder="0"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-4">
+                  <div className="form-group mb-3">
+                    <label htmlFor="editInventoryReorderPoint">Reorder Point</label>
+                    <input
+                      type="number"
+                      className="form-control"
+                      id="editInventoryReorderPoint"
+                      value={selectedInventory.reorder_point || ""}
+                      onChange={(e) =>
+                        handleEditInventoryChange("reorder_point", e.target.value ? parseInt(e.target.value) : null)
+                      }
+                      placeholder="Optional"
+                    />
+                  </div>
                 </div>
               </div>
-              <div className="col-md-4">
-                <div className="form-group mb-3">
-                  <label htmlFor="editInventoryMaxStock">Maximum Stock</label>
-                  <input
-                    type="number"
-                    className="form-control"
-                    id="editInventoryMaxStock"
-                    value={selectedInventory.maximum_stock || ""}
-                    onChange={(e) =>
-                      handleEditInventoryChange("maximum_stock", parseInt(e.target.value) || 0)
-                    }
-                    placeholder="0"
-                  />
-                </div>
-              </div>
-              <div className="col-md-4">
-                <div className="form-group mb-3">
-                  <label htmlFor="editInventoryReorderPoint">Reorder Point</label>
-                  <input
-                    type="number"
-                    className="form-control"
-                    id="editInventoryReorderPoint"
-                    value={selectedInventory.reorder_point || ""}
-                    onChange={(e) =>
-                      handleEditInventoryChange("reorder_point", e.target.value ? parseInt(e.target.value) : null)
-                    }
-                    placeholder="Optional"
-                  />
-                </div>
-              </div>
-            </div>
 
-            <div className="row">
-              <div className="col-md-6">
-                <div className="form-group mb-3">
-                  <label htmlFor="editInventoryLocation">Location</label>
-                  <select
-                    className="form-control"
-                    id="editInventoryLocation"
-                    value={selectedInventory.location_id || ""}
-                    onChange={(e) =>
-                      handleEditInventoryChange("location_id", e.target.value ? parseInt(e.target.value) : null)
-                    }
-                  >
-                    <option value="">Select Location (Optional)</option>
-                    {locations.map((location: InventoryLocationData) => (
-                      <option key={location.id} value={location.id}>
-                        {location.name}
-                      </option>
-                    ))}
-                  </select>
+              <div className="row">
+                <div className="col-md-6">
+                  <div className="form-group mb-3">
+                    <label htmlFor="editInventoryLocation">Location</label>
+                    <select
+                      className="form-control"
+                      id="editInventoryLocation"
+                      value={selectedInventory.location_id || ""}
+                      onChange={(e) =>
+                        handleEditInventoryChange("location_id", e.target.value ? parseInt(e.target.value) : null)
+                      }
+                    >
+                      <option value="">Select Location (Optional)</option>
+                      {locations.map((location: InventoryLocationData) => (
+                        <option key={location.id} value={location.id}>
+                          {location.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group mb-3">
+                    <label htmlFor="editInventorySupplier">Supplier</label>
+                    <select
+                      className="form-control"
+                      id="editInventorySupplier"
+                      value={selectedInventory.supplier_id || ""}
+                      onChange={(e) =>
+                        handleEditInventoryChange("supplier_id", e.target.value ? parseInt(e.target.value) : null)
+                      }
+                    >
+                      <option value="">Select Supplier (Optional)</option>
+                      {suppliers.map((supplier: InventorySupplierData) => (
+                        <option key={supplier.id} value={supplier.id}>
+                          {supplier.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
               </div>
-              <div className="col-md-6">
-                <div className="form-group mb-3">
-                  <label htmlFor="editInventorySupplier">Supplier</label>
-                  <select
-                    className="form-control"
-                    id="editInventorySupplier"
-                    value={selectedInventory.supplier_id || ""}
-                    onChange={(e) =>
-                      handleEditInventoryChange("supplier_id", e.target.value ? parseInt(e.target.value) : null)
-                    }
-                  >
-                    <option value="">Select Supplier (Optional)</option>
-                    {suppliers.map((supplier: InventorySupplierData) => (
-                      <option key={supplier.id} value={supplier.id}>
-                        {supplier.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            </div>
 
-            <div className="row">
-              <div className="col-md-12">
-                <div className="form-group mb-3">
-                  <label htmlFor="editInventoryNotes">Notes</label>
-                  <textarea
-                    className="form-control"
-                    id="editInventoryNotes"
-                    value={selectedInventory.notes || ""}
-                    onChange={(e) =>
-                      handleEditInventoryChange("notes", e.target.value)
-                    }
-                    rows={2}
-                    placeholder="Additional notes..."
-                  />
+              <div className="row">
+                <div className="col-md-12">
+                  <div className="form-group mb-3">
+                    <label htmlFor="editInventoryNotes">Notes</label>
+                    <textarea
+                      className="form-control"
+                      id="editInventoryNotes"
+                      value={selectedInventory.notes || ""}
+                      onChange={(e) =>
+                        handleEditInventoryChange("notes", e.target.value)
+                      }
+                      rows={2}
+                      placeholder="Additional notes..."
+                    />
+                  </div>
                 </div>
               </div>
-            </div>
-          </Modal.Body>
-          <Modal.Footer>
-            <Button variant="secondary" onClick={closeEditInventoryModal}>
-              Close
-            </Button>
-            <Button
-              variant="primary"
-              onClick={handleSubmitEditInventory}
-              disabled={editingInventory}
-            >
-              {editingInventory ? "Updating..." : "Update Inventory Item"}
-            </Button>
-          </Modal.Footer>
-        </Modal>
+            </>
+          }
+          submitButtonText={editingInventory ? "Updating..." : "Update Inventory Item"}
+          cancelButtonText="Close"
+          onSubmit={handleSubmitEditInventory}
+          onCancel={closeEditInventoryModal}
+          submitButtonVariant="primary"
+          cancelButtonVariant="secondary"
+        />
       )}
 
       {/* Delete Inventory Modal */}
       {showDeleteInventoryModal && selectedInventory && (
-        <Modal
+        <ConfirmModal
           show={showDeleteInventoryModal}
           onHide={() => setShowDeleteInventoryModal(false)}
-        >
-          <Modal.Header closeButton>
-            <Modal.Title>Delete Inventory Item?</Modal.Title>
-          </Modal.Header>
-          <Modal.Body>
-            <p>
-              Are you sure you want to delete inventory item{" "}
-              <b className="text-danger">{selectedInventory.name}</b>?
-            </p>
-            <p>
-              This action cannot be undone.
-            </p>
-            <p>
-              Type the word <b className="text-danger">DELETE</b> to confirm
-            </p>
-            <input
-              type="text"
-              className="form-control"
-              id="confirmDeleteInventory"
-              value={confirmDeleteInventory}
-              onChange={(e) => setConfirmDeleteInventory(e.target.value)}
-              placeholder="Type the word DELETE to confirm"
-            />
-          </Modal.Body>
-          <Modal.Footer>
-            <Button
-              variant="secondary"
-              onClick={() => setShowDeleteInventoryModal(false)}
-            >
-              Close
-            </Button>
-            <Button variant="danger" onClick={handleSubmitDeleteInventory}>
-              Delete
-            </Button>
-          </Modal.Footer>
-        </Modal>
+          title="Delete Inventory Item?"
+          description="Are you sure you want to delete inventory item {targetName}? This action cannot be undone."
+          targetName={selectedInventory.name}
+          confirmButtonText="Delete"
+          cancelButtonText="Close"
+          onConfirm={handleSubmitDeleteInventory}
+          onCancel={() => setShowDeleteInventoryModal(false)}
+          confirmButtonVariant="danger"
+          cancelButtonVariant="secondary"
+          requireTextConfirmation={true}
+
+        />
       )}
     </React.Fragment>
   );

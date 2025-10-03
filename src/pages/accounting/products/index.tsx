@@ -34,16 +34,17 @@ import moment from "moment";
 
 import "@assets/scss/common.scss";
 import { motion } from "framer-motion";
-import { FiEdit, FiTrash2 } from "react-icons/fi";
 import TableAction from "@components/TableAction";
 
+import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import PageHeader from "@components/PageHeader";
-import PageSummaryGrid from "@components/PageSummaryGrid";
 import FormModal from "../../partial/FormModal";
 import ConfirmModal from "@pages/partial/ConfirmModal";
 import SuccessfulModal from "@pages/partial/SuccessfulModal";
-
+import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
+import DatatableActionButton from "@components/DatatableActionButton";
+import { FiEdit, FiTrash2, FiEye,FiPlus } from "react-icons/fi";
 
 interface SelectOption {
   value: number;
@@ -80,7 +81,7 @@ const ProductList = () => {
         sortable: true,
         cell: (props: ProductData) => (
           <div>
-            <div className="fw-bold text-primary">{props.name}</div>
+            <div className="">{props.name}</div>
             {props.description && (
               <div className="text-muted small">{props.description}</div>
             )}
@@ -93,7 +94,7 @@ const ProductList = () => {
         selector: (row: ProductData) => row.category?.name,
         sortable: true,
         cell: (props: ProductData) => (
-          <span className="badge bg-info">
+          <span className="status-badge info">
             {props.category?.name || "No Category"}
           </span>
         ),
@@ -104,7 +105,7 @@ const ProductList = () => {
         selector: (row: ProductData) => row.base_price,
         sortable: true,
         cell: (props: ProductData) => (
-          <span className="fw-bold text-success">
+          <span >
             {props.currency_code}{" "}
             {parseFloat(props.base_price || "0").toFixed(2)}
           </span>
@@ -116,7 +117,7 @@ const ProductList = () => {
         selector: (row: ProductData) => row.is_service,
         sortable: true,
         cell: (props: ProductData) => (
-          <span className={`badge ${props.is_service ? "bg-primary" : "bg-secondary"}`}>
+          <span className={`status-badge ${props.is_service ? "primary" : "info"}`}>
             {props.is_service ? "Service" : "Product"}
           </span>
         ),
@@ -161,22 +162,20 @@ const ProductList = () => {
         sortable: false,
         cell: (props: ProductData) => (
           <>  
-          <TableAction
+          <DatatableActionButton
                     actions={[
                         {
                             label: 'Edit',
-                            icon: FiEdit,
-                            //permission: 'edit-products',
+                            icon: <FiEdit />,
                             onClick: () => handleEditProduct(props),
-                            variant: 'edit'
+                            className: 'gap-2'
                         },
                         {
                             label: 'Delete',
-                            icon: FiTrash2,
-                            //permission: 'delete-products',
+                            icon: <FiTrash2 />,
                             onClick: () => handleDeleteProduct(props),
-                            variant: 'delete'
-                        },
+                            className: 'text-danger gap-2'
+                        }
                     ]}
                 />
           </>
@@ -391,8 +390,6 @@ const ProductList = () => {
   const handleSubmitDeleteProduct = useCallback(async () => {
     if (!selectedProduct) return;
 
-    const confirmDeleteValue = confirmDeleteProduct.trim();
-    if (confirmDeleteValue === "DELETE") {
       try {
         await deleteProduct(selectedProduct.id);
         setSelectedProduct(null);
@@ -404,9 +401,7 @@ const ProductList = () => {
         console.error("Error deleting product:", error);
         toast.error("Failed to delete product");
       }
-    } else {
-      toast.error("Please type the word DELETE to confirm");
-    }
+
   }, [confirmDeleteProduct, selectedProduct]);
 
 
@@ -470,8 +465,7 @@ const ProductList = () => {
   const handleSubmitDeleteCategory = useCallback(async () => {
     if (!selectedCategory) return;
 
-    const confirmDeleteValue = confirmDeleteCategory.trim();
-    if (confirmDeleteValue === "DELETE") {
+    
       try {
         await deleteProductCategory(selectedCategory.id);
         setSelectedCategory(null);
@@ -484,9 +478,7 @@ const ProductList = () => {
         console.error("Error deleting category:", error);
         toast.error("Failed to delete category");
       }
-    } else {
-      toast.error("Please type the word DELETE to confirm");
-    }
+   
   }, [confirmDeleteCategory, selectedCategory, openCategoryModal]);
 
 
@@ -524,16 +516,13 @@ const ProductList = () => {
       />
 
       {/* Create Product Modal */}
-      {showCreateProductModal && (
-        <Modal
-          show={showCreateProductModal}
-          onHide={closeCreateProductModal}
-          size="lg"
-        >
-          <Modal.Header closeButton>
-            <Modal.Title>Create New Product</Modal.Title>
-          </Modal.Header>
-          <Modal.Body>
+      <FormModal
+        show={showCreateProductModal}
+        onHide={closeCreateProductModal}
+        title="Create New Product"
+        desc="Fill in the details below to create a new product"
+        formHtml={
+          <>
             <div className="row">
               <div className="col-md-6">
                 <div className="form-group mb-3">
@@ -643,171 +632,153 @@ const ProductList = () => {
                 </div>
               </div>
             </div>
-          </Modal.Body>
-          <Modal.Footer>
-            <Button variant="secondary" onClick={closeCreateProductModal}>
-              Close
-            </Button>
-            <Button
-              variant="primary"
-              onClick={handleSubmitCreateProduct}
-              disabled={creatingProduct}
-            >
-              {creatingProduct ? "Creating..." : "Create Product"}
-            </Button>
-          </Modal.Footer>
-        </Modal>
-      )}
+          </>
+        }
+        submitButtonText={creatingProduct ? "Creating..." : "Create Product"}
+        cancelButtonText="Close"
+        onSubmit={handleSubmitCreateProduct}
+        onCancel={closeCreateProductModal}
+        submitButtonVariant="primary"
+        cancelButtonVariant="secondary"
+      />
 
       {/* Edit Product Modal */}
       {showEditProductModal && selectedProduct && (
-        <Modal
+        <FormModal
           show={showEditProductModal}
           onHide={closeEditProductModal}
-          size="lg"
-        >
-          <Modal.Header closeButton>
-            <Modal.Title>
-              Edit Product: {selectedProduct.name}
-            </Modal.Title>
-          </Modal.Header>
-          <Modal.Body>
-            <div className="row">
-              <div className="col-md-6">
-                <div className="form-group mb-3">
-                  <label htmlFor="editProductName">Product Name</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    id="editProductName"
-                    value={selectedProduct.name || ""}
-                    onChange={(e) =>
-                      handleEditProductChange("name", e.target.value)
-                    }
-                    placeholder="Enter product name"
-                  />
+          title={`Edit Product: ${selectedProduct.name}`}
+          desc="Update the product details below"
+          formHtml={
+            <>
+              <div className="row">
+                <div className="col-md-6">
+                  <div className="form-group mb-3">
+                    <label htmlFor="editProductName">Product Name</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      id="editProductName"
+                      value={selectedProduct.name || ""}
+                      onChange={(e) =>
+                        handleEditProductChange("name", e.target.value)
+                      }
+                      placeholder="Enter product name"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group mb-3">
+                    <label htmlFor="editProductCategory">Category</label>
+                    <select
+                      className="form-control"
+                      id="editProductCategory"
+                      value={selectedProduct.category_id || ""}
+                      onChange={(e) =>
+                        handleEditProductChange("category_id", e.target.value)
+                      }
+                    >
+                      <option value="">Select Category</option>
+                      {categories.map((category: ProductCategoryData) => (
+                        <option key={category.id} value={category.id}>
+                          {category.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
               </div>
-              <div className="col-md-6">
-                <div className="form-group mb-3">
-                  <label htmlFor="editProductCategory">Category</label>
-                  <select
-                    className="form-control"
-                    id="editProductCategory"
-                    value={selectedProduct.category_id || ""}
-                    onChange={(e) =>
-                      handleEditProductChange("category_id", e.target.value)
-                    }
-                  >
-                    <option value="">Select Category</option>
-                    {categories.map((category: ProductCategoryData) => (
-                      <option key={category.id} value={category.id}>
-                        {category.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            </div>
 
-            <div className="row">
-              <div className="col-md-6">
-                <div className="form-group mb-3">
-                  <label htmlFor="editProductPrice">Base Price</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    className="form-control"
-                    id="editProductPrice"
-                    value={selectedProduct.base_price || ""}
-                    onChange={(e) =>
-                      handleEditProductChange("base_price", e.target.value)
-                    }
-                    placeholder="0.00"
-                  />
+              <div className="row">
+                <div className="col-md-6">
+                  <div className="form-group mb-3">
+                    <label htmlFor="editProductPrice">Base Price</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      className="form-control"
+                      id="editProductPrice"
+                      value={selectedProduct.base_price || ""}
+                      onChange={(e) =>
+                        handleEditProductChange("base_price", e.target.value)
+                      }
+                      placeholder="0.00"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group mb-3">
+                    <label htmlFor="editProductType">Type</label>
+                    <select
+                      className="form-control"
+                      id="editProductType"
+                      value={selectedProduct.is_service ? "service" : "product"}
+                      onChange={(e) =>
+                        handleEditProductChange("is_service", e.target.value === "service")
+                      }
+                    >
+                      <option value="product">Product</option>
+                      <option value="service">Service</option>
+                    </select>
+                  </div>
                 </div>
               </div>
-              <div className="col-md-6">
-                <div className="form-group mb-3">
-                  <label htmlFor="editProductType">Type</label>
-                  <select
-                    className="form-control"
-                    id="editProductType"
-                    value={selectedProduct.is_service ? "service" : "product"}
-                    onChange={(e) =>
-                      handleEditProductChange("is_service", e.target.value === "service")
-                    }
-                  >
-                    <option value="product">Product</option>
-                    <option value="service">Service</option>
-                  </select>
-                </div>
-              </div>
-            </div>
 
-            <div className="row">
-              <div className="col-md-6">
-                <div className="form-group mb-3">
-                  <label htmlFor="editProductStatus">Status</label>
-                  <select
-                    className="form-control"
-                    id="editProductStatus"
-                    value={selectedProduct.is_active ? "active" : "inactive"}
-                    onChange={(e) =>
-                      handleEditProductChange("is_active", e.target.value === "active")
-                    }
-                  >
-                    <option value="active">Active</option>
-                    <option value="inactive">Inactive</option>
-                  </select>
+              <div className="row">
+                <div className="col-md-6">
+                  <div className="form-group mb-3">
+                    <label htmlFor="editProductStatus">Status</label>
+                    <select
+                      className="form-control"
+                      id="editProductStatus"
+                      value={selectedProduct.is_active ? "active" : "inactive"}
+                      onChange={(e) =>
+                        handleEditProductChange("is_active", e.target.value === "active")
+                      }
+                    >
+                      <option value="active">Active</option>
+                      <option value="inactive">Inactive</option>
+                    </select>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div className="row">
-              <div className="col-md-12">
-                <div className="form-group mb-3">
-                  <label htmlFor="editProductDescription">Description</label>
-                  <textarea
-                    className="form-control"
-                    id="editProductDescription"
-                    value={selectedProduct.description || ""}
-                    onChange={(e) =>
-                      handleEditProductChange("description", e.target.value)
-                    }
-                    rows={3}
-                    placeholder="Enter product description..."
-                  />
+              <div className="row">
+                <div className="col-md-12">
+                  <div className="form-group mb-3">
+                    <label htmlFor="editProductDescription">Description</label>
+                    <textarea
+                      className="form-control"
+                      id="editProductDescription"
+                      value={selectedProduct.description || ""}
+                      onChange={(e) =>
+                        handleEditProductChange("description", e.target.value)
+                      }
+                      rows={3}
+                      placeholder="Enter product description..."
+                    />
+                  </div>
                 </div>
               </div>
-            </div>
-          </Modal.Body>
-          <Modal.Footer>
-            <Button variant="secondary" onClick={closeEditProductModal}>
-              Close
-            </Button>
-            <Button
-              variant="primary"
-              onClick={handleSubmitEditProduct}
-              disabled={editingProduct}
-            >
-              {editingProduct ? "Updating..." : "Update Product"}
-            </Button>
-          </Modal.Footer>
-        </Modal>
+            </>
+          }
+          submitButtonText={editingProduct ? "Updating..." : "Update Product"}
+          cancelButtonText="Close"
+          onSubmit={handleSubmitEditProduct}
+          onCancel={closeEditProductModal}
+          submitButtonVariant="primary"
+          cancelButtonVariant="secondary"
+        />
       )}
 
       {/* Category Management Modal */}
-      {showCategoryModal && (
-        <Modal
-          show={showCategoryModal}
-          onHide={closeCategoryModal}
-          size="lg"
-        >
-          <Modal.Header closeButton>
-            <Modal.Title>Manage Product Categories</Modal.Title>
-          </Modal.Header>
-          <Modal.Body>
+      <FormModal
+        show={showCategoryModal}
+        onHide={closeCategoryModal}
+        title="Manage Product Categories"
+        desc="View and manage your product categories below"
+        formHtml={
+          <>
             <div className="table-responsive">
               <table className="table table-striped">
                 <thead>
@@ -865,179 +836,126 @@ const ProductList = () => {
                 </tbody>
               </table>
             </div>
-          </Modal.Body>
-          <Modal.Footer>
-            <Button variant="secondary" onClick={closeCategoryModal}>
-              Close
-            </Button>
-          </Modal.Footer>
-        </Modal>
-      )}
+          </>
+        }
+        submitButtonText=""
+        cancelButtonText="Close"
+        onSubmit={() => {}}
+        onCancel={closeCategoryModal}
+        submitButtonVariant="primary"
+        cancelButtonVariant="secondary"
+        ShowSubmitButton={false}
+      />
 
       {/* Edit Category Modal */}
       {showEditCategoryModal && selectedCategory && (
-        <Modal
+        <FormModal
           show={showEditCategoryModal}
           onHide={() => setShowEditCategoryModal(false)}
-          size="lg"
-        >
-          <Modal.Header closeButton>
-            <Modal.Title>Edit Category: {selectedCategory.name}</Modal.Title>
-          </Modal.Header>
-          <Modal.Body>
-            <div className="form-group mb-3">
-              <label htmlFor="editCategoryName">Category Name</label>
-              <input
-                type="text"
-                className="form-control"
-                id="editCategoryName"
-                value={selectedCategory.name || ""}
-                onChange={(e) =>
-                  setSelectedCategory({
-                    ...selectedCategory,
-                    name: e.target.value,
-                  })
-                }
-                placeholder="Enter category name"
-              />
-            </div>
-            <div className="form-group mb-3">
-              <label htmlFor="editCategoryDescription">Description</label>
-              <textarea
-                className="form-control"
-                id="editCategoryDescription"
-                value={selectedCategory.description || ""}
-                onChange={(e) =>
-                  setSelectedCategory({
-                    ...selectedCategory,
-                    description: e.target.value,
-                  })
-                }
-                rows={3}
-                placeholder="Enter category description..."
-              />
-            </div>
-            <div className="form-group mb-3">
-              <label htmlFor="editCategoryStatus">Status</label>
-              <select
-                className="form-control"
-                id="editCategoryStatus"
-                value={selectedCategory.is_active ? "active" : "inactive"}
-                onChange={(e) =>
-                  setSelectedCategory({
-                    ...selectedCategory,
-                    is_active: e.target.value === "active",
-                  })
-                }
-              >
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-              </select>
-            </div>
-          </Modal.Body>
-          <Modal.Footer>
-            <Button
-              variant="secondary"
-              onClick={() => setShowEditCategoryModal(false)}
-            >
-              Close
-            </Button>
-            <Button
-              variant="primary"
-              onClick={handleSubmitEditCategory}
-              disabled={editingCategory}
-            >
-              {editingCategory ? "Updating..." : "Update Category"}
-            </Button>
-          </Modal.Footer>
-        </Modal>
+          title={`Edit Category: ${selectedCategory.name}`}
+          desc="Update the category details below"
+          formHtml={
+            <>
+              <div className="form-group mb-3">
+                <label htmlFor="editCategoryName">Category Name</label>
+                <input
+                  type="text"
+                  className="form-control"
+                  id="editCategoryName"
+                  value={selectedCategory.name || ""}
+                  onChange={(e) =>
+                    setSelectedCategory({
+                      ...selectedCategory,
+                      name: e.target.value,
+                    })
+                  }
+                  placeholder="Enter category name"
+                />
+              </div>
+              <div className="form-group mb-3">
+                <label htmlFor="editCategoryDescription">Description</label>
+                <textarea
+                  className="form-control"
+                  id="editCategoryDescription"
+                  value={selectedCategory.description || ""}
+                  onChange={(e) =>
+                    setSelectedCategory({
+                      ...selectedCategory,
+                      description: e.target.value,
+                    })
+                  }
+                  rows={3}
+                  placeholder="Enter category description..."
+                />
+              </div>
+              <div className="form-group mb-3">
+                <label htmlFor="editCategoryStatus">Status</label>
+                <select
+                  className="form-control"
+                  id="editCategoryStatus"
+                  value={selectedCategory.is_active ? "active" : "inactive"}
+                  onChange={(e) =>
+                    setSelectedCategory({
+                      ...selectedCategory,
+                      is_active: e.target.value === "active",
+                    })
+                  }
+                >
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                </select>
+              </div>
+            </>
+          }
+          submitButtonText={editingCategory ? "Updating..." : "Update Category"}
+          cancelButtonText="Close"
+          onSubmit={handleSubmitEditCategory}
+          onCancel={() => setShowEditCategoryModal(false)}
+          submitButtonVariant="primary"
+          cancelButtonVariant="secondary"
+        />
       )}
 
       {/* Delete Category Modal */}
       {showDeleteCategoryModal && selectedCategory && (
-        <Modal
+        <ConfirmModal
           show={showDeleteCategoryModal}
           onHide={() => setShowDeleteCategoryModal(false)}
-        >
-          <Modal.Header closeButton>
-            <Modal.Title>Delete Category?</Modal.Title>
-          </Modal.Header>
-          <Modal.Body>
-            <p>
-              Are you sure you want to delete category{" "}
-              <b className="text-danger">{selectedCategory.name}</b>?
-            </p>
-            <p>
-              This action cannot be undone and will affect all products in this
-              category.
-            </p>
-            <p>
-              Type the word <b className="text-danger">DELETE</b> to confirm
-            </p>
-            <input
-              type="text"
-              className="form-control"
-              id="confirmDeleteCategory"
-              value={confirmDeleteCategory}
-              onChange={(e) => setConfirmDeleteCategory(e.target.value)}
-              placeholder="Type the word DELETE to confirm"
-            />
-          </Modal.Body>
-          <Modal.Footer>
-            <Button
-              variant="secondary"
-              onClick={() => setShowDeleteCategoryModal(false)}
-            >
-              Close
-            </Button>
-            <Button variant="danger" onClick={handleSubmitDeleteCategory}>
-              Delete
-            </Button>
-          </Modal.Footer>
-        </Modal>
+          title="Delete Category?"
+          description="Are you sure you want to delete category {targetName}? This action cannot be undone and will affect all products in this category."
+          targetName={selectedCategory.name}
+          confirmButtonText="Delete"
+          cancelButtonText="Close"
+          onConfirm={handleSubmitDeleteCategory}
+          onCancel={() => setShowDeleteCategoryModal(false)}
+          confirmButtonVariant="danger"
+          cancelButtonVariant="secondary"
+          requireTextConfirmation={true}
+          confirmationPlaceholder="Type the word DELETE to confirm"
+          confirmationLabel=""
+          requiredConfirmationText="DELETE"
+        />
       )}
 
       {/* Delete Product Modal */}
       {showDeleteProductModal && selectedProduct && (
-        <Modal
+        <ConfirmModal
           show={showDeleteProductModal}
           onHide={() => setShowDeleteProductModal(false)}
-        >
-          <Modal.Header closeButton>
-            <Modal.Title>Delete Product?</Modal.Title>
-          </Modal.Header>
-          <Modal.Body>
-            <p>
-              Are you sure you want to delete product{" "}
-              <b className="text-danger">{selectedProduct.name}</b>?
-            </p>
-            <p>
-              This action cannot be undone.
-            </p>
-            <p>
-              Type the word <b className="text-danger">DELETE</b> to confirm
-            </p>
-            <input
-              type="text"
-              className="form-control"
-              id="confirmDeleteProduct"
-              value={confirmDeleteProduct}
-              onChange={(e) => setConfirmDeleteProduct(e.target.value)}
-              placeholder="Type the word DELETE to confirm"
-            />
-          </Modal.Body>
-          <Modal.Footer>
-            <Button
-              variant="secondary"
-              onClick={() => setShowDeleteProductModal(false)}
-            >
-              Close
-            </Button>
-            <Button variant="danger" onClick={handleSubmitDeleteProduct}>
-              Delete
-            </Button>
-          </Modal.Footer>
-        </Modal>
+          title="Delete Product?"
+          description="Are you sure you want to delete product {targetName}? This action cannot be undone."
+          targetName={selectedProduct.name}
+          confirmButtonText="Delete"
+          cancelButtonText="Close"
+          onConfirm={handleSubmitDeleteProduct}
+          onCancel={() => setShowDeleteProductModal(false)}
+          confirmButtonVariant="danger"
+          cancelButtonVariant="secondary"
+          requireTextConfirmation={true}
+          confirmationPlaceholder="Type the word DELETE to confirm"
+          confirmationLabel=""
+          requiredConfirmationText="DELETE"
+        />
       )}
 
     </React.Fragment>

@@ -3,6 +3,7 @@ import { Button, Card, Col, Dropdown, Row } from 'react-bootstrap';
 import Select from 'react-select';
 import { toast } from "react-toastify";
 import { getResellers } from "@utils/accounting";
+import { FiFilter } from "react-icons/fi";
 
 interface CompaniesFiltersProps {
   onFiltersChange?: (filters: Record<string, any>) => void;
@@ -128,13 +129,13 @@ export default function CompaniesFilters({
 
   return (
     <div className="d-flex align-items-center ms-auto gap-2">
-      <div className="d-flex align-items-center">
+      {/* <div className="d-flex align-items-center">
         <div className="d-block align-items-center gap-2" style={{textAlign: 'right'}}>
           {renderFilterBadges()}
         </div>
-      </div>
+      </div> */}
       
-      {Object.keys(selectedFilters).length > 0 && (
+      {/* {Object.keys(selectedFilters).length > 0 && (
         <span 
           className="text-primary tagClearFilter" 
           onClick={clearFilters}
@@ -142,17 +143,17 @@ export default function CompaniesFilters({
         >
           Clear Filters
         </span>
-      )}
+      )} */}
       
       {showFilters && (
         <Dropdown show={showFiltersDropdown} onToggle={setShowFiltersDropdown}>
-          <Dropdown.Toggle variant="primary" size='sm'>
-            <span className="ti ti-filter"></span>
+          <Dropdown.Toggle variant="info" size='sm'>
+            <FiFilter size={10} />
             Filters
           </Dropdown.Toggle>
-          <Dropdown.Menu className="filterBoxDropdown" style={{width: '400px'}}>
-            <Dropdown.ItemText>
-              <Card>
+          <Dropdown.Menu className="filterBoxDropdown p-0" style={{width: '400px'}}>
+            <Dropdown.ItemText className="p-0">
+              <Card className="mb-0">
                 <Card.Header className="p-3 bg-gray-200">
                   <h5>Filter Companies</h5>
                   <small className="text-muted d-block mt-1">
@@ -196,9 +197,7 @@ export default function CompaniesFilters({
                       onChange={(e) => handleFilterChange('email', e.target.value)}
                     />
                   </div>
-                </Card.Body>
-              </Card>
-              <Row>
+                  <Row>
                 <Col md={12} className="d-flex justify-content-end gap-2">
                   <Button variant="outline-primary" onClick={clearFilters}>
                     Clear Filters
@@ -208,6 +207,10 @@ export default function CompaniesFilters({
                   </Button>
                 </Col>
               </Row>
+                
+                </Card.Body>
+              </Card>
+              
             </Dropdown.ItemText>
           </Dropdown.Menu>
         </Dropdown>

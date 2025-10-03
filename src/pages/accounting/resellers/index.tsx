@@ -32,16 +32,20 @@ import {
 import { toast } from "react-toastify";
 import { useSession } from "next-auth/react";
 
-import PageHeader from "@components/PageHeader";
-import moment from "moment";
 import "@assets/scss/common.scss";
-import PageSummaryGrid, { SummaryCard } from "@components/PageSummaryGrid";
+import "@assets/scss/tabs.scss";
+import PageHeader from "@components/PageHeader";
+import FormModal from "../../partial/FormModal";
 import ConfirmModal from "@pages/partial/ConfirmModal";
 import SuccessfulModal from "@pages/partial/SuccessfulModal";
+import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
+import DatatableActionButton from "@components/DatatableActionButton";
+import { FiEdit, FiTrash2, FiEye,FiPlus } from "react-icons/fi";
 
-import { FiEdit, FiEye, FiMoreVertical, FiTrash2 } from "react-icons/fi";
+
+import { FiMoreVertical } from "react-icons/fi";
 import { Link } from "feather-icons-react";
-import FormModal from "@pages/partial/FormModal";
+import moment from "moment";
 
 import dynamic from "next/dynamic";
 import { ApexOptions } from "apexcharts";
@@ -122,7 +126,9 @@ const ResellerList = () => {
 
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isChartLoading, setIsChartLoading] = useState<boolean>(true);
-  const [currentFilters, setCurrentFilters] = useState<{ search?: string }>({});
+  const [currentFilters, setCurrentFilters] = useState<{ search?: string }>({
+    search: "",
+  });
 
   // Table columns
   const columns: Column[] = useMemo(
@@ -174,40 +180,28 @@ const ResellerList = () => {
         selector: (row: any) => row.id,
         sortable: false,
         cell: (props: any) => (
-          <Dropdown
-            className="table-action-dropdown"
-            //drop="start"
-            placement="top-start"
-          >
-            <DropdownToggle variant="outline-secondary" size="sm">
-              <FiMoreVertical size={14} />
-            </DropdownToggle>
-            <DropdownMenu>
-              <DropdownItem
-                className="action-edit"
-                onClick={() => handleEditReseller(props)}
-              >
-                <FiEdit className="me-2" />
-                Edit
-              </DropdownItem>
-
-              <DropdownItem
-                className="action-view"
-                onClick={() => handleViewAsReseller(props)}
-              >
-                <FiEye className="me-2" />
-                View As Reseller
-              </DropdownItem>
-
-              <DropdownItem
-                className="action-delete"
-                onClick={() => handleDeleteReseller(props)}
-              >
-                <FiTrash2 className="me-2" />
-                Delete
-              </DropdownItem>
-            </DropdownMenu>
-          </Dropdown>
+          <DatatableActionButton
+            actions={[
+              {
+                label: 'Edit',
+                icon: <FiEdit />,
+                onClick: () => handleEditReseller(props),
+                className: 'gap-2'
+              },
+              {
+                label: 'View As Reseller',
+                icon: <FiEye />,
+                onClick: () => handleViewAsReseller(props),
+                className: 'gap-2'
+              },
+              {
+                label: 'Delete',
+                icon: <FiTrash2 />,
+                onClick: () => handleDeleteReseller(props),
+                className: 'text-danger gap-2'
+              }
+            ]}
+          />
         ),
       },
     ],
@@ -222,10 +216,10 @@ const ResellerList = () => {
       return await getResellers({
         page,
         per_page: perPage,
-        search,
+        search:currentFilters.search,
       });
     },
-    []
+    [currentFilters.search]
   );
 
   // Reset form data

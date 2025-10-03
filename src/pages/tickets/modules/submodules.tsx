@@ -11,6 +11,18 @@ import { useSession } from 'next-auth/react';
 import { GetHierarchyData } from '@utils/users';
 import Select from 'react-select';
 
+import "@assets/scss/common.scss";
+import "@assets/scss/tabs.scss";
+import PageHeader from "@components/PageHeader";
+import FormModal from "../../partial/FormModal";
+import ConfirmModal from "@pages/partial/ConfirmModal";
+import SuccessfulModal from "@pages/partial/SuccessfulModal";
+import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
+import DatatableActionButton from "@components/DatatableActionButton";
+import { FiEdit, FiTrash2, FiEye,FiPlus } from "react-icons/fi";
+
+
+
 interface Submodule {
   id: string;
   name: string;
@@ -244,14 +256,14 @@ const SubmodulesPage = () => {
       cell: (props: Submodule) => {
         const moduleItem = modules.find(m => m.id == props.module_id);
         return (
-          <Badge 
+          <span className="status-badge" 
             style={{ 
               backgroundColor: moduleItem?.color || '#6c757d',
               color: 'white'
             }}
           >
             {moduleItem?.name || 'Unknown'}
-          </Badge>
+          </span>
         );
       }
     },
@@ -272,22 +284,22 @@ const SubmodulesPage = () => {
       selector: (row: Submodule) => row.id,
       sortable: false,
       cell: (props: Submodule) => (
-        <div className="d-flex gap-2">
-          <Button
-            variant="outline-info"
-            size="sm"
-            onClick={() => openSubmoduleChildrenModal(props)}
-          >
-            Manage Children
-          </Button>
-          <Button
-            variant="outline-danger"
-            size="sm"
-            onClick={() => handleDeleteSubmodule(props)}
-          >
-            Delete
-          </Button>
-        </div>
+        <DatatableActionButton
+          actions={[
+            {
+              label: 'Manage Children',
+              icon: <FiEye />,
+              onClick: () => openSubmoduleChildrenModal(props),
+              className: 'gap-2'
+            },
+            {
+              label: 'Delete',
+              icon: <FiTrash2 />,
+              onClick: () => handleDeleteSubmodule(props),
+              className: 'text-danger gap-2'
+            }
+          ]}
+        />
       )
     }
   ], [modules, extensions, openSubmoduleChildrenModal, handleDeleteSubmodule]);
@@ -465,13 +477,16 @@ const SubmodulesPage = () => {
                             <h6 className="mb-1">{child.name}</h6>
                             <p className="mb-1 text-muted small">{child.description || 'No description'}</p>
                           </div>
-                          <Button 
-                            variant="outline-danger" 
-                            size="sm" 
-                            onClick={() => handleDeleteChild(child)}
-                          >
-                            Delete
-                          </Button>
+                          <DatatableActionButton
+                            actions={[
+                              {
+                                label: 'Delete',
+                                icon: <FiTrash2 />,
+                                onClick: () => handleDeleteChild(child),
+                                className: 'text-danger gap-2'
+                              }
+                            ]}
+                          />
                         </div>
                       </div>
                     </div>

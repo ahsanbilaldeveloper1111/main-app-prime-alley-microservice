@@ -426,17 +426,10 @@ const CrmCampaigns = () => {
         }
       />
 
-      <div className="container-fluid">
-        
 
-      
 
         {/* Campaigns List */}
-        <div className="row">
-          <div className="col-12">
-            <Card className="border-0 shadow-sm">
-              <Card.Body>
-                <GenericListPage
+        <GenericListPage
                   columns={columns}
                   fetchData={fetchCampaigns}
                   title="Campaigns"
@@ -447,11 +440,6 @@ const CrmCampaigns = () => {
                   search={false}
                   tableStyle="table-style-2"
                 />
-              </Card.Body>
-            </Card>
-          </div>
-        </div>
-      </div>
 
       {/* Create/Edit Campaign Modal */}
      
