@@ -144,6 +144,7 @@ const Header = ({ themeMode }: HeaderProps) => {
         return () => router.events.off('routeChangeStart', handleRouteChange);
     }, [router, hideSubmenuPopup]);
 
+
     // Event handlers
     const createMouseEnterHandler = useCallback(() => {
         return function(e: Event) {
@@ -401,14 +402,7 @@ const Header = ({ themeMode }: HeaderProps) => {
 
     // Memoized navigation items
     const navigationItems = useMemo((): MenuItem[] => [
-        {
-            key: 'controlhub',
-            permission: PERMISSIONS.CONTROL_HUB_SERVICES,
-            icon: ICONS.CONTROL_HUB,
-            label: MENU_LABELS.CONTROL_HUB,
-            target: '#pc-tab-controlhub'
-        },
-       
+      
         {
             key: 'crm',
             permission: PERMISSIONS.CRM_SERVICES,
@@ -423,20 +417,28 @@ const Header = ({ themeMode }: HeaderProps) => {
             label: MENU_LABELS.LIVE_CALLS,
             target: '#pc-tab-9'
         },
+        // {
+        //     key: 'call-logs',
+        //     permission: PERMISSIONS.CALL_LOGS_SERVICES,
+        //     icon: ICONS.CALL_LOGS,
+        //     label: MENU_LABELS.CALL_LOGS,
+        //     target: '#pc-tab-2'
+        // },
+        // {
+        //     key: 'call-recording',
+        //     permission: PERMISSIONS.CALL_RECORDINGS_SERVICES,
+        //     icon: ICONS.CALL_RECORDINGS,
+        //     label: MENU_LABELS.CALL_RECORDINGS,
+        //     target: '#pc-tab-3'
+        // },
         {
-            key: 'call-logs',
-            permission: PERMISSIONS.CALL_LOGS_SERVICES,
-            icon: ICONS.CALL_LOGS,
-            label: MENU_LABELS.CALL_LOGS,
-            target: '#pc-tab-2'
-        },
-        {
-            key: 'call-recording',
-            permission: PERMISSIONS.CALL_RECORDINGS_SERVICES,
-            icon: ICONS.CALL_RECORDINGS,
-            label: MENU_LABELS.CALL_RECORDINGS,
-            target: '#pc-tab-3'
-        },
+                key: 'call-history',
+                permission: PERMISSIONS.CALL_HISTORY_SERVICES,
+                icon: ICONS.CALL_HISTORY,
+                label: MENU_LABELS.CALL_HISTORY,
+                target: '#pc-tab-2'
+            },
+
         {
             key: 'call-reports',
             permission: PERMISSIONS.REPORTS_SERVICES,
@@ -495,6 +497,15 @@ const Header = ({ themeMode }: HeaderProps) => {
             label: MENU_LABELS.NETOPS,
             target: '#pc-tab-16'
         },
+
+        {
+            key: 'controlhub',
+            permission: PERMISSIONS.CONTROL_HUB_SERVICES,
+            icon: ICONS.CONTROL_HUB,
+            label: MENU_LABELS.CONTROL_HUB,
+            target: '#pc-tab-controlhub'
+        },
+       
     
         
     ], []);
@@ -589,7 +600,7 @@ const Header = ({ themeMode }: HeaderProps) => {
         },
         {
             id: 'pc-tab-2',
-            title: MENU_LABELS.CALL_LOGS,
+            title: MENU_LABELS.CALL_HISTORY,
             items: [
                 {
                     key: 'dashboard-call-logs',
@@ -604,6 +615,13 @@ const Header = ({ themeMode }: HeaderProps) => {
                     icon: ICONS.GAUGE,
                     label: SUBMENU_LABELS.CALL_LOGS_LIST,
                     href: '/call-logs'
+                },
+                {
+                    key: 'view-call-recordings',
+                    permission: 'view-call-recordings',
+                    icon: ICONS.GAUGE,
+                    label: MENU_LABELS.CALL_RECORDINGS,
+                    href: '/call-recordings'
                 }
             ]
         },
@@ -1296,10 +1314,11 @@ const Header = ({ themeMode }: HeaderProps) => {
             `}</style>
            <nav className="pc-sidebar">
                 <div className="navbar-wrapper">
-                    <div className="m-header">
+                    <div className="m-header" style={{backgroundColor: "#1a6bc4"}}>
                     <Link href={`${BASE_URL}/dashboard`}  className="b-brand text-primary">
-                        <img src={CompanyLogo2.src} alt="logo" className="img-fluid" />
-                                        </Link>
+                        {/* <img src={CompanyLogo2.src} alt="logo" className="img-fluid" /> */}
+                        <span className="sidebar-logo-text">Business Contact Center</span>
+                    </Link>
                             </div>
 
 

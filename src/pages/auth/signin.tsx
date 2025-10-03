@@ -9,6 +9,7 @@ import Script from 'next/script';import dashboard from "@pages/dashboard";
 import { toast } from "react-toastify";
 import { FaSpinner } from "react-icons/fa";
 import '@assets/scss/login.scss';
+import Footer from '@components/Footer';
 
 
 const Signin = () => {
@@ -170,7 +171,7 @@ const Signin = () => {
         <header className="login-info-panel">
             <div className="info-panel-content">
                 <i className="fas fa-satellite-dish" style={{fontSize: '3rem', marginBottom: '20px'}}></i>
-                <h1 className="text-white">Ring Edge</h1>
+                <h1 className="text-white">Business Contact Center</h1>
                
                 {/* <br />
                 <Image src={Logo} alt="Ring Edge" /> */}
@@ -256,6 +257,22 @@ const Signin = () => {
             </div>
         </main>
     </div>
+
+    <footer className="pc-footer m-0 p-0 mt-3">
+    <div className="row">
+          <div className="col-sm-6 my-1">
+            <p className="m-0">© {new Date().getFullYear()} All rights reserved. Powered by <a href="https://ringedge.com/" target="_blank" className="text-primary"> Ring Edge</a></p>
+          </div>
+          <div className="col-sm-6 ms-auto my-1">
+            <ul className="list-inline footer-link mb-0 justify-content-sm-end d-flex">
+              <li className="list-inline-item"><a href="#" target="_blank">Documentation</a></li>
+              <li className="list-inline-item"><a href="#" target="_blank">Support</a></li>
+            </ul>
+          </div>
+        </div>
+    </footer>
+
+    
 
             
         </React.Fragment>

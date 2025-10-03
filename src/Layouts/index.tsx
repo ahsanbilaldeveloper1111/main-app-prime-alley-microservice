@@ -5,6 +5,7 @@ import { changeThemeLayout, changeThemeMode, changeThemePreset } from '../toolki
 import { changeLayoutTheme, changeSidebarTheme, changeSidebarThemeCaptions } from '../toolkit/themeLayouts/thunk';
 import { createSelector } from "reselect";
 import { useRouter } from 'next/router';
+import Footer from '@components/Footer';
 
 
 import Moduler from './Moduler';
@@ -189,6 +190,11 @@ const Layout = ({ children }: LayoutProps) => {
 					themeMode={themeMode}
 					changeThemeMode={changeThemeMode}
 				/>
+
+				
+				<Footer />
+				
+				
 			</>
 	);
 };
