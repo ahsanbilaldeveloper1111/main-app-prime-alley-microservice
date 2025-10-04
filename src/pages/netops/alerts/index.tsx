@@ -8,7 +8,7 @@ import { Column } from "@components/CustomDataTable";
 import { Button, Modal, Row, Col } from "react-bootstrap";
 import { toast } from "react-toastify";
 import { useSession } from "next-auth/react";
-import PageSummaryGrid, { SummaryCard } from "@components/PageSummaryGrid";
+
 import AlertsFilters from "@components/filters/AlertsFilters";
 import {
   getAlerts,
@@ -22,6 +22,19 @@ import {
   GlobalDateFormat,
   GlobalTimeFormat,
 } from "@utils/Helper";
+
+
+import "@assets/scss/common.scss";
+import "@assets/scss/tabs.scss";
+import PageHeader from "@components/PageHeader";
+import FormModal from "../../partial/FormModal";
+import ConfirmModal from "@pages/partial/ConfirmModal";
+import SuccessfulModal from "@pages/partial/SuccessfulModal";
+import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
+import DatatableActionButton from "@components/DatatableActionButton";
+import { FiEdit, FiTrash2, FiEye, FiPlus, FiCheck } from "react-icons/fi";
+
+
 
 interface Summary {
   total_alerts: number;
@@ -56,11 +69,11 @@ const Alerts = () => {
             case "HOST_UNREACHABLE":
               return "warning";
             default:
-              return "secondary";
+              return "info";
           }
         };
         return (
-          <span className={`badge bg-${getAlertTypeColor(props.alert_type)}`}>
+          <span className={`status-badge ${getAlertTypeColor(props.alert_type)}`}>
             {props.alert_type.replace("_", " ")}
           </span>
         );
@@ -81,13 +94,13 @@ const Alerts = () => {
             case "MEDIUM":
               return "info";
             case "LOW":
-              return "secondary";
+              return "info";
             default:
-              return "secondary";
+              return "info";
           }
         };
         return (
-          <span className={`badge bg-${getSeverityColor(props.severity)}`}>
+          <span className={`status-badge ${getSeverityColor(props.severity)}`}>
             {props.severity}
           </span>
         );
@@ -118,7 +131,7 @@ const Alerts = () => {
       cell: (props: any) => {
         return (
           <span
-            className={`badge bg-${props.is_resolved ? "success" : "warning"}`}
+            className={`status-badge ${props.is_resolved ? "warning" : "success"}`}
           >
             {props.is_resolved ? "Resolved" : "Active"}
           </span>
@@ -214,24 +227,26 @@ const Alerts = () => {
       selector: (row: any) => row.id,
       sortable: false,
       cell: (props: any) => {
+        const actions = [];
+        
+        if (!props.is_resolved) {
+          actions.push({
+            label: 'Resolve',
+            icon: resolvingAlertId === props.id ? (
+              <i className="fas fa-spinner fa-spin"></i>
+            ) : (
+              <FiCheck />
+            ),
+            onClick: () => handleResolveAlert(props.id),
+            className: 'text-success gap-2',
+            disabled: resolvingAlertId === props.id
+          });
+        }
+        
         return (
-          <div className="d-flex gap-2">
-            {!props.is_resolved && (
-              <Button
-                variant="outline-success"
-                size="sm"
-                onClick={() => handleResolveAlert(props.id)}
-                disabled={resolvingAlertId === props.id}
-                title="Resolve Alert"
-              >
-                {resolvingAlertId === props.id ? (
-                  <i className="fas fa-spinner fa-spin"></i>
-                ) : (
-                  <i className="fas fa-check"></i>
-                )}
-              </Button>
-            )}
-          </div>
+          <DatatableActionButton
+            actions={actions}
+          />
         );
       },
     },
@@ -394,10 +409,10 @@ const Alerts = () => {
 
               <Col md={8} className="d-flex justify-content-end">
                 <div className="action-buttons">
-                  {/* <div className="search-container">
+                  <div className="search-container">
                            <i className="fas fa-search search-icon"></i>
-                           <input type="text" className="search-bar" placeholder="Search call logs..." onChange={(e) => handleFiltersChange({...currentFilters, search: e.target.value})}/>
-                       </div> */}
+                           <input type="text" className="search-bar" placeholder="Search alerts..." onChange={(e) => handleFiltersChange({...currentFilters, search: e.target.value})}/>
+                       </div>
 
                   <AlertsFilters
                     onFiltersChange={handleFiltersChange}
@@ -421,7 +436,7 @@ const Alerts = () => {
         defaultPageSize={15}
         filters={currentFilters}
         refreshKey={refreshKey}
-        search={true}
+        search={false}
         tableStyle="table-style-2"
       />
     </React.Fragment>

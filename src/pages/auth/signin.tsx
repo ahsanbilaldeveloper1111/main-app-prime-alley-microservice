@@ -88,7 +88,7 @@ const Signin = () => {
     return (
         <React.Fragment>
             <Head>
-                <title>Sign In - Ring Edge</title>
+                <title>Sign In - Business Contact Center</title>
             </Head>
             <Script 
                 src="https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js"
@@ -174,7 +174,7 @@ const Signin = () => {
                 <h1 className="text-white">Business Contact Center</h1>
                
                 {/* <br />
-                <Image src={Logo} alt="Ring Edge" /> */}
+                <Image src={Logo} alt="Business Contact Center" /> */}
 
                 <p>A new frontier in telecommunications and data management. Secure, efficient, and reliable.</p>
             </div>

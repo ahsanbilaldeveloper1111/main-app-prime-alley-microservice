@@ -4,7 +4,7 @@ import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
 import GenericListPage from '@components/GenericListPage';
 import { Column } from '@components/CustomDataTable';
-import { Button, Modal, Row, Col, Form } from 'react-bootstrap';
+import { Button, Row, Col } from 'react-bootstrap';
 import { toast } from 'react-toastify';
 import { useSession } from 'next-auth/react';
 import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
@@ -527,88 +527,94 @@ const Devices = () => {
             />
 
             {/* Edit Device Modal */}
-            <Modal show={showEditModal} onHide={() => setShowEditModal(false)} size="lg" centered>
-                <Modal.Header closeButton>
-                    <Modal.Title>Edit Device</Modal.Title>
-                </Modal.Header>
-                <Form onSubmit={handleEditSubmit}>
-                    <Modal.Body>
-                        <Row>
-                            <Col md={6}>
-                                <Form.Group className="mb-3">
-                                    <Form.Label>Hostname *</Form.Label>
-                                    <Form.Control
+            <FormModal
+                show={showEditModal}
+                onHide={() => setShowEditModal(false)}
+                title="Edit Device"
+                desc="Please update the device details below."
+                formHtml={
+                    <>
+                        <div className="row">
+                            <div className="col-md-6">
+                                <div className="form-group mb-3">
+                                    <label className="form-label">Hostname *</label>
+                                    <input
                                         type="text"
                                         name="hostname"
                                         value={editFormData.hostname}
                                         onChange={handleEditInputChange}
                                         required
                                         placeholder="Enter hostname"
+                                        className="form-control"
                                     />
-                                </Form.Group>
-                            </Col>
-                            <Col md={6}>
-                                <Form.Group className="mb-3">
-                                    <Form.Label>IP Address *</Form.Label>
-                                    <Form.Control
+                                </div>
+                            </div>
+                            <div className="col-md-6">
+                                <div className="form-group mb-3">
+                                    <label className="form-label">IP Address *</label>
+                                    <input
                                         type="text"
                                         name="ip_address"
                                         value={editFormData.ip_address}
                                         onChange={handleEditInputChange}
                                         required
                                         placeholder="Enter IP address"
+                                        className="form-control"
                                     />
-                                </Form.Group>
-                            </Col>
-                        </Row>
-                        <Row>
-                            <Col md={6}>
-                                <Form.Group className="mb-3">
-                                    <Form.Label>Username *</Form.Label>
-                                    <Form.Control
+                                </div>
+                            </div>
+                        </div>
+                        <div className="row">
+                            <div className="col-md-6">
+                                <div className="form-group mb-3">
+                                    <label className="form-label">Username *</label>
+                                    <input
                                         type="text"
                                         name="username"
                                         value={editFormData.username}
                                         onChange={handleEditInputChange}
                                         required
                                         placeholder="Enter username"
+                                        className="form-control"
                                     />
-                                </Form.Group>
-                            </Col>
-                            <Col md={6}>
-                                <Form.Group className="mb-3">
-                                    <Form.Label>Password</Form.Label>
-                                    <Form.Control
+                                </div>
+                            </div>
+                            <div className="col-md-6">
+                                <div className="form-group mb-3">
+                                    <label className="form-label">Password</label>
+                                    <input
                                         type="password"
                                         name="password"
                                         value={editFormData.password}
                                         onChange={handleEditInputChange}
                                         placeholder="Enter new password (leave blank to keep current)"
+                                        className="form-control"
                                     />
-                                </Form.Group>
-                            </Col>
-                        </Row>
-                        <Row>
-                            <Col md={6}>
-                                <Form.Group className="mb-3">
-                                    <Form.Label>Protocol *</Form.Label>
-                                    <Form.Select
+                                </div>
+                            </div>
+                        </div>
+                        <div className="row">
+                            <div className="col-md-6">
+                                <div className="form-group mb-3">
+                                    <label className="form-label">Protocol *</label>
+                                    <select
                                         name="protocol"
                                         value={editFormData.protocol}
                                         onChange={handleEditInputChange}
                                         required
+                                        className="form-control"
                                     >
                                         <option value="SSH">SSH</option>
                                         <option value="TELNET">TELNET</option>
                                         <option value="HTTP">HTTP</option>
                                         <option value="HTTPS">HTTPS</option>
-                                    </Form.Select>
-                                </Form.Group>
-                            </Col>
-                            <Col md={6}>
-                                <Form.Group className="mb-3">
-                                    <Form.Label>Port *</Form.Label>
-                                    <Form.Control
+                                    </select>
+                                </div>
+                            </div>
+                            <div className="col-md-6">
+                                <div className="form-group mb-3">
+                                    <label className="form-label">Port *</label>
+                                    <input
                                         type="number"
                                         name="port"
                                         value={editFormData.port}
@@ -616,65 +622,67 @@ const Devices = () => {
                                         required
                                         min="1"
                                         max="65535"
+                                        className="form-control"
                                     />
-                                </Form.Group>
-                            </Col>
-                        </Row>
-                        <Row>
-                            <Col md={6}>
-                                <Form.Group className="mb-3">
-                                    <Form.Label>Customer Name *</Form.Label>
-                                    <Form.Control
+                                </div>
+                            </div>
+                        </div>
+                        <div className="row">
+                            <div className="col-md-6">
+                                <div className="form-group mb-3">
+                                    <label className="form-label">Customer Name *</label>
+                                    <input
                                         type="text"
                                         name="customer_name"
                                         value={editFormData.customer_name}
                                         onChange={handleEditInputChange}
                                         required
                                         placeholder="Enter customer name"
+                                        className="form-control"
                                     />
-                                </Form.Group>
-                            </Col>
-                            <Col md={6}>
-                                <Form.Group className="mb-3">
-                                    <Form.Label>Device Type</Form.Label>
-                                    <Form.Select
+                                </div>
+                            </div>
+                            <div className="col-md-6">
+                                <div className="form-group mb-3">
+                                    <label className="form-label">Device Type</label>
+                                    <select
                                         name="device_type"
                                         value={editFormData.device_type || ''}
                                         onChange={handleEditInputChange}
+                                        className="form-control"
                                     >
                                         <option value="">Select device type</option>
                                         <option value="cisco_ios">Cisco IOS</option>
                                         <option value="cisco_ios_telnet">Cisco IOS Telnet</option>
                                         <option value="generic">Generic</option>
-                                    </Form.Select>
-                                </Form.Group>
-                            </Col>
-                        </Row>
-                        <Row>
-                            <Col md={12}>
-                                <Form.Group className="mb-3">
-                                    <Form.Label>Enable Password</Form.Label>
-                                    <Form.Control
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="row">
+                            <div className="col-md-12">
+                                <div className="form-group mb-3">
+                                    <label className="form-label">Enable Password</label>
+                                    <input
                                         type="password"
                                         name="enable_password"
                                         value={editFormData.enable_password}
                                         onChange={handleEditInputChange}
                                         placeholder="Enter new enable password (leave blank to keep current)"
+                                        className="form-control"
                                     />
-                                </Form.Group>
-                            </Col>
-                        </Row>
-                    </Modal.Body>
-                    <Modal.Footer>
-                        <Button variant="secondary" onClick={() => setShowEditModal(false)}>
-                            Cancel
-                        </Button>
-                        <Button variant="primary" type="submit">
-                            Update Device
-                        </Button>
-                    </Modal.Footer>
-                </Form>
-            </Modal>
+                                </div>
+                            </div>
+                        </div>
+                    </>
+                }
+                onSubmit={() => {
+                    const mockEvent = { preventDefault: () => {} } as React.FormEvent;
+                    handleEditSubmit(mockEvent);
+                }}
+                submitButtonText="Update Device"
+                cancelButtonText="Cancel"
+            />
 
             {/* Delete Confirmation Modal */}
             {showDeleteModal && deviceToDelete && (

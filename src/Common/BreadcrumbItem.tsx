@@ -14,7 +14,7 @@ const BreadcrumbItem: React.FC<BreadcrumbItemProps> = ({ mainTitle,mainLink, sub
   return (
     <React.Fragment>
     <Head>
-      <title>{subTitle} | Ring Edge</title>
+      <title>{subTitle} | Business Contact Center</title>
     </Head>
     {/* <div className="page-header">
       <div className="page-block">

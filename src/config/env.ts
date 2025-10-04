@@ -14,7 +14,7 @@ export const config = {
   
   // Application configuration
   app: {
-    name: 'Ring Edge | Business Contact Center',
+    name: 'Business Contact Center',
     baseUrl: process.env.NEXT_PUBLIC_BASE_URL,
   },
 };

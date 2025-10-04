@@ -4,12 +4,22 @@ import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
 import GenericListPage from '@components/GenericListPage';
 import { Column } from '@components/CustomDataTable';
-import { Button, Modal, Row, Col, Form } from 'react-bootstrap';
+import { Button, Row, Col } from 'react-bootstrap';
 import { toast } from 'react-toastify';
 import { useSession } from 'next-auth/react';
-import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
 import { getServices, getMonitoringDashboard, deleteService, createService, updateService, getDevices, Service, MonitoringDashboardResponse, Device } from '@utils/netops';
 import { convertUTCToUserTimezone, GlobalDateFormat, GlobalTimeFormat } from '@utils/Helper';
+
+import "@assets/scss/common.scss";
+import "@assets/scss/tabs.scss";
+import PageHeader from "@components/PageHeader";
+import FormModal from "../../partial/FormModal";
+import ConfirmModal from "@pages/partial/ConfirmModal";
+import SuccessfulModal from "@pages/partial/SuccessfulModal";
+import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
+import DatatableActionButton from "@components/DatatableActionButton";
+import { FiEdit, FiTrash2, FiEye,FiPlus } from "react-icons/fi";
+
 
 interface Summary {
     total_services: number;
@@ -38,7 +48,7 @@ const Services = () => {
         { key: 'status', name: 'Status', selector: (row: any) => row.status, sortable: true,
             cell: (props: any) => {
                 return (
-                    <span className={`badge bg-${props.status === 'UP' ? 'success' : 'danger'}`}>
+                    <span className={`status-badge ${props.status === 'UP' ? 'success' : 'danger'}`}>
                         {props.status}
                     </span>
                 );
@@ -52,7 +62,7 @@ const Services = () => {
         { key: 'is_active', name: 'Active', selector: (row: any) => row.is_active, sortable: true,
             cell: (props: any) => {
                 return (
-                    <span className={`badge bg-${props.is_active ? 'success' : 'secondary'}`}>
+                    <span className={`status-badge ${props.is_active ? 'success' : 'secondary'}`}>
                         {props.is_active ? 'Active' : 'Inactive'}
                     </span>
                 );
@@ -78,22 +88,22 @@ const Services = () => {
         { key: 'actions', name: 'Actions', selector: (row: any) => row.service_id, sortable: false,
             cell: (props: any) => {
                 return (
-                    <div className="d-flex gap-2">
-                        <Button
-                            variant="outline-primary"
-                            size="sm"
-                            onClick={() => handleEditService(props)}
-                        >
-                            <i className="fas fa-edit"></i>
-                        </Button>
-                        <Button
-                            variant="outline-danger"
-                            size="sm"
-                            onClick={() => handleDeleteService(props.id, props.service_name)}
-                        >
-                            <i className="fas fa-trash"></i>
-                        </Button>
-                    </div>
+                    <DatatableActionButton
+                        actions={[
+                            {
+                                label: 'Edit',
+                                icon: <FiEdit />,
+                                onClick: () => handleEditService(props),
+                                className: 'gap-2'
+                            },
+                            {
+                                label: 'Delete',
+                                icon: <FiTrash2 />,
+                                onClick: () => handleDeleteService(props.id, props.service_name),
+                                className: 'text-danger gap-2'
+                            }
+                        ]}
+                    />
                 );
             }
         }
@@ -224,7 +234,6 @@ const Services = () => {
         if (!serviceToDelete) return;
 
         try {
-            console.log("ZE DELETING SERVICE", serviceToDelete)
             await deleteService(serviceToDelete.id);
             toast.success(`Service ${serviceToDelete.name} deleted successfully`);
             setRefreshKey(prev => prev + 1);
@@ -334,18 +343,25 @@ const Services = () => {
                                 <h2 className="mb-0">Services</h2>
                             </Col>
                             <Col md={8} className="d-flex justify-content-end">
+
+
+
                                 <div className="action-buttons">
+                                <div className="search-container">
+                            <i className="fas fa-search search-icon"></i>
+                            <input type="text" className="search-bar" placeholder="Search services..." onChange={(e) => handleFiltersChange({...currentFilters, search: e.target.value})}/>
+                        </div>
                                     <Button
                                         variant="primary"
                                         onClick={handleCreateService}
-                                        className="me-2"
+                                        
                                     >
                                         <i className="fas fa-plus"></i> Add Service
                                     </Button>
                                     <Button
-                                        variant="outline-primary"
+                                        variant="info"
                                         onClick={() => setRefreshKey(prev => prev + 1)}
-                                        className="me-2"
+                                        
                                     >
                                         <i className="fas fa-sync-alt"></i> Refresh
                                     </Button>
@@ -366,26 +382,28 @@ const Services = () => {
                     defaultPageSize={15}
                     filters={currentFilters}
                     refreshKey={refreshKey}
-                    search={true}
+                    search={false}
                     tableStyle='table-style-2'
                 />
 
             {/* Create Service Modal */}
-            <Modal show={showCreateModal} onHide={() => setShowCreateModal(false)} size="lg" centered>
-                <Modal.Header closeButton>
-                    <Modal.Title>Add New Service</Modal.Title>
-                </Modal.Header>
-                <Form onSubmit={handleCreateSubmit}>
-                    <Modal.Body>
-                        <Row>
-                            <Col md={6}>
-                                <Form.Group className="mb-3">
-                                    <Form.Label>Device *</Form.Label>
-                                    <Form.Select
+            <FormModal
+                show={showCreateModal}
+                onHide={() => setShowCreateModal(false)}
+                title="Add New Service"
+                desc="Please fill in the details below to create a new service."
+                formHtml={
+                    <>
+                        <div className="row">
+                            <div className="col-md-6">
+                                <div className="form-group mb-3">
+                                    <label className="form-label">Device *</label>
+                                    <select
                                         name="device_id"
                                         value={formData.device_id}
                                         onChange={handleInputChange}
                                         required
+                                        className="form-control"
                                     >
                                         <option value={0}>Select a device</option>
                                         {devices.map((device) => (
@@ -393,59 +411,62 @@ const Services = () => {
                                                 {device.hostname} ({device.ip_address})
                                             </option>
                                         ))}
-                                    </Form.Select>
-                                </Form.Group>
-                            </Col>
-                            <Col md={6}>
-                                <Form.Group className="mb-3">
-                                    <Form.Label>Service Name *</Form.Label>
-                                    <Form.Control
+                                    </select>
+                                </div>
+                            </div>
+                            <div className="col-md-6">
+                                <div className="form-group mb-3">
+                                    <label className="form-label">Service Name *</label>
+                                    <input
                                         type="text"
                                         name="service_name"
                                         value={formData.service_name}
                                         onChange={handleInputChange}
                                         required
                                         placeholder="Enter service name"
+                                        className="form-control"
                                     />
-                                </Form.Group>
-                            </Col>
-                        </Row>
-                        <Row>
-                            <Col md={6}>
-                                <Form.Group className="mb-3">
-                                    <Form.Label>Service Type *</Form.Label>
-                                    <Form.Select
+                                </div>
+                            </div>
+                        </div>
+                        <div className="row">
+                            <div className="col-md-6">
+                                <div className="form-group mb-3">
+                                    <label className="form-label">Service Type *</label>
+                                    <select
                                         name="service_type"
                                         value={formData.service_type}
                                         onChange={handleInputChange}
                                         required
+                                        className="form-control"
                                     >
                                         <option value="PING">PING</option>
                                         <option value="HTTP">HTTP</option>
                                         <option value="HTTPS">HTTPS</option>
                                         <option value="SSH">SSH</option>
                                         <option value="TELNET">TELNET</option>
-                                    </Form.Select>
-                                </Form.Group>
-                            </Col>
-                            <Col md={6}>
-                                <Form.Group className="mb-3">
-                                    <Form.Label>API Endpoint</Form.Label>
-                                    <Form.Control
+                                    </select>
+                                </div>
+                            </div>
+                            <div className="col-md-6">
+                                <div className="form-group mb-3">
+                                    <label className="form-label">API Endpoint</label>
+                                    <input
                                         type="url"
                                         name="api_endpoint"
                                         value={formData.api_endpoint}
                                         onChange={handleInputChange}
                                         placeholder="Enter API endpoint (optional)"
+                                        className="form-control"
                                     />
-                                </Form.Group>
-                            </Col>
-                        </Row>
-                        <Row>
-                            <Col md={6}>
-                                <Form.Group className="mb-3">
-                                    <Form.Label>Check Interval (seconds) *</Form.Label>
-                                    <Form.Control
+                                </div>
+                            </div>
+                        </div>
+                        <div className="row">
+                            <div className="col-md-6">
+                                <div className="form-group mb-3">
+                                    <label className="form-label">Check Interval (seconds) *</label>
+                                    <input
                                         type="number"
                                         name="check_interval"
                                         value={formData.check_interval}
@@ -453,13 +474,14 @@ const Services = () => {
                                         required
                                         min="1"
                                         max="3600"
+                                        className="form-control"
                                     />
-                                </Form.Group>
-                            </Col>
-                            <Col md={6}>
-                                <Form.Group className="mb-3">
-                                    <Form.Label>Timeout (seconds) *</Form.Label>
-                                    <Form.Control
+                                </div>
+                            </div>
+                            <div className="col-md-6">
+                                <div className="form-group mb-3">
+                                    <label className="form-label">Timeout (seconds) *</label>
+                                    <input
                                         type="number"
                                         name="timeout_seconds"
                                         value={formData.timeout_seconds}
@@ -467,38 +489,39 @@ const Services = () => {
                                         required
                                         min="1"
                                         max="300"
+                                        className="form-control"
                                     />
-                                </Form.Group>
-                            </Col>
-                        </Row>
-                    </Modal.Body>
-                    <Modal.Footer>
-                        <Button variant="secondary" onClick={() => setShowCreateModal(false)}>
-                            Cancel
-                        </Button>
-                        <Button variant="primary" type="submit">
-                            Create Service
-                        </Button>
-                    </Modal.Footer>
-                </Form>
-            </Modal>
+                                </div>
+                            </div>
+                        </div>
+                    </>
+                }
+                onSubmit={() => {
+                    const mockEvent = { preventDefault: () => {} } as React.FormEvent;
+                    handleCreateSubmit(mockEvent);
+                }}
+                submitButtonText="Create Service"
+                cancelButtonText="Cancel"
+            />
 
             {/* Edit Service Modal */}
-            <Modal show={showEditModal} onHide={() => setShowEditModal(false)} size="lg" centered>
-                <Modal.Header closeButton>
-                    <Modal.Title>Edit Service</Modal.Title>
-                </Modal.Header>
-                <Form onSubmit={handleEditSubmit}>
-                    <Modal.Body>
-                        <Row>
-                            <Col md={6}>
-                                <Form.Group className="mb-3">
-                                    <Form.Label>Device *</Form.Label>
-                                    <Form.Select
+            <FormModal
+                show={showEditModal}
+                onHide={() => setShowEditModal(false)}
+                title="Edit Service"
+                desc="Please update the service details below."
+                formHtml={
+                    <>
+                        <div className="row">
+                            <div className="col-md-6">
+                                <div className="form-group mb-3">
+                                    <label className="form-label">Device *</label>
+                                    <select
                                         name="device_id"
                                         value={formData.device_id}
                                         onChange={handleInputChange}
                                         required
+                                        className="form-control"
                                     >
                                         <option value={0}>Select a device</option>
                                         {devices.map((device) => (
@@ -506,59 +529,62 @@ const Services = () => {
                                                 {device.hostname} ({device.ip_address})
                                             </option>
                                         ))}
-                                    </Form.Select>
-                                </Form.Group>
-                            </Col>
-                            <Col md={6}>
-                                <Form.Group className="mb-3">
-                                    <Form.Label>Service Name *</Form.Label>
-                                    <Form.Control
+                                    </select>
+                                </div>
+                            </div>
+                            <div className="col-md-6">
+                                <div className="form-group mb-3">
+                                    <label className="form-label">Service Name *</label>
+                                    <input
                                         type="text"
                                         name="service_name"
                                         value={formData.service_name}
                                         onChange={handleInputChange}
                                         required
                                         placeholder="Enter service name"
+                                        className="form-control"
                                     />
-                                </Form.Group>
-                            </Col>
-                        </Row>
-                        <Row>
-                            <Col md={6}>
-                                <Form.Group className="mb-3">
-                                    <Form.Label>Service Type *</Form.Label>
-                                    <Form.Select
+                                </div>
+                            </div>
+                        </div>
+                        <div className="row">
+                            <div className="col-md-6">
+                                <div className="form-group mb-3">
+                                    <label className="form-label">Service Type *</label>
+                                    <select
                                         name="service_type"
                                         value={formData.service_type}
                                         onChange={handleInputChange}
                                         required
+                                        className="form-control"
                                     >
                                         <option value="PING">PING</option>
                                         <option value="HTTP">HTTP</option>
                                         <option value="HTTPS">HTTPS</option>
                                         <option value="SSH">SSH</option>
                                         <option value="TELNET">TELNET</option>
-                                    </Form.Select>
-                                </Form.Group>
-                            </Col>
-                            <Col md={6}>
-                                <Form.Group className="mb-3">
-                                    <Form.Label>API Endpoint</Form.Label>
-                                    <Form.Control
+                                    </select>
+                                </div>
+                            </div>
+                            <div className="col-md-6">
+                                <div className="form-group mb-3">
+                                    <label className="form-label">API Endpoint</label>
+                                    <input
                                         type="url"
                                         name="api_endpoint"
                                         value={formData.api_endpoint}
                                         onChange={handleInputChange}
                                         placeholder="Enter API endpoint (optional)"
+                                        className="form-control"
                                     />
-                                </Form.Group>
-                            </Col>
-                        </Row>
-                        <Row>
-                            <Col md={6}>
-                                <Form.Group className="mb-3">
-                                    <Form.Label>Check Interval (seconds) *</Form.Label>
-                                    <Form.Control
+                                </div>
+                            </div>
+                        </div>
+                        <div className="row">
+                            <div className="col-md-6">
+                                <div className="form-group mb-3">
+                                    <label className="form-label">Check Interval (seconds) *</label>
+                                    <input
                                         type="number"
                                         name="check_interval"
                                         value={formData.check_interval}
@@ -566,13 +592,14 @@ const Services = () => {
                                         required
                                         min="1"
                                         max="3600"
+                                        className="form-control"
                                     />
-                                </Form.Group>
-                            </Col>
-                            <Col md={6}>
-                                <Form.Group className="mb-3">
-                                    <Form.Label>Timeout (seconds) *</Form.Label>
-                                    <Form.Control
+                                </div>
+                            </div>
+                            <div className="col-md-6">
+                                <div className="form-group mb-3">
+                                    <label className="form-label">Timeout (seconds) *</label>
+                                    <input
                                         type="number"
                                         name="timeout_seconds"
                                         value={formData.timeout_seconds}
@@ -580,40 +607,41 @@ const Services = () => {
                                         required
                                         min="1"
                                         max="300"
+                                        className="form-control"
                                     />
-                                </Form.Group>
-                            </Col>
-                        </Row>
-                    </Modal.Body>
-                    <Modal.Footer>
-                        <Button variant="secondary" onClick={() => setShowEditModal(false)}>
-                            Cancel
-                        </Button>
-                        <Button variant="primary" type="submit">
-                            Update Service
-                        </Button>
-                    </Modal.Footer>
-                </Form>
-            </Modal>
+                                </div>
+                            </div>
+                        </div>
+                    </>
+                }
+                onSubmit={() => {
+                    const mockEvent = { preventDefault: () => {} } as React.FormEvent;
+                    handleEditSubmit(mockEvent);
+                }}
+                submitButtonText="Update Service"
+                cancelButtonText="Cancel"
+            />
 
             {/* Delete Confirmation Modal */}
-            <Modal show={showDeleteModal} onHide={() => setShowDeleteModal(false)} centered>
-                <Modal.Header closeButton>
-                    <Modal.Title>Confirm Delete</Modal.Title>
-                </Modal.Header>
-                <Modal.Body>
-                    Are you sure you want to delete service <strong>{serviceToDelete?.name}</strong>? 
-                    This action cannot be undone.
-                </Modal.Body>
-                <Modal.Footer>
-                    <Button variant="secondary" onClick={() => setShowDeleteModal(false)}>
-                        Cancel
-                    </Button>
-                    <Button variant="danger" onClick={confirmDeleteService}>
-                        Delete Service
-                    </Button>
-                </Modal.Footer>
-            </Modal>
+            {showDeleteModal && serviceToDelete && (
+                <ConfirmModal
+                    show={showDeleteModal}
+                    onHide={() => setShowDeleteModal(false)}
+                    title="Delete Service?"
+                    description="Are you sure you want to delete service {targetName}? This action cannot be undone."
+                    targetName={serviceToDelete.name}
+                    confirmButtonText="Delete Service"
+                    cancelButtonText="Cancel"
+                    onConfirm={confirmDeleteService}
+                    onCancel={() => setShowDeleteModal(false)}
+                    confirmButtonVariant="danger"
+                    cancelButtonVariant="secondary"
+                    requireTextConfirmation={true}
+                    confirmationPlaceholder="Type the word DELETE to confirm"
+                    confirmationLabel=""
+                    requiredConfirmationText="DELETE"
+                />
+            )}
         </React.Fragment>
     );
 };

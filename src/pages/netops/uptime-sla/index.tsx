@@ -241,7 +241,7 @@ const UptimeSLAMonitoring = () => {
         <Col md={12}>
           <div className="page-header-title style-2">
             <Row className="d-flex justify-content-between align-items-center">
-              <Col md={4}>
+              <Col md={12}>
                 <h2 className="mb-0">Uptime & SLA Monitoring</h2>
               </Col>
             </Row>
