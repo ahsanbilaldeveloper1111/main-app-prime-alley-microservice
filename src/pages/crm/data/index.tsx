@@ -1690,7 +1690,62 @@ const CrmDataManagement = () => {
         desc="Please fill the details below to upload the CRM data."
         formHtml={
           <>
-           {uploading && (
+          <div
+            className={`border-2 border-dashed rounded p-4 text-center ${
+              dragActive ? "border-primary bg-light" : "border-secondary"
+            }`}
+            onDragEnter={handleDrag}
+            onDragLeave={handleDrag}
+            onDragOver={handleDrag}
+            onDrop={handleDrop}
+            style={{ minHeight: "200px", display: "flex", alignItems: "center", justifyContent: "center" }}
+          >
+            {selectedFile ? (
+              <div className="d-flex flex-column align-items-center">
+                <FiDatabase
+                  className="text-success mb-3"
+                  style={{ fontSize: "3rem" }}
+                />
+                <p className="mt-2 mb-1">
+                  <strong>{selectedFile.name}</strong>
+                </p>
+                <p className="text-muted small mb-3">
+                  Size: {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
+                </p>
+                <Button
+                  variant="outline-danger"
+                  size="sm"
+                  className="app-button"
+                  onClick={() => setSelectedFile(null)}
+                >
+                  Remove File
+                </Button>
+              </div>
+            ) : (
+              <div className="d-flex flex-column align-items-center">
+                <FiUpload className="text-muted mb-3" style={{ fontSize: "3rem" }} />
+                <p className="mt-2 mb-2">Drag and drop your CSV file here</p>
+                <p className="text-muted small mb-3">or</p>
+                <Button
+                  variant="outline-primary"
+                  size="sm"
+                  className="app-button"
+                  onClick={() => document.getElementById("fileInput")?.click()}
+                >
+                  Browse Files
+                </Button>
+                <input
+                  id="fileInput"
+                  type="file"
+                  accept=".csv"
+                  onChange={handleFileInputChange}
+                  style={{ display: "none" }}
+                />
+              </div>
+            )}
+          </div>
+
+          {uploading && (
             <div className="mt-3">
               <div className="d-flex justify-content-between align-items-center mb-2">
                 <span>Uploading...</span>
