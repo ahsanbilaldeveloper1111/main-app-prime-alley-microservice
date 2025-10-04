@@ -44,8 +44,10 @@ import {
   FiCheckCircle,
   FiAlertCircle,
   FiCalendar,
+  FiPlus,
 } from "react-icons/fi";
 import { Column } from "@components/CustomDataTable";
+
 import {
   getCrmData,
   uploadCrmDataCsv,
@@ -73,6 +75,15 @@ import {
   CrmDataResponse,
 } from "@utils/crm";
 import { GetHierarchyData } from "@utils/users";
+
+import "@assets/scss/common.scss";
+import "@assets/scss/tabs.scss";
+import PageHeader from "@components/PageHeader";
+import FormModal from "../../partial/FormModal";
+import ConfirmModal from "@pages/partial/ConfirmModal";
+import SuccessfulModal from "@pages/partial/SuccessfulModal";
+import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
+import DatatableActionButton from "@components/DatatableActionButton";
 
 const CrmDataManagement = () => {
   const { data: session } = useSession();
@@ -166,6 +177,9 @@ const CrmDataManagement = () => {
     overdueCalls: 0,
     assignedEntries: 0,
     unassignedEntries: 0,
+    total_scheduled:0,
+    not_scheduled:0,
+    total_records:0
   });
 
   // Static tags data
@@ -343,6 +357,9 @@ const CrmDataManagement = () => {
         overdueCalls: counts.scheduled_calls?.overdue || 0,
         assignedEntries: counts.summary.assigned_records,
         unassignedEntries: counts.summary.unassigned_records,
+        total_scheduled: counts.scheduled_calls?.total_scheduled || 0,
+        not_scheduled: counts.scheduled_calls?.not_scheduled || 0,
+        total_records: counts.summary.total_records || 0,
       };
     } catch (error) {
       console.error("Failed to get dashboard stats:", error);
@@ -353,6 +370,9 @@ const CrmDataManagement = () => {
         overdueCalls: 0,
         assignedEntries: 0,
         unassignedEntries: 0,
+        total_scheduled: 0,
+        not_scheduled: 0,
+        total_records: 0,
       };
     }
   }, [currentFilters]);
@@ -743,6 +763,11 @@ const CrmDataManagement = () => {
     }
   }, [calculateEntryCounts]);
 
+
+  const [showSuccessfulModal, setShowSuccessfulModal] = useState(false);
+  const [successModalTitle, setSuccessModalTitle] = useState("");
+  const [successModalDescription, setSuccessModalDescription] = useState("");
+
   // Handle data assignment directly (no second dialog)
   const handleDataAssignmentSubmit = useCallback(async () => {
     if (assignmentCampaign.length === 0) {
@@ -826,6 +851,13 @@ const CrmDataManagement = () => {
       setAssignmentDistribution("equal");
       setTotalEntriesToAssign(0);
       setCustomDistribution({});
+
+      setShowSuccessfulModal(true);
+      setSuccessModalTitle("Data Assignment Successful!");
+      setSuccessModalDescription("The data has been successfully assigned.");
+
+
+
       setRefreshKey((prev) => prev + 1);
     } catch (error: any) {
       console.error("Assign error:", error);
@@ -951,6 +983,9 @@ const CrmDataManagement = () => {
       window.location.href = `/crm/leads/create?crm_data_id=${selectedDataItem.id}`;
     } else {
       toast.success("After call data saved successfully! No lead generated.");
+      setShowSuccessfulModal(true);
+      setSuccessModalTitle("After Call Successful!");
+      setSuccessModalDescription("The after call data has been successfully saved.");
     }
   }, [afterCallData, selectedDataItem, handleAfterCallModalClose]);
 
@@ -1012,6 +1047,9 @@ const CrmDataManagement = () => {
       );
       setRefreshKey((prev) => prev + 1);
       handleScheduleModalClose();
+      setShowSuccessfulModal(true);
+      setSuccessModalTitle("Schedule Call Successful!");
+      setSuccessModalDescription("The call has been successfully scheduled.");
     } catch (error) {
       console.error("Failed to schedule call:", error);
     }
@@ -1072,9 +1110,9 @@ const CrmDataManagement = () => {
         cell: (props: any) => (
           <div>
             {props.phone ? (
-              <Badge bg="info">{props.phone}</Badge>
+              <span className="status-badge info">{props.phone}</span>
             ) : (
-              <span className="text-muted">N/A</span>
+              <span className="status-badge info">N/A</span>
             )}
           </div>
         ),
@@ -1087,14 +1125,14 @@ const CrmDataManagement = () => {
         cell: (props: any) => (
           <div>
             {props.user_extension ? (
-              <Badge bg="success">
+              <span className="status-badge success">
                 {extensions.find(
                   (extension: any) =>
                     extension.id.toString() === props.user_extension?.toString()
                 )?.display_name || props.user_extension}
-              </Badge>
+              </span>
             ) : (
-              <span className="text-muted">Unassigned</span>
+              <span className="status-badge default">Unassigned</span>
             )}
           </div>
         ),
@@ -1107,9 +1145,9 @@ const CrmDataManagement = () => {
         cell: (props: any) => (
           <div>
             {props.is_viewed ? (
-              <Badge bg="primary">Viewed</Badge>
+              <span className="status-badge warning">Viewed</span>
             ) : (
-              <Badge bg="warning">New</Badge>
+              <span className="status-badge success">New</span>
             )}
           </div>
         ),
@@ -1126,9 +1164,9 @@ const CrmDataManagement = () => {
           return (
             <div>
               {campaign ? (
-                <Badge bg="info">{campaign.label}</Badge>
+                <span className="status-badge primary">{campaign.label}</span>
               ) : (
-                <span className="text-muted">No Campaign</span>
+                <span className="status-badge info">No Campaign</span>
               )}
             </div>
           );
@@ -1145,9 +1183,9 @@ const CrmDataManagement = () => {
           return (
             <div className="d-flex flex-wrap gap-1">
               {tags?.map((tag: any, index: any) => (
-                <Badge key={index} bg="secondary" className="small">
+                <span key={index} className="status-badge info">
                   {tag.name}
-                </Badge>
+                </span>
               ))}
             </div>
           );
@@ -1164,9 +1202,9 @@ const CrmDataManagement = () => {
             callEndReasons.find((r) => r.value === "answered") ||
             callEndReasons[0];
           return (
-            <Badge bg={endReason.color as any} className="small">
+            <span className={`status-badge ${endReason.color as any}`}>
               {endReason.label}
-            </Badge>
+            </span>
           );
         },
       },
@@ -1189,10 +1227,10 @@ const CrmDataManagement = () => {
               label: "Callback Requested",
               color: "warning",
             },
-            { value: "no_answer", label: "No Answer", color: "secondary" },
+            { value: "no_answer", label: "No Answer", color: "warning" },
             { value: "busy", label: "Busy", color: "info" },
-            { value: "do_not_call", label: "Do Not Call", color: "dark" },
-            { value: "wrong_number", label: "Wrong Number", color: "light" },
+            { value: "do_not_call", label: "Do Not Call", color: "danger" },
+            { value: "wrong_number", label: "Wrong Number", color: "info" },
             { value: "follow_up", label: "Follow Up", color: "primary" },
           ];
 
@@ -1201,9 +1239,9 @@ const CrmDataManagement = () => {
             dispositions[Math.floor(Math.random() * dispositions.length)];
 
           return (
-            <Badge bg={randomDisposition.color as any} className="small">
+            <span className={`status-badge ${randomDisposition.color as any}`}>
               {randomDisposition.label}
-            </Badge>
+            </span>
           );
         },
       },
@@ -1219,8 +1257,7 @@ const CrmDataManagement = () => {
           if (!hasCall) {
             return (
               <div className="d-flex align-items-center">
-                <FiClock className="me-1 text-muted" size={12} />
-                <span className="small text-muted">-</span>
+                <span className="text-muted">N/A</span>
               </div>
             );
           }
@@ -1240,8 +1277,8 @@ const CrmDataManagement = () => {
             
           return (
             <div className="d-flex align-items-center">
-              <FiClock className="me-1" size={12} />
-              <span className="small">
+             
+              <span className="">
                 {moment(lastCalled).format("MMM DD, HH:mm")}
               </span>
             </div>
@@ -1255,7 +1292,7 @@ const CrmDataManagement = () => {
         sortable: true,
         cell: (props: any) => {
           if (!props.scheduled_call_at) {
-            return <span className="text-muted small">Not scheduled</span>;
+            return <span className="status-badge info">Not scheduled</span>;
           }
 
           const isOverdue = moment(props.scheduled_call_at).isBefore(moment());
@@ -1265,19 +1302,10 @@ const CrmDataManagement = () => {
 
           return (
             <div className="d-flex align-items-center">
-              <FiClock
-                className={`me-1 ${
-                  isOverdue
-                    ? "text-danger"
-                    : isNextHour
-                    ? "text-warning"
-                    : "text-success"
-                }`}
-                size={12}
-              />
+             
               <span
-                className={`small ${
-                  isOverdue ? "text-danger" : isNextHour ? "text-warning" : ""
+                className={`status-badge ${
+                  isOverdue ? "danger" : isNextHour ? "warning" : ""
                 }`}
               >
                 {moment(props.scheduled_call_at).format("MMM DD, HH:mm")}
@@ -1304,12 +1332,13 @@ const CrmDataManagement = () => {
             <div>
               {hasRecording ? (
                 <Button
-                  variant="outline-primary"
+                  variant="info"
+                  className="btn-sm app-button"
                   size="sm"
                   onClick={() => handlePlayRecording(recordingUrl)}
                   title="Play Recording"
                 >
-                  <FiPlay size={12} />
+                  <FiPlay size={12} /> Play
                 </Button>
               ) : (
                 <span className="text-muted small">No recording</span>
@@ -1326,7 +1355,8 @@ const CrmDataManagement = () => {
         cell: (props: any) => (
           <div className="d-flex gap-1">
             <Button
-              variant="outline-primary"
+              variant="primary"
+              className="app-button"
               size="sm"
               onClick={() => handleViewData(props)}
               title="View Details"
@@ -1335,64 +1365,21 @@ const CrmDataManagement = () => {
             </Button>
             <>
               <Button
-                variant="outline-success"
+                variant="success"
+                className="app-button"
                 size="sm"
                 onClick={() => handleCallClick(props)}
                 title="Call Now"
               >
                 <FiPhone size={14} />
               </Button>
-              <Dropdown>
-                <Dropdown.Toggle
-                  variant="outline-info"
-                  size="sm"
-                  id="call-dropdown"
-                >
-                  <FiMessageCircle size={14} />
-                </Dropdown.Toggle>
-                <Dropdown.Menu>
-                  <Dropdown.Item
-                    onClick={() => handleCallAction("whatsapp", props)}
-                  >
-                    <FiMessageCircle className="me-2" />
-                    WhatsApp
-                  </Dropdown.Item>
-                  <Dropdown.Item
-                    onClick={() => handleCallAction("phone", props)}
-                  >
-                    <FiPhone className="me-2" />
-                    Phone Call
-                  </Dropdown.Item>
-                  <Dropdown.Item onClick={() => handleCallAction("sms", props)}>
-                    <FiMessageCircle className="me-2" />
-                    SMS
-                  </Dropdown.Item>
-                  <Dropdown.Divider />
-                  <Dropdown.Item
-                    onClick={() => handleCallAction("facebook", props)}
-                  >
-                    <FiMessageCircle className="me-2" />
-                    Facebook
-                  </Dropdown.Item>
-                  <Dropdown.Item
-                    onClick={() => handleCallAction("telegram", props)}
-                  >
-                    <FiMessageCircle className="me-2" />
-                    Telegram
-                  </Dropdown.Item>
-                  <Dropdown.Item
-                    onClick={() => handleCallAction("skype", props)}
-                  >
-                    <FiPhone className="me-2" />
-                    Skype
-                  </Dropdown.Item>
-                </Dropdown.Menu>
-              </Dropdown>
+              
             </>
             {props.scheduled_call_at ? (
               <Button
-                variant="outline-warning"
+                variant="warning"
                 size="sm"
+                className="app-button"
                 onClick={() => handleUnscheduleCall(props)}
                 title="Unschedule Call"
               >
@@ -1400,7 +1387,8 @@ const CrmDataManagement = () => {
               </Button>
             ) : (
               <Button
-                variant="outline-info"
+                variant="info"
+                className="app-button"
                 size="sm"
                 onClick={() => handleScheduleCall(props)}
                 title="Schedule Call"
@@ -1409,13 +1397,48 @@ const CrmDataManagement = () => {
               </Button>
             )}
             <Button
-              variant="outline-danger"
+              variant="danger"
+              className="app-button"
               size="sm"
               onClick={() => handleDeleteData(props)}
               title="Delete Entry"
             >
               <FiTrash2 size={14} />
             </Button>
+            <DatatableActionButton
+                actions={[
+                  {
+                    label: 'WhatsApp',
+                    icon: <FiMessageCircle className="me-2" />,
+                    onClick: () => handleCallAction("whatsapp", props),
+                  },
+                  {
+                    label: 'Phone Call',
+                    icon: <FiPhone className="me-2" />,
+                    onClick: () => handleCallAction("phone", props),
+                  },
+                  {
+                    label: 'SMS',
+                    icon: <FiMessageCircle className="me-2" />,
+                    onClick: () => handleCallAction("sms", props),
+                  },
+                  {
+                    label: 'Facebook',
+                    icon: <FiMessageCircle className="me-2" />,
+                    onClick: () => handleCallAction("facebook", props),
+                  },
+                  {
+                    label: 'Telegram',
+                    icon: <FiMessageCircle className="me-2" />,
+                    onClick: () => handleCallAction("telegram", props),
+                  },
+                  {
+                    label: 'Skype',
+                    icon: <FiPhone className="me-2" />,
+                    onClick: () => handleCallAction("skype", props),
+                  },
+                ]}
+              />
           </div>
         ),
       },
@@ -1463,30 +1486,12 @@ const CrmDataManagement = () => {
         subTitle="Data Management"
       />
 
-      <div className="container-fluid">
-        {/* Header */}
-        <div className="row mb-4">
-          <div className="col-12">
-            <div className="d-flex justify-content-between align-items-center">
-              <div>
-                <h1 className="h3 mb-0 d-flex align-items-center">
-                  <FiDatabase className="me-2" />
-                  CRM Data Management
-                </h1>
-                <p className="text-muted">
-                  Upload and manage your CRM data from CSV files
-                </p>
-              </div>
-              <div className="d-flex gap-2">
-                {selectedItems.length > 0 && (
-                  <Button
-                    variant="danger"
-                    onClick={() => setShowBulkDeleteModal(true)}
-                  >
-                    <FiTrash2 className="me-2" />
-                    Delete Selected ({selectedItems.length})
-                  </Button>
-                )}
+      <PageHeader
+        title="CRM Data Management"
+        buttons={
+          <>
+          
+         
                 <Button variant="success" onClick={handleDataAssignment}>
                   <FiUsers className="me-2" />
                   Data Assignment
@@ -1512,201 +1517,142 @@ const CrmDataManagement = () => {
                   <FiUpload className="me-2" />
                   Upload CSV
                 </Button>
-              </div>
-            </div>
-          </div>
-        </div>
+          </>
+        }
+      />
 
-        {/* Dashboard Cards */}
-        <div className="row mb-4">
-          <div className="col-md-2">
-            <Card className="border-0 shadow-sm h-100">
-              <Card.Body className="text-center">
-                <div className="d-flex align-items-center justify-content-center mb-2">
-                  <FiClock className="text-warning me-2" size={24} />
-                  <h4 className="mb-0 text-warning">
-                    {dashboardStats.callsInNextHour}
-                  </h4>
-                </div>
-                <p className="mb-0 small text-muted">
-                  Calls in Next Hour
-                  {(currentFilters.campaign_id?.length > 0 ||
-                    currentFilters.tags?.length > 0) && (
-                    <span className="text-primary"> (Filtered)</span>
-                  )}
-                </p>
-              </Card.Body>
-            </Card>
-          </div>
-          <div className="col-md-2">
-            <Card className="border-0 shadow-sm h-100">
-              <Card.Body className="text-center">
-                <div className="d-flex align-items-center justify-content-center mb-2">
-                  <FiClock className="text-info me-2" size={24} />
-                  <h4 className="mb-0 text-info">
-                    {dashboardStats.callsInNext24Hours}
-                  </h4>
-                </div>
-                <p className="mb-0 small text-muted">
-                  Calls in Next 24h
-                  {(currentFilters.campaign_id?.length > 0 ||
-                    currentFilters.tags?.length > 0) && (
-                    <span className="text-primary"> (Filtered)</span>
-                  )}
-                </p>
-              </Card.Body>
-            </Card>
-          </div>
-          <div className="col-md-2">
-            <Card className="border-0 shadow-sm h-100">
-              <Card.Body className="text-center">
-                <div className="d-flex align-items-center justify-content-center mb-2">
-                  <FiX className="text-danger me-2" size={24} />
-                  <h4 className="mb-0 text-danger">
-                    {dashboardStats.overdueCalls}
-                  </h4>
-                </div>
-                <p className="mb-0 small text-muted">
-                  Overdue Calls
-                  {(currentFilters.campaign_id?.length > 0 ||
-                    currentFilters.tags?.length > 0) && (
-                    <span className="text-primary"> (Filtered)</span>
-                  )}
-                </p>
-              </Card.Body>
-            </Card>
-          </div>
-          <div className="col-md-3">
-            <Card className="border-0 shadow-sm h-100">
-              <Card.Body className="text-center">
-                <div className="d-flex align-items-center justify-content-center mb-2">
-                  <FiUser className="text-success me-2" size={24} />
-                  <h4 className="mb-0 text-success">
-                    {dashboardStats.assignedEntries.toLocaleString()}
-                  </h4>
-                </div>
-                <p className="mb-0 small text-muted">
-                  Assigned Entries
-                  {(currentFilters.campaign_id?.length > 0 ||
-                    currentFilters.tags?.length > 0) && (
-                    <span className="text-primary"> (Filtered)</span>
-                  )}
-                </p>
-              </Card.Body>
-            </Card>
-          </div>
-          <div className="col-md-3">
-            <Card className="border-0 shadow-sm h-100">
-              <Card.Body className="text-center">
-                <div className="d-flex align-items-center justify-content-center mb-2">
-                  <FiAlertCircle className="text-warning me-2" size={24} />
-                  <h4 className="mb-0 text-warning">
-                    {dashboardStats.unassignedEntries.toLocaleString()}
-                  </h4>
-                </div>
-                <p className="mb-0 small text-muted">
-                  Unassigned Entries
-                  {(currentFilters.campaign_id?.length > 0 ||
-                    currentFilters.tags?.length > 0) && (
-                    <span className="text-primary"> (Filtered)</span>
-                  )}
-                </p>
-              </Card.Body>
-            </Card>
-          </div>
-        </div>
+      <div className="container-fluid">
+        {/* Header */}
 
-        {/* Search and Filters */}
-        <div className="row mb-3">
-          <div className="col-md-4">
-            <Form.Group>
-              <Form.Label>Search Entries</Form.Label>
-              <Form.Control
-                type="text"
-                placeholder="Search by phone number..."
-                value={currentFilters.search || ""}
-                onChange={(e) => {
-                  handleFiltersChange({
-                    ...currentFilters,
-                    search: e.target.value,
-                  });
-                }}
-              />
-            </Form.Group>
-          </div>
-          <div className="col-md-4">
-            <Form.Group>
-              <Form.Label>Filter by Campaigns</Form.Label>
-              <CreatableSelect
-                isMulti
-                value={
-                  currentFilters.campaign_id
-                    ? availableCampaigns.filter((campaign) =>
-                        currentFilters.campaign_id.includes(campaign.value)
-                      )
-                    : []
-                }
-                onChange={(selected) => {
-                  const campaignIds = selected
-                    ? selected.map((item: any) => item.value)
-                    : [];
-                  handleFiltersChange({
-                    ...currentFilters,
-                    campaign_id: campaignIds,
-                  });
-                }}
-                options={availableCampaigns}
-                placeholder="Select campaigns to filter..."
-                styles={{
-                  control: (base) => ({
-                    ...base,
-                    borderColor: "#ced4da",
-                    boxShadow: "none",
-                    fontSize: "14px",
-                  }),
-                }}
-              />
-            </Form.Group>
-          </div>
-          <div className="col-md-4">
-            <Form.Group>
-              <Form.Label>Filter by Tags</Form.Label>
-              <CreatableSelect
-                isMulti
-                value={
-                  currentFilters.tags
-                    ? availableTags.filter((tag) =>
-                        currentFilters.tags.includes(tag.value)
-                      )
-                    : []
-                }
-                onChange={(selected) => {
-                  const tags = selected
-                    ? selected.map((item: any) => item.value)
-                    : [];
-                  handleFiltersChange({ ...currentFilters, tags: tags });
-                }}
-                options={availableTags}
-                placeholder="Select tags to filter..."
-                styles={{
-                  control: (base) => ({
-                    ...base,
-                    borderColor: "#ced4da",
-                    boxShadow: "none",
-                    fontSize: "14px",
-                  }),
-                }}
-              />
-            </Form.Group>
-          </div>
-        </div>
+        <PageSummaryGrid
+         cards={[
+          {
+            id: "total-records",
+            title: "Total Records",
+            value: dashboardStats.total_records,
+            description: "Total Records in the system",
+            delay: 0.1,
+            showAnimatedNumber: true,
+            animationDuration: 1000,
+            fontStyle: 'style-2'
+          },
+          {
+            id: "total-scheduled",
+            title: "Scheduled",
+            value: dashboardStats.total_scheduled,
+            description: "Total Scheduled Calls in the system",
+            delay: 0.1,
+            showAnimatedNumber: true,
+            animationDuration: 1000,
+            fontStyle: 'style-2'
+          },
+          {
+            id: "total-not-scheduled",
+            title: "Not Scheduled",
+            value: dashboardStats.not_scheduled,
+            description: "Total Not Scheduled Calls in the system",
+            delay: 0.2,
+            showAnimatedNumber: true,
+            animationDuration: 1000,
+            fontStyle: 'style-2'
+          },
+          {
+            id: "calls-in-next-hour",
+            title: "Next Hour",
+            value: dashboardStats.callsInNextHour,
+            description: "Calls in Next Hour",
+            delay: 0.1,
+            showAnimatedNumber: true,
+            animationDuration: 1000,
+            fontStyle: 'style-2'
+          }, 
+          {
+            id: "calls-in-next-24-hours",
+            title: "Next 24h",
+            value: dashboardStats.callsInNext24Hours,
+            description: "Total Calls in Next 24h in the system",
+            delay: 0.3,
+            showAnimatedNumber: true,
+            animationDuration: 1000,
+            fontStyle: 'style-2'
+          },
+          {
+            id: "overdue-calls",
+            title: "Overdue Calls",
+            value: dashboardStats.overdueCalls,
+            description: "Total Overdue Calls in the system",
+            delay: 0.5,
+            showAnimatedNumber: true,
+            animationDuration: 1000,
+            fontStyle: 'style-2'
+          },
+          {
+            id: "assigned-entries",
+            title: "Assigned Entries",
+            value: dashboardStats.assignedEntries,
+            description: "Total Assigned Entries in the system",
+            delay: 0.7,
+            showAnimatedNumber: true,
+            animationDuration: 1000,
+            fontStyle: 'style-2'
+          },
+          {
+            id: "unassigned-entries",
+            title: "Unassigned Entries",
+            value: dashboardStats.unassignedEntries,
+            description: "Total Unassigned Entries in the system",
+            delay: 0.7,
+            showAnimatedNumber: true,
+            animationDuration: 1000,
+            fontStyle: 'style-2'
+          }
+         ]}
+        />
+       
 
-        {/* Additional CRM Data Filters */}
-        <div className="row mb-3">
-          <div className="col-12">
-            <CrmDataFilters onFiltersChange={handleFiltersChange} />
-          </div>
-        </div>
+       
+
+      
+<Row className="mb-3">
+            <Col md={12}>
+                <div className="page-header-title style-2">
+                <Row className="d-flex justify-content-between align-items-center">
+                    
+                    <Col md={12} className="d-flex justify-content-end">
+                      
+                    <div className="action-buttons">
+                    <div className="search-container">
+                            <i className="fas fa-search search-icon"></i>
+                            <input type="text" className="search-bar" placeholder="Search by phone number..." onChange={(e) => handleFiltersChange({...currentFilters, search: e.target.value})}/>
+                        </div>
+                    
+                    <CrmDataFilters onFiltersChange={handleFiltersChange} />
+                    {selectedItems.length > 0 && (
+                  <Button
+                    variant="danger"
+                    onClick={() => setShowBulkDeleteModal(true)}
+                  >
+                    <FiTrash2 className="me-2" />
+                    Delete Selected ({selectedItems.length})
+                  </Button>
+                )}
+                     
+                  
+                    </div>
+
+
+
+                    </Col>
+                  </Row>
+               
+                
+                </div>
+            </Col>
+            </Row>
+
+       
+        
+        
 
         {/* CRM Data List */}
         <div className="row">
@@ -1725,6 +1671,8 @@ const CrmDataManagement = () => {
                   rowSelection={true}
                   onSelectionChange={handleItemSelection}
                   clearSelectedRows={clearSelectedRows}
+                  tableStyle="table-style-2"
+
                 />
               </Card.Body>
             </Card>
@@ -1733,70 +1681,16 @@ const CrmDataManagement = () => {
       </div>
 
       {/* Upload Modal */}
-      <Modal
+      
+
+      <FormModal
         show={showUploadModal}
         onHide={() => setShowUploadModal(false)}
-        size="lg"
-      >
-        <Modal.Header closeButton>
-          <Modal.Title className="d-flex align-items-center">
-            <FiUpload className="me-2" />
-            Import CRM Data
-          </Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <div
-            className={`border-2 border-dashed rounded p-4 text-center ${
-              dragActive ? "border-primary bg-light" : "border-secondary"
-            }`}
-            onDragEnter={handleDrag}
-            onDragLeave={handleDrag}
-            onDragOver={handleDrag}
-            onDrop={handleDrop}
-          >
-            {selectedFile ? (
-              <div>
-                <FiDatabase
-                  className="text-success"
-                  style={{ fontSize: "3rem" }}
-                />
-                <p className="mt-2 mb-0">
-                  <strong>{selectedFile.name}</strong>
-                </p>
-                <p className="text-muted small">
-                  Size: {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
-                </p>
-                <Button
-                  variant="outline-danger"
-                  size="sm"
-                  onClick={() => setSelectedFile(null)}
-                >
-                  Remove File
-                </Button>
-              </div>
-            ) : (
-              <div>
-                <FiUpload className="text-muted" style={{ fontSize: "3rem" }} />
-                <p className="mt-2 mb-0">Drag and drop your CSV file here</p>
-                <p className="text-muted small">or</p>
-                <Button
-                  variant="outline-primary"
-                  onClick={() => document.getElementById("fileInput")?.click()}
-                >
-                  Browse Files
-                </Button>
-                <input
-                  id="fileInput"
-                  type="file"
-                  accept=".csv"
-                  onChange={handleFileInputChange}
-                  style={{ display: "none" }}
-                />
-              </div>
-            )}
-          </div>
-
-          {uploading && (
+        title="Upload CRM Data"
+        desc="Please fill the details below to upload the CRM data."
+        formHtml={
+          <>
+           {uploading && (
             <div className="mt-3">
               <div className="d-flex justify-content-between align-items-center mb-2">
                 <span>Uploading...</span>
@@ -1914,46 +1808,29 @@ const CrmDataManagement = () => {
               </li>
             </ul>
           </Alert>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button
-            variant="secondary"
-            onClick={() => setShowUploadModal(false)}
-            disabled={uploading}
-          >
-            Cancel
-          </Button>
-          <Button
-            variant="primary"
-            onClick={handleUpload}
-            disabled={!selectedFile || uploading}
-          >
-            {uploading ? (
-              <>
-                <Spinner size="sm" className="me-2" />
-                Uploading...
-              </>
-            ) : (
-              "Upload File"
-            )}
-          </Button>
-        </Modal.Footer>
-      </Modal>
+          </>
+        }
+        submitButtonText="Upload File"
+        cancelButtonText="Cancel"
+        onSubmit={() => handleUpload()}
+        onCancel={() => setShowUploadModal(false)}
+      />
+
+
+
+
+
 
       {/* View Data Modal */}
-      <Modal
+     
+      <FormModal
         show={showViewModal}
         onHide={() => setShowViewModal(false)}
-        size="lg"
-      >
-        <Modal.Header closeButton>
-          <Modal.Title className="d-flex align-items-center">
-            <FiEye className="me-2" />
-            View CRM Data - #{selectedDataItem?.id}
-          </Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          {selectedDataItem && (
+        title={`View CRM Data #${selectedDataItem?.id}`}
+        desc="Please fill the details below to view the CRM data."
+        formHtml={
+          <>
+           {selectedDataItem && (
             <div>
               <Row>
                 <Col className="mb-3" md={6}>
@@ -2136,13 +2013,20 @@ const CrmDataManagement = () => {
               </div>
             </div>
           )}
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={() => setShowViewModal(false)}>
-            Close
-          </Button>
-        </Modal.Footer>
-      </Modal>
+          </>
+        }
+        submitButtonText="Close"
+        cancelButtonText="Cancel"
+        onSubmit={() => setShowViewModal(false)}
+        onCancel={() => setShowViewModal(false)}
+      
+      />
+
+
+
+
+
+
 
       {/* Delete Confirmation Modal */}
       <Modal show={showDeleteModal} onHide={() => setShowDeleteModal(false)}>
@@ -2187,19 +2071,14 @@ const CrmDataManagement = () => {
         </Modal.Footer>
       </Modal>
 
-      {/* Data Assignment Modal */}
-      <Modal
+      {/* Data Assignment Success Modal */}
+      <FormModal
         show={showDataAssignmentModal}
         onHide={handleDataAssignmentModalClose}
-        size="lg"
-      >
-        <Modal.Header closeButton>
-          <Modal.Title className="d-flex align-items-center">
-            <FiUsers className="me-2" />
-            Smart Data Distribution
-          </Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
+        title=" Smart Data Distribution"
+        desc="Please fill the details below to smart data distribution."
+        formHtml={
+          <>
           <div className="mb-4">
             <div className="d-flex align-items-center mb-3">
               <FiFilter className="me-2 text-primary" />
@@ -2278,7 +2157,8 @@ const CrmDataManagement = () => {
             <p className="text-muted small mb-3">
               Based on your filters, here's what's available for assignment.
             </p>
-            <div className="row">
+
+            {/* <div className="row">
               <div className="col-md-4">
                 <div className="card bg-light border-primary">
                   <div className="card-body text-center">
@@ -2308,7 +2188,39 @@ const CrmDataManagement = () => {
                   </div>
                 </div>
               </div>
-            </div>
+            </div> */}
+
+            <Row>
+              <Col md={12} className="text-left">
+              <PageSummaryGrid
+              gridColumns={3}
+              cardHeading="h5"
+              gridTextAlign="center"
+              cards={[
+                {
+                  id: 'total-entries',
+                  title: 'Total Entries',
+                  value: assignmentCounts?.total || 0,
+                  description: 'Matching your filters'
+                },
+                {
+                  id: 'assigned-entries',
+                  title: 'Assigned Entries',
+                  value: assignmentCounts?.assigned || 0,
+                  description: 'In use by team members'
+                },
+                {
+                  id: 'available-entries',
+                  title: 'Available Entries',
+                  value: assignmentCounts?.unassigned || 0,
+                  description: 'Ready for assignment'
+                }
+              ]}
+            />
+              </Col>
+            </Row>
+
+
           </div>
 
           <div className="mb-4">
@@ -2487,44 +2399,21 @@ const CrmDataManagement = () => {
               equally among users in each campaign.
             </Alert>
           </div>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={handleDataAssignmentModalClose}>
-            Cancel
-          </Button>
-          <Button
-            variant="success"
-            disabled={
-              totalEntriesToAssign === 0 ||
-              assignmentCampaign.length === 0 ||
-              (assignmentDistribution === "custom" &&
-                totalEntriesToAssign -
-                  Object.values(customDistribution).reduce(
-                    (sum, count) => sum + count,
-                    0
-                  ) !==
-                  0)
-            }
-            onClick={handleDataAssignmentSubmit}
-          >
-            Assign Entries
-          </Button>
-        </Modal.Footer>
-      </Modal>
+          </>
+        }
+        submitButtonText="OK"
+        cancelButtonText="Cancel"
+        onSubmit={handleDataAssignmentSubmit}
+        onCancel={handleDataAssignmentModalClose}
+      />
 
-      {/* After Call Modal */}
-      <Modal
+      <FormModal
         show={showAfterCallModal}
-        onHide={handleAfterCallModalClose}
-        size="lg"
-      >
-        <Modal.Header closeButton>
-          <Modal.Title className="d-flex align-items-center">
-            <FiPhone className="me-2" />
-            After Call Dialog
-          </Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
+        onHide={() => setShowAfterCallModal(false)}
+        title="After Call Dialog"
+        desc="Please fill the details below to record call outcomes and schedule follow-up actions."
+        formHtml={
+          <>
           <Row>
             <Col md={6}>
               <Form.Group className="mb-3">
@@ -2664,30 +2553,21 @@ const CrmDataManagement = () => {
             outcomes and schedule follow-up actions. All fields marked with *
             are required.
           </Alert>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={handleAfterCallModalClose}>
-            Cancel
-          </Button>
-          <Button variant="primary" onClick={handleAfterCallSubmit}>
-            Save Call Data
-          </Button>
-        </Modal.Footer>
-      </Modal>
+          </>
+        }
+        submitButtonText="Save Call Data"
+        cancelButtonText="Cancel"
+        onSubmit={() => handleAfterCallSubmit()}
+        onCancel={() => setShowAfterCallModal(false)}
+      />
 
-      {/* Schedule Call Modal */}
-      <Modal
+      <FormModal
         show={showScheduleModal}
-        onHide={handleScheduleModalClose}
-        size="lg"
-      >
-        <Modal.Header closeButton>
-          <Modal.Title className="d-flex align-items-center">
-            <FiCalendar className="me-2" />
-            Schedule Call
-          </Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
+        onHide={() => setShowScheduleModal(false)}
+        title="Schedule Call"
+        desc="Please fill the details below to schedule a call."
+        formHtml={
+          <>
           {selectedEntryForSchedule && (
             <div className="mb-3">
               <h6>Schedule Call For:</h6>
@@ -2753,31 +2633,28 @@ const CrmDataManagement = () => {
             <strong>Note:</strong> The call will be scheduled and you'll receive
             a reminder at the selected time.
           </Alert>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={handleScheduleModalClose}>
-            Cancel
-          </Button>
-          <Button variant="primary" onClick={handleScheduleSubmit}>
-            Schedule Call
-          </Button>
-        </Modal.Footer>
-      </Modal>
+          </>
+        }
+        submitButtonText="Schedule Call"
+        cancelButtonText="Cancel"
+        onSubmit={() => handleScheduleSubmit()}
+        onCancel={() => handleScheduleModalClose()}
+      />
 
-      {/* View History Modal */}
-      <Modal
+
+
+
+
+      
+
+      <FormModal
         show={showHistoryModal}
         onHide={() => setShowHistoryModal(false)}
-        size="xl"
-      >
-        <Modal.Header closeButton>
-          <Modal.Title className="d-flex align-items-center">
-            <FiClock className="me-2" />
-            Activity History
-          </Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <div className="mb-4">
+        title="Activity History"
+        desc="Please fill the details below to view the activity history."
+        formHtml={
+          <>
+           <div className="mb-4">
             <div className="d-flex justify-content-between align-items-center">
               <div>
                 <h5 className="mb-1">System Activity Log</h5>
@@ -2812,7 +2689,7 @@ const CrmDataManagement = () => {
               </p>
             </div>
           ) : (
-            <div className="timeline">
+            <div className="timeline ">
               {historyData.map((activity, index) => {
                 const getActivityIcon = (action: string) => {
                   switch (action) {
@@ -2978,7 +2855,7 @@ const CrmDataManagement = () => {
                 };
 
                 return (
-                  <div key={activity.id} className="timeline-item mb-4">
+                  <div key={activity.id} className="timeline-item mb-4 ">
                     <div className="d-flex">
                       <div className="timeline-marker me-3">
                         <div
@@ -3076,16 +2953,17 @@ const CrmDataManagement = () => {
                 </div>
               </div>
             )}
-        </Modal.Body>
-        <Modal.Footer>
-          <Button
-            variant="secondary"
-            onClick={() => setShowHistoryModal(false)}
-          >
-            Close
-          </Button>
-        </Modal.Footer>
-      </Modal>
+          </>
+        }
+        submitButtonText="Close"
+        cancelButtonText="Cancel"
+        onSubmit={() => setShowHistoryModal(false)}
+        onCancel={() => setShowHistoryModal(false)}
+      />
+
+
+
+
 
       {/* Bulk Delete Modal */}
       <Modal
@@ -3122,6 +3000,14 @@ const CrmDataManagement = () => {
       </Modal>
     </React.Fragment>
   );
+
+
+  <SuccessfulModal
+          show={showSuccessfulModal}
+          onHide={() => setShowSuccessfulModal(false)}
+          title={successModalTitle}
+          description={successModalDescription}
+        />
 };
 
 CrmDataManagement.getLayout = (page: ReactElement) => {

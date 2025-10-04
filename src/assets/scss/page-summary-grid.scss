@@ -7,6 +7,41 @@
       gap: 25px;
       margin-bottom: 30px;
   }
+
+  /* Grid column options */
+  .dashboard-grid.grid-2-columns {
+      grid-template-columns: repeat(2, 1fr);
+  }
+
+  .dashboard-grid.grid-3-columns {
+      grid-template-columns: repeat(3, 1fr);
+  }
+
+  .dashboard-grid.grid-4-columns {
+      grid-template-columns: repeat(4, 1fr);
+  }
+
+  /* Responsive adjustments for grid columns */
+  @media (max-width: 1200px) {
+      .dashboard-grid.grid-4-columns {
+          grid-template-columns: repeat(3, 1fr);
+      }
+  }
+
+  @media (max-width: 900px) {
+      .dashboard-grid.grid-3-columns,
+      .dashboard-grid.grid-4-columns {
+          grid-template-columns: repeat(2, 1fr);
+      }
+  }
+
+  @media (max-width: 600px) {
+      .dashboard-grid.grid-2-columns,
+      .dashboard-grid.grid-3-columns,
+      .dashboard-grid.grid-4-columns {
+          grid-template-columns: 1fr;
+      }
+  }
   .dashboard-card {
       background-color: white;//var(--input-bg);
       padding: 25px;

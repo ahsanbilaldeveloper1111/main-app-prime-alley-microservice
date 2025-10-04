@@ -7,8 +7,17 @@ import CrmFilters from "@components/filters/CrmFilters";
 import { getOpportunities, deleteOpportunity, markLeadLost, getLostReasons } from "@utils/crm";
 import { GetHierarchyData } from "@utils/users";
 import { Column } from "@components/CustomDataTable";
-import { Button, Modal, Row, Col, Badge, Dropdown, Form } from "react-bootstrap";
+import { Button, Modal, Row, Col, Badge, Form } from "react-bootstrap";
 import { toast } from "react-toastify";
+import "@assets/scss/common.scss";
+import "@assets/scss/tabs.scss";
+import PageHeader from "@components/PageHeader";
+import FormModal from "../../partial/FormModal";
+import ConfirmModal from "@pages/partial/ConfirmModal";
+import SuccessfulModal from "@pages/partial/SuccessfulModal";
+import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
+import DatatableActionButton from "@components/DatatableActionButton";
+
 
 
 import {
@@ -16,7 +25,6 @@ import {
   FiPlus,
   FiEdit,
   FiTrash2,
-  FiEye,
   FiXCircle,
 } from "react-icons/fi";
 import Link from "next/link";
@@ -101,7 +109,7 @@ const CrmOpportunities = () => {
         sortable: true,
         cell: (props: any) => (
           <div>
-            <div className="fw-medium">{props.name || "Unnamed Lead"}</div>
+            <div className="fw-medium text-capitalize">{props.name || "Unnamed Lead"}</div>
             <small className="text-muted">
               {props.description || "No Description"}
             </small>
@@ -114,9 +122,7 @@ const CrmOpportunities = () => {
         selector: (row: any) => row.company_name,
         sortable: true,
         cell: (props: any) => (
-          <div>
-              <div>{props.company_name || "No Company"}</div>
-          </div>
+          <span className={`status-badge primary ${props.company_name ? "primary" : "info"}`}>{props.company_name || "No Company"}</span>
         ),
       },
       {
@@ -125,7 +131,7 @@ const CrmOpportunities = () => {
         selector: (row: any) => row.stage?.name || "New",
         sortable: true,
         cell: (props: any) => (
-          <Badge bg="secondary">{props.stage?.name || "New"}</Badge>
+          <span className="status-badge primary">{props.stage?.name || "New"}</span>
         ),
       },
       {
@@ -153,9 +159,9 @@ const CrmOpportunities = () => {
           }
 
           return (
-            <Badge bg={status === "new" ? "primary" : "info"}>
+            <span className={`status-badge ${status === "new" ? "primary" : "info"}`}>
               {status.charAt(0).toUpperCase() + status.slice(1)}
-            </Badge>
+            </span>
           );
         },
       },
@@ -178,32 +184,26 @@ const CrmOpportunities = () => {
         selector: (row: any) => row.id,
         sortable: false,
         cell: (props: any) => (
-          <Dropdown>
-            <Dropdown.Toggle variant="outline-secondary" size="sm">
-              Actions
-            </Dropdown.Toggle>
-            <Dropdown.Menu>
-              
-              <Dropdown.Item href={`/crm/leads/${props.id}/edit`}>
-                <FiEdit className="me-2" />
-                Edit
-              </Dropdown.Item>
-              {!props.is_lost && (
-                <Dropdown.Item onClick={() => handleMarkLost(props)}>
-                  <FiXCircle className="me-2" />
-                  Mark as Lost
-                </Dropdown.Item>
-              )}
-              <Dropdown.Divider />
-              <Dropdown.Item
-                onClick={() => handleDeleteOpportunity(props)}
-                className="text-danger"
-              >
-                <FiTrash2 className="me-2" />
-                Delete
-              </Dropdown.Item>
-            </Dropdown.Menu>
-          </Dropdown>
+          <DatatableActionButton
+            actions={[
+              {
+                label: 'Edit',
+                icon: <FiEdit className="me-2" />,
+                onClick: () => window.location.href = `/crm/leads/${props.id}/edit`,
+              },
+              ...(!props.is_lost ? [{
+                label: 'Mark as Lost',
+                icon: <FiXCircle className="me-2" />,
+                onClick: () => handleMarkLost(props),
+              }] : []),
+              {
+                label: 'Delete',
+                icon: <FiTrash2 className="me-2" />,
+                onClick: () => handleDeleteOpportunity(props),
+                className: 'text-danger',
+              },
+            ]}
+          />
         ),
       },
     ],
@@ -215,8 +215,13 @@ const CrmOpportunities = () => {
       const params: any = {
         page,
         perPage,
-        search,
       };
+
+      // Use search from filters if available, otherwise use the search parameter
+      const searchTerm = memoizedFilters.search || search;
+      if (searchTerm) {
+        params.search = searchTerm;
+      }
 
       // Add filter parameters at top level
       if (memoizedFilters.stage_id) {
@@ -265,52 +270,34 @@ const CrmOpportunities = () => {
         subTitle="Opportunities"
       />
 
-      <Row className="mb-3">
-        <Col md={12}>
-          <div className="page-header-title">
-            <h2 className="mb-0 d-flex align-items-center">
-              <FiTarget className="me-2" />
-              Opportunities Management
-            </h2>
-            <p className="text-muted mb-0">
-              Track your sales opportunities and manage your pipeline
-            </p>
-          </div>
-        </Col>
-      </Row>
-
-      <Row className="mb-3">
-        <Col md={12}>
-          <div className="d-flex justify-content-between align-items-center">
-            <div>
-              <Button
-                variant="success"
-                href="/crm/leads/create?type=opportunity"
-                className="d-flex align-items-center"
-              >
-                <FiPlus className="me-2" />
-                New Opportunity
-              </Button>
-            </div>
-          </div>
-        </Col>
-      </Row>
-
-      {/* CRM Filters */}
-      <div className="row mb-3">
-        <div className="col-12">
-          <CrmFilters onFiltersChange={setCurrentFilters} />
-        </div>
-      </div>
+       <PageHeader
+         title="Opportunities"
+         filters={
+           <CrmFilters onFiltersChange={setCurrentFilters} />
+         }
+         showSearch={true}
+         searchPlaceholder="Search opportunities..."
+         searchValue={currentFilters?.search || ""}
+         onSearchChange={(value) => setCurrentFilters({...currentFilters, search: value})}
+         buttons={
+           <Link href="/crm/leads/create?type=opportunity" className="btn btn-primary">
+             <FiPlus className="me-2" />
+             New Opportunity
+           </Link>
+         }
+         leftGrid={3}
+         rightGrid={9}
+       />
 
       <GenericListPage
         columns={columns}
         fetchData={fetchOpportunities}
         title="Opportunities"
-        searchPlaceholder="Search opportunities..."
         defaultPageSize={15}
         filters={memoizedFilters}
         refreshKey={refreshKey}
+        search={false}
+        tableStyle="table-style-2"
       />
 
       {/* Delete Confirmation Modal */}
@@ -393,6 +380,9 @@ const CrmOpportunities = () => {
           </Button>
         </Modal.Footer>
       </Modal>
+
+
+      
     </React.Fragment>
   );
 };

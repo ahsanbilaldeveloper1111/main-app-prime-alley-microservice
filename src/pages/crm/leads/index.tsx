@@ -42,6 +42,16 @@ import {
 import Link from "next/link";
 import { toast } from "react-toastify";
 
+import "@assets/scss/common.scss";
+import "@assets/scss/tabs.scss";
+import PageHeader from "@components/PageHeader";
+import FormModal from "../../partial/FormModal";
+import ConfirmModal from "@pages/partial/ConfirmModal";
+import SuccessfulModal from "@pages/partial/SuccessfulModal";
+import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
+import DatatableActionButton from "@components/DatatableActionButton";
+
+
 const CrmLeads = () => {
   const [stages, setStages] = useState<any[]>([]);
   const [lostReasons, setLostReasons] = useState<
@@ -100,8 +110,10 @@ const CrmLeads = () => {
         per_page: perPage,
       };
 
-      if (search) {
-        params.search = search;
+      // Use search from filters if available, otherwise use the search parameter
+      const searchTerm = currentFilters.search || search;
+      if (searchTerm) {
+        params.search = searchTerm;
       }
 
       // Add filter parameters at top level
@@ -163,7 +175,11 @@ const CrmLeads = () => {
       setShowDeleteModal(false);
       setLeadToDelete(null);
       // Refresh the list
-      window.location.reload();
+      setShowSuccessfulModal(true);
+      setSuccessModalTitle("Lead Deleted");
+      setSuccessModalDescription("Lead has been deleted successfully");
+      //window.location.reload();
+      setRefreshKey((oldKey) => oldKey + 1);
     } catch (error) {
       console.error("Failed to delete lead:", error);
     }
@@ -225,6 +241,11 @@ const CrmLeads = () => {
     setShowMarkLostModal(true);
   }, []);
 
+
+  const [showSuccessfulModal, setShowSuccessfulModal] = useState(false);
+  const [successModalTitle, setSuccessModalTitle] = useState('');
+  const [successModalDescription, setSuccessModalDescription] = useState('');
+
   const handleMarkLostSubmit = useCallback(async () => {
     if (!leadToMarkLost || !lostReasonId) return;
 
@@ -238,8 +259,12 @@ const CrmLeads = () => {
       setLostReasonId(null);
       setLostFeedback("");
       toast.success("Lead marked as lost!");
+      setShowSuccessfulModal(true);
+      setSuccessModalTitle("Lead Marked as Lost");
+      setSuccessModalDescription("Lead has been marked as lost successfully");
       // Refresh the list
-      window.location.reload();
+      //window.location.reload();
+      setRefreshKey((oldKey) => oldKey + 1);
     } catch (error) {
       console.error("Failed to mark lead as lost:", error);
     }
@@ -279,7 +304,7 @@ const CrmLeads = () => {
         selector: (row: any) => row.stage?.name || "New",
         sortable: true,
         cell: (props: any) => (
-          <Badge bg="secondary">{props.stage?.name || "New"}</Badge>
+          <span className="status-badge text-capitalize primary">{props.stage?.name || "New"}</span>
         ),
       },
       {
@@ -294,7 +319,7 @@ const CrmLeads = () => {
           if (isLost) {
             return (
               <div>
-                <Badge bg="danger">Lost</Badge>
+                <span className="status-badge text-capitalize danger">Lost</span>
                 {props.lost_reason && (
                   <div className="mt-1">
                     <small className="text-muted">
@@ -307,9 +332,9 @@ const CrmLeads = () => {
           }
 
           return (
-            <Badge bg={status === "new" ? "primary" : "info"}>
+            <span className={`status-badge text-capitalize ${status === "new" ? "primary" : "info"}`}>
               {status.charAt(0).toUpperCase() + status.slice(1)}
-            </Badge>
+            </span>
           );
         },
       },
@@ -332,37 +357,31 @@ const CrmLeads = () => {
         selector: (row: any) => row.id,
         sortable: false,
         cell: (props: any) => (
-          <Dropdown>
-            <Dropdown.Toggle variant="outline-secondary" size="sm">
-              Actions
-            </Dropdown.Toggle>
-            <Dropdown.Menu>
-              <Dropdown.Item href={`/crm/leads/${props.id}/edit`}>
-                <FiEdit className="me-2" />
-                Edit
-              </Dropdown.Item>
-              {!props.is_lost && !props.is_opportunity && (
-                <Dropdown.Item onClick={() => handleConvertLead(props)}>
-                  <FiTarget className="me-2" />
-                  Convert to Opportunity
-                </Dropdown.Item>
-              )}
-              {!props.is_lost && (
-                <Dropdown.Item onClick={() => handleMarkLost(props)}>
-                  <FiXCircle className="me-2" />
-                  Mark as Lost
-                </Dropdown.Item>
-              )}
-              <Dropdown.Divider />
-              <Dropdown.Item
-                onClick={() => handleDeleteLead(props.id)}
-                className="text-danger"
-              >
-                <FiTrash2 className="me-2" />
-                Delete
-              </Dropdown.Item>
-            </Dropdown.Menu>
-          </Dropdown>
+          <DatatableActionButton
+            actions={[
+              {
+                label: 'Edit',
+                icon: <FiEdit className="me-2" />,
+                onClick: () => window.location.href = `/crm/leads/${props.id}/edit`,
+              },
+              ...(!props.is_lost && !props.is_opportunity ? [{
+                label: 'Convert to Opportunity',
+                icon: <FiTarget className="me-2" />,
+                onClick: () => handleConvertLead(props),
+              }] : []),
+              ...(!props.is_lost ? [{
+                label: 'Mark as Lost',
+                icon: <FiXCircle className="me-2" />,
+                onClick: () => handleMarkLost(props),
+              }] : []),
+              {
+                label: 'Delete',
+                icon: <FiTrash2 className="me-2" />,
+                onClick: () => handleDeleteLead(props.id),
+                className: 'text-danger',
+              },
+            ]}
+          />
         ),
       },
     ],
@@ -377,36 +396,26 @@ const CrmLeads = () => {
         subTitle="Leads"
       />
 
-      <div className="container-fluid">
-        {/* Header */}
-        <div className="row mb-4">
-          <div className="col-12">
-            <div className="d-flex justify-content-between align-items-center">
-              <div>
-                <h1 className="h3 mb-0">Leads Management</h1>
-                <p className="text-muted">Manage and track your sales leads</p>
-              </div>
-              <div>
-                <Link href="/crm/leads/create" className="btn btn-primary">
+      <PageHeader
+        title="Leads"
+        filters={
+          <CrmFilters onFiltersChange={handleFiltersChange} />
+        }
+        showSearch={true}
+        searchValue={currentFilters.search || ""}
+        onSearchChange={(value) => handleFiltersChange({...currentFilters, search: value})}
+        searchPlaceholder="Search leads..."
+        buttons={
+          <Link href="/crm/leads/create" className="btn btn-primary">
                   <FiPlus className="me-2" />
                   New Lead
                 </Link>
-              </div>
-            </div>
-          </div>
-        </div>
+        }
+        leftGrid={3}
+        rightGrid={9}
+      />
 
-        {/* CRM Filters */}
-        <div className="row mb-3">
-          <CrmFilters onFiltersChange={handleFiltersChange} />
-        </div>
-
-        {/* Leads List */}
-        <div className="row">
-          <div className="col-12">
-            <Card className="border-0 shadow-sm">
-              <Card.Body>
-                <GenericListPage
+<GenericListPage
                   columns={columns}
                   fetchData={fetchLeads}
                   title="Leads"
@@ -414,42 +423,31 @@ const CrmLeads = () => {
                   defaultPageSize={15}
                   filters={currentFilters}
                   refreshKey={refreshKey}
+                  search={false}
+                  tableStyle="table-style-2"
                 />
-              </Card.Body>
-            </Card>
-          </div>
-        </div>
-      </div>
 
-      {/* Delete Confirmation Modal */}
-      <Modal show={showDeleteModal} onHide={() => setShowDeleteModal(false)}>
-        <Modal.Header closeButton>
-          <Modal.Title>Delete Lead</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          Are you sure you want to delete this lead? This action cannot be
-          undone.
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={() => setShowDeleteModal(false)}>
-            Cancel
-          </Button>
-          <Button variant="danger" onClick={confirmDeleteLead}>
-            Delete
-          </Button>
-        </Modal.Footer>
-      </Modal>
+      <ConfirmModal
+        show={showDeleteModal}
+        onHide={() => setShowDeleteModal(false)}
+        title="Delete Lead"
+        description="Are you sure you want to delete this lead?"
+        onConfirm={() => confirmDeleteLead()}
+        targetName=""
+        confirmButtonText="Delete"
+        confirmButtonVariant="danger"
+        cancelButtonVariant="secondary"
+        onCancel={() => setShowDeleteModal(false)}
+      />
 
       {/* Convert Lead Modal */}
-      <Modal
+      <FormModal
         show={showConvertModal}
         onHide={() => setShowConvertModal(false)}
-        size="lg"
-      >
-        <Modal.Header closeButton>
-          <Modal.Title>Convert Lead to Opportunity</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
+        title="Convert lead to opportunity"
+        desc="Please fill in the details below to convert the lead to an opportunity."
+        formHtml={
+          <>
           <Form>
             <Row>
               <Col md={6}>
@@ -534,29 +532,25 @@ const CrmLeads = () => {
               />
             </Form.Group>
           </Form>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button
-            variant="secondary"
-            onClick={() => setShowConvertModal(false)}
-          >
-            Cancel
-          </Button>
-          <Button variant="success" onClick={handleConvertSubmit}>
-            Convert to Opportunity
-          </Button>
-        </Modal.Footer>
-      </Modal>
+          </>
+        }
+        onSubmit={handleConvertSubmit}
+        onCancel={() => setShowConvertModal(false)}
+        submitButtonText="Convert to Opportunity"
+        cancelButtonText="Cancel"
+      />
 
-      {/* Mark Lead Lost Modal */}
-      <Modal
+
+
+
+
+      <FormModal
         show={showMarkLostModal}
         onHide={() => setShowMarkLostModal(false)}
-      >
-        <Modal.Header closeButton>
-          <Modal.Title>Mark Lead as Lost</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
+        title="Mark lead as lost"
+        desc="Please fill in the details below to mark the lead as lost."
+        formHtml={
+          <>
           <Form.Group className="mb-3">
             <Form.Label>Lost Reason *</Form.Label>
             <Form.Select
@@ -584,19 +578,24 @@ const CrmLeads = () => {
               placeholder="Please provide additional feedback about why this lead was lost..."
             />
           </Form.Group>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button
-            variant="secondary"
-            onClick={() => setShowMarkLostModal(false)}
-          >
-            Cancel
-          </Button>
-          <Button variant="warning" onClick={handleMarkLostSubmit}>
-            Mark as Lost
-          </Button>
-        </Modal.Footer>
-      </Modal>
+          </>
+        }
+        onSubmit={handleMarkLostSubmit}
+        onCancel={() => setShowMarkLostModal(false)}
+        submitButtonText="Mark as Lost"
+        cancelButtonText="Cancel"
+      />
+
+
+      <SuccessfulModal
+          show={showSuccessfulModal}
+          onHide={() => setShowSuccessfulModal(false)}
+          title={successModalTitle}
+          description={successModalDescription}
+        />
+		
+
+
     </React.Fragment>
   );
 };

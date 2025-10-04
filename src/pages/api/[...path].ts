@@ -29,7 +29,7 @@ const parseFormData = async (req: NextApiRequest) => {
     if (fileArray && Array.isArray(fileArray) && fileArray.length > 0) {
       const file = fileArray[0];
       if (file.filepath && file.mimetype) {
-        console.log(`Processing file: ${key}, MIME: ${file.mimetype}, Size: ${file.size}`);
+        //console.log(`Processing file: ${key}, MIME: ${file.mimetype}, Size: ${file.size}`);
         
         // Read file buffer and append with proper MIME type
         const fileBuffer = await fs.readFile(file.filepath);
@@ -43,7 +43,7 @@ const parseFormData = async (req: NextApiRequest) => {
         // Clean up temporary file
         await fs.unlink(file.filepath);
         
-        console.log(`File ${key} added with MIME type: ${file.mimetype}`);
+        //console.log(`File ${key} added with MIME type: ${file.mimetype}`);
       }
     }
   }
@@ -129,18 +129,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (isFormData) {
       // For FormData requests, preserve the original Content-Type header with boundary
       headers['Content-Type'] = contentType;
-      console.log('=== FORMDATA DEBUG ===');
-      console.log('Original Content-Type:', contentType);
-      console.log('Target URL:', targetUrl);
-      console.log('Request method:', req.method);
+      // console.log('=== FORMDATA DEBUG ===');
+      // console.log('Original Content-Type:', contentType);
+      // console.log('Target URL:', targetUrl);
+      // console.log('Request method:', req.method);
       
       try {
         // Parse FormData manually since bodyParser is disabled for this route
         requestData = await parseFormData(req);
-        console.log('FormData parsed successfully');
-        console.log('FormData entries count:', Array.from(requestData.entries()).length);
+        // console.log('FormData parsed successfully');
+        // console.log('FormData entries count:', Array.from(requestData.entries()).length);
       } catch (parseError) {
-        console.error('Error parsing FormData:', parseError);
+       // console.error('Error parsing FormData:', parseError);
         throw new Error('Failed to parse FormData');
       }
       
@@ -191,8 +191,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       responseType: isAudioDownload ? 'arraybuffer' : (req.headers['accept']?.includes('blob') ? 'arraybuffer' : 'json'),
     });
 
-    console.log('Backend response status:', response.status);
-    console.log('Backend response headers:', response.headers);
+    // console.log('Backend response status:', response.status);
+    // console.log('Backend response headers:', response.headers);
 
     // Forward the response status
     res.status(response.status);
@@ -218,7 +218,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     } else if (typeof response.data === 'string') {
       // For text responses
-      console.log('Sending text response');
+     // console.log('Sending text response');
       res.send(response.data);
     } else {
       console.log("SENDING JSON RESPONSE");
@@ -227,19 +227,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
     
   } catch (error: any) {
-    console.error('=== PROXY ERROR ===');
-    console.error('Error type:', error.constructor.name);
-    console.error('Error message:', error.message);
-    console.error('Error code:', error.code);
-    console.error('Error response:', error.response?.data);
-    console.error('Error status:', error.response?.status);
-    console.error('==================');
+    // console.error('=== PROXY ERROR ===');
+    // console.error('Error type:', error.constructor.name);
+    // console.error('Error message:', error.message);
+    // console.error('Error code:', error.code);
+    // console.error('Error response:', error.response?.data);
+    // console.error('Error status:', error.response?.status);
+    // console.error('==================');
     
     // Handle different types of errors
     if (error.response) {
       // The request was made and the server responded with a status code
       // that falls out of the range of 2xx
-      console.log('Backend responded with error status:', error.response.status);
+     // console.log('Backend responded with error status:', error.response.status);
       res.status(error.response.status);
       
       // Handle error response data
@@ -254,7 +254,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     } else if (error.request) {
       // The request was made but no response was received
-      console.log('No response received from backend');
+     // console.log('No response received from backend');
       res.status(503);
       res.json({ 
         error: 'Service unavailable',
@@ -263,7 +263,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     } else {
       // Something happened in setting up the request that triggered an Error
-      console.log('Request setup error:', error.message);
+     // console.log('Request setup error:', error.message);
       res.status(500);
       res.json({ 
         error: 'Internal server error',

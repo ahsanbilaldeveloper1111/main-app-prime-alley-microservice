@@ -29,15 +29,18 @@ import { Button, Modal, Row, Col, Form, Alert, Spinner } from "react-bootstrap";
 import { toast } from "react-toastify";
 import { useRouter } from "next/router";
 import moment from "moment";
-
+import "@assets/scss/common.scss";
+import "@assets/scss/tabs.scss";
 import PageHeader from "@components/PageHeader";
-import '@assets/scss/common.scss';
-import '@assets/scss/tabs.scss'
-import PageSummaryGrid from "@components/PageSummaryGrid";
-import FormModal from '../../../partial/FormModal';
+import FormModal from "@pages/partial/FormModal";
 import ConfirmModal from "@pages/partial/ConfirmModal";
 import SuccessfulModal from "@pages/partial/SuccessfulModal";
-import { FiEdit, FiTrash2 } from "react-icons/fi";
+import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
+import DatatableActionButton from "@components/DatatableActionButton";
+import { FiEdit, FiTrash2, FiEye,FiPlus } from "react-icons/fi";
+
+
+
 import TableAction from "@components/TableAction";
 
 const CompanyProductPricing = () => {
@@ -81,6 +84,16 @@ const CompanyProductPricing = () => {
   const [products, setProducts] = useState<ProductData[]>([]);
   const [isLoadingProducts, setIsLoadingProducts] = useState<boolean>(false);
 
+  interface TableFilters {
+    product_pricing_search?: string;
+    discount_applicability_search?: string;
+  }
+
+  const [currentFilters, setCurrentFilters] = useState<TableFilters>({
+    product_pricing_search: "",
+    discount_applicability_search: "",
+  });
+
   // Load products on component mount
   useEffect(() => {
     const loadProducts = async () => {
@@ -102,15 +115,15 @@ const CompanyProductPricing = () => {
   // Table columns
   const columns: Column[] = useMemo(
     () => [
-      {
-        key: "id",
-        name: "ID",
-        selector: (row: any) => row.id,
-        sortable: true,
-        cell: (props: any) => (
-          <span className="fw-bold text-primary">#{props.id}</span>
-        ),
-      },
+      // {
+      //   key: "id",
+      //   name: "ID",
+      //   selector: (row: any) => row.id,
+      //   sortable: true,
+      //   cell: (props: any) => (
+      //     <span>{props.id}</span>
+      //   ),
+      // },
       {
         key: "product_name",
         name: "Product",
@@ -118,7 +131,7 @@ const CompanyProductPricing = () => {
         sortable: true,
         cell: (props: any) => (
           <div>
-            <div className="fw-bold">{props.product?.name || "N/A"}</div>
+            <div className="">{props.product?.name || "N/A"}</div>
             <small className="text-muted">{props.product?.category?.name || "N/A"}</small>
           </div>
         ),
@@ -129,7 +142,7 @@ const CompanyProductPricing = () => {
         selector: (row: any) => row.product?.base_price,
         sortable: true,
         cell: (props: any) => (
-          <span className="text-muted">
+          <span >
             {props.product?.currency_code} {props.product?.base_price || "0.00"}
           </span>
         ),
@@ -140,7 +153,7 @@ const CompanyProductPricing = () => {
         selector: (row: any) => row.selling_price,
         sortable: true,
         cell: (props: any) => (
-          <span className="fw-bold text-success">
+          <span >
             {props.product?.currency_code} {props.selling_price || "0.00"}
           </span>
         ),
@@ -174,21 +187,21 @@ const CompanyProductPricing = () => {
         sortable: false,
         cell: (props: any) => (
           <>
-          <TableAction
+          <DatatableActionButton
                     actions={[
                         {
                             label: 'Edit',
-                            icon: FiEdit,
+                            icon: <FiEdit />,
                             onClick: () => handleEditPricing(props),
                            // permission: 'edit-companies',
-                            variant: 'edit'
+                            className: 'gap-2'
                         },
                         {
                             label: 'Delete',
-                            icon: FiTrash2,
+                            icon: <FiTrash2 />,
                             onClick: () => handleDeletePricing(props),
                             //permission: 'delete-companies',
-                            variant: 'delete'
+                            className: 'text-danger gap-2'
                         },
                     ]}
                     
@@ -206,22 +219,22 @@ const CompanyProductPricing = () => {
   // Discount applicability columns
   const discountColumns: Column[] = useMemo(
     () => [
-      {
-        key: "id",
-        name: "ID",
-        selector: (row: any) => row.id,
-        sortable: true,
-        cell: (props: any) => (
-          <span className="fw-bold text-primary">#{props.id}</span>
-        ),
-      },
+      // {
+      //   key: "id",
+      //   name: "ID",
+      //   selector: (row: any) => row.id,
+      //   sortable: true,
+      //   cell: (props: any) => (
+      //     <span className="fw-bold text-primary">#{props.id}</span>
+      //   ),
+      // },
       {
         key: "name",
         name: "Name",
         selector: (row: any) => row.name,
         sortable: true,
         cell: (props: any) => (
-          <div className="fw-bold">{props.name}</div>
+          <div>{props.name}</div>
         ),
       },
       {
@@ -250,7 +263,7 @@ const CompanyProductPricing = () => {
         selector: (row: any) => row.discount_percentage || row.discount_amount,
         sortable: true,
         cell: (props: any) => (
-          <span className="fw-bold text-success">
+          <span >
             {props.discount_type === 'percentage' 
               ? `${props.discount_percentage}%` 
               : `$${props.discount_amount || '0.00'}`}
@@ -297,21 +310,21 @@ const CompanyProductPricing = () => {
         sortable: false,
         cell: (props: any) => (
           <>  
-          <TableAction
+          <DatatableActionButton
                     actions={[
                         {
                             label: 'Edit',
-                            icon: FiEdit,
+                            icon: <FiEdit />,
                             onClick: () => handleEditDiscount(props),
                             //permission: 'edit-companies',
-                            variant: 'edit'
+                            className: 'gap-2'
                         },
                         {
                             label: 'Delete',
-                            icon: FiTrash2,
+                            icon: <FiTrash2 />,
                             onClick: () => handleDeleteDiscount(props),
                             //permission: 'delete-companies',
-                            variant: 'delete'
+                            className: 'text-danger gap-2'
                         },
                     ]}
                 />
@@ -331,10 +344,10 @@ const CompanyProductPricing = () => {
       return await getProductPricingList(Number(companyId), {
         page,
         per_page: perPage,
-        search,
+        search: currentFilters.product_pricing_search,
       });
     },
-    [companyId]
+    [companyId, currentFilters.product_pricing_search]
   );
 
   // Fetch discount applicability function
@@ -345,10 +358,10 @@ const CompanyProductPricing = () => {
       return await getDiscountApplicabilityList(Number(companyId), {
         page,
         per_page: perPage,
-        search,
+        search: currentFilters.discount_applicability_search,
       });
     },
-    [companyId]
+    [companyId, currentFilters.discount_applicability_search]
   );
 
   // Reset form data
@@ -679,11 +692,6 @@ const CompanyProductPricing = () => {
     }));
   }, []);
 
-  interface TableFilters {
-    search?: string;
-  }
-
-  const [currentFilters, setCurrentFilters] = useState<TableFilters>({});
   const handleFiltersChange = useCallback((filters: TableFilters) => {
     setCurrentFilters(filters);
   }, []);
@@ -747,8 +755,8 @@ const CompanyProductPricing = () => {
         title="Product Pricing"
         showSearch={true}
         searchPlaceholder="Search product pricing..."
-        searchValue={currentFilters.search || ""}
-        onSearchChange={(value) => handleFiltersChange({...currentFilters, search: value})}
+        searchValue={currentFilters.product_pricing_search || ""}
+        onSearchChange={(value) => handleFiltersChange({...currentFilters, product_pricing_search: value})}
         buttons={
           <Button variant="primary" size="sm" onClick={openCreateModal}>Add Product Pricing</Button>
         }
@@ -761,7 +769,7 @@ const CompanyProductPricing = () => {
             searchPlaceholder="Search product pricing..."
             defaultPageSize={15}
             refreshKey={refreshKey}
-            search={false}
+            search={true}
             filters={filters}
             tableStyle="table-style-2"
 
@@ -774,8 +782,8 @@ const CompanyProductPricing = () => {
             title="Discount Applicability"
             showSearch={true}
             searchPlaceholder="Search discount applicability..."
-            searchValue={currentFilters.search || ""}
-            onSearchChange={(value) => handleFiltersChange({...currentFilters, search: value})}
+            searchValue={currentFilters.discount_applicability_search || ""}
+            onSearchChange={(value) => handleFiltersChange({...currentFilters, discount_applicability_search: value})}
             buttons={
               <Button variant="primary" size="sm" onClick={openCreateDiscountModal}>Add Discount Applicability</Button>
             }
@@ -796,536 +804,501 @@ const CompanyProductPricing = () => {
       </div>
 
       {/* Create Modal */}
-      <Modal show={showCreateModal} onHide={closeCreateModal} size="lg">
-        <Modal.Header closeButton>
-          <Modal.Title>Add Product Pricing</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <div className="row">
-            <div className="col-md-6">
-              <div className="form-group mb-3">
-                <label htmlFor="createProductId">Product *</label>
-                <select
-                  className="form-control"
-                  id="createProductId"
-                  value={formData.product_id}
-                  onChange={(e) => handleInputChange("product_id", e.target.value)}
-                  disabled={isLoadingProducts}
-                >
-                  <option value="">Select Product</option>
-                  {products.map((product) => (
-                    <option key={product.id} value={product.id.toString()}>
-                      {product.name} - {product.currency_code} {product.base_price}
-                    </option>
-                  ))}
-                </select>
-                {isLoadingProducts && (
-                  <div className="mt-2">
-                    <Spinner animation="border" size="sm" className="me-2" />
-                    <small>Loading products...</small>
-                  </div>
-                )}
+      <FormModal
+        show={showCreateModal}
+        onHide={closeCreateModal}
+        title="Add Product Pricing"
+        desc="Fill in the details below to add product pricing"
+        formHtml={
+          <>
+            <div className="row">
+              <div className="col-md-6">
+                <div className="form-group mb-3">
+                  <label htmlFor="createProductId">Product *</label>
+                  <select
+                    className="form-control"
+                    id="createProductId"
+                    value={formData.product_id}
+                    onChange={(e) => handleInputChange("product_id", e.target.value)}
+                    disabled={isLoadingProducts}
+                  >
+                    <option value="">Select Product</option>
+                    {products.map((product) => (
+                      <option key={product.id} value={product.id.toString()}>
+                        {product.name} - {product.currency_code} {product.base_price}
+                      </option>
+                    ))}
+                  </select>
+                  {isLoadingProducts && (
+                    <div className="mt-2">
+                      <Spinner animation="border" size="sm" className="me-2" />
+                      <small>Loading products...</small>
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-            <div className="col-md-6">
-              <div className="form-group mb-3">
-                <label htmlFor="createSellingPrice">Selling Price *</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  className="form-control"
-                  id="createSellingPrice"
-                  value={formData.selling_price}
-                  onChange={(e) => handleInputChange("selling_price", e.target.value)}
-                  placeholder="0.00"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className="row">
-            <div className="col-md-6">
-              <div className="form-group mb-3">
-                <div className="form-check">
+              <div className="col-md-6">
+                <div className="form-group mb-3">
+                  <label htmlFor="createSellingPrice">Selling Price *</label>
                   <input
-                    className="form-check-input"
-                    type="checkbox"
-                    id="createIsActive"
-                    checked={formData.is_active}
-                    onChange={(e) => handleInputChange("is_active", e.target.checked)}
+                    type="number"
+                    step="0.01"
+                    className="form-control"
+                    id="createSellingPrice"
+                    value={formData.selling_price}
+                    onChange={(e) => handleInputChange("selling_price", e.target.value)}
+                    placeholder="0.00"
                   />
-                  <label className="form-check-label" htmlFor="createIsActive">
-                    Active
-                  </label>
                 </div>
               </div>
             </div>
-          </div>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={closeCreateModal}>
-            Cancel
-          </Button>
-          <Button
-            variant="primary"
-            onClick={handleCreatePricing}
-            disabled={isLoading || isLoadingProducts}
-          >
-            {isLoading ? "Creating..." : "Create Pricing"}
-          </Button>
-        </Modal.Footer>
-      </Modal>
+
+            <div className="row">
+              <div className="col-md-6">
+                <div className="form-group mb-3">
+                  <div className="form-check">
+                    <input
+                      className="form-check-input"
+                      type="checkbox"
+                      id="createIsActive"
+                      checked={formData.is_active}
+                      onChange={(e) => handleInputChange("is_active", e.target.checked)}
+                    />
+                    <label className="form-check-label" htmlFor="createIsActive">
+                      Active
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </>
+        }
+        submitButtonText={isLoading || isLoadingProducts ? "Creating..." : "Create Pricing"}
+        cancelButtonText="Cancel"
+        onSubmit={handleCreatePricing}
+        onCancel={closeCreateModal}
+        submitButtonVariant="primary"
+        cancelButtonVariant="secondary"
+        ShowSubmitButton={!isLoadingProducts}
+      />
 
       {/* Edit Modal */}
-      <Modal show={showEditModal} onHide={closeEditModal} size="lg">
-        <Modal.Header closeButton>
-          <Modal.Title>Edit Product Pricing</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <div className="row">
-            <div className="col-md-6">
-              <div className="form-group mb-3">
-                <label htmlFor="editProductId">Product *</label>
-                <select
-                  className="form-control"
-                  id="editProductId"
-                  value={formData.product_id}
-                  onChange={(e) => handleInputChange("product_id", e.target.value)}
-                  disabled={isLoadingProducts}
-                >
-                  <option value="">Select Product</option>
-                  {products.map((product) => (
-                    <option key={product.id} value={product.id.toString()}>
-                      {product.name} - {product.currency_code} {product.base_price}
-                    </option>
-                  ))}
-                </select>
-                {isLoadingProducts && (
-                  <div className="mt-2">
-                    <Spinner animation="border" size="sm" className="me-2" />
-                    <small>Loading products...</small>
-                  </div>
-                )}
+      <FormModal
+        show={showEditModal}
+        onHide={closeEditModal}
+        title="Edit Product Pricing"
+        desc="Update the product pricing details below"
+        formHtml={
+          <>
+            <div className="row">
+              <div className="col-md-6">
+                <div className="form-group mb-3">
+                  <label htmlFor="editProductId">Product *</label>
+                  <select
+                    className="form-control"
+                    id="editProductId"
+                    value={formData.product_id}
+                    onChange={(e) => handleInputChange("product_id", e.target.value)}
+                    disabled={isLoadingProducts}
+                  >
+                    <option value="">Select Product</option>
+                    {products.map((product) => (
+                      <option key={product.id} value={product.id.toString()}>
+                        {product.name} - {product.currency_code} {product.base_price}
+                      </option>
+                    ))}
+                  </select>
+                  {isLoadingProducts && (
+                    <div className="mt-2">
+                      <Spinner animation="border" size="sm" className="me-2" />
+                      <small>Loading products...</small>
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-            <div className="col-md-6">
-              <div className="form-group mb-3">
-                <label htmlFor="editSellingPrice">Selling Price *</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  className="form-control"
-                  id="editSellingPrice"
-                  value={formData.selling_price}
-                  onChange={(e) => handleInputChange("selling_price", e.target.value)}
-                  placeholder="0.00"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className="row">
-            <div className="col-md-6">
-              <div className="form-group mb-3">
-                <div className="form-check">
+              <div className="col-md-6">
+                <div className="form-group mb-3">
+                  <label htmlFor="editSellingPrice">Selling Price *</label>
                   <input
-                    className="form-check-input"
-                    type="checkbox"
-                    id="editIsActive"
-                    checked={formData.is_active}
-                    onChange={(e) => handleInputChange("is_active", e.target.checked)}
+                    type="number"
+                    step="0.01"
+                    className="form-control"
+                    id="editSellingPrice"
+                    value={formData.selling_price}
+                    onChange={(e) => handleInputChange("selling_price", e.target.value)}
+                    placeholder="0.00"
                   />
-                  <label className="form-check-label" htmlFor="editIsActive">
-                    Active
-                  </label>
                 </div>
               </div>
             </div>
-          </div>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={closeEditModal}>
-            Cancel
-          </Button>
-          <Button
-            variant="primary"
-            onClick={handleUpdatePricing}
-            disabled={isLoading || isLoadingProducts}
-          >
-            {isLoading ? "Updating..." : "Update Pricing"}
-          </Button>
-        </Modal.Footer>
-      </Modal>
+
+            <div className="row">
+              <div className="col-md-6">
+                <div className="form-group mb-3">
+                  <div className="form-check">
+                    <input
+                      className="form-check-input"
+                      type="checkbox"
+                      id="editIsActive"
+                      checked={formData.is_active}
+                      onChange={(e) => handleInputChange("is_active", e.target.checked)}
+                    />
+                    <label className="form-check-label" htmlFor="editIsActive">
+                      Active
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </>
+        }
+        submitButtonText={isLoading || isLoadingProducts ? "Updating..." : "Update Pricing"}
+        cancelButtonText="Cancel"
+        onSubmit={handleUpdatePricing}
+        onCancel={closeEditModal}
+        submitButtonVariant="primary"
+        cancelButtonVariant="secondary"
+        ShowSubmitButton={!isLoadingProducts}
+      />
 
       {/* Delete Modal */}
-      <Modal show={showDeleteModal} onHide={closeDeleteModal}>
-        <Modal.Header closeButton>
-          <Modal.Title>Delete Product Pricing</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <p>
-            Are you sure you want to delete the product pricing for{" "}
-            <strong className="text-danger">{selectedPricing?.product?.name}</strong>?
-          </p>
-          <p className="text-muted">
-            This action cannot be undone.
-          </p>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={closeDeleteModal}>
-            Cancel
-          </Button>
-          <Button
-            variant="danger"
-            onClick={handleConfirmDelete}
-            disabled={isLoading}
-          >
-            {isLoading ? "Deleting..." : "Delete Pricing"}
-          </Button>
-        </Modal.Footer>
-      </Modal>
+      <ConfirmModal
+        show={showDeleteModal}
+        onHide={closeDeleteModal}
+        title="Delete Product Pricing?"
+        description="Are you sure you want to delete product pricing for {targetName}? This action cannot be undone."
+        targetName={selectedPricing?.product?.name || ""}
+        confirmButtonText={isLoading ? "Deleting..." : "Delete Pricing"}
+        cancelButtonText="Cancel"
+        onConfirm={handleConfirmDelete}
+        onCancel={closeDeleteModal}
+        confirmButtonVariant="danger"
+        cancelButtonVariant="secondary"
+      />
 
       {/* Create Discount Modal */}
-      <Modal show={showCreateDiscountModal} onHide={closeCreateDiscountModal} size="xl">
-        <Modal.Header closeButton>
-          <Modal.Title>Add Discount Applicability</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <div className="row">
-            <div className="col-md-6">
-              <div className="form-group mb-3">
-                <label htmlFor="createDiscountName">Name *</label>
-                <input
-                  type="text"
-                  className="form-control"
-                  id="createDiscountName"
-                  value={discountFormData.name}
-                  onChange={(e) => handleDiscountInputChange("name", e.target.value)}
-                  placeholder="Enter discount name"
-                />
-              </div>
-            </div>
-            <div className="col-md-6">
-              <div className="form-group mb-3">
-                <label htmlFor="createDiscountType">Discount Type *</label>
-                <select
-                  className="form-control"
-                  id="createDiscountType"
-                  value={discountFormData.discount_type}
-                  onChange={(e) => handleDiscountInputChange("discount_type", e.target.value)}
-                >
-                  <option value="percentage">Percentage</option>
-                  <option value="fixed">Fixed Amount</option>
-                </select>
-              </div>
-            </div>
-          </div>
-
-          <div className="row">
-            <div className="col-md-12">
-              <div className="form-group mb-3">
-                <label htmlFor="createDiscountDescription">Description</label>
-                <textarea
-                  className="form-control"
-                  id="createDiscountDescription"
-                  rows={3}
-                  value={discountFormData.description}
-                  onChange={(e) => handleDiscountInputChange("description", e.target.value)}
-                  placeholder="Enter discount description"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className="row">
-            <div className="col-md-6">
-              <div className="form-group mb-3">
-                <label htmlFor="createDiscountValue">
-                  {discountFormData.discount_type === 'percentage' ? 'Discount Percentage (%)' : 'Discount Amount ($)'} *
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  className="form-control"
-                  id="createDiscountValue"
-                  value={discountFormData.discount_type === 'percentage' ? discountFormData.discount_percentage : discountFormData.discount_amount || ''}
-                  onChange={(e) => handleDiscountInputChange(
-                    discountFormData.discount_type === 'percentage' ? 'discount_percentage' : 'discount_amount',
-                    parseFloat(e.target.value) || 0
-                  )}
-                  placeholder={discountFormData.discount_type === 'percentage' ? '0.00' : '0.00'}
-                />
-              </div>
-            </div>
-            <div className="col-md-6">
-              <div className="form-group mb-3">
-                <div className="form-check mt-4">
+      <FormModal
+        show={showCreateDiscountModal}
+        onHide={closeCreateDiscountModal}
+        title="Add Discount Applicability"
+        desc="Fill in the details below to add discount applicability"
+        formHtml={
+          <>
+            <div className="row">
+              <div className="col-md-6">
+                <div className="form-group mb-3">
+                  <label htmlFor="createDiscountName">Name *</label>
                   <input
-                    className="form-check-input"
-                    type="checkbox"
-                    id="createDiscountIsApplicable"
-                    checked={discountFormData.is_applicable}
-                    onChange={(e) => handleDiscountInputChange("is_applicable", e.target.checked)}
+                    type="text"
+                    className="form-control"
+                    id="createDiscountName"
+                    value={discountFormData.name}
+                    onChange={(e) => handleDiscountInputChange("name", e.target.value)}
+                    placeholder="Enter discount name"
                   />
-                  <label className="form-check-label" htmlFor="createDiscountIsApplicable">
-                    Is Applicable
+                </div>
+              </div>
+              <div className="col-md-6">
+                <div className="form-group mb-3">
+                  <label htmlFor="createDiscountType">Discount Type *</label>
+                  <select
+                    className="form-control"
+                    id="createDiscountType"
+                    value={discountFormData.discount_type}
+                    onChange={(e) => handleDiscountInputChange("discount_type", e.target.value)}
+                  >
+                    <option value="percentage">Percentage</option>
+                    <option value="fixed">Fixed Amount</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div className="row">
+              <div className="col-md-12">
+                <div className="form-group mb-3">
+                  <label htmlFor="createDiscountDescription">Description</label>
+                  <textarea
+                    className="form-control"
+                    id="createDiscountDescription"
+                    rows={3}
+                    value={discountFormData.description}
+                    onChange={(e) => handleDiscountInputChange("description", e.target.value)}
+                    placeholder="Enter discount description"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="row">
+              <div className="col-md-6">
+                <div className="form-group mb-3">
+                  <label htmlFor="createDiscountValue">
+                    {discountFormData.discount_type === 'percentage' ? 'Discount Percentage (%)' : 'Discount Amount ($)'} *
                   </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    className="form-control"
+                    id="createDiscountValue"
+                    value={discountFormData.discount_type === 'percentage' ? discountFormData.discount_percentage : discountFormData.discount_amount || ''}
+                    onChange={(e) => handleDiscountInputChange(
+                      discountFormData.discount_type === 'percentage' ? 'discount_percentage' : 'discount_amount',
+                      parseFloat(e.target.value) || 0
+                    )}
+                    placeholder={discountFormData.discount_type === 'percentage' ? '0.00' : '0.00'}
+                  />
+                </div>
+              </div>
+              <div className="col-md-6">
+                <div className="form-group mb-3">
+                  <div className="form-check  mt-4">
+                    <input
+                      className="form-check-input"
+                      type="checkbox"
+                      id="createDiscountIsApplicable"
+                      checked={discountFormData.is_applicable}
+                      onChange={(e) => handleDiscountInputChange("is_applicable", e.target.checked)}
+                    />
+                    <label className="form-check-label" htmlFor="createDiscountIsApplicable">
+                      Is Applicable
+                    </label>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
 
-          <div className="row">
-            <div className="col-md-6">
-              <div className="form-group mb-3">
-                <label htmlFor="createDiscountValidFrom">Valid From *</label>
-                <input
-                  type="date"
-                  className="form-control"
-                  id="createDiscountValidFrom"
-                  value={discountFormData.valid_from}
-                  min={moment().format("YYYY-MM-DD")}
-                  onChange={(e) => handleDiscountInputChange("valid_from", e.target.value)}
-                />
+            <div className="row">
+              <div className="col-md-6">
+                <div className="form-group mb-3">
+                  <label htmlFor="createDiscountValidFrom">Valid From *</label>
+                  <input
+                    type="date"
+                    className="form-control"
+                    id="createDiscountValidFrom"
+                    value={discountFormData.valid_from}
+                    min={moment().format("YYYY-MM-DD")}
+                    onChange={(e) => handleDiscountInputChange("valid_from", e.target.value)}
+                  />
+                </div>
               </div>
-            </div>
-            <div className="col-md-6">
-              <div className="form-group mb-3">
-                <label htmlFor="createDiscountValidUntil">Valid Until *</label>
-                <input
-                  type="date"
-                  className="form-control"
-                  id="createDiscountValidUntil"
-                  value={discountFormData.valid_until}
-                  min={discountFormData.valid_from || moment().format("YYYY-MM-DD")}
-                  onChange={(e) => handleDiscountInputChange("valid_until", e.target.value)}
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className="row">
-            <div className="col-md-12">
-              <div className="form-group mb-3">
-                <label>Select Product Pricings *</label>
-                <div className="border rounded p-3" style={{ maxHeight: '200px', overflowY: 'auto' }}>
-                  {products.map((product) => (
-                    <div key={product.id} className="form-check">
-                      <input
-                        className="form-check-input"
-                        type="checkbox"
-                        id={`createPricing${product.id}`}
-                        checked={discountFormData.pricing_ids.includes(product.id)}
-                        onChange={(e) => handlePricingIdsChange(product.id, e.target.checked)}
-                      />
-                      <label className="form-check-label" htmlFor={`createPricing${product.id}`}>
-                        {product.name} - {product.currency_code} {product.base_price}
-                      </label>
-                    </div>
-                  ))}
+              <div className="col-md-6">
+                <div className="form-group mb-3">
+                  <label htmlFor="createDiscountValidUntil">Valid Until *</label>
+                  <input
+                    type="date"
+                    className="form-control"
+                    id="createDiscountValidUntil"
+                    value={discountFormData.valid_until}
+                    min={discountFormData.valid_from || moment().format("YYYY-MM-DD")}
+                    onChange={(e) => handleDiscountInputChange("valid_until", e.target.value)}
+                  />
                 </div>
               </div>
             </div>
-          </div>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={closeCreateDiscountModal}>
-            Cancel
-          </Button>
-          <Button
-            variant="primary"
-            onClick={handleCreateDiscount}
-            disabled={isLoading}
-          >
-            {isLoading ? "Creating..." : "Create Discount"}
-          </Button>
-        </Modal.Footer>
-      </Modal>
+
+            <div className="row">
+              <div className="col-md-12">
+                <div className="form-group mb-3">
+                  <label>Select Product Pricings *</label>
+                  <div className="border rounded p-3" style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                    {products.map((product) => (
+                      <div key={product.id} className="form-check">
+                        <input
+                          className="form-check-input"
+                          type="checkbox"
+                          id={`createPricing${product.id}`}
+                          checked={discountFormData.pricing_ids.includes(product.id)}
+                          onChange={(e) => handlePricingIdsChange(product.id, e.target.checked)}
+                        />
+                        <label className="form-check-label" htmlFor={`createPricing${product.id}`}>
+                          {product.name} - {product.currency_code} {product.base_price}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </>
+        }
+        submitButtonText={isLoading ? "Creating..." : "Create Discount"}
+        cancelButtonText="Cancel"
+        onSubmit={handleCreateDiscount}
+        onCancel={closeCreateDiscountModal}
+        submitButtonVariant="primary"
+        cancelButtonVariant="secondary"
+      />
 
       {/* Edit Discount Modal */}
-      <Modal show={showEditDiscountModal} onHide={closeEditDiscountModal} size="xl">
-        <Modal.Header closeButton>
-          <Modal.Title>Edit Discount Applicability</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <div className="row">
-            <div className="col-md-6">
-              <div className="form-group mb-3">
-                <label htmlFor="editDiscountName">Name *</label>
-                <input
-                  type="text"
-                  className="form-control"
-                  id="editDiscountName"
-                  value={discountFormData.name}
-                  onChange={(e) => handleDiscountInputChange("name", e.target.value)}
-                  placeholder="Enter discount name"
-                />
-              </div>
-            </div>
-            <div className="col-md-6">
-              <div className="form-group mb-3">
-                <label htmlFor="editDiscountType">Discount Type *</label>
-                <select
-                  className="form-control"
-                  id="editDiscountType"
-                  value={discountFormData.discount_type}
-                  onChange={(e) => handleDiscountInputChange("discount_type", e.target.value)}
-                >
-                  <option value="percentage">Percentage</option>
-                  <option value="fixed">Fixed Amount</option>
-                </select>
-              </div>
-            </div>
-          </div>
-
-          <div className="row">
-            <div className="col-md-12">
-              <div className="form-group mb-3">
-                <label htmlFor="editDiscountDescription">Description</label>
-                <textarea
-                  className="form-control"
-                  id="editDiscountDescription"
-                  rows={3}
-                  value={discountFormData.description}
-                  onChange={(e) => handleDiscountInputChange("description", e.target.value)}
-                  placeholder="Enter discount description"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className="row">
-            <div className="col-md-6">
-              <div className="form-group mb-3">
-                <label htmlFor="editDiscountValue">
-                  {discountFormData.discount_type === 'percentage' ? 'Discount Percentage (%)' : 'Discount Amount ($)'} *
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  className="form-control"
-                  id="editDiscountValue"
-                  value={discountFormData.discount_type === 'percentage' ? discountFormData.discount_percentage : discountFormData.discount_amount || ''}
-                  onChange={(e) => handleDiscountInputChange(
-                    discountFormData.discount_type === 'percentage' ? 'discount_percentage' : 'discount_amount',
-                    parseFloat(e.target.value) || 0
-                  )}
-                  placeholder={discountFormData.discount_type === 'percentage' ? '0.00' : '0.00'}
-                />
-              </div>
-            </div>
-            <div className="col-md-6">
-              <div className="form-group mb-3">
-                <div className="form-check mt-4">
+      <FormModal
+        show={showEditDiscountModal}
+        onHide={closeEditDiscountModal}
+        title="Edit Discount Applicability"
+        desc="Update the discount applicability details below"
+        formHtml={
+          <>
+            <div className="row">
+              <div className="col-md-6">
+                <div className="form-group mb-3">
+                  <label htmlFor="editDiscountName">Name *</label>
                   <input
-                    className="form-check-input"
-                    type="checkbox"
-                    id="editDiscountIsApplicable"
-                    checked={discountFormData.is_applicable}
-                    onChange={(e) => handleDiscountInputChange("is_applicable", e.target.checked)}
+                    type="text"
+                    className="form-control"
+                    id="editDiscountName"
+                    value={discountFormData.name}
+                    onChange={(e) => handleDiscountInputChange("name", e.target.value)}
+                    placeholder="Enter discount name"
                   />
-                  <label className="form-check-label" htmlFor="editDiscountIsApplicable">
-                    Is Applicable
+                </div>
+              </div>
+              <div className="col-md-6">
+                <div className="form-group mb-3">
+                  <label htmlFor="editDiscountType">Discount Type *</label>
+                  <select
+                    className="form-control"
+                    id="editDiscountType"
+                    value={discountFormData.discount_type}
+                    onChange={(e) => handleDiscountInputChange("discount_type", e.target.value)}
+                  >
+                    <option value="percentage">Percentage</option>
+                    <option value="fixed">Fixed Amount</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div className="row">
+              <div className="col-md-12">
+                <div className="form-group mb-3">
+                  <label htmlFor="editDiscountDescription">Description</label>
+                  <textarea
+                    className="form-control"
+                    id="editDiscountDescription"
+                    rows={3}
+                    value={discountFormData.description}
+                    onChange={(e) => handleDiscountInputChange("description", e.target.value)}
+                    placeholder="Enter discount description"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="row">
+              <div className="col-md-6">
+                <div className="form-group mb-3">
+                  <label htmlFor="editDiscountValue">
+                    {discountFormData.discount_type === 'percentage' ? 'Discount Percentage (%)' : 'Discount Amount ($)'} *
                   </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    className="form-control"
+                    id="editDiscountValue"
+                    value={discountFormData.discount_type === 'percentage' ? discountFormData.discount_percentage : discountFormData.discount_amount || ''}
+                    onChange={(e) => handleDiscountInputChange(
+                      discountFormData.discount_type === 'percentage' ? 'discount_percentage' : 'discount_amount',
+                      parseFloat(e.target.value) || 0
+                    )}
+                    placeholder={discountFormData.discount_type === 'percentage' ? '0.00' : '0.00'}
+                  />
+                </div>
+              </div>
+              <div className="col-md-6">
+                <div className="form-group mb-3">
+                  <div className="form-check form-switch mt-4">
+                    <input
+                      className="form-check-input"
+                      type="checkbox"
+                      role="switch"
+                      id="editDiscountIsApplicable"
+                      checked={discountFormData.is_applicable}
+                      onChange={(e) => handleDiscountInputChange("is_applicable", e.target.checked)}
+                    />
+                    <label className="form-check-label" htmlFor="editDiscountIsApplicable">
+                      Is Applicable
+                    </label>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
 
-          <div className="row">
-            <div className="col-md-6">
-              <div className="form-group mb-3">
-                <label htmlFor="editDiscountValidFrom">Valid From *</label>
-                <input
-                  type="date"
-                  className="form-control"
-                  id="editDiscountValidFrom"
-                  value={discountFormData.valid_from}
-                  min={moment().format("YYYY-MM-DD")}
-                  onChange={(e) => handleDiscountInputChange("valid_from", e.target.value)}
-                />
+            <div className="row">
+              <div className="col-md-6">
+                <div className="form-group mb-3">
+                  <label htmlFor="editDiscountValidFrom">Valid From *</label>
+                  <input
+                    type="date"
+                    className="form-control"
+                    id="editDiscountValidFrom"
+                    value={discountFormData.valid_from}
+                    min={moment().format("YYYY-MM-DD")}
+                    onChange={(e) => handleDiscountInputChange("valid_from", e.target.value)}
+                  />
+                </div>
               </div>
-            </div>
-            <div className="col-md-6">
-              <div className="form-group mb-3">
-                <label htmlFor="editDiscountValidUntil">Valid Until *</label>
-                <input
-                  type="date"
-                  className="form-control"
-                  id="editDiscountValidUntil"
-                  value={discountFormData.valid_until}
-                  min={discountFormData.valid_from || moment().format("YYYY-MM-DD")}
-                  onChange={(e) => handleDiscountInputChange("valid_until", e.target.value)}
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className="row">
-            <div className="col-md-12">
-              <div className="form-group mb-3">
-                <label>Select Product Pricings *</label>
-                <div className="border rounded p-3" style={{ maxHeight: '200px', overflowY: 'auto' }}>
-                  {products.map((product) => (
-                    <div key={product.id} className="form-check">
-                      <input
-                        className="form-check-input"
-                        type="checkbox"
-                        id={`editPricing${product.id}`}
-                        checked={discountFormData.pricing_ids.includes(product.id)}
-                        onChange={(e) => handlePricingIdsChange(product.id, e.target.checked)}
-                      />
-                      <label className="form-check-label" htmlFor={`editPricing${product.id}`}>
-                        {product.name} - {product.currency_code} {product.base_price}
-                      </label>
-                    </div>
-                  ))}
+              <div className="col-md-6">
+                <div className="form-group mb-3">
+                  <label htmlFor="editDiscountValidUntil">Valid Until *</label>
+                  <input
+                    type="date"
+                    className="form-control"
+                    id="editDiscountValidUntil"
+                    value={discountFormData.valid_until}
+                    min={discountFormData.valid_from || moment().format("YYYY-MM-DD")}
+                    onChange={(e) => handleDiscountInputChange("valid_until", e.target.value)}
+                  />
                 </div>
               </div>
             </div>
-          </div>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={closeEditDiscountModal}>
-            Cancel
-          </Button>
-          <Button
-            variant="primary"
-            onClick={handleUpdateDiscount}
-            disabled={isLoading}
-          >
-            {isLoading ? "Updating..." : "Update Discount"}
-          </Button>
-        </Modal.Footer>
-      </Modal>
+
+            <div className="row">
+              <div className="col-md-12">
+                <div className="form-group mb-3">
+                  <label>Select Product Pricings *</label>
+                  <div className="border rounded p-3" style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                    {products.map((product) => (
+                      <div key={product.id} className="form-check">
+                        <input
+                          className="form-check-input"
+                          type="checkbox"
+                          id={`editPricing${product.id}`}
+                          checked={discountFormData.pricing_ids.includes(product.id)}
+                          onChange={(e) => handlePricingIdsChange(product.id, e.target.checked)}
+                        />
+                        <label className="form-check-label" htmlFor={`editPricing${product.id}`}>
+                          {product.name} - {product.currency_code} {product.base_price}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </>
+        }
+        submitButtonText={isLoading ? "Updating..." : "Update Discount"}
+        cancelButtonText="Cancel"
+        onSubmit={handleUpdateDiscount}
+        onCancel={closeEditDiscountModal}
+        submitButtonVariant="primary"
+        cancelButtonVariant="secondary"
+      />
 
       {/* Delete Discount Modal */}
-      <Modal show={showDeleteDiscountModal} onHide={closeDeleteDiscountModal}>
-        <Modal.Header closeButton>
-          <Modal.Title>Delete Discount Applicability</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <p>
-            Are you sure you want to delete the discount applicability{" "}
-            <strong className="text-danger">{selectedDiscount?.name}</strong>?
-          </p>
-          <p className="text-muted">
-            This action cannot be undone.
-          </p>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={closeDeleteDiscountModal}>
-            Cancel
-          </Button>
-          <Button
-            variant="danger"
-            onClick={handleConfirmDeleteDiscount}
-            disabled={isLoading}
-          >
-            {isLoading ? "Deleting..." : "Delete Discount"}
-          </Button>
-        </Modal.Footer>
-      </Modal>
+      <ConfirmModal
+        show={showDeleteDiscountModal}
+        onHide={closeDeleteDiscountModal}
+        title="Delete Discount Applicability?"
+        description="Are you sure you want to delete discount applicability {targetName}? This action cannot be undone."
+        targetName={selectedDiscount?.name || ""}
+        confirmButtonText={isLoading ? "Deleting..." : "Delete Discount"}
+        cancelButtonText="Cancel"
+        onConfirm={handleConfirmDeleteDiscount}
+        onCancel={closeDeleteDiscountModal}
+        confirmButtonVariant="danger"
+        cancelButtonVariant="secondary"
+      />
     </React.Fragment>
   );
 };

@@ -12,6 +12,17 @@ import { useTokenService } from 'src/hooks/useTokenService';
 import { useSession } from 'next-auth/react';
 import moment from 'moment';
 
+import "@assets/scss/common.scss";
+import "@assets/scss/tabs.scss";
+import PageHeader from "@components/PageHeader";
+import FormModal from "../../partial/FormModal";
+import ConfirmModal from "@pages/partial/ConfirmModal";
+import SuccessfulModal from "@pages/partial/SuccessfulModal";
+import DatatableActionButton from "@components/DatatableActionButton";
+import { FiEdit, FiPlus, FiTrash2 } from "react-icons/fi";
+import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
+
+
 const TicketStatuses = () => {
     const { data:session, status } = useSession();
    
@@ -43,43 +54,36 @@ const TicketStatuses = () => {
             sortable: false,
             cell: (props: any) => (
                 
-                <div className="action-buttons-container">
-    
-                    {session?.user?.permissions?.includes('edit-ticket-status-tickets')  && (
-                        <button 
-                            className="btn btn-sm btn-outline-primary" 
-                            onClick={() => handleEditStatus(props)}
-                        >
-                            Edit
-                        </button>
-                    )}  
-
-                    {session?.user?.permissions?.includes('delete-ticket-status-tickets')   && (
-                        <button 
-                            className="btn btn-sm btn-outline-danger" 
-                            onClick={() => handleDeleteStatus(props)}
-                            disabled={props?.tickets_count > 0}
-                        >
-                            Delete
-                        </button>
-                    )}
-
-                    
-                </div>
+                <DatatableActionButton
+                    actions={[
+                        ...(session?.user?.permissions?.includes('edit-ticket-status-tickets') ? [{
+                            label: 'Edit',
+                            icon: <FiEdit />,
+                            onClick: () => handleEditStatus(props),
+                            className: 'gap-2'
+                        }] : []),
+                        ...(session?.user?.permissions?.includes('delete-ticket-status-tickets') ? [{
+                            label: props?.tickets_count > 0 ? 'Delete (In Use)' : 'Delete',
+                            icon: <FiTrash2 />,
+                            onClick: () => props?.tickets_count > 0 ? null : handleDeleteStatus(props),
+                            className: props?.tickets_count > 0 ? 'text-muted gap-2' : 'text-danger gap-2'
+                        }] : [])
+                    ]}
+                />
             ),
         },
     ], [session?.user?.permissions]);
 
     const [refreshKey, setRefreshKey] = useState<number>(0);
-    const [currentFilters, setCurrentFilters] = useState({});
+    const [currentFilters, setCurrentFilters] = useState({search: ""});
 
     const memoizedFilters = useMemo(() => currentFilters, [currentFilters]);
 
     const fetchStatuses = useCallback(async (page = 1, perPage = 15, search = "") => {
-        const response = await ListStatuses({ page, perPage, search, filters: memoizedFilters });
+        const response = await ListStatuses({ page, perPage, search:currentFilters.search || search, filters: memoizedFilters });
         console.log('Response:', response);
         return response;
-    }, [memoizedFilters]);
+    }, [memoizedFilters, currentFilters]);
 
     const handleFiltersChange = useCallback((filters: any) => {
         //console.log('Filters changed:', filters);
@@ -113,7 +117,6 @@ const TicketStatuses = () => {
     }, [selectedStatus, selectedStatusName, selectedStatusColor]);
 
     const [showDeleteModuleModal, setShowDeleteModuleModal] = useState<boolean>(false);
-    const [confirmDelete, setConfirmDelete] = useState<string>("");
 
     const handleDeleteStatus = useCallback((props: any) => {
         setSelectedStatus(props.id);
@@ -122,20 +125,14 @@ const TicketStatuses = () => {
     }, []);
 
     const handleSubmitDeleteStatus  = useCallback(async () => {
-        const confirmDeleteValue = confirmDelete.trim();
-        if(confirmDeleteValue === "DELETE"){
-            const response = await DeleteStatus(selectedStatus);
+        const response = await DeleteStatus(selectedStatus);
             if(response){
                 setSelectedStatus(null);
                 setSelectedStatusName(null);
                 setShowDeleteStatusModal(false);
-                setConfirmDelete("");
                 setRefreshKey(prev => prev + 1); // Trigger refresh
             }
-        }else{
-            toast.error('Please type the word DELETE to confirm');
-        }
-    }, [confirmDelete, selectedStatus]);
+    }, [selectedStatus]);
 
     const [showCreateStatusModal, setShowCreateStatusModal] = useState<boolean>(false);
     const [newStatusName, setNewStatusName] = useState<string>("");
@@ -162,24 +159,29 @@ const TicketStatuses = () => {
     const handleNewStatusColorChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => setNewStatusColor(e.target.value), []);
     const handleEditStatusNameChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => setSelectedStatusName(e.target.value), []);
     const handleEditStatusColorChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => setSelectedStatusColor(e.target.value), []);
-    const handleConfirmDeleteChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => setConfirmDelete(e.target.value), []);
 
     return (
         <React.Fragment>
             <BreadcrumbItem mainTitle="Tickets" mainLink="/tickets/statuses" subTitle="Ticket Status" />
-            <Row className="mb-3">
-            <Col md={12}>
-                <div className="page-header-title">
-                <h2 className="mb-0 d-flex align-items-center">
-                    Ticket Status
+            <PageHeader
+                title="Ticket Statuses"
+                showSearch={true}
+                searchPlaceholder="Search statuses..."
+                searchValue={currentFilters.search || ""}
+                onSearchChange={(value) => handleFiltersChange({...currentFilters, search: value})}
+                buttons={
+                    <>
                     {session?.user?.permissions?.includes('create-ticket-status-tickets') && (
-                        <Button variant="outline-primary" size="sm" className="ms-3" onClick={openCreateStatusModal}>New Status</Button>
+                    <Button variant="primary" size="sm" onClick={openCreateStatusModal}>
+                        <FiPlus className="me-2" />
+                        New Status
+                    </Button>
                     )}
+                    </>
                     
-                </h2>
-                </div>
-            </Col>
-            </Row>
+                }
+            />
+           
 
             {session?.user?.permissions?.includes('ticket-statuses-tickets') && (
                  <GenericListPage
@@ -190,18 +192,18 @@ const TicketStatuses = () => {
                  defaultPageSize={15}
                  filters={memoizedFilters}
                  refreshKey={refreshKey}
+                 search={false}
+                 tableStyle="table-style-2"
              />
             )}
 
-            {showEditStatusModal && (
-                <Modal
-                    show={showEditStatusModal}
-                    onHide={closeEditStatusModal}
-                >
-                    <Modal.Header closeButton>
-                        <Modal.Title>Edit Status</Modal.Title>
-                    </Modal.Header>
-                    <Modal.Body>
+            <FormModal
+                show={showEditStatusModal}
+                onHide={closeEditStatusModal}
+                title="Edit Status"
+                desc="Update the status details below"
+                formHtml={
+                    <>
                         <div className="form-group mb-3">
                             <label htmlFor="editStatusName">Status Name</label>
                             <input type="text" className="form-control" id="editStatusName" value={selectedStatusName} onChange={handleEditStatusNameChange} placeholder="Status Name" />
@@ -214,52 +216,37 @@ const TicketStatuses = () => {
                                 <input type="text" className="form-control" id="editStatusColor" value={selectedStatusColor} onChange={handleEditStatusColorChange} placeholder="e.g., #FF5733 or rgb(255, 87, 51)" />
                             </div>
                         </div>
+                    </>
+                }
+                submitButtonText="Save changes"
+                cancelButtonText="Cancel"
+                onSubmit={handleSubmitEditStatus}
+                onCancel={closeEditStatusModal}
+                submitButtonVariant="primary"
+                cancelButtonVariant="secondary"
+            />
 
+            <ConfirmModal
+                show={showDeleteStatusModal}
+                onHide={closeDeleteStatusModal}
+                title="Delete Status?"
+                description="Are you sure you want to delete status {targetName}? This action cannot be undone."
+                targetName={selectedStatusName || ""}
+                confirmButtonText="Delete"
+                cancelButtonText="Cancel"
+                onConfirm={handleSubmitDeleteStatus}
+                onCancel={closeDeleteStatusModal}
+                confirmButtonVariant="danger"
+                cancelButtonVariant="secondary"
+            />
 
-                    </Modal.Body>
-                    <Modal.Footer>
-                        <Button variant="secondary" onClick={closeEditStatusModal}>Close</Button>
-                        <Button variant="primary" onClick={() => handleSubmitEditStatus()}>Save changes</Button>
-                    </Modal.Footer>
-                </Modal>
-            )}
-
-            {showDeleteStatusModal && (
-                <Modal
-                    show={showDeleteStatusModal}
-                    onHide={closeDeleteStatusModal}
-                >
-                    <Modal.Header closeButton>
-                        <Modal.Title>Delete Module?</Modal.Title>
-                    </Modal.Header>
-                    <Modal.Body>
-                        <p>
-                            Are you sure you want to delete this <b className="text-danger">{selectedStatusName}</b> status?
-                        </p>
-                        <p>
-                            Type the word <b className="text-danger">DELETE</b> to confirm
-                        </p>
-                        <input type="text" className="form-control" id="confirmDelete" value={confirmDelete} onChange={handleConfirmDeleteChange} placeholder="Type the word DELETE to confirm" />
-
-                    </Modal.Body>
-                    <Modal.Footer>
-                        <Button variant="secondary" onClick={closeDeleteStatusModal}>Close</Button>
-                        <Button variant="danger" onClick={() => handleSubmitDeleteStatus()}>Delete</Button>
-                    </Modal.Footer>
-                    
-                </Modal>
-            )}
-
-            {showCreateStatusModal && (
-                <Modal
-                    show={showCreateStatusModal}
-                    onHide={closeCreateStatusModal}
-                >
-                    <Modal.Header closeButton>
-                        <Modal.Title>New Status</Modal.Title>
-                    </Modal.Header>
-                    <Modal.Body>
-                        
+            <FormModal
+                show={showCreateStatusModal}
+                onHide={closeCreateStatusModal}
+                title="New Status"
+                desc="Fill in the details below to create a new status"
+                formHtml={
+                    <>
                         <div className="form-group mb-3">
                             <label htmlFor="newStatusName">Status Name</label>
                             <input type="text" className="form-control" id="newStatusName"  value={newStatusName} onChange={handleNewStatusNameChange} placeholder="Status Name" />
@@ -286,15 +273,15 @@ const TicketStatuses = () => {
                                 />
                             </div>
                         </div>
-
-
-                    </Modal.Body>
-                    <Modal.Footer>
-                        <Button variant="secondary" onClick={closeCreateStatusModal}>Close</Button>
-                        <Button variant="primary" onClick={() => handleSubmitCreateStatus()}>Create</Button>
-                    </Modal.Footer>
-                </Modal>
-            )}
+                    </>
+                }
+                submitButtonText="Create"
+                cancelButtonText="Cancel"
+                onSubmit={handleSubmitCreateStatus}
+                onCancel={closeCreateStatusModal}
+                submitButtonVariant="primary"
+                cancelButtonVariant="secondary"
+            />
         
         </React.Fragment>
     );

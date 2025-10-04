@@ -14,6 +14,15 @@ import { Button, Modal, Row, Col, Badge, Form, Alert } from "react-bootstrap";
 import { FiEdit, FiTrash2, FiPlus, FiSave } from "react-icons/fi";
 import { toast } from "react-toastify";
 
+import "@assets/scss/common.scss";
+import "@assets/scss/tabs.scss";
+import PageHeader from "@components/PageHeader";
+import FormModal from "../../partial/FormModal";
+import ConfirmModal from "@pages/partial/ConfirmModal";
+import SuccessfulModal from "@pages/partial/SuccessfulModal";
+import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
+import DatatableActionButton from "@components/DatatableActionButton";
+
 interface LostReason {
   id: number;
   name: string;
@@ -33,6 +42,7 @@ const LostReasonsManagement = () => {
   const [editingReason, setEditingReason] = useState<LostReason | null>(null);
   const [reasonToDelete, setReasonToDelete] = useState<LostReason | null>(null);
   const [refreshKey, setRefreshKey] = useState<number>(0);
+  const [currentFilters, setCurrentFilters] = useState({ search: "" });
   const [formData, setFormData] = useState({
     name: "",
     description: "",
@@ -41,15 +51,21 @@ const LostReasonsManagement = () => {
     sequence: 1,
   });
 
+
+  const handleFiltersChange = (filters: any) => {
+    setCurrentFilters(filters);
+  };
+
   const fetchLostReasonsForTable = useCallback(
     async (page = 1, perPage = 15, search = "") => {
       try {
         const reasonsData = await getLostReasons();
+        const searchTerm = currentFilters.search || search;
         const filteredReasons = reasonsData.filter((reason) => {
-          if (!search) return true;
+          if (!searchTerm) return true;
           return (
-            !!reason.name.toLowerCase().includes(search.toLowerCase()) ||
-            !!reason.description?.toLowerCase().includes(search.toLowerCase())
+            !!reason.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            !!reason.description?.toLowerCase().includes(searchTerm.toLowerCase())
           );
         });
 
@@ -75,8 +91,12 @@ const LostReasonsManagement = () => {
         };
       }
     },
-    []
+    [currentFilters]
   );
+
+  const [showSuccessfulModal, setShowSuccessfulModal] = useState(false);
+  const [successModalTitle, setSuccessModalTitle] = useState("");
+  const [successModalDescription, setSuccessModalDescription] = useState("");
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -92,6 +112,9 @@ const LostReasonsManagement = () => {
         color: "#dc3545",
         sequence: 1,
       });
+      setShowSuccessfulModal(true);
+      setSuccessModalTitle("Lost Reason Created");
+      setSuccessModalDescription("Lost reason created successfully!");
       setRefreshKey((oldKey) => oldKey + 1);
     } catch (error) {
       toast.error("Failed to create lost reason");
@@ -107,6 +130,9 @@ const LostReasonsManagement = () => {
       toast.success("Lost reason deleted successfully!");
       setShowDeleteModal(false);
       setReasonToDelete(null);
+      setShowSuccessfulModal(true);
+      setSuccessModalTitle("Lost Reason Deleted");
+      setSuccessModalDescription("Lost reason deleted successfully!");
       setRefreshKey((oldKey) => oldKey + 1);
     } catch (error) {
       toast.error("Failed to delete lost reason");
@@ -123,9 +149,9 @@ const LostReasonsManagement = () => {
 
   const getStatusBadge = (reason: LostReason) => {
     if (reason.active) {
-      return <Badge bg="success">Active</Badge>;
+      return <span className="status-badge success">Active</span>;
     }
-    return <Badge bg="secondary">Inactive</Badge>;
+    return <span className="status-badge danger">Inactive</span>;
   };
 
   // Memoized columns for the table
@@ -135,21 +161,7 @@ const LostReasonsManagement = () => {
         key: "name",
         name: "Reason",
         selector: (row: LostReason) => row.name,
-        sortable: true,
-        cell: (props: LostReason) => (
-          <div className="d-flex align-items-center">
-            <div
-              className="me-2"
-              style={{
-                width: "12px",
-                height: "12px",
-                backgroundColor: props.color,
-                borderRadius: "50%",
-              }}
-            />
-            <strong>{props.name}</strong>
-          </div>
-        ),
+        sortable: true
       },
       {
         key: "sequence",
@@ -157,7 +169,7 @@ const LostReasonsManagement = () => {
         selector: (row: LostReason) => row.sequence,
         sortable: true,
         cell: (props: LostReason) => (
-          <Badge bg="secondary">{props.sequence}</Badge>
+          <span className="status-badge info">{props.sequence}</span>
         ),
       },
       {
@@ -176,7 +188,7 @@ const LostReasonsManagement = () => {
                 borderRadius: "4px",
               }}
             />
-            <small className="text-muted">{props.color}</small>
+            <span className="status-badge info">{props.color}</span>
           </div>
         ),
       },
@@ -193,9 +205,9 @@ const LostReasonsManagement = () => {
         selector: (row: LostReason) => row.description || "",
         sortable: true,
         cell: (props: LostReason) => (
-          <small className="text-muted">
+          <p>
             {props.description || "No description"}
-          </small>
+          </p>
         ),
       },
       {
@@ -204,9 +216,9 @@ const LostReasonsManagement = () => {
         selector: (row: LostReason) => row.created_at,
         sortable: true,
         cell: (props: LostReason) => (
-          <small className="text-muted">
+          <p>
             {new Date(props.created_at).toLocaleDateString()}
-          </small>
+          </p>
         ),
       },
       {
@@ -216,17 +228,20 @@ const LostReasonsManagement = () => {
         sortable: false,
         cell: (props: LostReason) => (
           <div className="d-flex gap-1">
-            <Button
-              variant="outline-danger"
-              disabled={props?.ticket_count !== undefined && props?.ticket_count > 0}
-              size="sm"
-              onClick={() => {
-                setReasonToDelete(props);
-                setShowDeleteModal(true);
-              }}
-            >
-              <FiTrash2 />
-            </Button>
+            <DatatableActionButton
+              actions={[
+                {
+                  label: 'Delete',
+                  className: 'text-danger',
+                  icon: <FiTrash2 />,
+                  onClick: () => {
+                    setReasonToDelete(props);
+                    setShowDeleteModal(true);
+                  },
+                },
+              ]}
+            
+            />
           </div>
         ),
       },
@@ -244,9 +259,27 @@ const LostReasonsManagement = () => {
         subTitle="Lost Reasons"
       />
 
+        <PageHeader
+          title="Lost Reasons"
+          showSearch={true}
+          searchValue={currentFilters.search || ""}
+          onSearchChange={(value) => handleFiltersChange({...currentFilters, search: value})}
+        searchPlaceholder="Search lost reasons..."
+        buttons={
+          <Button
+            variant="primary"
+            onClick={() => setShowCreateModal(true)}
+          >
+            <FiPlus className="me-2" />
+            New Lost Reason
+          </Button>
+        }
+      />
+   
+
       <div className="container-fluid">
         {/* Header */}
-        <div className="row mb-4">
+        {/* <div className="row mb-4">
           <div className="col-12">
             <div className="d-flex justify-content-between align-items-center">
               <div>
@@ -266,7 +299,7 @@ const LostReasonsManagement = () => {
               </div>
             </div>
           </div>
-        </div>
+        </div> */}
 
         {/* Lost Reasons List */}
         <div className="row">
@@ -279,22 +312,28 @@ const LostReasonsManagement = () => {
               defaultPageSize={15}
               refreshKey={refreshKey}
               filters={filters}
+              search={false}
               pagination={false}
+              tableStyle="table-style-2"
             />
           </div>
         </div>
       </div>
 
-      {/* Create Lost Reason Modal */}
-      <Modal
+      <FormModal
         show={showCreateModal}
         onHide={() => setShowCreateModal(false)}
-        size="lg"
-      >
-        <Modal.Header closeButton>
-          <Modal.Title>Create New Lost Reason</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
+        title="Create New Lost Reason"
+        desc="Please fill in the details below to create a new lost reason."
+        submitButtonText="Create Lost Reason"
+        cancelButtonText="Cancel"
+        onSubmit={() => { 
+          const mockEvent = { preventDefault: () => {} } as React.FormEvent;
+          handleCreateSubmit(mockEvent); 
+        }}
+        onCancel={() => setShowCreateModal(false)}
+        formHtml={
+          <>
           <Form onSubmit={handleCreateSubmit}>
             <Row>
               <Col md={6}>
@@ -366,44 +405,39 @@ const LostReasonsManagement = () => {
               />
             </Form.Group>
           </Form>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={() => setShowCreateModal(false)}>
-            Cancel
-          </Button>
-          <Button type="submit" variant="primary" onClick={handleCreateSubmit}>
-            <FiSave className="me-2" />
-            Create Lost Reason
-          </Button>
-        </Modal.Footer>
-      </Modal>
+          </>
+        }
+      />
 
-      {/* Delete Confirmation Modal */}
-      <Modal show={showDeleteModal} onHide={() => setShowDeleteModal(false)}>
-        <Modal.Header closeButton>
-          <Modal.Title>Delete Lost Reason</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <Alert variant="warning">
-            <strong>Warning!</strong> Deleting this lost reason will affect all
-            leads currently marked as lost with this reason.
-          </Alert>
-          <p>
-            Are you sure you want to delete the lost reason{" "}
-            <strong>{reasonToDelete?.name}</strong>?
-          </p>
-          <p className="text-muted">This action cannot be undone.</p>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={() => setShowDeleteModal(false)}>
-            Cancel
-          </Button>
-          <Button variant="danger" onClick={handleDeleteReason}>
-            <FiTrash2 className="me-2" />
-            Delete Lost Reason
-          </Button>
-        </Modal.Footer>
-      </Modal>
+<SuccessfulModal
+          show={showSuccessfulModal}
+          onHide={() => setShowSuccessfulModal(false)}
+          title={successModalTitle}
+          description={successModalDescription}
+        />
+
+
+
+      <ConfirmModal
+        show={showDeleteModal}
+        onHide={() => setShowDeleteModal(false)}
+        title="Delete Lost Reason"
+        description={`Are you sure you want to delete ${reasonToDelete?.name} lost reason?`}
+        onConfirm={handleDeleteReason}
+        targetName={reasonToDelete?.name || ""}
+        confirmButtonText="Delete Lost Reason"
+        cancelButtonText="Cancel"
+        confirmButtonVariant="danger"
+        cancelButtonVariant="secondary"
+        onCancel={() => setShowDeleteModal(false)}
+      />
+
+
+
+
+
+
+
     </React.Fragment>
   );
 };

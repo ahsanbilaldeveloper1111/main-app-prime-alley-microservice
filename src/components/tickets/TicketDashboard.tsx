@@ -6,6 +6,17 @@ import ChartDonut from '@components/ChartDonut';
 import imgStatus1 from '@assets/images/widget/img-status-1.svg';
 import TicketsFilters from '@components/filters/TicketFilters';
 
+import "@assets/scss/common.scss";
+import "@assets/scss/tabs.scss";
+import PageHeader from "@components/PageHeader";
+import FormModal from "@pages/partial/FormModal";
+import ConfirmModal from "@pages/partial/ConfirmModal";
+import SuccessfulModal from "@pages/partial/SuccessfulModal";
+import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
+import DatatableActionButton from "@components/DatatableActionButton";
+import { FiEdit, FiTrash2, FiEye,FiPlus } from "react-icons/fi";
+
+
 interface Summary {
     tickets: number;
 }
@@ -62,75 +73,48 @@ const TicketDashboard: React.FC = () => {
 
     return (
         <React.Fragment>
-            <Row className="mb-3">
-                <Col md={12}>
-                    <div className="page-header-title">
-                        <h2 className="mb-0 d-flex align-items-center">
-                            Ticket Dashboard 
-                            <TicketsFilters onFiltersChange={handleFiltersChange} />
-                        </h2>
-                    </div>
-                </Col>
-            </Row>
 
-            <Row>
-                <Col md={3}>
-                    <div className="card statistics-card-1">
-                        <div className="card-body">
-                            <img src={imgStatus1.src} alt="img" className="img-fluid img-bg" />
-                            <div className="d-flex align-items-center">
-                                <div className="avtar bg-brand-color-1 text-white me-3">
-                                    <i className="ph-duotone ph-ticket f-26"></i>
-                                </div>
-                                <div>
-                                    <p className="text-muted mb-0">Tickets</p>
-                                    <div className="d-flex align-items-end">
-                                        {summary?.tickets > 0 ? (
-                                            <AnimatedNumber value={summary?.tickets} duration={1000} />
-                                        ) : (
-                                            <h2 className="mb-0 f-w-500">0</h2>
-                                        )}
-                                    </div>
-                                </div>  
-                            </div>
-                        </div>
-                    </div>
-                </Col>
-            </Row>
 
-            <Row>
-                <Col md={12}>
-                    <h4>Ticket Status Summary</h4>
-                </Col>
-                {statusSummary.map((status, index) => (
-                    <Col md={3} key={index}>
-                        <div className="card statistics-card-1">
-                            <div className="card-body">
-                                <img src={imgStatus1.src} alt="img" className="img-fluid img-bg" />
-                                <div className="d-flex align-items-center">
-                                    <div className="avtar bg-brand-color-1 text-white me-3">
-                                        <i className="ph-duotone ph-ticket f-26"></i>
-                                    </div>
-                                    <div>
-                                        <p className="text-muted mb-0">{status.name}</p>
-                                        <div className="d-flex align-items-end">
-                                            {summary?.tickets > 0 ? (
-                                                <AnimatedNumber value={status.count} duration={1000} />
-                                            ) : (
-                                                <h2 className="mb-0 f-w-500">0</h2>
-                                            )}
-                                        </div>
-                                    </div>  
-                                </div>
-                            </div>
-                        </div>
-                    </Col>
-                ))}
-            </Row>
+            <PageHeader
+                title="Ticket Dashboard"
+                showSearch={false}
+                buttons={
+                    <TicketsFilters onFiltersChange={handleFiltersChange} />
+                }
+            />
+         
+            <PageSummaryGrid 
+                cards={[
+                    {
+                        id: 'total-tickets',
+                        title: 'Total Tickets',
+                        value: summary?.tickets,
+                        description: 'Total tickets in the system',
+                        icon: <i className="ph-duotone ph-ticket f-26"></i>,
+                        delay: 0.1,
+                        showAnimatedNumber: true,
+                        animationDuration: 1000,
+                        fontStyle: 'style-2',
+                        color: 'primary'
+                    },
+                    ...statusSummary.map((status, index) => ({
+                        id: `status-${index}`,
+                        title: status.name,
+                        value: summary?.tickets > 0 ? status.count : 0,
+                        description: `${status.name} tickets`,
+                        icon: <i className="ph-duotone ph-ticket f-26"></i>,
+                        delay: 0.1 + ((index + 1) * 0.1),
+                        showAnimatedNumber: true,
+                        animationDuration: 1000,
+                        fontStyle: 'style-2',
+                        color: 'primary'
+                    }))
+                ]}
+            />
 
             <Row>
                 <Col md={12}>
-                    <h4>Module Summary</h4>
+                    <h4 className="mb-3 app-title-heading">Module Summary</h4>
                 </Col>
                 {moduleSummary.map((module, index) => {
                     const chartSeries = module.statuses.map(status => status.count);
@@ -140,11 +124,11 @@ const TicketDashboard: React.FC = () => {
                         <Col md={4} key={index}>
                             <div className="card">
                                 <div className="card-header">
-                                    <h5 className="card-title mb-0 d-flex align-items-center justify-content-between">
+                                    <h5 className="app-title-heading mb-0 d-flex align-items-center justify-content-between">
                                         <span className="text-muted">
                                             {module.module_name}
                                         </span>
-                                        <span className="badge bg-primary">
+                                        <span className="status-badge primary">
                                             Total: {module.total_tickets}
                                         </span>
                                     </h5>

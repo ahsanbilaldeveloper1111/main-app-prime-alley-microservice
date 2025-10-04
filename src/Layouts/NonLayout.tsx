@@ -2,6 +2,7 @@
 import { useRouter } from 'next/router';
 import React, { useEffect } from 'react';
 import { ReactNode } from 'react'
+import Footer from '@components/Footer';
 
 interface NonLayoutProps  {
     children: ReactNode
@@ -25,6 +26,7 @@ const NonLayout = ({children} : NonLayoutProps) => {
     return (
         <React.Fragment>
             {children}
+          
         </React.Fragment>
     );
 }

@@ -15,6 +15,19 @@ import { GetHierarchyData } from '@utils/users';
 import Select from 'react-select';
 import { ListSubmodules, DeleteSubmodule } from '@utils/ticket-module';
 
+import "@assets/scss/common.scss";
+import "@assets/scss/tabs.scss";
+import PageHeader from "@components/PageHeader";
+import FormModal from "../../partial/FormModal";
+import ConfirmModal from "@pages/partial/ConfirmModal";
+import SuccessfulModal from "@pages/partial/SuccessfulModal";
+import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
+import DatatableActionButton from "@components/DatatableActionButton";
+import { FiEdit, FiTrash2, FiEye,FiPlus } from "react-icons/fi";
+
+
+
+
 const TicketModules = () => {
     const { data:session, status } = useSession();
     const [extensions, setExtensions] = useState<any>([]);
@@ -42,7 +55,7 @@ const TicketModules = () => {
          },
         { key: 'user_extension', name: 'User Extension', selector: (row: any) => row.user_extension, sortable: true,
             cell: (props: any) => (
-                <span className="badge bg-info">
+                <span className="status-badge primary">
                     {extensions.find(
                         (extension: any) =>
                             extension.id.toString() === props.user_extension?.toString()
@@ -70,43 +83,36 @@ const TicketModules = () => {
             selector: (row: any) => row.id,
             sortable: false,
             cell: (props: any) => (
-                
-                <div className="action-buttons-container">
-    
-                    {session?.user?.permissions?.includes('edit-ticket-module-tickets')  && (
-                        <button 
-                            className="btn btn-sm btn-outline-primary" 
-                            onClick={() => handleEditModule(props)}
-                        >
-                            Edit
-                        </button>
-                    )}  
-
-                    <button 
-                        className="btn btn-sm btn-outline-info" 
-                        onClick={() => openSubmoduleModal(props)}
-                    >
-                        Manage Submodules
-                    </button>
-
-                    {session?.user?.permissions?.includes('delete-ticket-module-tickets')  && props.tickets_count == 0 && (
-                        <button 
-                            className="btn btn-sm btn-outline-danger" 
-                            onClick={() => handleDeleteModule(props)}
-                            disabled={props?.tickets_count > 0}
-                        >
-                            Delete
-                        </button>
-                    )}
-
-                    
-                </div>
+                <DatatableActionButton
+                    actions={[
+                        ...(session?.user?.permissions?.includes('edit-ticket-module-tickets') ? [{
+                            label: 'Edit',
+                            icon: <FiEdit />,
+                            onClick: () => handleEditModule(props),
+                            className: 'gap-2'
+                        }] : []),
+                        {
+                            label: 'Manage Submodules',
+                            icon: <FiEye />,
+                            onClick: () => openSubmoduleModal(props),
+                            className: 'gap-2'
+                        },
+                        ...(session?.user?.permissions?.includes('delete-ticket-module-tickets') ? [{
+                            label: props?.tickets_count > 0 ? 'Delete (In Use)' : 'Delete',
+                            icon: <FiTrash2 />,
+                            onClick: () => props?.tickets_count > 0 ? null : handleDeleteModule(props),
+                            className: props?.tickets_count > 0 ? 'text-muted gap-2' : 'text-danger gap-2'
+                        }] : [])
+                    ]}
+                />
             ),
         },
     ], [session?.user?.permissions, extensions]);
 
     const [refreshKey, setRefreshKey] = useState<number>(0);
-    const [currentFilters, setCurrentFilters] = useState({});
+    const [currentFilters, setCurrentFilters] = useState({
+        search: ""
+    });
 
     // Extension-related states
     const [hierarchyData, setHierarchyData] = useState<any>([]);
@@ -126,13 +132,13 @@ const TicketModules = () => {
     }, []);
 
     const fetchModules = useCallback(async (page = 1, perPage = 15, search = "") => {
-        return await ListModules({ page, perPage, search, filters: memoizedFilters });
+        return await ListModules({ page, perPage, search:currentFilters.search || search, filters: memoizedFilters });
     }, [memoizedFilters]);
 
     const handleFiltersChange = useCallback((filters: any) => {
         //console.log('Filters changed:', filters);
         setCurrentFilters(filters);
-    }, []);
+    }, [currentFilters]);
 
     const [selectedModule, setSelectedModule] = useState<any>(null);
     const [selectedModuleName, setSelectedModuleName] = useState<any>(null);
@@ -167,7 +173,6 @@ const TicketModules = () => {
     }, [selectedModule, selectedModuleName, selectedModuleDescription, selectedModuleColor, selectedModuleUserExtension]);
 
     const [showDeleteModuleModal, setShowDeleteModuleModal] = useState<boolean>(false);
-    const [confirmDelete, setConfirmDelete] = useState<string>("");
 
     const handleDeleteModule = useCallback((props: any) => {
         setSelectedModule(props.id);
@@ -176,20 +181,14 @@ const TicketModules = () => {
     }, []);
 
     const handleSubmitDeleteModule = useCallback(async () => {
-        const confirmDeleteValue = confirmDelete.trim();
-        if(confirmDeleteValue === "DELETE"){
-            const response = await DeleteModule(selectedModule);
+        const response = await DeleteModule(selectedModule);
             if(response){
                 setSelectedModule(null);
                 setSelectedModuleName(null);
                 setShowDeleteModuleModal(false);
-                setConfirmDelete("");
                 setRefreshKey(prev => prev + 1); // Trigger refresh
             }
-        }else{
-            toast.error('Please type the word DELETE to confirm');
-        }
-    }, [confirmDelete, selectedModule]);
+    }, [selectedModule]);
 
     const [showCreateModuleModal, setShowCreateModuleModal] = useState<boolean>(false);
     const [newModuleName, setNewModuleName] = useState<string>("");
@@ -235,7 +234,6 @@ const TicketModules = () => {
     const handleEditModuleNameChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => setSelectedModuleName(e.target.value), []);
     const handleEditModuleDescriptionChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => setSelectedModuleDescription(e.target.value), []);
     const handleEditModuleColorChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => setSelectedModuleColor(e.target.value), []);
-    const handleConfirmDeleteChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => setConfirmDelete(e.target.value), []);
 
     // Submodule management functions
     const [selectedModuleForSubmodules, setSelectedModuleForSubmodules] = useState<any>(null);
@@ -288,19 +286,22 @@ const TicketModules = () => {
     return (
         <React.Fragment>
             <BreadcrumbItem mainTitle="Tickets" mainLink="/tickets/modules" subTitle="Ticket Modules" />
-            <Row className="mb-3">
-            <Col md={12}>
-                <div className="page-header-title">
-                <h2 className="mb-0 d-flex align-items-center">
-                    Ticket Modules
-                    {session?.user?.permissions?.includes('create-ticket-module-tickets') && (
-                        <Button variant="outline-primary" size="sm" className="ms-3" onClick={openCreateModuleModal}>New Module</Button>
-                    )}
-                    <Button variant="outline-info" size="sm" className="ms-2" onClick={() => window.location.href = '/tickets/modules/submodules'}>Manage Submodules</Button>
-                </h2>
-                </div>
-            </Col>
-            </Row>
+
+            <PageHeader
+                title="Ticket Modules"
+                showSearch={true}
+                searchPlaceholder="Search modules..."
+                searchValue={currentFilters.search || ""}
+                onSearchChange={(value) => handleFiltersChange({...currentFilters, search: value})}
+                buttons={
+                    <>
+                        <Button variant="info"  onClick={() => window.location.href = '/tickets/modules/submodules'}>Manage Submodules</Button>
+                        {session?.user?.permissions?.includes('create-ticket-module-tickets') && (
+                            <Button variant="primary" onClick={openCreateModuleModal}>New Module</Button>
+                        )}
+                    </>
+                }
+            />
 
             {session?.user?.permissions?.includes('ticket-modules-tickets') && (
                  <GenericListPage
@@ -311,18 +312,18 @@ const TicketModules = () => {
                  defaultPageSize={15}
                  filters={memoizedFilters}
                  refreshKey={refreshKey}
+                 search={false}
+                 tableStyle="table-style-2"
              />
             )}
 
-            {showEditModuleModal && (
-                <Modal
-                    show={showEditModuleModal}
-                    onHide={closeEditModuleModal}
-                >
-                    <Modal.Header closeButton>
-                        <Modal.Title>Edit Module</Modal.Title>
-                    </Modal.Header>
-                    <Modal.Body>
+            <FormModal
+                show={showEditModuleModal}
+                onHide={closeEditModuleModal}
+                title="Edit Module"
+                desc="Update the module details below"
+                formHtml={
+                    <>
                         <div className="form-group mb-3">
                             <label htmlFor="editModuleName">Module Name</label>
                             <input type="text" className="form-control" id="editModuleName" value={selectedModuleName} onChange={handleEditModuleNameChange} placeholder="Module Name" />
@@ -342,7 +343,7 @@ const TicketModules = () => {
                         </div>
 
                         <div className="form-group mb-3">
-                            <label htmlFor="editModuleUserExtension">User Extension d (Optional)</label>
+                            <label htmlFor="editModuleUserExtension">User Extension (Optional)</label>
                             <Select
                                 id="editModuleUserExtension"
                                 value={
@@ -368,52 +369,37 @@ const TicketModules = () => {
                                 isSearchable
                             />
                         </div>
+                    </>
+                }
+                submitButtonText="Save changes"
+                cancelButtonText="Cancel"
+                onSubmit={handleSubmitEditModule}
+                onCancel={closeEditModuleModal}
+                submitButtonVariant="primary"
+                cancelButtonVariant="secondary"
+            />
 
-                        
-                    </Modal.Body>
-                    <Modal.Footer>
-                        <Button variant="secondary" onClick={closeEditModuleModal}>Close</Button>
-                        <Button variant="primary" onClick={() => handleSubmitEditModule()}>Save changes</Button>
-                    </Modal.Footer>
-                </Modal>
-            )}
+            <ConfirmModal
+                show={showDeleteModuleModal}
+                onHide={closeDeleteModuleModal}
+                title="Delete Module?"
+                description="Are you sure you want to delete module {targetName}? This action cannot be undone."
+                targetName={selectedModuleName || ""}
+                confirmButtonText="Delete"
+                cancelButtonText="Cancel"
+                onConfirm={handleSubmitDeleteModule}
+                onCancel={closeDeleteModuleModal}
+                confirmButtonVariant="danger"
+                cancelButtonVariant="secondary"
+            />
 
-            {showDeleteModuleModal && (
-                <Modal
-                    show={showDeleteModuleModal}
-                    onHide={closeDeleteModuleModal}
-                >
-                    <Modal.Header closeButton>
-                        <Modal.Title>Delete Module?</Modal.Title>
-                    </Modal.Header>
-                    <Modal.Body>
-                        <p>
-                            Are you sure you want to delete this <b className="text-danger">{selectedModuleName}</b> module?
-                        </p>
-                        <p>
-                            Type the word <b className="text-danger">DELETE</b> to confirm
-                        </p>
-                        <input type="text" className="form-control" id="confirmDelete" value={confirmDelete} onChange={handleConfirmDeleteChange} placeholder="Type the word DELETE to confirm" />
-
-                    </Modal.Body>
-                    <Modal.Footer>
-                        <Button variant="secondary" onClick={closeDeleteModuleModal}>Close</Button>
-                        <Button variant="danger" onClick={() => handleSubmitDeleteModule()}>Delete</Button>
-                    </Modal.Footer>
-                    
-                </Modal>
-            )}
-
-            {showCreateModuleModal && (
-                <Modal
-                    show={showCreateModuleModal}
-                    onHide={closeCreateModuleModal}
-                >
-                    <Modal.Header closeButton>
-                        <Modal.Title>New Module</Modal.Title>
-                    </Modal.Header>
-                    <Modal.Body>
-                        
+            <FormModal
+                show={showCreateModuleModal}
+                onHide={closeCreateModuleModal}
+                title="New Module"
+                desc="Fill in the details below to create a new module"
+                formHtml={
+                    <>
                         <div className="form-group mb-3">
                             <label htmlFor="newModuleName">Module Name</label>
                             <input type="text" className="form-control" id="newModuleName"  value={newModuleName} onChange={handleNewModuleNameChange} placeholder="Module Name" />
@@ -447,7 +433,7 @@ const TicketModules = () => {
                         </div>
 
                         <div className="form-group mb-3">
-                            <label htmlFor="newModuleUserExtension">User Extension a (Optional)</label>
+                            <label htmlFor="newModuleUserExtension">User Extension (Optional)</label>
                             <Select
                                 id="newModuleUserExtension"
                                 value={newModuleUserExtension}
@@ -463,27 +449,24 @@ const TicketModules = () => {
                                 isSearchable
                             />
                         </div>
-
-
-                    </Modal.Body>
-                    <Modal.Footer>
-                        <Button variant="secondary" onClick={closeCreateModuleModal}>Close</Button>
-                        <Button variant="primary" onClick={() => handleSubmitCreateModule()}>Create</Button>
-                    </Modal.Footer>
-                </Modal>
-            )}
+                    </>
+                }
+                submitButtonText="Create"
+                cancelButtonText="Cancel"
+                onSubmit={handleSubmitCreateModule}
+                onCancel={closeCreateModuleModal}
+                submitButtonVariant="primary"
+                cancelButtonVariant="secondary"
+            />
 
             {/* Submodule Management Modal */}
-            {showSubmoduleModal && (
-                <Modal
-                    show={showSubmoduleModal}
-                    onHide={closeSubmoduleModal}
-                    size="lg"
-                >
-                    <Modal.Header closeButton>
-                        <Modal.Title>Module Submodules - {selectedModuleForSubmodules?.name}</Modal.Title>
-                    </Modal.Header>
-                    <Modal.Body>
+            <FormModal
+                show={showSubmoduleModal}
+                onHide={closeSubmoduleModal}
+                title={`Module Submodules - ${selectedModuleForSubmodules?.name || ''}`}
+                desc="Manage submodules for this module"
+                formHtml={
+                    <>
                         <div className="text-center mb-4">
                             <h5>Submodule Management</h5>
                             <p className="text-muted">
@@ -528,12 +511,16 @@ const TicketModules = () => {
                                 </div>
                             </div>
                         )}
-                    </Modal.Body>
-                    <Modal.Footer>
-                        <Button variant="secondary" onClick={closeSubmoduleModal}>Close</Button>
-                    </Modal.Footer>
-                </Modal>
-            )}
+                    </>
+                }
+                ShowSubmitButton={false}
+                cancelButtonText="Close"
+                onCancel={closeSubmoduleModal}
+                submitButtonText="Create"
+                onSubmit={handleSubmitCreateModule}
+                submitButtonVariant="primary"
+                cancelButtonVariant="secondary"
+            />
         
         </React.Fragment>
     );

@@ -5,11 +5,23 @@ import BreadcrumbItem from '@common/BreadcrumbItem';
 import GenericListPage from '@components/GenericListPage';
 import { ListSubmodules, CreateSubmodule, DeleteSubmodule, GetAllModules, ListSubmoduleChildren, CreateSubmoduleChild, DeleteSubmoduleChild } from '@utils/ticket-module';
 import { Column } from '@components/CustomDataTable';
-import { Button, Modal, Row, Col, Card, Badge } from 'react-bootstrap';
+import { Button, Row, Col, Card, Badge } from 'react-bootstrap';
 import { toast } from 'react-toastify';
 import { useSession } from 'next-auth/react';
 import { GetHierarchyData } from '@utils/users';
 import Select from 'react-select';
+
+import "@assets/scss/common.scss";
+import "@assets/scss/tabs.scss";
+import PageHeader from "@components/PageHeader";
+import FormModal from "../../partial/FormModal";
+import ConfirmModal from "@pages/partial/ConfirmModal";
+import SuccessfulModal from "@pages/partial/SuccessfulModal";
+import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
+import DatatableActionButton from "@components/DatatableActionButton";
+import { FiEdit, FiTrash2, FiEye,FiPlus } from "react-icons/fi";
+
+
 
 interface Submodule {
   id: string;
@@ -38,7 +50,7 @@ interface Module {
 const SubmodulesPage = () => {
   const { data: session, status } = useSession();
   const [refreshKey, setRefreshKey] = useState<number>(0);
-  const [currentFilters, setCurrentFilters] = useState({});
+  const [currentFilters, setCurrentFilters] = useState({search: ""});
   const [modules, setModules] = useState<Module[]>([]);
   const [extensions, setExtensions] = useState<any[]>([]);
 
@@ -87,8 +99,8 @@ const SubmodulesPage = () => {
   }, []);
 
   const fetchSubmodules = useCallback(async (page = 1, perPage = 15, search = "") => {
-    return await ListSubmodules({ page, perPage, search, filters: memoizedFilters });
-  }, [memoizedFilters]);
+    return await ListSubmodules({ page, perPage, search:currentFilters.search || search, filters: memoizedFilters });
+  }, [memoizedFilters, currentFilters]);
 
   const handleFiltersChange = useCallback((filters: any) => {
     setCurrentFilters(filters);
@@ -123,18 +135,15 @@ const SubmodulesPage = () => {
     }
   }, [newSubmoduleName, newSubmoduleDescription, newSubmoduleModuleId, newSubmoduleUserExtension]);
 
-  const handleDeleteSubmodule = useCallback(async (submodule: Submodule) => {
-    if (window.confirm(`Are you sure you want to delete submodule "${submodule.name}"?`)) {
-      try {
-        const response = await DeleteSubmodule(submodule.id);
-        if (response) {
-          setRefreshKey(prev => prev + 1);
-          toast.success('Submodule deleted successfully');
-        }
-      } catch (error) {
-        console.error('Error deleting submodule:', error);
-        toast.error('Failed to delete submodule');
-      }
+  const [selectedSubmoduleForDelete, setSelectedSubmoduleForDelete] = useState<string | null>(null);
+  const [showSubmoduleDeleteModal, setShowSubmoduleDeleteModal] = useState<boolean>(false);
+
+  const handleDeleteSubmodule = useCallback(async () => {
+    console.log(selectedSubmoduleForDelete);
+    const response = await DeleteSubmodule(selectedSubmoduleForDelete?.toString() || "");
+    if (response) {
+      setRefreshKey(prev => prev + 1);
+      toast.success('Submodule deleted successfully');
     }
   }, []);
 
@@ -205,19 +214,12 @@ const SubmodulesPage = () => {
   }, [newChildName, newChildDescription, newChildUserExtension, selectedSubmodule, fetchSubmoduleChildren]);
 
   const handleDeleteChild = useCallback(async (child: SubmoduleChild) => {
-    if (window.confirm(`Are you sure you want to delete submodule child "${child.name}"?`)) {
-      try {
-        const response = await DeleteSubmoduleChild(child.id);
+    const response = await DeleteSubmoduleChild(child.id);
         if (response && selectedSubmodule) {
           // Refresh the children list
           await fetchSubmoduleChildren(selectedSubmodule.id);
           toast.success('Submodule child deleted successfully');
         }
-      } catch (error) {
-        console.error('Error deleting submodule child:', error);
-        toast.error('Failed to delete submodule child');
-      }
-    }
   }, [selectedSubmodule, fetchSubmoduleChildren]);
 
   const columns: Column[] = useMemo(() => [
@@ -244,14 +246,14 @@ const SubmodulesPage = () => {
       cell: (props: Submodule) => {
         const moduleItem = modules.find(m => m.id == props.module_id);
         return (
-          <Badge 
+          <span className="status-badge" 
             style={{ 
               backgroundColor: moduleItem?.color || '#6c757d',
               color: 'white'
             }}
           >
             {moduleItem?.name || 'Unknown'}
-          </Badge>
+          </span>
         );
       }
     },
@@ -272,22 +274,25 @@ const SubmodulesPage = () => {
       selector: (row: Submodule) => row.id,
       sortable: false,
       cell: (props: Submodule) => (
-        <div className="d-flex gap-2">
-          <Button
-            variant="outline-info"
-            size="sm"
-            onClick={() => openSubmoduleChildrenModal(props)}
-          >
-            Manage Children
-          </Button>
-          <Button
-            variant="outline-danger"
-            size="sm"
-            onClick={() => handleDeleteSubmodule(props)}
-          >
-            Delete
-          </Button>
-        </div>
+        <DatatableActionButton
+          actions={[
+            {
+              label: 'Manage Children',
+              icon: <FiEye />,
+              onClick: () => openSubmoduleChildrenModal(props),
+              className: 'gap-2'
+            },
+            {
+              label: 'Delete',
+              icon: <FiTrash2 />,
+              onClick: () => {
+                setSelectedSubmoduleForDelete(props.id);
+                setShowSubmoduleDeleteModal(true);
+              },
+              className: 'text-danger gap-2'
+            }
+          ]}
+        />
       )
     }
   ], [modules, extensions, openSubmoduleChildrenModal, handleDeleteSubmodule]);
@@ -299,26 +304,27 @@ const SubmodulesPage = () => {
         mainLink="/tickets/modules" 
         subTitle="Submodules" 
       />
-      
-      <Row className="mb-3">
-        <Col md={12}>
-          <div className="page-header-title">
-            <h2 className="mb-0 d-flex align-items-center">
-              Submodules
-              {session?.user?.permissions?.includes('create-ticket-module-tickets') && (
+
+      <PageHeader
+        title="Submodules"
+        showSearch={true}
+        searchPlaceholder="Search submodules..."
+        searchValue={currentFilters.search || ""}
+        onSearchChange={(value) => handleFiltersChange({...currentFilters, search: value})}
+        buttons={
+          <>
+          {session?.user?.permissions?.includes('create-ticket-module-tickets') && (
                 <Button 
-                  variant="outline-primary" 
-                  size="sm" 
-                  className="ms-3" 
+                  variant="primary" 
                   onClick={() => setShowCreateModal(true)}
                 >
                   New Submodule
                 </Button>
               )}
-            </h2>
-          </div>
-        </Col>
-      </Row>
+          </>
+        }
+      />
+      
 
       {session?.user?.permissions?.includes('ticket-modules-tickets') && (
         <GenericListPage
@@ -329,83 +335,78 @@ const SubmodulesPage = () => {
           defaultPageSize={15}
           filters={memoizedFilters}
           refreshKey={refreshKey}
+          search={false}
+          tableStyle="table-style-2"
         />
       )}
 
       {/* Create Submodule Modal */}
-      <Modal show={showCreateModal} onHide={() => setShowCreateModal(false)}>
-        <Modal.Header closeButton>
-          <Modal.Title>Create New Submodule</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <div className="form-group mb-3">
-            <label htmlFor="submoduleName">Submodule Name *</label>
-            <input
-              type="text"
-              className="form-control"
-              id="submoduleName"
-              value={newSubmoduleName}
-              onChange={(e) => setNewSubmoduleName(e.target.value)}
-              placeholder="Enter submodule name"
-            />
-          </div>
-          
-          <div className="form-group mb-3">
-            <label htmlFor="submoduleDescription">Description</label>
-            <textarea
-              className="form-control"
-              id="submoduleDescription"
-              value={newSubmoduleDescription}
-              onChange={(e) => setNewSubmoduleDescription(e.target.value)}
-              placeholder="Enter description (optional)"
-              rows={3}
-            />
-          </div>
-          
-          <div className="form-group mb-3">
-            <label htmlFor="submoduleModule">Module *</label>
-            <select
-              className="form-control"
-              id="submoduleModule"
-              value={newSubmoduleModuleId}
-              onChange={(e) => setNewSubmoduleModuleId(e.target.value)}
-            >
-              <option value="">Select Module</option>
-              {modules.map((module) => (
-                <option key={module.id} value={module.id}>
-                  {module.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={() => setShowCreateModal(false)}>
-            Cancel
-          </Button>
-          <Button 
-            variant="primary" 
-            onClick={handleCreateSubmodule}
-            disabled={!newSubmoduleName.trim() || !newSubmoduleModuleId}
-          >
-            Create Submodule
-          </Button>
-        </Modal.Footer>
-      </Modal>
+      <FormModal
+        show={showCreateModal}
+        onHide={() => setShowCreateModal(false)}
+        title="Create New Submodule"
+        desc="Please fill in the details below to create a new submodule."
+        submitButtonText="Create Submodule"
+        cancelButtonText="Cancel"
+        onSubmit={handleCreateSubmodule}
+        onCancel={() => setShowCreateModal(false)}
+        formHtml={
+          <>
+            <div className="form-group mb-3">
+              <label htmlFor="submoduleName">Submodule Name *</label>
+              <input
+                type="text"
+                className="form-control"
+                id="submoduleName"
+                value={newSubmoduleName}
+                onChange={(e) => setNewSubmoduleName(e.target.value)}
+                placeholder="Enter submodule name"
+              />
+            </div>
+            
+            <div className="form-group mb-3">
+              <label htmlFor="submoduleDescription">Description</label>
+              <textarea
+                className="form-control"
+                id="submoduleDescription"
+                value={newSubmoduleDescription}
+                onChange={(e) => setNewSubmoduleDescription(e.target.value)}
+                placeholder="Enter description (optional)"
+                rows={3}
+              />
+            </div>
+            
+            <div className="form-group mb-3">
+              <label htmlFor="submoduleModule">Module *</label>
+              <select
+                className="form-control"
+                id="submoduleModule"
+                value={newSubmoduleModuleId}
+                onChange={(e) => setNewSubmoduleModuleId(e.target.value)}
+              >
+                <option value="">Select Module</option>
+                {modules.map((module) => (
+                  <option key={module.id} value={module.id}>
+                    {module.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </>
+        }
+      />
 
       {/* Submodule Children Modal */}
-      <Modal 
-        show={showSubmoduleChildrenModal} 
+      <FormModal
+        show={showSubmoduleChildrenModal}
         onHide={closeSubmoduleChildrenModal}
-        size="lg"
-      >
-        <Modal.Header closeButton>
-          <Modal.Title>
-            Manage Submodule Children - {selectedSubmodule?.name}
-          </Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
+        title={`Manage Submodule Children - ${selectedSubmodule?.name}`}
+        desc="Create new children and manage existing ones for this submodule."
+        submitButtonText="Create Child"
+        cancelButtonText="Close"
+        onSubmit={handleCreateChild}
+        onCancel={closeSubmoduleChildrenModal}
+        formHtml={
           <div className="row">
             {/* Create New Child Section */}
             <div className="col-md-6">
@@ -433,15 +434,6 @@ const SubmodulesPage = () => {
                   rows={3}
                 />
               </div>
-              
-              
-              <Button 
-                variant="primary" 
-                onClick={handleCreateChild}
-                disabled={!newChildName.trim()}
-              >
-                Create Child
-              </Button>
             </div>
 
             {/* Existing Children Section */}
@@ -465,13 +457,9 @@ const SubmodulesPage = () => {
                             <h6 className="mb-1">{child.name}</h6>
                             <p className="mb-1 text-muted small">{child.description || 'No description'}</p>
                           </div>
-                          <Button 
-                            variant="outline-danger" 
-                            size="sm" 
-                            onClick={() => handleDeleteChild(child)}
-                          >
-                            Delete
-                          </Button>
+
+                          <Button variant="danger" size="sm" onClick={() => handleDeleteChild(child)}>Delete</Button>
+                          
                         </div>
                       </div>
                     </div>
@@ -480,13 +468,21 @@ const SubmodulesPage = () => {
               )}
             </div>
           </div>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={closeSubmoduleChildrenModal}>
-            Close
-          </Button>
-        </Modal.Footer>
-      </Modal>
+        }
+      />
+
+      {/* Delete Submodule Confirmation Modal */}
+      <ConfirmModal
+        show={showSubmoduleDeleteModal}
+        onHide={() => setShowSubmoduleDeleteModal(false)}
+        title="Delete Submodule"
+        description="Are you sure you want to delete this submodule? This action cannot be undone."
+        targetName=""
+        confirmButtonText="Delete"
+        cancelButtonText="Cancel"
+        onConfirm={handleDeleteSubmodule}
+        onCancel={() => setShowSubmoduleDeleteModal(false)}
+      />
     </React.Fragment>
   );
 };

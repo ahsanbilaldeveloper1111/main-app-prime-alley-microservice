@@ -21,8 +21,8 @@ export const HEADER_CONSTANTS = {
   
   // Menu Labels
   MENU_LABELS: {
-    DASHBOARD: 'Home',
-    CONTROL_HUB: 'Control Hub',
+    DASHBOARD: 'Dashboard',
+    CONTROL_HUB: 'Resources',
     SIM_GATEWAY: 'SIM Gateway',
     CALL_LOGS: 'Call Logs',
     CALL_RECORDINGS: 'Call Recordings',
@@ -38,7 +38,8 @@ export const HEADER_CONSTANTS = {
     SALES: 'Sales',
     WEB_RTC: 'Web RTC',
     OMNI_CHANNEL: 'Omni Channel',
-    HR_SERVICES: 'HR Services'
+    HR_SERVICES: 'HR Services',
+    CALL_HISTORY: 'Call History'
   } as const,
   
   // Submenu Labels
@@ -147,7 +148,7 @@ export const HEADER_CONSTANTS = {
   
   // Icons
   ICONS: {
-    DASHBOARD: 'ti ti-settings',
+    DASHBOARD: 'ti ti-grid-dots',
     CONTROL_HUB: 'ti ti-settings',
     SIM_GATEWAY: 'ti ti-antenna-bars-4',
     CALL_LOGS: 'ph-duotone ph-file-text',
@@ -165,6 +166,7 @@ export const HEADER_CONSTANTS = {
     WEB_RTC: 'ph-duotone ph-link',
     OMNI_CHANNEL: 'ph-duotone ph-link',
     HR_SERVICES: 'ph-duotone ph-link',
+    CALL_HISTORY: 'ph-duotone ph-phone-call',
     
     // Submenu Icons
     USERS: 'ph-duotone ph-users',
@@ -203,7 +205,8 @@ export const HEADER_CONSTANTS = {
     CRM_SERVICES: 'crm-services',
     DNCR_SERVICES: 'dncr-services',
     ACCOUNTS_SERVICES: 'accounts-services',
-    NETOPS_SERVICES: 'health-care-services'
+    NETOPS_SERVICES: 'health-care-services',
+    CALL_HISTORY_SERVICES: 'call-history-services'
   } as const
 } as const;
 

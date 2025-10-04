@@ -27,11 +27,14 @@ import moment from "moment";
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import PageHeader from "@components/PageHeader";
-import PageSummaryGrid from "@components/PageSummaryGrid";
 import FormModal from "../../partial/FormModal";
 import ConfirmModal from "@pages/partial/ConfirmModal";
 import SuccessfulModal from "@pages/partial/SuccessfulModal";
-import { FiEdit, FiTrash2 } from "react-icons/fi";
+import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
+import DatatableActionButton from "@components/DatatableActionButton";
+import { FiEdit, FiTrash2, FiEye,FiPlus } from "react-icons/fi";
+
+
 import TableAction from "@components/TableAction";
 
 const LocationList = () => {
@@ -58,7 +61,7 @@ const LocationList = () => {
         sortable: true,
         cell: (props: InventoryLocationData) => (
           <div>
-            <div className="fw-bold text-primary">{props.name}</div>
+            <div>{props.name}</div>
             {props.contact_person && (
               <div className="text-muted small">Contact: {props.contact_person}</div>
             )}
@@ -71,7 +74,7 @@ const LocationList = () => {
         selector: (row: InventoryLocationData) => row.address,
         sortable: true,
         cell: (props: InventoryLocationData) => (
-          <div className="text-muted small">
+          <div >
             {props.address ? (
               <div>
                 <div>{props.address}</div>
@@ -87,12 +90,25 @@ const LocationList = () => {
         ),
       },
       {
+        key: "contact",
+        name: "Contact",
+        selector: (row: InventoryLocationData) => row.phone,
+        sortable: true,
+        cell: (props: InventoryLocationData) => (
+          <div className="text-muted small">
+            {props.phone && <div>Phone: {props.phone}</div>}
+            {props.email && <div>Email: {props.email}</div>}
+            {!props.phone && !props.email && "No contact info"}
+          </div>
+        ),
+      },
+      {
         key: "created_at",
         name: "Created",
         selector: (row: InventoryLocationData) => row.created_at,
         sortable: true,
         cell: (props: InventoryLocationData) => (
-          <span className="text-muted">
+          <span >
             {moment(props.created_at).format("DD/MM/YYYY")}
           </span>
         ),
@@ -104,19 +120,19 @@ const LocationList = () => {
         sortable: false,
         cell: (props: InventoryLocationData) => (
           <>
-          <TableAction
+          <DatatableActionButton
                     actions={[
                         {
                             label: 'Edit',
-                            icon: FiEdit,
+                            icon: <FiEdit />,
                             onClick: () => handleEditLocation(props),
-                            variant: 'edit'
+                            className: 'gap-2'
                         },
                         {
                             label: 'Delete',
-                            icon: FiTrash2,
+                            icon: <FiTrash2 />,
                             onClick: () => handleDeleteLocation(props),
-                            variant: 'delete'
+                            className: 'text-danger gap-2'
                         },
                     ]}
                 />
@@ -295,20 +311,16 @@ const LocationList = () => {
     if (!selectedLocation) return;
 
     const confirmDeleteValue = confirmDeleteLocation.trim();
-    if (confirmDeleteValue === "DELETE") {
-      try {
-        await deleteInventoryLocation(selectedLocation.id);
-        setSelectedLocation(null);
-        setShowDeleteLocationModal(false);
-        setConfirmDeleteLocation("");
-        setRefreshKey((prev) => prev + 1);
-        toast.success("Location deleted successfully");
-      } catch (error) {
-        console.error("Error deleting location:", error);
-        toast.error("Failed to delete location");
-      }
-    } else {
-      toast.error("Please type the word DELETE to confirm");
+    try {
+      await deleteInventoryLocation(selectedLocation.id);
+      setSelectedLocation(null);
+      setShowDeleteLocationModal(false);
+      setConfirmDeleteLocation("");
+      setRefreshKey((prev) => prev + 1);
+      toast.success("Location deleted successfully");
+    } catch (error) {
+      console.error("Error deleting location:", error);
+      toast.error("Failed to delete location");
     }
   }, [confirmDeleteLocation, selectedLocation]);
 
@@ -343,303 +355,259 @@ const LocationList = () => {
 
       {/* Create Location Modal */}
       {showCreateLocationModal && (
-        <Modal
+        <FormModal
           show={showCreateLocationModal}
           onHide={closeCreateLocationModal}
-          size="lg"
-        >
-          <Modal.Header closeButton>
-            <Modal.Title>Create New Location</Modal.Title>
-          </Modal.Header>
-          <Modal.Body>
-            <div className="row">
-              <div className="col-md-12">
-                <div className="form-group mb-3">
-                  <label htmlFor="newLocationName">Location Name *</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    id="newLocationName"
-                    value={newLocation.name}
-                    onChange={(e) =>
-                      handleNewLocationChange("name", e.target.value)
-                    }
-                    placeholder="Enter location name"
-                  />
+          title="Create New Location"
+          desc="Fill in the details below to create a new location"
+          formHtml={
+            <>
+              <div className="row">
+                <div className="col-md-12">
+                  <div className="form-group mb-3">
+                    <label htmlFor="newLocationName">Location Name *</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      id="newLocationName"
+                      value={newLocation.name}
+                      onChange={(e) =>
+                        handleNewLocationChange("name", e.target.value)
+                      }
+                      placeholder="Enter location name"
+                    />
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div className="row">
-              <div className="col-md-12">
-                <div className="form-group mb-3">
-                  <label htmlFor="newLocationAddress">Address</label>
-                  <textarea
-                    className="form-control"
-                    id="newLocationAddress"
-                    value={newLocation.address}
-                    onChange={(e) =>
-                      handleNewLocationChange("address", e.target.value)
-                    }
-                    rows={3}
-                    placeholder="Enter address..."
-                  />
+              <div className="row">
+                <div className="col-md-12">
+                  <div className="form-group mb-3">
+                    <label htmlFor="newLocationAddress">Address</label>
+                    <textarea
+                      className="form-control"
+                      id="newLocationAddress"
+                      value={newLocation.address}
+                      onChange={(e) =>
+                        handleNewLocationChange("address", e.target.value)
+                      }
+                      rows={3}
+                      placeholder="Enter address..."
+                    />
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div className="row">
-              <div className="col-md-6">
-                <div className="form-group mb-3">
-                  <label htmlFor="newLocationCity">City</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    id="newLocationCity"
-                    value={newLocation.city}
-                    onChange={(e) =>
-                      handleNewLocationChange("city", e.target.value)
-                    }
-                    placeholder="Enter city"
-                  />
+              <div className="row">
+                <div className="col-md-6">
+                  <div className="form-group mb-3">
+                    <label htmlFor="newLocationCity">City</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      id="newLocationCity"
+                      value={newLocation.city}
+                      onChange={(e) =>
+                        handleNewLocationChange("city", e.target.value)
+                      }
+                      placeholder="Enter city"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group mb-3">
+                    <label htmlFor="newLocationState">State/Province</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      id="newLocationState"
+                      value={newLocation.state}
+                      onChange={(e) =>
+                        handleNewLocationChange("state", e.target.value)
+                      }
+                      placeholder="Enter state/province"
+                    />
+                  </div>
                 </div>
               </div>
-              <div className="col-md-6">
-                <div className="form-group mb-3">
-                  <label htmlFor="newLocationState">State/Province</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    id="newLocationState"
-                    value={newLocation.state}
-                    onChange={(e) =>
-                      handleNewLocationChange("state", e.target.value)
-                    }
-                    placeholder="Enter state/province"
-                  />
-                </div>
-              </div>
-            </div>
 
-            <div className="row">
-              <div className="col-md-6">
-                <div className="form-group mb-3">
-                  <label htmlFor="newLocationZipCode">ZIP/Postal Code</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    id="newLocationZipCode"
-                    value={newLocation.zip_code}
-                    onChange={(e) =>
-                      handleNewLocationChange("zip_code", e.target.value)
-                    }
-                    placeholder="Enter ZIP/postal code"
-                  />
+              <div className="row">
+                <div className="col-md-6">
+                  <div className="form-group mb-3">
+                    <label htmlFor="newLocationZipCode">ZIP/Postal Code</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      id="newLocationZipCode"
+                      value={newLocation.zip_code}
+                      onChange={(e) =>
+                        handleNewLocationChange("zip_code", e.target.value)
+                      }
+                      placeholder="Enter ZIP/postal code"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group mb-3">
+                    <label htmlFor="newLocationCountry">Country</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      id="newLocationCountry"
+                      value={newLocation.country}
+                      onChange={(e) =>
+                        handleNewLocationChange("country", e.target.value)
+                      }
+                      placeholder="Enter country"
+                    />
+                  </div>
                 </div>
               </div>
-              <div className="col-md-6">
-                <div className="form-group mb-3">
-                  <label htmlFor="newLocationCountry">Country</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    id="newLocationCountry"
-                    value={newLocation.country}
-                    onChange={(e) =>
-                      handleNewLocationChange("country", e.target.value)
-                    }
-                    placeholder="Enter country"
-                  />
-                </div>
-              </div>
-            </div>
-          </Modal.Body>
-          <Modal.Footer>
-            <Button variant="secondary" onClick={closeCreateLocationModal}>
-              Close
-            </Button>
-            <Button
-              variant="primary"
-              onClick={handleSubmitCreateLocation}
-              disabled={creatingLocation}
-            >
-              {creatingLocation ? "Creating..." : "Create Location"}
-            </Button>
-          </Modal.Footer>
-        </Modal>
+            </>
+          }
+          submitButtonText={creatingLocation ? "Creating..." : "Create Location"}
+          cancelButtonText="Close"
+          onSubmit={handleSubmitCreateLocation}
+          onCancel={closeCreateLocationModal}
+          submitButtonVariant="primary"
+          cancelButtonVariant="secondary"
+        />
       )}
 
       {/* Edit Location Modal */}
       {showEditLocationModal && selectedLocation && (
-        <Modal
+        <FormModal
           show={showEditLocationModal}
           onHide={closeEditLocationModal}
-          size="lg"
-        >
-          <Modal.Header closeButton>
-            <Modal.Title>
-              Edit Location: {selectedLocation.name}
-            </Modal.Title>
-          </Modal.Header>
-          <Modal.Body>
-            <div className="row">
-              <div className="col-md-12">
-                <div className="form-group mb-3">
-                  <label htmlFor="editLocationName">Location Name *</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    id="editLocationName"
-                    value={selectedLocation.name || ""}
-                    onChange={(e) =>
-                      handleEditLocationChange("name", e.target.value)
-                    }
-                    placeholder="Enter location name"
-                  />
+          title={`Edit Location: ${selectedLocation.name}`}
+          desc="Update the location details below"
+          formHtml={
+            <>
+              <div className="row">
+                <div className="col-md-12">
+                  <div className="form-group mb-3">
+                    <label htmlFor="editLocationName">Location Name *</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      id="editLocationName"
+                      value={selectedLocation.name || ""}
+                      onChange={(e) =>
+                        handleEditLocationChange("name", e.target.value)
+                      }
+                      placeholder="Enter location name"
+                    />
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div className="row">
-              <div className="col-md-12">
-                <div className="form-group mb-3">
-                  <label htmlFor="editLocationAddress">Address</label>
-                  <textarea
-                    className="form-control"
-                    id="editLocationAddress"
-                    value={selectedLocation.address || ""}
-                    onChange={(e) =>
-                      handleEditLocationChange("address", e.target.value)
-                    }
-                    rows={3}
-                    placeholder="Enter address..."
-                  />
+              <div className="row">
+                <div className="col-md-12">
+                  <div className="form-group mb-3">
+                    <label htmlFor="editLocationAddress">Address</label>
+                    <textarea
+                      className="form-control"
+                      id="editLocationAddress"
+                      value={selectedLocation.address || ""}
+                      onChange={(e) =>
+                        handleEditLocationChange("address", e.target.value)
+                      }
+                      rows={3}
+                      placeholder="Enter address..."
+                    />
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div className="row">
-              <div className="col-md-6">
-                <div className="form-group mb-3">
-                  <label htmlFor="editLocationCity">City</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    id="editLocationCity"
-                    value={selectedLocation.city || ""}
-                    onChange={(e) =>
-                      handleEditLocationChange("city", e.target.value)
-                    }
-                    placeholder="Enter city"
-                  />
+              <div className="row">
+                <div className="col-md-6">
+                  <div className="form-group mb-3">
+                    <label htmlFor="editLocationCity">City</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      id="editLocationCity"
+                      value={selectedLocation.city || ""}
+                      onChange={(e) =>
+                        handleEditLocationChange("city", e.target.value)
+                      }
+                      placeholder="Enter city"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group mb-3">
+                    <label htmlFor="editLocationState">State/Province</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      id="editLocationState"
+                      value={selectedLocation.state || ""}
+                      onChange={(e) =>
+                        handleEditLocationChange("state", e.target.value)
+                      }
+                      placeholder="Enter state/province"
+                    />
+                  </div>
                 </div>
               </div>
-              <div className="col-md-6">
-                <div className="form-group mb-3">
-                  <label htmlFor="editLocationState">State/Province</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    id="editLocationState"
-                    value={selectedLocation.state || ""}
-                    onChange={(e) =>
-                      handleEditLocationChange("state", e.target.value)
-                    }
-                    placeholder="Enter state/province"
-                  />
-                </div>
-              </div>
-            </div>
 
-            <div className="row">
-              <div className="col-md-6">
-                <div className="form-group mb-3">
-                  <label htmlFor="editLocationZipCode">ZIP/Postal Code</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    id="editLocationZipCode"
-                    value={selectedLocation.zip_code || ""}
-                    onChange={(e) =>
-                      handleEditLocationChange("zip_code", e.target.value)
-                    }
-                    placeholder="Enter ZIP/postal code"
-                  />
+              <div className="row">
+                <div className="col-md-6">
+                  <div className="form-group mb-3">
+                    <label htmlFor="editLocationZipCode">ZIP/Postal Code</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      id="editLocationZipCode"
+                      value={selectedLocation.zip_code || ""}
+                      onChange={(e) =>
+                        handleEditLocationChange("zip_code", e.target.value)
+                      }
+                      placeholder="Enter ZIP/postal code"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group mb-3">
+                    <label htmlFor="editLocationCountry">Country</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      id="editLocationCountry"
+                      value={selectedLocation.country || ""}
+                      onChange={(e) =>
+                        handleEditLocationChange("country", e.target.value)
+                      }
+                      placeholder="Enter country"
+                    />
+                  </div>
                 </div>
               </div>
-              <div className="col-md-6">
-                <div className="form-group mb-3">
-                  <label htmlFor="editLocationCountry">Country</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    id="editLocationCountry"
-                    value={selectedLocation.country || ""}
-                    onChange={(e) =>
-                      handleEditLocationChange("country", e.target.value)
-                    }
-                    placeholder="Enter country"
-                  />
-                </div>
-              </div>
-            </div>
-          </Modal.Body>
-          <Modal.Footer>
-            <Button variant="secondary" onClick={closeEditLocationModal}>
-              Close
-            </Button>
-            <Button
-              variant="primary"
-              onClick={handleSubmitEditLocation}
-              disabled={editingLocation}
-            >
-              {editingLocation ? "Updating..." : "Update Location"}
-            </Button>
-          </Modal.Footer>
-        </Modal>
+            </>
+          }
+          submitButtonText={editingLocation ? "Updating..." : "Update Location"}
+          cancelButtonText="Close"
+          onSubmit={handleSubmitEditLocation}
+          onCancel={closeEditLocationModal}
+          submitButtonVariant="primary"
+          cancelButtonVariant="secondary"
+        />
       )}
 
       {/* Delete Location Modal */}
       {showDeleteLocationModal && selectedLocation && (
-        <Modal
+        <ConfirmModal
           show={showDeleteLocationModal}
           onHide={() => setShowDeleteLocationModal(false)}
-        >
-          <Modal.Header closeButton>
-            <Modal.Title>Delete Location?</Modal.Title>
-          </Modal.Header>
-          <Modal.Body>
-            <p>
-              Are you sure you want to delete location{" "}
-              <b className="text-danger">{selectedLocation.name}</b>?
-            </p>
-            <p>
-              This action cannot be undone.
-            </p>
-            <p>
-              Type the word <b className="text-danger">DELETE</b> to confirm
-            </p>
-            <input
-              type="text"
-              className="form-control"
-              id="confirmDeleteLocation"
-              value={confirmDeleteLocation}
-              onChange={(e) => setConfirmDeleteLocation(e.target.value)}
-              placeholder="Type the word DELETE to confirm"
-            />
-          </Modal.Body>
-          <Modal.Footer>
-            <Button
-              variant="secondary"
-              onClick={() => setShowDeleteLocationModal(false)}
-            >
-              Close
-            </Button>
-            <Button variant="danger" onClick={handleSubmitDeleteLocation}>
-              Delete
-            </Button>
-          </Modal.Footer>
-        </Modal>
+          title="Delete Location?"
+          description="Are you sure you want to delete location {targetName}? This action cannot be undone."
+          targetName={selectedLocation.name}
+          confirmButtonText="Delete"
+          cancelButtonText="Close"
+          onConfirm={handleSubmitDeleteLocation}
+          onCancel={() => setShowDeleteLocationModal(false)}
+        />
       )}
     </React.Fragment>
   );

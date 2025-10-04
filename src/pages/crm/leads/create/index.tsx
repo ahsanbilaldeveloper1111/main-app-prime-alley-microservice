@@ -6,10 +6,20 @@ import { createLead, getStages, StageData, getCampaigns, getCampaignById, Campai
 import { GetHierarchyData } from "@utils/users";
 import { Button, Row, Col, Form, Card, Alert, Badge } from "react-bootstrap";
 import Select from "react-select";
-import { FiSave, FiArrowLeft, FiDatabase, FiTarget } from "react-icons/fi";
+import { FiSave, FiArrowLeft, FiDatabase, FiTarget, FiPlus } from "react-icons/fi";
 import Link from "next/link";
 import { toast } from "react-toastify";
 import { useRouter } from "next/router";
+
+import "@assets/scss/common.scss";
+import "@assets/scss/tabs.scss";
+import PageHeader from "@components/PageHeader";
+import FormModal from "../../../partial/FormModal";
+import ConfirmModal from "@pages/partial/ConfirmModal";
+import SuccessfulModal from "@pages/partial/SuccessfulModal";
+import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
+import DatatableActionButton from "@components/DatatableActionButton";
+
 
 const CreateLead = () => {
   const router = useRouter();
@@ -335,26 +345,20 @@ const CreateLead = () => {
         subTitle={isOpportunity ? "Create Opportunity" : "Create Lead"}
       />
 
+
+      <PageHeader
+        title={isOpportunity ? "Create Opportunity" : "Create Lead"}
+        buttons={
+          <Link href={isOpportunity ? "/crm/opportunities" : "/crm/leads"} 
+          className="btn btn-primary">
+          <FiArrowLeft className="me-2" />
+          Back to {isOpportunity ? "Opportunities" : "Leads"}
+        </Link>
+        }
+      />
+
       <div className="container-fluid">
-        {/* Header */}
-        <div className="row mb-4">
-          <div className="col-12">
-            <div className="d-flex justify-content-between align-items-center">
-              <div>
-                <h1 className="h3 mb-0">Create New {isOpportunity ? "Opportunity" : "Lead"}</h1>
-                <p className="text-muted">
-                  Add a new {isOpportunity ? "opportunity" : "lead"} to your CRM pipeline
-                </p>
-              </div>
-              <div>
-                <Link href={isOpportunity ? "/crm/opportunities" : "/crm/leads"} className="btn btn-outline-secondary">
-                  <FiArrowLeft className="me-2" />
-                  Back to {isOpportunity ? "Opportunities" : "Leads"}
-                </Link>
-              </div>
-            </div>
-          </div>
-        </div>
+       
 
         {/* Create Lead Form */}
         <div className="row">
@@ -362,7 +366,7 @@ const CreateLead = () => {
             <Card className="border-0 shadow-sm">
               <Card.Header>
                 <div className="d-flex justify-content-between align-items-center">
-                  <h5 className="mb-0">{isOpportunity ? "Opportunity" : "Lead"} Information</h5>
+                  <h4 className="mb-0 app-heading">{isOpportunity ? "Opportunity" : "Lead"} Information</h4>
                   {selectedCrmData && (
                     <Badge bg="info" className="d-flex align-items-center">
                       <FiDatabase className="me-1" size={14} />
@@ -530,7 +534,7 @@ const CreateLead = () => {
 
                   {/* Company Information Section */}
                   <div className="border-top pt-3 mt-4">
-                    <h6 className="mb-3">Company Information</h6>
+                    <h4 className="mb-3 app-heading">Company Information</h4>
                     <Row>
                       <Col md={6}>
                         <Form.Group className="mb-3">
@@ -652,7 +656,7 @@ const CreateLead = () => {
                   )}
 
                   <div className="d-flex gap-2">
-                    <Button type="submit" variant="primary" disabled={loading}>
+                    <Button type="submit" variant="primary" className="app-button" disabled={loading}>
                       {loading ? (
                         "Creating..."
                       ) : (
@@ -664,7 +668,7 @@ const CreateLead = () => {
                     </Button>
                     <Link
                       href="/crm/leads"
-                      className="btn btn-outline-secondary"
+                      className="btn btn-info app-button"
                     >
                       Cancel
                     </Link>

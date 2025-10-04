@@ -50,6 +50,17 @@ import { useRouter } from "next/router";
 import moment from "moment";
 import Select from "react-select";
 
+import "@assets/scss/custom-datatable.scss";
+import "@assets/scss/common.scss";
+import "@assets/scss/tabs.scss";
+import PageHeader from "@components/PageHeader";
+import FormModal from "../../../partial/FormModal";
+import ConfirmModal from "@pages/partial/ConfirmModal";
+import SuccessfulModal from "@pages/partial/SuccessfulModal";
+import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
+import DatatableActionButton from "@components/DatatableActionButton";
+
+
 interface Meeting {
   id: number;
   name: string;
@@ -242,8 +253,17 @@ const EditLead = () => {
     }
   };
 
-  const handleMeetingSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+
+  
+const [showSuccessfulModal, setShowSuccessfulModal] = useState(false)
+const [successModalTitle, setSuccessModalTitle] = useState('')
+const [successModalDescription, setSuccessModalDescription] = useState('')
+const handleCloseSuccessfulModal = () => {
+    setShowSuccessfulModal(false)
+}
+
+  const handleMeetingSubmit = async () => {
+   
     setLoading(true);
 
     try {
@@ -256,6 +276,9 @@ const EditLead = () => {
       if (editingMeeting) {
         await updateMeeting(editingMeeting.id, meetingData);
         toast.success("Meeting updated successfully!");
+        setShowSuccessfulModal(true);
+        setSuccessModalTitle("Meeting Updated");
+        setSuccessModalDescription("Meeting updated successfully!");
       } else {
         await createMeeting(meetingData);
         toast.success("Meeting created successfully!");
@@ -279,16 +302,26 @@ const EditLead = () => {
     }
   };
 
-  const handleDeleteMeeting = async (meetingId: number) => {
-    if (window.confirm("Are you sure you want to delete this meeting?")) {
-      try {
-        await deleteMeeting(meetingId);
-        toast.success("Meeting deleted successfully!");
-        fetchMeetings();
-      } catch (error) {
-        toast.error("Failed to delete meeting");
-        console.error("Delete meeting error:", error);
-      }
+  const [showDeleteMeetingModal, setShowDeleteMeetingModal] = useState<boolean>(false);
+  const [selectedMeeting, setSelectedMeeting] = useState<number>(0);
+  const handleCloseDeleteMeetingModal = () => {
+    setShowDeleteMeetingModal(false);
+  }
+
+  const handleDeleteMeeting = async () => {
+    try {
+      await deleteMeeting(selectedMeeting);
+      toast.success("Meeting deleted successfully!");
+
+      setShowDeleteMeetingModal(false);
+      setSelectedMeeting(0);
+      setShowSuccessfulModal(true);
+      setSuccessModalTitle("Meeting Deleted");
+      setSuccessModalDescription("Meeting has been deleted successfully");
+      fetchMeetings();
+    } catch (error) {
+      toast.error("Failed to delete meeting");
+      console.error("Delete meeting error:", error);
     }
   };
 
@@ -558,36 +591,25 @@ const EditLead = () => {
         subTitle="Leads"
       />
 
+      <PageHeader
+        title={`Edit ${isOpportunity ? "Opportunity" : "Lead"}`}
+        buttons={
+          <Link href={isOpportunity ? "/crm/opportunities" : "/crm/leads"} className="btn btn-primary me-2">
+            <FiArrowLeft className="me-2" />
+            Back to {isOpportunity ? "Opportunities" : "Leads"}
+          </Link>
+        }
+      />
+
       <div className="container-fluid">
-        {/* Header */}
-        <div className="row mb-4">
-          <div className="col-12">
-            <div className="d-flex justify-content-between align-items-center">
-              <div>
-                <h1 className="h3 mb-0">Edit {isOpportunity ? "Opportunity" : "Lead"}: {lead.name}</h1>
-                <p className="text-muted">
-                  Update lead information and manage meetings
-                </p>
-              </div>
-              <div>
-                <Link
-                  href={isOpportunity ? "/crm/opportunities" : "/crm/leads"}
-                  className="btn btn-outline-secondary me-2"
-                >
-                  <FiArrowLeft className="me-2" />
-                  Back to {isOpportunity ? "Opportunities" : "Leads"}
-                </Link>
-              </div>
-            </div>
-          </div>
-        </div>
+        
 
         <Row>
           {/* Lead Information */}
           <Col md={6}>
             <Card className="border-0 shadow-sm mb-4">
               <Card.Header>
-                <h5 className="mb-0">Lead Information</h5>
+                <h5 className="mb-0 app-title-heading">Lead Information</h5>
               </Card.Header>
               <Card.Body>
                 <Form onSubmit={handleSubmit}>
@@ -682,7 +704,7 @@ const EditLead = () => {
 
                   {/* Company Information Section */}
                   <div className="border-top pt-3 mt-4">
-                    <h6 className="mb-3">Company Information</h6>
+                    <h6 className="mb-3 app-title-heading">Company Information</h6>
                     <Row>
                       <Col md={6}>
                         <Form.Group className="mb-3">
@@ -824,7 +846,7 @@ const EditLead = () => {
                       </div>
                     )}
 
-                  <Button type="submit" variant="primary" disabled={loading}>
+                  <Button type="submit" variant="primary" className="app-button" disabled={loading}>
                     {loading ? (
                       "Updating..."
                     ) : (
@@ -842,11 +864,12 @@ const EditLead = () => {
           {/* Meetings Management */}
           <Col md={6}>
             <Card className="border-0 shadow-sm">
-              <Card.Header className="d-flex justify-content-between align-items-center">
-                <h5 className="mb-0">Meetings</h5>
+              <Card.Header className="d-flex justify-content-between align-items-center p-3">
+                <h5 className="mb-0 app-title-heading">Meetings</h5>
                 <Button
                   variant="primary"
                   size="sm"
+                  className="app-button"
                   onClick={() => setShowMeetingModal(true)}
                 >
                   <FiPlus className="me-2" />
@@ -860,7 +883,7 @@ const EditLead = () => {
                   </p>
                 ) : (
                   <div className="table-responsive">
-                    <Table size="sm">
+                    <Table className="table-bordered custom-app-table">
                       <thead>
                         <tr>
                           <th>Meeting</th>
@@ -901,27 +924,23 @@ const EditLead = () => {
                               </div>
                             </td>
                             <td>
-                              <Badge
-                                bg={
-                                  meeting.status == "scheduled"
-                                    ? "primary"
-                                    : "success"
+                              <span
+                                  className={
+                                    meeting.status == "scheduled"
+                                      ? "status-badge text-capitalize primary"
+                                    : "status-badge text-capitalize success"
                                 }
                               >
                                 {meeting.status}
-                              </Badge>
+                              </span>
                             </td>
                             <td>
-                              <Dropdown>
-                                <Dropdown.Toggle
-                                  variant="outline-secondary"
-                                  size="sm"
-                                >
-                                  Actions
-                                </Dropdown.Toggle>
-                                <Dropdown.Menu>
-                                  <Dropdown.Item
-                                    onClick={() => {
+                              <DatatableActionButton
+                                actions={[
+                                  {
+                                    label: 'Edit',
+                                    icon: <FiEdit className="me-2" />,
+                                    onClick: () => {
                                       setEditingMeeting(meeting);
                                       setMeetingForm({
                                         name: meeting.name,
@@ -933,22 +952,19 @@ const EditLead = () => {
                                         ) || [""],
                                       });
                                       setShowMeetingModal(true);
-                                    }}
-                                  >
-                                    <FiEdit className="me-2" />
-                                    Edit
-                                  </Dropdown.Item>
-                                  <Dropdown.Item
-                                    onClick={() =>
-                                      handleDeleteMeeting(meeting.id)
-                                    }
-                                    className="text-danger"
-                                  >
-                                    <FiTrash2 className="me-2" />
-                                    Delete
-                                  </Dropdown.Item>
-                                </Dropdown.Menu>
-                              </Dropdown>
+                                    },
+                                  },
+                                  {
+                                    label: 'Delete',
+                                    icon: <FiTrash2 className="me-2" />,
+                                    onClick: () => {
+                                      setSelectedMeeting(meeting.id);
+                                      setShowDeleteMeetingModal(true);
+                                    },
+                                    className: 'text-danger',
+                                  },
+                                ]}
+                              />
                             </td>
                           </tr>
                         ))}
@@ -1071,7 +1087,7 @@ const EditLead = () => {
       </div>
 
       {/* Meeting Modal */}
-      <Modal
+      {/* <Modal
         show={showMeetingModal}
         onHide={() => setShowMeetingModal(false)}
         size="lg"
@@ -1082,7 +1098,39 @@ const EditLead = () => {
           </Modal.Title>
         </Modal.Header>
         <Modal.Body>
-          <Form onSubmit={handleMeetingSubmit}>
+          
+        </Modal.Body>
+        <Modal.Footer>
+          <Button
+            variant="secondary"
+            onClick={() => setShowMeetingModal(false)}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="primary"
+            onClick={handleMeetingSubmit}
+            disabled={loading}
+          >
+            {loading
+              ? "Saving..."
+              : editingMeeting
+              ? "Update Meeting"
+              : "Create Meeting"}
+          </Button>
+        </Modal.Footer>
+      </Modal> */}
+
+
+
+      <FormModal
+                        show={showMeetingModal}
+                        onHide={() => setShowMeetingModal(false)}
+                        title={editingMeeting ? "Edit Meeting" : "Create New Meeting"}
+                        desc="Please fill in the details below to edit the meeting."
+                        formHtml={
+                            <>
+                            <Form onSubmit={handleMeetingSubmit}>
             <Row>
               <Col md={6}>
                 <Form.Group className="mb-3">
@@ -1203,27 +1251,38 @@ const EditLead = () => {
               </Button>
             </Form.Group>
           </Form>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button
-            variant="secondary"
-            onClick={() => setShowMeetingModal(false)}
-          >
-            Cancel
-          </Button>
-          <Button
-            variant="primary"
-            onClick={handleMeetingSubmit}
-            disabled={loading}
-          >
-            {loading
-              ? "Saving..."
-              : editingMeeting
-              ? "Update Meeting"
-              : "Create Meeting"}
-          </Button>
-        </Modal.Footer>
-      </Modal>
+                            </>
+                        }
+                        submitButtonText={editingMeeting ? "Edit Meeting" : "Create New Meeting"}
+                        cancelButtonText="Cancel"
+                        onSubmit={() => handleMeetingSubmit()}
+                        onCancel={() => setShowMeetingModal(false)}
+                    />
+
+
+
+<SuccessfulModal
+          show={showSuccessfulModal}
+          onHide={() => setShowSuccessfulModal(false)}
+          title={successModalTitle}
+          description={successModalDescription}
+        />
+
+        <ConfirmModal
+          show={showDeleteMeetingModal}
+          onHide={handleCloseDeleteMeetingModal}
+          title="Delete Meeting"
+          description="Are you sure you want to delete this meeting?"
+          onConfirm={() => handleDeleteMeeting()}
+          targetName=""
+          confirmButtonText="Delete"
+          confirmButtonVariant="danger"
+          requireTextConfirmation={true}
+          requiredConfirmationText="delete"
+        />
+		
+
+
     </React.Fragment>
   );
 };

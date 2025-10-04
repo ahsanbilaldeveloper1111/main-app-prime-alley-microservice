@@ -5,6 +5,7 @@ import CreatableSelect from 'react-select/creatable';
 import "react-datepicker/dist/react-datepicker.css";
 import { toast } from "react-toastify";
 import Select from 'react-select';
+import {FiFilter,FiEye, FiTrash, FiX} from "react-icons/fi";
 
 
 interface SelectOption {
@@ -822,21 +823,102 @@ export default function GenericFilter({
 
   return (
     <div className="d-flex align-items-center ms-auto gap-2">
-      <div className="d-flex align-items-center">
+      
+      <div className="selectedFiltersBox">
+      {/* <div className="d-flex align-items-center">
         <div className="d-block align-items-center gap-2" style={{textAlign: 'right'}}  >
             {renderFilterBadges()}
         </div>
-      </div>
+      </div> */}
       
       {Object.keys(selectedFilters).length > 0 && (
-        <span 
-          className="text-primary tagClearFilter" 
-          onClick={clearFilters}
-          style={{ cursor: 'pointer',minWidth: '75px' }}
-        >
-          Clear Filters
-        </span>
+        <>
+          <Dropdown>
+            <Dropdown.Toggle variant="default" size="sm" className="ms-2">
+              <FiEye  />
+              Selected Filters ({Object.keys(selectedFilters).length})
+            </Dropdown.Toggle>
+            <Dropdown.Menu className="filterViewDropdown" style={{minWidth: '300px'}}>
+              <Dropdown.ItemText>
+                <div className="">
+                  <h6 className="mb-2">Active Filters</h6>
+                  <div className="d-flex flex-wrap gap-1 activeFiltersList">
+                    {Object.entries(selectedFilters)
+                      .filter(([key, value]) => {
+                        if (value === null || value === undefined || value === '') return false;
+                        if (Array.isArray(value) && value.length === 0) return false;
+                        if (typeof value === 'object' && Object.keys(value).length === 0) return false;
+                        return true;
+                      })
+                      .map(([key, value]) => {
+                        let displayValue = value;
+                        if (Array.isArray(value)) {
+                          displayValue = value.join(', ');
+                        } else if (typeof value === 'object' && value !== null) {
+                          const keys = Object.keys(value);
+                          const isMultiSelectObject = keys.every(key => value[key] === key);
+                          if (isMultiSelectObject) {
+                            displayValue = keys.join(', ');
+                          } else {
+                            displayValue = Object.entries(value)
+                              .filter(([k, v]) => v !== null && v !== undefined && v !== '')
+                              .map(([k, v]) => `${k}: ${v}`)
+                              .join(', ');
+                          }
+                        } else if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(.\d+)?Z$/.test(value)) {
+                          const dateObj = new Date(value);
+                          const options: Intl.DateTimeFormatOptions = {
+                            year: 'numeric',
+                            month: 'short',
+                            day: '2-digit',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            hour12: true
+                          };
+                          displayValue = dateObj.toLocaleString(undefined, options);
+                        }
+
+                        return (
+                          <div key={key} className="d-flex align-items-center justify-content-between bg-light p-2 rounded mb-1" style={{width: '100%'}}>
+                            <div className="flex-grow-1">
+                              <small className="text-muted d-block">{toTitleCase(key)}</small>
+                              <span className="text-dark">{displayValue}</span>
+                            </div>
+                            <button
+                              className="btn btn-sm btn-outline-danger"
+                              onClick={() => removeFilter(key)}
+                              style={{ padding: '2px 6px', fontSize: '10px' }}
+                            >
+                              <FiX size={10} />
+                            </button>
+                          </div>
+                        );
+                      })}
+                  </div>
+                  <div className="mt-2 pt-2 border-top">
+                    <button 
+                      className="btn btn-sm btn-danger w-100 text-center"
+                      onClick={clearFilters}
+                    >
+                      <FiTrash size={10} />
+                      Clear All Filters
+                    </button>
+                  </div>
+                </div>
+              </Dropdown.ItemText>
+            </Dropdown.Menu>
+          </Dropdown>
+{/*           
+          <span 
+            className="text-primary tagClearFilter" 
+            onClick={clearFilters}
+            style={{ cursor: 'pointer',minWidth: '75px' }}
+          >
+            Clear Filters
+          </span> */}
+        </>
       )}
+      </div>
       
       {additionalButtons}
       
@@ -846,8 +928,8 @@ export default function GenericFilter({
             resetFormFieldsToCurrentState();
           }
         }}>
-          <Dropdown.Toggle variant="primary" size='sm'>
-            <span className="ti ti-filter"></span>
+          <Dropdown.Toggle variant="info" size='sm'>
+            <FiFilter size={10} />
           Filters
         </Dropdown.Toggle>
         <Dropdown.Menu className="filterBoxDropdown" style={{width: dropdownWidth}} ref={dropdownRef}>

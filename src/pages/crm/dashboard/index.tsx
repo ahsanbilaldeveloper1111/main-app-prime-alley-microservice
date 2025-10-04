@@ -44,6 +44,11 @@ const CrmDashboard = () => {
   const [recentMeetings, setRecentMeetings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [currentFilters, setCurrentFilters] = useState({ search: "" });
+
+  const handleFiltersChange = (filters: any) => {
+    setCurrentFilters(filters);
+  };
 
   const fetchDashboardData = useCallback(async () => {
     try {
@@ -114,105 +119,52 @@ const CrmDashboard = () => {
         subTitle="Dashboard"
       />
 
-{/* <PageHeader
+<PageHeader
         title="CRM Dashboard"
-        showSearch={true}
-        searchPlaceholder="Search invoices..."
-        searchValue={currentFilters.search || ""}
-        onSearchChange={(value) => handleFiltersChange({...currentFilters, search: value})}
+       
         buttons={
-          <Button variant="primary" size="sm" onClick={openCreateInvoiceModal}>New Invoice</Button>
+          <>
+          <Link href="/crm/leads/create" className="btn btn-primary me-2">
+          <FiPlus className="me-2" />
+          New Lead
+        </Link>
+        <Link
+          href="/crm/leads/create?type=opportunity"
+          className="btn btn-primary me-2"
+        >
+          <FiPlus className="me-2" />
+          New Opportunity
+        </Link>
+          </>
         }
-      /> */}
+      />
 
       <div className="container-fluid">
-        {/* Header */}
-        <div className="row mb-4">
-          <div className="col-12">
-            <div className="d-flex justify-content-between align-items-center">
-              <div>
-                <h1 className="h3 mb-0">CRM Dashboard</h1>
-                <p className="text-muted">
-                  Overview of your customer relationship management activities
-                </p>
-              </div>
-              <div>
-                <Link href="/crm/leads/create" className="btn btn-primary me-2">
-                  <FiPlus className="me-2" />
-                  New Lead
-                </Link>
-                <Link
-                  href="/crm/opportunities/create"
-                  className="btn btn-outline-primary"
-                >
-                  <FiPlus className="me-2" />
-                  New Opportunity
-                </Link>
-              </div>
-            </div>
-          </div>
-        </div>
 
-        {/* Key Metrics */}
-        <div className="row g-4 mb-4">
-          <div className="col-xl-4 col-md-6">
-            <Card className="border-0 shadow-sm">
-              <Card.Body>
-                <div className="d-flex align-items-center">
-                  <div className="flex-shrink-0">
-                    <div className="bg-primary bg-opacity-10 p-3 rounded">
-                      <FiUsers className="text-primary" size={24} />
-                    </div>
-                  </div>
-                  <div className="flex-grow-1 ms-3">
-                    <h4 className="mb-1">{dashboardData.total_leads || 0}</h4>
-                    <p className="text-muted mb-0">Total Leads</p>
-                  </div>
-                </div>
-              </Card.Body>
-            </Card>
-          </div>
-
-          <div className="col-xl-4 col-md-6">
-            <Card className="border-0 shadow-sm">
-              <Card.Body>
-                <div className="d-flex align-items-center">
-                  <div className="flex-shrink-0">
-                    <div className="bg-success bg-opacity-10 p-3 rounded">
-                      <FiTarget className="text-success" size={24} />
-                    </div>
-                  </div>
-                  <div className="flex-grow-1 ms-3">
-                    <h4 className="mb-1">
-                      {dashboardData.total_opportunities || 0}
-                    </h4>
-                    <p className="text-muted mb-0">Opportunities</p>
-                  </div>
-                </div>
-              </Card.Body>
-            </Card>
-          </div>
-
-          <div className="col-xl-4 col-md-6">
-            <Card className="border-0 shadow-sm">
-              <Card.Body>
-                <div className="d-flex align-items-center">
-                  <div className="flex-shrink-0">
-                    <div className="bg-info bg-opacity-10 p-3 rounded">
-                      <FiCalendar className="text-info" size={24} />
-                    </div>
-                  </div>
-                  <div className="flex-grow-1 ms-3">
-                    <h4 className="mb-1">
-                      {dashboardData.total_meetings || 0}
-                    </h4>
-                    <p className="text-muted mb-0">Meetings</p>
-                  </div>
-                </div>
-              </Card.Body>
-            </Card>
-          </div>
-        </div>
+        <PageSummaryGrid
+         cards={[
+          {
+            id: 'total-leads',
+            title: 'Total Leads',
+            value: dashboardData.total_leads || 0,
+            description: 'Total leads in the system',
+          },
+          {
+            id: 'total-opportunities',
+            title: 'Total Opportunities',
+            value: dashboardData.total_opportunities || 0,
+            description: 'Total opportunities in the system',
+          },
+          {
+            id: 'total-meetings',
+            title: 'Total Meetings',
+            value: dashboardData.total_meetings || 0,
+            description: 'Total meetings in the system',
+          }
+         ]
+          
+         }
+        />
 
         {/* Leads by Stage */}
         {dashboardData.leads_by_stage &&
@@ -221,35 +173,24 @@ const CrmDashboard = () => {
               <div className="col-12">
                 <Card className="border-0 shadow-sm">
                   <Card.Header className="bg-transparent">
-                    <h5 className="mb-0">Leads by Stage</h5>
+                    <h5 className="mb-0 app-title-heading">Leads by Stage</h5>
                   </Card.Header>
                   <Card.Body>
-                    <div className="row">
-                      {dashboardData.leads_by_stage.map((stage, index) => (
-                        <div key={index} className="col-md-6 col-lg-4 mb-3">
-                          <div className="d-flex justify-content-between align-items-center mb-2">
-                            <span className="fw-medium">
-                              {stage.stage_name}
-                            </span>
-                            {/* <span className="text-muted">{stage.count}</span> */}
-                          </div>
-                          <div className="d-flex align-items-center">
-                            <div
-                              className="me-2"
-                              style={{
-                                width: "12px",
-                                height: "12px",
-                                backgroundColor: stage.color,
-                                borderRadius: "50%",
-                              }}
-                            />
-                            <small className="text-muted">
-                              {stage.count} leads
-                            </small>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+
+                    <PageSummaryGrid
+                      cards={dashboardData.leads_by_stage.map((stage) => ({
+                        id: stage.stage_name,
+                        title: stage.stage_name,
+                        value: stage.count,
+                        description: "Total "+stage.stage_name+" leads in the system",
+                        className: 'col-md-3',
+                      }))}
+                    />
+
+
+
+
+                    
                   </Card.Body>
                 </Card>
               </div>
@@ -262,15 +203,16 @@ const CrmDashboard = () => {
           <div className="col-lg-4">
             <Card className="border-0 shadow-sm h-100">
               <Card.Header className="bg-transparent d-flex justify-content-between align-items-center">
-                <h6 className="mb-0">Recent Leads</h6>
+                <h5 className="app-title-heading mb-0">Recent Leads</h5>
                 <Link
                   href="/crm/leads"
-                  className="btn btn-sm btn-outline-primary"
+                  className="btn app-button btn-sm btn-primary"
                 >
                   View All
                 </Link>
               </Card.Header>
               <Card.Body>
+                
                 {recentLeads.length > 0 ? (
                   recentLeads.map((lead, index) => (
                     <div key={index} className="d-flex align-items-center mb-3">
@@ -304,10 +246,10 @@ const CrmDashboard = () => {
           <div className="col-lg-4">
             <Card className="border-0 shadow-sm h-100">
               <Card.Header className="bg-transparent d-flex justify-content-between align-items-center">
-                <h6 className="mb-0">Recent Opportunities</h6>
+                <h5 className="mb-0 app-title-heading">Recent Opportunities</h5>
                 <Link
                   href="/crm/opportunities"
-                  className="btn btn-sm btn-outline-primary"
+                  className="btn app-button btn-sm btn-primary"
                 >
                   View All
                 </Link>
@@ -353,7 +295,7 @@ const CrmDashboard = () => {
           <div className="col-lg-4">
             <Card className="border-0 shadow-sm h-100">
               <Card.Header className="bg-transparent d-flex justify-content-between align-items-center">
-                <h6 className="mb-0">Recent Meetings</h6>
+                <h5 className="mb-0 app-title-heading">Recent Meetings</h5>
               </Card.Header>
               <Card.Body>
                 {recentMeetings.length > 0 ? (
@@ -392,14 +334,14 @@ const CrmDashboard = () => {
           <div className="col-12">
             <Card className="border-0 shadow-sm">
               <Card.Header className="bg-transparent">
-                <h5 className="mb-0">Quick Actions</h5>
+                <h5 className="mb-0 app-title-heading">Quick Actions</h5>
               </Card.Header>
               <Card.Body>
                 <div className="row g-3">
                   <div className="col-md-4">
                     <Link
                       href="/crm/leads/create"
-                      className="btn btn-outline-primary w-100"
+                      className="btn app-button btn-primary w-100"
                     >
                       <FiPlus className="me-2" />
                       Create Lead
@@ -408,7 +350,7 @@ const CrmDashboard = () => {
                   <div className="col-md-4">
                     <Link
                       href="/crm/leads/create?type=opportunity"
-                      className="btn btn-outline-success w-100"
+                      className="btn app-button btn-success w-100"
                     >
                       <FiPlus className="me-2" />
                       Create Opportunity
@@ -417,7 +359,7 @@ const CrmDashboard = () => {
                   <div className="col-md-4">
                     <Link
                       href="/crm/stages"
-                      className="btn btn-outline-warning w-100"
+                      className="btn app-button btn-warning w-100"
                     >
                       <FiTrendingUp className="me-2" />
                       Manage Stages
