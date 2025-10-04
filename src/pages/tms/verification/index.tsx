@@ -6,6 +6,7 @@ import { useRouter } from 'next/router';
 import { tmsLogin, verifyEmailCode, resendEmailCode } from '@services/tms/tmsAuth';
 import { signIn } from 'next-auth/react';
 import { toast } from 'react-toastify';
+import "@assets/scss/common.scss";
 
 const TmsLogin = () => {
 
@@ -420,7 +421,7 @@ const TmsLogin = () => {
 
     return (
         <React.Fragment>
-            <BreadcrumbItem mainTitle="TMS" mainLink="/tms" subTitle="TMS Verify" />
+            <BreadcrumbItem mainTitle="TMS" mainLink="/tms" subTitle="Automation Verify" />
             <div 
                 className="d-flex align-items-center justify-content-center px-3" 
                 style={{ minHeight: '80vh',  }}
@@ -433,13 +434,13 @@ const TmsLogin = () => {
                                     <div className="d-inline-flex align-items-center justify-content-center rounded-circle mb-3" style={{ width: 56, height: 56, backgroundColor: 'rgba(13,110,253,0.1)' }}>
                                         <i className={`ph-duotone ${verificationStep === 'login' ? 'ph-shield-check' : verificationStep === 'email' ? 'ph-envelope' : 'ph-device-mobile'}`} style={{ fontSize: 26, color: '#0d6efd' }}></i>
                                     </div>
-                                    <h3 className="mb-1">
+                                    <h3 className="mb-1 app-title-heading">
                                         {verificationStep === 'login' && 'Verify your identity'}
                                         {verificationStep === 'email' && 'Email Verification'}
                                         {verificationStep === '2fa' && 'Two-Factor Authentication'}
                                     </h3>
                                     <div className="text-muted">
-                                        {verificationStep === 'login' && 'Verify your identity to access TMS system'}
+                                        {verificationStep === 'login' && 'Verify your identity to access automation system'}
                                         {verificationStep === 'email' && 'A verification code has been sent to your email. Please enter it below.'}
                                         {verificationStep === '2fa' && 'Enter the 6-digit code from your authenticator app to complete verification'}
                                     </div>
@@ -478,7 +479,7 @@ const TmsLogin = () => {
                                                     placeholder="••••••••"
                                                 />
                                                 <Button 
-                                                    variant="outline-secondary" 
+                                                    variant="info" 
                                                     type="button" 
                                                     onClick={() => setShowPassword((s) => !s)}
                                                     aria-label={showPassword ? 'Hide password' : 'Show password'}
@@ -488,7 +489,7 @@ const TmsLogin = () => {
                                             </InputGroup>
                                         </Form.Group>
                                         <div className="d-flex gap-2 justify-content-center pt-2">
-                                            <Button type="submit" disabled={loading} className="px-4">
+                                            <Button type="submit" className="btn-primary app-button px-4" disabled={loading}>
                                                 {loading ? 'Verifying...' : 'Verify'}
                                             </Button>
                                         </div>
@@ -551,7 +552,7 @@ const TmsLogin = () => {
                                                 {timeLeft === 0 && (
                                                     <div className="mb-3 text-center">
                                                         <Button 
-                                                            variant="link" 
+                                                            variant="primary" 
                                                             onClick={handleResendCode}
                                                             disabled={resendLoading}
                                                             className="text-decoration-none p-0"
@@ -600,7 +601,7 @@ const TmsLogin = () => {
 
                                         <div className="d-flex gap-2 justify-content-center pt-2">
                                             <Button 
-                                                variant="outline-secondary" 
+                                                variant="secondary" 
                                                 type="button" 
                                                 onClick={handleBackToLogin}
                                                 className="px-3"
@@ -610,7 +611,7 @@ const TmsLogin = () => {
                                             <Button 
                                                 type="submit" 
                                                 disabled={verificationLoading} 
-                                                className="px-4"
+                                                className="px-4 app-button btn-primary"
                                             >
                                                 {verificationLoading ? 'Verifying...' : 'Verify'}
                                             </Button>

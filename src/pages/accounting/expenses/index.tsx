@@ -33,17 +33,18 @@ import { toast } from "react-toastify";
 import { useSession } from "next-auth/react";
 import moment from "moment";
 
+import { motion } from "framer-motion";
+
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import PageHeader from "@components/PageHeader";
-import PageSummaryGrid from "@components/PageSummaryGrid";
-import FormModal from "../../partial/FormModal";
+import FormModal from "@pages/partial/FormModal";
 import ConfirmModal from "@pages/partial/ConfirmModal";
 import SuccessfulModal from "@pages/partial/SuccessfulModal";
+import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
+import DatatableActionButton from "@components/DatatableActionButton";
+import { FiEdit, FiTrash2, FiEye,FiPlus,FiDownload } from "react-icons/fi";
 
-import { motion } from "framer-motion";
-import { FiEdit, FiTrash2, FiEye, FiDownload } from "react-icons/fi";
-import TableAction from "@components/TableAction";
 
 interface SelectOption {
   value: number;
@@ -102,7 +103,7 @@ const ExpenseList = () => {
         sortable: true,
         cell: (props: ExpenseData) => (
           <div>
-            <div className="fw-bold text-primary">{props.description}</div>
+            <div>{props.description}</div>
             {props.expense_number && (
               <div className="text-muted small">#{props.expense_number}</div>
             )}
@@ -115,12 +116,15 @@ const ExpenseList = () => {
         selector: (row: ExpenseData) => row.category?.name,
         sortable: true,
         cell: (props: ExpenseData) => (
+          <>
           <span
-            className="badge"
-            style={{ backgroundColor: props.category?.color || "#6c757d" }}
+            className="status-badge info"
+            // style={{ backgroundColor: props.category?.color || "#6c757d" }}
           >
             {props.category?.name || "No Category"}
           </span>
+          
+          </>
         ),
       },
       {
@@ -129,7 +133,7 @@ const ExpenseList = () => {
         selector: (row: ExpenseData) => row.amount,
         sortable: true,
         cell: (props: ExpenseData) => (
-          <span className="fw-bold text-success">
+          <span>
             {props.currency_code} {parseFloat(props.amount || "0").toFixed(2)}
           </span>
         ),
@@ -141,7 +145,7 @@ const ExpenseList = () => {
         sortable: true,
         cell: (props: ExpenseData) => (
           <div>
-            <span className="text-warning">
+            <span >
               {props.currency_code}{" "}
               {parseFloat(props.tax_amount || "0").toFixed(2)}
             </span>
@@ -158,7 +162,7 @@ const ExpenseList = () => {
         selector: (row: ExpenseData) => row.total_amount,
         sortable: true,
         cell: (props: ExpenseData) => (
-          <span className="fw-bold text-primary">
+          <span>
             {props.currency_code}{" "}
             {parseFloat(props.total_amount || "0").toFixed(2)}
           </span>
@@ -178,10 +182,10 @@ const ExpenseList = () => {
           };
           return (
             <span
-              className={`status-badge text-uppercase ${
+              className={`status-badge text-capitalize ${
                 statusColors[
                   props.payment_status as keyof typeof statusColors
-                ] || "secondary"
+                ] || "info"
               }`}
             >
               {props.payment_status}
@@ -195,7 +199,7 @@ const ExpenseList = () => {
         selector: (row: ExpenseData) => row.expense_date,
         sortable: true,
         cell: (props: ExpenseData) => (
-          <span className="text-muted">
+          <span>
             {moment(props.expense_date).format("DD/MM/YYYY")}
           </span>
         ),
@@ -206,33 +210,28 @@ const ExpenseList = () => {
         selector: (row: ExpenseData) => row.id,
         sortable: false,
         cell: (props: ExpenseData) => (
-          <>
-            <TableAction
-              actions={[
-                {
-                  label: "View Attachments",
-                  icon: FiEye,
-                  onClick: () => handleViewAttachments(props),
-                  // permission: 'view-expenses',
-                  variant: "default",
-                },
-                {
-                  label: "Edit",
-                  icon: FiEdit,
-                  onClick: () => handleEditExpense(props),
-                  // permission: 'edit-expenses',
-                  variant: "edit",
-                },
-                {
-                  label: "Delete",
-                  icon: FiTrash2,
-                  onClick: () => handleDeleteExpense(props),
-                  // permission: 'delete-expenses',
-                  variant: "delete",
-                },
-              ]}
-            />
-          </>
+          <DatatableActionButton
+            actions={[
+              {
+                label: "View Attachments",
+                icon: <FiEye />,
+                onClick: () => handleViewAttachments(props),
+                className: 'gap-2'
+              },
+              {
+                label: "Edit",
+                icon: <FiEdit />,
+                onClick: () => handleEditExpense(props),
+                className: 'gap-2'
+              },
+              {
+                label: "Delete",
+                icon: <FiTrash2 />,
+                onClick: () => handleDeleteExpense(props),
+                className: 'text-danger gap-2'
+              },
+            ]}
+          />
         ),
       },
     ],
@@ -564,26 +563,21 @@ const ExpenseList = () => {
     setShowDeleteExpenseModal(true);
   }, []);
 
-  const handleSubmitDeleteExpense = useCallback(async () => {
+  const handleSubmitDeleteExpense = useCallback(async (confirmationText: string) => {
     if (!selectedExpense) return;
 
-    const confirmDeleteValue = confirmDeleteExpense.trim();
-    if (confirmDeleteValue === "DELETE") {
-      try {
-        await deleteExpense(selectedExpense.id);
-        setSelectedExpense(null);
-        setShowDeleteExpenseModal(false);
-        setConfirmDeleteExpense("");
-        setRefreshKey((prev) => prev + 1);
-        toast.success("Expense deleted successfully");
-      } catch (error) {
-        console.error("Error deleting expense:", error);
-        toast.error("Failed to delete expense");
-      }
-    } else {
-      toast.error("Please type the word DELETE to confirm");
+    try {
+      await deleteExpense(selectedExpense.id);
+      setSelectedExpense(null);
+      setShowDeleteExpenseModal(false);
+      setConfirmDeleteExpense("");
+      setRefreshKey((prev) => prev + 1);
+      toast.success("Expense deleted successfully");
+    } catch (error) {
+      console.error("Error deleting expense:", error);
+      toast.error("Failed to delete expense");
     }
-  }, [confirmDeleteExpense, selectedExpense]);
+  }, [selectedExpense]);
 
   // Category Management Handlers
   const openCategoryModal = useCallback(async () => {
@@ -690,27 +684,22 @@ const ExpenseList = () => {
     }
   }, [selectedCategory, openCategoryModal]);
 
-  const handleSubmitDeleteCategory = useCallback(async () => {
+  const handleSubmitDeleteCategory = useCallback(async (confirmationText: string) => {
     if (!selectedCategory) return;
-
-    const confirmDeleteValue = confirmDeleteCategory.trim();
-    if (confirmDeleteValue === "DELETE") {
-      try {
-        await deleteExpenseCategory(selectedCategory.id);
-        setSelectedCategory(null);
-        setShowDeleteCategoryModal(false);
-        setConfirmDeleteCategory("");
-        await openCategoryModal(); // Refresh the list
-        await fetchCategories(); // Refresh the dropdown
-        toast.success("Category deleted successfully");
-      } catch (error) {
-        console.error("Error deleting category:", error);
-        toast.error("Failed to delete category");
-      }
-    } else {
-      toast.error("Please type the word DELETE to confirm");
+    
+    try {
+      await deleteExpenseCategory(selectedCategory.id);
+      setSelectedCategory(null);
+      setShowDeleteCategoryModal(false);
+      setConfirmDeleteCategory("");
+      await openCategoryModal(); // Refresh the list
+      await fetchCategories(); // Refresh the dropdown
+      toast.success("Category deleted successfully");
+    } catch (error) {
+      console.error("Error deleting category:", error);
+      toast.error("Failed to delete category");
     }
-  }, [confirmDeleteCategory, selectedCategory, openCategoryModal]);
+  }, [selectedCategory, openCategoryModal]);
 
   return (
     <React.Fragment>
@@ -756,16 +745,17 @@ const ExpenseList = () => {
       />
 
       {/* Create Expense Modal */}
-      {showCreateExpenseModal && (
-        <Modal
-          show={showCreateExpenseModal}
-          onHide={closeCreateExpenseModal}
-          size="lg"
-        >
-          <Modal.Header closeButton>
-            <Modal.Title>Create New Expense</Modal.Title>
-          </Modal.Header>
-          <Modal.Body>
+      <FormModal
+        show={showCreateExpenseModal}
+        onHide={closeCreateExpenseModal}
+        title="Create New Expense"
+        desc="Please fill in the details below to create a new expense."
+        submitButtonText={creatingExpense ? "Creating..." : "Create Expense"}
+        cancelButtonText="Close"
+        onSubmit={handleSubmitCreateExpense}
+        onCancel={closeCreateExpenseModal}
+        formHtml={
+          <>
             <div className="row">
               <div className="col-md-6">
                 <div className="form-group mb-3">
@@ -846,6 +836,7 @@ const ExpenseList = () => {
                   <input
                     type="number"
                     step="0.01"
+                    min="0"
                     className="form-control"
                     id="newExpenseAmount"
                     value={newExpense.amount}
@@ -862,6 +853,7 @@ const ExpenseList = () => {
                   <input
                     type="number"
                     step="0.01"
+                    min="0"
                     className="form-control"
                     id="newExpenseTaxAmount"
                     value={newExpense.tax_amount}
@@ -894,6 +886,7 @@ const ExpenseList = () => {
                   <input
                     type="number"
                     step="0.01"
+                    min="0"
                     className="form-control"
                     id="newExpenseTotalAmount"
                     value={newExpense.total_amount}
@@ -943,35 +936,22 @@ const ExpenseList = () => {
                 )}
               </div>
             </div>
-          </Modal.Body>
-          <Modal.Footer>
-            <Button variant="secondary" onClick={closeCreateExpenseModal}>
-              Close
-            </Button>
-            <Button
-              variant="primary"
-              onClick={handleSubmitCreateExpense}
-              disabled={creatingExpense}
-            >
-              {creatingExpense ? "Creating..." : "Create Expense"}
-            </Button>
-          </Modal.Footer>
-        </Modal>
-      )}
+          </>
+        }
+      />
 
       {/* Edit Expense Modal */}
-      {showEditExpenseModal && selectedExpense && (
-        <Modal
-          show={showEditExpenseModal}
-          onHide={closeEditExpenseModal}
-          size="lg"
-        >
-          <Modal.Header closeButton>
-            <Modal.Title>
-              Edit Expense: {selectedExpense.description}
-            </Modal.Title>
-          </Modal.Header>
-          <Modal.Body>
+      <FormModal
+        show={showEditExpenseModal}
+        onHide={closeEditExpenseModal}
+        title={`Edit Expense: ${selectedExpense?.description || ""}`}
+        desc="Please update the expense details below."
+        submitButtonText={editingExpense ? "Updating..." : "Update Expense"}
+        cancelButtonText="Close"
+        onSubmit={handleSubmitEditExpense}
+        onCancel={closeEditExpenseModal}
+        formHtml={
+          <>
             <div className="row">
               <div className="col-md-6">
                 <div className="form-group mb-3">
@@ -979,7 +959,7 @@ const ExpenseList = () => {
                   <select
                     className="form-control"
                     id="editExpenseCategory"
-                    value={selectedExpense.category_id || ""}
+                    value={selectedExpense?.category_id || ""}
                     onChange={(e) =>
                       handleEditExpenseChange("category_id", e.target.value)
                     }
@@ -1001,7 +981,7 @@ const ExpenseList = () => {
                     className="form-control"
                     id="editExpenseDate"
                     value={
-                      selectedExpense.expense_date
+                      selectedExpense?.expense_date
                         ? moment(selectedExpense.expense_date).format(
                             "YYYY-MM-DD"
                           )
@@ -1023,7 +1003,7 @@ const ExpenseList = () => {
                     type="text"
                     className="form-control"
                     id="editExpenseDescription"
-                    value={selectedExpense.description || ""}
+                    value={selectedExpense?.description || ""}
                     onChange={(e) =>
                       handleEditExpenseChange("description", e.target.value)
                     }
@@ -1040,7 +1020,7 @@ const ExpenseList = () => {
                   <select
                     className="form-control"
                     id="editExpenseCurrency"
-                    value={selectedExpense.currency || "USD"}
+                    value={selectedExpense?.currency || "USD"}
                     onChange={(e) =>
                       handleEditExpenseChange("currency", e.target.value)
                     }
@@ -1058,9 +1038,10 @@ const ExpenseList = () => {
                   <input
                     type="number"
                     step="0.01"
+                    min="0"
                     className="form-control"
                     id="editExpenseAmount"
-                    value={selectedExpense.amount || ""}
+                    value={selectedExpense?.amount || ""}
                     onChange={(e) =>
                       handleEditExpenseChange("amount", e.target.value)
                     }
@@ -1074,9 +1055,10 @@ const ExpenseList = () => {
                   <input
                     type="number"
                     step="0.01"
+                    min="0"
                     className="form-control"
                     id="editExpenseTaxAmount"
-                    value={selectedExpense.tax_amount || ""}
+                    value={selectedExpense?.tax_amount || ""}
                     onChange={(e) =>
                       handleEditExpenseChange("tax_amount", e.target.value)
                     }
@@ -1090,7 +1072,7 @@ const ExpenseList = () => {
                   <select
                     className="form-control"
                     id="editExpenseTaxType"
-                    value={selectedExpense.tax_type || "amount"}
+                    value={selectedExpense?.tax_type || "amount"}
                     onChange={(e) =>
                       handleEditExpenseChange("tax_type", e.target.value)
                     }
@@ -1106,9 +1088,10 @@ const ExpenseList = () => {
                   <input
                     type="number"
                     step="0.01"
+                    min="0"
                     className="form-control"
                     id="editExpenseTotalAmount"
-                    value={selectedExpense.total_amount || ""}
+                    value={selectedExpense?.total_amount || ""}
                     onChange={(e) =>
                       handleEditExpenseChange("total_amount", e.target.value)
                     }
@@ -1155,39 +1138,27 @@ const ExpenseList = () => {
                 )}
               </div>
             </div>
-          </Modal.Body>
-          <Modal.Footer>
-            <Button variant="secondary" onClick={closeEditExpenseModal}>
-              Close
-            </Button>
-            <Button
-              variant="primary"
-              onClick={handleSubmitEditExpense}
-              disabled={editingExpense}
-            >
-              {editingExpense ? "Updating..." : "Update Expense"}
-            </Button>
-          </Modal.Footer>
-        </Modal>
-      )}
+          </>
+        }
+      />
 
       {/* Category Management Modal */}
-      {showCategoryModal && (
-        <Modal show={showCategoryModal} onHide={closeCategoryModal} size="lg">
-          <Modal.Header closeButton>
-            <Modal.Title>Manage Expense Categories</Modal.Title>
-          </Modal.Header>
-          <Modal.Body>
-            <div className="d-flex justify-content-between align-items-center mb-3">
-              <h5 className="mb-0">Categories</h5>
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={handleCreateCategory}
-              >
-                Create Category
-              </Button>
-            </div>
+      <FormModal
+        show={showCategoryModal}
+        onHide={closeCategoryModal}
+        title="Manage Expense Categories"
+        desc="View and manage all expense categories. You can create new categories, edit existing ones, or delete unused categories."
+        submitButtonText="Create New Category"
+        cancelButtonText="Close"
+        onSubmit={handleCreateCategory}
+        onCancel={closeCategoryModal}
+        ShowSubmitButton={false}
+        formHtml={
+          <>
+          <div className="d-flex mb-3 justify-content-end align-items-end text-end">
+            <button className="btn btn-sm btn-primary app-button" onClick={handleCreateCategory}>Create New Category</button>
+          </div>
+
             <div className="table-responsive">
               <table className="table table-striped">
                 <thead>
@@ -1204,7 +1175,7 @@ const ExpenseList = () => {
                   {categoryList.map((category: ExpenseCategoryData) => (
                     <tr key={category.id}>
                       <td>
-                        <div className="fw-bold">{category.name}</div>
+                        <div>{category.name}</div>
                       </td>
                       <td>
                         <div className="text-muted">
@@ -1229,20 +1200,20 @@ const ExpenseList = () => {
                         </span>
                       </td>
                       <td>
-                        <span className="badge bg-info">
+                        <span className="status-badge primary">
                           {(category as any).expenses?.length || 0}
                         </span>
                       </td>
                       <td>
                         <div className="action-buttons-container">
                           <button
-                            className="btn btn-sm btn-outline-primary me-1"
+                            className="btn btn-sm btn-primary app-button me-1"
                             onClick={() => handleEditCategory(category)}
                           >
                             Edit
                           </button>
                           <button
-                            className="btn btn-sm btn-outline-danger"
+                            className="btn btn-sm btn-danger app-button"
                             onClick={() => handleDeleteCategory(category)}
                           >
                             Delete
@@ -1254,38 +1225,34 @@ const ExpenseList = () => {
                 </tbody>
               </table>
             </div>
-          </Modal.Body>
-          <Modal.Footer>
-            <Button variant="secondary" onClick={closeCategoryModal}>
-              Close
-            </Button>
-          </Modal.Footer>
-        </Modal>
-      )}
+          </>
+        }
+      />
 
       {/* Edit Category Modal */}
-      {showEditCategoryModal && selectedCategory && (
-        <Modal
-          show={showEditCategoryModal}
-          onHide={() => setShowEditCategoryModal(false)}
-          size="lg"
-        >
-          <Modal.Header closeButton>
-            <Modal.Title>Edit Category: {selectedCategory.name}</Modal.Title>
-          </Modal.Header>
-          <Modal.Body>
+      <FormModal
+        show={showEditCategoryModal}
+        onHide={() => setShowEditCategoryModal(false)}
+        title={`Edit Category: ${selectedCategory?.name || ""}`}
+        desc="Please update the category details below."
+        submitButtonText={editingCategory ? "Updating..." : "Update Category"}
+        cancelButtonText="Close"
+        onSubmit={handleSubmitEditCategory}
+        onCancel={() => setShowEditCategoryModal(false)}
+        formHtml={
+          <>
             <div className="form-group mb-3">
               <label htmlFor="editCategoryName">Category Name</label>
               <input
                 type="text"
                 className="form-control"
                 id="editCategoryName"
-                value={selectedCategory.name || ""}
+                value={selectedCategory?.name || ""}
                 onChange={(e) =>
-                  setSelectedCategory({
+                  selectedCategory && setSelectedCategory({
                     ...selectedCategory,
                     name: e.target.value,
-                  })
+                  } as ExpenseCategoryData)
                 }
                 placeholder="Enter category name"
               />
@@ -1295,12 +1262,12 @@ const ExpenseList = () => {
               <textarea
                 className="form-control"
                 id="editCategoryDescription"
-                value={selectedCategory.description || ""}
+                value={selectedCategory?.description || ""}
                 onChange={(e) =>
-                  setSelectedCategory({
+                  selectedCategory && setSelectedCategory({
                     ...selectedCategory,
                     description: e.target.value,
-                  })
+                  } as ExpenseCategoryData)
                 }
                 rows={3}
                 placeholder="Enter category description..."
@@ -1308,151 +1275,89 @@ const ExpenseList = () => {
             </div>
             <div className="form-group mb-3">
               <label htmlFor="editCategoryColor">Color</label>
-              <input
-                type="color"
-                className="form-control"
-                id="editCategoryColor"
-                value={selectedCategory.color || "#000000"}
-                onChange={(e) =>
-                  setSelectedCategory({
-                    ...selectedCategory,
-                    color: e.target.value,
-                  })
-                }
-              />
+              <div className="d-flex align-items-center">
+                <input
+                  type="color"
+                  className="form-control me-2"
+                  id="editCategoryColor"
+                  value={selectedCategory?.color || "#000000"}
+                  onChange={(e) =>
+                    selectedCategory && setSelectedCategory({
+                      ...selectedCategory,
+                      color: e.target.value,
+                    } as ExpenseCategoryData)
+                  }
+                  style={{ width: "60px", height: "38px" }}
+                />
+                <input
+                  type="text"
+                  className="form-control"
+                  value={selectedCategory?.color || "#000000"}
+                  onChange={(e) =>
+                    selectedCategory && setSelectedCategory({
+                      ...selectedCategory,
+                      color: e.target.value,
+                    } as ExpenseCategoryData)
+                  }
+                  placeholder="#000000"
+                />
+              </div>
             </div>
             <div className="form-group mb-3">
               <label htmlFor="editCategoryStatus">Status</label>
               <select
                 className="form-control"
                 id="editCategoryStatus"
-                value={selectedCategory.is_active ? "active" : "inactive"}
+                value={selectedCategory?.is_active ? "active" : "inactive"}
                 onChange={(e) =>
-                  setSelectedCategory({
+                  selectedCategory && setSelectedCategory({
                     ...selectedCategory,
                     is_active: e.target.value === "active",
-                  })
+                  } as ExpenseCategoryData)
                 }
               >
                 <option value="active">Active</option>
                 <option value="inactive">Inactive</option>
               </select>
             </div>
-          </Modal.Body>
-          <Modal.Footer>
-            <Button
-              variant="secondary"
-              onClick={() => setShowEditCategoryModal(false)}
-            >
-              Close
-            </Button>
-            <Button
-              variant="primary"
-              onClick={handleSubmitEditCategory}
-              disabled={editingCategory}
-            >
-              {editingCategory ? "Updating..." : "Update Category"}
-            </Button>
-          </Modal.Footer>
-        </Modal>
-      )}
+          </>
+        }
+      />
 
       {/* Delete Category Modal */}
-      {showDeleteCategoryModal && selectedCategory && (
-        <Modal
-          show={showDeleteCategoryModal}
-          onHide={() => setShowDeleteCategoryModal(false)}
-        >
-          <Modal.Header closeButton>
-            <Modal.Title>Delete Category?</Modal.Title>
-          </Modal.Header>
-          <Modal.Body>
-            <p>
-              Are you sure you want to delete category{" "}
-              <b className="text-danger">{selectedCategory.name}</b>?
-            </p>
-            <p>
-              This action cannot be undone and will affect all expenses in this
-              category.
-            </p>
-            <p>
-              Type the word <b className="text-danger">DELETE</b> to confirm
-            </p>
-            <input
-              type="text"
-              className="form-control"
-              id="confirmDeleteCategory"
-              value={confirmDeleteCategory}
-              onChange={(e) => setConfirmDeleteCategory(e.target.value)}
-              placeholder="Type the word DELETE to confirm"
-            />
-          </Modal.Body>
-          <Modal.Footer>
-            <Button
-              variant="secondary"
-              onClick={() => setShowDeleteCategoryModal(false)}
-            >
-              Close
-            </Button>
-            <Button variant="danger" onClick={handleSubmitDeleteCategory}>
-              Delete
-            </Button>
-          </Modal.Footer>
-        </Modal>
-      )}
+      <ConfirmModal
+        show={showDeleteCategoryModal}
+        onHide={() => setShowDeleteCategoryModal(false)}
+        title="Delete Category?"
+        description={`Are you sure you want to delete category ${selectedCategory?.name}? This action cannot be undone and will affect all expenses in this category.`}
+        onConfirm={handleSubmitDeleteCategory}
+        onCancel={() => setShowDeleteCategoryModal(false)}
+        targetName={selectedCategory?.name || ""}
+      />
 
       {/* Delete Expense Modal */}
-      {showDeleteExpenseModal && selectedExpense && (
-        <Modal
-          show={showDeleteExpenseModal}
-          onHide={() => setShowDeleteExpenseModal(false)}
-        >
-          <Modal.Header closeButton>
-            <Modal.Title>Delete Expense?</Modal.Title>
-          </Modal.Header>
-          <Modal.Body>
-            <p>
-              Are you sure you want to delete expense{" "}
-              <b className="text-danger">{selectedExpense.description}</b>?
-            </p>
-            <p>This action cannot be undone.</p>
-            <p>
-              Type the word <b className="text-danger">DELETE</b> to confirm
-            </p>
-            <input
-              type="text"
-              className="form-control"
-              id="confirmDeleteExpense"
-              value={confirmDeleteExpense}
-              onChange={(e) => setConfirmDeleteExpense(e.target.value)}
-              placeholder="Type the word DELETE to confirm"
-            />
-          </Modal.Body>
-          <Modal.Footer>
-            <Button
-              variant="secondary"
-              onClick={() => setShowDeleteExpenseModal(false)}
-            >
-              Close
-            </Button>
-            <Button variant="danger" onClick={handleSubmitDeleteExpense}>
-              Delete
-            </Button>
-          </Modal.Footer>
-        </Modal>
-      )}
+      <ConfirmModal
+        show={showDeleteExpenseModal}
+        onHide={() => setShowDeleteExpenseModal(false)}
+        title="Delete Expense?"
+        description={`Are you sure you want to delete expense ${selectedExpense?.description}? This action cannot be undone.`}
+        targetName={selectedExpense?.description || ""}
+        onConfirm={handleSubmitDeleteExpense}
+        onCancel={() => setShowDeleteExpenseModal(false)}
+      />
 
       {/* Create Category Modal */}
-      {showCreateCategoryModal && (
-        <Modal
-          show={showCreateCategoryModal}
-          onHide={() => setShowCreateCategoryModal(false)}
-          size="lg"
-        >
-          <Modal.Header closeButton>
-            <Modal.Title>Create New Category</Modal.Title>
-          </Modal.Header>
-          <Modal.Body>
+      <FormModal
+        show={showCreateCategoryModal}
+        onHide={() => setShowCreateCategoryModal(false)}
+        title="Create New Category"
+        desc="Please fill in the details below to create a new expense category."
+        submitButtonText={creatingCategory ? "Creating..." : "Create Category"}
+        cancelButtonText="Close"
+        onSubmit={handleSubmitCreateCategory}
+        onCancel={() => setShowCreateCategoryModal(false)}
+        formHtml={
+          <>
             <div className="form-group mb-3">
               <label htmlFor="newCategoryName">Category Name</label>
               <input
@@ -1520,41 +1425,26 @@ const ExpenseList = () => {
                 <option value="inactive">Inactive</option>
               </select>
             </div>
-          </Modal.Body>
-          <Modal.Footer>
-            <Button
-              variant="secondary"
-              onClick={() => setShowCreateCategoryModal(false)}
-            >
-              Close
-            </Button>
-            <Button
-              variant="primary"
-              onClick={handleSubmitCreateCategory}
-              disabled={creatingCategory}
-            >
-              {creatingCategory ? "Creating..." : "Create Category"}
-            </Button>
-          </Modal.Footer>
-        </Modal>
-      )}
+          </>
+        }
+      />
 
       {/* View Attachments Modal */}
-      {showViewAttachmentsModal && selectedExpenseForAttachments && (
-        <Modal
-          show={showViewAttachmentsModal}
-          onHide={closeViewAttachmentsModal}
-          size="lg"
-        >
-          <Modal.Header closeButton>
-            <Modal.Title>
-              Attachments - {selectedExpenseForAttachments.description}
-            </Modal.Title>
-          </Modal.Header>
-          <Modal.Body>
+      <FormModal
+        show={showViewAttachmentsModal}
+        onHide={closeViewAttachmentsModal}
+        title={`Attachments - ${selectedExpenseForAttachments?.description || ""}`}
+        desc="View and download receipt files attached to this expense."
+        submitButtonText="Close"
+        ShowSubmitButton={false}
+        cancelButtonText=" close"
+        onSubmit={closeViewAttachmentsModal}
+        onCancel={closeViewAttachmentsModal}
+        formHtml={
+          <>
             <div className="mb-3">
               <h6>Receipt Files</h6>
-              {selectedExpenseForAttachments.files && selectedExpenseForAttachments.files.length > 0 ? (
+              {selectedExpenseForAttachments?.files && selectedExpenseForAttachments.files.length > 0 ? (
                 <div className="list-group">
                   {selectedExpenseForAttachments.files.map((file, index) => (
                     <div key={index} className="list-group-item d-flex justify-content-between align-items-center">
@@ -1601,46 +1491,6 @@ const ExpenseList = () => {
               )}
             </div>
 
-            {/* Legacy Receipt Download */}
-            {/* {selectedExpenseForAttachments.receipt_path && (
-              <div className="mb-3">
-                <h6>Legacy Receipt</h6>
-                <div className="list-group">
-                  <div className="list-group-item d-flex justify-content-between align-items-center">
-                    <div className="d-flex align-items-center">
-                      <span className="me-2" style={{ fontSize: '1.2em' }}>
-                        📄
-                      </span>
-                      <div>
-                        <div className="fw-bold">Receipt</div>
-                        <small className="text-muted">
-                          Legacy receipt file
-                        </small>
-                      </div>
-                    </div>
-                    <Button
-                      variant="outline-primary"
-                      size="sm"
-                      onClick={() => handleDownloadReceipt(selectedExpenseForAttachments.id)}
-                      disabled={downloadingFile === -1}
-                    >
-                      {downloadingFile === -1 ? (
-                        <>
-                          <span className="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
-                          Downloading...
-                        </>
-                      ) : (
-                        <>
-                          <FiDownload className="me-1" />
-                          Download
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            )} */}
-
             {/* Summary */}
             <div className="mt-3 p-3 bg-light rounded">
               <h6>Summary</h6>
@@ -1648,27 +1498,22 @@ const ExpenseList = () => {
                 <div className="col-md-6">
                   <small className="text-muted">Total Files:</small>
                   <div className="fw-bold">
-                    {(selectedExpenseForAttachments.files?.length || 0) }
+                    {(selectedExpenseForAttachments?.files?.length || 0) }
                   </div>
                 </div>
                 <div className="col-md-6">
                   <small className="text-muted">Total Size:</small>
                   <div className="fw-bold">
                     {formatFileSize(
-                      (selectedExpenseForAttachments.files?.reduce((total, file) => total + file.size, 0) || 0)
+                      (selectedExpenseForAttachments?.files?.reduce((total, file) => total + file.size, 0) || 0)
                     )}
                   </div>
                 </div>
               </div>
             </div>
-          </Modal.Body>
-          <Modal.Footer>
-            <Button variant="secondary" onClick={closeViewAttachmentsModal}>
-              Close
-            </Button>
-          </Modal.Footer>
-        </Modal>
-      )}
+          </>
+        }
+      />
     </React.Fragment>
   );
 };
