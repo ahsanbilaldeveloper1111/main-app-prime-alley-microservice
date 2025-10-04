@@ -45,6 +45,10 @@ $googleFontsUrl: "https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;
 }
 .pc-submenu-popup .pc-link {
     color: #01353c;
+    transition: var(--transition-speed);
+    &:hover{
+        transform: translateY(-2px);
+    }
 }
 
 
@@ -320,6 +324,10 @@ body .nextjs-toast{
 
 .layout-collapse .pc-sidebar .main-caption .pc-item > .pc-link{
 font-weight: 600;
+transition: var(--transition-speed);
+&:hover{
+    transform: translateY(-2px);
+}
     &.active {
     // background: linear-gradient(135deg, #2583f2 0%, #1a6bc4 100%);
     background: #ffffff;

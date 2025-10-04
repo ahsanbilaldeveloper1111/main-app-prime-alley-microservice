@@ -15,20 +15,26 @@ import GsmListFilter from '@components/filters/GsmListFilter';
 
 import '@assets/scss/common.scss';
 
-import AnimatedNumber from '@components/AnimatedNumber';
-import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
+
 import { motion } from 'framer-motion';
 import imgStatus1 from '@assets/images/widget/img-status-1.svg'
 import imgStatus2 from '@assets/images/widget/img-status-2.svg'
 import imgStatus3 from '@assets/images/widget/img-status-3.svg'
 import imgStatus4 from '@assets/images/widget/img-status-4.svg'
-import { Dropdown, DropdownToggle, DropdownMenu, DropdownItem } from 'react-bootstrap';
-import { FiEdit, FiMoreVertical, FiTrash2 } from 'react-icons/fi';
 
 import AddGsmModal from '@pages/gsm/partial/AddGsmModal';
-import SuccessfulModal from '@pages/partial/SuccessfulModal';
-import ConfirmModal from '@pages/partial/ConfirmModal';
+
  import GsmDetailModel from '@pages/gsm/partial/GsmDetailModel';
+
+ import "@assets/scss/common.scss";
+import "@assets/scss/tabs.scss";
+import PageHeader from "@components/PageHeader";
+import FormModal from "../../partial/FormModal";
+import ConfirmModal from "@pages/partial/ConfirmModal";
+import SuccessfulModal from "@pages/partial/SuccessfulModal";
+import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
+import DatatableActionButton from "@components/DatatableActionButton";
+import { FiEdit, FiTrash2, FiEye,FiPlus } from "react-icons/fi";
 
 
 
@@ -73,41 +79,28 @@ const GsmList = () => {
           selector: (row: any) => row.id,
           sortable: false,
           cell: (props: any) => (
-              
-            //   <div className="action-buttons-container">
-  
-            //       {session?.user?.permissions?.includes('edit-gsm-management')  && (
-            //           <button className="btn btn-sm btn-outline-primary" onClick={() => handleEditGsm(props)}>Edit</button>
-            //       )}  
-
-            //       {session?.user?.permissions?.includes('delete-gsm-management')  && (
-            //           <button className="btn btn-sm btn-outline-danger" onClick={() => handleDeleteGsm(props)}>Delete</button>
-            //       )}
-            //   </div>
-
-            <Dropdown
-                className="table-action-dropdown"
-                //drop="start"
-                placement="top-start"
-            >
-                <DropdownToggle variant="outline-secondary" size="sm">
-                    <FiMoreVertical size={14} />
-                </DropdownToggle>
-                <DropdownMenu>
-                    <DropdownItem className="action-edit" onClick={() => setShowAddGsmModal(true)}>
-                        <FiEdit className="me-2" />
-                        Edit
-                    </DropdownItem>
-                    <DropdownItem className="action-view" onClick={() => setShowGsmDetailsModel(true)}>
-                        <FiEdit className="me-2" />
-                        View
-                    </DropdownItem>
-                    <DropdownItem className="action-delete" onClick={() => setShowDeleteGsmModal(true)}>
-                        <FiTrash2 className="me-2" />
-                        Delete
-                    </DropdownItem>
-                </DropdownMenu>
-            </Dropdown>
+            <DatatableActionButton
+              actions={[
+                {
+                  label: 'Edit',
+                  icon: <FiEdit className="me-2" />,
+                  onClick: () => setShowAddGsmModal(true),
+                  className: 'action-edit'
+                },
+                {
+                  label: 'View',
+                  icon: <FiEye className="me-2" />,
+                  onClick: () => setShowGsmDetailsModel(true),
+                  className: 'action-view'
+                },
+                {
+                  label: 'Delete',
+                  icon: <FiTrash2 className="me-2" />,
+                  onClick: () => setShowDeleteGsmModal(true),
+                  className: 'action-delete'
+                }
+              ]}
+            />
           ),
       },
     ];

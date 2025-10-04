@@ -10,6 +10,20 @@ import { useSession } from 'next-auth/react';
 import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
 import { getDevices, getMonitoringDashboard, deleteDevice, createDevice, updateDevice, Device, MonitoringDashboardResponse } from '@utils/netops';
 import { convertUTCToUserTimezone, GlobalDateFormat, GlobalTimeFormat } from '@utils/Helper';
+import "@assets/scss/common.scss";
+import { FiRefreshCw } from 'react-icons/fi';
+
+import "@assets/scss/tabs.scss";
+import PageHeader from "@components/PageHeader";
+import FormModal from "../../partial/FormModal";
+import ConfirmModal from "@pages/partial/ConfirmModal";
+import SuccessfulModal from "@pages/partial/SuccessfulModal";
+import DatatableActionButton from "@components/DatatableActionButton";
+import { FiEdit, FiTrash2, FiEye,FiPlus } from "react-icons/fi";
+
+
+
+
 
 interface Summary {
     total_devices: number;
@@ -31,7 +45,7 @@ const Devices = () => {
         { key: 'is_active', name: 'Status', selector: (row: any) => row.is_active, sortable: true,
             cell: (props: any) => {
                 return (
-                    <span className={`badge bg-${props.is_active ? 'success' : 'danger'}`}>
+                    <span className={`status-badge ${props.is_active ? 'success' : 'danger'}`}>
                         {props.is_active ? 'Active' : 'Inactive'}
                     </span>
                 );
@@ -48,22 +62,22 @@ const Devices = () => {
         { key: 'actions', name: 'Actions', selector: (row: any) => row.id, sortable: false,
             cell: (props: any) => {
                 return (
-                    <div className="d-flex gap-2">
-                        <Button
-                            variant="outline-primary"
-                            size="sm"
-                            onClick={() => handleEditDevice(props)}
-                        >
-                            <i className="fas fa-edit"></i>
-                        </Button>
-                        <Button
-                            variant="outline-danger"
-                            size="sm"
-                            onClick={() => handleDeleteDevice(props.id, props.hostname)}
-                        >
-                            <i className="fas fa-trash"></i>
-                        </Button>
-                    </div>
+                    <DatatableActionButton
+                        actions={[
+                            {
+                                label: 'Edit',
+                                icon: <FiEdit />,
+                                onClick: () => handleEditDevice(props),
+                                className: 'gap-2'
+                            },
+                            {
+                                label: 'Delete',
+                                icon: <FiTrash2 />,
+                                onClick: () => handleDeleteDevice(props.id, props.hostname),
+                                className: 'text-danger gap-2'
+                            }
+                        ]}
+                    />
                 );
             }
         }
@@ -82,17 +96,6 @@ const Devices = () => {
     const [showEditModal, setShowEditModal] = useState(false);
     const [deviceToDelete, setDeviceToDelete] = useState<{id: number, hostname: string} | null>(null);
     const [editingDevice, setEditingDevice] = useState<Device | null>(null);
-    const [formData, setFormData] = useState({
-        hostname: '',
-        ip_address: '',
-        username: '',
-        password: '',
-        protocol: 'SSH' as 'SSH' | 'TELNET' | 'HTTP' | 'HTTPS',
-        port: 22,
-        customer_name: '',
-        device_type: null as 'cisco_ios' | 'cisco_ios_telnet' | 'generic' | null,
-        enable_password: ''
-    });
 
     // Create cards data for PageSummaryGrid
     const summaryCards: SummaryCard[] = [
@@ -179,7 +182,7 @@ const Devices = () => {
         setShowDeleteModal(true);
     };
 
-    const confirmDeleteDevice = async () => {
+    const confirmDeleteDevice = async (confirmationText: string) => {
         if (!deviceToDelete) return;
 
         try {
@@ -195,23 +198,32 @@ const Devices = () => {
     };
 
     const handleCreateDevice = () => {
-        setFormData({
-            hostname: '',
-            ip_address: '',
-            username: '',
-            password: '',
-            protocol: 'SSH',
-            port: 22,
-            customer_name: '',
-            device_type: null,
-            enable_password: ''
-        });
         setShowCreateModal(true);
+    };
+
+    const [editFormData, setEditFormData] = useState({
+        hostname: '',
+        ip_address: '',
+        username: '',
+        password: '',
+        protocol: 'SSH' as 'SSH' | 'TELNET' | 'HTTP' | 'HTTPS',
+        port: 22,
+        customer_name: '',
+        device_type: null as 'cisco_ios' | 'cisco_ios_telnet' | 'generic' | null,
+        enable_password: ''
+    });
+
+    const handleEditInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+        const { name, value } = e.target;
+        setEditFormData(prev => ({
+            ...prev,
+            [name]: name === 'port' ? parseInt(value) || 22 : value
+        }));
     };
 
     const handleEditDevice = (device: Device) => {
         setEditingDevice(device);
-        setFormData({
+        setEditFormData({
             hostname: device.hostname,
             ip_address: device.ip_address,
             username: device.username,
@@ -219,28 +231,40 @@ const Devices = () => {
             protocol: device.protocol,
             port: device.port,
             customer_name: device.customer_name,
-            device_type: device.device_type,
+            device_type: device.device_type || null,
             enable_password: '' // Don't pre-fill enable password for security
         });
         setShowEditModal(true);
     };
 
-    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+
+    const [createFormData, setCreateFormData] = useState({
+        hostname: '',
+        ip_address: '',
+        username: '',
+        password: '',
+        protocol: 'SSH' as 'SSH' | 'TELNET' | 'HTTP' | 'HTTPS',
+        port: 22,
+        customer_name: '',
+        device_type: null as 'cisco_ios' | 'cisco_ios_telnet' | 'generic' | null,
+        enable_password: ''
+    });
+
+    const handleCreateInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
-        setFormData(prev => ({
+        setCreateFormData(prev => ({
             ...prev,
             [name]: name === 'port' ? parseInt(value) || 22 : value
         }));
     };
 
-    const handleCreateSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
+    const handleCreateSubmit = async () => {
         try {
-            await createDevice(formData);
+            await createDevice(createFormData);
             toast.success('Device created successfully');
             setRefreshKey(prev => prev + 1);
             setShowCreateModal(false);
-            setFormData({
+            setCreateFormData({
                 hostname: '',
                 ip_address: '',
                 username: '',
@@ -263,7 +287,7 @@ const Devices = () => {
 
         try {
             // Only include password fields if they have values
-            const updateData: any = { ...formData };
+            const updateData: any = { ...editFormData };
             if (!updateData.password) {
                 delete updateData.password;
             }
@@ -308,20 +332,22 @@ const Devices = () => {
                                 <h2 className="mb-0">Devices</h2>
                             </Col>
                             <Col md={8} className="d-flex justify-content-end">
-                                <div className="action-buttons">
+                                <div className="action-buttons gap-2">
                                     <Button
                                         variant="primary"
-                                        onClick={handleCreateDevice}
                                         className="me-2"
+                                        onClick={handleCreateDevice}
+                                        
                                     >
                                         <i className="fas fa-plus"></i> Add Device
                                     </Button>
                                     <Button
-                                        variant="outline-primary"
-                                        onClick={() => setRefreshKey(prev => prev + 1)}
+                                        variant="info"
                                         className="me-2"
+                                        onClick={() => setRefreshKey(prev => prev + 1)}
+                                       
                                     >
-                                        <i className="fas fa-sync-alt"></i> Refresh
+                                        <FiRefreshCw size={14} /> Refresh
                                     </Button>
                                 </div>
                             </Col>
@@ -345,142 +371,160 @@ const Devices = () => {
                 />
 
             {/* Create Device Modal */}
-            <Modal show={showCreateModal} onHide={() => setShowCreateModal(false)} size="lg" centered>
-                <Modal.Header closeButton>
-                    <Modal.Title>Add New Device</Modal.Title>
-                </Modal.Header>
-                <Form onSubmit={handleCreateSubmit}>
-                    <Modal.Body>
-                        <Row>
-                            <Col md={6}>
-                                <Form.Group className="mb-3">
-                                    <Form.Label>Hostname *</Form.Label>
-                                    <Form.Control
+            <FormModal
+                show={showCreateModal}
+                onHide={() => setShowCreateModal(false)}
+                title="Add New Device"
+                desc="Please fill in the details below to create a new device."
+                formHtml={
+                    <>
+                        <div className="row">
+                            <div className="col-md-6">
+                                <div className="form-group mb-3">
+                                    <label className="form-label">Hostname *</label>
+                                    <input
                                         type="text"
                                         name="hostname"
-                                        value={formData.hostname}
-                                        onChange={handleInputChange}
+                                        value={createFormData.hostname}
+                                        onChange={handleCreateInputChange}
                                         required
                                         placeholder="Enter hostname"
+                                        className="form-control"
                                     />
-                                </Form.Group>
-                            </Col>
-                            <Col md={6}>
-                                <Form.Group className="mb-3">
-                                    <Form.Label>IP Address *</Form.Label>
-                                    <Form.Control
+                                </div>
+                            </div>
+                            <div className="col-md-6">
+                                <div className="form-group mb-3">
+                                    <label className="form-label">IP Address *</label>
+                                    <input
                                         type="text"
                                         name="ip_address"
-                                        value={formData.ip_address}
-                                        onChange={handleInputChange}
+                                        value={createFormData.ip_address}
+                                        onChange={handleCreateInputChange}
                                         required
                                         placeholder="Enter IP address"
+                                        className="form-control"
                                     />
-                                </Form.Group>
-                            </Col>
-                        </Row>
-                        <Row>
-                            <Col md={6}>
-                                <Form.Group className="mb-3">
-                                    <Form.Label>Username *</Form.Label>
-                                    <Form.Control
+                                </div>
+                            </div>
+                        </div>
+                        <div className="row">
+                            <div className="col-md-6">
+                                <div className="form-group mb-3">
+                                    <label className="form-label">Username *</label>
+                                    <input
                                         type="text"
                                         name="username"
-                                        value={formData.username}
-                                        onChange={handleInputChange}
+                                        value={createFormData.username}
+                                        onChange={handleCreateInputChange}
                                         required
                                         placeholder="Enter username"
+                                        className="form-control"
                                     />
-                                </Form.Group>
-                            </Col>
-                            <Col md={6}>
-                                <Form.Group className="mb-3">
-                                    <Form.Label>Password *</Form.Label>
-                                    <Form.Control
+                                </div>
+                            </div>
+                            <div className="col-md-6">
+                                <div className="form-group mb-3">
+                                    <label className="form-label">Password *</label>
+                                    <input
                                         type="password"
                                         name="password"
-                                        value={formData.password}
-                                        onChange={handleInputChange}
+                                        value={createFormData.password}
+                                        onChange={handleCreateInputChange}
                                         required
                                         placeholder="Enter password"
+                                        className="form-control"
                                     />
-                                </Form.Group>
-                            </Col>
-                        </Row>
-                        <Row>
-                            <Col md={6}>
-                                <Form.Group className="mb-3">
-                                    <Form.Label>Protocol *</Form.Label>
-                                    <Form.Select
+                                </div>
+                            </div>
+                        </div>
+                        <div className="row">
+                            <div className="col-md-6">
+                                <div className="form-group mb-3">
+                                    <label className="form-label">Protocol *</label>
+                                    <select
                                         name="protocol"
-                                        value={formData.protocol}
-                                        onChange={handleInputChange}
+                                        value={createFormData.protocol}
+                                        onChange={handleCreateInputChange}
                                         required
+                                        className="form-control"
                                     >
                                         <option value="SSH">SSH</option>
                                         <option value="TELNET">TELNET</option>
                                         <option value="HTTP">HTTP</option>
                                         <option value="HTTPS">HTTPS</option>
-                                    </Form.Select>
-                                </Form.Group>
-                            </Col>
-                            <Col md={6}>
-                                <Form.Group className="mb-3">
-                                    <Form.Label>Port *</Form.Label>
-                                    <Form.Control
+                                    </select>
+                                </div>
+                            </div>
+                            <div className="col-md-6">
+                                <div className="form-group mb-3">
+                                    <label className="form-label">Port *</label>
+                                    <input
                                         type="number"
                                         name="port"
-                                        value={formData.port}
-                                        onChange={handleInputChange}
+                                        value={createFormData.port}
+                                        onChange={handleCreateInputChange}
                                         required
                                         min="1"
                                         max="65535"
+                                        className="form-control"
                                     />
-                                </Form.Group>
-                            </Col>
-                        </Row>
-                        <Row>
-                            <Col md={6}>
-                                <Form.Group className="mb-3">
-                                    <Form.Label>Customer Name *</Form.Label>
-                                    <Form.Control
+                                </div>
+                            </div>
+                        </div>
+                        <div className="row">
+                            <div className="col-md-6">
+                                <div className="form-group mb-3">
+                                    <label className="form-label">Customer Name *</label>
+                                    <input
                                         type="text"
                                         name="customer_name"
-                                        value={formData.customer_name}
-                                        onChange={handleInputChange}
+                                        value={createFormData.customer_name}
+                                        onChange={handleCreateInputChange}
                                         required
                                         placeholder="Enter customer name"
+                                        className="form-control"
                                     />
-                                </Form.Group>
-                            </Col>
-                            <Col md={6}>
-                                <Form.Group className="mb-3">
-                                    <Form.Label>Device Type</Form.Label>
-                                    <Form.Select
+                                </div>
+                            </div>
+                            <div className="col-md-6">
+                                <div className="form-group mb-3">
+                                    <label className="form-label">Device Type</label>
+                                    <select
                                         name="device_type"
-                                        value={formData.device_type || ''}
-                                        onChange={handleInputChange}
+                                        value={createFormData.device_type || ''}
+                                        onChange={handleCreateInputChange}
+                                        className="form-control"
                                     >
                                         <option value="">Select device type</option>
                                         <option value="cisco_ios">Cisco IOS</option>
                                         <option value="cisco_ios_telnet">Cisco IOS Telnet</option>
                                         <option value="generic">Generic</option>
-                                    </Form.Select>
-                                </Form.Group>
-                            </Col>
-                        </Row>
-                    
-                    </Modal.Body>
-                    <Modal.Footer>
-                        <Button variant="secondary" onClick={() => setShowCreateModal(false)}>
-                            Cancel
-                        </Button>
-                        <Button variant="primary" type="submit">
-                            Create Device
-                        </Button>
-                    </Modal.Footer>
-                </Form>
-            </Modal>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="row">
+                            <div className="col-md-12">
+                                <div className="form-group mb-3">
+                                    <label className="form-label">Enable Password</label>
+                                    <input
+                                        type="password"
+                                        name="enable_password"
+                                        value={createFormData.enable_password}
+                                        onChange={handleCreateInputChange}
+                                        placeholder="Enter enable password"
+                                        className="form-control"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    </>
+                }
+                onSubmit={handleCreateSubmit}
+                submitButtonText="Create Device"
+                cancelButtonText="Cancel"
+            />
 
             {/* Edit Device Modal */}
             <Modal show={showEditModal} onHide={() => setShowEditModal(false)} size="lg" centered>
@@ -496,8 +540,8 @@ const Devices = () => {
                                     <Form.Control
                                         type="text"
                                         name="hostname"
-                                        value={formData.hostname}
-                                        onChange={handleInputChange}
+                                        value={editFormData.hostname}
+                                        onChange={handleEditInputChange}
                                         required
                                         placeholder="Enter hostname"
                                     />
@@ -509,8 +553,8 @@ const Devices = () => {
                                     <Form.Control
                                         type="text"
                                         name="ip_address"
-                                        value={formData.ip_address}
-                                        onChange={handleInputChange}
+                                        value={editFormData.ip_address}
+                                        onChange={handleEditInputChange}
                                         required
                                         placeholder="Enter IP address"
                                     />
@@ -524,8 +568,8 @@ const Devices = () => {
                                     <Form.Control
                                         type="text"
                                         name="username"
-                                        value={formData.username}
-                                        onChange={handleInputChange}
+                                        value={editFormData.username}
+                                        onChange={handleEditInputChange}
                                         required
                                         placeholder="Enter username"
                                     />
@@ -537,8 +581,8 @@ const Devices = () => {
                                     <Form.Control
                                         type="password"
                                         name="password"
-                                        value={formData.password}
-                                        onChange={handleInputChange}
+                                        value={editFormData.password}
+                                        onChange={handleEditInputChange}
                                         placeholder="Enter new password (leave blank to keep current)"
                                     />
                                 </Form.Group>
@@ -550,8 +594,8 @@ const Devices = () => {
                                     <Form.Label>Protocol *</Form.Label>
                                     <Form.Select
                                         name="protocol"
-                                        value={formData.protocol}
-                                        onChange={handleInputChange}
+                                        value={editFormData.protocol}
+                                        onChange={handleEditInputChange}
                                         required
                                     >
                                         <option value="SSH">SSH</option>
@@ -567,8 +611,8 @@ const Devices = () => {
                                     <Form.Control
                                         type="number"
                                         name="port"
-                                        value={formData.port}
-                                        onChange={handleInputChange}
+                                        value={editFormData.port}
+                                        onChange={handleEditInputChange}
                                         required
                                         min="1"
                                         max="65535"
@@ -583,8 +627,8 @@ const Devices = () => {
                                     <Form.Control
                                         type="text"
                                         name="customer_name"
-                                        value={formData.customer_name}
-                                        onChange={handleInputChange}
+                                        value={editFormData.customer_name}
+                                        onChange={handleEditInputChange}
                                         required
                                         placeholder="Enter customer name"
                                     />
@@ -595,8 +639,8 @@ const Devices = () => {
                                     <Form.Label>Device Type</Form.Label>
                                     <Form.Select
                                         name="device_type"
-                                        value={formData.device_type || ''}
-                                        onChange={handleInputChange}
+                                        value={editFormData.device_type || ''}
+                                        onChange={handleEditInputChange}
                                     >
                                         <option value="">Select device type</option>
                                         <option value="cisco_ios">Cisco IOS</option>
@@ -613,8 +657,8 @@ const Devices = () => {
                                     <Form.Control
                                         type="password"
                                         name="enable_password"
-                                        value={formData.enable_password}
-                                        onChange={handleInputChange}
+                                        value={editFormData.enable_password}
+                                        onChange={handleEditInputChange}
                                         placeholder="Enter new enable password (leave blank to keep current)"
                                     />
                                 </Form.Group>
@@ -633,23 +677,25 @@ const Devices = () => {
             </Modal>
 
             {/* Delete Confirmation Modal */}
-            <Modal show={showDeleteModal} onHide={() => setShowDeleteModal(false)} centered>
-                <Modal.Header closeButton>
-                    <Modal.Title>Confirm Delete</Modal.Title>
-                </Modal.Header>
-                <Modal.Body>
-                    Are you sure you want to delete device <strong>{deviceToDelete?.hostname}</strong>? 
-                    This action cannot be undone.
-                </Modal.Body>
-                <Modal.Footer>
-                    <Button variant="secondary" onClick={() => setShowDeleteModal(false)}>
-                        Cancel
-                    </Button>
-                    <Button variant="danger" onClick={confirmDeleteDevice}>
-                        Delete Device
-                    </Button>
-                </Modal.Footer>
-            </Modal>
+            {showDeleteModal && deviceToDelete && (
+                <ConfirmModal
+                    show={showDeleteModal}
+                    onHide={() => setShowDeleteModal(false)}
+                    title="Delete Device?"
+                    description="Are you sure you want to delete device {targetName}? This action cannot be undone."
+                    targetName={deviceToDelete.hostname}
+                    confirmButtonText="Delete Device"
+                    cancelButtonText="Cancel"
+                    onConfirm={confirmDeleteDevice}
+                    onCancel={() => setShowDeleteModal(false)}
+                    confirmButtonVariant="danger"
+                    cancelButtonVariant="secondary"
+                    requireTextConfirmation={true}
+                    confirmationPlaceholder="Type the word DELETE to confirm"
+                    confirmationLabel=""
+                    requiredConfirmationText="DELETE"
+                />
+            )}
         </React.Fragment>
     );
 };

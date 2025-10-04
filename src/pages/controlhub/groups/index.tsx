@@ -1,18 +1,19 @@
 import '@assets/scss/datatable-style.scss';
-import React, { ReactElement, useRef, useState } from 'react';
+import React, { ReactElement, useState } from 'react';
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
 import GenericListPage from '@components/GenericListPage';
 import { getAllGroups, ListGroups, updateGroup,deleteGroup,addGroup } from '@utils/groups';
 import { Column } from '@components/CustomDataTable';
-import { Button, DropdownItem, DropdownToggle, Dropdown, DropdownMenu, Modal, Row, Popover, Overlay } from 'react-bootstrap';
+import { Button, Modal, Row } from 'react-bootstrap';
 import { Col } from 'react-bootstrap';
 import GroupsFilters from '@components/filters/GroupsFilters';
 import { toast } from 'react-toastify';
 import { useTokenService } from 'src/hooks/useTokenService';
 import { useSession } from 'next-auth/react';
 import '@assets/scss/common.scss';
-import { FiEdit, FiMoreVertical, FiTrash2 } from 'react-icons/fi';
+import { FiEdit, FiTrash2 } from 'react-icons/fi';
+import DatatableActionButton from '@components/DatatableActionButton';
 import TableAction from '@components/TableAction';
 import { Link } from 'feather-icons-react';
 import FormModal from "@pages/partial/FormModal";
@@ -20,52 +21,6 @@ import '@assets/scss/common.scss';
 import SuccessfulModal from '@pages/partial/SuccessfulModal';
 import ConfirmModal from '@pages/partial/ConfirmModal';
 
-// Action Cell Component
-const ActionCell = ({ props, onEdit, onDelete, session }: any) => {
-    const [show, setShow] = useState(false);
-    const target = useRef(null);
-    
-    return (
-        <div className="table-action-dropdown">
-            <Button
-                ref={target}
-                variant="outline-secondary"
-                size="sm"
-                onClick={() => setShow(!show)}
-            >
-                <FiMoreVertical size={14} />
-            </Button>
-
-            <Overlay
-                show={show}
-                target={target.current}
-                placement="left"
-                rootClose
-                onHide={() => setShow(false)}
-            >
-                <Popover className="action-menu-popover">
-                    <Popover.Body className="p-0">
-                        <div className="action-menu">
-                            {session?.user?.permissions?.includes('edit-groups') && (
-                                <button className="action-item action-edit" onClick={() => { onEdit(props); setShow(false); }}>
-                                    <FiEdit className="me-2" />
-                                    Edit
-                                </button>
-                            )}
-
-                            {session?.user?.permissions?.includes('delete-groups') && (
-                                <button className="action-item text-danger" onClick={() => { onDelete(props); setShow(false); }}>
-                                    <FiTrash2 className="me-2" />
-                                    Delete
-                                </button>
-                            )}
-                        </div>
-                    </Popover.Body>
-                </Popover>
-            </Overlay>
-        </div>
-    );
-};
 
 
 const Groups = () => {
@@ -82,11 +37,21 @@ const Groups = () => {
                 selector: (row: any) => row.id,
                 sortable: false,
                 cell: (props: any) => (
-                    <ActionCell 
-                        props={props} 
-                        onEdit={handleEditGroup} 
-                        onDelete={handleDeleteGroup} 
-                        session={session} 
+                    <DatatableActionButton
+                        actions={[
+                            ...(session?.user?.permissions?.includes('edit-groups') ? [{
+                                label: 'Edit',
+                                icon: <FiEdit className="me-2" />,
+                                onClick: () => handleEditGroup(props),
+                                className: 'action-edit'
+                            }] : []),
+                            ...(session?.user?.permissions?.includes('delete-groups') ? [{
+                                label: 'Delete',
+                                icon: <FiTrash2 className="me-2" />,
+                                onClick: () => handleDeleteGroup(props),
+                                className: 'text-danger'
+                            }] : [])
+                        ]}
                     />
                 )
             }

@@ -9,6 +9,7 @@ import { Button, Row, Col, Card, Form, Spinner } from 'react-bootstrap';
 import { toast } from 'react-toastify';
 import { useSession } from 'next-auth/react';
 import Select from 'react-select';
+import "@assets/scss/common.scss";
 
 const GsmSync = () => {
     const { data: session, status } = useSession();
@@ -158,8 +159,8 @@ const GsmSync = () => {
                             <h5 className="card-title mb-0">GSM Sync Configuration</h5>
                         </Card.Header>
                         <Card.Body>
-                            <Row>
-                                <Col md={6}>
+                            <Row className="d-flex justify-content-between align-items-center">
+                                <Col md={5}>
                                     <Form.Group className="mb-3">
                                         <Form.Label>Select GSM</Form.Label>
                                         <Select
@@ -173,9 +174,10 @@ const GsmSync = () => {
                                         />
                                     </Form.Group>
                                 </Col>
-                                <Col md={6}>
+                                <Col md={5}>
                                     <Form.Group className="mb-3">
-                                        <Form.Label>Select Type</Form.Label>
+                                        
+                                    <Form.Label>Select Type</Form.Label>
                                         <Select
                                             value={selectedType}
                                             onChange={handleTypeChange}
@@ -184,29 +186,15 @@ const GsmSync = () => {
                                             isClearable
                                         />
                                     </Form.Group>
+
+                                    
                                 </Col>
-                            </Row>
-                            
-                            <Row>
-                                <Col md={6}>
-                                    <Form.Group className="mb-3">
-                                        <Form.Label>Select Ports (Multi-select)</Form.Label>
-                                        <Select
-                                            value={selectedPorts}
-                                            onChange={handlePortsChange}
-                                            options={portsList}
-                                            placeholder="Choose ports..."
-                                            isMulti
-                                            isClearable
-                                            isSearchable
-                                            isDisabled={!selectedGsm}
-                                        />
-                                    </Form.Group>
-                                </Col>
-                                <Col md={6} className="d-flex align-items-center">
-                                    <div className="d-flex gap-2 mt-3 items-center">
-                                        <Button
+                                <Col md={2}>
+                                  <Form.Group className="mb-3">
+                                  <Form.Label></Form.Label>
+                                  <Button
                                             variant="primary"
+                                            className="btn-sm app-button"
                                             onClick={handleFetchDetails}
                                             disabled={isFetchButtonDisabled}
                                             size="sm"
@@ -227,10 +215,29 @@ const GsmSync = () => {
                                                 'Sync Ports'
                                             )}
                                         </Button>
-                                        
-                                        <Button
+                                  </Form.Group>
+                                </Col>
+                            </Row>
+                            
+                            <Row>
+                                <Col md={6}>
+                                    <Form.Group className="mb-3">
+                                        <Form.Label>Select Ports (Multi-select)</Form.Label>
+                                        <Select
+                                            value={selectedPorts}
+                                            onChange={handlePortsChange}
+                                            options={portsList}
+                                            placeholder="Choose ports..."
+                                            isMulti
+                                            isClearable
+                                            isSearchable
+                                            isDisabled={!selectedGsm}
+                                        />
+                                    </Form.Group>
+                                    <Button
                                             variant="success"
                                             onClick={handleSyncMobileNumbers}
+                                            className="btn-sm app-button"
                                             disabled={isMobileSyncButtonDisabled}
                                             size="sm"
                                         >
@@ -250,8 +257,8 @@ const GsmSync = () => {
                                                 'Sync Mobile Numbers'
                                             )}
                                         </Button>
-                                    </div>
                                 </Col>
+                               
                             </Row>
 
                             {(selectedGsm && selectedType) || (selectedGsm && selectedPorts.length > 0) ? (

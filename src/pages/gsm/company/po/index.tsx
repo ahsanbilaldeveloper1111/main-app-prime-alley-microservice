@@ -17,6 +17,7 @@ import moment from "moment";
 import CompanyPOFilters from "@components/filters/CompanyPOFilters";
 
 import '@assets/scss/common.scss';
+import { FiRefreshCw } from "react-icons/fi";
 
 interface CompanyPOData {
   company_name: string;
@@ -210,8 +211,8 @@ const CompanyPO = () => {
 
                         <CompanyPOFilters onFiltersChange={handleFiltersChange}  />
                        
-                        <button className="btn btn-export" id="export-btn" onClick={handleRefresh}>
-                            <i className="fas fa-refresh"></i> Refresh
+                        <button className="btn btn-primary" onClick={handleRefresh}>
+                            <FiRefreshCw className="me-2" /> Refresh
                         </button>
                     </div>
 

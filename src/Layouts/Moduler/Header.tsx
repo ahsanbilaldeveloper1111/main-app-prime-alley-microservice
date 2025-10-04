@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useMemo } from "react";
+import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/router";
@@ -52,6 +52,12 @@ const Header = ({ themeMode }: HeaderProps) => {
         isAdmin: false
     });
     
+    // Ref to track hide timeout
+    const hideTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    
+    // Ref to track if submenu position has been set
+    const submenuPositionedRef = useRef<boolean>(false);
+    
     // Memoized user data
     const userData = useMemo(() => {
         if (!session?.user) return null;
@@ -100,11 +106,20 @@ const Header = ({ themeMode }: HeaderProps) => {
 
     // Utility functions
     const hideSubmenuPopup = useCallback(() => {
+        // Clear any existing timeout
+        if (hideTimeoutRef.current) {
+            clearTimeout(hideTimeoutRef.current);
+            hideTimeoutRef.current = null;
+        }
+        
         const submenuPopup = document.querySelector(DOM_SELECTORS.SUBMENU_POPUP) as HTMLElement;
-            if (submenuPopup) {
-                submenuPopup.classList.remove('active');
-                submenuPopup.style.display = 'none';
-            }
+        if (submenuPopup) {
+            // Hide immediately without animation
+            submenuPopup.classList.remove('active');
+            submenuPopup.style.display = 'none';
+            // Reset positioning flag when hiding
+            submenuPositionedRef.current = false;
+        }
     }, []);
 
     const updateSubmenuHeight = useCallback((tabPane: HTMLElement) => {
@@ -137,12 +152,110 @@ const Header = ({ themeMode }: HeaderProps) => {
         setTimeout(() => updateSubmenuHeight(tabPane), TIMING.HEIGHT_UPDATE_DELAY);
     }, [updateSubmenuHeight]);
 
+    const adjustSubmenuPosition = useCallback((submenuPopup: HTMLElement, targetRect: DOMRect, sidebarRect: DOMRect, forceReposition = false) => {
+        // Don't reposition if already positioned and not forcing
+        if (submenuPositionedRef.current && !forceReposition) {
+            return;
+        }
+        
+        const viewportHeight = window.innerHeight;
+        const submenuHeight = submenuPopup.offsetHeight;
+        const relativeTop = targetRect.top - sidebarRect.top;
+        const spaceBelow = viewportHeight - (targetRect.bottom);
+        const spaceAbove = targetRect.top;
+        
+        // If submenu height is not available yet, use a reasonable estimate
+        const estimatedHeight = submenuHeight || 200;
+        
+        // Check if submenu would extend beyond bottom of viewport
+        if (spaceBelow < estimatedHeight && spaceAbove > estimatedHeight) {
+            // Position from bottom to top
+            const bottomPosition = viewportHeight - (targetRect.bottom);
+            submenuPopup.style.top = 'auto';
+            submenuPopup.style.bottom = `${bottomPosition}px`;
+            submenuPopup.style.position = 'absolute';
+            submenuPopup.classList.add('positioned-bottom');
+        } else {
+            // Position from top to bottom (default)
+            submenuPopup.style.top = `${relativeTop}px`;
+            submenuPopup.style.bottom = 'auto';
+            submenuPopup.style.position = 'absolute';
+            submenuPopup.classList.remove('positioned-bottom');
+        }
+        
+        submenuPopup.style.left = '100%';
+        submenuPopup.style.zIndex = '1000';
+        
+        // Mark as positioned
+        submenuPositionedRef.current = true;
+    }, []);
+
     // Route change handler
     useEffect(() => {
         const handleRouteChange = hideSubmenuPopup;
         router.events.on('routeChangeStart', handleRouteChange);
         return () => router.events.off('routeChangeStart', handleRouteChange);
     }, [router, hideSubmenuPopup]);
+
+    // Window resize handler to recalculate submenu positioning
+    useEffect(() => {
+        const handleResize = () => {
+            const submenuPopup = document.querySelector(DOM_SELECTORS.SUBMENU_POPUP) as HTMLElement;
+            if (submenuPopup && submenuPopup.classList.contains('active')) {
+                const sidebar = document.querySelector(DOM_SELECTORS.SIDEBAR) as HTMLElement;
+                const activeNavLink = document.querySelector('.pc-link.active') as HTMLElement;
+                if (sidebar && activeNavLink) {
+                    const tabRect = activeNavLink.getBoundingClientRect();
+                    const sidebarRect = sidebar.getBoundingClientRect();
+                    adjustSubmenuPosition(submenuPopup, tabRect, sidebarRect, true); // Force reposition on resize
+                }
+            }
+        };
+
+        // Global mouse move handler to better track menu interactions
+        const handleGlobalMouseMove = (e: MouseEvent) => {
+            const submenuPopup = document.querySelector(DOM_SELECTORS.SUBMENU_POPUP) as HTMLElement;
+            if (!submenuPopup || !submenuPopup.classList.contains('active')) return;
+
+            const target = e.target as HTMLElement;
+            const isOverSidebar = target.closest(DOM_SELECTORS.SIDEBAR);
+            const isOverSubmenu = target.closest('.pc-submenu-popup');
+            
+            // Clear any existing timeout
+            if (hideTimeoutRef.current) {
+                clearTimeout(hideTimeoutRef.current);
+                hideTimeoutRef.current = null;
+            }
+            
+            // Only hide if mouse is completely outside both sidebar and submenu
+            if (!isOverSidebar && !isOverSubmenu) {
+                hideTimeoutRef.current = setTimeout(() => {
+                    const currentSubmenuPopup = document.querySelector(DOM_SELECTORS.SUBMENU_POPUP) as HTMLElement;
+                    if (currentSubmenuPopup && currentSubmenuPopup.classList.contains('active')) {
+                        const currentTarget = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement;
+                        const stillOutsideSidebar = !currentTarget?.closest(DOM_SELECTORS.SIDEBAR);
+                        const stillOutsideSubmenu = !currentTarget?.closest('.pc-submenu-popup');
+                        
+                        if (stillOutsideSidebar && stillOutsideSubmenu) {
+                            hideSubmenuPopup();
+                        }
+                    }
+                }, 50); // Reduced delay from 200ms to 50ms
+            }
+        };
+
+        window.addEventListener('resize', handleResize);
+        document.addEventListener('mousemove', handleGlobalMouseMove);
+        
+        return () => {
+            window.removeEventListener('resize', handleResize);
+            document.removeEventListener('mousemove', handleGlobalMouseMove);
+            if (hideTimeoutRef.current) {
+                clearTimeout(hideTimeoutRef.current);
+                hideTimeoutRef.current = null;
+            }
+        };
+    }, [adjustSubmenuPosition, hideSubmenuPopup]);
 
 
     // Event handlers
@@ -159,60 +272,89 @@ const Header = ({ themeMode }: HeaderProps) => {
                             return;
                         }
                         
-            const submenuPopup = document.querySelector(DOM_SELECTORS.SUBMENU_POPUP) as HTMLElement;
+                        const submenuPopup = document.querySelector(DOM_SELECTORS.SUBMENU_POPUP) as HTMLElement;
                         if (submenuPopup) {
-                            submenuPopup.classList.add('active');
+                            // Clear any existing hide timeout
+                            if (hideTimeoutRef.current) {
+                                clearTimeout(hideTimeoutRef.current);
+                                hideTimeoutRef.current = null;
+                            }
+                            
+                            // Show the popup first
                             submenuPopup.style.display = 'block';
                             
                             const tabRect = target.getBoundingClientRect();
-                const sidebarRect = document.querySelector(DOM_SELECTORS.SIDEBAR)?.getBoundingClientRect();
+                            const sidebarRect = document.querySelector(DOM_SELECTORS.SIDEBAR)?.getBoundingClientRect();
                             
                             if (sidebarRect) {
+                                // Position immediately for initial display
                                 const relativeTop = tabRect.top - sidebarRect.top;
                                 submenuPopup.style.top = `${relativeTop}px`;
-                                submenuPopup.style.position = 'absolute';
                                 submenuPopup.style.left = '100%';
+                                submenuPopup.style.position = 'absolute';
                                 submenuPopup.style.zIndex = '1000';
+                                
+                                // Start the fade in animation after a brief delay
+                                setTimeout(() => {
+                                    submenuPopup.classList.add('active');
+                                }, 10);
+                                
+                                // Then adjust position after content is rendered
+                                setTimeout(() => {
+                                    adjustSubmenuPosition(submenuPopup, tabRect, sidebarRect);
+                                }, 50);
+                                
+                                const targetId = target.getAttribute('data-bs-target');
+                                const tabPane = targetId ? document.querySelector(targetId) as HTMLElement : null;
+                                if (tabPane) {
+                                    // Reset scroll position before showing tab pane
+                                    const navbar = tabPane.querySelector('.pc-navbar') as HTMLElement;
+                                    if (navbar) {
+                                        navbar.scrollTop = 0;
+                                    }
+                                    showTabPane(tabPane);
+                                    
+                                    // Ensure positioning is correct after tab pane is shown
+                                    setTimeout(() => {
+                                        adjustSubmenuPosition(submenuPopup, tabRect, sidebarRect, true);
+                                    }, 100);
+                                }
                             }
-                        }
-                        
-                        const targetId = target.getAttribute('data-bs-target');
-                        const tabPane = targetId ? document.querySelector(targetId) as HTMLElement : null;
-                        if (tabPane) {
-                            // Reset scroll position before showing tab pane
-                            const navbar = tabPane.querySelector('.pc-navbar') as HTMLElement;
-                            if (navbar) {
-                                navbar.scrollTop = 0;
-                            }
-                            showTabPane(tabPane);
                         }
         };
     }, [showTabPane]);
 
     const createMouseLeaveHandler = useCallback(() => {
         return function(e: Event) {
-                        const target = e.target as HTMLElement;
+            const target = e.target as HTMLElement;
             if (!target || !target.closest(DOM_SELECTORS.NAV_LINKS.split(' > ')[0]) || 
                 !target.classList.contains('pc-link') || target.tagName === 'BUTTON') {
-                            return;
-                        }
-                        
-                        const computedStyle = window.getComputedStyle(target);
-                        if (computedStyle.position === 'absolute' || computedStyle.position === 'fixed') {
-                            return;
-                        }
-                        
-                        const mouseEvent = e as MouseEvent;
-                        const relatedTarget = mouseEvent.relatedTarget as HTMLElement;
-            const submenuPopup = document.querySelector(DOM_SELECTORS.SUBMENU_POPUP) as HTMLElement;
-                        
-                        if (relatedTarget && submenuPopup && submenuPopup.contains(relatedTarget)) {
-                            return;
-                        }
-                        
-            hideSubmenuPopup();
+                return;
+            }
+            
+            const computedStyle = window.getComputedStyle(target);
+            if (computedStyle.position === 'absolute' || computedStyle.position === 'fixed') {
+                return;
+            }
+            
+            const mouseEvent = e as MouseEvent;
+            const relatedTarget = mouseEvent.relatedTarget as HTMLElement;
+            
+            // Don't hide if moving to submenu popup or its children
+            if (relatedTarget && (
+                relatedTarget.closest('.pc-submenu-popup') ||
+                relatedTarget.classList.contains('pc-submenu-popup')
+            )) {
+                return;
+            }
+            
+            // Only hide if moving to a different nav link or completely away
+            if (relatedTarget && relatedTarget.closest(DOM_SELECTORS.NAV_LINKS.split(' > ')[0])) {
+                // Moving to another nav link, let the global handler manage this
+                return;
+            }
         };
-    }, [hideSubmenuPopup]);
+    }, []);
 
     // Main hover events effect
     useEffect(() => {
@@ -244,26 +386,49 @@ const Header = ({ themeMode }: HeaderProps) => {
                 if (!submenuPopup) return;
                 
                 const submenuEnterHandler = () => {
+                    // Clear any existing hide timeout
+                    if (hideTimeoutRef.current) {
+                        clearTimeout(hideTimeoutRef.current);
+                        hideTimeoutRef.current = null;
+                    }
+                    
                     submenuPopup.classList.add('active');
-                        const activeTabPane = submenuPopup.querySelector('.tab-pane.active') as HTMLElement;
-                        if (activeTabPane) {
-                            // Reset scroll position for the active navbar
-                            const navbar = activeTabPane.querySelector('.pc-navbar') as HTMLElement;
-                            if (navbar) {
-                                navbar.scrollTop = 0;
-                            }
-                            setTimeout(() => updateSubmenuHeight(activeTabPane), TIMING.HEIGHT_UPDATE_DELAY);
+                    const activeTabPane = submenuPopup.querySelector('.tab-pane.active') as HTMLElement;
+                    if (activeTabPane) {
+                        // Reset scroll position for the active navbar
+                        const navbar = activeTabPane.querySelector('.pc-navbar') as HTMLElement;
+                        if (navbar) {
+                            navbar.scrollTop = 0;
                         }
+                        setTimeout(() => {
+                            updateSubmenuHeight(activeTabPane);
+                            // Don't recalculate position when entering submenu popup
+                            // This prevents the slight upward shift
+                        }, TIMING.HEIGHT_UPDATE_DELAY);
+                    }
                 };
                 
-                const submenuLeaveHandler = () => {
-                    submenuPopup.classList.remove('active');
-                    submenuPopup.style.display = 'none';
-                    const tabPanes = document.querySelectorAll(DOM_SELECTORS.TAB_PANES);
-                    tabPanes.forEach((tabPane) => {
-                        tabPane.classList.remove('active', 'show');
-                });
-            };
+                const submenuLeaveHandler = (e: Event) => {
+                    const mouseEvent = e as MouseEvent;
+                    const relatedTarget = mouseEvent.relatedTarget as HTMLElement;
+                    
+                    // Don't hide if moving back to the navigation link
+                    if (relatedTarget && relatedTarget.closest(DOM_SELECTORS.NAV_LINKS.split(' > ')[0])) {
+                        return;
+                    }
+                    
+                    // Hide immediately when leaving submenu popup
+                    // Clear any existing timeout first
+                    if (hideTimeoutRef.current) {
+                        clearTimeout(hideTimeoutRef.current);
+                        hideTimeoutRef.current = null;
+                    }
+                    
+                    // Hide with minimal delay to prevent flickering
+                    hideTimeoutRef.current = setTimeout(() => {
+                        hideSubmenuPopup();
+                    }, 10);
+                };
 
                 submenuPopup.addEventListener('mouseenter', submenuEnterHandler);
                 submenuPopup.addEventListener('mouseleave', submenuLeaveHandler);
@@ -274,16 +439,26 @@ const Header = ({ themeMode }: HeaderProps) => {
                 const sidebar = document.querySelector(DOM_SELECTORS.SIDEBAR) as HTMLElement;
                 if (!sidebar) return;
                 
-                sidebar.addEventListener('mouseleave', () => {
-                    const submenuPopup = document.querySelector(DOM_SELECTORS.SUBMENU_POPUP) as HTMLElement;
-                    if (submenuPopup) {
-                        submenuPopup.classList.remove('active');
-                        submenuPopup.style.display = 'none';
-                        const tabPanes = document.querySelectorAll(DOM_SELECTORS.TAB_PANES);
-                        tabPanes.forEach((tabPane) => {
-                            tabPane.classList.remove('active', 'show');
-                        });
+                sidebar.addEventListener('mouseleave', (e) => {
+                    const mouseEvent = e as MouseEvent;
+                    const relatedTarget = mouseEvent.relatedTarget as HTMLElement;
+                    
+                    // Don't hide if moving to submenu popup
+                    if (relatedTarget && relatedTarget.closest('.pc-submenu-popup')) {
+                        return;
                     }
+                    
+                    // Hide immediately when leaving sidebar
+                    // Clear any existing timeout first
+                    if (hideTimeoutRef.current) {
+                        clearTimeout(hideTimeoutRef.current);
+                        hideTimeoutRef.current = null;
+                    }
+                    
+                    // Hide with minimal delay to prevent flickering
+                    hideTimeoutRef.current = setTimeout(() => {
+                        hideSubmenuPopup();
+                    }, 10);
                 });
             };
 

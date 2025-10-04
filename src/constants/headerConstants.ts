@@ -174,7 +174,7 @@ export const HEADER_CONSTANTS = {
     LIST: 'ph-duotone ph-list',
     ENVELOPE: 'ph-duotone ph-envelope',
     ARROWS_CLOCKWISE: 'ph-duotone ph-arrows-clockwise',
-    BUILDING: 'ph-duotone ph-building',
+    BUILDING: 'ph-duotone ph-buildings',
     FILE_ANALYTICS: 'ti ti-file-analytics',
     TRANSLATE: 'ph-duotone ph-translate',
     SHOPPING_CART: 'ph-duotone ph-shopping-cart',

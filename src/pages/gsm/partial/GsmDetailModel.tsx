@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, Col, Row } from 'react-bootstrap';
 import dynamic from 'next/dynamic';
 import { ApexOptions } from 'apexcharts';
+import "@assets/scss/common.scss";
 const ReactApexChart = dynamic(() => import('react-apexcharts'), { ssr: false });
 
 interface GsmDetailModelProps {
@@ -355,14 +356,17 @@ const GsmDetailModel: React.FC<GsmDetailModelProps> = ({
                                           </Row>
                                     </div>
                                     <div className="action-button-container mt-3 d-flex justify-content-center gap-2">
-                                          <button className="btn btn-primary">
-                                                <i className="fas fa-edit"></i> Send Command
+                                          <button className="btn btn-primary app-button btn-sm">
+                                                {/* <i className="fas fa-paper-plane"></i>  */}
+                                                Send Command
                                           </button>
-                                          <button className="btn btn-warning">
-                                                <i className="fas fa-sync"></i> Force Update
+                                          <button className="btn btn-warning app-button btn-sm">
+                                                {/* <i className="fas fa-sync"></i> */}
+                                                 Force Update
                                           </button>
-                                          <button className="btn btn-success">
-                                                <i className="fas fa-power-off"></i> Toggle Power
+                                          <button className="btn btn-success app-button btn-sm">
+                                                {/* <i className="fas fa-power-off"></i>  */}
+                                                Toggle Power
                                           </button>
                                     </div>
                               </Card.Body>

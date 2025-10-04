@@ -7,7 +7,7 @@ import { ListGsmAssign, AssignPorts,UnassignPorts,DelinkCompany,EditAssign,NewAs
 import { getGsmData } from '@utils/GsmManagement';
 
 import { Column } from '@components/CustomDataTable';
-import { Button, DropdownItem, DropdownMenu, Dropdown, Modal, Row, DropdownToggle } from 'react-bootstrap';
+import { Button, Modal, Row } from 'react-bootstrap';
 import { Col } from 'react-bootstrap';
 import { toast } from 'react-toastify';
 import { useTokenService } from 'src/hooks/useTokenService';
@@ -21,7 +21,8 @@ import imgStatus1 from '@assets/images/widget/img-status-1.svg'
 import imgStatus2 from '@assets/images/widget/img-status-2.svg'
 import imgStatus3 from '@assets/images/widget/img-status-3.svg'
 import imgStatus4 from '@assets/images/widget/img-status-4.svg'
-import { FiEdit, FiTrash2,FiMoreVertical } from 'react-icons/fi';
+import { FiEdit, FiTrash2, FiEye } from 'react-icons/fi';
+import DatatableActionButton from '@components/DatatableActionButton';
 import GsmAssignmentModal from '@pages/gsm/partial/GsmAssignmentModal';
 import SuccessfulModal from '@pages/partial/SuccessfulModal';
 import ConfirmModal from '@pages/partial/ConfirmModal';
@@ -68,29 +69,28 @@ const GsmAssign = () => {
                       <button className="btn btn-sm btn-outline-primary" onClick={() => handleEditLink(props)}>Edit</button>
                   )} */}
 
-<Dropdown
-                className="table-action-dropdown"
-                //drop="start"
-                placement="top-start"
-            >
-                <DropdownToggle variant="outline-secondary" size="sm">
-                    <FiMoreVertical size={14} />
-                </DropdownToggle>
-                <DropdownMenu>
-                    <DropdownItem className="action-edit" onClick={() => handleAssignGsm()}>
-                        <FiEdit className="me-2" />
-                        Edit
-                    </DropdownItem>
-                    <DropdownItem className="action-view" onClick={() => handleAssignPortsNew(props)}>
-                        <FiEdit className="me-2" />
-                        Ports
-                    </DropdownItem>
-                    <DropdownItem className="action-delete" onClick={() => handleDelinkCompany(props)}>
-                        <FiTrash2 className="me-2" />
-                        Delete
-                    </DropdownItem>
-                </DropdownMenu>
-            </Dropdown>
+<DatatableActionButton
+              actions={[
+                {
+                  label: 'Edit',
+                  icon: <FiEdit className="me-2" />,
+                  onClick: () => handleAssignGsm(),
+                  className: 'action-edit'
+                },
+                {
+                  label: 'Ports',
+                  icon: <FiEye className="me-2" />,
+                  onClick: () => handleAssignPortsNew(props),
+                  className: 'action-view'
+                },
+                {
+                  label: 'Delete',
+                  icon: <FiTrash2 className="me-2" />,
+                  onClick: () => handleDelinkCompany(props),
+                  className: 'action-delete'
+                }
+              ]}
+            />
 
                   
               </div>
@@ -351,7 +351,7 @@ const GsmAssign = () => {
                         </div> */}
                         <GsmCompanyFilter onFiltersChange={handleFiltersChange} onExport={handleExport} showExport={false} />
 
-                        <button className="btn btn-info btn-sm"  onClick={() => handleAssignGsm()}>
+                        <button className="btn btn-primary btn-sm"  onClick={() => handleAssignGsm()}>
                             <i className="fas fa-plus"></i> New Assign
                         </button>
                         

@@ -4,6 +4,7 @@ import Select from 'react-select';
 import { toast } from "react-toastify";
 import { ListGsmManagement } from "@utils/GsmManagement";
 import { GetCompanyList } from "@utils/GsmAssign";
+import { FiFilter } from "react-icons/fi";
 
 interface CompanyPOFiltersProps {
   onFiltersChange: (filters: any) => void;
@@ -94,41 +95,13 @@ export default function CompanyPOFilters({ onFiltersChange }: CompanyPOFiltersPr
 
   return (
     <div className="d-flex align-items-center ms-auto gap-2">
-      {/* Active Filters Display */}
-      <div className="d-flex align-items-center gap-2 mt-3">
-        {Object.entries(selectedFilters).map(([key, value]) => (
-          <p key={key} className="badge bg-primary" style={{fontSize: '12px', marginRight: '5px'}}>
-            {key}: {value}
-            <span
-              className="btn-close btn-close-white ms-2 text-white"
-              onClick={() => {
-                setSelectedFilters((prev) => {
-                  const updated = { ...prev };
-                  delete updated[key];
-                  return updated;
-                });
-                // Reset corresponding dropdown
-                if (key === 'gsm_id') setSelectedGsm(null);
-                if (key === 'company') setSelectedCompany(null);
-                // Apply filters without the removed filter
-                const newFilters = { ...selectedFilters };
-                delete newFilters[key];
-                onFiltersChange(newFilters);
-              }}
-            ></span>
-          </p>
-        ))}
-      </div>
+     
       
-      {Object.keys(selectedFilters).length > 0 && (
-        <span className="text-primary tagClearFilter" onClick={handleResetFilters}>
-          Clear Filters
-        </span>
-      )}
+     
 
       <Dropdown>
-        <Dropdown.Toggle variant="primary" size='sm'>
-          <span className="ti ti-filter"></span>
+        <Dropdown.Toggle variant="info" size='sm'>
+          <FiFilter size={10} />
           Filters
         </Dropdown.Toggle>
         <Dropdown.Menu className="filterBoxDropdown" style={{width: '500px'}} ref={dropdownRef}>
@@ -170,7 +143,7 @@ export default function CompanyPOFilters({ onFiltersChange }: CompanyPOFiltersPr
                   <Button variant="primary" size="sm" onClick={handleApplyFilters}>
                     Apply Filters
                   </Button>
-                  <Button variant="outline-secondary" size="sm" onClick={handleResetFilters}>
+                  <Button variant="secondary" size="sm" onClick={handleResetFilters}>
                     Reset
                   </Button>
                 </div>

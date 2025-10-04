@@ -386,27 +386,27 @@ const GsmInbox = () => {
                   
                   <div className="message-card-header">
                       <div className="sender-info">
-                          <span className="sender-name">SMS from +97165066400</span>
+                          <span className="sender-name">SMS from {item?.number}</span>
                           <span className="label-chip">
-                              <span className="port-status-dot active"></span> Port 6
+                              <span className="port-status-dot active"></span> Port {item?.port?.port_number}
                           </span>
                       </div>
                       <div className="meta-info">
-                          <span className="meta-item"><i className="fas fa-mobile-alt"></i> GSM: Test</span>
-                          <span className="meta-item timestamp"><i className="fas fa-clock"></i> 30 minutes ago</span>
+                          <span className="meta-item"><i className="fas fa-mobile-alt"></i> GSM: {item?.gsm?.name}</span>
+                          <span className="meta-item timestamp"><i className="fas fa-clock"></i> {moment(item?.received_at).fromNow()}</span>
                       </div>
                   </div>
                   <p className="message-body">
-                      <span className="message-preview">You MISSED 1 Call(s) from +97165066400, last call: 22/09/2025 11:46:35</span>
+                      <span className="message-preview">{item?.text}</span>
                   </p>
                   <div className="details-grid">
                       <div className="detail-item">
                           <strong>Receiver Number</strong>
-                          <span>+971547141001</span>
+                          <span>{item?.port?.mobile_number?.length > 0 ? item?.port?.mobile_number : 'N/A'}</span>
                       </div>
                       <div className="detail-item">
                           <strong>SMSC</strong>
-                          <span>+971500186533</span>
+                          <span>{item?.smsc?.length > 0 ? item?.smsc : 'N/A'}</span>
                       </div>
                       <div className="detail-item">
                           <strong>IMSI</strong>

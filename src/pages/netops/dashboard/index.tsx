@@ -285,11 +285,10 @@ const NetOpsDashboard = () => {
         <Col md={12}>
           <div className="page-header-title style-2">
             <Row className="d-flex justify-content-between align-items-center">
-              <Col md={4}>
+              <Col md={8}>
                 <h2 className="mb-0">Network Operations Dashboard</h2>
-                <small className="text-muted">Showing recent data</small>
               </Col>
-              <Col md={8} className="d-flex justify-content-end">
+              <Col md={4} className="d-flex justify-content-end">
                 <div className="action-buttons">
                   <div className="d-flex align-items-center gap-2">
                     {state.lastUpdated && (
@@ -416,7 +415,7 @@ const NetOpsDashboard = () => {
         <Col md={6}>
           <div className="card">
             <div className="card-body">
-              <h5 className="mb-0 app-title-heading">Recent Alerts</h5>
+              <h5 className="mb-0 app-title-heading mb-3">Recent Alerts</h5>
               {(() => {
                 // Collect all alerts from devices
                 const allAlerts = state.comprehensiveData?.devices?.flatMap(device => 
@@ -483,7 +482,7 @@ const NetOpsDashboard = () => {
         <Col md={6}>
           <div className="card">
             <div className="card-body">
-              <h5 className="mb-0 app-title-heading">Device Status Overview</h5>
+              <h5 className="mb-0 app-title-heading mb-3">Device Status Overview</h5>
               {state.comprehensiveData?.devices.length === 0 ? (
                 <EmptyState
                   title="No Devices"

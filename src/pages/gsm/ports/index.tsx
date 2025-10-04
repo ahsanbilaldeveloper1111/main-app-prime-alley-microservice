@@ -7,7 +7,7 @@ import { ListPorts } from '@utils/ports';
 import { getGsmData } from '@utils/GsmManagement';
 
 import { Column } from '@components/CustomDataTable';
-import { Button, DropdownItem, DropdownMenu, Dropdown, Modal, Row,DropdownToggle   } from 'react-bootstrap';
+import { Button, Modal, Row } from 'react-bootstrap';
 import { Col } from 'react-bootstrap';
 import { toast } from 'react-toastify';
 import { useTokenService } from 'src/hooks/useTokenService';
@@ -25,7 +25,8 @@ import imgStatus1 from '@assets/images/widget/img-status-1.svg'
 import imgStatus2 from '@assets/images/widget/img-status-2.svg'
 import imgStatus3 from '@assets/images/widget/img-status-3.svg'
 import imgStatus4 from '@assets/images/widget/img-status-4.svg'
-import { FiEdit, FiMoreVertical } from 'react-icons/fi';
+import { FiEdit } from 'react-icons/fi';
+import DatatableActionButton from '@components/DatatableActionButton';
 
 
 const GsmPorts = () => {
@@ -98,23 +99,16 @@ const GsmPorts = () => {
                       <button className="btn btn-sm btn-outline-primary" onClick={() => handleUpdateMobileNumber(props.id)}>Update Mobile Number</button>
                   )}     */}
 
-<Dropdown
-                className="table-action-dropdown"
-                //drop="start"
-                placement="top-start"
-            >
-                <DropdownToggle variant="outline-secondary" size="sm">
-                    <FiMoreVertical size={14} />
-                </DropdownToggle>
-                <DropdownMenu>
-                    <DropdownItem className="action-edit" onClick={() => handleUpdateMobileNumber(props.id)}>
-                        <FiEdit className="me-2" />
-                        Update Mobile Number
-                    </DropdownItem>
-                   
-                    
-                </DropdownMenu>
-            </Dropdown>
+<DatatableActionButton
+              actions={[
+                ...(session?.user?.permissions?.includes('update-mobile-number-gsm-ports') ? [{
+                  label: 'Update Mobile Number',
+                  icon: <FiEdit className="me-2" />,
+                  onClick: () => handleUpdateMobileNumber(props.id),
+                  className: 'action-edit'
+                }] : [])
+              ]}
+            />
               </div>
           ),
       },

@@ -1,11 +1,11 @@
 import '@assets/scss/datatable-style.scss';
-import React, { ReactElement, useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import React, { ReactElement, useState, useCallback, useMemo, useEffect } from 'react';
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
 import GenericListPage from '@components/GenericListPage';
 import { getAllRoles, ListRoles, updateRole,deleteRole,addRole,BulkDeleteRoles } from '@utils/roles';
 import { Column } from '@components/CustomDataTable';
-import { Button, Overlay, Popover, Modal, Row } from 'react-bootstrap';
+import { Button, Modal, Row } from 'react-bootstrap';
 import { Col } from 'react-bootstrap';
 import RolesFilters from '@components/filters/RolesFilters';
 import { toast } from 'react-toastify';
@@ -19,68 +19,9 @@ import SuccessfulModal from '@pages/partial/SuccessfulModal'
 import FormModal from '@pages/partial/FormModal'
 import ConfirmModal from '@pages/partial/ConfirmModal'
 
-import { FiEdit, FiMoreVertical, FiTrash2, FiEye } from 'react-icons/fi';
+import { FiEdit, FiTrash2, FiEye } from 'react-icons/fi';
+import DatatableActionButton from '@components/DatatableActionButton';
 
-// Action Cell Component
-const ActionCell = ({ props, onEdit, onDelete, onViewPermissions, onAssignPermissions, session }: any) => {
-    const [show, setShow] = useState(false);
-    const target = useRef(null);
-    
-    return (
-        <div className="table-action-dropdown">
-            <Button
-                ref={target}
-                variant="outline-secondary"
-                size="sm"
-                onClick={() => setShow(!show)}
-            >
-                <FiMoreVertical size={14} />
-            </Button>
-
-            <Overlay
-                show={show}
-                target={target.current}
-                placement="left"
-                rootClose
-                onHide={() => setShow(false)}
-            >
-                <Popover className="action-menu-popover">
-                    <Popover.Body className="p-0">
-                        <div className="action-menu">
-                            {session?.user?.permissions?.includes('edit-ranks') && (
-                                <button className="action-item action-edit" onClick={() => { onEdit(props); setShow(false); }}>
-                                    <FiEdit className="me-2" />
-                                    Edit
-                                </button>
-                            )}
-
-                            {session?.user?.permissions?.includes('view-permissions-ranks') && (
-                                <Link href={`/controlhub/ranks/permissions/${props.id}`} className="action-item action-view" onClick={() => setShow(false)}>
-                                    <FiEye className="me-2" />
-                                    View Permissions
-                                </Link>
-                            )}
-
-                            {session?.user?.permissions?.includes('assign-permissions-ranks') && (
-                                <Link href={`/controlhub/ranks/permissions/edit/${props.id}`} className="action-item action-assign" onClick={() => setShow(false)}>
-                                    <FiEdit className="me-2" />
-                                    Assign Permissions
-                                </Link>
-                            )}
-
-                            {session?.user?.permissions?.includes('delete-ranks') && (
-                                <button className="action-item text-danger" onClick={() => { onDelete(props); setShow(false); }}>
-                                    <FiTrash2 className="me-2" />
-                                    Delete
-                                </button>
-                            )}
-                        </div>
-                    </Popover.Body>
-                </Popover>
-            </Overlay>
-        </div>
-    );
-};
 
 const Ranks = () => {
     const { data:session, status } = useSession();
@@ -121,11 +62,37 @@ const Ranks = () => {
                     selector: (row: any) => row.id,
                     sortable: false,
                     cell: (props: any) => (
-                        <ActionCell 
-                            props={props} 
-                            onEdit={handleEditRank} 
-                            onDelete={handleDeleteRank} 
-                            session={session} 
+                        <DatatableActionButton
+                            actions={[
+                                ...(session?.user?.permissions?.includes('edit-ranks') ? [{
+                                    label: 'Edit',
+                                    icon: <FiEdit className="me-2" />,
+                                    onClick: () => handleEditRank(props),
+                                    className: 'action-edit'
+                                }] : []),
+                                ...(session?.user?.permissions?.includes('view-permissions-ranks') ? [{
+                                    label: 'View Permissions',
+                                    icon: <FiEye className="me-2" />,
+                                    onClick: () => {
+                                        window.location.href = `/controlhub/ranks/permissions/${props.id}`;
+                                    },
+                                    className: 'action-view'
+                                }] : []),
+                                ...(session?.user?.permissions?.includes('assign-permissions-ranks') ? [{
+                                    label: 'Assign Permissions',
+                                    icon: <FiEdit className="me-2" />,
+                                    onClick: () => {
+                                        window.location.href = `/controlhub/ranks/permissions/edit/${props.id}`;
+                                    },
+                                    className: 'action-assign'
+                                }] : []),
+                                ...(session?.user?.permissions?.includes('delete-ranks') ? [{
+                                    label: 'Delete',
+                                    icon: <FiTrash2 className="me-2" />,
+                                    onClick: () => handleDeleteRank(props),
+                                    className: 'text-danger'
+                                }] : [])
+                            ]}
                         />
                     )
                 }
