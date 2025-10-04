@@ -2501,3 +2501,60 @@ export const getSupplierProducts = async (
     throw error;
   }
 };
+
+// Direct Payment Interfaces
+export interface CreateDirectPaymentData {
+  amount: number;
+  currency: string;
+  payment_method_id: string;
+  invoice_id: number;
+  customer_id: number;
+}
+
+// Payment Intent Response Interface
+export interface PaymentIntentResponse {
+  id: string;
+  status: 'succeeded' | 'requires_action' | 'requires_payment_method' | 'canceled';
+  client_secret: string;
+  amount: number;
+  currency: string;
+}
+
+// API Response Interface
+export interface ApiResponse<T> {
+  data: T;
+  message: string;
+  success: boolean;
+}
+
+// Create direct payment function
+export const createDirectPayment = async (data: CreateDirectPaymentData): Promise<PaymentIntentResponse> => {
+  try {
+    const response = await axiosInstance.post(
+      '/accounting/stripe/create-payment-intent',
+      data
+    );
+    
+    // Handle the actual API response structure
+    console.log(response, "RARARA");
+    if (response.data?.code === 200 && response.data?.data?.success) {
+      // The actual payment intent data should be in response.data.data.data
+      // If it's an empty array, we might need to handle this case
+      const paymentData = response.data.data;
+      
+      // if (Array.isArray(paymentData) && paymentData.length === 0) {
+      //   // Handle case where data is empty array
+      //   throw new Error("No payment intent data returned from server");
+      // }
+      
+      return paymentData as PaymentIntentResponse;
+    }
+    
+    // Fallback to extractData if structure is different
+    return extractData<PaymentIntentResponse>(response.data);
+  } catch (error: any) {
+    console.log(error, "error.createDirectPayment");
+    toast.error(error?.message || "Failed to create direct payment");
+    throw error;
+  }
+};

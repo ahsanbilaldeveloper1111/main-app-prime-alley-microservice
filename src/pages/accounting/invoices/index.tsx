@@ -16,36 +16,51 @@ import {
   deleteInvoice,
   getInvoice,
   getActiveProducts,
+  getPaymentMethods,
+  payInvoice,
+  createDirectPayment,
   InvoiceData,
   InvoiceCreateUpdatePayload,
   InvoiceItemCreateUpdatePayload,
   InvoiceItemData,
   CompanyData,
   ProductData,
+  PaymentMethodData,
+  InvoicePaymentPayload,
+  CreateDirectPaymentData,
+  PaymentIntentResponse,
 } from "@utils/accounting";
 import { getCompanies } from "@utils/accounting";
 import { Column } from "@components/CustomDataTable";
-import { Button, Modal, Row } from "react-bootstrap";
+import { Button, Modal, Row, Form, Alert } from "react-bootstrap";
 import { Col } from "react-bootstrap";
 import { toast } from "react-toastify";
 import { useSession } from "next-auth/react";
 import moment from "moment";
+import { loadStripe } from "@stripe/stripe-js";
+import {
+  Elements,
+  CardElement,
+  useStripe,
+  useElements,
+} from "@stripe/react-stripe-js";
+import { FaShieldAlt, FaCreditCard, FaPlus } from "react-icons/fa";
 
 import "@assets/scss/common.scss";
+
 import "@assets/scss/tabs.scss";
 import PageHeader from "@components/PageHeader";
+import PageSummaryGrid from "@components/PageSummaryGrid";
 import FormModal from "../../partial/FormModal";
 import ConfirmModal from "@pages/partial/ConfirmModal";
 import SuccessfulModal from "@pages/partial/SuccessfulModal";
-import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
-import DatatableActionButton from "@components/DatatableActionButton";
-
 
 import { motion } from "framer-motion";
-import { FiEdit, FiTrash2, FiPrinter, FiDownload } from "react-icons/fi";
-
+import { FiEdit, FiTrash2, FiPrinter, FiDownload, FiCreditCard, FiDollarSign } from "react-icons/fi";
+import TableAction, { Action } from "@components/TableAction";
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { Spinner } from "react-bootstrap";
 
 // Extend jsPDF type to include autoTable
 declare module 'jspdf' {
@@ -63,6 +78,436 @@ interface InvoiceFormData extends Omit<InvoiceData, 'items'> {
   items: InvoiceItemCreateUpdatePayload[];
 }
 
+
+// Payment Hook Return Type
+interface UseCreateInvoicePaymentReturn {
+  createInvoicePayment: (data: CreateDirectPaymentData, callbacks?: {
+    onSuccess?: (response: PaymentIntentResponse) => void;
+    onError?: (error: any) => void;
+  }) => Promise<void>;
+  isCreateInvoicePaymentPending: boolean;
+  isCreateInvoicePaymentError: boolean;
+  createInvoicePaymentError: any;
+}
+
+// Utility function to format currency
+const formatCurrency = (amount: number, currency: string): string => {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: currency.toUpperCase()
+  }).format(amount);
+};
+
+
+// Custom hook for creating invoice payments
+const useCreateInvoicePayment = (): UseCreateInvoicePaymentReturn => {
+  const [isPending, setIsPending] = useState(false);
+  const [isError, setIsError] = useState(false);
+  const [error, setError] = useState<any>(null);
+
+  const createInvoicePayment = useCallback(async (
+    data: CreateDirectPaymentData,
+    callbacks?: {
+      onSuccess?: (response: PaymentIntentResponse) => void;
+      onError?: (error: any) => void;
+    }
+  ) => {
+    setIsPending(true);
+    setIsError(false);
+    setError(null);
+
+    try {
+      const response = await createDirectPayment(data);
+      callbacks?.onSuccess?.(response);
+    } catch (err) {
+      setIsError(true);
+      setError(err);
+      callbacks?.onError?.(err);
+    } finally {
+      setIsPending(false);
+    }
+  }, []);
+
+  return {
+    createInvoicePayment,
+    isCreateInvoicePaymentPending: isPending,
+    isCreateInvoicePaymentError: isError,
+    createInvoicePaymentError: error,
+  };
+};
+
+// Payment Cards Component for Display
+const PaymentCardsDisplay = ({ 
+  paymentMethods, 
+  isLoadingPaymentMethods 
+}: { 
+  paymentMethods: PaymentMethodData[]; 
+  isLoadingPaymentMethods: boolean; 
+}) => {
+  console.log("PaymentCardsDisplay - paymentMethods:", paymentMethods);
+  console.log("PaymentCardsDisplay - isLoadingPaymentMethods:", isLoadingPaymentMethods);
+
+  if (isLoadingPaymentMethods) {
+    return (
+      <div className="text-center py-3">
+        <Spinner animation="border" size="sm" className="me-2" />
+        <span>Loading payment methods...</span>
+      </div>
+    );
+  }
+
+  if (paymentMethods.length === 0) {
+    return (
+      <div className="text-center py-3 text-muted">
+        <FiCreditCard size={24} className="mb-2" />
+        <div>No payment methods available</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="row">
+      {paymentMethods.map((method) => (
+        <div key={method.id} className="col-md-6 mb-3">
+          <div className="card h-100">
+            <div className="card-body">
+              <div className="d-flex justify-content-between align-items-start mb-2">
+                <div className="d-flex align-items-center">
+                  <FiCreditCard className="me-2 text-primary" />
+                  <span className="badge bg-primary">
+                    {method.type === "card" ? "Card" : "Bank Account"}
+                  </span>
+                  {method.is_default && (
+                    <span className="badge bg-success ms-2">Default</span>
+                  )}
+                </div>
+              </div>
+              
+              {method.type === "card" && method.card ? (
+                <div>
+                  <div className="fw-bold mb-1">
+                    {method.card.brand.toUpperCase()} •••• {method.card.last4}
+                  </div>
+                  <div className="text-muted small mb-2">
+                    Expires {method.card.exp_month}/{method.card.exp_year}
+                  </div>
+                  {method.billing_details?.name && (
+                    <div className="text-info small">
+                      <i className="fas fa-user me-1"></i>
+                      {method.billing_details.name}
+                    </div>
+                  )}
+                </div>
+              ) : method.type === "bank_account" && method.bank_account ? (
+                <div>
+                  <div className="fw-bold mb-1">
+                    {method.bank_account.bank_name} •••• {method.bank_account.last4}
+                  </div>
+                  <div className="text-muted small mb-2">
+                    Routing: {method.bank_account.routing_number}
+                  </div>
+                  {method.billing_details?.name && (
+                    <div className="text-info small">
+                      <i className="fas fa-user me-1"></i>
+                      {method.billing_details.name}
+                    </div>
+                  )}
+                </div>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+// Payment Selection Component for Payment Modal
+const PaymentMethodSelector = ({ 
+  paymentMethods, 
+  selectedPaymentMethod,
+  onPaymentMethodSelect,
+  isLoadingPaymentMethods 
+}: { 
+  paymentMethods: PaymentMethodData[]; 
+  selectedPaymentMethod: string;
+  onPaymentMethodSelect: (methodId: string) => void;
+  isLoadingPaymentMethods: boolean; 
+}) => {
+  if (isLoadingPaymentMethods) {
+    return (
+      <div className="text-center py-3">
+        <Spinner animation="border" size="sm" className="me-2" />
+        <span>Loading payment methods...</span>
+      </div>
+    );
+  }
+
+  if (paymentMethods.length === 0) {
+    return (
+      <div className="text-center py-3 text-muted">
+        <FiCreditCard size={24} className="mb-2" />
+        <div>No payment methods available for this company</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="row">
+      {paymentMethods.map((method) => (
+        <div key={method.id} className="col-md-6 mb-3">
+          <div 
+            className={`card h-100 cursor-pointer ${selectedPaymentMethod === method.id ? 'border-primary bg-light' : ''}`}
+            onClick={() => onPaymentMethodSelect(method.id)}
+            style={{ cursor: 'pointer' }}
+          >
+            <div className="card-body">
+              <div className="d-flex justify-content-between align-items-start mb-2">
+                <div className="d-flex align-items-center">
+                  <FiCreditCard className="me-2 text-primary" />
+                  <span className="badge bg-primary">
+                    {method.type === "card" ? "Card" : "Bank Account"}
+                  </span>
+                  {method.is_default && (
+                    <span className="badge bg-success ms-2">Default</span>
+                  )}
+                </div>
+                <div className="form-check">
+                  <input
+                    className="form-check-input"
+                    type="radio"
+                    name="paymentMethod"
+                    checked={selectedPaymentMethod === method.id}
+                    onChange={() => onPaymentMethodSelect(method.id)}
+                  />
+                </div>
+              </div>
+              
+              {method.type === "card" && method.card ? (
+                <div>
+                  <div className="fw-bold mb-1">
+                    {method.card.brand.toUpperCase()} •••• {method.card.last4}
+                  </div>
+                  <div className="text-muted small mb-2">
+                    Expires {method.card.exp_month}/{method.card.exp_year}
+                  </div>
+                  {method.billing_details?.name && (
+                    <div className="text-info small">
+                      <i className="fas fa-user me-1"></i>
+                      {method.billing_details.name}
+                    </div>
+                  )}
+                </div>
+              ) : method.type === "bank_account" && method.bank_account ? (
+                <div>
+                  <div className="fw-bold mb-1">
+                    {method.bank_account.bank_name} •••• {method.bank_account.last4}
+                  </div>
+                  <div className="text-muted small mb-2">
+                    Routing: {method.bank_account.routing_number}
+                  </div>
+                  {method.billing_details?.name && (
+                    <div className="text-info small">
+                      <i className="fas fa-user me-1"></i>
+                      {method.billing_details.name}
+                    </div>
+                  )}
+                </div>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+// Direct Card Payment Form Component
+const DirectCardPaymentForm: React.FC<{
+  amount: number;
+  currency: string;
+  invoiceId: number;
+  customerId: number;
+  onPaymentSuccess: () => void;
+  onPaymentError: (error: string) => void;
+  onSwitchToAddCard: () => void;
+}> = ({ amount, currency, invoiceId, customerId, onPaymentSuccess, onPaymentError, onSwitchToAddCard }) => {
+  const stripe = useStripe();
+  const elements = useElements();
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [cardError, setCardError] = useState<string | null>(null);
+
+  // Use the invoice payment hook
+  const { 
+    createInvoicePayment, 
+    isCreateInvoicePaymentPending, 
+    isCreateInvoicePaymentError, 
+    createInvoicePaymentError 
+  } = useCreateInvoicePayment();
+  const [cardComplete, setCardComplete] = useState(false);
+
+  const CARD_ELEMENT_OPTIONS = {
+    style: {
+      base: {
+        fontSize: '16px',
+        color: '#424770',
+        '::placeholder': {
+          color: '#aab7c4',
+        },
+      },
+      invalid: {
+        color: '#9e2146',
+      },
+    },
+    hidePostalCode: true,
+  };
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+
+    if (!stripe || !elements) {
+      onPaymentError('Stripe has not loaded yet');
+      return;
+    }
+
+    setIsProcessing(true);
+    setCardError(null);
+
+    try {
+      // Create payment method
+      const { error, paymentMethod } = await stripe.createPaymentMethod({
+        type: 'card',
+        card: elements.getElement(CardElement)!,
+      });
+
+      if (error) {
+        setCardError(error.message || 'Failed to create payment method');
+        setIsProcessing(false);
+        return;
+      }
+
+      // Create payment intent using the hook
+      createInvoicePayment({
+        amount: amount, // Send amount in original currency units (not cents)
+        currency: currency.toLowerCase(),
+        payment_method_id: paymentMethod.id,
+        invoice_id: invoiceId,
+        customer_id: customerId,
+      }, {
+        onSuccess: (paymentResult) => {
+          // Handle payment result based on status
+          console.log(paymentResult, "RARARA");
+          if ((paymentResult as any).success) {
+              toast.success('Payment successful!');
+              onPaymentSuccess();}
+            else{
+              onPaymentError('Payment was not successful. Status: ' + paymentResult.status);
+          }
+          setIsProcessing(false);
+        },
+        onError: (error) => {
+          onPaymentError(error.message || 'Payment processing failed');
+          setIsProcessing(false);
+        }
+      });
+    } catch (error: any) {
+      onPaymentError(error.message || 'Payment processing failed');
+      setIsProcessing(false);
+    }
+  };
+
+  const handleCardChange = (event: any) => {
+    setCardError(event.error ? event.error.message : null);
+    setCardComplete(event.complete);
+  };
+
+  return (
+    <Form onSubmit={handleSubmit}>
+      <Row>
+        <Col md={12}>
+          <Form.Group className="mb-3">
+            <Form.Label className="fw-semibold">
+              Card Information <span className="text-danger">*</span>
+            </Form.Label>
+            <div className="p-3 border rounded bg-light">
+              <CardElement
+                options={CARD_ELEMENT_OPTIONS}
+                onChange={handleCardChange}
+              />
+            </div>
+            {cardError && (
+              <Alert variant="danger" className="mt-2 py-2">
+                <small>{cardError}</small>
+              </Alert>
+            )}
+            <Form.Text className="text-muted d-flex align-items-center mt-2">
+              <FaShieldAlt className="me-1" />
+              <small>Your card information is securely processed by Stripe</small>
+            </Form.Text>
+          </Form.Group>
+        </Col>
+      </Row>
+
+      <Row>
+        <Col md={6}>
+          <div className="d-flex align-items-center h-100">
+            <div className="text-muted">
+              <small>
+                <FaShieldAlt className="me-1" />
+                Secure SSL encryption
+              </small>
+            </div>
+          </div>
+        </Col>
+        <Col md={6}>
+          <div className="text-end">
+            <div className="h5 mb-0 text-success">
+              {formatCurrency(amount, currency)}
+            </div>
+            <small className="text-muted">Payment Amount</small>
+          </div>
+        </Col>
+      </Row>
+
+      <div className="d-flex gap-2 mt-3">
+        <Button
+          type="submit"
+          variant="success"
+          disabled={!cardComplete || isProcessing || isCreateInvoicePaymentPending}
+          className="flex-fill"
+        >
+          {isProcessing || isCreateInvoicePaymentPending ? (
+            <>
+              <Spinner animation="border" size="sm" className="me-2" />
+              Processing Payment...
+            </>
+          ) : (
+            <>
+              <FaCreditCard className="me-2" />
+              Pay Now
+            </>
+          )}
+        </Button>
+        <Button
+          type="button"
+          variant="outline-primary"
+          onClick={onSwitchToAddCard}
+          disabled={isProcessing}
+        >
+          <FaPlus className="me-1" />
+          Add Card
+        </Button>
+      </div>
+
+      {isCreateInvoicePaymentError && (
+        <Alert variant="danger" className="mt-3">
+          {createInvoicePaymentError?.message || 'Payment processing failed'}
+        </Alert>
+      )}
+    </Form>
+  );
+};
+
 const InvoiceList = () => {
   const { data: session, status } = useSession();
 
@@ -71,6 +516,17 @@ const InvoiceList = () => {
 
   const [companies, setCompanies] = useState<CompanyData[]>([]);
   const [products, setProducts] = useState<ProductData[]>([]);
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethodData[]>([]);
+  const [isLoadingPaymentMethods, setIsLoadingPaymentMethods] = useState<boolean>(false);
+  
+  // Payment modal states
+  const [showPaymentModal, setShowPaymentModal] = useState<boolean>(false);
+  const [selectedInvoiceForPayment, setSelectedInvoiceForPayment] = useState<InvoiceData | null>(null);
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>("");
+  const [paymentNotes, setPaymentNotes] = useState<string>("");
+  const [isProcessingPayment, setIsProcessingPayment] = useState<boolean>(false);
+  const [paymentMode, setPaymentMode] = useState<'saved' | 'direct'>('saved');
+  const [stripePublishableKey, setStripePublishableKey] = useState<string>("");
 
   const columns: Column[] = useMemo(
     () => [
@@ -81,7 +537,7 @@ const InvoiceList = () => {
         sortable: true,
         cell: (props: InvoiceData) => (
           <div>
-            <div className="">{props.invoice_number}</div>
+            <div className="fw-bold text-primary">#{props.invoice_number}</div>
           </div>
         ),
       },
@@ -91,7 +547,7 @@ const InvoiceList = () => {
         selector: (row: InvoiceData) => row.company?.name,
         sortable: true,
         cell: (props: InvoiceData) => (
-          <span className="">
+          <span className="status-badge primary">
             {props.company?.name || "Unknown Company"}
           </span>
         ),
@@ -102,7 +558,7 @@ const InvoiceList = () => {
         selector: (row: InvoiceData) => row.subtotal,
         sortable: true,
         cell: (props: InvoiceData) => (
-          <span className="">
+          <span className="fw-bold text-success">
             {props.currency_code} {parseFloat(props.subtotal || "0").toFixed(2)}
           </span>
         ),
@@ -113,7 +569,7 @@ const InvoiceList = () => {
         selector: (row: InvoiceData) => row.tax_amount,
         sortable: true,
         cell: (props: InvoiceData) => (
-          <span className="">
+          <span className="text-warning">
             {props.currency_code}{" "}
             {parseFloat(props.tax_amount || "0").toFixed(2)}
           </span>
@@ -125,7 +581,7 @@ const InvoiceList = () => {
         selector: (row: InvoiceData) => row.total_amount,
         sortable: true,
         cell: (props: InvoiceData) => (
-          <span className="">
+          <span className="fw-bold text-primary">
             {props.currency_code}{" "}
             {parseFloat(props.total_amount || "0").toFixed(2)}
           </span>
@@ -148,8 +604,8 @@ const InvoiceList = () => {
             <span
               className={`status-badge ${
                 statusColors[props.status as keyof typeof statusColors] ||
-                ""
-              } text-capitalize`}
+                "bg-secondary"
+              } text-uppercase`}
             >
               {props.status}
             </span>
@@ -185,37 +641,82 @@ const InvoiceList = () => {
         name: "ACTION",
         selector: (row: InvoiceData) => row.id,
         sortable: false,
-        cell: (props: InvoiceData) => (
-          <>  
-          <DatatableActionButton
-                    actions={[
-                        {
-                            label: 'Edit',
-                            icon: <FiEdit />,
-                            onClick: () => handleEditInvoice(props),
-                            className: 'gap-2'
-                        },
-                        {
-                            label: 'Download PDF',
-                            icon: <FiDownload />,
-                            onClick: () => handleDownloadPDF(props),
-                            className:'gap-2'
-                        },
-                        {
-                            label: 'Delete',
-                            icon: <FiTrash2 />  ,
-                            onClick: () => handleDeleteInvoice(props),
-                            className: 'text-danger gap-2'
-                        },
-                    ]}
-                />
-          </>
-          
-        ),
+        cell: (props: InvoiceData) => {
+          const isUnpaid = props.status === 'draft' || props.status === 'sent' || props.status === 'overdue';
+          const actions = [
+            {
+              label: 'Edit',
+              icon: FiEdit,
+              onClick: () => handleEditInvoice(props),
+              variant: 'edit'
+            },
+            {
+              label: 'Download PDF',
+              icon: FiDownload,
+              onClick: () => handleDownloadPDF(props),
+              variant: 'default'
+            }
+          ];
+
+          // Add Pay action for unpaid invoices
+          if (isUnpaid) {
+            actions.push({
+              label: 'Pay',
+              icon: FiDollarSign,
+              onClick: () => handlePayInvoice(props),
+              variant: 'success'
+            });
+          }
+
+          // Add Delete action
+          actions.push({
+            label: 'Delete',
+            icon: FiTrash2,
+            onClick: () => handleDeleteInvoice(props),
+            variant: 'delete'
+          });
+
+          return (
+            <TableAction actions={actions as Action[]} />
+          );
+        },
       },
     ],
     [session?.user?.permissions]
   );
+
+  // Load payment methods for a company
+  const loadPaymentMethods = useCallback(async (companyId: number) => {
+    if (!companyId) {
+      console.log("No company ID provided to loadPaymentMethods");
+      return;
+    }
+
+    console.log("Loading payment methods for company ID:", companyId);
+    setIsLoadingPaymentMethods(true);
+    try {
+      const methods = await getPaymentMethods(companyId);
+      console.log("Payment methods loaded:", methods);
+      setPaymentMethods(methods);
+    } catch (error) {
+      console.error("Error loading payment methods:", error);
+      setPaymentMethods([]);
+    } finally {
+      setIsLoadingPaymentMethods(false);
+    }
+  }, []);
+
+  // Load Stripe publishable key
+  const loadStripePublishableKey = useCallback(async () => {
+    try {
+      // You'll need to implement getPublishableKey in your accounting utils
+      // For now, we'll use a placeholder or get it from environment
+      const key = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || "";
+      setStripePublishableKey(key);
+    } catch (error) {
+      console.error("Error loading Stripe publishable key:", error);
+    }
+  }, []);
 
   useEffect(() => {
     const fetchCompanies = async () => {
@@ -240,7 +741,8 @@ const InvoiceList = () => {
 
     fetchCompanies();
     fetchProducts();
-  }, []);
+    loadStripePublishableKey();
+  }, [loadStripePublishableKey]);
 
   const memoizedFilters = useMemo(() => currentFilters, [currentFilters]);
 
@@ -301,7 +803,13 @@ const InvoiceList = () => {
       items: convertedItems
     });
     setShowEditInvoiceModal(true);
-  }, []);
+    
+    // Load payment methods for the company when editing
+    if (props.company_id) {
+      console.log("Loading payment methods for edit invoice company:", props.company_id);
+      loadPaymentMethods(parseInt(props.company_id));
+    }
+  }, [loadPaymentMethods]);
 
   const handleSubmitEditInvoice = useCallback(async () => {
     if (!selectedInvoice) return;
@@ -480,11 +988,13 @@ const InvoiceList = () => {
       subtotal: 0,
       total_amount: 0,
     });
+    setPaymentMethods([]);
   }, []);
 
   const closeEditInvoiceModal = useCallback(() => {
     setShowEditInvoiceModal(false);
     setSelectedInvoice(null);
+    setPaymentMethods([]);
   }, []);
 
   // Delete Invoice Handlers
@@ -493,19 +1003,111 @@ const InvoiceList = () => {
     setShowDeleteInvoiceModal(true);
   }, []);
 
+  // Payment handlers
+  const handlePayInvoice = useCallback(async (invoice: InvoiceData) => {
+    setSelectedInvoiceForPayment(invoice);
+    setShowPaymentModal(true);
+    
+    // Load payment methods for the company
+    if (invoice.company_id) {
+      console.log("Loading payment methods for payment:", invoice.company_id);
+      await loadPaymentMethods(parseInt(invoice.company_id));
+    }
+  }, [loadPaymentMethods]);
+
+  const handleProcessPayment = useCallback(async () => {
+    if (!selectedInvoiceForPayment || !selectedPaymentMethod) {
+      toast.error("Please select a payment method");
+      return;
+    }
+
+    setIsProcessingPayment(true);
+    try {
+      const paymentPayload: InvoicePaymentPayload = {
+        invoice_id: selectedInvoiceForPayment.id,
+        payment_method: "stripe",
+        payment_mode: "one_time",
+        amount: parseFloat(selectedInvoiceForPayment.total_amount),
+        payment_method_id: selectedPaymentMethod,
+        notes: paymentNotes || `Payment for invoice ${selectedInvoiceForPayment.invoice_number}`
+      };
+
+      await payInvoice(paymentPayload);
+      toast.success("Payment processed successfully");
+      
+      // Close modal and reset state
+      setShowPaymentModal(false);
+      setSelectedInvoiceForPayment(null);
+      setSelectedPaymentMethod("");
+      setPaymentNotes("");
+      setPaymentMethods([]);
+      
+      // Refresh the invoice list
+      setRefreshKey((prev) => prev + 1);
+    } catch (error) {
+      console.error("Error processing payment:", error);
+      toast.error("Failed to process payment");
+    } finally {
+      setIsProcessingPayment(false);
+    }
+  }, [selectedInvoiceForPayment, selectedPaymentMethod, paymentNotes]);
+
+  const closePaymentModal = useCallback(() => {
+    setShowPaymentModal(false);
+    setSelectedInvoiceForPayment(null);
+    setSelectedPaymentMethod("");
+    setPaymentNotes("");
+    setPaymentMethods([]);
+    setPaymentMode('saved');
+  }, []);
+
+  // Payment mode handlers
+  const handleSwitchToDirectPayment = useCallback(() => {
+    setPaymentMode('direct');
+  }, []);
+
+  const handleSwitchToSavedPayment = useCallback(() => {
+    setPaymentMode('saved');
+  }, []);
+
+  // Direct payment handlers
+  const handleDirectPaymentSuccess = useCallback(() => {
+    toast.success("Payment processed successfully");
+    
+    // Close modal and reset state
+    setShowPaymentModal(false);
+    setSelectedInvoiceForPayment(null);
+    setSelectedPaymentMethod("");
+    setPaymentNotes("");
+    setPaymentMethods([]);
+    setPaymentMode('saved');
+    
+    // Refresh the invoice list
+    setRefreshKey((prev) => prev + 1);
+  }, []);
+
+  const handleDirectPaymentError = useCallback((error: string) => {
+    toast.error(error);
+  }, []);
+
   const handleSubmitDeleteInvoice = useCallback(async () => {
     if (!selectedInvoice) return;
-console.log("Selected Invoice", selectedInvoice);
-    try {
-      await deleteInvoice(selectedInvoice.id);
-      setSelectedInvoice(null);
-      setShowDeleteInvoiceModal(false);
-      setConfirmDeleteInvoice("");
-      setRefreshKey((prev) => prev + 1);
-      toast.success("Invoice deleted successfully");
-    } catch (error) {
-      console.error("Error deleting invoice:", error);
-      toast.error("Failed to delete invoice");
+
+    const confirmDeleteValue = confirmDeleteInvoice.trim();
+    if (confirmDeleteValue === "DELETE") {
+      try {
+        await deleteInvoice(selectedInvoice.id);
+        setSelectedInvoice(null);
+        setShowDeleteInvoiceModal(false);
+        setConfirmDeleteInvoice("");
+        setRefreshKey((prev) => prev + 1);
+        toast.success("Invoice deleted successfully");
+      } catch (error) {
+        console.error("Error deleting invoice:", error);
+        toast.error("Failed to delete invoice");
+      }
+    } else {
+      toast.error("Please type the word DELETE to confirm");
     }
   }, [confirmDeleteInvoice, selectedInvoice]);
 
@@ -635,8 +1237,14 @@ console.log("Selected Invoice", selectedInvoice);
         ...prev,
         [field]: value,
       }));
+      
+      // Load payment methods when company is selected
+      if (field === 'company_id' && value) {
+        console.log("Company selected in create modal:", value);
+        loadPaymentMethods(parseInt(value));
+      }
     },
-    []
+    [loadPaymentMethods]
   );
 
   const handleEditInvoiceChange = useCallback(
@@ -645,8 +1253,14 @@ console.log("Selected Invoice", selectedInvoice);
         ...prev!,
         [field]: value,
       }));
+      
+      // Load payment methods when company is selected
+      if (field === 'company_id' && value) {
+        console.log("Company selected in edit modal:", value);
+        loadPaymentMethods(parseInt(value));
+      }
     },
-    []
+    [loadPaymentMethods]
   );
 
 
@@ -887,13 +1501,16 @@ console.log("Selected Invoice", selectedInvoice);
       />
 
       {/* Create Invoice Modal */}
-      <FormModal
-        show={showCreateInvoiceModal}
-        onHide={closeCreateInvoiceModal}
-        title="Create New Invoice"
-        desc="Fill in the details below to create a new invoice"
-        formHtml={
-          <>
+      {showCreateInvoiceModal && (
+        <Modal
+          show={showCreateInvoiceModal}
+          onHide={closeCreateInvoiceModal}
+          size="lg"
+        >
+          <Modal.Header closeButton>
+            <Modal.Title>Create New Invoice</Modal.Title>
+          </Modal.Header>
+          <Modal.Body>
             <div className="row">
               <div className="col-md-6">
                 <div className="form-group mb-3">
@@ -1145,6 +1762,21 @@ console.log("Selected Invoice", selectedInvoice);
               </div>
             </div>
 
+            {/* Payment Methods Section */}
+            {newInvoice.company_id && (
+              <div className="row">
+                <div className="col-md-12">
+                  <div className="form-group mb-3">
+                    <label>Payment Methods</label>
+                    <PaymentCardsDisplay 
+                      paymentMethods={paymentMethods}
+                      isLoadingPaymentMethods={isLoadingPaymentMethods}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="row">
               <div className="col-md-6">
                 <div className="form-group mb-3">
@@ -1199,373 +1831,553 @@ console.log("Selected Invoice", selectedInvoice);
                 </div>
               </div>
             </div>
-          </>
-        }
-        submitButtonText={creatingInvoice ? "Creating..." : "Create Invoice"}
-        cancelButtonText="Close"
-        onSubmit={handleSubmitCreateInvoice}
-        onCancel={closeCreateInvoiceModal}
-        submitButtonVariant="primary"
-        cancelButtonVariant="secondary"
-      />
+          </Modal.Body>
+          <Modal.Footer>
+            <Button variant="secondary" onClick={closeCreateInvoiceModal}>
+              Close
+            </Button>
+            <Button
+              variant="primary"
+              onClick={handleSubmitCreateInvoice}
+              disabled={creatingInvoice}
+            >
+              {creatingInvoice ? "Creating..." : "Create Invoice"}
+            </Button>
+          </Modal.Footer>
+        </Modal>
+      )}
 
       {/* Edit Invoice Modal */}
       {showEditInvoiceModal && selectedInvoice && (
-        <FormModal
+        <Modal
           show={showEditInvoiceModal}
           onHide={closeEditInvoiceModal}
-          title={`Edit Invoice #${selectedInvoice.invoice_number}`}
-          desc="Update the invoice details below"
-          formHtml={
-            <>
-              <div className="row">
-                <div className="col-md-6">
-                  <div className="form-group mb-3">
-                    <label htmlFor="editInvoiceCompany">Company</label>
-                    <select
-                      className="form-control"
-                      id="editInvoiceCompany"
-                      value={selectedInvoice.company_id || ""}
-                      onChange={(e) =>
-                        handleEditInvoiceChange("company_id", e.target.value)
-                      }
-                    >
-                      <option value="">Select Company</option>
-                      {companies.map((company: CompanyData) => (
-                        <option key={company.id} value={company.id}>
-                          {company.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-                <div className="col-md-6">
-                  <div className="form-group mb-3">
-                    <label htmlFor="editInvoiceDate">Invoice Date</label>
-                    <input
-                      type="date"
-                      className="form-control"
-                      id="editInvoiceDate"
-                      value={
-                        selectedInvoice.invoice_date
-                          ? moment(selectedInvoice.invoice_date).format(
-                              "YYYY-MM-DD"
-                            )
-                          : ""
-                      }
-                      onChange={(e) =>
-                        handleEditInvoiceChange("invoice_date", e.target.value)
-                      }
-                    />
-                  </div>
+          size="lg"
+        >
+          <Modal.Header closeButton>
+            <Modal.Title>
+              Edit Invoice #{selectedInvoice.invoice_number}
+            </Modal.Title>
+          </Modal.Header>
+          <Modal.Body>
+            <div className="row">
+              <div className="col-md-6">
+                <div className="form-group mb-3">
+                  <label htmlFor="editInvoiceCompany">Company</label>
+                  <select
+                    className="form-control"
+                    id="editInvoiceCompany"
+                    value={selectedInvoice.company_id || ""}
+                    onChange={(e) =>
+                      handleEditInvoiceChange("company_id", e.target.value)
+                    }
+                  >
+                    <option value="">Select Company</option>
+                    {companies.map((company: CompanyData) => (
+                      <option key={company.id} value={company.id}>
+                        {company.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
-
-              <div className="row">
-                <div className="col-md-6">
-                  <div className="form-group mb-3">
-                    <label htmlFor="editInvoiceDueDate">Due Date</label>
-                    <input
-                      type="date"
-                      className="form-control"
-                      id="editInvoiceDueDate"
-                      value={
-                        selectedInvoice.due_date
-                          ? moment(selectedInvoice.due_date).format("YYYY-MM-DD")
-                          : ""
-                      }
-                      onChange={(e) =>
-                        handleEditInvoiceChange("due_date", e.target.value)
-                      }
-                      min={moment().format("YYYY-MM-DD")}
-                    />
-                  </div>
-                </div>
-                <div className="col-md-6">
-                  <div className="form-group mb-3">
-                    <label htmlFor="editInvoicePaymentMode">Payment Mode</label>
-                    <select
-                      className="form-control"
-                      id="editInvoicePaymentMode"
-                      value={selectedInvoice.payment_mode || "one_time"}
-                      onChange={(e) =>
-                        handleEditInvoiceChange("payment_mode", e.target.value)
-                      }
-                    >
-                      <option value="one_time">One Time</option>
-                      <option value="recurring">Recurring</option>
-                    </select>
-                  </div>
+              <div className="col-md-6">
+                <div className="form-group mb-3">
+                  <label htmlFor="editInvoiceDate">Invoice Date</label>
+                  <input
+                    type="date"
+                    className="form-control"
+                    id="editInvoiceDate"
+                    value={
+                      selectedInvoice.invoice_date
+                        ? moment(selectedInvoice.invoice_date).format(
+                            "YYYY-MM-DD"
+                          )
+                        : ""
+                    }
+                    onChange={(e) =>
+                      handleEditInvoiceChange("invoice_date", e.target.value)
+                    }
+                  />
                 </div>
               </div>
+            </div>
 
-              {/* Invoice Items Section */}
-              <div className="row">
-                <div className="col-md-12">
-                  <div className="form-group mb-3">
-                    <div className="d-flex justify-content-between align-items-center mb-2">
-                      <label>Invoice Items</label>
-                      <Button
-                        variant="outline-primary"
-                        size="sm"
-                        onClick={addEditInvoiceItem}
-                      >
-                        Add Item
-                      </Button>
+            <div className="row">
+              <div className="col-md-6">
+                <div className="form-group mb-3">
+                  <label htmlFor="editInvoiceDueDate">Due Date</label>
+                  <input
+                    type="date"
+                    className="form-control"
+                    id="editInvoiceDueDate"
+                    value={
+                      selectedInvoice.due_date
+                        ? moment(selectedInvoice.due_date).format("YYYY-MM-DD")
+                        : ""
+                    }
+                    onChange={(e) =>
+                      handleEditInvoiceChange("due_date", e.target.value)
+                    }
+                    min={moment().format("YYYY-MM-DD")}
+                  />
+                </div>
+              </div>
+              <div className="col-md-6">
+                <div className="form-group mb-3">
+                  <label htmlFor="editInvoicePaymentMode">Payment Mode</label>
+                  <select
+                    className="form-control"
+                    id="editInvoicePaymentMode"
+                    value={selectedInvoice.payment_mode || "one_time"}
+                    onChange={(e) =>
+                      handleEditInvoiceChange("payment_mode", e.target.value)
+                    }
+                  >
+                    <option value="one_time">One Time</option>
+                    <option value="recurring">Recurring</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Invoice Items Section */}
+            <div className="row">
+              <div className="col-md-12">
+                <div className="form-group mb-3">
+                  <div className="d-flex justify-content-between align-items-center mb-2">
+                    <label>Invoice Items</label>
+                    <Button
+                      variant="outline-primary"
+                      size="sm"
+                      onClick={addEditInvoiceItem}
+                    >
+                      Add Item
+                    </Button>
+                  </div>
+                  
+                  {selectedInvoice.items.length === 0 ? (
+                    <div className="text-muted text-center py-3">
+                      No items added yet. Click "Add Item" to start.
                     </div>
-                    
-                    {selectedInvoice.items.length === 0 ? (
-                      <div className="text-muted text-center py-3">
-                        No items added yet. Click "Add Item" to start.
-                      </div>
-                    ) : (
-                      <div className="table-responsive">
-                        <table style={{tableLayout: "fixed"}} className="table table-bordered">
-                          <thead>
-                            <tr>
-                              <th colSpan={2}>Product</th>
-                              <th>Quantity</th>
-                              <th>Unit Price</th>
-                              <th>Tax Rate (%)</th>
-                              <th>Line Total</th>
-                              <th>Action</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {selectedInvoice.items.map((item, index) => {
-                              const product = products.find(p => p.id.toString() === item.product_id);
-                              const quantity = parseFloat(item.quantity) || 0;
-                              const unitPrice = parseFloat(item.unit_price) || 0;
-                              const taxRate = parseFloat(item.tax_rate) || 0;
-                              const lineTotal = quantity * unitPrice;
-                              const lineTax = lineTotal * taxRate / 100;
-                              const lineTotalWithTax = lineTotal + lineTax;
-                              
-                              return (
-                                <tr key={index}>
-                                  <td colSpan={2}>
-                                    <select
-                                      className="form-control form-control-sm"
-                                      value={item.product_id}
-                                      onChange={(e) => updateEditInvoiceItem(index, "product_id", e.target.value)}
-                                    >
-                                      <option value="">Select Product</option>
-                                      {products.map((product) => (
-                                        <option key={product.id} value={product.id.toString()}>
-                                          {product.name} - {product.currency_code} {product.base_price}
-                                        </option>
-                                      ))}
-                                    </select>
-                                  </td>
-                                  <td>
-                                    <input
-                                      type="number"
-                                      step="0.01"
-                                      className="form-control form-control-sm"
-                                      value={item.quantity}
-                                      onChange={(e) => updateEditInvoiceItem(index, "quantity", e.target.value)}
-                                      placeholder="0.00"
-                                    />
-                                  </td>
-                                  <td>
-                                    <input
-                                      type="number"
-                                      step="0.01"
-                                      className="form-control form-control-sm"
-                                      value={item.unit_price}
-                                      onChange={(e) => updateEditInvoiceItem(index, "unit_price", e.target.value)}
-                                      placeholder="0.00"
-                                    />
-                                  </td>
-                                  <td>
-                                    <input
-                                      type="number"
-                                      step="0.01"
-                                      className="form-control form-control-sm"
-                                      value={item.tax_rate}
-                                      onChange={(e) => updateEditInvoiceItem(index, "tax_rate", e.target.value)}
-                                      placeholder="0.00"
-                                    />
-                                  </td>
-                                  <td>
-                                    <span className="fw-bold">
-                                      {selectedInvoice.currency_code} {lineTotalWithTax.toFixed(2)}
-                                    </span>
-                                  </td>
-                                  <td>
-                                    <Button
-                                      variant="outline-danger"
-                                      size="sm"
-                                      onClick={() => removeEditInvoiceItem(index)}
-                                    >
-                                      Remove
-                                    </Button>
-                                  </td>
-                                </tr>
-                              );
-                            })}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
-                  </div>
+                  ) : (
+                    <div className="table-responsive">
+                      <table style={{tableLayout: "fixed"}} className="table table-bordered">
+                        <thead>
+                          <tr>
+                            <th colSpan={2}>Product</th>
+                            <th>Quantity</th>
+                            <th>Unit Price</th>
+                            <th>Tax Rate (%)</th>
+                            <th>Line Total</th>
+                            <th>Action</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {selectedInvoice.items.map((item, index) => {
+                            const product = products.find(p => p.id.toString() === item.product_id);
+                            const quantity = parseFloat(item.quantity) || 0;
+                            const unitPrice = parseFloat(item.unit_price) || 0;
+                            const taxRate = parseFloat(item.tax_rate) || 0;
+                            const lineTotal = quantity * unitPrice;
+                            const lineTax = lineTotal * taxRate / 100;
+                            const lineTotalWithTax = lineTotal + lineTax;
+                            
+                            return (
+                              <tr key={index}>
+                                <td colSpan={2}>
+                                  <select
+                                    className="form-control form-control-sm"
+                                    value={item.product_id}
+                                    onChange={(e) => updateEditInvoiceItem(index, "product_id", e.target.value)}
+                                  >
+                                    <option value="">Select Product</option>
+                                    {products.map((product) => (
+                                      <option key={product.id} value={product.id.toString()}>
+                                        {product.name} - {product.currency_code} {product.base_price}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </td>
+                                <td>
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    className="form-control form-control-sm"
+                                    value={item.quantity}
+                                    onChange={(e) => updateEditInvoiceItem(index, "quantity", e.target.value)}
+                                    placeholder="0.00"
+                                  />
+                                </td>
+                                <td>
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    className="form-control form-control-sm"
+                                    value={item.unit_price}
+                                    onChange={(e) => updateEditInvoiceItem(index, "unit_price", e.target.value)}
+                                    placeholder="0.00"
+                                  />
+                                </td>
+                                <td>
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    className="form-control form-control-sm"
+                                    value={item.tax_rate}
+                                    onChange={(e) => updateEditInvoiceItem(index, "tax_rate", e.target.value)}
+                                    placeholder="0.00"
+                                  />
+                                </td>
+                                <td>
+                                  <span className="fw-bold">
+                                    {selectedInvoice.currency_code} {lineTotalWithTax.toFixed(2)}
+                                  </span>
+                                </td>
+                                <td>
+                                  <Button
+                                    variant="outline-danger"
+                                    size="sm"
+                                    onClick={() => removeEditInvoiceItem(index)}
+                                  >
+                                    Remove
+                                  </Button>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </div>
               </div>
+            </div>
 
-              <div className="row">
-                <div className="col-md-4">
-                  <div className="form-group mb-3">
-                    <label htmlFor="editInvoiceSubtotal">Subtotal</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      className="form-control"
-                      id="editInvoiceSubtotal"
-                      value={selectedInvoice.subtotal || ""}
-                      readOnly
-                      placeholder="0.00"
-                    />
-                  </div>
-                </div>
-                <div className="col-md-4">
-                  <div className="form-group mb-3">
-                    <label htmlFor="editInvoiceTaxAmount">Tax Amount</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      className="form-control"
-                      id="editInvoiceTaxAmount"
-                      value={selectedInvoice.tax_amount || ""}
-                      readOnly
-                      placeholder="0.00"
-                    />
-                  </div>
-                </div>
-                <div className="col-md-4">
-                  <div className="form-group mb-3">
-                    <label htmlFor="editInvoiceTotalAmount">Total Amount</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      className="form-control"
-                      id="editInvoiceTotalAmount"
-                      value={selectedInvoice.total_amount || ""}
-                      readOnly
-                      placeholder="0.00"
-                    />
-                  </div>
+            <div className="row">
+              <div className="col-md-4">
+                <div className="form-group mb-3">
+                  <label htmlFor="editInvoiceSubtotal">Subtotal</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    className="form-control"
+                    id="editInvoiceSubtotal"
+                    value={selectedInvoice.subtotal || ""}
+                    readOnly
+                    placeholder="0.00"
+                  />
                 </div>
               </div>
-
-              <div className="row">
-                <div className="col-md-6">
-                  <div className="form-group mb-3">
-                    <label htmlFor="editInvoiceCurrency">Currency</label>
-                    <select
-                      className="form-control"
-                      id="editInvoiceCurrency"
-                      value={selectedInvoice.currency_code || "USD"}
-                      onChange={(e) =>
-                        handleEditInvoiceChange("currency_code", e.target.value)
-                      }
-                    >
-                      <option value="USD">USD</option>
-                      <option value="AED">AED</option>
-                      <option value="PKR">PKR</option>
-                      <option value="EUR">EUR</option>
-                      <option value="GBP">GBP</option>
-                    </select>
-                  </div>
+              <div className="col-md-4">
+                <div className="form-group mb-3">
+                  <label htmlFor="editInvoiceTaxAmount">Tax Amount</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    className="form-control"
+                    id="editInvoiceTaxAmount"
+                    value={selectedInvoice.tax_amount || ""}
+                    readOnly
+                    placeholder="0.00"
+                  />
                 </div>
               </div>
-
-              <div className="row">
-                <div className="col-md-6">
-                  <div className="form-group mb-3">
-                    <label htmlFor="editInvoiceExchangeRate">Exchange Rate</label>
-                    <input
-                      type="number"
-                      step="0.000001"
-                      className="form-control"
-                      id="editInvoiceExchangeRate"
-                      value={selectedInvoice.exchange_rate || "1.000000"}
-                      onChange={(e) =>
-                        handleEditInvoiceChange("exchange_rate", e.target.value)
-                      }
-                      placeholder="1.000000"
-                    />
-                  </div>
+              <div className="col-md-4">
+                <div className="form-group mb-3">
+                  <label htmlFor="editInvoiceTotalAmount">Total Amount</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    className="form-control"
+                    id="editInvoiceTotalAmount"
+                    value={selectedInvoice.total_amount || ""}
+                    readOnly
+                    placeholder="0.00"
+                  />
                 </div>
               </div>
+            </div>
 
+            <div className="row">
+              <div className="col-md-6">
+                <div className="form-group mb-3">
+                  <label htmlFor="editInvoiceCurrency">Currency</label>
+                  <select
+                    className="form-control"
+                    id="editInvoiceCurrency"
+                    value={selectedInvoice.currency_code || "USD"}
+                    onChange={(e) =>
+                      handleEditInvoiceChange("currency_code", e.target.value)
+                    }
+                  >
+                    <option value="USD">USD</option>
+                    <option value="AED">AED</option>
+                    <option value="PKR">PKR</option>
+                    <option value="EUR">EUR</option>
+                    <option value="GBP">GBP</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Payment Methods Section */}
+            {selectedInvoice.company_id && (
               <div className="row">
                 <div className="col-md-12">
                   <div className="form-group mb-3">
-                    <label htmlFor="editInvoiceNotes">Notes</label>
-                    <textarea
-                      className="form-control"
-                      id="editInvoiceNotes"
-                      value={selectedInvoice.notes || ""}
-                      onChange={(e) =>
-                        handleEditInvoiceChange("notes", e.target.value)
-                      }
-                      rows={3}
-                      placeholder="Additional notes..."
+                    <label>Payment Methods</label>
+                    <PaymentCardsDisplay 
+                      paymentMethods={paymentMethods}
+                      isLoadingPaymentMethods={isLoadingPaymentMethods}
                     />
                   </div>
                 </div>
               </div>
+            )}
 
-              <div className="row">
-                <div className="col-md-12">
-                  <div className="form-group mb-3">
-                    <label htmlFor="editInvoiceTerms">Terms & Conditions</label>
-                    <textarea
-                      className="form-control"
-                      id="editInvoiceTerms"
-                      value={selectedInvoice.terms_conditions || ""}
-                      onChange={(e) =>
-                        handleEditInvoiceChange(
-                          "terms_conditions",
-                          e.target.value
-                        )
-                      }
-                      rows={3}
-                      placeholder="Terms and conditions..."
-                    />
-                  </div>
+            <div className="row">
+              <div className="col-md-6">
+                <div className="form-group mb-3">
+                  <label htmlFor="editInvoiceExchangeRate">Exchange Rate</label>
+                  <input
+                    type="number"
+                    step="0.000001"
+                    className="form-control"
+                    id="editInvoiceExchangeRate"
+                    value={selectedInvoice.exchange_rate || "1.000000"}
+                    onChange={(e) =>
+                      handleEditInvoiceChange("exchange_rate", e.target.value)
+                    }
+                    placeholder="1.000000"
+                  />
                 </div>
               </div>
-            </>
-          }
-          submitButtonText={editingInvoice ? "Updating..." : "Update Invoice"}
-          cancelButtonText="Close"
-          onSubmit={handleSubmitEditInvoice}
-          onCancel={closeEditInvoiceModal}
-          submitButtonVariant="primary"
-          cancelButtonVariant="secondary"
-        />
+            </div>
+
+            <div className="row">
+              <div className="col-md-12">
+                <div className="form-group mb-3">
+                  <label htmlFor="editInvoiceNotes">Notes</label>
+                  <textarea
+                    className="form-control"
+                    id="editInvoiceNotes"
+                    value={selectedInvoice.notes || ""}
+                    onChange={(e) =>
+                      handleEditInvoiceChange("notes", e.target.value)
+                    }
+                    rows={3}
+                    placeholder="Additional notes..."
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="row">
+              <div className="col-md-12">
+                <div className="form-group mb-3">
+                  <label htmlFor="editInvoiceTerms">Terms & Conditions</label>
+                  <textarea
+                    className="form-control"
+                    id="editInvoiceTerms"
+                    value={selectedInvoice.terms_conditions || ""}
+                    onChange={(e) =>
+                      handleEditInvoiceChange(
+                        "terms_conditions",
+                        e.target.value
+                      )
+                    }
+                    rows={3}
+                    placeholder="Terms and conditions..."
+                  />
+                </div>
+              </div>
+            </div>
+          </Modal.Body>
+          <Modal.Footer>
+            <Button variant="secondary" onClick={closeEditInvoiceModal}>
+              Close
+            </Button>
+            <Button
+              variant="primary"
+              onClick={handleSubmitEditInvoice}
+              disabled={editingInvoice}
+            >
+              {editingInvoice ? "Updating..." : "Update Invoice"}
+            </Button>
+          </Modal.Footer>
+        </Modal>
       )}
 
       {/* Delete Invoice Modal */}
       {showDeleteInvoiceModal && selectedInvoice && (
-        <ConfirmModal
+        <Modal
           show={showDeleteInvoiceModal}
           onHide={() => setShowDeleteInvoiceModal(false)}
-          title="Delete Invoice?"
-          description="Are you sure you want to delete invoice {targetName}? This action cannot be undone."
-          targetName={`#${selectedInvoice.invoice_number}`}
-          confirmButtonText="Delete"
-          cancelButtonText="Close"
-          onConfirm={handleSubmitDeleteInvoice}
-          onCancel={() => setShowDeleteInvoiceModal(false)}
-          confirmButtonVariant="danger"
-          cancelButtonVariant="secondary"
-          requireTextConfirmation={true}
-          confirmationPlaceholder="Type the word DELETE to confirm"
-          confirmationLabel=""
-          requiredConfirmationText="DELETE"
-        />
+        >
+          <Modal.Header closeButton>
+            <Modal.Title>Delete Invoice?</Modal.Title>
+          </Modal.Header>
+          <Modal.Body>
+            <p>
+              Are you sure you want to delete invoice{" "}
+              <b className="text-danger">#{selectedInvoice.invoice_number}</b>?
+            </p>
+            <p>
+              This action cannot be undone.
+            </p>
+            <p>
+              Type the word <b className="text-danger">DELETE</b> to confirm
+            </p>
+            <input
+              type="text"
+              className="form-control"
+              id="confirmDeleteInvoice"
+              value={confirmDeleteInvoice}
+              onChange={(e) => setConfirmDeleteInvoice(e.target.value)}
+              placeholder="Type the word DELETE to confirm"
+            />
+          </Modal.Body>
+          <Modal.Footer>
+            <Button
+              variant="secondary"
+              onClick={() => setShowDeleteInvoiceModal(false)}
+            >
+              Close
+            </Button>
+            <Button variant="danger" onClick={handleSubmitDeleteInvoice}>
+              Delete
+            </Button>
+          </Modal.Footer>
+        </Modal>
+      )}
+
+      {/* Payment Modal */}
+      {showPaymentModal && selectedInvoiceForPayment && (
+        <Modal
+          show={showPaymentModal}
+          onHide={closePaymentModal}
+          size="lg"
+        >
+          <Modal.Header closeButton>
+            <Modal.Title>
+              <FiDollarSign className="me-2" />
+              Process Payment - Invoice #{selectedInvoiceForPayment.invoice_number}
+            </Modal.Title>
+          </Modal.Header>
+          <Modal.Body>
+            {/* Invoice Summary */}
+            <div className="card mb-4">
+              <div className="card-header">
+                <h6 className="mb-0">Invoice Summary</h6>
+              </div>
+              <div className="card-body">
+                <div className="row">
+                  <div className="col-md-6">
+                    <p><strong>Company:</strong> {selectedInvoiceForPayment.company?.name}</p>
+                    <p><strong>Invoice Date:</strong> {moment(selectedInvoiceForPayment.invoice_date).format('DD/MM/YYYY')}</p>
+                    <p><strong>Due Date:</strong> {selectedInvoiceForPayment.due_date ? moment(selectedInvoiceForPayment.due_date).format('DD/MM/YYYY') : 'N/A'}</p>
+                  </div>
+                  <div className="col-md-6">
+                    <p><strong>Subtotal:</strong> {selectedInvoiceForPayment.currency_code} {parseFloat(selectedInvoiceForPayment.subtotal || '0').toFixed(2)}</p>
+                    <p><strong>Tax Amount:</strong> {selectedInvoiceForPayment.currency_code} {parseFloat(selectedInvoiceForPayment.tax_amount || '0').toFixed(2)}</p>
+                    <p><strong className="text-primary">Total Amount:</strong> {selectedInvoiceForPayment.currency_code} {parseFloat(selectedInvoiceForPayment.total_amount || '0').toFixed(2)}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Payment Method Selection */}
+            <div className="mb-4">
+              <div className="d-flex justify-content-between align-items-center mb-3">
+                <h6 className="mb-0">Payment Method</h6>
+                <div className="btn-group" role="group">
+                  <Button
+                    variant={paymentMode === 'saved' ? 'primary' : 'outline-primary'}
+                    size="sm"
+                    onClick={handleSwitchToSavedPayment}
+                  >
+                    <FiCreditCard className="me-1" />
+                    Saved Cards
+                  </Button>
+                  <Button
+                    variant={paymentMode === 'direct' ? 'primary' : 'outline-primary'}
+                    size="sm"
+                    onClick={handleSwitchToDirectPayment}
+                  >
+                    <FaCreditCard className="me-1" />
+                    Enter Card
+                  </Button>
+                </div>
+              </div>
+
+              {paymentMode === 'saved' ? (
+                <PaymentMethodSelector
+                  paymentMethods={paymentMethods}
+                  selectedPaymentMethod={selectedPaymentMethod}
+                  onPaymentMethodSelect={setSelectedPaymentMethod}
+                  isLoadingPaymentMethods={isLoadingPaymentMethods}
+                />
+              ) : (
+                stripePublishableKey ? (
+                  <Elements stripe={loadStripe(stripePublishableKey)}>
+                    <DirectCardPaymentForm
+                      amount={parseFloat(selectedInvoiceForPayment.total_amount || '0')}
+                      currency={selectedInvoiceForPayment.currency_code || 'USD'}
+                      invoiceId={selectedInvoiceForPayment.id}
+                      customerId={parseInt(selectedInvoiceForPayment.company_id || '0')}
+                      onPaymentSuccess={handleDirectPaymentSuccess}
+                      onPaymentError={handleDirectPaymentError}
+                      onSwitchToAddCard={handleSwitchToSavedPayment}
+                    />
+                  </Elements>
+                ) : (
+                  <div className="text-center py-3">
+                    <Spinner animation="border" size="sm" className="me-2" />
+                    <span>Loading Stripe...</span>
+                  </div>
+                )
+              )}
+            </div>
+
+            {/* Payment Notes */}
+            <div className="mb-3">
+              <label htmlFor="paymentNotes" className="form-label">Payment Notes (Optional)</label>
+              <textarea
+                className="form-control"
+                id="paymentNotes"
+                value={paymentNotes}
+                onChange={(e) => setPaymentNotes(e.target.value)}
+                rows={3}
+                placeholder="Add any notes about this payment..."
+              />
+            </div>
+          </Modal.Body>
+          <Modal.Footer>
+            <Button variant="secondary" onClick={closePaymentModal}>
+              Cancel
+            </Button>
+            {paymentMode === 'saved' && (
+              <Button
+                variant="success"
+                onClick={handleProcessPayment}
+                disabled={!selectedPaymentMethod || isProcessingPayment}
+              >
+                {isProcessingPayment ? (
+                  <>
+                    <Spinner animation="border" size="sm" className="me-2" />
+                    Processing...
+                  </>
+                ) : (
+                  <>
+                    <FiDollarSign className="me-2" />
+                    Process Payment
+                  </>
+                )}
+              </Button>
+            )}
+          </Modal.Footer>
+        </Modal>
       )}
     </React.Fragment>
   );

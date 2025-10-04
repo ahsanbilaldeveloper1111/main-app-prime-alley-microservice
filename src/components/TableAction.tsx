@@ -3,7 +3,7 @@ import { Dropdown, DropdownToggle, DropdownMenu, DropdownItem } from 'react-boot
 import { FiMoreVertical } from 'react-icons/fi';
 import { IconType } from 'react-icons';
 
-interface Action {
+export interface Action {
     label: string;
     icon: IconType;
     onClick: () => void;
