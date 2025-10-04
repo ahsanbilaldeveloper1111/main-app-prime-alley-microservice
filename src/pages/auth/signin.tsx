@@ -258,17 +258,19 @@ const Signin = () => {
         </main>
     </div>
 
-    <footer className="pc-footer m-0 p-0 mt-3">
+    
+
+    <footer className="pc-footer m-0 mt-3">
     <div className="row">
-          <div className="col-sm-6 my-1">
+          <div className="col-sm-12 my-1 text-center">
             <p className="m-0">© {new Date().getFullYear()} All rights reserved. Powered by <a href="https://ringedge.com/" target="_blank" className="text-primary"> Ring Edge</a></p>
           </div>
-          <div className="col-sm-6 ms-auto my-1">
+          {/* <div className="col-sm-6 ms-auto my-1">
             <ul className="list-inline footer-link mb-0 justify-content-sm-end d-flex">
               <li className="list-inline-item"><a href="#" target="_blank">Documentation</a></li>
               <li className="list-inline-item"><a href="#" target="_blank">Support</a></li>
             </ul>
-          </div>
+          </div> */}
         </div>
     </footer>
 

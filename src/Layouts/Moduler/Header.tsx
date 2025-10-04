@@ -1489,10 +1489,10 @@ const Header = ({ themeMode }: HeaderProps) => {
             `}</style>
            <nav className="pc-sidebar">
                 <div className="navbar-wrapper">
-                    <div className="m-header" style={{backgroundColor: "#1a6bc4"}}>
+                    <div className="m-header" >
                     <Link href={`${BASE_URL}/dashboard`}  className="b-brand text-primary">
-                        {/* <img src={CompanyLogo2.src} alt="logo" className="img-fluid" /> */}
-                        <span className="sidebar-logo-text">Business Contact Center</span>
+                        <img src={CompanyLogo2.src} alt="logo" className="img-fluid" />
+                        {/* <span className="sidebar-logo-text">Business Contact Center</span> */}
                     </Link>
                             </div>
 
