@@ -18,6 +18,16 @@ import { useSession } from "next-auth/react";
 import moment from "moment";
 import Select from "react-select";
 
+import "@assets/scss/common.scss";
+import "@assets/scss/tabs.scss";
+import PageHeader from "@components/PageHeader";
+import FormModal from "@pages/partial/FormModal";
+import ConfirmModal from "@pages/partial/ConfirmModal";
+import SuccessfulModal from "@pages/partial/SuccessfulModal";
+import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
+import DatatableActionButton from "@components/DatatableActionButton";
+import { FiEdit, FiTrash2, FiEye,FiPlus } from "react-icons/fi";
+
 import {ListRecordingProfile } from "@utils/tms/List";
 
 interface SelectOption {
@@ -29,7 +39,11 @@ const CiscoPbxRecordingProfile = () => {
   const { data: session, status } = useSession();
 
   const [refreshKey, setRefreshKey] = useState<number>(0);
-  const [currentFilters, setCurrentFilters] = useState({});
+  const [currentFilters, setCurrentFilters] = useState<any>({});
+
+  const handleFiltersChange = (filters: any) => {
+    setCurrentFilters(filters);
+  };
 
   const columns: Column[] = useMemo(
     () => [
@@ -61,15 +75,16 @@ const CiscoPbxRecordingProfile = () => {
         mainLink="/tms/cisco-pbx/recording-profile"
         subTitle="Cisco PBX Recording Profile"
       />
-      <Row className="mb-3">
-        <Col md={12}>
-          <div className="page-header-title">
-            <h2 className="mb-0 d-flex align-items-center">
-              Recording Profile
-            </h2>
-          </div>
-        </Col>
-      </Row>
+      
+
+      <PageHeader
+        title="Cisco PBX Recording Profile"
+        showSearch={true}
+        searchPlaceholder="Search recording profile..."
+        searchValue={currentFilters?.search || ""}
+        onSearchChange={(value: any) => handleFiltersChange({...currentFilters, search: value})}
+      />
+
 
       
         <GenericListPage
@@ -80,7 +95,9 @@ const CiscoPbxRecordingProfile = () => {
           defaultPageSize={15}
           filters={memoizedFilters}
           refreshKey={refreshKey}
-          search={true}
+          search={false}
+          tableStyle="table-style-2"
+
         />
       
 

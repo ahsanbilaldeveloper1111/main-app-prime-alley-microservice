@@ -120,22 +120,22 @@ axiosInstance.interceptors.request.use(
     let retryCount = 0;
 
     // Debug logging for all requests
-    console.log('=== AXIOS REQUEST INTERCEPTOR ===');
-    console.log('Request URL:', config.url);
-    console.log('Full URL:', `${config.baseURL || ''}${config.url}`);
-    console.log('Method:', config.method);
-    console.log('Headers:', config.headers);
+    // console.log('=== AXIOS REQUEST INTERCEPTOR ===');
+    // console.log('Request URL:', config.url);
+    // console.log('Full URL:', `${config.baseURL || ''}${config.url}`);
+    // console.log('Method:', config.method);
+    // console.log('Headers:', config.headers);
 
     // Debug logging for FormData requests
     if (config.data instanceof FormData) {
-      console.log('=== AXIOS INTERCEPTOR DEBUG ===');
-      console.log('FormData request detected');
-      console.log('URL:', config.url);
-      console.log('Method:', config.method);
-      console.log('Base URL:', config.baseURL || '');
-      console.log('Full URL:', `${config.baseURL || ''}${config.url}`);
-      console.log('Headers before interceptor:', config.headers);
-      console.log('FormData entries count:', Array.from(config.data.entries()).length);
+      // console.log('=== AXIOS INTERCEPTOR DEBUG ===');
+      // console.log('FormData request detected');
+      // console.log('URL:', config.url);
+      // console.log('Method:', config.method);
+      // console.log('Base URL:', config.baseURL || '');
+      // console.log('Full URL:', `${config.baseURL || ''}${config.url}`);
+      // console.log('Headers before interceptor:', config.headers);
+      // console.log('FormData entries count:', Array.from(config.data.entries()).length);
     }
 
     // Function to retry fetching token and setting Authorization header

@@ -109,7 +109,7 @@ export const routePermissions: RoutePermission[] = [
         children: [
             {
                 path: '/',
-                permissions: ['views-call-recordings']
+                permissions: ['view-call-recordings']
             },
         ]
     },
