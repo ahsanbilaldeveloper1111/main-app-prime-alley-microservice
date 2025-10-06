@@ -89,12 +89,8 @@ export const routePermissions: RoutePermission[] = [
     //call logs services start
     {
         path: '/call-logs',
-        permissions: [PERMISSIONS.CALL_LOGS_SERVICES],
+        permissions: ['view-call-logs'],
         children: [
-            {
-                path: '/',
-                permissions: ['view-call-logs'],
-            },
             {
                 path: '/dashboard',
                 permissions: ['dashboard-call-logs']
@@ -105,13 +101,7 @@ export const routePermissions: RoutePermission[] = [
     //call recordings services start
     {
         path: '/call-recordings',
-        permissions: [PERMISSIONS.CALL_RECORDINGS_SERVICES],
-        children: [
-            {
-                path: '/',
-                permissions: ['view-call-recordings']
-            },
-        ]
+        permissions: ['view-call-recordings']
     },
     
     //call reports services start
