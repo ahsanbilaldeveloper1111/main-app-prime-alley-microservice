@@ -253,16 +253,6 @@ export const createCallLogsFiltersConfig = (hierarchyData?: any, isVisibleCallDi
         {
           type: 'select',
           isMulti: true,
-          name: 'extension',
-          label: 'Extension Names',
-          options: hierarchyData?.users?.map((user: { id: string; name: string }) => ({
-            value: user.id,
-            label: user.name
-          })) || []
-        },
-        {
-          type: 'select',
-          isMulti: true,
           name: 'extension_number',
           label: 'Extension Numbers',
           options: hierarchyData?.extensions?.map((ext: { id: string; name: string }) => ({
