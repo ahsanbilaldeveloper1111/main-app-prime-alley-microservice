@@ -34,6 +34,16 @@ import '@assets/scss/tabs.scss';
 import { motion, AnimatePresence } from "framer-motion";
 import { easeInOut, easeOut, easeIn } from "framer-motion";
 import moment from 'moment';
+import "@assets/scss/common.scss";
+import "@assets/scss/tabs.scss";
+import PageHeader from "@components/PageHeader";
+import FormModal from "@pages/partial/FormModal";
+import ConfirmModal from "@pages/partial/ConfirmModal";
+import SuccessfulModal from "@pages/partial/SuccessfulModal";
+import DatatableActionButton from "@components/DatatableActionButton";
+import { FiEdit, FiTrash2, FiEye,FiPlus } from "react-icons/fi";
+
+
 
 interface Summary {
   total_calls: number;
@@ -546,11 +556,14 @@ const CallStatsExtension = () => {
       }
     }, [currentFilters, filtersReady, fetchCallLogs, status, session]);
 
+    const [currentChartDataType, setCurrentChartDataType] = useState<'calls' | 'time' | 'cost' | 'custom'>('custom');
+
     const handleOpenChartModal = (chartData: { series: any[]; categories: string[] } | null, title: string, dataType: 'calls' | 'time' | 'cost' | 'custom') => {
         console.log('Opening chart modal:', { title, dataType, hasChartData: !!chartData });
         if (chartData) {
             setCurrentChartData(chartData);
             setCurrentChartTitle(title);
+            setCurrentChartDataType(dataType);
             setShowChartModal(true);
         }
     };
@@ -1054,7 +1067,7 @@ const CallStatsExtension = () => {
                                 series={currentChartData.series}
                                 categories={currentChartData.categories}
                                 height={500}
-                                dataType="custom"
+                                dataType={currentChartDataType}
                             />
                         </div>
                     ) : (

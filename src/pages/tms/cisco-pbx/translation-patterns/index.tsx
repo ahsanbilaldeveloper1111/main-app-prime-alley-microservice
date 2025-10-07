@@ -102,6 +102,8 @@ const CiscoPbxListTranslationPatterns = () => {
         searchPlaceholder="Search translation patterns..."
         searchValue={currentFilters?.search || ""}
         onSearchChange={(value: any) => handleFiltersChange({...currentFilters, search: value})}
+        leftGrid={7}
+        rightGrid={5}
       />
 
       
@@ -113,7 +115,8 @@ const CiscoPbxListTranslationPatterns = () => {
           defaultPageSize={15}
           filters={memoizedFilters}
           refreshKey={refreshKey}
-          search={true}
+          search={false}
+          tableStyle="table-style-2"
         />
       
 

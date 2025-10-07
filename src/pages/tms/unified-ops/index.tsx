@@ -18,6 +18,17 @@ import { useSession } from "next-auth/react";
 import moment from "moment";
 import Select from "react-select";
 
+import "@assets/scss/common.scss";
+import "@assets/scss/tabs.scss";
+import PageHeader from "@components/PageHeader";
+import FormModal from "@pages/partial/FormModal";
+import ConfirmModal from "@pages/partial/ConfirmModal";
+import SuccessfulModal from "@pages/partial/SuccessfulModal";
+import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
+import DatatableActionButton from "@components/DatatableActionButton";
+import { FiEdit, FiTrash2, FiEye,FiPlus } from "react-icons/fi";
+
+
 import { ListUnifiedOps } from "@utils/tms/List";
 
 interface SelectOption {
@@ -29,7 +40,7 @@ const UnifiedOpsList = () => {
   const { data: session, status } = useSession();
 
   const [refreshKey, setRefreshKey] = useState<number>(0);
-  const [currentFilters, setCurrentFilters] = useState({});
+  const [currentFilters, setCurrentFilters] = useState({search: ""});
 
   const columns: Column[] = useMemo(
     () => [
@@ -56,10 +67,15 @@ const UnifiedOpsList = () => {
   const fetchUnifiedOps = useCallback(
       
       async (page = 1, perPage = 15, search = "") => {
-        return await ListUnifiedOps({ page, perPage, search, filters: currentFilters });
+        return await ListUnifiedOps({ page, perPage, search: search || memoizedFilters?.search || "", filters: currentFilters });
       },
-      [memoizedFilters]
+      [memoizedFilters,currentFilters]
     );
+
+  const handleFiltersChange = (filters: any) => {
+    setCurrentFilters(filters);
+    setRefreshKey((oldKey) => oldKey + 1);
+  };
 
 
   return (
@@ -69,15 +85,14 @@ const UnifiedOpsList = () => {
         mainLink="/tms/unified-ops"
         subTitle="Unified Ops"
       />
-      <Row className="mb-3">
-        <Col md={12}>
-          <div className="page-header-title">
-            <h2 className="mb-0 d-flex align-items-center">
-            List Unified Ops
-            </h2>
-          </div>
-        </Col>
-      </Row>
+      
+        <PageHeader
+          title="Unified Ops"
+          showSearch={true}
+          searchPlaceholder="Search Unified Ops..."
+          searchValue={currentFilters?.search || ""}
+          onSearchChange={(value: any) => handleFiltersChange({...currentFilters, search: value})}
+        />
 
       
         <GenericListPage
@@ -88,7 +103,8 @@ const UnifiedOpsList = () => {
           defaultPageSize={15}
           filters={memoizedFilters}
           refreshKey={refreshKey}
-          search={true}
+          search={false}
+          tableStyle="table-style-2"
         />
       
 

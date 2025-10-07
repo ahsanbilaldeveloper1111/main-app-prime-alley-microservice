@@ -104,6 +104,8 @@ const CiscoPbxRemoteDestinationProfile = () => {
         searchPlaceholder="Search remote destination profile..."
         searchValue={currentFilters?.search || ""}
         onSearchChange={(value: any) => handleFiltersChange({...currentFilters, search: value})}
+        leftGrid={7}
+        rightGrid={5}
       />
 
         <GenericListPage
@@ -114,7 +116,8 @@ const CiscoPbxRemoteDestinationProfile = () => {
           defaultPageSize={15}
           filters={memoizedFilters}
           refreshKey={refreshKey}
-          search={true}
+          search={false}
+          tableStyle="table-style-2"
         />
       
 

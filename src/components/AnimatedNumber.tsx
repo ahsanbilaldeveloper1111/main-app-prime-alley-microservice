@@ -14,7 +14,6 @@ interface AnimatedNumberProps {
 const AnimatedNumber = ({ value, duration = 1000, textColor = '', suffix = '', prefix = '', valueType = '', size = '', fontStyle = '' }: AnimatedNumberProps) => {
   const [displayValue, setDisplayValue] = useState(0);
 
-  // Function to format seconds as "1m 23s"
   const formatSeconds = (seconds: number): string => {
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = Math.floor(seconds % 60);
@@ -26,6 +25,28 @@ const AnimatedNumber = ({ value, duration = 1000, textColor = '', suffix = '', p
     } else {
       return `${remainingSeconds}s`;
     }
+  };
+
+  // Function to format seconds as "1m 23s"
+  const formatSecondsInHHMMSS = (seconds: number): string => {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const remainingSeconds = Math.floor(seconds % 60);
+    
+    console.log('formatSeconds input:', seconds, 'hours:', hours, 'minutes:', minutes, 'remainingSeconds:', remainingSeconds);
+    
+    const parts = [];
+    if (hours > 0) {
+      parts.push(`${hours}h`);
+    }
+    if (minutes > 0) {
+      parts.push(`${minutes}m`);
+    }
+    if (remainingSeconds > 0 || parts.length === 0) {
+      parts.push(`${remainingSeconds}s`);
+    }
+    
+    return parts.join(' ');
   };
 
   useEffect(() => {

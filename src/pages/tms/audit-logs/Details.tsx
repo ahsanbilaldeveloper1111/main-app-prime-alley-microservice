@@ -5,6 +5,8 @@ import { Modal } from "react-bootstrap";
 import { AuditLog } from "@models/tms/AuditLog";
 import { Row, Col, Badge } from "react-bootstrap";
 
+
+
 interface AuditLogDetailProps {
     auditLog: AuditLog;
     close: () => void;

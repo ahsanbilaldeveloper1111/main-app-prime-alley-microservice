@@ -519,10 +519,14 @@ const CallTrendCountry = () => {
       }
     }, [currentFilters, filtersReady]);
 
+
+    const [currentChartDataType, setCurrentChartDataType] = useState<'calls' | 'time' | 'cost' | 'custom'>('custom');
+
     const handleOpenChartModal = (chartData: { series: any[]; categories: string[] } | null, title: string, dataType: 'calls' | 'time' | 'cost' | 'custom') => {
         if (chartData) {
             setCurrentChartData(chartData);
             setCurrentChartTitle(title);
+            setCurrentChartDataType(dataType);
             setShowChartModal(true);
         }
     };
@@ -870,7 +874,7 @@ const CallTrendCountry = () => {
                                 series={currentChartData.series}
                                 categories={currentChartData.categories}
                                 height={500}
-                                dataType="custom"
+                                dataType={currentChartDataType}
                                 useLogScale={true}
                             />
                         </div>

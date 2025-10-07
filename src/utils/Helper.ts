@@ -360,6 +360,43 @@ export const formatMinutesAndSeconds = (seconds: number): string => {
   return `${minutes}m ${secs}s`;
 };
 
+export const convertSecondsToHHMMSS = (seconds: number): string => {
+  if (!seconds || seconds < 0) return '0s';
+  
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = Math.floor(seconds % 60);
+  
+  if (hours === 0 && minutes === 0) return `${secs}s`;
+  if (hours === 0) return `${minutes}m ${secs}s`;
+  return `${hours}h ${minutes}m ${secs}s`;
+};
+
+export const convertSecondsToHumanReadable = (seconds: number): string => {
+  if (!seconds || seconds < 0) return '0sec';
+  
+  const years = Math.floor(seconds / (365 * 24 * 3600));
+  const months = Math.floor((seconds % (365 * 24 * 3600)) / (30 * 24 * 3600));
+  const weeks = Math.floor((seconds % (30 * 24 * 3600)) / (7 * 24 * 3600));
+  const days = Math.floor((seconds % (7 * 24 * 3600)) / (24 * 3600));
+  const hours = Math.floor((seconds % (24 * 3600)) / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = Math.floor(seconds % 60);
+  
+  const parts = [];
+  
+  if (years > 0) parts.push(`${years}Y`);
+  if (months > 0) parts.push(`${months}M`);
+  if (weeks > 0) parts.push(`${weeks}w`);
+  if (days > 0) parts.push(`${days}d`);
+  if (hours > 0) parts.push(`${hours}h`);
+  if (minutes > 0) parts.push(`${minutes}m`);
+  if (secs > 0) parts.push(`${secs}sec`);
+  
+  return parts.length > 0 ? parts.join(' ') : '0sec';
+};
+
+
 export const ModuleSlug = {
   CALL_REPORTS: 'call-reports',
   CALL_LOGS: 'call-logs',

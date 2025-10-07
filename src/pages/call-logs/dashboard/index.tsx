@@ -636,7 +636,7 @@ const [ExtensionChart, setExtensionChart] = React.useState({
   }, []);
 
   const fetchTrendByCountryStats = async () => {
-    const response = await ListCallLogs({ page:  page, perPage: perPage, search: "", filters: currentFilters,reportType: 'trendStatsCountry' }, 'call-logs/statsTrendByCountry');
+    const response = await ListCallLogs({ page:  page, perPage: perPage, search: "", filters: currentFilters,reportType: 'statsCountry' }, 'call-logs/statsByCountry');
     if(response?.dataList?.length > 0){
       setTrendByCountryData(response?.dataList);
     }
@@ -909,14 +909,14 @@ const [ExtensionChart, setExtensionChart] = React.useState({
 
                         {trendByCountryData.length === 0 ? (
                                         <EmptyState
-                                            title="No Call Trend by Country Data"
-                                            description="List of call trend by country data will appear here."
+                                            title="No Call Stats by Country Data"
+                                            description="List of call stats by country data will appear here."
                                             isTableRow={true}
                                             colSpan={6}
                                         />
                                     ) : ( 
                                       <>
-                                      <h5 className="mb-0 app-title-heading">Call Trend by Country</h5>
+                                      <h5 className="mb-0 app-title-heading">Call Stats by Country</h5>
                                       <div className="table-responsive">
                                        <table className="table table-bordered table-striped table-sm ">
                                 <thead>

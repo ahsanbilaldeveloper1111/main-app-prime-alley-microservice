@@ -115,7 +115,8 @@ const CiscoPbxListSipTrunks = () => {
           defaultPageSize={15}
           filters={memoizedFilters}
           refreshKey={refreshKey}
-          search={true}
+          search={false}
+          tableStyle="table-style-2"
         />
       
 

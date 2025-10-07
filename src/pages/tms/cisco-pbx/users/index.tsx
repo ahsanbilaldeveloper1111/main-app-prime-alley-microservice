@@ -103,15 +103,14 @@ const CiscoPbxUsers = () => {
         mainLink="/tms/cisco-pbx/users"
         subTitle="Cisco PBX Users"
       />
-      <Row className="mb-3">
-        <Col md={12}>
-          <div className="page-header-title">
-            <h2 className="mb-0 d-flex align-items-center">
-              Cisco PBX Users
-            </h2>
-          </div>
-        </Col>
-      </Row>
+      
+      <PageHeader
+        title="Cisco PBX Users"
+        showSearch={true}
+        searchPlaceholder="Search users..."
+        searchValue={currentFilters?.search || ""}
+        onSearchChange={(value: any) => handleFiltersChange({...currentFilters, search: value})}
+      />
 
       
         <GenericListPage

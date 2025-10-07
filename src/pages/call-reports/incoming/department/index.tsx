@@ -26,6 +26,18 @@ import { motion, AnimatePresence } from "framer-motion";
 import { easeInOut, easeOut, easeIn } from "framer-motion";
 import moment from 'moment';
 
+import "@assets/scss/common.scss";
+import "@assets/scss/tabs.scss";
+import PageHeader from "@components/PageHeader";
+import FormModal from "@pages/partial/FormModal";
+import ConfirmModal from "@pages/partial/ConfirmModal";
+import SuccessfulModal from "@pages/partial/SuccessfulModal";
+import DatatableActionButton from "@components/DatatableActionButton";
+import { FiEdit, FiTrash2, FiEye,FiPlus } from "react-icons/fi";
+
+
+
+
 interface Summary {
   total_calls: number;
   answered_calls: number;
@@ -528,11 +540,15 @@ const CallIncomingDepartment = () => {
       }
     }, [currentFilters, filtersReady]);
 
+
+    const [currentChartDataType, setCurrentChartDataType] = useState<'calls' | 'time' | 'cost' | 'custom'>('custom');
+
     const handleOpenChartModal = (chartData: { series: any[]; categories: string[] } | null, title: string, dataType: 'calls' | 'time' | 'cost' | 'custom') => {
         if (chartData) {
             setCurrentChartData(chartData);
             setCurrentChartTitle(title);
             setShowChartModal(true);
+            setCurrentChartDataType(dataType);
         }
     };
 
@@ -550,24 +566,26 @@ const CallIncomingDepartment = () => {
 
 
             <Row className="mb-3">
-            <Col md={12}>
-                <div className="page-header-title">
-                <Row className="align-items-center">
-                    <Col md={4}>
-                      <h3 className="mb-0 d-flex align-items-center">
-                      Call Incoming By Department
-                      </h3>
-                    </Col>
-                    <Col md={8} className="d-flex justify-content-end">
-                      <CallLogsFilters
-                       onFiltersChange={handleFiltersChange} onExport={handleExport} isVisibleCallDirection={false} moduleSlug={ModuleSlug.CALL_REPORTS} />
-                    </Col>
-                  </Row>
-               
-                
+        <Col md={12}>
+          <div className="page-header-title style-2">
+            <Row className="d-flex justify-content-between align-items-center">
+              <Col md={5}>
+                <h2 className="mb-0">Call Incoming By Department</h2>
+              </Col>
+              <Col md={7} className="d-flex justify-content-end">
+                <div className="action-buttons">
+                  <CallLogsFilters
+                    onFiltersChange={handleFiltersChange} 
+                    onExport={handleExport} 
+                    isVisibleCallDirection={false} 
+                    moduleSlug={ModuleSlug.CALL_REPORTS} 
+                  />
                 </div>
-            </Col>
+              </Col>
             </Row>
+          </div>
+        </Col>
+      </Row>
 
 
             <Row>
@@ -891,7 +909,7 @@ const CallIncomingDepartment = () => {
                                 series={currentChartData.series}
                                 categories={currentChartData.categories}
                                 height={500}
-                                dataType="custom"
+                                dataType={currentChartDataType}
                             />
                         </div>
                     ) : (

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { ApexOptions } from 'apexcharts';
 import { Button, Modal } from 'react-bootstrap';
@@ -60,6 +60,12 @@ const ChartBar: React.FC<ChartBarProps> = ({
   useLogScale = false
 }) => {
   const [showAllDataModal, setShowAllDataModal] = useState(false);
+  const [chartDataType, setChartDataType] = useState(dataType);
+
+  // Update dataType when prop changes
+  useEffect(() => {
+    setChartDataType(dataType);
+  }, [dataType]);
 
   // Helper function to convert seconds to minutes and seconds format
   const formatTimeFromSeconds = (seconds: number): string => {
@@ -91,7 +97,7 @@ const ChartBar: React.FC<ChartBarProps> = ({
 
   // Default tooltip formatter based on data type
   const getDefaultTooltipFormatter = (value: number, seriesName: string): string => {
-    switch (dataType) {
+    switch (chartDataType) {
       case 'calls':
         return `${value} calls`;
       case 'time':
@@ -216,7 +222,6 @@ const ChartBar: React.FC<ChartBarProps> = ({
             }
             return getDefaultTooltipFormatter(value, seriesName);
           } catch (error) {
-            console.warn('Error in tooltip formatter:', error);
             return getDefaultTooltipFormatter(value, `Series ${seriesIndex + 1}`);
           }
         }
@@ -226,7 +231,7 @@ const ChartBar: React.FC<ChartBarProps> = ({
       categories: displayedCategories,
       labels: {
         formatter: (value: string) => {
-          if (dataType === 'time') {
+          if (chartDataType === 'time') {
             return formatSecondsToHHMMSS(Number(value));
           }
           return value;
@@ -312,28 +317,24 @@ const ChartBar: React.FC<ChartBarProps> = ({
           <div style={{ height: '400px' }}>
             <ReactApexChart 
               options={{
-                ...chartOptions,
+                chart: chartOptions.chart,
+                plotOptions: chartOptions.plotOptions,
+                legend: chartOptions.legend,
+                dataLabels: chartOptions.dataLabels,
+                tooltip: chartOptions.tooltip,
                 xaxis: {
                   categories: categories,
                   labels: {
                     formatter: (value: string) => {
-                      if (dataType === 'time') {
-                        return formatSecondsToHHMMSS(Number(value));
+                      if (chartDataType === 'time') {
+                        const formatted = formatSecondsToHHMMSS(Number(value));
+                        return formatted;
                       }
                       return value;
                     }
                   }
                 },
-                yaxis: {
-                  labels: {
-                    formatter: (value: number) => {
-                      if (yAxisLabel) {
-                        return `${value} ${yAxisLabel}`;
-                      }
-                      return value.toString();
-                    }
-                  }
-                }
+                yaxis: chartOptions.yaxis
               }} 
               series={useLogScale ? series.map(s => ({
                 ...s,

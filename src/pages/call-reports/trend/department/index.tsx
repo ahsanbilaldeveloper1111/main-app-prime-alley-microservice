@@ -27,6 +27,7 @@ import { easeInOut, easeOut, easeIn } from "framer-motion";
 import moment from 'moment';
 import { ModuleSlug } from '@utils/Helper';
 
+
 interface Summary {
   total_calls: number;
   answered_calls: number;
@@ -519,10 +520,13 @@ const CallTrendDepartment = () => {
       }
     }, [currentFilters, filtersReady]);
 
+    const [currentChartDataType, setCurrentChartDataType] = useState<'calls' | 'time' | 'cost' | 'custom'>('custom');
+
     const handleOpenChartModal = (chartData: { series: any[]; categories: string[] } | null, title: string, dataType: 'calls' | 'time' | 'cost' | 'custom') => {
         if (chartData) {
             setCurrentChartData(chartData);
             setCurrentChartTitle(title);
+            setCurrentChartDataType(dataType);
             setShowChartModal(true);
         }
     };
@@ -873,7 +877,7 @@ const CallTrendDepartment = () => {
                                 series={currentChartData.series}
                                 categories={currentChartData.categories}
                                 height={500}
-                                dataType="custom"
+                                dataType={currentChartDataType}
                             />
                         </div>
                     ) : (

@@ -97,6 +97,8 @@ const CiscoPbxRemoteDestination = () => {
         searchPlaceholder="Search remote destination..."
         searchValue={currentFilters?.search || ""}
         onSearchChange={(value: any) => handleFiltersChange({...currentFilters, search: value})}
+        leftGrid={7}
+        rightGrid={5}
       />
 
       
