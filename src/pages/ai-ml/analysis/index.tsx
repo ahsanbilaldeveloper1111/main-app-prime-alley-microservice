@@ -176,7 +176,7 @@ const CallAnalysis = () => {
     onError: (error) => {
       console.error('Analysis SSE error:', error);
       //toast.error(`WebSocket connection failed: ${error.message || error}`);
-      setError(error.message || 'Analysis SSE connection failed');
+      setError(error.message || 'Analysis connection failed');
       setLoading(false);
     },
     onOpen: () => {
@@ -1282,14 +1282,7 @@ const CallAnalysis = () => {
 
           </Tabs>
         ) : (
-          <Row>
-            <Col md={12}>
-              <Alert variant="info">
-                <Alert.Heading>No Analysis Data</Alert.Heading>
-                <p>Enter the parameters above and click "Analyze Call" to view the analysis results.</p>
-              </Alert>
-            </Col>
-          </Row>
+          <></>
         )}
       </div>
     </React.Fragment>

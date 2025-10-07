@@ -509,3 +509,25 @@ export const MarkAsCompanyAdmin = async (id: string, is_company_admin: boolean) 
     throw error;
   }
 }
+
+export const SyncLdapUsers = async () => {
+  try {
+    const response = await axiosInstance.get(`users/syncLdapUsers`);
+    if(response){
+      console.log('Response:', response);
+      const responseData = response.data;
+      if(responseData.code === 200){
+        return responseData.data;
+      }else{
+        toast.error(responseData.message);
+        return false;
+      }
+    }else{
+      toast.error('Failed to sync LDAP users');
+      return false;
+    }
+  } catch (error) {
+    console.error('API Error:', error);
+    throw error;
+  }
+}
