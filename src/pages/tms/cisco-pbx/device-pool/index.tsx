@@ -20,6 +20,16 @@ import Select from "react-select";
 
 import { ListDeviePool } from "@utils/tms/List";
 
+import "@assets/scss/common.scss";
+import "@assets/scss/tabs.scss";
+import PageHeader from "@components/PageHeader";
+import FormModal from "@pages/partial/FormModal";
+import ConfirmModal from "@pages/partial/ConfirmModal";
+import SuccessfulModal from "@pages/partial/SuccessfulModal";
+import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
+import DatatableActionButton from "@components/DatatableActionButton";
+import { FiEdit, FiTrash2, FiEye,FiPlus } from "react-icons/fi";
+
 interface SelectOption {
   value: number;
   label: string;
@@ -29,7 +39,11 @@ const CiscoPbxListDevicePool = () => {
   const { data: session, status } = useSession();
 
   const [refreshKey, setRefreshKey] = useState<number>(0);
-  const [currentFilters, setCurrentFilters] = useState({});
+  const [currentFilters, setCurrentFilters] = useState<any>({});
+
+  const handleFiltersChange = (filters: any) => {
+    setCurrentFilters(filters);
+  };
 
   const columns: Column[] = useMemo(
     () => [
@@ -69,15 +83,14 @@ const CiscoPbxListDevicePool = () => {
         mainLink="/tms/cisco-pbx/device-pool"
         subTitle="Cisco PBX Device Pool"
       />
-      <Row className="mb-3">
-        <Col md={12}>
-          <div className="page-header-title">
-            <h2 className="mb-0 d-flex align-items-center">
-              List Device Pool
-            </h2>
-          </div>
-        </Col>
-      </Row>
+
+      <PageHeader
+        title="Cisco PBX Device Pool"
+        showSearch={true}
+        searchPlaceholder="Search device pool..."
+        searchValue={currentFilters?.search || ""}
+        onSearchChange={(value: any) => handleFiltersChange({...currentFilters, search: value})}
+      />
 
       
         <GenericListPage
@@ -88,7 +101,8 @@ const CiscoPbxListDevicePool = () => {
           defaultPageSize={15}
           filters={memoizedFilters}
           refreshKey={refreshKey}
-          search={true}
+          search={false}
+          tableStyle="table-style-2"
         />
       
 

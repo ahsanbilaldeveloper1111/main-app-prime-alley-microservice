@@ -18,6 +18,16 @@ import { useSession } from "next-auth/react";
 import moment from "moment";
 import Select from "react-select";
 
+import "@assets/scss/common.scss";
+import "@assets/scss/tabs.scss";
+import PageHeader from "@components/PageHeader";
+import FormModal from "@pages/partial/FormModal";
+import ConfirmModal from "@pages/partial/ConfirmModal";
+import SuccessfulModal from "@pages/partial/SuccessfulModal";
+import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
+import DatatableActionButton from "@components/DatatableActionButton";
+import { FiEdit, FiTrash2, FiEye,FiPlus } from "react-icons/fi";
+
 import { ListUsers, UpdateUserTms,getRanks,DeleteUser } from "@utils/tms/tmsUserManagement";
 
 interface SelectOption {
@@ -34,7 +44,7 @@ const TmsUserManagement = () => {
   const { data: session, status } = useSession();
 
   const [refreshKey, setRefreshKey] = useState<number>(0);
-  const [currentFilters, setCurrentFilters] = useState({});
+  const [currentFilters, setCurrentFilters] = useState<any>({});
   const [updatingUsers, setUpdatingUsers] = useState<Set<number>>(new Set());
 
   // User type options
@@ -279,6 +289,10 @@ const TmsUserManagement = () => {
       }
     };
 
+    const handleFiltersChange = (filters: any) => {
+      setCurrentFilters(filters);
+    };
+
 
   return (
     <React.Fragment>
@@ -287,15 +301,15 @@ const TmsUserManagement = () => {
         mainLink="/tms/management"
         subTitle="Users"
       />
-      <Row className="mb-3">
-        <Col md={12}>
-          <div className="page-header-title">
-            <h2 className="mb-0 d-flex align-items-center">
-            List Users
-            </h2>
-          </div>
-        </Col>
-      </Row>
+      
+
+      <PageHeader
+        title="Users"
+        showSearch={true}
+        searchPlaceholder="Search Users..."
+        searchValue={currentFilters?.search || ""}
+        onSearchChange={(value: any) => handleFiltersChange({...currentFilters, search: value})}
+      />
 
       
         <GenericListPage

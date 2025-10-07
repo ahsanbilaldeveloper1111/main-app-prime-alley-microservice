@@ -33,6 +33,17 @@ import Select from "react-select";
 
 import {ListAppUsers } from "@utils/tms/List";
 
+import "@assets/scss/common.scss";
+import "@assets/scss/tabs.scss";
+import PageHeader from "@components/PageHeader";
+import FormModal from "@pages/partial/FormModal";
+import ConfirmModal from "@pages/partial/ConfirmModal";
+import SuccessfulModal from "@pages/partial/SuccessfulModal";
+import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
+import DatatableActionButton from "@components/DatatableActionButton";
+import { FiEdit, FiTrash2, FiEye,FiPlus } from "react-icons/fi";
+
+
 interface SelectOption {
   value: number;
   label: string;
@@ -42,7 +53,7 @@ const CiscoPbxAppUsers = () => {
   const { data: session, status } = useSession();
 
   const [refreshKey, setRefreshKey] = useState<number>(0);
-  const [currentFilters, setCurrentFilters] = useState({});
+  const [currentFilters, setCurrentFilters] = useState<any>({});
 
   const columns: Column[] = useMemo(
     () => [
@@ -64,10 +75,14 @@ const CiscoPbxAppUsers = () => {
 
   const fetchAppUsers = useCallback(
     async (page = 1, perPage = 15, search = "") => {
-      return await ListAppUsers({ page, perPage, search, filters: currentFilters });
+      return await ListAppUsers({ page, perPage, search: search || memoizedFilters?.search || "", filters: currentFilters });
     },
     [memoizedFilters]
   );
+
+  const handleFiltersChange = (filters: any) => {
+    setCurrentFilters(filters);
+  };
 
   return (
     <React.Fragment>
@@ -76,15 +91,15 @@ const CiscoPbxAppUsers = () => {
         mainLink="/tms/cisco-pbx/app-users"
         subTitle="Cisco PBX App Users"
       />
-      <Row className="mb-3">
-        <Col md={12}>
-          <div className="page-header-title">
-            <h2 className="mb-0 d-flex align-items-center">
-              App Users
-            </h2>
-          </div>
-        </Col>
-      </Row>
+      
+
+      <PageHeader
+        title="Cisco PBX App Users"
+        showSearch={true}
+        searchPlaceholder="Search app users..."
+        searchValue={currentFilters?.search || ""}
+        onSearchChange={(value: any) => handleFiltersChange({...currentFilters, search: value})}
+      />
 
       
         <GenericListPage
@@ -95,7 +110,9 @@ const CiscoPbxAppUsers = () => {
           defaultPageSize={15}
           filters={memoizedFilters}
           refreshKey={refreshKey}
-          search={true}
+          search={false}
+          tableStyle="table-style-2"
+
         />
       
 

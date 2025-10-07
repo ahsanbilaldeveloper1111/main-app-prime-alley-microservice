@@ -4,9 +4,10 @@ import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
 import GenericListPage from '@components/GenericListPage';
 
-import { getAllUsers } from '@utils/users';
+import { getAllUsers, SyncLdapUsers } from '@utils/users';
 import { Column } from '@components/CustomDataTable';
 import { Row, Modal, Table, Col, Button } from 'react-bootstrap';
+import FormModal from '@pages/partial/FormModal';
 import UsersFilters from '@components/filters/UsersFilters';
 import { toast } from 'react-toastify';
 import { useTokenService } from 'src/hooks/useTokenService';
@@ -49,6 +50,35 @@ const Users = () => {
 
     // Local dynamic custom-field columns
     const [customFieldColumns, setCustomFieldColumns] = useState<Column[]>([]);
+
+
+    const [loadingLdapUsers, setLoadingLdapUsers] = useState(false);
+    const [responseDataLdapUsers, setResponseDataLdapUsers] = useState<any>(null);
+    const [showSyncLdapUsersModal, setShowSyncLdapUsersModal] = useState(false);
+    const [errorLdapUsers, setErrorLdapUsers] = useState<any>(null);
+
+    const handleCloseSyncLdapUsersModal = () => {
+        setShowSyncLdapUsersModal(false);
+    }
+
+    const syncLdapUsers = async () => {
+      try {
+        console.log('Syncing LDAP users');
+        setLoadingLdapUsers(true);
+        setErrorLdapUsers(null);
+        setShowSyncLdapUsersModal(true);
+
+        const response = await SyncLdapUsers();
+        if(response){
+          console.log('Response fun:', response);
+          setResponseDataLdapUsers(response);
+          setLoadingLdapUsers(false);
+        }
+       
+      } catch (error) {
+        console.error(error);
+      }
+    }
 
     // Memoize base columns to prevent recreation on every render
     const baseColumns: Column[] = useMemo(() => [
@@ -980,6 +1010,10 @@ React.useEffect(() => {
 
 
 
+
+
+
+
     const renderOverviewTab = () => (
         <>
            
@@ -1343,7 +1377,11 @@ React.useEffect(() => {
                             <i className="fas fa-search search-icon"></i>
                             <input type="text" className="search-bar" placeholder="Search users..." onChange={(e) => handleFiltersChange({...currentFilters, search: e.target.value})}/>
                         </div>
-                        <UsersFilters onFiltersChange={handleFiltersChange} onExport={handleExport} />
+                        <UsersFilters onFiltersChange={handleFiltersChange} onExport={handleExport}  />
+
+                        {session?.user?.permissions?.includes('sync-ldap') && (
+                            <Button variant="primary" size="sm" onClick={() => syncLdapUsers()}>Sync Users</Button>
+                        )}
 
                         
                     </div>
@@ -1428,6 +1466,54 @@ React.useEffect(() => {
                         </Button>
                     </Modal.Footer>
                 </Modal>
+
+
+
+                <FormModal
+                    show={showSyncLdapUsersModal}
+                    onHide={handleCloseSyncLdapUsersModal}
+                    title="Synced Users"
+                    desc=""
+                    formHtml={
+                        loadingLdapUsers ? (
+                            <p>Syncing users...</p>
+                        ) : responseDataLdapUsers ? (
+                            <table className="table table-bordered table-align-center">
+                              <thead>
+                                <tr>
+                                  <th>Type</th>
+                                  <th>Total Users</th>
+                                </tr>
+                              </thead>
+                                <tbody>
+                                  <tr>
+                                      <td>New</td>
+                                      <td>{responseDataLdapUsers?.count_new_user}</td>
+                                  </tr>
+                                  <tr>
+                                      <td>Updated</td>
+                                      <td>{responseDataLdapUsers?.count_updated_user}</td>
+                                  </tr>
+                                  <tr>
+                                      <td>Removed</td>
+                                      <td>{responseDataLdapUsers?.count_removed_user}</td>
+                                  </tr>
+                                  <tr>
+                                      <td>Errors</td>
+                                      <td>{responseDataLdapUsers?.count_errors}</td>
+                                  </tr>
+                                </tbody>
+                            </table>
+                        ) : (
+                            <></>
+                        )
+                    }
+                    submitButtonText="Close"
+                    cancelButtonText="Close"
+                    onSubmit={handleCloseSyncLdapUsersModal}
+                    ShowSubmitButton={false}
+                    submitButtonVariant="primary"
+                />
             </React.Fragment>
         </ProtectedRoute>
     );
