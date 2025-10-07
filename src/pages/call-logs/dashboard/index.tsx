@@ -72,6 +72,15 @@ interface TrendByCountry {
   AvgCost: string;
 }
 
+// Helper function to format seconds to HH:MM:SS
+const formatSecondsToTime = (seconds: number): string => {
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = seconds % 60;
+  
+  return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+};
+
 const CallDashboard = () => {
     const { data:session, status } = useSession();
     const [showCountryChartModal, setShowCountryChartModal] = useState(false);
@@ -246,7 +255,26 @@ const CallDashboard = () => {
             ...ExtensionChart.options,
             xaxis: {
               ...ExtensionChart.options.xaxis,
-              categories: extensionLabels
+              categories: extensionLabels,
+              labels: {
+                show: true,
+                formatter: function(value: string) {
+                  const numValue = parseFloat(value);
+                  return isNaN(numValue) ? value : formatSecondsToTime(numValue);
+                },
+                style: {
+                  fontSize: '11px',
+                  colors: '#666'
+                }
+              }
+            },
+            tooltip: {
+              ...ExtensionChart.options.tooltip,
+              y: {
+                formatter: function(value: number) {
+                  return formatSecondsToTime(value);
+                }
+              }
             }
           }
         });
@@ -268,35 +296,60 @@ const CallDashboard = () => {
             name: 'Shortest',
             data: shortestData
           }, {
-            name: 'Longest',
-            data: longestData
-          }, {
             name: 'Average',
             data: averageData
+          }, {
+            name: 'Longest',
+            data: longestData
           }],
           options: {
             ...DepartmentChart.options,
               xaxis: {
                 ...DepartmentChart.options.xaxis,
-                categories: departmentLabels as string[]
+                categories: departmentLabels as string[],
+                labels: {
+                  show: true,
+                  formatter: function(value: string) {
+                    const numValue = parseFloat(value);
+                    return isNaN(numValue) ? value : formatSecondsToTime(numValue);
+                  },
+                  style: {
+                    fontSize: '11px',
+                    colors: '#666'
+                  }
+                }
               },
             yaxis: {
               ...DepartmentChart.options.yaxis,
-              
+              show: true,
+              labels: {
+                show: true,
+                style: {
+                  fontSize: '11px',
+                  colors: '#666'
+                }
+              }
             },
             chart: {
               ...DepartmentChart.options.chart
             },
             plotOptions: {
               bar: {
-                horizontal: false,
-                columnWidth: '60%',
                 borderRadius: 4,
-                borderRadiusApplication: 'end'
+                borderRadiusApplication: 'end',
+                horizontal: true,
+                columnHeight: '2px',
               }
             },
             dataLabels: {
               enabled: false,
+            },
+            tooltip: {
+              y: {
+                formatter: function(value: number) {
+                  return formatSecondsToTime(value);
+                }
+              }
             }
           }
         });
@@ -332,7 +385,25 @@ const CallDashboard = () => {
             ...CountryChart.options,
             xaxis: {
               ...CountryChart.options.xaxis,
-              categories: countryLabels
+              categories: countryLabels,
+              labels: {
+                show: true,
+                formatter: function(value: string) {
+                  const numValue = parseFloat(value);
+                  return isNaN(numValue) ? value : formatSecondsToTime(numValue);
+                },
+                style: {
+                  fontSize: '11px',
+                  colors: '#666'
+                }
+              }
+            },
+            tooltip: {
+              y: {
+                formatter: function(value: number) {
+                  return formatSecondsToTime(value);
+                }
+              }
             }
           }
         });
@@ -370,8 +441,26 @@ const CallDashboard = () => {
       dataLabels: {
         enabled: false
       },
+      tooltip: {
+        y: {
+          formatter: function(value: number) {
+            return formatSecondsToTime(value);
+          }
+        }
+      },
       xaxis: {
         categories: [] as string[],
+        labels: {
+          show: true,
+          formatter: function(value: string) {
+            const numValue = parseFloat(value);
+            return isNaN(numValue) ? value : formatSecondsToTime(numValue);
+          },
+          style: {
+            fontSize: '11px',
+            colors: '#666'
+          }
+        }
       },
       yaxis: {
         
@@ -400,35 +489,57 @@ const [DepartmentChart, setDepartmentChart] = React.useState({
         },
         plotOptions: {
           bar: {
-            horizontal: false,
-            columnWidth: '55%',
-            borderRadius: 5,
-            borderRadiusApplication: 'end'
-          },
+            borderRadius: 4,
+            borderRadiusApplication: 'end',
+            horizontal: true,
+            columnHeight: '2px',
+          }
+        },
+        legend: {
+          show: true,
+          position: 'bottom'
         },
         dataLabels: {
           enabled: false
         },
-        stroke: {
-          show: true,
-          width: 2,
-          colors: ['transparent']
+        tooltip: {
+          y: {
+            formatter: function(value: number) {
+              return formatSecondsToTime(value);
+            }
+          }
         },
         xaxis: {
           categories: [] as string[],
           labels: {
             show: true,
+            formatter: function(value: string) {
+              const numValue = parseFloat(value);
+              return isNaN(numValue) ? value : formatSecondsToTime(numValue);
+            },
             style: {
-              // fontSize: '8px',
-             
+              fontSize: '11px',
+              colors: '#666'
             }
           }
-
         },
         yaxis: {
-          //show: false,
+          show: true,
           title: {
-            text: ''
+            text: 'Duration', // <-- Your custom label here
+            style: {
+              fontSize: '12px',
+              fontWeight: 'bold',
+              color: '#263238',
+              marginRight: '10px'
+            }
+          },
+          labels: {
+            show: true,
+            style: {
+              fontSize: '11px',
+              colors: '#666'
+            }
           }
         },
         fill: {
@@ -467,10 +578,26 @@ const [ExtensionChart, setExtensionChart] = React.useState({
     },
     tooltip: {
       shared: false,
-      intersect: false
+      intersect: false,
+      y: {
+        formatter: function(value: number) {
+          return formatSecondsToTime(value);
+        }
+      }
     },
     xaxis: {
       categories: [] as string[],
+      labels: {
+        show: true,
+        formatter: function(value: string) {
+          const numValue = parseFloat(value);
+          return isNaN(numValue) ? value : formatSecondsToTime(numValue);
+        },
+        style: {
+          fontSize: '11px',
+          colors: '#666'
+        }
+      }
     },
     yaxis: {
       title: {
