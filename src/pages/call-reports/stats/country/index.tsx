@@ -125,7 +125,8 @@ const CallStatsCountry = () => {
         perPage, 
         search, 
         filters: currentFilters, 
-        reportType: 'statsCountry' 
+        reportType: 'statsCountry',
+        moduleSlug: ModuleSlug.CALL_REPORTS
       }, 'call-logs/statsByCountry');
       
       if (response?.summary) {

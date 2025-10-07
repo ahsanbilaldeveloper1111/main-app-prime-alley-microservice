@@ -396,14 +396,14 @@ export const createCallRecordingsFiltersConfig = (hierarchyData?: any, isVisible
           })) || []
         },
         {
-          type: 'select',
+          type: 'multiSelect',
           isMulti: true,
           name: 'remote_party_number',
           label: 'Remote Party Numbers',
-          options: hierarchyData?.extensions?.map((ext: { id: string; name: string }) => ({
-            value: ext.id,
-            label: ext.name
-          })) || []
+          // options: hierarchyData?.extensions?.map((ext: { id: string; name: string }) => ({
+          //   value: ext.id,
+          //   label: ext.name
+          // })) || []
         }
       ]
     },
