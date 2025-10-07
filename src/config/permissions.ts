@@ -200,6 +200,16 @@ export const routePermissions: RoutePermission[] = [
                 ]
             },
             {
+                path: '/analyse-recordings',
+                permissions: ['transcriptions-analysis-aiml'],
+                children: [
+                    {
+                        path: '/',
+                        permissions: ['transcriptions-analysis-aiml']
+                    }
+                ]
+            },
+            {
                 path: '/translate',
                 permissions: ['translate-aiml']
             },

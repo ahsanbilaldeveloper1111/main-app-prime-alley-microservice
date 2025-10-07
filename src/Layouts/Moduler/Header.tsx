@@ -819,6 +819,13 @@ const Header = ({ themeMode }: HeaderProps) => {
                 //     href: '/ai-ml/transcriptions'
                 // },
                 {
+                    key: 'analyse-recordings-aiml',
+                    permission: 'transcriptions-analysis-aiml',
+                    icon: ICONS.FILE_ANALYTICS,
+                    label: SUBMENU_LABELS.ANALYSE_RECORDINGS,
+                    href: '/ai-ml/analyse-recordings'
+                },
+                {
                     key: 'translate-aiml',
                     permission: 'translate-aiml',
                     icon: ICONS.TRANSLATE,
