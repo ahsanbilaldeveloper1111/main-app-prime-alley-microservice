@@ -200,7 +200,8 @@ const CallStatsExtension = () => {
         
         try {
             
-            const response = await ListCallLogs({ page, perPage, search, filters: currentFilters, reportType: 'statsExtension' }, 'call-logs/statsByExtension');
+            const response = await ListCallLogs({ page, perPage, search, filters: currentFilters, reportType: 'statsExtension', 
+                moduleSlug: ModuleSlug.CALL_REPORTS }, 'call-logs/statsByExtension');
            
             
             if (response?.summary) {
@@ -406,7 +407,8 @@ const CallStatsExtension = () => {
           try {
             console.log('Fetching chart data with filters:', currentFilters);
             console.log('About to call ListCallLogs for chart with params:', { page: 1, perPage: 15, search: "", filters: currentFilters, reportType: 'chartExtension' });
-            const response = await ListCallLogs({ page: 1, perPage: 15, search: "", filters: currentFilters, reportType: 'chartExtension' }, 'call-logs/stats/extension/chart');
+            const response = await ListCallLogs({ page: 1, perPage: 15, search: "", filters: currentFilters, reportType: 'chartExtension', 
+                moduleSlug: ModuleSlug.CALL_REPORTS }, 'call-logs/stats/extension/chart');
             console.log('Chart API response:', response);
             console.log('Chart API response type:', typeof response);
             console.log('Chart API response keys:', response ? Object.keys(response) : 'null/undefined');

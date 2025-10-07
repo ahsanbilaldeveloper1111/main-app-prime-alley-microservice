@@ -192,7 +192,8 @@ const CallIncomingExtension = () => {
         
         try {
             console.log('About to call ListCallLogs with params:', { page, perPage, search, filters: currentFilters, reportType: 'incomingStatsExtension' });
-            const response = await ListCallLogs({ page, perPage, search, filters: currentFilters, reportType: 'incomingStatsExtension' }, 'call-logs/statsIncomingByExtension');
+            const response = await ListCallLogs({ page, perPage, search, filters: currentFilters, reportType: 'incomingStatsExtension', 
+                moduleSlug: ModuleSlug.CALL_REPORTS }, 'call-logs/statsIncomingByExtension');
             console.log('API response:', response);
             console.log('API response type:', typeof response);
             console.log('API response keys:', response ? Object.keys(response) : 'null/undefined');
@@ -407,7 +408,8 @@ const CallIncomingExtension = () => {
         const fetchCharts = async () => {
           setChartLoading(true);
           try {
-            const response = await ListCallLogs({ page: 1, perPage: 15, search: "", filters: currentFilters,reportType: 'chartIncomingExtension' }, 'call-logs/stats/extension/chart');
+            const response = await ListCallLogs({ page: 1, perPage: 15, search: "", filters: currentFilters,reportType: 'chartIncomingExtension', 
+                moduleSlug: ModuleSlug.CALL_REPORTS }, 'call-logs/stats/extension/chart');
            
             const chartData = response?.chart_data;
             
