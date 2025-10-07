@@ -130,7 +130,9 @@ const CallStatsDepartment = () => {
         perPage, 
         search, 
         filters: currentFilters, 
-        reportType: 'statsDepartment' 
+        reportType: 'statsDepartment',
+        moduleSlug: ModuleSlug.CALL_REPORTS
+
       }, 'call-logs/statsByDepartment');
       
       if (response?.summary) {
@@ -195,7 +197,8 @@ const CallStatsDepartment = () => {
             perPage: 15, 
             search: "", 
             filters: currentFilters, 
-            reportType: 'chartDepartment' 
+            reportType: 'chartDepartment',
+            moduleSlug: ModuleSlug.CALL_REPORTS
           }, 'call-logs/stats/department/chart');
           
           const chartData = response?.chart_data;

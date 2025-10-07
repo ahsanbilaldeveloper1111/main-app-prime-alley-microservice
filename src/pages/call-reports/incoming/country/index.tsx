@@ -199,7 +199,8 @@ const CallIncomingCountry = () => {
         setLoading(true);
         
         try {
-            const response = await ListCallLogs({ page, perPage, search, filters: currentFilters, reportType: 'incomingStatsCountry' }, 'call-logs/statsIncomingByCountry');
+            const response = await ListCallLogs({ page, perPage, search, filters: currentFilters, reportType: 'incomingStatsCountry', 
+                moduleSlug: ModuleSlug.CALL_REPORTS }, 'call-logs/statsIncomingByCountry');
             
             if (response?.summary) {
                 setSummary(response.summary);
@@ -396,7 +397,8 @@ const CallIncomingCountry = () => {
         const fetchCharts = async () => {
           setChartLoading(true);
           try {
-            const response = await ListCallLogs({ page: 1, perPage: 15, search: "", filters: currentFilters,reportType: 'chartIncomingCountry' }, 'call-logs/stats/country/chart');
+            const response = await ListCallLogs({ page: 1, perPage: 15, search: "", filters: currentFilters,reportType: 'chartIncomingCountry', 
+                moduleSlug: ModuleSlug.CALL_REPORTS }, 'call-logs/stats/country/chart');
            
             const chartData = response?.chart_data;
             

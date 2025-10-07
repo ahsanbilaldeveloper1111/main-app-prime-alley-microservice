@@ -173,7 +173,8 @@ const CallTrendDepartment = () => {
         
         try {
             console.log('About to call ListCallLogs with params:', { page, perPage, search, filters: currentFilters, reportType: 'trendStatsDepartment' });
-            const response = await ListCallLogs({ page, perPage, search, filters: currentFilters, reportType: 'trendStatsDepartment' }, 'call-logs/statsTrendByDepartment');
+            const response = await ListCallLogs({ page, perPage, search, filters: currentFilters, reportType: 'trendStatsDepartment', 
+                moduleSlug: ModuleSlug.CALL_REPORTS }, 'call-logs/statsTrendByDepartment');
             console.log('API response:', response);
             console.log('API response type:', typeof response);
             console.log('API response keys:', response ? Object.keys(response) : 'null/undefined');
@@ -353,7 +354,7 @@ const CallTrendDepartment = () => {
         if (exportType === 'excel') {
          
           await DownloadStreamingExport(
-            { filters: currentFilters, isExport: true, exportType ,reportType:'trendStatsDepartment' }, 'call-logs/statsTrendByDepartment',
+            { filters: currentFilters, isExport: true, exportType ,reportType:'trendStatsDepartment', moduleSlug: ModuleSlug.CALL_REPORTS }, 'call-logs/statsTrendByDepartment',
             'trendStatsDepartment'
           );
         }
@@ -388,7 +389,8 @@ const CallTrendDepartment = () => {
         const fetchCharts = async () => {
           setChartLoading(true);
           try {
-            const response = await ListCallLogs({ page: 1, perPage: 15, search: "", filters: currentFilters,reportType: 'chartDepartment' }, 'call-logs/stats/department/chart');
+            const response = await ListCallLogs({ page: 1, perPage: 15, search: "", filters: currentFilters,reportType: 'chartDepartment', 
+                moduleSlug: ModuleSlug.CALL_REPORTS }, 'call-logs/stats/department/chart');
            
             const chartData = response?.chart_data;
             

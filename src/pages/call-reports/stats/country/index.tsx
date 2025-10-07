@@ -191,7 +191,9 @@ const CallStatsCountry = () => {
             perPage: 15, 
             search: "", 
             filters: currentFilters, 
-            reportType: 'chartCountry' 
+            reportType: 'chartCountry',
+            moduleSlug: ModuleSlug.CALL_REPORTS
+
           }, 'call-logs/stats/country/chart');
           
           const chartData = response?.chart_data;
