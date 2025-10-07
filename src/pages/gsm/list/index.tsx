@@ -84,7 +84,7 @@ const GsmList = () => {
                 {
                   label: 'Edit',
                   icon: <FiEdit className="me-2" />,
-                  onClick: () => setShowAddGsmModal(true),
+                  onClick: () => handleEditGsm(props),
                   className: 'action-edit'
                 },
                 {
@@ -96,7 +96,7 @@ const GsmList = () => {
                 {
                   label: 'Delete',
                   icon: <FiTrash2 className="me-2" />,
-                  onClick: () => setShowDeleteGsmModal(true),
+                  onClick: () => handleDeleteGsm(props),
                   className: 'action-delete'
                 }
               ]}
@@ -224,20 +224,32 @@ const GsmList = () => {
         toast.error('Please fill all the fields');
         return;
       }
-      const response = await updateGsm(editGsmId, editGsmName, editGsmIpAddress, editGsmUsername, editGsmPassword, editGsmStatus);
-      if(response){
-        setShowEditGsmModal(false);
-        setEditGsmName('');
-        setEditGsmIpAddress('');
-        setEditGsmUsername('');
-        setEditGsmPassword('');
-        setEditGsmStatus('');
-        setRefreshKey(refreshKey + 1);
+      
+      try {
+        const response = await updateGsm(editGsmId, editGsmName, editGsmIpAddress, editGsmUsername, editGsmPassword, editGsmStatus);
+        if(response){
+          setShowEditGsmModal(false);
+          setEditGsmName('');
+          setEditGsmIpAddress('');
+          setEditGsmUsername('');
+          setEditGsmPassword('');
+          setEditGsmStatus('');
+          setRefreshKey(refreshKey + 1);
+          
+          // Show success message
+          setSuccessModalTitle('Successfully Updated');
+          setSuccessModalDescription('The GSM device has been successfully updated.');
+          setShowSuccessModal(true);
+        } else {
+          toast.error('Failed to update GSM device');
+        }
+      } catch (error) {
+        console.error('Error updating GSM:', error);
+        toast.error('An error occurred while updating the GSM device');
       }
     };
     
     const [showDeleteGsmModal, setShowDeleteGsmModal] = useState<boolean>(false);
-    const [confirmDelete, setConfirmDelete] = useState<string>("");
     const [selectedGsm, setSelectedGsm] = useState<string>("");
     const [selectedGsmName, setSelectedGsmName] = useState<string>("");
 
@@ -248,19 +260,24 @@ const GsmList = () => {
     };
 
     const handleSubmitDeleteGsm = async () => {
-      const confirmDeleteValue = confirmDelete.trim().toLowerCase();
-        if(confirmDeleteValue == "delete"){
+      try {
         const response = await deleteGsm(selectedGsm);
         if(response){
             setShowDeleteGsmModal(false);
             setSelectedGsm('');
             setSelectedGsmName('');
             setRefreshKey(refreshKey + 1);
-        }else{
+            
+            // Show success message
+            setSuccessModalTitle('Successfully Deleted');
+            setSuccessModalDescription('The GSM device has been successfully deleted.');
+            setShowSuccessModal(true);
+        } else {
           toast.error('Failed to delete GSM');
         }
-      }else{
-        toast.error('Please type the word delete to confirm');
+      } catch (error) {
+        console.error('Error deleting GSM:', error);
+        toast.error('An error occurred while deleting the GSM device');
       }
     };
 
@@ -410,18 +427,10 @@ const GsmList = () => {
                <ConfirmModal
                 show={showDeleteGsmModal}
                 onHide={() => setShowDeleteGsmModal(false)}
-                title="Delete Gsm?"
-                description="Are you sure you want to proceed with {targetName}?"
-                targetName="this operation"
-                onConfirm={() => {
-                    console.log('Gsm deleted');
-                    setShowDeleteGsmModal(false);
-                    setSuccessModalTitle('Successfully Deleted');
-                    setSuccessModalDescription('The GSM data has been successfully deleted.');
-            
-                    setShowSuccessModal(true);
-                    //handleSubmitDeleteGsm();
-                }}
+                title="Delete GSM?"
+                description={`Are you sure you want to delete "${selectedGsmName}"? This action cannot be undone.`}
+                targetName="this GSM device"
+                onConfirm={handleSubmitDeleteGsm}
                 />
                 </>
             )}

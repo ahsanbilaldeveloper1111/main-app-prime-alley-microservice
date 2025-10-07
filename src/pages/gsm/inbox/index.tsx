@@ -15,7 +15,7 @@ import { toast } from 'react-toastify';
 
 const GsmInbox = () => {
   const [refreshKey, setRefreshKey] = useState<number>(0);
-  const [currentFilters, setCurrentFilters] = useState<{search?: string; [key: string]: any}>({});
+  const [currentFilters, setCurrentFilters] = useState<{[key: string]: any}>({});
 
   const columns: Column[] = useMemo(
     () => [
@@ -166,7 +166,7 @@ const GsmInbox = () => {
   const [perPage] = useState(15);
 
   useEffect(() => {
-    fetchGsmInbox(currentPage, perPage, memoizedFilters.search || "");
+    fetchGsmInbox(currentPage, perPage, "");
   }, [memoizedFilters, currentPage, perPage]);
 
   const fetchGsmInbox = useCallback(
@@ -174,7 +174,7 @@ const GsmInbox = () => {
       const response = await ListGsmInbox({
         page,
         perPage,
-        search: search || memoizedFilters.search || "",
+        search: "",
         filters: memoizedFilters,
       });
       console.log('response gsm inbox:', response);
@@ -186,19 +186,18 @@ const GsmInbox = () => {
 
   const handleFiltersChange = useCallback((filters: any) => {
     console.log('Filters changed:', filters);
-    console.log('Search value:', filters.search);
     setCurrentFilters(filters);
     // Trigger refresh when filters change
     setRefreshKey(prev => prev + 1);
   }, []);
 
   const [showDetailsModal, setShowDetailsModal] = useState(false);
-  const handleCopyMessage = useCallback(() => {
-    console.log('Copy message');
-    const message = 'This is a test message';
+  const [selectedMessage, setSelectedMessage] = useState<any>(null);
+  const handleCopyMessage = useCallback((text: string) => {
+    console.log('Copy message', text);
     
     if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(message).then(() => {
+      navigator.clipboard.writeText(text).then(() => {
         toast.success('Message copied to clipboard');
       }).catch(() => {
         toast.error('Failed to copy message');
@@ -206,7 +205,7 @@ const GsmInbox = () => {
     } else {
       // Fallback for older browsers
       const textArea = document.createElement('textarea');
-      textArea.value = message;
+      textArea.value = text;
       document.body.appendChild(textArea);
       textArea.select();
       document.execCommand('copy');
@@ -297,10 +296,6 @@ const GsmInbox = () => {
         <Col md={8} className="d-flex justify-content-end">
                       
                     <div className="action-buttons">
-                        <div className="search-container">
-                            <i className="fas fa-search search-icon"></i>
-                            <input type="text" className="search-bar" placeholder="Search by number or keyword..." onChange={(e) => handleFiltersChange({...currentFilters, search: e.target.value})}/>
-                        </div>
                         <GsmInboxFilter onFiltersChange={handleFiltersChange} showExport={false} />
                         
                         
@@ -317,16 +312,12 @@ const GsmInbox = () => {
         <div className="inbox-analytics">
             <div className="analytics-grid">
                 <div className="analytics-item">
-                    <div className="analytics-item-value" id="total-messages-count">10</div>
+                    <div className="analytics-item-value" id="total-messages-count">{gsmInbox?.total || 0}</div>
                     <div className="analytics-item-label">Total Messages</div>
-                </div>
-                <div className="analytics-item">
-                    <div className="analytics-item-value" id="unread-messages-count">3</div>
-                    <div className="analytics-item-label">Unread</div>
                 </div>
             </div>
             <div className="analytics-note">
-                Statistics shown are for the last 24 hours. Use the `Filters` option for older data.
+                Statistics shown are for the current page. Use the `Filters` option for specific data.
             </div>
         </div>
         </Col>
@@ -382,7 +373,10 @@ const GsmInbox = () => {
                   </div>
               </label>
               <span className="new-indicator" onClick={() => handleMarkAsRead(item.id)}></span>
-              <div className="message-content" onClick={() => setShowDetailsModal(true)}>
+              <div className="message-content" onClick={() => {
+                setSelectedMessage(item);
+                setShowDetailsModal(true);
+              }}>
                   
                   <div className="message-card-header">
                       <div className="sender-info">
@@ -410,7 +404,7 @@ const GsmInbox = () => {
                       </div>
                       <div className="detail-item">
                           <strong>IMSI</strong>
-                          <span>424821819785925</span>
+                          <span>{item?.imsi || 'N/A'}</span>
                       </div>
                   </div>
               </div>
@@ -428,38 +422,38 @@ const GsmInbox = () => {
         </Col>
       </Row>
 
-      {showDetailsModal && (
+      {showDetailsModal && selectedMessage && (
         <div id="detail-modal" className="modal" style={{display: 'flex'}}>
         <div className="modal-content">
             <span className="close-btn" id="detail-close-btn" onClick={() => setShowDetailsModal(false)}><i className="fas fa-times"></i></span>
-            <h2 id="detail-sender">SMS from +1234567890</h2>
+            <h2 id="detail-sender">SMS from {selectedMessage?.number || 'N/A'}</h2>
             <div id="detail-meta" className="meta-info">
-                    <span className="meta-item"><i className="fas fa-clock"></i> 14 hours ago</span>
-                    <span className="meta-item"><i className="fas fa-mobile-alt"></i> GSM: Test</span>
-                    <span className="label-chip">Port 6</span>
+                    <span className="meta-item"><i className="fas fa-clock"></i> {selectedMessage?.received_at ? moment(selectedMessage.received_at).fromNow() : 'N/A'}</span>
+                    <span className="meta-item"><i className="fas fa-mobile-alt"></i> GSM: {selectedMessage?.gsm?.name || 'N/A'}</span>
+                    <span className="label-chip">Port {selectedMessage?.port?.port_number || 'N/A'}</span>
                 </div>
-            <div id="detail-body" className="modal-message-body">This is a failed test message. It was not sent properly.</div>
-            <button className="copy-message-btn" style={{marginTop: '20px', display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '10px 20px', border: 'none', borderRadius: '8px', backgroundColor: 'var(--primary-accent)', color: 'white', cursor: 'pointer', transition: 'background-color 0.2s'}} onClick={() => handleCopyMessage()}>
+            <div id="detail-body" className="modal-message-body">{selectedMessage?.text || 'N/A'}</div>
+            <button className="copy-message-btn" style={{marginTop: '20px', display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '10px 20px', border: 'none', borderRadius: '8px', backgroundColor: 'var(--primary-accent)', color: 'white', cursor: 'pointer', transition: 'background-color 0.2s'}} onClick={() => handleCopyMessage(selectedMessage?.text || '')}>
                 <i className="fas fa-copy"></i> Copy Message
             </button>
             <div id="detail-grid" className="details-grid">
                     <div className="detail-item">
                         <strong>Sender Number</strong>
-                        <span>+1234567890</span>
-                        <button className="copy-btn" data-text-to-copy="+1234567890"><i className="fas fa-copy" onClick={() => handleCopyMessage()}></i></button>
+                        <span>{selectedMessage?.number || 'N/A'}</span>
+                        <button className="copy-btn" data-text-to-copy={selectedMessage?.number || ''}><i className="fas fa-copy" onClick={() => handleCopyMessage(selectedMessage?.number || '')}></i></button>
                     </div>
                     <div className="detail-item">
                         <strong>Receiver Number</strong>
-                        <span>+1987654321</span>
-                        <button className="copy-btn" data-text-to-copy="+1987654321"><i className="fas fa-copy" onClick={() => handleCopyMessage()}></i></button>
+                        <span>{selectedMessage?.port?.mobile_number || 'N/A'}</span>
+                        <button className="copy-btn" data-text-to-copy={selectedMessage?.port?.mobile_number || ''}><i className="fas fa-copy" onClick={() => handleCopyMessage(selectedMessage?.port?.mobile_number || '')}></i></button>
                     </div>
                     <div className="detail-item">
                         <strong>SMSC</strong>
-                        <span>+1000000000</span>
+                        <span>{selectedMessage?.smsc || 'N/A'}</span>
                     </div>
                     <div className="detail-item">
                         <strong>IMSI</strong>
-                        <span>123456789012345</span>
+                        <span>{selectedMessage?.imsi || 'N/A'}</span>
                     </div>
                 </div>
         </div>

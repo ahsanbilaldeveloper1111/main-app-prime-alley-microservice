@@ -72,12 +72,6 @@ const GsmAssign = () => {
 <DatatableActionButton
               actions={[
                 {
-                  label: 'Edit',
-                  icon: <FiEdit className="me-2" />,
-                  onClick: () => handleAssignGsm(),
-                  className: 'action-edit'
-                },
-                {
                   label: 'Ports',
                   icon: <FiEye className="me-2" />,
                   onClick: () => handleAssignPortsNew(props),

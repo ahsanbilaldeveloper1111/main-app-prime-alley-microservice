@@ -828,20 +828,6 @@ export const createGsmInboxFiltersConfig = (hierarchyData?: any): FilterTab[] =>
         ]
       }
     ]
-  },
-  {
-    id: 'sender_filters',
-    title: 'Sender Filters',
-    icon: 'ti ti-phone',
-    fields: [
-      {
-        type: 'text',
-        isMulti: false,
-        name: 'sender',
-        label: 'Sender Number',
-        placeholder: 'Enter sender mobile number'
-      }
-    ]
   }
 ];
 
