@@ -398,7 +398,7 @@ export const createCallRecordingsFiltersConfig = (hierarchyData?: any, isVisible
         {
           type: 'select',
           isMulti: true,
-          name: 'extension',
+          name: 'extension_number',
           label: 'Extensions',
           options: hierarchyData?.extensions?.map((ext: { id: string; name: string }) => ({
             value: ext.id,
