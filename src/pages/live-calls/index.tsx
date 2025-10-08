@@ -76,6 +76,9 @@ const CtiDashboard = () => {
   const [animatingCards, setAnimatingCards] = useState<Set<string>>(new Set())
   const [cardPositions, setCardPositions] = useState<{ [dn: string]: { x: number; y: number; width: number; height: number } }>({})
   const [lastPositions, setLastPositions] = useState<{ [dn: string]: { [section: string]: number } }>({})
+  
+  // Fullscreen state
+  const [isFullscreen, setIsFullscreen] = useState(false)
 
   // Popover handlers
   const handlePopoverToggle = (dn: string) => {
@@ -309,6 +312,35 @@ const CtiDashboard = () => {
       default: return 'offline'
     }
   }
+
+  // Fullscreen functionality
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      // Enter fullscreen
+      document.documentElement.requestFullscreen().then(() => {
+        setIsFullscreen(true)
+      }).catch((err) => {
+        console.error('Error attempting to enable fullscreen:', err)
+      })
+    } else {
+      // Exit fullscreen
+      document.exitFullscreen().then(() => {
+        setIsFullscreen(false)
+      }).catch((err) => {
+        console.error('Error attempting to exit fullscreen:', err)
+      })
+    }
+  }
+
+  // Listen for fullscreen changes
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement)
+    }
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange)
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange)
+  }, [])
 
 
 
@@ -1273,6 +1305,9 @@ const CtiDashboard = () => {
 
   const getColor = (state: string, conf: boolean, isOneToOne: boolean, role: string, parties: any[] = [], dn: string, terminalState: string) => {
     if (conf && !isOneToOne) return '#6f42c1'
+
+    // Handle HELD state directly if no parties or if state is already HELD
+    if (state === 'HELD') return 'green'
     
     const filtered = parties.filter((p: any) => p.callingAddress === dn || p.calledAddress === dn)
     if (!filtered.length) {
@@ -1321,6 +1356,9 @@ const CtiDashboard = () => {
   const getText = (state: string, isConference: boolean, isOneToOne: boolean, parties: any[] = [], dn: string) => {
     if (isConference && !isOneToOne) return 'Call in Progress'
     
+    // Handle HELD state directly if no parties or if state is already HELD
+    if (state === 'HELD') return 'On Hold'
+    
     const filtered = parties.filter((p: any) => p.callingAddress === dn || p.calledAddress === dn)
     if (!filtered.length) return dn
     
@@ -1338,12 +1376,29 @@ const CtiDashboard = () => {
     const isCaller = activeParty.callingAddress === dn
     const isCallee = activeParty.calledAddress === dn
     
-    return {
+    // Debug logging
+    console.log('getText debug:', {
+      state,
+      effectiveState,
+      isConference,
+      isOneToOne,
+      parties: parties.length,
+      dn,
+      activeParty: activeParty?.callStatus
+    })
+    
+    const stateMap = {
       RINGING: isCaller ? 'Calling' : isCallee ? 'Incoming' : effectiveState,
       ANSWERED: isCaller ? 'Outgoing' : isCallee ? 'CONNECTED' : effectiveState,
       RETRIEVED: isCaller ? 'Outgoing' : isCallee ? 'CONNECTED' : effectiveState,
-      HELD: 'On Hold'
-    }[effectiveState as keyof typeof getText] || effectiveState
+      HELD: 'On Hold',
+      CONNECTED: isCaller ? 'Outgoing' : isCallee ? 'Connected' : effectiveState,
+      ON_HOLD: 'On Hold'
+    }
+    
+    const result = stateMap[effectiveState as keyof typeof stateMap] || effectiveState
+    console.log('getText result:', result, 'for state:', effectiveState)
+    return result
   }
 
 
@@ -1386,7 +1441,7 @@ const CtiDashboard = () => {
 
                     <Col md={7} className="d-flex justify-content-end">
                       
-                    <div className="action-buttons">
+                    <div className="action-buttons d-flex gap-2">
                        
                     {session?.user?.permissions?.includes('dial-call-cti') && (
               <Link 
@@ -1399,6 +1454,19 @@ const CtiDashboard = () => {
                 Dialer
               </Link>
               )}
+              
+              <Button
+                variant="info"
+                size="sm"
+                onClick={toggleFullscreen}
+                className="d-flex align-items-center"
+                title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
+              >
+                <i className="material-icons-two-tone me-2" style={{ backgroundColor: '#fff' }}>
+                  {isFullscreen ? 'fullscreen_exit' : 'fullscreen'}
+                </i>
+                {isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
+              </Button>
                     </div>
 
 
@@ -1415,7 +1483,7 @@ const CtiDashboard = () => {
 
 
        {/* CTI Summary Cards */}
-       <PageSummaryGrid 
+       {/* <PageSummaryGrid 
          cards={[
            {
              id: 'total-extensions',
@@ -1495,7 +1563,7 @@ const CtiDashboard = () => {
              fontStyle: 'style-2'
            }
          ]}
-       />
+       /> */}
 
 
 
@@ -1563,7 +1631,7 @@ const CtiDashboard = () => {
                     const hasContent = sectionDns.length > 0
 
                     return (
-                      <div key={sectionKey} className="mb-3 section-card-header" data-section={sectionKey}>
+                      <div key={sectionKey} className="mb-3 section-card-header" data-section={sectionKey} style={{ borderColor: getSectionColor(sectionKey) }}>
                         <div className="d-flex align-items-center justify-content-between card-header-top-section">
                           <div className="d-flex align-items-center">
                             <i className="material-icons-two-tone me-2" style={{ fontSize: '1.5rem' }}>
@@ -1573,10 +1641,37 @@ const CtiDashboard = () => {
                           </div>
                            <span className="badge" style={{ backgroundColor: getSectionColor(sectionKey) }}>{sectionDns.length}</span>
                         </div>
+                        {/* Progress Bar */}
+                        
+                        
+                        {sectionDns.length > 0 && (
+                          <>
+                          <div className="progress-container">
+                          <div className="progress" style={{ height: '6px', backgroundColor: '#e9ecef' }}>
+                            <div 
+                              className="progress-bar" 
+                              role="progressbar" 
+                              style={{ 
+                                width: `${summaryData.extensions > 0 ? (sectionDns.length / summaryData.extensions) * 100 : 0}%`,
+                                backgroundColor: getSectionColor(sectionKey),
+                                transition: 'width 0.3s ease'
+                              }}
+                              aria-valuenow={sectionDns.length}
+                              aria-valuemin={0}
+                              aria-valuemax={summaryData.extensions}
+                            ></div>
+                          </div>
+                        </div>
+                          </>
+                        )}
+                        
                         <div className={`card-body-section ${hasContent ? 'has-content' : ''}`} data-section={sectionKey}>
                           {hasContent ? (
                             <div className="row g-3 justify-content-left align-items-left m-0">
                           {sectionDns.map(({ dn, devices: deviceList, call, active }) => {
+
+
+                          
                             const cls = getCardLevelStatus(deviceList)
                             const callColor = active && call ? getColor(
                               call.currentState || '',
@@ -1620,23 +1715,31 @@ const CtiDashboard = () => {
                                       <div className="user-info">
                                         <h6 className="extension-number" title={dn}>{dn}</h6>
                                         <p className="user-name">User name</p>
-                                        {/* <p className="status-text" style={{ color: getSectionColor(sectionKey) }}>
-                                          {cls === 'registered'
-                                            ? 'Online'
-                                            : cls === 'unregistered'
-                                              ? 'Offline'
-                                              : 'Stale'
-                                          }
-                                        </p> */}
+                                        <p className="status-text">
+                                          <span className="status-indicator" style={{ display: 'inline-block',width: '10px', height: '10px',borderRadius: '50%',marginRight: '5px',backgroundColor: getSectionColor(sectionKey) }}></span>
+                                        {getSectionTitle(sectionKey)}
+                                        </p>
                                         {active && call && (
-                                          <p className="small mb-0" style={{ color: callColor }}>
-                                            {getText(
-                                              call.currentState || '',
-                                              call.isConference || false,
-                                              call.isOneToOne || false,
-                                              call.parties || [],
-                                              dn
-                                            )}
+                                          <p className="small mb-0" style={{ color: callColor, padding: '2px' }}>
+                                            {(() => {
+                                              console.log('Call state debug for', dn, ':', {
+                                                currentState: call.currentState,
+                                                isConference: call.isConference,
+                                                isOneToOne: call.isOneToOne,
+                                                parties: call.parties?.length || 0,
+                                                call: call
+                                              })
+                                              const result = getText(
+                                                call.currentState || '',
+                                                call.isConference || false,
+                                                call.isOneToOne || false,
+                                                call.parties || [],
+                                                dn
+                                              )
+                                              console.log('Final display text for', dn, ':', result)
+                                              console.log('Rendering text for', dn, ':', result, 'with color:', callColor)
+                                              return result
+                                            })()}
                                           </p>
                                         )}
                                       </div>

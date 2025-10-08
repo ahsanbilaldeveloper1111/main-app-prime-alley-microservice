@@ -281,25 +281,27 @@
                 font-size: 12px;
                 font-weight: 600;
                 color: #1a1a1a;
-                margin: 0 0 2px 0;
+                margin: 0 0 5px 0;
                 line-height: 1.2;
                 display: block;
             }
             
             .user-name {
-                font-size: 12px;
-                color: #666;
-                margin: 0 0 1px 0;
+                font-size: 13px;
+                color: #6b7280;
+                margin: 0 0 5px 0;
                 line-height: 1.2;
                 display: block;
             }
             
             .status-text {
-                font-size: 11px;
-                color: #888;
+                font-size: 12px;
+                color: #1f2937;
                 margin: 0;
                 line-height: 1.2;
                 display: block;
+                text-transform: capitalize;
+                font-weight: 600;
             }
         }
         
@@ -1389,6 +1391,7 @@
     background-color: #fff;
     border-radius: 8px;
     padding: 0px;
+    border:0;
    
 
     .card-header-top-section{
@@ -1408,6 +1411,49 @@
     .badge{
         background-color: #6c757d;
         margin-left: auto;
+    }
+    
+    .progress-container {
+        .progress {
+            border-radius: 0px;
+            overflow: hidden;
+            box-shadow: none;
+            background: #fff;
+            
+            .progress-bar {
+                border-radius:0px !important;
+                position: relative;
+                overflow: hidden;
+                background: #fff;
+                
+                &::after {
+                    content: '';
+                    position: absolute;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    bottom: 0;
+                    background: linear-gradient(45deg, rgba(255, 255, 255, 0.2) 25%, transparent 25%, transparent 50%, rgba(255, 255, 255, 0.2) 50%, rgba(255, 255, 255, 0.2) 75%, transparent 75%);
+                    background-size: 8px 8px;
+                    animation: progress-stripes 1s linear infinite;
+                }
+            }
+        }
+        
+        .progress-text {
+            text-align: center;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+    }
+}
+
+@keyframes progress-stripes {
+    0% {
+        background-position: 0 0;
+    }
+    100% {
+        background-position: 8px 0;
     }
 }
 .card-body-section{
@@ -1520,6 +1566,27 @@
     padding: 16px;
 }
 
+/* Fullscreen styles */
+:fullscreen {
+    .layout-collapse .pc-sidebar,.pc-footer,.pc-header{display: none !important;}
+    .layout-collapse .pc-sidebar:not(.pc-sidebar-hide) ~ .pc-footer, .layout-collapse .pc-sidebar:not(.pc-sidebar-hide) ~ .pc-container{
+        margin-left: 0px !important;
+    }
+    .pc-container{top: 0px !important;}
+}
+
+/* Fullscreen button styles */
+.action-buttons {
+    .btn {
+        transition: all 0.2s ease;
+        
+        &:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+    }
+}
+
 /* User card styles for animation */
 .user-card {
     background: #fff;
@@ -1559,16 +1626,9 @@
         align-items: center;
         gap: 6px;
         font-size: 0.75rem;
-        font-weight: 500;
-        
-        .status-indicator {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background: #6c757d;
-        }
+        font-weight: 600;
     }
-    
+   
     /* Status-specific styling */
     &.status-supervision {
         border-color: #ffc107;
