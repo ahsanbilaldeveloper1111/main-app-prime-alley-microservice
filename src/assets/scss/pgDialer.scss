@@ -1,0 +1,211 @@
+
+.dial-pad .btn {
+    font-size: 1.5rem;
+    font-weight: 600;
+    transition: all 0.2s ease;
+  }
+  .dial-pad .btn:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  }
+  .extensions-grid {
+    display: block;
+    max-height: 300px;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+  .extension-button {
+    width: 100%;
+    margin-bottom: 5px;
+    padding: 5px;
+    border: 1px solid #dee2e6;
+    border-radius: 0.375rem;
+    background-color: #fff;
+    transition: all 0.2s ease;
+    cursor: pointer;
+    font-size: 0.875rem;
+  }
+  .extension-button.online {
+    border-color: #198754;
+    color: #198754;
+  }
+  .extension-button.offline {
+    border-color: #6c757d;
+    color: #6c757d;
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+  .extension-button.selected {
+    background-color: #0d6efd;
+    color: white;
+    border-color: #0d6efd;
+    transform: scale(1.05);
+    box-shadow: 0 4px 8px rgba(13, 110, 253, 0.3);
+  }
+  .extension-button.active-call {
+    border-color: #ffc107;
+    color: #856404;
+    background-color: #fff3cd;
+  }
+  .extension-button:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+  }
+  .extension-button:focus {
+    outline: none;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+  }
+  .extensions-grid::-webkit-scrollbar {
+    width: 6px;
+  }
+  .extensions-grid::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 3px;
+  }
+  .extensions-grid::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 3px;
+  }
+  .extensions-grid::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8;
+  }
+  
+  /* Merge call selection styles */
+  .merge-call-selection {
+    transition: all 0.2s ease;
+  }
+  
+  .merge-call-selection:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+  }
+  
+  .merge-call-selection.selected {
+    border-color: #0d6efd !important;
+    background-color: #0d6efd !important;
+    color: white !important;
+  }
+  
+  .merge-call-selection.selected:hover {
+    background-color: #0b5ed7 !important;
+  }
+
+  /* Merged call box styles */
+  .merged-call-member {
+    transition: all 0.2s ease;
+    border: 1px solid #dee2e6;
+    border-radius: 0.375rem;
+    background-color: #f8f9fa;
+  }
+  
+  .merged-call-member:hover {
+    border-color: #adb5bd;
+    background-color: #e9ecef;
+  }
+  
+  .merged-call-header {
+    background: linear-gradient(135deg, #28a745, #20c997);
+    color: white;
+    border-radius: 0.375rem 0.375rem 0 0;
+    padding: 0.75rem;
+    margin: -0.75rem -0.75rem 1rem -0.75rem;
+  }
+  
+  .remove-member-btn {
+    transition: all 0.2s ease;
+  }
+  
+  .remove-member-btn:hover {
+    transform: scale(1.1);
+    box-shadow: 0 2px 4px rgba(220, 53, 69, 0.3);
+  }
+  
+  .transfer-member-btn {
+    transition: all 0.2s ease;
+  }
+  
+  .transfer-member-btn:hover {
+    transform: scale(1.1);
+    box-shadow: 0 2px 4px rgba(13, 110, 253, 0.3);
+  }
+
+  /* Transfer modal styles */
+  .modal-overlay {
+    animation: fadeIn 0.2s ease-in-out;
+  }
+  
+  .modal-content {
+    animation: slideIn 0.2s ease-in-out;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  }
+  
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  
+  @keyframes slideIn {
+    from { 
+      opacity: 0;
+      transform: translateY(-20px);
+    }
+    to { 
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #dee2e6;
+    padding-bottom: 1rem;
+  }
+  
+  .modal-footer {
+    border-top: 1px solid #dee2e6;
+    padding-top: 1rem;
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+  }
+.pg-dialer-container {
+    background-color: #fff;
+
+    .app-button {
+      background-color: #fff;
+      border-color: #746f6f;
+      color: #746f6f !important;
+      padding: 5px !important;
+
+      &.btnDial {
+        color:#fff !important;
+        padding: 10px !important;
+      }
+
+      i{
+        background-color: #fff;
+      }
+
+      &:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+
+        i{
+          background-color: #fff;
+        }
+      }
+
+      &:hover {
+        transform: scale(1.05);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        color: #fff !important;
+        border-color: #0d6efd !important;
+
+        i{
+          background-color: #fff;
+        }
+      }
+    }
+  }

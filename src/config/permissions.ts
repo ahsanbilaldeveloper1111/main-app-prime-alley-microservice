@@ -432,6 +432,17 @@ export const routePermissions: RoutePermission[] = [
             { path: '/dialer',permissions: ['dial-call-cti']},
 
         ]
+    },
+
+    //cti services start
+    {
+        path: '/live-calls',
+        permissions: [PERMISSIONS.CTI_SERVICES],
+        children: [
+            { path: '/',permissions: ['view-cti']},
+            { path: '/dialer',permissions: ['dial-call-cti']},
+
+        ]
     }
 ];
 

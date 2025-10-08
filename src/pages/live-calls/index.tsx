@@ -1,7 +1,7 @@
-import React, { ReactElement, useEffect, useState, useCallback } from 'react'
+import React, { ReactElement, useEffect, useState, useCallback, useRef } from 'react'
 import Layout from '@layout/index'
 import BreadcrumbItem from '@common/BreadcrumbItem'
-import { Button, Card, Col, Form, Modal, Row, Dropdown } from 'react-bootstrap'
+import { Button, Card, Col, Form, Modal, Row, Dropdown, Overlay, Popover } from 'react-bootstrap'
 import DeviceSelectionModal from '../../components/DeviceSelectionModal'
 import { DashboardData } from '@utils/GsmManagement'
 import { toast } from 'react-toastify'
@@ -73,6 +73,28 @@ const CtiDashboard = () => {
   const [showDebugInfo, setShowDebugInfo] = useState(false)
   const [restoredCallStates, setRestoredCallStates] = useState<number>(0)
   
+  // Popover state management
+  const [activePopover, setActivePopover] = useState<string | null>(null)
+  const popoverRefs = useRef<{ [dn: string]: HTMLDivElement | null }>({})
+  
+  // Animation state management
+  const [cardAnimations, setCardAnimations] = useState<{ [dn: string]: 'adding' | null }>({})
+  const [previousSections, setPreviousSections] = useState<{ [dn: string]: string }>({})
+
+  // Popover handlers
+  const handlePopoverToggle = (dn: string) => {
+    setActivePopover(activePopover === dn ? null : dn)
+  }
+
+  const handlePopoverHide = () => {
+    setActivePopover(null)
+  }
+
+  const handleActionClick = (dn: string, action: string) => {
+    console.log(`${action} action for:`, dn)
+    setActivePopover(null)
+  }
+  
   // Device selection modal state
   const [showDeviceSelectionModal, setShowDeviceSelectionModal] = useState(false)
   const [availableDevices, setAvailableDevices] = useState<Array<{
@@ -127,6 +149,91 @@ const CtiDashboard = () => {
     return activeMonitoring.dn && activeMonitoring.type && activeMonitoring.deviceName ? 1 : 0
   }
 
+  // Helper function to categorize DNs into sections
+  const categorizeDns = (dn: string, devices: CtiDevice[], call: any, active: boolean) => {
+    const cls = getCardLevelStatus(devices)
+    
+    // Check if DN is being monitored (In Supervision)
+    if (activeMonitoring.dn === dn && activeMonitoring.type && activeMonitoring.deviceName) {
+      return 'supervision'
+    }
+    
+    // Check if DN has active calls (On Call)
+    if (active && call) {
+      return 'onCall'
+    }
+    
+    // Check device status (Active/Idle vs Down/Offline)
+    if (cls === 'registered') {
+      return 'activeIdle'
+    } else if (cls === 'unregistered' || cls === 'stale') {
+      return 'downOffline'
+    }
+    
+    return 'downOffline' // Default fallback
+  }
+
+  // Helper function to get section title
+  const getSectionTitle = (section: string) => {
+    switch (section) {
+      case 'supervision':
+        return 'In Supervision'
+      case 'onCall':
+        return 'On Call'
+      case 'activeIdle':
+        return 'Active/Idle'
+      case 'downOffline':
+        return 'Down/Offline'
+      default:
+        return 'Unknown'
+    }
+  }
+
+  // Helper function to get section icon
+  const getSectionIcon = (section: string) => {
+    switch (section) {
+      case 'supervision':
+        return 'visibility'
+      case 'onCall':
+        return 'call'
+      case 'activeIdle':
+        return 'check_circle'
+      case 'downOffline':
+        return 'error'
+      default:
+        return 'help'
+    }
+  }
+
+  // Helper function to get section color
+  const getSectionColor = (section: string) => {
+    switch (section) {
+      case 'supervision':
+        return '#ffc107' // Amber for supervision
+      case 'onCall':
+        return '#dc3545' // Red for active calls
+      case 'activeIdle':
+        return '#28a745' // Green for active/idle
+      case 'downOffline':
+        return '#6c757d' // Gray for down/offline
+      default:
+        return '#6c757d'
+    }
+  }
+
+  // Helper function to get section order for direction calculation
+  const getSectionOrder = (section: string) => {
+    switch (section) {
+      case 'supervision': return 0
+      case 'onCall': return 1
+      case 'activeIdle': return 2
+      case 'downOffline': return 3
+      default: return 3
+    }
+  }
+
+
+
   // Check for restored call states on component mount
   useEffect(() => {
     const info = getLocalStorageCallStatesInfo()
@@ -138,6 +245,44 @@ const CtiDashboard = () => {
       // })
     }
   }, [])
+
+  // Handle card animations when moving between sections
+  useEffect(() => {
+    if (!isInitialized || !dnsMap) return
+
+    const dnsList = Object.values(dnsMap).filter(({ dn }) => dn !== userAddress)
+    
+    dnsList.forEach(({ dn, devices }) => {
+      const deviceList = Object.values(devices || {})
+      const call = getDnCallState(dn)
+      const active = hasActiveCalls(dn)
+      const currentSection = categorizeDns(dn, deviceList, call, active)
+      const previousSection = previousSections[dn]
+      
+      // If section changed, trigger fade-in animation
+      if (previousSection && previousSection !== currentSection) {
+        setCardAnimations(prev => ({
+          ...prev,
+          [dn]: 'adding'
+        }))
+        
+        // Clear animation after it completes
+        setTimeout(() => {
+          setCardAnimations(prev => ({
+            ...prev,
+            [dn]: null
+          }))
+        }, 500) // Match animation duration
+      }
+      
+      // Update previous section
+      setPreviousSections(prev => ({
+        ...prev,
+        [dn]: currentSection
+      }))
+    })
+  }, [dnsMap, isInitialized, userAddress, hasActiveCalls, getDnCallState, activeMonitoring])
+
 
   // Clear CTI call states on page load
   useEffect(() => {
@@ -339,6 +484,133 @@ const CtiDashboard = () => {
       font-size: 0.75rem;
       line-height: 1.2;
     }
+    
+    /* Card styles */
+    .card-wrapper {
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      border-radius:10px;
+    }
+    
+    .card-wrapper:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+    
+    /* Simple slide animations */
+    .card-wrapper.slide-up {
+      animation: slideUp 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+    }
+    
+    .card-wrapper.slide-down {
+      animation: slideDown 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+    }
+    
+    @keyframes slideUp {
+      0% {
+        transform: translateY(30px);
+        opacity: 0;
+      }
+      100% {
+        transform: translateY(0);
+        opacity: 1;
+      }
+    }
+    
+    @keyframes slideDown {
+      0% {
+        transform: translateY(-30px);
+        opacity: 0;
+      }
+      100% {
+        transform: translateY(0);
+        opacity: 1;
+      }
+    }
+    
+    
+    .section-transition {
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .section-container {
+      min-height: 150px;
+      border: 2px dashed rgba(0, 0, 0, 0.1);
+      border-radius: 8px;
+      background: linear-gradient(135deg, rgba(248, 249, 250, 0.5) 0%, rgba(255, 255, 255, 0.3) 100%);
+      transition: all 0.3s ease;
+      position: relative;
+      overflow: hidden;
+      
+    }
+    
+   
+    
+    .section-container:hover {
+     
+      
+    }
+    
+    .section-container::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, transparent 0%, currentColor 50%, transparent 100%);
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+    
+    .section-container:hover::before {
+      opacity: 0.3;
+    }
+    
+    .section-container.has-content {
+      border: none;
+      background: transparent;
+    }
+    
+    .empty-section-placeholder {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 150px;
+      color: #6c757d;
+      font-style: italic;
+      text-align: center;
+      padding: 20px;
+    }
+    
+    .empty-section-placeholder .material-icons-two-tone {
+      font-size: 3rem;
+      opacity: 0.3;
+      margin-bottom: 1rem;
+    }
+    
+    /* Section-specific styling */
+    .section-container[data-section="supervision"] {
+      border-color: rgba(255, 193, 7, 0.3);
+      background: linear-gradient(135deg, rgba(255, 193, 7, 0.05) 0%, rgba(255, 193, 7, 0.02) 100%);
+    }
+    
+    .section-container[data-section="onCall"] {
+      border-color: rgba(220, 53, 69, 0.3);
+      background: linear-gradient(135deg, rgba(220, 53, 69, 0.05) 0%, rgba(220, 53, 69, 0.02) 100%);
+    }
+    
+    .section-container[data-section="activeIdle"] {
+      border-color: rgba(40, 167, 69, 0.3);
+      background: linear-gradient(135deg, rgba(40, 167, 69, 0.05) 0%, rgba(40, 167, 69, 0.02) 100%);
+    }
+    
+    .section-container[data-section="downOffline"] {
+      border-color: rgba(108, 117, 125, 0.3);
+      background: linear-gradient(135deg, rgba(108, 117, 125, 0.05) 0%, rgba(108, 117, 125, 0.02) 100%);
+    }
+    
     .dial-pad .btn {
       font-size: 1.5rem;
       font-weight: 600;
@@ -1007,7 +1279,7 @@ const CtiDashboard = () => {
   return (
     <React.Fragment>
       <style dangerouslySetInnerHTML={{ __html: customStyles }} />
-      <BreadcrumbItem mainTitle="CTI" mainLink="/cti" subTitle="Live View" />
+      <BreadcrumbItem mainTitle="CTI" mainLink="/cti" subTitle="Live Calls" />
 
       {/* Header */}
       
@@ -1233,139 +1505,315 @@ const CtiDashboard = () => {
             </div>
             <div className="card-body p-0">
               <div className="container-fluid pt-3 pb-3">
-                <div className="row g-3 justify-content-center align-items-center">
-                  {Object.values(dnsMap)
-                    .filter(({ dn }) => dn !== userAddress) // Filter out user's own extension
-                    .map(({ dn, devices }) => {
+                {(() => {
+                  // Helper function to get section color (defined locally for IIFE scope)
+                  const getSectionColor = (section: string) => {
+                    switch (section) {
+                      case 'supervision':
+                        return '#ffc107' // Amber for supervision
+                      case 'onCall':
+                        return '#dc3545' // Red for active calls
+                      case 'activeIdle':
+                        return '#28a745' // Green for active/idle
+                      case 'downOffline':
+                        return '#6c757d' // Gray for down/offline
+                      default:
+                        return '#6c757d'
+                    }
+                  }
+
+                  // Group DNs by sections
+                  const dnsList = Object.values(dnsMap).filter(({ dn }) => dn !== userAddress)
+                  const sections = {
+                    supervision: [] as any[],
+                    onCall: [] as any[],
+                    activeIdle: [] as any[],
+                    downOffline: [] as any[]
+                  }
+
+                  dnsList.forEach(({ dn, devices }) => {
                     const deviceList = Object.values(devices || {})
                     const call = getDnCallState(dn)
                     const active = hasActiveCalls(dn)
-                    const cls = getCardLevelStatus(deviceList)
-                    const callColor = active && call ? getColor(
-                      call.currentState || '',
-                      call.isConference || false,
-                      call.isOneToOne || false,
-                      call.role || '',
-                      call.parties || [],
-                      dn,
-                      cls
-                    ) : '#6b7280'
+                    const section = categorizeDns(dn, deviceList, call, active)
+                    
+                    sections[section as keyof typeof sections].push({ dn, devices: deviceList, call, active })
+                  })
+
+                  // Define section order
+                  const sectionOrder = ['supervision', 'onCall', 'activeIdle', 'downOffline']
+
+                  return sectionOrder.map(sectionKey => {
+                    const sectionDns = sections[sectionKey as keyof typeof sections]
+                    const hasContent = sectionDns.length > 0
 
                     return (
-                      <div key={dn} className="col-6 col-sm-4 col-md-3 col-lg-2">
-                        <div className="card-wrapper position-relative">
-                          <div 
-                            className={`card text-white ${cls} shadow-sm position-relative`}
-                            style={{
-                              ['--call-border-color' as string]: callColor,
-                              ['--call-shadow-color' as string]: `${callColor}40`,
-                              height: '100%',
-                              minHeight: '120px'
-                            }}
-                          >
-                            <div className="card-body d-flex align-items-center p-2">
-                              <i className="material-icons-two-tone extension-icon">phone</i>
-                              <div className="flex-grow-1 ms-2 text-truncate">
-                                <h6 className="mb-1" title={dn}>{dn}</h6>
-                                <p className="small mb-0">
-                                  {cls === 'registered'
-                                    ? 'Online'
-                                    : cls === 'unregistered'
-                                      ? 'Offline'
-                                      : 'Stale'
-                                  }
-                                </p>
-                                {active && call && (
-                                  <p className="small mb-0" style={{ color: callColor }}>
-                                    {getText(
-                                      call.currentState || '',
-                                      call.isConference || false,
-                                      call.isOneToOne || false,
-                                      call.parties || [],
-                                      dn
-                                    )}
-                                  </p>
-                                )}
-                              </div>
-                            </div>
-                            <div className="device-icons d-flex flex-wrap gap-1 px-2 pb-2">
-                              {deviceList.map(({ deviceName, deviceType, terminalState }) => {
-                                const iconClass = getDeviceIconClass(deviceType)
-                                const dotColor =
-                                  terminalState === 'REGISTERED'
-                                    ? '#10b981'
-                                    : terminalState === 'UNREGISTERED'
-                                      ? '#ef4444'
-                                      : terminalState === 'STALE'
-                                        ? '#f59e0b'
-                                        : '#6b7280'
+                      <div key={sectionKey} className="mb-4" data-section={sectionKey}>
+                        <div className="d-flex align-items-center mb-2">
+                          <i className="material-icons-two-tone me-2" style={{ fontSize: '1.5rem', color: getSectionColor(sectionKey) }}>
+                            {getSectionIcon(sectionKey)}
+                          </i>
+                          <h6 className="mb-0 app-title-heading mb-1" style={{ color: getSectionColor(sectionKey) }}>{getSectionTitle(sectionKey)}</h6>
+                          <span className="badge ms-2" style={{ backgroundColor: getSectionColor(sectionKey) }}>{sectionDns.length}</span>
+                        </div>
+                        <div className={`section-container2 ${hasContent ? 'has-content' : ''}`} data-section={sectionKey}>
+                          {hasContent ? (
+                            <div className="row g-3 justify-content-left align-items-left m-0">
+                          {sectionDns.map(({ dn, devices: deviceList, call, active }) => {
+                            const cls = getCardLevelStatus(deviceList)
+                            const callColor = active && call ? getColor(
+                              call.currentState || '',
+                              call.isConference || false,
+                              call.isOneToOne || false,
+                              call.role || '',
+                              call.parties || [],
+                              dn,
+                              cls
+                            ) : '#6b7280'
 
-                                const deviceCall = getCallStateForDevice(dn, deviceName)
-                                const isDeviceActiveCall =
-                                  deviceCall &&
-                                  ['CONNECTED', 'ON_HOLD', 'ANSWERED','RETRIEVED'].includes(deviceCall.currentState || '')
+                            const cardClasses = `card-wrapper position-relative`
 
-                                return (
+                            return (
+                              <div key={dn} className="col-6 col-sm-4 col-md-3 col-lg-2 m-0 mb-3">
+                                <div className={cardClasses}>
                                   <div 
-                                    key={deviceName}
-                                    className={`device-icon-wrapper position-relative ${isDeviceActiveCall ? 'active' : ''} ${
-                                      activeMonitoring.dn === dn && activeMonitoring.type && activeMonitoring.deviceName === deviceName ? 'monitoring' : ''
+                                    className={`card text-white ${cls} shadow-sm position-relative mb-0 new-card-design ${
+                                      cardAnimations[dn] ? `card-${cardAnimations[dn]}` : ''
                                     }`}
-                                    title={`${deviceName} (${terminalState})`}
-                                    onClick={() => {
-                                      if (isDeviceActiveCall) {
-                                        console.log('Opening popup for:', dn, deviceName)
-                                        setShowPopup({ dn: dn, deviceName })
-                                        handleMonitorSelect(dn, 'SILENT', Object.values(dnsMap[dn]?.devices || {}))
-                                      } else if (terminalState === 'STALE') {
-                                        console.log('Device is STALE, popup disabled')
-                                      } else {
-                                        console.log('Device not in active call, popup disabled')
-                                      }
+                                    style={{
+                                      ['--call-border-color' as string]: callColor,
+                                      ['--call-shadow-color' as string]: `${callColor}40`,
+                                      height: '100%',
+                                      minHeight: '140px'
                                     }}
-                                    style={{ borderColor: 'black' }}
                                   >
-                                    <i
-                                      className={iconClass}
-                                      style={{
-                                        fontSize: '1.3rem',
-                                        color: dotColor
-                                      }}
-                                    >
-                                      {deviceType === 'SOFT'
-                                        ? 'headset_mic'
-                                        : deviceType === 'HARD'
-                                          ? 'phone'
-                                          : deviceType === 'ANDROID'
-                                            ? 'android'
-                                            : deviceType === 'IOS'
-                                              ? 'phone_iphone'
-                                              : 'device_unknown'
-                                      }
-                                    </i>
-                                    <span
-                                      className="device-status-dot"
-                                      style={{ backgroundColor: dotColor }}
-                                    />
+                                    {/* Hover Overlay */}
+                                    <div className="card-hover-overlay">
+                                      <div className="overlay-content">
+                                        {/* <i className="material-icons-two-tone overlay-icon">business</i> */}
+                                        <span className="company-name">Prime Alley Technology</span>
+                                      </div>
+                                    </div>
+                                    {/* Section 1: Information Section */}
+                                    <div className="card-info-section">
+                                      <div className="user-avatar">
+                                        <i className="material-icons-two-tone">account_circle</i>
+                                      </div>
+                                      <div className="user-info">
+                                        <h6 className="extension-number" title={dn}>{dn}</h6>
+                                        <p className="user-name">User name</p>
+                                        <p className="status-text">
+                                          {cls === 'registered'
+                                            ? 'Online'
+                                            : cls === 'unregistered'
+                                              ? 'Offline'
+                                              : 'Stale'
+                                          }
+                                        </p>
+                                        {active && call && (
+                                          <p className="small mb-0" style={{ color: callColor }}>
+                                            {getText(
+                                              call.currentState || '',
+                                              call.isConference || false,
+                                              call.isOneToOne || false,
+                                              call.parties || [],
+                                              dn
+                                            )}
+                                          </p>
+                                        )}
+                                      </div>
+                                      <div className="card-actions">
+                                        <div 
+                                          ref={(el) => { popoverRefs.current[dn] = el }}
+                                          className="more-options"
+                                          onClick={() => handlePopoverToggle(dn)}
+                                        >
+                                          <i className="material-icons-two-tone">more_vert</i>
+                                        </div>
+                                        
+                                        <Overlay
+                                          show={activePopover === dn}
+                                          target={popoverRefs.current[dn]}
+                                          placement="bottom-end"
+                                          rootClose
+                                          onHide={handlePopoverHide}
+                                        >
+                                          <Popover className="action-menu-popover">
+                                            <Popover.Body className="p-0">
+                                              <div className="action-menu">
+                                                <span className="dropdown-section-title">Monitor Type</span>
+                                                <button 
+                                                  className="dropdown-item disabled" 
+                                                  title="Monitoring available when DN is in a call" 
+                                                  disabled
+                                                >
+                                                  Silent
+                                                </button>
+                                                <button 
+                                                  className="dropdown-item disabled" 
+                                                  title="Monitoring available when DN is in a call" 
+                                                  disabled
+                                                >
+                                                  Whisper
+                                                </button>
+                                                <button 
+                                                  className="dropdown-item disabled" 
+                                                  title="Monitoring available when DN is in a call" 
+                                                  disabled
+                                                >
+                                                  Barge In
+                                                </button>
+                                                <hr className="dropdown-divider" />
+                                                <span className="dropdown-section-title">Tone</span>
+                                                <button 
+                                                  className="dropdown-item disabled" 
+                                                  title="Monitoring available when DN is in a call" 
+                                                  disabled
+                                                >
+                                                  No Tone
+                                                </button>
+                                                <button 
+                                                  className="dropdown-item disabled" 
+                                                  title="Monitoring available when DN is in a call" 
+                                                  disabled
+                                                >
+                                                  Notify Me
+                                                </button>
+                                                <button 
+                                                  className="dropdown-item disabled" 
+                                                  title="Monitoring available when DN is in a call" 
+                                                  disabled
+                                                >
+                                                  Notify Agent
+                                                </button>
+                                                <button 
+                                                  className="dropdown-item disabled" 
+                                                  title="Monitoring available when DN is in a call" 
+                                                  disabled
+                                                >
+                                                  Notify Both
+                                                </button>
+                                                <div className="dropdown-caption">Monitoring available when DN is in a call</div>
+                                              </div>
+                                            </Popover.Body>
+                                          </Popover>
+                                        </Overlay>
+                                      </div>
+                                    </div>
+
+                                    {/* Section 2: Device Dropdown Section */}
+                                    {/* <div className="device-dropdown-section">
+                                      <select className="device-dropdown">
+                                        <option value="">Select Device</option>
+                                        {deviceList.map((device: CtiDevice) => (
+                                          <option key={device.deviceName} value={device.deviceName}>
+                                            {device.deviceName} ({device.terminalState})
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </div> */}
+
+                                    {/* Section 3: Current Device Icons Section */}
+                                    <div className="current-devices-section">
+                                      
+                                      <div className="device-icons">
+                                        {deviceList.map((device: CtiDevice) => {
+                                          const { deviceName, deviceType, terminalState } = device
+                                          const iconClass = getDeviceIconClass(deviceType)
+                                          const dotColor =
+                                            terminalState === 'REGISTERED'
+                                              ? '#10b981'
+                                              : terminalState === 'UNREGISTERED'
+                                                ? '#ef4444'
+                                                : terminalState === 'STALE'
+                                                  ? '#f59e0b'
+                                                  : '#6b7280'
+
+                                          const deviceCall = getCallStateForDevice(dn, deviceName)
+                                          const isDeviceActiveCall =
+                                            deviceCall &&
+                                            ['CONNECTED', 'ON_HOLD', 'ANSWERED','RETRIEVED'].includes(deviceCall.currentState || '')
+
+                                          return (
+                                            <div 
+                                              key={deviceName}
+                                              className={`device-icon-wrapper position-relative ${isDeviceActiveCall ? 'active' : ''} ${
+                                                activeMonitoring.dn === dn && activeMonitoring.type && activeMonitoring.deviceName === deviceName ? 'monitoring' : ''
+                                              }`}
+                                              title={`${deviceName} (${terminalState})`}
+                                              onClick={() => {
+                                                if (isDeviceActiveCall) {
+                                                  console.log('Opening popup for:', dn, deviceName)
+                                                  setShowPopup({ dn: dn, deviceName })
+                                                  handleMonitorSelect(dn, 'SILENT', Object.values(dnsMap[dn]?.devices || {}))
+                                                } else if (terminalState === 'STALE') {
+                                                  console.log('Device is STALE, popup disabled')
+                                                } else {
+                                                  console.log('Device not in active call, popup disabled')
+                                                }
+                                              }}
+                                            >
+                                              <i
+                                                className={iconClass}
+                                                style={{
+                                                  fontSize: '1rem',
+                                                  color: dotColor
+                                                }}
+                                              >
+                                                {deviceType === 'SOFT'
+                                                  ? 'headset_mic'
+                                                  : deviceType === 'HARD'
+                                                    ? 'phone'
+                                                    : deviceType === 'ANDROID'
+                                                      ? 'android'
+                                                      : deviceType === 'IOS'
+                                                        ? 'phone_iphone'
+                                                        : 'device_unknown'
+                                                }
+                                              </i>
+                                              <span
+                                                className="device-status-dot"
+                                                style={{ backgroundColor: dotColor }}
+                                              />
+                                            </div>
+                                          )
+                                        })}
+                                      </div>
+                                    </div>
                                   </div>
-                                )
-                              })}
+                                </div>
+                              </div>
+                            )
+                          })}
                             </div>
-                          </div>
+                          ) : (
+                            <>
+                            {/* <div className="empty-section-placeholder">
+                              <i className="material-icons-two-tone" style={{ fontSize: '1.5rem', color: getSectionColor(sectionKey) }}>{getSectionIcon(sectionKey)}</i>
+                              <p className="mb-0">No devices in {getSectionTitle(sectionKey).toLowerCase()}</p>
+                              <small>
+                                {sectionKey === 'supervision' && 'No devices are currently being monitored'}
+                                {sectionKey === 'onCall' && 'No devices are currently on active calls'}
+                                {sectionKey === 'activeIdle' && 'No devices are currently online and available'}
+                                {sectionKey === 'downOffline' && 'No devices are currently offline or down'}
+                              </small>
+                            </div> */}
+                            </>
+                          )}
                         </div>
                       </div>
                     )
-                  })}
-                  {loading && (
-                    <div className="col-12 text-center">
-                      <div className="loading-spinner">
-                        <div className="spinner-border" role="status">
-                          <span className="visually-hidden">Loading...</span>
-                        </div>
+                  })
+                })()}
+                {loading && (
+                  <div className="col-12 text-center">
+                    <div className="loading-spinner">
+                      <div className="spinner-border" role="status">
+                        <span className="visually-hidden">Loading...</span>
                       </div>
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
