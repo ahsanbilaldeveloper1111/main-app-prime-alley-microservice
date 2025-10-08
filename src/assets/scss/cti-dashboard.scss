@@ -67,7 +67,7 @@
 .card.registered .card-body,
 .card.unregistered .card-body,
 .card.stale .card-body {
-    backdrop-filter: blur(10px);
+    // backdrop-filter: blur(10px);
     background: rgba(255, 255, 255, 0.1);
 }
 
@@ -226,6 +226,263 @@
     margin-right: 4px;
 }
 
+/* New Card Design - Redesigned Layout */
+.new-card-design {
+    background: #eaffeb !important;
+    border-color: #4CAF50 !important;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 100px !important;
+
+
+    
+    .card-info-section {
+        display: flex;
+        align-items: flex-start;
+        padding: 12px;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+        flex-shrink: 0;
+        
+        .user-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: #f0f0f0;
+            border: 2px solid #ddd;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 10px;
+            flex-shrink: 0;
+            margin-top: 2px;
+            
+            .avatar-icon {
+                font-size: 16px;
+                color: #666;
+            }
+        }
+        
+        .user-info {
+            flex-grow: 1;
+            min-width: 0;
+            margin-right: 8px;
+            
+            .extension-number {
+                font-size: 12px;
+                font-weight: 600;
+                color: #1a1a1a;
+                margin: 0 0 2px 0;
+                line-height: 1.2;
+                display: block;
+            }
+            
+            .user-name {
+                font-size: 12px;
+                color: #666;
+                margin: 0 0 1px 0;
+                line-height: 1.2;
+                display: block;
+            }
+            
+            .status-text {
+                font-size: 11px;
+                color: #888;
+                margin: 0;
+                line-height: 1.2;
+                display: block;
+            }
+        }
+        
+        .card-actions {
+            display: flex;
+            align-items: flex-start;
+            flex-shrink: 0;
+            z-index: 999;
+            background:none !important;
+        
+            
+            .more-options {
+                width: 20px;
+                height: 20px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                cursor: pointer;
+                border-radius: 3px;
+                transition: background-color 0.2s;
+                margin-top: 2px;
+                
+                &:hover {
+                    // background-color: rgba(0, 0, 0, 0.1);
+                }
+                
+                .more-icon {
+                    font-size: 14px;
+                    color: #666;
+                }
+            }
+        }
+    }
+    
+    .device-dropdown-section {
+        padding: 8px 12px;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+        flex-shrink: 0;
+        
+        .device-dropdown {
+            width: 100%;
+            padding: 4px 6px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            background: white;
+            font-size: 11px;
+            color: #333;
+            cursor: pointer;
+            height: 28px;
+            
+            &:focus {
+                outline: none;
+                border-color: #007bff;
+            }
+        }
+    }
+    
+    .current-devices-section {
+        padding: 0px 12px 7px;
+        flex-grow: 1;
+        display: block;
+        align-items: normal;
+        
+        .device-actions {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 8px;
+            justify-content: flex-start;
+            
+            .device-action-btn {
+                width: 28px;
+                height: 28px;
+                padding: 0;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                border-radius: 4px;
+                font-size: 12px;
+                
+                i {
+                    font-size: 14px;
+                }
+            }
+        }
+        
+        .device-icons {
+            display: flex;
+            gap: 4px;
+            justify-content: flex-start;
+            flex-wrap: wrap;
+            width: 100%;
+        }
+    }
+}
+
+/* Card Action Popover - Custom styling */
+.action-menu-popover {
+    z-index: 9999 !important;
+    border: none !important;
+    background: transparent !important;
+    
+    .popover-body {
+        padding: 0 !important;
+        background: white;
+        border: 1px solid #e0e0e0;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+
+    .action-menu {
+        min-width: 200px;
+        padding: 8px 0;
+        
+        .dropdown-section-title {
+            display: block;
+            padding: 8px 16px 4px;
+            font-size: 12px;
+            font-weight: 600;
+            color: #6c757d;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .dropdown-item {
+            display: block !important;
+            width: 100% !important;
+            padding: 8px 16px !important;
+            border: none !important;
+            background: none !important;
+            text-decoration: none !important;
+            color: #333 !important;
+            font-size: 14px !important;
+            text-align: left !important;
+            transition: all 0.2s ease !important;
+            cursor: pointer !important;
+            margin: 0 !important;
+            border-radius: 0 !important;
+
+            &:hover:not(:disabled) {
+                background-color: #f8f9fa !important;
+                color: #007bff !important;
+            }
+
+            &:focus:not(:disabled) {
+                background-color: #f8f9fa !important;
+                color: #007bff !important;
+                outline: none !important;
+                box-shadow: none !important;
+            }
+            
+            &.disabled {
+                color: #adb5bd !important;
+                cursor: not-allowed !important;
+                opacity: 0.6 !important;
+            }
+        }
+        
+        .dropdown-divider {
+            margin: 8px 0 !important;
+            border: none !important;
+            border-top: 1px solid #e9ecef !important;
+        }
+        
+        .dropdown-caption {
+            display: block;
+            padding: 8px 16px;
+            font-size: 11px;
+            color: #6c757d;
+            font-style: italic;
+            text-align: center;
+            border-top: 1px solid #f0f0f0;
+            margin-top: 4px;
+        }
+    }
+}
+
+/* Override card colors for new design */
+.new-card-design.registered {
+    background: #eaffeb !important;
+    border-color: #4CAF50 !important;
+}
+
+.new-card-design.unregistered {
+    background: #ffd7d7 !important;
+    border-color: #ef4444 !important;
+}
+
+.new-card-design.stale {
+    background: #fff3de !important;
+    border-color: #f59e0b !important;
+}
+
 /* Device icons (sit above overlay) */
 .device-icons {
     display: flex;
@@ -239,17 +496,18 @@
 
 .device-icon-wrapper {
     position: relative;
-    width: 28px;
-    height: 28px;
-    border-radius: 6px;
-    border: 2px solid black;
+    width: 24px;
+    height: 24px;
+    border-radius: 4px;
+    border: 1px solid #ccc;
     display: flex;
     align-items: center;
     justify-content: center;
     background: #fff;
     cursor: pointer;
-    box-shadow: 0 0 4px rgba(0, 0, 0, .15);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, .1);
     transition: all 0.3s ease;
+    flex-shrink: 0;
 }
 
 @keyframes activeDevicePulse {
@@ -286,13 +544,13 @@
 
 .device-status-dot {
     position: absolute;
-    bottom: 0;
-    right: 0;
-    width: 8px;
-    height: 8px;
+    top: -2px;
+    right: -2px;
+    width: 6px;
+    height: 6px;
     border-radius: 50%;
-    border: 1.5px solid #fff;
-    box-shadow: 0 0 4px rgba(0, 0, 0, .4);
+    border: 1px solid #fff;
+    box-shadow: 0 0 2px rgba(0, 0, 0, .3);
 }
 
 .device-icon-wrapper.device-active-call {
@@ -1011,4 +1269,74 @@
 .device-icon-wrapper {
     opacity: 0.4;
     cursor: auto;
+}
+
+/* Card Hover Overlay */
+.new-card-design {
+    .card-hover-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgb(18 17 17 / 59%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        opacity: 0;
+        visibility: hidden;
+        transition: all 0.3s ease;
+        z-index: 10;
+        border-radius: 0px;
+        
+        .overlay-content {
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            color: white;
+            gap: 3px;
+            
+            .overlay-icon {
+                font-size: 1.2rem;
+                color: #fff;
+                background-color: #fff;
+            }
+            
+            .company-name {
+                font-size: 0.7rem;
+                font-weight: 600;
+                color: #fff;
+                text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+            }
+        }
+    }
+    
+    &:hover {
+        .card-actions .material-icons-two-tone {
+           background-color: #fff;
+        }
+        .card-hover-overlay {
+            opacity: 1;
+            visibility: visible;
+        }
+    }
+    
+    /* Card State Transition Animations */
+    &.card-adding {
+        animation: cardFadeIn 0.5s ease-out forwards;
+    }
+}
+
+/* Card Fade In Animation */
+@keyframes cardFadeIn {
+    0% {
+        opacity: 0;
+        transform: scale(0.8);
+    }
+    100% {
+        opacity: 1;
+        transform: scale(1);
+    }
 }

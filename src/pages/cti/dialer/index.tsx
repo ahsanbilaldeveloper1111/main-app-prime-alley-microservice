@@ -1,4 +1,5 @@
 import React, { ReactElement, useState, useEffect, useRef } from 'react'
+import { useRouter } from 'next/router'
 import Layout from '@layout/index'
 import BreadcrumbItem from '@common/BreadcrumbItem'
 import { Button, Card, Col, Row, Alert, Badge } from 'react-bootstrap'
@@ -10,7 +11,15 @@ import DeviceSelectionModal from '../../../components/DeviceSelectionModal'
 import Select from 'react-select'
 import { FaLastfmSquare } from 'react-icons/fa'
 
+import "@assets/scss/common.scss";
+import "@assets/scss/tabs.scss";
+import PageHeader from "@components/PageHeader";
+import "@assets/scss/pgDialer.scss";
+
+
 const CtiDialer = () => {
+  const router = useRouter()
+  
   // CTI Socket hook integration
   const {
     summaryData,
@@ -69,6 +78,7 @@ const CtiDialer = () => {
     status: string
   }>>(new Map())
   const processedEventsRef = useRef<Set<string>>(new Set())
+  const hasAutoDialedRef = useRef<boolean>(false)
   
   // Device selection state
   const [showDeviceSelectionModal, setShowDeviceSelectionModal] = useState(false)
@@ -492,6 +502,7 @@ const CtiDialer = () => {
     setProcessingCalls(new Set())
     setSelectedCallsForMerge(new Set())
     processedEventsRef.current.clear()
+    hasAutoDialedRef.current = false
     
     //console.log('Manually cleared all call-related data')
     toast.info('All call data cleared')
@@ -1749,6 +1760,33 @@ const CtiDialer = () => {
     }
   }, [eventLog]) // Removed activeCalls dependency
 
+  // Handle URL query parameter for dialedNumber and auto-dial
+  useEffect(() => {
+    if (router.isReady && router.query.dialedNumber && !hasAutoDialedRef.current) {
+      const numberFromUrl = router.query.dialedNumber as string
+      console.log('URL dialedNumber parameter found:', numberFromUrl)
+      
+      // Only set if it's a valid number and not already set
+      if (numberFromUrl && numberFromUrl.trim() !== '' && !dialedNumber) {
+        // Extract only numbers from the URL parameter
+        const numbersOnly = numberFromUrl.replace(/[^0-9]/g, '')
+        if (numbersOnly.length > 0 && numbersOnly.length <= 15) {
+          setDialedNumber(numbersOnly)
+          console.log('Prefilled dialed number from URL:', numbersOnly)
+          
+          // Mark that we're about to auto-dial to prevent multiple calls
+          hasAutoDialedRef.current = true
+          
+          // Auto-dial after a short delay to ensure the component is fully loaded
+          setTimeout(() => {
+            console.log('Auto-dialing number from URL:', numbersOnly)
+            handleDial()
+          }, 1000) // 1 second delay
+        }
+      }
+    }
+  }, [router.isReady, router.query.dialedNumber, dialedNumber])
+
   // Clear call data only on page refresh
   useEffect(() => {
     // Check if this is a page refresh using performance navigation API
@@ -1779,6 +1817,7 @@ const CtiDialer = () => {
       setProcessingCalls(new Set())
       setSelectedCallsForMerge(new Set())
       processedEventsRef.current.clear()
+      hasAutoDialedRef.current = false
       
       //console.log('Cleared all call-related data on page refresh')
     } else {
@@ -2392,34 +2431,17 @@ const CtiDialer = () => {
 
   return (
     <React.Fragment>
-      <BreadcrumbItem mainTitle="CTI" mainLink="/cti" subTitle="Dialer" />
+      <BreadcrumbItem mainTitle="CTI" mainLink="/cti" subTitle="Live Dialer" />
 
-      {/* Header */}
-      <Row className="mb-3">
-        <Col md={12}>
-          <div className="page-header-title d-flex justify-content-between align-items-center">
-                          <h2 className="mb-0">
-                <i className="material-icons-two-tone me-2">dialpad</i>
-                CTI Dialer
-                {/* {isInProtectedMode && (
-                  <Badge bg="warning" className="ms-2">
-                    <i className="material-icons-two-tone me-1">shield</i>
-                    Protected Mode
-                  </Badge>
-                )} */}
-                {/* {getActiveCallsCount() > 0 && (
-                  <Badge bg="success" className="ms-2">
-                    {getActiveCallsCount()} Active Call{getActiveCallsCount() !== 1 ? 's' : ''}
-                  </Badge>
-                )} */}
-              </h2>
-            <Link href="/cti" className="btn btn-outline-secondary">
-              <i className="material-icons-two-tone me-2">arrow_back</i>
-              Back to CTI
-            </Link>
-          </div>
-        </Col>
-      </Row>
+
+      <PageHeader title="Live Dialer"
+      buttons={
+        <Link href="/cti" className="btn btn-primary">
+          <i className="material-icons-two-tone me-2" style={{ backgroundColor: '#fff' }}>arrow_back</i>
+          Back
+        </Link>
+      }
+       /> 
 
       <Row>
         {/* Dialer Section */}
@@ -2431,10 +2453,10 @@ const CtiDialer = () => {
                 Dialer
               </h5>
             </Card.Header>
-            <Card.Body className="text-center">
+            <Card.Body className="text-center pg-dialer-container">
               <Row>
                 {/* Extensions */}
-                <Col md={4} style={{ backgroundColor: '#2c466159' }}>
+                <Col md={4} style={{ backgroundColor: 'rgb(198 203 208 / 35%)' }}>
                   <div className="mb-4">
                     <h6 className="fw-bold mb-3 text-start mt-3">
                       <i className="material-icons-two-tone me-2">people</i>
@@ -2507,7 +2529,7 @@ const CtiDialer = () => {
                 </Col>
 
                 {/* Dial Pad */}
-                <Col md={8} style={{ backgroundColor: 'rgb(44 70 97)' }}>
+                <Col md={8} style={{ backgroundColor: '#fff' }}>
                   {/* Display Number */}
                   <div className="mb-4">
                     <div className="display-4 fw-bold mb-2 text-primary">
@@ -2519,7 +2541,7 @@ const CtiDialer = () => {
                         onKeyDown={handleKeyDown}
                         className="form-control form-control-lg text-center border-0 bg-transparent text-primary fw-bold"
                         style={{ 
-                          fontSize: '2.5rem', 
+                          fontSize: '1.5rem', 
                           outline: 'none',
                           boxShadow: 'none',
                           borderBottom: '2px solid transparent',
@@ -2531,19 +2553,14 @@ const CtiDialer = () => {
                         onBlur={(e) => {
                           e.target.style.borderBottomColor = 'transparent'
                         }}
-                        placeholder="Enter or paste number"
+                        placeholder="Type number"
                         maxLength={15}
                         autoComplete="off"
-                        title="Type numbers or paste from clipboard"
+                        title=""
                       />
                     </div>
                     
-                    <div className="text-center mb-2">
-                      <small className="text-muted">
-                        <i className="material-icons-two-tone me-1" style={{ fontSize: '14px' }}>keyboard</i>
-                        Type numbers or paste from clipboard
-                      </small>
-                    </div>
+                   
                     
                     {showInvalidWarning && (
                       <div className="alert alert-warning py-2 mb-3">
@@ -2554,20 +2571,23 @@ const CtiDialer = () => {
                     
                     <div className="d-flex justify-content-center gap-2 mb-3">
                       <Button
-                        variant="info"
+                        variant="primary"
                         size="sm"
+                        className="app-button text-center"
                         onClick={handleBackspace}
                         disabled={!dialedNumber}
                       >
-                        <i className="material-icons-two-tone">backspace</i>
+                        <i className="material-icons-two-tone" style={{ backgroundColor: '#fff' }}>backspace</i>
                       </Button>
                       <Button
-                        variant="info"
+                        variant="primary"
                         size="sm"
+                        className="app-button text-center"
                         onClick={handleClear}
+                        
                         disabled={!dialedNumber}
                       >
-                        <i className="material-icons-two-tone">clear</i>
+                        <i className="material-icons-two-tone" style={{ backgroundColor: '#fff' }}>clear</i>
                       </Button>
                     </div>
                   </div>
@@ -2578,12 +2598,11 @@ const CtiDialer = () => {
                       {[1, 2, 3].map((num) => (
                         <div key={num} className="col-4">
                           <Button
-                            variant="outline-primary"
-                            size="lg"
-                            className="w-100 py-3"
+                             variant="outline-primary"
+                             className="w-100 py-3 app-button text-center d-block"
                             onClick={() => handleDialPadClick(num.toString())}
                           >
-                            {num}
+                            <b>{num}</b>
                           </Button>
                         </div>
                       ))}
@@ -2593,11 +2612,11 @@ const CtiDialer = () => {
                         <div key={num} className="col-4">
                           <Button
                             variant="outline-primary"
-                            size="lg"
-                            className="w-100 py-3"
+                           
+                            className="w-100 py-3 app-button text-center d-block"
                             onClick={() => handleDialPadClick(num.toString())}
                           >
-                            {num}
+                             <b>{num}</b>
                           </Button>
                         </div>
                       ))}
@@ -2606,12 +2625,12 @@ const CtiDialer = () => {
                       {[7, 8, 9].map((num) => (
                         <div key={num} className="col-4">
                           <Button
-                            variant="outline-primary"
-                            size="lg"
-                            className="w-100 py-3"
+                             variant="outline-primary"
+                            
+                             className="w-100 py-3 app-button text-center d-block"
                             onClick={() => handleDialPadClick(num.toString())}
                           >
-                            {num}
+                             <b>{num}</b>
                           </Button>
                         </div>
                       ))}
@@ -2620,31 +2639,32 @@ const CtiDialer = () => {
                       <div className="col-4">
                         <Button
                           variant="outline-primary"
-                          size="lg"
-                          className="w-100 py-3"
+                         
+                          className="w-100 py-3 app-button text-center d-block"
                           onClick={() => handleDialPadClick('*')}
                         >
-                          *
+                          <b><i className="material-icons-two-tone">*</i></b>
+                          
                         </Button>
                       </div>
                       <div className="col-4">
                         <Button
-                          variant="outline-primary"
-                          size="lg"
-                          className="w-100 py-3"
+                           variant="outline-primary"
+                          
+                           className="w-100 py-3 app-button text-center d-block"
                           onClick={() => handleDialPadClick('0')}
                         >
-                          0
+                          <b>0</b>
                         </Button>
                       </div>
                       <div className="col-4">
                         <Button
                           variant="outline-primary"
-                          size="lg"
-                          className="w-100 py-3"
+                         
+                          className="w-100 py-3 app-button text-center d-block"
                           onClick={() => handleDialPadClick('#')}
                         >
-                          #
+                          <b>#</b>
                         </Button>
                       </div>
                     </div>
@@ -2653,13 +2673,13 @@ const CtiDialer = () => {
                   {/* Dial Button */}
                   <div className="text-center">
                     <Button
-                      variant="info"
-                      size="lg"
-                      className="w-100 py-3 mb-4"
+                      variant="primary"
+                     
+                      className="w-100 py-3 app-button text-center d-block mb-4 btnDial"
                       onClick={handleDial}
-                      //disabled={!dialedNumber.trim() || isDialing || !isDialedNumberValid(dialedNumber) || !canDialNumber(dialedNumber).canDial}
+                     
                     >
-                      <i className="material-icons-two-tone me-2">call</i>
+                      <i className="material-icons-two-tone me-2" style={{ backgroundColor: '#fff' }}>call</i>
                       {isDialing ? 'Dialing...' : 'Dial'}
                     </Button>
                     
@@ -3042,177 +3062,9 @@ const CtiDialer = () => {
       </Row>
 
       <style jsx>{`
-        .dial-pad .btn {
-          font-size: 1.5rem;
-          font-weight: 600;
-          transition: all 0.2s ease;
-        }
-        .dial-pad .btn:hover {
-          transform: scale(1.05);
-          box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-        }
-        .extensions-grid {
-          display: block;
-          max-height: 300px;
-          overflow-x: hidden;
-          overflow-y: auto;
-        }
-        .extension-button {
-          width: 100%;
-          margin-bottom: 5px;
-          padding: 5px;
-          border: 1px solid #dee2e6;
-          border-radius: 0.375rem;
-          background-color: #fff;
-          transition: all 0.2s ease;
-          cursor: pointer;
-          font-size: 0.875rem;
-        }
-        .extension-button.online {
-          border-color: #198754;
-          color: #198754;
-        }
-        .extension-button.offline {
-          border-color: #6c757d;
-          color: #6c757d;
-          opacity: 0.6;
-          cursor: not-allowed;
-        }
-        .extension-button.selected {
-          background-color: #0d6efd;
-          color: white;
-          border-color: #0d6efd;
-          transform: scale(1.05);
-          box-shadow: 0 4px 8px rgba(13, 110, 253, 0.3);
-        }
-        .extension-button.active-call {
-          border-color: #ffc107;
-          color: #856404;
-          background-color: #fff3cd;
-        }
-        .extension-button:hover:not(:disabled) {
-          transform: translateY(-2px);
-          box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
-        }
-        .extension-button:focus {
-          outline: none;
-          box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
-        }
-        .extensions-grid::-webkit-scrollbar {
-          width: 6px;
-        }
-        .extensions-grid::-webkit-scrollbar-track {
-          background: #f1f1f1;
-          border-radius: 3px;
-        }
-        .extensions-grid::-webkit-scrollbar-thumb {
-          background: #c1c1c1;
-          border-radius: 3px;
-        }
-        .extensions-grid::-webkit-scrollbar-thumb:hover {
-          background: #a8a8a8;
-        }
         
-        /* Merge call selection styles */
-        .merge-call-selection {
-          transition: all 0.2s ease;
-        }
         
-        .merge-call-selection:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
-        }
         
-        .merge-call-selection.selected {
-          border-color: #0d6efd !important;
-          background-color: #0d6efd !important;
-          color: white !important;
-        }
-        
-        .merge-call-selection.selected:hover {
-          background-color: #0b5ed7 !important;
-        }
-
-        /* Merged call box styles */
-        .merged-call-member {
-          transition: all 0.2s ease;
-          border: 1px solid #dee2e6;
-          border-radius: 0.375rem;
-          background-color: #f8f9fa;
-        }
-        
-        .merged-call-member:hover {
-          border-color: #adb5bd;
-          background-color: #e9ecef;
-        }
-        
-        .merged-call-header {
-          background: linear-gradient(135deg, #28a745, #20c997);
-          color: white;
-          border-radius: 0.375rem 0.375rem 0 0;
-          padding: 0.75rem;
-          margin: -0.75rem -0.75rem 1rem -0.75rem;
-        }
-        
-        .remove-member-btn {
-          transition: all 0.2s ease;
-        }
-        
-        .remove-member-btn:hover {
-          transform: scale(1.1);
-          box-shadow: 0 2px 4px rgba(220, 53, 69, 0.3);
-        }
-        
-        .transfer-member-btn {
-          transition: all 0.2s ease;
-        }
-        
-        .transfer-member-btn:hover {
-          transform: scale(1.1);
-          box-shadow: 0 2px 4px rgba(13, 110, 253, 0.3);
-        }
-
-        /* Transfer modal styles */
-        .modal-overlay {
-          animation: fadeIn 0.2s ease-in-out;
-        }
-        
-        .modal-content {
-          animation: slideIn 0.2s ease-in-out;
-          box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-        }
-        
-        @keyframes fadeIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-        
-        @keyframes slideIn {
-          from { 
-            opacity: 0;
-            transform: translateY(-20px);
-          }
-          to { 
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-        
-        .modal-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          border-bottom: 1px solid #dee2e6;
-          padding-bottom: 1rem;
-        }
-        
-        .modal-footer {
-          border-top: 1px solid #dee2e6;
-          padding-top: 1rem;
-          display: flex;
-          justify-content: flex-end;
-          gap: 0.5rem;
-        }
       `}</style>
 
       {/* Transfer Call Modal */}

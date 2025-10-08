@@ -56,7 +56,7 @@ export const HEADER_CONSTANTS = {
     PORTS: 'Ports',
     INBOX: 'Inbox',
     SYNC_GSM: 'Sync GSM',
-    COMPANY_PO: 'Company PO',
+    COMPANY_PO: 'Company Profiling',
     
     // Call Logs
     CALL_LOGS_DASHBOARD: 'Dashboard',
