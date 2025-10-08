@@ -196,9 +196,9 @@ export const NewAssignement = async (gsm_ip: string, company_identifier: string)
   }
 }
 
-export const ViewGsm = async (id: string): Promise<any> => {
+export const ViewGsm = async (id: string, params: any = {}): Promise<any> => {
   try {
-    const response: AxiosResponse<any> = await axiosInstance.get(`gsm/view-gsm/${id}`);
+    const response: AxiosResponse<any> = await axiosInstance.get(`gsm/view-gsm/${id}`, { params });
     return response?.data?.data;
   } catch (error) {
     console.error('API Error:', error);
@@ -210,6 +210,16 @@ export const ViewGsm = async (id: string): Promise<any> => {
 export const GetCompanyList = async (): Promise<any> => {
   try {
     const response: AxiosResponse<any> = await axiosInstance.get(`gsm/company/list`);
+    return response?.data?.data;
+  } catch (error) {
+    console.error('API Error:', error);
+    throw error;
+  }
+};
+
+export const getDashboardData = async (): Promise<any> => {
+  try {
+    const response: AxiosResponse<any> = await axiosInstance.get(`gsm/dashboard`);
     return response?.data?.data;
   } catch (error) {
     console.error('API Error:', error);
@@ -317,3 +327,22 @@ export const SyncPortsMobileNumber = async (ports: number[], gsm: string): Promi
     throw error;
   }
 };
+
+export const SendGsmUssd = async (params: any = {}) => {
+  try {
+    const response = await axiosInstance.post(`gsm/send_ussd`, params);
+    return response?.data?.data;
+  } catch (error) {
+    throw error;
+  }
+};
+
+export const SendSms = async (params: any = {}) => {
+  try {
+    const response = await axiosInstance.post(`gsm/send_sms`, params);
+    return response?.data?.data;
+  } catch (error) {
+    throw error;
+  }
+};
+

@@ -235,45 +235,6 @@ const GsmInbox = () => {
     }
   }, [currentPage, gsmInbox?.last_page]);
 
-  const [selectedMessageId, setSelectedMessageId] = useState<number[]>([]);
-  const [selectAll, setSelectAll] = useState(false);
-
-  const handleDeleteSelected = useCallback(() => {
-    console.log('Delete selected messages:', selectedMessageId);
-    toast.success(`${selectedMessageId.length} messages deleted`);
-    setSelectedMessageId([]);
-    setSelectAll(false);
-  }, [selectedMessageId]);
-
-  const handleMessageSelect = useCallback((messageId: number, isSelected: boolean) => {
-    console.log('Message selected:', messageId, isSelected);
-    setSelectedMessageId(prev => {
-      if (isSelected) {
-        return [...prev, messageId];
-      } else {
-        return prev.filter(id => id !== messageId);
-      }
-    });
-  }, []);
-
-  const handleSelectAll = useCallback((isSelected: boolean) => {
-    console.log('Select all:', isSelected);
-    setSelectAll(isSelected);
-    if (isSelected) {
-      const allIds = gsmInbox?.data?.map((item: any) => item.id) || [];
-      setSelectedMessageId(allIds);
-    } else {
-      setSelectedMessageId([]);
-    }
-  }, [gsmInbox?.data]);
-
-  // Update select all checkbox when individual selections change
-  useEffect(() => {
-    if (gsmInbox?.data?.length > 0) {
-      const allSelected = gsmInbox.data.every((item: any) => selectedMessageId.includes(item.id));
-      setSelectAll(allSelected);
-    }
-  }, [selectedMessageId, gsmInbox?.data]);
 
   return (
     <>
@@ -327,51 +288,9 @@ const GsmInbox = () => {
       {gsmInbox?.data?.length > 0 ? (
         <Row>
           <Col md={12}>
-          {selectedMessageId.length > 0 && (
-                           <div className="mb-1 row">
-                             <div className="col-md-12">
-                               <div className="alert alert-info d-flex align-items-center justify-content-between selectionRowBox">
-                                 <div className="selected-rows d-flex align-items-center gap-3">
-                                   <label className="d-flex align-items-center mb-0">
-                                     <input 
-                                       type="checkbox" 
-                                       checked={selectAll}
-                                       onChange={(e) => handleSelectAll(e.target.checked)}
-                                       className="me-2"
-                                     />
-                                     Select All
-                                   </label>
-                                   <strong>{selectedMessageId.length}</strong> Selected
-                                 </div>
-                                 <div className="btn-group">
-                                   <button 
-                                     type="button" 
-                                     className="btn btn-outline-danger btn-sm"
-                                     onClick={handleDeleteSelected}
-                                   >
-                                     Bulk Delete
-                                   </button>
-                                 </div>
-                               </div>
-                             </div>
-                           </div>
-                         )}
-          </Col>
-          <Col md={12}>
           <div className="inbox-list">
             {gsmInbox?.data?.map((item: any) => (
               <div className="message-card new" data-sender={item.sender} data-receiver={item.receiver} data-smsc={item.smsc} data-imsi={item.imsi} data-full-message={item.full_message} data-timestamp={item.timestamp} data-status={item.status} style={{display: 'flex'}}>
-              <label>
-                  <input 
-                    type="checkbox" 
-                    className="message-checkbox" 
-                    checked={selectedMessageId.includes(item.id)}
-                    onChange={(e) => handleMessageSelect(item.id, e.target.checked)}
-                  />
-                  <div className="message-checkbox-container">
-                      <i className="fas fa-check"></i>
-                  </div>
-              </label>
               <span className="new-indicator" onClick={() => handleMarkAsRead(item.id)}></span>
               <div className="message-content" onClick={() => {
                 setSelectedMessage(item);

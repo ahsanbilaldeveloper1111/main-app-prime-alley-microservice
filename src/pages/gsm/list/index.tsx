@@ -35,6 +35,7 @@ import SuccessfulModal from "@pages/partial/SuccessfulModal";
 import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
 import DatatableActionButton from "@components/DatatableActionButton";
 import { FiEdit, FiTrash2, FiEye,FiPlus } from "react-icons/fi";
+import { getDashboardData, ViewGsm } from '@utils/GsmAssign';
 
 
 
@@ -50,6 +51,11 @@ const GsmList = () => {
         { key: 'device_status', name: 'Device Status', selector: (row: any) => row.device_status, sortable: true,
           cell: (row: any) => (
             <div className="flex items-center gap-2">
+              <div onClick={() => {
+                ViewGsm(row.id, {
+                  company: '0a6b00c3-020f-4379-bd2d-8a0a79888e57'
+                });
+              }}>ASD</div>
               {row?.device_status ? (
                 <>
                  
@@ -57,7 +63,7 @@ const GsmList = () => {
 
                   <div className={`device-status-dot ${row.device_status === 'power_on' ? 'active animate-ping' : ''}`}></div>
                     
-                    {row?.device_status?.toUpperCase() || 'OFFLINE'}
+                    {row?.device_status?.toUpperCase() || 'OFFLINE'} dd
                   
                   </div>
                 </>
@@ -286,7 +292,6 @@ const GsmList = () => {
     const handleExportSuccessful = async () => {
       setShowExportSuccessfulModal(true);
     }
-
 
     const [successModalTitle, setSuccessModalTitle] = useState('');
     const [successModalDescription, setSuccessModalDescription] = useState('');

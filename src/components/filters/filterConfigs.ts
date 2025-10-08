@@ -630,7 +630,7 @@ export const createGsmCompanyFiltersConfig = (hierarchyData?: any): FilterTab[] 
       {
         type: 'select',
         isMulti: false,
-        name: 'gsm',
+        name: 'gsm_id',
         label: 'GSM',
         options: hierarchyData?.gsm?.map((gsm: { id: string; name: string }) => ({
           value: gsm.id,
@@ -818,7 +818,22 @@ export const createGsmInboxFiltersConfig = (hierarchyData?: any): FilterTab[] =>
         ]
       }
     ]
-  }
+  },
+  {
+    id: 'sender',
+    title: 'Phone Number',
+    icon: 'ti ti-phone',
+    fields: [
+      {
+        type: 'text',
+        isMulti: false,
+        name: 'sender',
+        label: 'Phone Number',
+        placeholder: 'Enter Phone Number'
+      },
+       
+    ]
+  },
 ];
 
 
