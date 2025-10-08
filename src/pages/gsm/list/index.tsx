@@ -51,11 +51,6 @@ const GsmList = () => {
         { key: 'device_status', name: 'Device Status', selector: (row: any) => row.device_status, sortable: true,
           cell: (row: any) => (
             <div className="flex items-center gap-2">
-              <div onClick={() => {
-                ViewGsm(row.id, {
-                  company: '0a6b00c3-020f-4379-bd2d-8a0a79888e57'
-                });
-              }}>ASD</div>
               {row?.device_status ? (
                 <>
                  
@@ -63,7 +58,7 @@ const GsmList = () => {
 
                   <div className={`device-status-dot ${row.device_status === 'power_on' ? 'active animate-ping' : ''}`}></div>
                     
-                    {row?.device_status?.toUpperCase() || 'OFFLINE'} dd
+                    {row?.device_status?.toUpperCase() || 'OFFLINE'}
                   
                   </div>
                 </>
