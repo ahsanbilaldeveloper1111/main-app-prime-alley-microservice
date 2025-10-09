@@ -9,6 +9,7 @@ import '@assets/scss/gsm-dashboard.scss'
 import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid'
 import moment from 'moment'
 import useCtiStomp from '../../hooks/useCtiStomp'
+import useGlobalCallTimer from '../../hooks/useGlobalCallTimer'
 import dynamic from 'next/dynamic'
 
 import Link from 'next/link'
@@ -31,6 +32,22 @@ interface CtiDevice {
 interface DnData {
   dn: string
   devices: Record<string, CtiDevice>
+}
+
+// CallTimer component for displaying elapsed time
+const CallTimer: React.FC<{ dn: string; isActive: boolean }> = ({ dn, isActive }) => {
+  const { elapsedTime, isRunning } = useGlobalCallTimer(dn, isActive)
+  
+  // Debug logging
+  console.log('CallTimer render:', { dn, isActive, elapsedTime, isRunning })
+  
+  if (!isActive) {
+    return null
+  }
+
+  return (
+    <p className={`call-timer ${isRunning ? 'running' : ''}`}>{elapsedTime}</p>
+  )
 }
 
 const CtiDashboard = () => {
@@ -233,75 +250,82 @@ const CtiDashboard = () => {
 
   // FLIP Animation functions
   const animateCardMove = useCallback((dn: string, fromSection: string, toSection: string) => {
-    console.log(`🎭 Starting FLIP animation for ${dn} from ${fromSection} to ${toSection}`)
+   // console.log(`🎭 Starting FLIP animation for ${dn} from ${fromSection} to ${toSection}`)
     
     // Get the stored first position
-    const first = cardPositions[dn]
-    if (!first) {
-      console.log(`❌ No stored position for ${dn}`)
-      return
-    }
+    setCardPositions(prev => {
+      const first = prev[dn]
+      if (!first) {
+        //console.log(`❌ No stored position for ${dn}`)
+        return prev
+      }
 
-    console.log(`📍 Using stored first position:`, first)
+      //console.log(`📍 Using stored first position:`, first)
 
-    // Mark as animating
-    setAnimatingCards(prev => new Set(Array.from(prev).concat(dn)))
+      // Mark as animating
+      setAnimatingCards(prev => new Set(Array.from(prev).concat(dn)))
 
-    // Get the card in its new position
-    const card = document.querySelector(`[data-dn="${dn}"]`) as HTMLElement
-    if (!card) {
-      console.log(`❌ Card not found for ${dn}`)
-      return
-    }
+      // Get the card in its new position
+      const card = document.querySelector(`[data-dn="${dn}"]`) as HTMLElement
+      if (!card) {
+        //console.log(`❌ Card not found for ${dn}`)
+        return prev
+      }
 
-    const last = card.getBoundingClientRect()
-    console.log(`📍 Last position:`, last)
+      const last = card.getBoundingClientRect()
+      //console.log(`📍 Last position:`, last)
 
-    // Calculate the difference
-    const dx = first.x - last.left
-    const dy = first.y - last.top
-    const sx = first.width / last.width
-    const sy = first.height / last.height
+      // Calculate the difference
+      const dx = first.x - last.left
+      const dy = first.y - last.top
+      const sx = first.width / last.width
+      const sy = first.height / last.height
 
-    console.log(`📐 Transform: translate(${dx}px, ${dy}px) scale(${sx}, ${sy})`)
+      //console.log(`📐 Transform: translate(${dx}px, ${dy}px) scale(${sx}, ${sy})`)
 
-    // Apply the FLIP animation
-    card.style.transition = 'none'
-    card.style.transform = `translate(${dx}px, ${dy}px) scale(${sx}, ${sy})`
-    card.classList.add('anim-moving')
+      // Apply the FLIP animation
+      card.style.transition = 'none'
+      card.style.transform = `translate(${dx}px, ${dy}px) scale(${sx}, ${sy})`
+      card.classList.add('anim-moving')
 
-    // Force reflow
-    card.offsetHeight
+      // Force reflow
+      card.offsetHeight
 
-    // Animate to final position
-    requestAnimationFrame(() => {
-      card.style.transition = 'transform 0.6s var(--ease)'
-      card.style.transform = 'translate(0, 0) scale(1)'
-    })
-
-    // Add return glow if returning to a known position
-    const remembered = lastPositions[dn]?.[toSection]
-    if (remembered !== undefined) {
-      card.classList.add('return-glow')
-      setTimeout(() => card.classList.remove('return-glow'), 600)
-    }
-
-    // Clean up after animation
-    const handleTransitionEnd = () => {
-      card.classList.remove('anim-moving')
-      card.style.transition = ''
-      card.style.transform = ''
-      setAnimatingCards(prev => {
-        const newSet = new Set(Array.from(prev))
-        newSet.delete(dn)
-        return newSet
+      // Animate to final position
+      requestAnimationFrame(() => {
+        card.style.transition = 'transform 0.6s var(--ease)'
+        card.style.transform = 'translate(0, 0) scale(1)'
       })
-      card.removeEventListener('transitionend', handleTransitionEnd)
-      console.log(`✅ Animation completed for ${dn}`)
-    }
 
-    card.addEventListener('transitionend', handleTransitionEnd, { once: true })
-  }, [lastPositions, cardPositions])
+      // Add return glow if returning to a known position
+      setLastPositions(prevLastPositions => {
+        const remembered = prevLastPositions[dn]?.[toSection]
+        if (remembered !== undefined) {
+          card.classList.add('return-glow')
+          setTimeout(() => card.classList.remove('return-glow'), 600)
+        }
+        return prevLastPositions
+      })
+
+      // Clean up after animation
+      const handleTransitionEnd = () => {
+        card.classList.remove('anim-moving')
+        card.style.transition = ''
+        card.style.transform = ''
+        setAnimatingCards(prev => {
+          const newSet = new Set(Array.from(prev))
+          newSet.delete(dn)
+          return newSet
+        })
+        card.removeEventListener('transitionend', handleTransitionEnd)
+        //console.log(`✅ Animation completed for ${dn}`)
+      }
+
+      card.addEventListener('transitionend', handleTransitionEnd, { once: true })
+      
+      return prev
+    })
+  }, [])
 
   const getSectionKey = (section: string) => {
     switch (section) {
@@ -361,6 +385,8 @@ const CtiDashboard = () => {
     if (!isInitialized || !dnsMap) return
 
     const dnsList = Object.values(dnsMap).filter(({ dn }) => dn !== userAddress)
+    const newPreviousSections: { [dn: string]: string } = {}
+    const animationsToTrigger: Array<{ dn: string; fromSection: string; toSection: string }> = []
     
     dnsList.forEach(({ dn, devices }) => {
       const deviceList = Object.values(devices || {})
@@ -369,19 +395,26 @@ const CtiDashboard = () => {
       const currentSection = categorizeDns(dn, deviceList, call, active)
       const previousSection = previousSections[dn]
       
+      // Store the new section for this DN
+      newPreviousSections[dn] = currentSection
+      
       // If section changed, trigger FLIP animation
       if (previousSection && previousSection !== currentSection) {
-        console.log(`🎬 Section change detected for ${dn} from ${previousSection} to ${currentSection}`)
+        //console.log(`🎬 Section change detected for ${dn} from ${previousSection} to ${currentSection}`)
         
         // Store the new position for this DN
-        if (!lastPositions[dn]) lastPositions[dn] = {}
-        lastPositions[dn][getSectionKey(currentSection)] = 0 // Will be updated with actual position
+        setLastPositions(prev => {
+          const newPositions = { ...prev }
+          if (!newPositions[dn]) newPositions[dn] = {}
+          newPositions[dn][getSectionKey(currentSection)] = 0 // Will be updated with actual position
+          return newPositions
+        })
         
         // Get the current position BEFORE React re-renders
         const card = document.querySelector(`[data-dn="${dn}"]`) as HTMLElement
         if (card) {
           const first = card.getBoundingClientRect()
-          console.log(`📍 Storing first position for ${dn}:`, first)
+         // console.log(`📍 Storing first position for ${dn}:`, first)
           
           // Store the position for the animation
           setCardPositions(prev => ({
@@ -390,19 +423,26 @@ const CtiDashboard = () => {
           }))
         }
         
-        // Trigger animation after React re-renders
-        setTimeout(() => {
-          animateCardMove(dn, previousSection, currentSection)
-        }, 50)
+        // Queue animation to trigger after state updates
+        animationsToTrigger.push({ dn, fromSection: previousSection, toSection: currentSection })
       }
-      
-      // Update previous section
-      setPreviousSections(prev => ({
-        ...prev,
-        [dn]: currentSection
-      }))
     })
-  }, [dnsMap, isInitialized, userAddress, hasActiveCalls, getDnCallState, activeMonitoring, animateCardMove, getSectionKey, lastPositions])
+    
+    // Update all previous sections in one batch
+    setPreviousSections(prev => ({
+      ...prev,
+      ...newPreviousSections
+    }))
+    
+    // Trigger animations after state updates
+    if (animationsToTrigger.length > 0) {
+      setTimeout(() => {
+        animationsToTrigger.forEach(({ dn, fromSection, toSection }) => {
+          animateCardMove(dn, fromSection, toSection)
+        })
+      }, 50)
+    }
+  }, [dnsMap, isInitialized, userAddress, hasActiveCalls, getDnCallState, activeMonitoring, animateCardMove, getSectionKey])
 
 
   // Clear CTI call states on page load
@@ -412,9 +452,9 @@ const CtiDashboard = () => {
         // Clear specific CTI call states
         localStorage.removeItem('cti_call_states')
         localStorage.removeItem('cti_call_states_timestamp')
-        console.log('🧹 Cleared CTI call states on page load')
+        //console.log('🧹 Cleared CTI call states on page load')
       } catch (error) {
-        console.error('Error clearing CTI call states:', error)
+        console.error('Error clearing call states:', error)
       }
     }
 
@@ -804,6 +844,33 @@ const CtiDashboard = () => {
       outline: none;
       box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
     }
+    
+    /* Call Status Color Styles */
+    .call-status-calling {
+      color: #d97706 !important; /* Orange for calling/ringing */
+    }
+    
+    .call-status-connected {
+      color: #059669 !important; /* Green for connected */
+    }
+    
+    .call-status-held {
+      color: #2563eb !important; /* Blue for held */
+    }
+    
+    .call-status-incoming {
+      color: #dc2626 !important; /* Red for incoming */
+    }
+    
+    .call-status-outgoing {
+      color: #d97706 !important; /* Orange for outgoing */
+    }
+    
+    .call-status-conference {
+      color: #6f42c1 !important; /* Purple for conference */
+    }
+    
+    
   `
 
   // Effects
@@ -851,14 +918,14 @@ const CtiDashboard = () => {
 
   useEffect(() => {
     if (eventLog && eventLog.length > 0) {
-      console.log('=== CTI Event Log ===')
-      eventLog.forEach((event, index) => {
-        console.log(`Event ${index + 1}:`, event)
-        console.log('Event Type:', event.type || 'Unknown')
-        console.log('Event Data:', event.data || event)
-        console.log('Timestamp:', event.timestamp || new Date().toISOString())
-        console.log('---')
-      })
+      // console.log('=== CTI Event Log ===')
+      // eventLog.forEach((event, index) => {
+      //   console.log(`Event ${index + 1}:`, event)
+      //   console.log('Event Type:', event.type || 'Unknown')
+      //   console.log('Event Data:', event.data || event)
+      //   console.log('Timestamp:', event.timestamp || new Date().toISOString())
+      //   console.log('---')
+      // })
     }
   }, [eventLog])
 
@@ -1307,7 +1374,7 @@ const CtiDashboard = () => {
     if (conf && !isOneToOne) return '#6f42c1'
 
     // Handle HELD state directly if no parties or if state is already HELD
-    if (state === 'HELD') return 'green'
+    if (state === 'HELD') return '#2563eb'
     
     const filtered = parties.filter((p: any) => p.callingAddress === dn || p.calledAddress === dn)
     if (!filtered.length) {
@@ -1345,16 +1412,16 @@ const CtiDashboard = () => {
         : state
 
     return {
-      RINGING: role === 'calling' ? 'red' : 'green',
-      ANSWERED: 'green',
-      CONNECTED: 'green',
-      RETRIEVED: 'green',
-      HELD: 'white'
+      RINGING: role === 'calling' ? '#d97706' : '#dc2626', // calling: orange, incoming: red
+      ANSWERED: '#059669', // connected: green
+      CONNECTED: '#059669', // connected: green
+      RETRIEVED: '#059669', // connected: green
+      HELD: '#2563eb' // held: blue
     }[effectiveState as keyof typeof getColor] || '#6c757d'
   }
 
   const getText = (state: string, isConference: boolean, isOneToOne: boolean, parties: any[] = [], dn: string) => {
-    if (isConference && !isOneToOne) return 'Call in Progress'
+    if (isConference && !isOneToOne) return 'Conference'
     
     // Handle HELD state directly if no parties or if state is already HELD
     if (state === 'HELD') return 'On Hold'
@@ -1377,15 +1444,15 @@ const CtiDashboard = () => {
     const isCallee = activeParty.calledAddress === dn
     
     // Debug logging
-    console.log('getText debug:', {
-      state,
-      effectiveState,
-      isConference,
-      isOneToOne,
-      parties: parties.length,
-      dn,
-      activeParty: activeParty?.callStatus
-    })
+    // console.log('getText debug:', {
+    //   state,
+    //   effectiveState,
+    //   isConference,
+    //   isOneToOne,
+    //   parties: parties.length,
+    //   dn,
+    //   activeParty: activeParty?.callStatus
+    // })
     
     const stateMap = {
       RINGING: isCaller ? 'Calling' : isCallee ? 'Incoming' : effectiveState,
@@ -1397,7 +1464,7 @@ const CtiDashboard = () => {
     }
     
     const result = stateMap[effectiveState as keyof typeof stateMap] || effectiveState
-    console.log('getText result:', result, 'for state:', effectiveState)
+   // console.log('getText result:', result, 'for state:', effectiveState)
     return result
   }
 
@@ -1681,7 +1748,9 @@ const CtiDashboard = () => {
                               call.parties || [],
                               dn,
                               cls
-                            ) : '#6b7280'
+                            ) : 'black'
+
+                            console.log('callColor', callColor)
 
                             const cardClasses = `card-wrapper position-relative`
 
@@ -1702,10 +1771,39 @@ const CtiDashboard = () => {
                                   >
                                     {/* Hover Overlay */}
                                     <div className="card-hover-overlay">
-                                      <div className="overlay-content">
-                                        {/* <i className="material-icons-two-tone overlay-icon">business</i> */}
-                                        <span className="company-name">Prime Alley Technology</span>
-                                      </div>
+                                    <p>
+                                      <strong>EXT:</strong> <span>{dn}</span>
+                                    </p>
+
+                                    {call?.parties && call?.parties.length > 0 && (
+                                      <p>
+                                        <strong>From:</strong> <span>{call.parties[0].callingAddress}</span>
+                                      </p>
+                                    )}
+                                    {call?.parties && call?.parties.length > 0 && (
+                                      <p>
+                                        <strong>To:</strong> <span>{call.parties[0].calledAddress}</span>
+                                      </p>
+                                    )}
+
+                                    
+                                    {active && call && (
+                                          <p className="small mb-0" style={{ color: callColor, padding: '2px',fontWeight: 'bold',textTransform: 'uppercase' }}>
+                                            {(() => {
+                                            
+                                              const result = getText(
+                                                call.currentState || '',
+                                                call.isConference || false,
+                                                call.isOneToOne || false,
+                                                call.parties || [],
+                                                dn
+                                              )
+                                              
+                                              return result
+                                            })()}
+                                          </p>
+                                        )}
+
                                     </div>
                                     {/* Section 1: Information Section */}
                                     <div className="card-info-section">
@@ -1719,29 +1817,6 @@ const CtiDashboard = () => {
                                           <span className="status-indicator" style={{ display: 'inline-block',width: '10px', height: '10px',borderRadius: '50%',marginRight: '5px',backgroundColor: getSectionColor(sectionKey) }}></span>
                                         {getSectionTitle(sectionKey)}
                                         </p>
-                                        {active && call && (
-                                          <p className="small mb-0" style={{ color: callColor, padding: '2px' }}>
-                                            {(() => {
-                                              console.log('Call state debug for', dn, ':', {
-                                                currentState: call.currentState,
-                                                isConference: call.isConference,
-                                                isOneToOne: call.isOneToOne,
-                                                parties: call.parties?.length || 0,
-                                                call: call
-                                              })
-                                              const result = getText(
-                                                call.currentState || '',
-                                                call.isConference || false,
-                                                call.isOneToOne || false,
-                                                call.parties || [],
-                                                dn
-                                              )
-                                              console.log('Final display text for', dn, ':', result)
-                                              console.log('Rendering text for', dn, ':', result, 'with color:', callColor)
-                                              return result
-                                            })()}
-                                          </p>
-                                        )}
                                       </div>
                                       {/* <div className="card-actions">
                                         <div 
@@ -1755,6 +1830,31 @@ const CtiDashboard = () => {
                                         
                                       </div> */}
                                     </div>
+
+                                    {active && call && (
+                                    <div className="card-timer-section" style={{ color: callColor }}>
+                                   
+                                          <p className=" mb-0">
+                                            {(() => {
+                                            
+                                              const result = getText(
+                                                call.currentState || '',
+                                                call.isConference || false,
+                                                call.isOneToOne || false,
+                                                call.parties || [],
+                                                dn
+                                              )
+                                              
+                                              return result
+                                            })()}
+                                          </p>
+                                       
+                                        <CallTimer 
+                                          dn={dn}
+                                          isActive={active && call ? true : false} 
+                                        />
+                                    </div>
+                                     )}
 
                                     {/* Section 2: Device Dropdown Section */}
                                     {/* <div className="device-dropdown-section">

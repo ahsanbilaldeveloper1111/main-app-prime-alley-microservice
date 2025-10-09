@@ -1292,21 +1292,98 @@
 
 /* Card Hover Overlay */
 .new-card-design {
+
+    .card-timer-section{
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 3px;
+        padding: 5px 10px;
+        border-bottom: 0px solid #eef2f6;
+        margin-bottom: 0px;
+        text-transform: uppercase;
+        font-weight: bold;
+        line-height: normal;
+       
+        // color: #28a745;
+
+        p{
+            font-size: 0.65rem !important;
+        }
+    }
+    
+    .call-timer {
+        margin:0;
+      }
+      
+      .call-timer.running {
+        //animation: timer-pulse 2s infinite;
+      }
+      @keyframes timer-pulse {
+        0% {
+          box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.4);
+        }
+        70% {
+          box-shadow: 0 0 0 4px rgba(40, 167, 69, 0);
+        }
+        100% {
+          box-shadow: 0 0 0 0 rgba(40, 167, 69, 0);
+        }
+      }
+      
+      
+    
     .card-hover-overlay {
         position: absolute;
         top: 0;
         left: 0;
         right: 0;
         bottom: 0;
-        background: rgb(18 17 17 / 59%);
         display: flex;
         align-items: center;
         justify-content: center;
         opacity: 0;
         visibility: hidden;
-        transition: all 0.3s ease;
+        transform: rotateY(180deg);
+        transition: all 0.4s ease;
         z-index: 10;
-        border-radius: 0px;
+        border-radius: 10px;
+        transform-style: preserve-3d;
+        backface-visibility: hidden;
+        animation: none;
+
+        background: #f8fafc; 
+        color: #1e293b;
+        
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: flex-start;
+        padding: 12px;
+        padding-bottom:30px;
+        box-shadow: inset 0 0 10px rgba(0,0,0,0.03); 
+
+        p {
+            margin: 4px 0; 
+            font-size: 0.7rem; 
+            font-weight: 400; /* Lighter weight for detail */
+            display: flex;
+            align-items: center;
+            width: 100%; 
+            display: flex;
+            justify-content: space-around;
+          }
+        strong {
+            font-weight: 500; 
+            color: #6b7280; 
+            margin-right: 15px;
+            display: inline-block;
+            flex-shrink: 0;
+          }
+           span {
+            font-weight: 700; /* Bold value */
+            color: #1e293b;
+          }
         
         .overlay-content {
             display: flex;
@@ -1339,6 +1416,8 @@
         .card-hover-overlay {
             opacity: 1;
             visibility: visible;
+            transform: rotateY(0deg);
+            animation: cardHoverFlip 0.5s ease-out forwards;
         }
     }
     
@@ -1357,6 +1436,22 @@
     100% {
         opacity: 1;
         transform: scale(1);
+    }
+}
+
+/* Card Hover Overlay Flip Animation */
+@keyframes cardHoverFlip {
+    0% {
+        opacity: 0;
+        transform: rotateY(180deg) scale(0.8);
+    }
+    50% {
+        opacity: 0.5;
+        transform: rotateY(90deg) scale(0.9);
+    }
+    100% {
+        opacity: 1;
+        transform: rotateY(0deg) scale(1);
     }
 }
 
@@ -1669,8 +1764,8 @@
 
 
 .card-wrapper  .card.new-card-design {
-    background: linear-gradient(180deg, #fff, #fbfdff) !important;
+    background: linear-gradient(180deg, #d1edeca6, #47db6621) !important;
     border-radius: 8px !important;
-    border: 1px solid #eef2f6 !important;
+    border: 1px solid #e5e7eb !important;
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.04) !important;
 }

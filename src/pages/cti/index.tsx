@@ -146,9 +146,9 @@ const CtiDashboard = () => {
         // Clear specific CTI call states
         localStorage.removeItem('cti_call_states')
         localStorage.removeItem('cti_call_states_timestamp')
-        console.log('🧹 Cleared CTI call states on page load')
+        //console.log('🧹 Cleared CTI call states on page load')
       } catch (error) {
-        console.error('Error clearing CTI call states:', error)
+        console.error('Error clearing call states:', error)
       }
     }
 

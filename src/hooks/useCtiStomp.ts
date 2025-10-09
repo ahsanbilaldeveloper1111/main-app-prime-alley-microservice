@@ -393,7 +393,7 @@ export default function useCtiStomp(wsPath = '/ws') {
             'Content-Type': 'application/json',
           }
         });
-        console.log('response cti connect:', response);
+        //console.log('response cti connect:', response);
 
         if (response.status === 200) {
           const data = response.data;
@@ -419,7 +419,7 @@ export default function useCtiStomp(wsPath = '/ws') {
     const connectWithToken = async (token: string, userAddress: string) => {
       
       const brokerURL = process.env.NEXT_PUBLIC_CTI_SOCKET_URL;
-      console.log('brokerURL:', brokerURL);
+      //console.log('brokerURL:', brokerURL);
       
       // Set userAddress in state
       setUserAddress(userAddress);
@@ -451,14 +451,14 @@ export default function useCtiStomp(wsPath = '/ws') {
             try {
               //console.log('complete-state received:', body);
               const payload = JSON.parse(body);
-              console.log('Parsed payload:', payload);
+              //console.log('Parsed payload:', payload);
               //console.log('Payload type:', typeof payload);
               //console.log('Is array?', Array.isArray(payload));
               
               // Process the payload and update state
               const grouped = groupDevicesByDnAndDeviceName(payload);
               console.log('grouped devices:', grouped);
-              console.log('Number of DNs:', Object.keys(grouped).length);
+             // console.log('Number of DNs:', Object.keys(grouped).length);
               
               setDnsMap(grouped);
               updateSummaryData(grouped);
