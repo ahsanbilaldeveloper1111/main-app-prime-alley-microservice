@@ -110,14 +110,15 @@ export const ExportCallLogs = async (params: PaginationParams = {}) => {
   }
 };
 
-export const DownloadCallRecording = async (id: string, agentExtension: string, endpoint: string) => {
+export const DownloadCallRecording = async (id: string, agentExtension: string, endpoint: string, node?: string) => {
 
   try {
     //window.open(`${endpoint}/${id}`, '_blank');
     const response = await axiosInstance.get(`${endpoint}/${id}`, {
       responseType: 'blob',
       params: {
-        extension_number: agentExtension
+        extension_number: agentExtension,
+        node: node
       }
     });
 

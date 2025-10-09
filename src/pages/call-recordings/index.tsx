@@ -625,7 +625,7 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
   const handleDownload = async (props: any) => {
     const { Id, AgentExtension } = props;
     return await DownloadCallRecording(
-      Id,AgentExtension,'call-logs/recordings/download'
+      Id,AgentExtension,'call-logs/recordings/download', props.imagicle
     );
   };
 
@@ -642,7 +642,7 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
     const trackId = recording.Id;
     const agentExtension = recording.AgentExtension;
 
-    loadAuthenticatedAudio(trackId, agentExtension);
+    loadAuthenticatedAudio(trackId, agentExtension, recording.imagicle);
 
     setSelectedRecording(recording);
      
@@ -651,7 +651,7 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
   };
 
 
-  const loadAuthenticatedAudio = async (audioTrackId: string, agentExtension: string) => {
+  const loadAuthenticatedAudio = async (audioTrackId: string, agentExtension: string, node?: string) => {
     if (!audioTrackId) return;
     
     setAudioLoading(true);
@@ -667,7 +667,8 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
       const response = await axiosInstance.get(`call-logs/recordings/download/${audioTrackId}`, {
         responseType: 'blob',
         params: {
-          extension_number: agentExtension
+          extension_number: agentExtension,
+          node: node
         },
         headers: {
           'Accept': 'audio/*, application/octet-stream, */*'
