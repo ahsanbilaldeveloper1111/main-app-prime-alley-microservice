@@ -94,6 +94,24 @@ const CtiDashboard = () => {
   const [cardPositions, setCardPositions] = useState<{ [dn: string]: { x: number; y: number; width: number; height: number } }>({})
   const [lastPositions, setLastPositions] = useState<{ [dn: string]: { [section: string]: number } }>({})
   
+  // Initialize previous sections when data is first loaded
+  useEffect(() => {
+    if (isInitialized && dnsMap && Object.keys(previousSections).length === 0) {
+      const dnsList = Object.values(dnsMap).filter(({ dn }) => dn !== userAddress)
+      const initialSections: { [dn: string]: string } = {}
+      
+      dnsList.forEach(({ dn, devices }) => {
+        const deviceList = Object.values(devices || {})
+        const call = getDnCallState(dn)
+        const active = hasActiveCalls(dn)
+        const section = categorizeDns(dn, deviceList, call, active)
+        initialSections[dn] = section
+      })
+      
+      setPreviousSections(initialSections)
+    }
+  }, [isInitialized, dnsMap, userAddress, getDnCallState, hasActiveCalls, previousSections])
+  
   // Fullscreen state
   const [isFullscreen, setIsFullscreen] = useState(false)
 
@@ -250,82 +268,83 @@ const CtiDashboard = () => {
 
   // FLIP Animation functions
   const animateCardMove = useCallback((dn: string, fromSection: string, toSection: string) => {
-   // console.log(`🎭 Starting FLIP animation for ${dn} from ${fromSection} to ${toSection}`)
+    console.log(`🎭 Starting FLIP animation for ${dn} from ${fromSection} to ${toSection}`)
     
     // Get the stored first position
-    setCardPositions(prev => {
-      const first = prev[dn]
-      if (!first) {
-        //console.log(`❌ No stored position for ${dn}`)
-        return prev
-      }
+    const first = cardPositions[dn]
+    if (!first) {
+      console.log(`❌ No stored position for ${dn}`)
+      return
+    }
 
-      //console.log(`📍 Using stored first position:`, first)
+    console.log(`📍 Using stored first position:`, first)
 
-      // Mark as animating
-      setAnimatingCards(prev => new Set(Array.from(prev).concat(dn)))
+    // Mark as animating
+    setAnimatingCards(prev => new Set(Array.from(prev).concat(dn)))
 
-      // Get the card in its new position
-      const card = document.querySelector(`[data-dn="${dn}"]`) as HTMLElement
-      if (!card) {
-        //console.log(`❌ Card not found for ${dn}`)
-        return prev
-      }
-
-      const last = card.getBoundingClientRect()
-      //console.log(`📍 Last position:`, last)
-
-      // Calculate the difference
-      const dx = first.x - last.left
-      const dy = first.y - last.top
-      const sx = first.width / last.width
-      const sy = first.height / last.height
-
-      //console.log(`📐 Transform: translate(${dx}px, ${dy}px) scale(${sx}, ${sy})`)
-
-      // Apply the FLIP animation
-      card.style.transition = 'none'
-      card.style.transform = `translate(${dx}px, ${dy}px) scale(${sx}, ${sy})`
-      card.classList.add('anim-moving')
-
-      // Force reflow
-      card.offsetHeight
-
-      // Animate to final position
-      requestAnimationFrame(() => {
-        card.style.transition = 'transform 0.6s var(--ease)'
-        card.style.transform = 'translate(0, 0) scale(1)'
+    // Get the card in its new position
+    const card = document.querySelector(`[data-dn="${dn}"]`) as HTMLElement
+    if (!card) {
+      console.log(`❌ Card not found for ${dn}`)
+      setAnimatingCards(prev => {
+        const newSet = new Set(Array.from(prev))
+        newSet.delete(dn)
+        return newSet
       })
+      return
+    }
 
-      // Add return glow if returning to a known position
-      setLastPositions(prevLastPositions => {
-        const remembered = prevLastPositions[dn]?.[toSection]
-        if (remembered !== undefined) {
-          card.classList.add('return-glow')
-          setTimeout(() => card.classList.remove('return-glow'), 600)
-        }
-        return prevLastPositions
-      })
+    const last = card.getBoundingClientRect()
+    console.log(`📍 Last position:`, last)
 
-      // Clean up after animation
-      const handleTransitionEnd = () => {
-        card.classList.remove('anim-moving')
-        card.style.transition = ''
-        card.style.transform = ''
-        setAnimatingCards(prev => {
-          const newSet = new Set(Array.from(prev))
-          newSet.delete(dn)
-          return newSet
-        })
-        card.removeEventListener('transitionend', handleTransitionEnd)
-        //console.log(`✅ Animation completed for ${dn}`)
-      }
+    // Calculate the difference
+    const dx = first.x - last.left
+    const dy = first.y - last.top
+    const sx = first.width / last.width
+    const sy = first.height / last.height
 
-      card.addEventListener('transitionend', handleTransitionEnd, { once: true })
-      
-      return prev
+    console.log(`📐 Transform: translate(${dx}px, ${dy}px) scale(${sx}, ${sy})`)
+
+    // Apply the FLIP animation
+    card.style.transition = 'none'
+    card.style.transform = `translate(${dx}px, ${dy}px) scale(${sx}, ${sy})`
+    card.classList.add('anim-moving')
+
+    // Force reflow
+    card.offsetHeight
+
+    // Animate to final position
+    requestAnimationFrame(() => {
+      card.style.transition = 'transform 0.6s cubic-bezier(0.4, 0, 0.2, 1)'
+      card.style.transform = 'translate(0, 0) scale(1)'
     })
-  }, [])
+
+    // Add return glow if returning to a known position
+    setLastPositions(prevLastPositions => {
+      const remembered = prevLastPositions[dn]?.[toSection]
+      if (remembered !== undefined) {
+        card.classList.add('return-glow')
+        setTimeout(() => card.classList.remove('return-glow'), 600)
+      }
+      return prevLastPositions
+    })
+
+    // Clean up after animation
+    const handleTransitionEnd = () => {
+      card.classList.remove('anim-moving')
+      card.style.transition = ''
+      card.style.transform = ''
+      setAnimatingCards(prev => {
+        const newSet = new Set(Array.from(prev))
+        newSet.delete(dn)
+        return newSet
+      })
+      card.removeEventListener('transitionend', handleTransitionEnd)
+      console.log(`✅ Animation completed for ${dn}`)
+    }
+
+    card.addEventListener('transitionend', handleTransitionEnd, { once: true })
+  }, [cardPositions])
 
   const getSectionKey = (section: string) => {
     switch (section) {
@@ -400,31 +419,25 @@ const CtiDashboard = () => {
       
       // If section changed, trigger FLIP animation
       if (previousSection && previousSection !== currentSection) {
-        //console.log(`🎬 Section change detected for ${dn} from ${previousSection} to ${currentSection}`)
-        
-        // Store the new position for this DN
-        setLastPositions(prev => {
-          const newPositions = { ...prev }
-          if (!newPositions[dn]) newPositions[dn] = {}
-          newPositions[dn][getSectionKey(currentSection)] = 0 // Will be updated with actual position
-          return newPositions
-        })
+        console.log(`🎬 Section change detected for ${dn} from ${previousSection} to ${currentSection}`)
         
         // Get the current position BEFORE React re-renders
         const card = document.querySelector(`[data-dn="${dn}"]`) as HTMLElement
         if (card) {
           const first = card.getBoundingClientRect()
-         // console.log(`📍 Storing first position for ${dn}:`, first)
+          console.log(`📍 Storing first position for ${dn}:`, first)
           
           // Store the position for the animation
           setCardPositions(prev => ({
             ...prev,
             [dn]: { x: first.left, y: first.top, width: first.width, height: first.height }
           }))
+          
+          // Queue animation to trigger after state updates
+          animationsToTrigger.push({ dn, fromSection: previousSection, toSection: currentSection })
+        } else {
+          console.log(`❌ Card not found for ${dn} during position capture`)
         }
-        
-        // Queue animation to trigger after state updates
-        animationsToTrigger.push({ dn, fromSection: previousSection, toSection: currentSection })
       }
     })
     
@@ -434,13 +447,13 @@ const CtiDashboard = () => {
       ...newPreviousSections
     }))
     
-    // Trigger animations after state updates
+    // Trigger animations after state updates with longer delay
     if (animationsToTrigger.length > 0) {
       setTimeout(() => {
         animationsToTrigger.forEach(({ dn, fromSection, toSection }) => {
           animateCardMove(dn, fromSection, toSection)
         })
-      }, 50)
+      }, 100) // Increased delay to ensure DOM is updated
     }
   }, [dnsMap, isInitialized, userAddress, hasActiveCalls, getDnCallState, activeMonitoring, animateCardMove, getSectionKey])
 
@@ -870,6 +883,43 @@ const CtiDashboard = () => {
       color: #6f42c1 !important; /* Purple for conference */
     }
     
+    /* FLIP Animation Styles */
+    .anim-moving {
+      z-index: 1000 !important;
+      pointer-events: none !important;
+    }
+    
+    .return-glow {
+      box-shadow: 0 0 20px rgba(255, 193, 7, 0.6) !important;
+      animation: returnGlow 0.6s ease-out;
+    }
+    
+    @keyframes returnGlow {
+      0% {
+        box-shadow: 0 0 20px rgba(255, 193, 7, 0.6);
+      }
+      100% {
+        box-shadow: 0 0 0 rgba(255, 193, 7, 0);
+      }
+    }
+    
+    /* Card transition styles */
+    .card-wrapper {
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    
+    .card-wrapper.animating {
+      transition: none !important;
+    }
+    
+    /* Smooth section transitions */
+    .section-container {
+      transition: all 0.3s ease;
+    }
+    
+    .section-container .row {
+      transition: all 0.3s ease;
+    }
     
   `
 
@@ -1534,6 +1584,9 @@ const CtiDashboard = () => {
                 </i>
                 {isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
               </Button>
+              
+              {/* Debug Animation Button */}
+
                     </div>
 
 
@@ -1752,7 +1805,7 @@ const CtiDashboard = () => {
 
                             console.log('callColor', callColor)
 
-                            const cardClasses = `card-wrapper position-relative`
+                            const cardClasses = `card-wrapper position-relative ${animatingCards.has(dn) ? 'animating' : ''}`
 
                             return (
                               <div key={dn} className="col-6 col-sm-4 col-md-3 col-lg-2 m-0 mb-3">
@@ -1760,7 +1813,7 @@ const CtiDashboard = () => {
                                   <div 
                                     className={`card text-white ${cls} shadow-sm position-relative mb-0 new-card-design ${
                                       cardAnimations[dn] ? `card-${cardAnimations[dn]}` : ''
-                                    } ${animatingCards.has(dn) ? 'animating' : ''}`}
+                                    }`}
                                     data-dn={dn}
                                     style={{
                                       ['--call-border-color' as string]: callColor,
@@ -1775,19 +1828,19 @@ const CtiDashboard = () => {
                                       <strong>EXT:</strong> <span>{dn}</span>
                                     </p>
 
-                                    {call?.parties && call?.parties.length > 0 && (
+                                    {/* {call?.parties && call?.parties.length > 0 && ( */}
+                                      <>
                                       <p>
-                                        <strong>From:</strong> <span>{call.parties[0].callingAddress}</span>
+                                        <strong>From:</strong> <span>{call?.parties[0]?.callingAddress || 'N/A'}</span>
                                       </p>
-                                    )}
-                                    {call?.parties && call?.parties.length > 0 && (
+                                   
                                       <p>
-                                        <strong>To:</strong> <span>{call.parties[0].calledAddress}</span>
+                                        <strong>To:</strong> <span>{call?.parties[0]?.calledAddress || 'N/A'}</span>
                                       </p>
-                                    )}
+                                      </>
+                                    {/* )} */}
 
-                                    
-                                    {active && call && (
+                                    {/* {active && call && (
                                           <p className="small mb-0" style={{ color: callColor, padding: '2px',fontWeight: 'bold',textTransform: 'uppercase' }}>
                                             {(() => {
                                             
@@ -1802,7 +1855,7 @@ const CtiDashboard = () => {
                                               return result
                                             })()}
                                           </p>
-                                        )}
+                                        )} */}
 
                                     </div>
                                     {/* Section 1: Information Section */}

@@ -1364,14 +1364,14 @@
         box-shadow: inset 0 0 10px rgba(0,0,0,0.03); 
 
         p {
-            margin: 4px 0; 
+            margin: 1px 0; 
             font-size: 0.7rem; 
             font-weight: 400; /* Lighter weight for detail */
             display: flex;
             align-items: center;
             width: 100%; 
             display: flex;
-            justify-content: space-around;
+            justify-content: space-between;
           }
         strong {
             font-weight: 500; 
