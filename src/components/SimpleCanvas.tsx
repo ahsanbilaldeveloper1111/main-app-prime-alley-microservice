@@ -80,8 +80,8 @@ const SimpleCanvas: React.FC<SimpleCanvasProps> = ({
                         </div> */}
 
                         <div className="sbox">
-                          <p className="text-muted mb-0 small">User Email</p>
-                          <h5><b>{rowData.email}</b></h5>
+                          <p className="text-muted mb-0 small">User Name</p>
+                          <h5><b style={{textTransform: 'none'}}>{rowData.username}</b></h5>
                         </div>
 
                         {/* <div className="sbox">
