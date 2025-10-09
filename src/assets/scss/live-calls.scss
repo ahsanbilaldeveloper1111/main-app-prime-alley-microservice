@@ -5,39 +5,39 @@
 /* Registered state - green theme */
 .card-wrapper .card.registered {
     //background: linear-gradient(135deg, #1de9b6 0%, #17ba92 100%);
-    background: #eaffeb !important;
-    border-color: #4CAF50 !important;
+   // background: #eaffeb !important;
+   // border-color: #4CAF50 !important;
 }
 
 .card.registered:hover {
     transform: translateY(-2px);
-    box-shadow: 0 6px 16px rgba(29, 233, 182, 0.4);
+   // box-shadow: 0 6px 16px rgba(29, 233, 182, 0.4);
     transition: all 0.3s ease;
 }
 
 /* Unregistered state - red theme */
 .card-wrapper .card.unregistered {
     //background: linear-gradient(135deg, #f44236 0%, #c3352b 100%);
-    background: #ffd7d7 !important;
-    border-color: #ef4444 !important;
+   // background: #ffd7d7 !important;
+   // border-color: #ef4444 !important;
 }
 
 .card.unregistered:hover {
     transform: translateY(-2px);
-    box-shadow: 0 6px 16px rgba(244, 66, 54, 0.4);
+    //box-shadow: 0 6px 16px rgba(244, 66, 54, 0.4);
     transition: all 0.3s ease;
 }
 
 /* Stale state - orange/warning theme */
 .card-wrapper .card.stale {
     //background: linear-gradient(135deg, #f4c22b 0%, #c39b22 100%);
-    background: #fff3de !important;
-    border-color: #f59e0b !important;
+    // background: #fff3de !important;
+    // border-color: #f59e0b !important;
 }
 
 .card.stale:hover {
     transform: translateY(-2px);
-    box-shadow: 0 6px 16px rgba(244, 194, 43, 0.4);
+   // box-shadow: 0 6px 16px rgba(244, 194, 43, 0.4);
     transition: all 0.3s ease;
 }
 
@@ -59,9 +59,9 @@
     overflow: hidden !important;
     overflow: hidden !important;
     color: black !important;
-    border-width: 3px !important;
-    border-color: transparent !important;  
-    border-style: solid !important;
+    // border-width: 3px !important;
+    // border-color: transparent !important;  
+    // border-style: solid !important;
 }
 
 .card.registered .card-body,
@@ -229,7 +229,7 @@
 /* New Card Design - Redesigned Layout */
 .card-wrapper  .new-card-design {
     background: #eaffeb !important;
-    border-color: #4CAF50 !important;
+    // border-color: #4CAF50 !important;
     display: flex;
     flex-direction: column;
     height: initial !important;
@@ -485,18 +485,18 @@
 
 /* Override card colors for new design */
 .new-card-design.registered {
-    background: #eaffeb !important;
-    border-color: #4CAF50 !important;
+    // background: #eaffeb !important;
+    // border-color: #4CAF50 !important;
 }
 
 .new-card-design.unregistered {
-    background: #ffd7d7 !important;
-    border-color: #ef4444 !important;
+   // background: #ffd7d7 !important;
+    //border-color: #ef4444 !important;
 }
 
 .new-card-design.stale {
-    background: #fff3de !important;
-    border-color: #f59e0b !important;
+    // background: #fff3de !important;
+    // border-color: #f59e0b !important;
 }
 
 /* Device icons (sit above overlay) */
@@ -1766,6 +1766,9 @@
 .card-wrapper  .card.new-card-design {
     background: linear-gradient(180deg, #d1edeca6, #47db6621) !important;
     border-radius: 8px !important;
-    border: 1px solid #e5e7eb !important;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.04) !important;
+    border-width:0px;
+    border-style: solid;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.04);
+
+    
 }

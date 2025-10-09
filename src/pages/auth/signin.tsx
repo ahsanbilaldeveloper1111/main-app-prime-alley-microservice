@@ -29,9 +29,12 @@ const Signin = () => {
     setLoading(true);
     setError('');
 
+    const credentialsEmail = credentials.email.split('@')[0];
+    const userEmail = credentialsEmail+process.env.NEXT_PUBLIC_DOMAIN;
+
     try {
       const result = await signIn('credentials', {
-        email: credentials.email,
+        email: userEmail,
         password: credentials.password,
         redirect: false,
         callbackUrl: callbackUrl ? decodeURIComponent(callbackUrl as string) : '/dashboard',
@@ -188,7 +191,7 @@ const Signin = () => {
                 <form className="login-form" id="loginForm" onSubmit={handleSubmit}>  
                     <div className="input-group">
                         <input 
-                        type="email" 
+                        type="text" 
                         id="email"
                         placeholder=" " 
                         required 

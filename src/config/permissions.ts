@@ -12,14 +12,9 @@ export interface RoutePermission {
 export const routePermissions: RoutePermission[] = [
     
     //profile services start
-    {
-        path: '/profile',
-        permissions: ['']
-    },
-    {
-        path: '/coming-soon',
-        permissions: ['']
-    },
+    {path: '/profile',permissions: ['']},
+    {path: '/coming-soon',permissions: ['']},
+    {path: '/plan-upgrade',permissions: ['']},
 
     //netops services start
     {

@@ -30,6 +30,7 @@ interface User {
     email: string;
     phone: string;
     ou: string;
+    username: string;
     department: string;
     company: string;
     last_synced_at: string;
@@ -629,8 +630,8 @@ const UserView = () => {
                                                     <h4 className="text-white mb-1 text-capitalize">{currentUser?.name}</h4>
 
 
-                                                    <p className="text-white mb-0 text-opacity">Email</p>
-                                                    <p className="text-white mb-2">{currentUser?.email}</p>
+                                                    <p className="text-white mb-0 text-opacity">User Name</p>
+                                                    <p className="text-white mb-2">{currentUser?.username}</p>
 
                                                    <hr className="theme-hr" />
 
@@ -1022,7 +1023,7 @@ const UserView = () => {
                                         .filter((user) => !linkedUsers.some(linkedUser => linkedUser.id === user.id))
                                         .map((user) => ({
                                     value: user.id,
-                                    label: `${user.name} (${user.email})`
+                                    label: `${user.name} (${user.username})`
                                     }))}
                                 />
                               </div>

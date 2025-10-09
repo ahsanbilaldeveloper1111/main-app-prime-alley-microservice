@@ -9,6 +9,8 @@ import AnimatedNumber from '@components/AnimatedNumber';
 import "@assets/scss/dashboard.scss";
 import "@assets/scss/common.scss";
 import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
+import { HEADER_CONSTANTS } from '@constants/headerConstants';
+const { BASE_URL, MENU_LABELS, SUBMENU_LABELS, ICONS, PERMISSIONS } = HEADER_CONSTANTS;
 
 interface Summary {
     online_agents: number;
@@ -61,41 +63,47 @@ const Dashboard = () => {
     }, [status, session]);
 
     const serviceCards = [
-        {
-            id: 'control-hub-services',
-            title: 'System Control',
-            // subtitle: 'System Control',
-            description: 'Centralized control and management of all system services and configurations.',
-            icon: <i className="ph-duotone ph-gear"></i>,
-            gradient: 'from-blue-500 to-indigo-600',
-            link: '/controlhub/users'
-        },
-        // {
-        //     id: 'gsm-services',
-        //     title: 'GSM Services',
-        //     // subtitle: 'GSM Services',
-        //     description: 'Comprehensive SMS management and messaging services for your business.',
-        //     icon: <i className="ph-duotone ph-phone"></i>,
-        //     gradient: 'from-green-500 to-emerald-600'
-        // },
+        
+      
         {
             id: 'call-logs-services',
-            title: 'Call Logs',
+            title: MENU_LABELS.CALL_HISTORY,
             // subtitle: 'Call Logs',
-            description: 'Track and manage all incoming and outgoing call activities.',
+            description: 'Monitor, record, and manage all incoming and outgoing call history and activity.',
             icon: <i className="ph-duotone ph-phone"></i>,
             gradient: 'from-purple-500 to-violet-600',
-            link: '/call-logs'
+            link: '/call-logs/dashboard'
         },
+        // {
+        //     id: 'call-recordings-services',
+        //     title: MENU_LABELS.CALL_RECORDINGS,
+        //     // subtitle: 'Voice Records',
+        //     description: 'Access and manage recorded calls for quality assurance and compliance.',
+        //     icon: <i className="ph-duotone ph-microphone"></i>,
+        //     gradient: 'from-orange-500 to-red-600',
+        //     link: '/call-recordings'
+        // },
         {
-            id: 'call-recordings-services',
-            title: 'Call Recordings',
-            // subtitle: 'Voice Records',
-            description: 'Access and manage recorded calls for quality assurance and compliance.',
-            icon: <i className="ph-duotone ph-microphone"></i>,
-            gradient: 'from-orange-500 to-red-600',
-            link: '/call-recordings'
+            id: 'health-care-services',
+            title: MENU_LABELS.NETOPS,
+            // subtitle: 'Accounts',
+            description: 'Track, monitor, and control all network operations seamlessly with NetOps',
+            icon: <i className="ph-duotone ph-brain"></i>,
+            gradient: 'from-pink-500 to-rose-600',
+            link: '/netops/dashboard'
         },
+       
+        {
+            id: 'gsm-services',
+            title: MENU_LABELS.SIM_GATEWAY,
+            // subtitle: 'GSM Services',
+            description: 'Comprehensive SMS management and messaging services for your business.',
+            icon: <i className="ph-duotone ph-phone"></i>,
+            gradient: 'from-green-500 to-emerald-600',
+            link: '/gsm/dashboard'
+        },
+        
+        
         // {
         //     id: 'ai-ml-services',
         //     title: 'Analytics',
@@ -112,15 +120,7 @@ const Dashboard = () => {
         //     icon: <i className="ph-duotone ph-phone"></i>,
         //     gradient: 'from-pink-500 to-rose-600'
         // },
-        // {
-        //     id: 'crm-services',
-        //     title: 'CRM',
-        //     // subtitle: 'Customer Relationship Management',
-        //     description: 'Customer details, history and touchpoints, always at hand.',
-        //     icon: <i className="ph-duotone ph-brain"></i>,
-        //     gradient: 'from-pink-500 to-rose-600',
-        //     link: '/crm'
-        // },
+        
         // {
         //     id: 'sales-services',
         //     title: 'Sales Management',
@@ -130,15 +130,7 @@ const Dashboard = () => {
         //     gradient: 'from-pink-500 to-rose-600',
         //     link: '/coming-soon'
         // },
-        // {
-        //     id: 'cti-services',
-        //     title: 'Live Calls',
-        //     // subtitle: 'Computer Telephony Integration',
-        //     description: 'Connect your calls with applications for quick access and context.',
-        //     icon: <i className="ph-duotone ph-brain"></i>,
-        //     gradient: 'from-pink-500 to-rose-600',
-        //     link: '/cti'
-        // },
+       
         // {
         //     id: 'dncr-servicess',
         //     title: 'Do Not Call Registry',
@@ -177,13 +169,33 @@ const Dashboard = () => {
         // },
         {
             id: 'accounts-servicess',
-            title: 'Billing',
+            title: MENU_LABELS.BILLING,
             // subtitle: 'Accounts',
             description: 'Manage your accounts, payroll, and benefits with ease.',
             icon: <i className="ph-duotone ph-brain"></i>,
             gradient: 'from-pink-500 to-rose-600',
             link: '/accounts'
         },
+        {
+            id: 'crm-servicess',
+            title: MENU_LABELS.CRM,
+            // subtitle: 'Customer Relationship Management',
+            description: 'Instant access to customer profiles, interaction history, and key touch points, all in one place.',
+            icon: <i className="ph-duotone ph-brain"></i>,
+            gradient: 'from-pink-500 to-rose-600',
+            link: '/crm/dashboard'
+        },
+         {
+            id: 'cti-servicess',
+            title: MENU_LABELS.LIVE_CALLS,
+            // subtitle: 'Computer Telephony Integration',
+            description: 'Connect calls with external applications for quick access and context.',
+            icon: <i className="ph-duotone ph-brain"></i>,
+            gradient: 'from-pink-500 to-rose-600',
+            link: '/cti'
+        },
+      
+        
         
         
     ];
@@ -364,7 +376,7 @@ const Dashboard = () => {
 
                     {/* Action Button */}
                     <div className="text-left mt-3">
-                        <Link href="!#" className={` locked-btn`}
+                        <Link href="plan-upgrade" className={` locked-btn`}
                             >
                             
                             Upgrade to Unlock

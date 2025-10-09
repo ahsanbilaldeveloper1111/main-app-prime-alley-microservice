@@ -107,7 +107,7 @@ const Users = () => {
           }
         },
 
-        { key: 'Email', name: 'email', selector: (row: any) => row.email, sortable: true },
+        // { key: 'Email', name: 'email', selector: (row: any) => row.email, sortable: true },
         
         
         // ...(session?.user?.permissions?.includes('show-ou-users') ? [

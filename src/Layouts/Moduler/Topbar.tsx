@@ -42,8 +42,9 @@ const TopBar = ({ handleOffcanvasToggle, changeThemeMode, toogleSidebarHide, too
       };
 
     
-    const [loggedInUserName, setLoggedInUserName] = useState('');
-    const [loggedInUserEmail, setLoggedInUserEmail] = useState('');
+    const [loggedInName, setLoggedInName] = useState('');
+    const [loggedInUserRole, setLoggedInUserRole] = useState('');
+    const [loggedInUserUsername, setLoggedInUserUsername] = useState('');
     const [isMobileSidebarActive, setIsMobileSidebarActive] = useState(false);
     const [phoneNumber, setPhoneNumber] = useState('');
     const [isDialpadOpen, setIsDialpadOpen] = useState(false);
@@ -51,8 +52,9 @@ const TopBar = ({ handleOffcanvasToggle, changeThemeMode, toogleSidebarHide, too
     useEffect(() => {
         if (status !=="loading" && session) {
           if (typeof window !== "undefined") {
-            setLoggedInUserName(session.user.name || '');
-            setLoggedInUserEmail(session.user.email || '');
+            setLoggedInName(session.user.name || '');
+            setLoggedInUserUsername(session.user.username || '');
+            setLoggedInUserRole(session.user.role || '');
           }
         }
       }, [ status, session]);
@@ -411,8 +413,8 @@ const TopBar = ({ handleOffcanvasToggle, changeThemeMode, toogleSidebarHide, too
                                     aria-expanded="false" 
                                     style={{ border: "none" }}>
                                     <div className="text-capitalize d-flex align-items-center">
-                                        <span className="user-avtar bg rounded-circle text-white" style={{ width: "30px", height: "30px", lineHeight: "30px", display: "inline-block", marginRight: "5px",backgroundColor: "#2c4661" }}>{loggedInUserName.split(' ')[0][0]}</span>
-                                        {loggedInUserName}
+                                        <span className="user-avtar bg rounded-circle text-white" style={{ width: "30px", height: "30px", lineHeight: "30px", display: "inline-block", marginRight: "5px",backgroundColor: "#2c4661" }}>{loggedInName.split(' ')[0][0]}</span>
+                                        {loggedInName}
                                         <FiChevronDown size={24}  />
                                     </div>
                                 </Dropdown.Toggle>
@@ -427,8 +429,16 @@ const TopBar = ({ handleOffcanvasToggle, changeThemeMode, toogleSidebarHide, too
                                                             <Image src={avatar2} alt="user-image" width={50} className="wid-50 rounded-circle" />
                                                         </div>
                                                         <div className="flex-grow-1 mx-3">
-                                                            <h5 className="mb-0 text-capitalize">{loggedInUserName}</h5>
-                                                            <div className="link-primary" >{loggedInUserEmail}</div>
+                                                            <h5 className="mb-0 text-capitalize">{loggedInName}</h5>
+                                                            <div className="link-primary" >
+                                                                {loggedInUserRole !== '' ? (
+                                                                    <span className="status-badge primary mt-1 small">{loggedInUserRole}</span>
+                                                                ) : (
+                                                                    <span className="status-badge primary mt-1 small">{loggedInUserUsername}</span>
+                                                                )}
+
+
+                                                                </div>
                                                         </div>
                                                         {/* <span className="badge bg-primary">PRO</span> */}
                                                     </div>

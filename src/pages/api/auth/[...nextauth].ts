@@ -38,6 +38,7 @@ declare module 'next-auth' {
       id?: string | null;
       name?: string | null;
       email?: string | null;
+      username?: string | null;
       is_admin?: string | null;
       phone?: string | null;
       role?: string | null;
@@ -69,6 +70,7 @@ declare module 'next-auth' {
   interface User {
     name?: string | null;
     email?: string | null;
+    username?: string | null;
     role?: string | null;
     is_admin?: string | null;
     phone?: string | null;
@@ -146,6 +148,7 @@ export const authOptions: NextAuthOptions = {
             id: jsonData.data?.id,
             name: jsonData.data?.name,
             email: jsonData.data?.email,
+            username: jsonData.data?.username,
             role: jsonData.data?.role,
             phone: jsonData.data?.phone,
             is_admin: jsonData.data?.is_admin || null,
@@ -191,6 +194,7 @@ export const authOptions: NextAuthOptions = {
         token.id = user.id;
         token.name = user.name;
         token.email = user.email;
+        token.username = user.username;
         token.is_admin = user.is_admin;
         token.phone = user.phone;
         token.role = user.role;
@@ -214,6 +218,7 @@ export const authOptions: NextAuthOptions = {
         session.user.id = token.id as string | null;
         session.user.name = token.name as string | null;
         session.user.email = token.email as string | null;
+        session.user.username = token.username as string | null;
         session.user.role = token.role as string | null;
         session.user.is_admin = token.is_admin as string | null;
         session.user.phone = token.phone as string | null;

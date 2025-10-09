@@ -1,33 +1,25 @@
 import React, { ReactElement, useEffect, useState, useCallback, useRef } from 'react'
 import Layout from '@layout/index'
 import BreadcrumbItem from '@common/BreadcrumbItem'
-import { Button, Card, Col, Form, Modal, Row, Dropdown, Overlay, Popover } from 'react-bootstrap'
+import { Button, Card, Col, Form, Modal, Row, Dropdown } from 'react-bootstrap'
 import DeviceSelectionModal from '../../components/DeviceSelectionModal'
-import { DashboardData } from '@utils/GsmManagement'
 import { toast } from 'react-toastify'
-import imgStatus1 from '@assets/images/widget/img-status-1.svg'
-import imgStatus2 from '@assets/images/widget/img-status-2.svg'
-import imgStatus4 from '@assets/images/widget/img-status-4.svg'
+import UserDummyImage from '@assets/images/user-dummy.jpg'
 import '@assets/scss/gsm-dashboard.scss'
-import AnimatedNumber from '@components/AnimatedNumber'
 import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid'
 import moment from 'moment'
 import useCtiStomp from '../../hooks/useCtiStomp'
+import useGlobalCallTimer from '../../hooks/useGlobalCallTimer'
 import dynamic from 'next/dynamic'
-import { ApexOptions } from 'apexcharts'
-import { set } from 'nprogress'
+
 import Link from 'next/link'
 import { clearAllLocalStorage, getLocalStorageInfo } from '../../utils/localStorageUtils'
 import { useSession } from 'next-auth/react';
 import { startMonitoring, stopMonitoring as stopMonitoringAPI, startBargeInMonitoring, stopBargeInMonitoring as stopBargeInMonitoringAPI } from '@utils/dialer'
 
-
 import '@assets/scss/common.scss';
-import '@assets/scss/cti-dashboard.scss';
+import '@assets/scss/live-calls.scss';
 
-
-const baseUrl = ''
-const ReactApexChart = dynamic(() => import('react-apexcharts'), { ssr: false })
 
 interface CtiDevice {
   dn: string
@@ -40,6 +32,22 @@ interface CtiDevice {
 interface DnData {
   dn: string
   devices: Record<string, CtiDevice>
+}
+
+// CallTimer component for displaying elapsed time
+const CallTimer: React.FC<{ dn: string; isActive: boolean }> = ({ dn, isActive }) => {
+  const { elapsedTime, isRunning } = useGlobalCallTimer(dn, isActive)
+  
+  // Debug logging
+  console.log('CallTimer render:', { dn, isActive, elapsedTime, isRunning })
+  
+  if (!isActive) {
+    return null
+  }
+
+  return (
+    <p className={`call-timer ${isRunning ? 'running' : ''}`}>{elapsedTime}</p>
+  )
 }
 
 const CtiDashboard = () => {
@@ -80,6 +88,32 @@ const CtiDashboard = () => {
   // Animation state management
   const [cardAnimations, setCardAnimations] = useState<{ [dn: string]: 'adding' | null }>({})
   const [previousSections, setPreviousSections] = useState<{ [dn: string]: string }>({})
+  
+  // FLIP Animation state
+  const [animatingCards, setAnimatingCards] = useState<Set<string>>(new Set())
+  const [cardPositions, setCardPositions] = useState<{ [dn: string]: { x: number; y: number; width: number; height: number } }>({})
+  const [lastPositions, setLastPositions] = useState<{ [dn: string]: { [section: string]: number } }>({})
+  
+  // Initialize previous sections when data is first loaded
+  useEffect(() => {
+    if (isInitialized && dnsMap && Object.keys(previousSections).length === 0) {
+      const dnsList = Object.values(dnsMap).filter(({ dn }) => dn !== userAddress)
+      const initialSections: { [dn: string]: string } = {}
+      
+      dnsList.forEach(({ dn, devices }) => {
+        const deviceList = Object.values(devices || {})
+        const call = getDnCallState(dn)
+        const active = hasActiveCalls(dn)
+        const section = categorizeDns(dn, deviceList, call, active)
+        initialSections[dn] = section
+      })
+      
+      setPreviousSections(initialSections)
+    }
+  }, [isInitialized, dnsMap, userAddress, getDnCallState, hasActiveCalls, previousSections])
+  
+  // Fullscreen state
+  const [isFullscreen, setIsFullscreen] = useState(false)
 
   // Popover handlers
   const handlePopoverToggle = (dn: string) => {
@@ -232,6 +266,125 @@ const CtiDashboard = () => {
     }
   }
 
+  // FLIP Animation functions
+  const animateCardMove = useCallback((dn: string, fromSection: string, toSection: string) => {
+    console.log(`🎭 Starting FLIP animation for ${dn} from ${fromSection} to ${toSection}`)
+    
+    // Get the stored first position
+    const first = cardPositions[dn]
+    if (!first) {
+      console.log(`❌ No stored position for ${dn}`)
+      return
+    }
+
+    console.log(`📍 Using stored first position:`, first)
+
+    // Mark as animating
+    setAnimatingCards(prev => new Set(Array.from(prev).concat(dn)))
+
+    // Get the card in its new position
+    const card = document.querySelector(`[data-dn="${dn}"]`) as HTMLElement
+    if (!card) {
+      console.log(`❌ Card not found for ${dn}`)
+      setAnimatingCards(prev => {
+        const newSet = new Set(Array.from(prev))
+        newSet.delete(dn)
+        return newSet
+      })
+      return
+    }
+
+    const last = card.getBoundingClientRect()
+    console.log(`📍 Last position:`, last)
+
+    // Calculate the difference
+    const dx = first.x - last.left
+    const dy = first.y - last.top
+    const sx = first.width / last.width
+    const sy = first.height / last.height
+
+    console.log(`📐 Transform: translate(${dx}px, ${dy}px) scale(${sx}, ${sy})`)
+
+    // Apply the FLIP animation
+    card.style.transition = 'none'
+    card.style.transform = `translate(${dx}px, ${dy}px) scale(${sx}, ${sy})`
+    card.classList.add('anim-moving')
+
+    // Force reflow
+    card.offsetHeight
+
+    // Animate to final position
+    requestAnimationFrame(() => {
+      card.style.transition = 'transform 0.6s cubic-bezier(0.4, 0, 0.2, 1)'
+      card.style.transform = 'translate(0, 0) scale(1)'
+    })
+
+    // Add return glow if returning to a known position
+    setLastPositions(prevLastPositions => {
+      const remembered = prevLastPositions[dn]?.[toSection]
+      if (remembered !== undefined) {
+        card.classList.add('return-glow')
+        setTimeout(() => card.classList.remove('return-glow'), 600)
+      }
+      return prevLastPositions
+    })
+
+    // Clean up after animation
+    const handleTransitionEnd = () => {
+      card.classList.remove('anim-moving')
+      card.style.transition = ''
+      card.style.transform = ''
+      setAnimatingCards(prev => {
+        const newSet = new Set(Array.from(prev))
+        newSet.delete(dn)
+        return newSet
+      })
+      card.removeEventListener('transitionend', handleTransitionEnd)
+      console.log(`✅ Animation completed for ${dn}`)
+    }
+
+    card.addEventListener('transitionend', handleTransitionEnd, { once: true })
+  }, [cardPositions])
+
+  const getSectionKey = (section: string) => {
+    switch (section) {
+      case 'supervision': return 'supervision'
+      case 'onCall': return 'oncall'
+      case 'activeIdle': return 'online'
+      case 'downOffline': return 'offline'
+      default: return 'offline'
+    }
+  }
+
+  // Fullscreen functionality
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      // Enter fullscreen
+      document.documentElement.requestFullscreen().then(() => {
+        setIsFullscreen(true)
+      }).catch((err) => {
+        console.error('Error attempting to enable fullscreen:', err)
+      })
+    } else {
+      // Exit fullscreen
+      document.exitFullscreen().then(() => {
+        setIsFullscreen(false)
+      }).catch((err) => {
+        console.error('Error attempting to exit fullscreen:', err)
+      })
+    }
+  }
+
+  // Listen for fullscreen changes
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement)
+    }
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange)
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange)
+  }, [])
+
 
 
   // Check for restored call states on component mount
@@ -246,11 +399,13 @@ const CtiDashboard = () => {
     }
   }, [])
 
-  // Handle card animations when moving between sections
+  // Handle FLIP animations when cards change sections
   useEffect(() => {
     if (!isInitialized || !dnsMap) return
 
     const dnsList = Object.values(dnsMap).filter(({ dn }) => dn !== userAddress)
+    const newPreviousSections: { [dn: string]: string } = {}
+    const animationsToTrigger: Array<{ dn: string; fromSection: string; toSection: string }> = []
     
     dnsList.forEach(({ dn, devices }) => {
       const deviceList = Object.values(devices || {})
@@ -259,29 +414,48 @@ const CtiDashboard = () => {
       const currentSection = categorizeDns(dn, deviceList, call, active)
       const previousSection = previousSections[dn]
       
-      // If section changed, trigger fade-in animation
-      if (previousSection && previousSection !== currentSection) {
-        setCardAnimations(prev => ({
-          ...prev,
-          [dn]: 'adding'
-        }))
-        
-        // Clear animation after it completes
-        setTimeout(() => {
-          setCardAnimations(prev => ({
-            ...prev,
-            [dn]: null
-          }))
-        }, 500) // Match animation duration
-      }
+      // Store the new section for this DN
+      newPreviousSections[dn] = currentSection
       
-      // Update previous section
-      setPreviousSections(prev => ({
-        ...prev,
-        [dn]: currentSection
-      }))
+      // If section changed, trigger FLIP animation
+      if (previousSection && previousSection !== currentSection) {
+        console.log(`🎬 Section change detected for ${dn} from ${previousSection} to ${currentSection}`)
+        
+        // Get the current position BEFORE React re-renders
+        const card = document.querySelector(`[data-dn="${dn}"]`) as HTMLElement
+        if (card) {
+          const first = card.getBoundingClientRect()
+          console.log(`📍 Storing first position for ${dn}:`, first)
+          
+          // Store the position for the animation
+          setCardPositions(prev => ({
+            ...prev,
+            [dn]: { x: first.left, y: first.top, width: first.width, height: first.height }
+          }))
+          
+          // Queue animation to trigger after state updates
+          animationsToTrigger.push({ dn, fromSection: previousSection, toSection: currentSection })
+        } else {
+          console.log(`❌ Card not found for ${dn} during position capture`)
+        }
+      }
     })
-  }, [dnsMap, isInitialized, userAddress, hasActiveCalls, getDnCallState, activeMonitoring])
+    
+    // Update all previous sections in one batch
+    setPreviousSections(prev => ({
+      ...prev,
+      ...newPreviousSections
+    }))
+    
+    // Trigger animations after state updates with longer delay
+    if (animationsToTrigger.length > 0) {
+      setTimeout(() => {
+        animationsToTrigger.forEach(({ dn, fromSection, toSection }) => {
+          animateCardMove(dn, fromSection, toSection)
+        })
+      }, 100) // Increased delay to ensure DOM is updated
+    }
+  }, [dnsMap, isInitialized, userAddress, hasActiveCalls, getDnCallState, activeMonitoring, animateCardMove, getSectionKey])
 
 
   // Clear CTI call states on page load
@@ -291,9 +465,9 @@ const CtiDashboard = () => {
         // Clear specific CTI call states
         localStorage.removeItem('cti_call_states')
         localStorage.removeItem('cti_call_states_timestamp')
-        console.log('🧹 Cleared CTI call states on page load')
+        //console.log('🧹 Cleared CTI call states on page load')
       } catch (error) {
-        console.error('Error clearing CTI call states:', error)
+        console.error('Error clearing call states:', error)
       }
     }
 
@@ -683,6 +857,71 @@ const CtiDashboard = () => {
       outline: none;
       box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
     }
+    
+    /* Call Status Color Styles */
+    .call-status-calling {
+      color: #d97706 !important; /* Orange for calling/ringing */
+    }
+    
+    .call-status-connected {
+      color: #059669 !important; /* Green for connected */
+    }
+    
+    .call-status-held {
+      color: #2563eb !important; /* Blue for held */
+    }
+    
+    .call-status-incoming {
+      color: #dc2626 !important; /* Red for incoming */
+    }
+    
+    .call-status-outgoing {
+      color: #d97706 !important; /* Orange for outgoing */
+    }
+    
+    .call-status-conference {
+      color: #6f42c1 !important; /* Purple for conference */
+    }
+    
+    /* FLIP Animation Styles */
+    .anim-moving {
+      z-index: 1000 !important;
+      pointer-events: none !important;
+      border-width: 3px !important;
+    }
+    
+    .return-glow {
+      box-shadow: 0 0 20px rgba(255, 193, 7, 0.6) !important;
+      animation: returnGlow 0.6s ease-out;
+    }
+    
+    @keyframes returnGlow {
+      0% {
+        box-shadow: 0 0 20px rgba(255, 193, 7, 0.6);
+      }
+      100% {
+        box-shadow: 0 0 0 rgba(255, 193, 7, 0);
+      }
+    }
+    
+    /* Card transition styles */
+    .card-wrapper {
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    
+    .card-wrapper.animating {
+      transition: none !important;
+    }
+    
+    /* Smooth section transitions */
+    .section-container {
+      transition: all 0.3s ease;
+    }
+    
+    .section-container .row {
+      transition: all 0.3s ease;
+    }
+    
   `
 
   // Effects
@@ -730,14 +969,14 @@ const CtiDashboard = () => {
 
   useEffect(() => {
     if (eventLog && eventLog.length > 0) {
-      console.log('=== CTI Event Log ===')
-      eventLog.forEach((event, index) => {
-        console.log(`Event ${index + 1}:`, event)
-        console.log('Event Type:', event.type || 'Unknown')
-        console.log('Event Data:', event.data || event)
-        console.log('Timestamp:', event.timestamp || new Date().toISOString())
-        console.log('---')
-      })
+      // console.log('=== CTI Event Log ===')
+      // eventLog.forEach((event, index) => {
+      //   console.log(`Event ${index + 1}:`, event)
+      //   console.log('Event Type:', event.type || 'Unknown')
+      //   console.log('Event Data:', event.data || event)
+      //   console.log('Timestamp:', event.timestamp || new Date().toISOString())
+      //   console.log('---')
+      // })
     }
   }, [eventLog])
 
@@ -1184,6 +1423,9 @@ const CtiDashboard = () => {
 
   const getColor = (state: string, conf: boolean, isOneToOne: boolean, role: string, parties: any[] = [], dn: string, terminalState: string) => {
     if (conf && !isOneToOne) return '#6f42c1'
+
+    // Handle HELD state directly if no parties or if state is already HELD
+    if (state === 'HELD') return '#2563eb'
     
     const filtered = parties.filter((p: any) => p.callingAddress === dn || p.calledAddress === dn)
     if (!filtered.length) {
@@ -1221,16 +1463,19 @@ const CtiDashboard = () => {
         : state
 
     return {
-      RINGING: role === 'calling' ? 'red' : 'green',
-      ANSWERED: 'green',
-      CONNECTED: 'green',
-      RETRIEVED: 'green',
-      HELD: 'white'
+      RINGING: role === 'calling' ? '#d97706' : '#dc2626', // calling: orange, incoming: red
+      ANSWERED: '#059669', // connected: green
+      CONNECTED: '#059669', // connected: green
+      RETRIEVED: '#059669', // connected: green
+      HELD: '#2563eb' // held: blue
     }[effectiveState as keyof typeof getColor] || '#6c757d'
   }
 
   const getText = (state: string, isConference: boolean, isOneToOne: boolean, parties: any[] = [], dn: string) => {
-    if (isConference && !isOneToOne) return 'Call in Progress'
+    if (isConference && !isOneToOne) return 'Conference'
+    
+    // Handle HELD state directly if no parties or if state is already HELD
+    if (state === 'HELD') return 'On Hold'
     
     const filtered = parties.filter((p: any) => p.callingAddress === dn || p.calledAddress === dn)
     if (!filtered.length) return dn
@@ -1249,12 +1494,29 @@ const CtiDashboard = () => {
     const isCaller = activeParty.callingAddress === dn
     const isCallee = activeParty.calledAddress === dn
     
-    return {
+    // Debug logging
+    // console.log('getText debug:', {
+    //   state,
+    //   effectiveState,
+    //   isConference,
+    //   isOneToOne,
+    //   parties: parties.length,
+    //   dn,
+    //   activeParty: activeParty?.callStatus
+    // })
+    
+    const stateMap = {
       RINGING: isCaller ? 'Calling' : isCallee ? 'Incoming' : effectiveState,
       ANSWERED: isCaller ? 'Outgoing' : isCallee ? 'CONNECTED' : effectiveState,
       RETRIEVED: isCaller ? 'Outgoing' : isCallee ? 'CONNECTED' : effectiveState,
-      HELD: 'On Hold'
-    }[effectiveState as keyof typeof getText] || effectiveState
+      HELD: 'On Hold',
+      CONNECTED: isCaller ? 'Outgoing' : isCallee ? 'Connected' : effectiveState,
+      ON_HOLD: 'On Hold'
+    }
+    
+    const result = stateMap[effectiveState as keyof typeof stateMap] || effectiveState
+   // console.log('getText result:', result, 'for state:', effectiveState)
+    return result
   }
 
 
@@ -1297,7 +1559,7 @@ const CtiDashboard = () => {
 
                     <Col md={7} className="d-flex justify-content-end">
                       
-                    <div className="action-buttons">
+                    <div className="action-buttons d-flex gap-2">
                        
                     {session?.user?.permissions?.includes('dial-call-cti') && (
               <Link 
@@ -1310,6 +1572,22 @@ const CtiDashboard = () => {
                 Dialer
               </Link>
               )}
+              
+              <Button
+                variant="info"
+                size="sm"
+                onClick={toggleFullscreen}
+                className="d-flex align-items-center"
+                title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
+              >
+                <i className="material-icons-two-tone me-2" style={{ backgroundColor: '#fff' }}>
+                  {isFullscreen ? 'fullscreen_exit' : 'fullscreen'}
+                </i>
+                {isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
+              </Button>
+              
+              {/* Debug Animation Button */}
+
                     </div>
 
 
@@ -1322,157 +1600,91 @@ const CtiDashboard = () => {
             </Col>
             </Row>
 
-      {/* Debug Information */}
-      {showDebugInfo && (
-        <Row className="mb-3">
-          <Col md={12}>
-            <div className="card">
-              <div className="card-header">
-                <h6 className="mb-0">
-                  <i className="material-icons-two-tone me-2">bug_report</i>
-                  Debug Information - Call State Persistence
-                </h6>
-              </div>
-              <div className="card-body">
-                <Row>
-                  <Col md={6}>
-                    <h6>LocalStorage Call States</h6>
-                    {(() => {
-                      const info = getLocalStorageInfo()
-                      return (
-                        <div>
-                          <p><strong>Total Keys:</strong> {info.totalKeys}</p>
-                          <p><strong>CTI Keys:</strong> {info.ctiKeys}</p>
-                          <p><strong>App Keys:</strong> {info.appKeys}</p>
-                          <p><strong>Total Size:</strong> {info.totalSize}</p>
-                          <Button
-                            variant="outline-danger"
-                            size="sm"
-                            onClick={clearLocalStorageCallStates}
-                            className="mt-2"
-                          >
-                            <i className="material-icons-two-tone me-2">clear</i>
-                            Clear All LocalStorage
-                          </Button>
-                          <Button
-                            variant="outline-primary"
-                            size="sm"
-                            onClick={syncPersistedCallStates}
-                            className="mt-2 ms-2"
-                            disabled={!isInitialized}
-                          >
-                            <i className="material-icons-two-tone me-2">sync</i>
-                            Sync with Server
-                          </Button>
-                        </div>
-                      )
-                    })()}
-                  </Col>
-                  <Col md={6}>
-                    <h6>Current Call States</h6>
-                    <p><strong>Active Calls:</strong> {Object.keys(eventLog.filter(e => e.type === 'call-events')).length}</p>
-                    <p><strong>Total Events:</strong> {eventLog.length}</p>
-                    <p><strong>Last Event:</strong> {eventLog.length > 0 ? new Date(eventLog[eventLog.length - 1]?.timestamp || Date.now()).toLocaleString() : 'None'}</p>
-                    <p><strong>Restored from Storage:</strong> {restoredCallStates}</p>
-                  </Col>
-                </Row>
-                {(() => {
-                  const info = getLocalStorageCallStatesInfo()
-                  if (info.data && Object.keys(info.data).length > 0) {
-                    return (
-                      <Row className="mt-3">
-                        <Col md={12}>
-                          <h6>Persisted Call Details</h6>
-                          <div className="table-responsive">
-                              <table className="table table-sm">
-                              <thead>
-                                <tr>
-                                  <th>Call ID</th>
-                                  <th>Event Type</th>
-                                  <th>Parties</th>
-                                  <th>Status</th>
-                                  <th>Time</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {Object.entries(info.data).map(([callId, callEvent]: [string, any]) => (
-                                  <tr key={callId}>
-                                    <td><code>{callId.substring(0, 8)}...</code></td>
-                                    <td>{callEvent.eventType || callEvent.currentState}</td>
-                                    <td>
-                                      {callEvent.parties?.map((p: any, idx: number) => (
-                                        <div key={idx} className="small">
-                                          {p.callingAddress} → {p.calledAddress} ({p.callStatus})
-                                        </div>
-                                      ))}
-                                    </td>
-                                    <td>
-                                      <span className={`badge ${
-                                        callEvent.isTerminating ? 'bg-danger' : 'bg-success'
-                                      }`}>
-                                        {callEvent.isTerminating ? 'Terminated' : 'Active'}
-                                      </span>
-                                    </td>
-                                    <td>{new Date(callEvent.eventTime).toLocaleTimeString()}</td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          </div>
-                        </Col>
-                      </Row>
-                    )
-                  }
-                  return null
-                })()}
-              </div>
-            </div>
-          </Col>
-        </Row>
-      )}
+     
 
 
        {/* CTI Summary Cards */}
-       <PageSummaryGrid 
+       {/* <PageSummaryGrid 
          cards={[
            {
-             id: 'total-gsms-count',
-             title: 'Extensions',
+             id: 'total-extensions',
+             title: 'Total Extensions',
              value: summaryData.extensions,
-             description: 'Total extensions in the system',
+             description: 'All extensions in the system',
              delay: 0.1,
              animationDuration: 1000,
              fontStyle: 'style-2'
            },
+          //  {
+          //    id: 'in-supervision',
+          //    title: 'In Supervision',
+          //    value: (() => {
+          //      const dnsList = Object.values(dnsMap).filter(({ dn }) => dn !== userAddress)
+          //      return dnsList.filter(({ dn, devices }) => {
+          //        const deviceList = Object.values(devices || {})
+          //        const call = getDnCallState(dn)
+          //        const active = hasActiveCalls(dn)
+          //        return categorizeDns(dn, deviceList, call, active) === 'supervision'
+          //      }).length
+          //    })(),
+          //    description: 'Extensions being monitored',
+          //    delay: 0.2,
+          //    animationDuration: 1000,
+          //    fontStyle: 'style-2'
+          //  },
            {
-             id: 'assigned-gsms-count',
-             title: 'Online',
-             value: summaryData.online,
-             description: 'Online devices',
+             id: 'on-call',
+             title: 'On Call',
+             value: (() => {
+               const dnsList = Object.values(dnsMap).filter(({ dn }) => dn !== userAddress)
+               return dnsList.filter(({ dn, devices }) => {
+                 const deviceList = Object.values(devices || {})
+                 const call = getDnCallState(dn)
+                 const active = hasActiveCalls(dn)
+                 return categorizeDns(dn, deviceList, call, active) === 'onCall'
+               }).length
+             })(),
+             description: 'Extensions with active calls',
              delay: 0.3,
              animationDuration: 1000,
              fontStyle: 'style-2'
            },
            {
-             id: 'unassigned-gsms-count',
-             title: 'On Hold',
-             value: summaryData.on_hold,
-             description: 'On hold devices',
-             delay: 0.5,
+             id: 'active-idle',
+             title: 'Active/Idle',
+             value: (() => {
+               const dnsList = Object.values(dnsMap).filter(({ dn }) => dn !== userAddress)
+               return dnsList.filter(({ dn, devices }) => {
+                 const deviceList = Object.values(devices || {})
+                 const call = getDnCallState(dn)
+                 const active = hasActiveCalls(dn)
+                 return categorizeDns(dn, deviceList, call, active) === 'activeIdle'
+               }).length
+             })(),
+             description: 'Online and available extensions',
+             delay: 0.4,
              animationDuration: 1000,
              fontStyle: 'style-2'
            },
            {
-             id: 'total-ports-count',
-             title: 'Connected',
-             value: summaryData.connected,
-             description: 'Connected devices',
-             delay: 0.7,
+             id: 'down-offline',
+             title: 'Down/Offline',
+             value: (() => {
+               const dnsList = Object.values(dnsMap).filter(({ dn }) => dn !== userAddress)
+               return dnsList.filter(({ dn, devices }) => {
+                 const deviceList = Object.values(devices || {})
+                 const call = getDnCallState(dn)
+                 const active = hasActiveCalls(dn)
+                 return categorizeDns(dn, deviceList, call, active) === 'downOffline'
+               }).length
+             })(),
+             description: 'Offline or down extensions',
+             delay: 0.5,
              animationDuration: 1000,
              fontStyle: 'style-2'
            }
          ]}
-       />
+       /> */}
 
 
 
@@ -1496,31 +1708,9 @@ const CtiDashboard = () => {
       {/* CTI Table */}
       <Row className="mt-3">
         <Col md={12}>
-          <div className="card">
-            <div className="card-header">
-              <h5>
-                <i className="material-icons-two-tone me-2">table_chart</i>
-                Live View 
-              </h5>
-            </div>
-            <div className="card-body p-0">
-              <div className="container-fluid pt-3 pb-3">
+        <div className="container-fluid pt-3 pb-3">
                 {(() => {
-                  // Helper function to get section color (defined locally for IIFE scope)
-                  const getSectionColor = (section: string) => {
-                    switch (section) {
-                      case 'supervision':
-                        return '#ffc107' // Amber for supervision
-                      case 'onCall':
-                        return '#dc3545' // Red for active calls
-                      case 'activeIdle':
-                        return '#28a745' // Green for active/idle
-                      case 'downOffline':
-                        return '#6c757d' // Gray for down/offline
-                      default:
-                        return '#6c757d'
-                    }
-                  }
+                  // Use the global getSectionColor function
 
                   // Group DNs by sections
                   const dnsList = Object.values(dnsMap).filter(({ dn }) => dn !== userAddress)
@@ -1548,18 +1738,47 @@ const CtiDashboard = () => {
                     const hasContent = sectionDns.length > 0
 
                     return (
-                      <div key={sectionKey} className="mb-4" data-section={sectionKey}>
-                        <div className="d-flex align-items-center mb-2">
-                          <i className="material-icons-two-tone me-2" style={{ fontSize: '1.5rem', color: getSectionColor(sectionKey) }}>
-                            {getSectionIcon(sectionKey)}
-                          </i>
-                          <h6 className="mb-0 app-title-heading mb-1" style={{ color: getSectionColor(sectionKey) }}>{getSectionTitle(sectionKey)}</h6>
-                          <span className="badge ms-2" style={{ backgroundColor: getSectionColor(sectionKey) }}>{sectionDns.length}</span>
+                      <div key={sectionKey} className="mb-3 section-card-header" data-section={sectionKey} style={{ borderColor: getSectionColor(sectionKey) }}>
+                        <div className="d-flex align-items-center justify-content-between card-header-top-section">
+                          <div className="d-flex align-items-center">
+                            <i className="material-icons-two-tone me-2" style={{ fontSize: '1.5rem' }}>
+                              {getSectionIcon(sectionKey)}
+                            </i>
+                            <h6 className="mb-0 app-title-heading">{getSectionTitle(sectionKey)}</h6>
+                          </div>
+                           <span className="badge" style={{ backgroundColor: getSectionColor(sectionKey) }}>{sectionDns.length}</span>
                         </div>
-                        <div className={`section-container2 ${hasContent ? 'has-content' : ''}`} data-section={sectionKey}>
+                        {/* Progress Bar */}
+                        
+                        
+                        {sectionDns.length > 0 && (
+                          <>
+                          <div className="progress-container">
+                          <div className="progress" style={{ height: '6px', backgroundColor: '#e9ecef' }}>
+                            <div 
+                              className="progress-bar" 
+                              role="progressbar" 
+                              style={{ 
+                                width: `${summaryData.extensions > 0 ? (sectionDns.length / summaryData.extensions) * 100 : 0}%`,
+                                backgroundColor: getSectionColor(sectionKey),
+                                transition: 'width 0.3s ease'
+                              }}
+                              aria-valuenow={sectionDns.length}
+                              aria-valuemin={0}
+                              aria-valuemax={summaryData.extensions}
+                            ></div>
+                          </div>
+                        </div>
+                          </>
+                        )}
+                        
+                        <div className={`card-body-section ${hasContent ? 'has-content' : ''}`} data-section={sectionKey}>
                           {hasContent ? (
                             <div className="row g-3 justify-content-left align-items-left m-0">
                           {sectionDns.map(({ dn, devices: deviceList, call, active }) => {
+
+
+                          
                             const cls = getCardLevelStatus(deviceList)
                             const callColor = active && call ? getColor(
                               call.currentState || '',
@@ -1569,9 +1788,11 @@ const CtiDashboard = () => {
                               call.parties || [],
                               dn,
                               cls
-                            ) : '#6b7280'
+                            ) : 'black'
 
-                            const cardClasses = `card-wrapper position-relative`
+                            console.log('callColor', callColor)
+
+                            const cardClasses = `card-wrapper position-relative ${animatingCards.has(dn) ? 'animating' : ''}`
 
                             return (
                               <div key={dn} className="col-6 col-sm-4 col-md-3 col-lg-2 m-0 mb-3">
@@ -1580,126 +1801,100 @@ const CtiDashboard = () => {
                                     className={`card text-white ${cls} shadow-sm position-relative mb-0 new-card-design ${
                                       cardAnimations[dn] ? `card-${cardAnimations[dn]}` : ''
                                     }`}
+                                    data-dn={dn}
                                     style={{
-                                      ['--call-border-color' as string]: callColor,
-                                      ['--call-shadow-color' as string]: `${callColor}40`,
+                                      borderColor: getSectionColor(sectionKey),
+                                      boxShadow: `${getSectionColor(sectionKey)}40`,
                                       height: '100%',
                                       minHeight: '140px'
                                     }}
                                   >
                                     {/* Hover Overlay */}
                                     <div className="card-hover-overlay">
-                                      <div className="overlay-content">
-                                        {/* <i className="material-icons-two-tone overlay-icon">business</i> */}
-                                        <span className="company-name">Prime Alley Technology</span>
-                                      </div>
+                                    <p>
+                                      <strong>EXT:</strong> <span>{dn}</span>
+                                    </p>
+
+                                    {/* {call?.parties && call?.parties.length > 0 && ( */}
+                                      <>
+                                      <p>
+                                        <strong>From:</strong> <span>{call?.parties[0]?.callingAddress || 'N/A'}</span>
+                                      </p>
+                                   
+                                      <p>
+                                        <strong>To:</strong> <span>{call?.parties[0]?.calledAddress || 'N/A'}</span>
+                                      </p>
+                                      </>
+                                    {/* )} */}
+
+                                    {/* {active && call && (
+                                          <p className="small mb-0" style={{ color: callColor, padding: '2px',fontWeight: 'bold',textTransform: 'uppercase' }}>
+                                            {(() => {
+                                            
+                                              const result = getText(
+                                                call.currentState || '',
+                                                call.isConference || false,
+                                                call.isOneToOne || false,
+                                                call.parties || [],
+                                                dn
+                                              )
+                                              
+                                              return result
+                                            })()}
+                                          </p>
+                                        )} */}
+
                                     </div>
                                     {/* Section 1: Information Section */}
                                     <div className="card-info-section">
                                       <div className="user-avatar">
-                                        <i className="material-icons-two-tone">account_circle</i>
+                                        <img src={UserDummyImage.src} alt="User" />
                                       </div>
                                       <div className="user-info">
                                         <h6 className="extension-number" title={dn}>{dn}</h6>
                                         <p className="user-name">User name</p>
                                         <p className="status-text">
-                                          {cls === 'registered'
-                                            ? 'Online'
-                                            : cls === 'unregistered'
-                                              ? 'Offline'
-                                              : 'Stale'
-                                          }
+                                          <span className="status-indicator" style={{ display: 'inline-block',width: '10px', height: '10px',borderRadius: '50%',marginRight: '5px',backgroundColor: getSectionColor(sectionKey) }}></span>
+                                        {getSectionTitle(sectionKey)}
                                         </p>
-                                        {active && call && (
-                                          <p className="small mb-0" style={{ color: callColor }}>
-                                            {getText(
-                                              call.currentState || '',
-                                              call.isConference || false,
-                                              call.isOneToOne || false,
-                                              call.parties || [],
-                                              dn
-                                            )}
-                                          </p>
-                                        )}
                                       </div>
-                                      <div className="card-actions">
+                                      {/* <div className="card-actions">
                                         <div 
                                           ref={(el) => { popoverRefs.current[dn] = el }}
                                           className="more-options"
                                           onClick={() => handlePopoverToggle(dn)}
                                         >
                                           <i className="material-icons-two-tone">more_vert</i>
-                                        </div>
+                                          </div>
+                                         
                                         
-                                        <Overlay
-                                          show={activePopover === dn}
-                                          target={popoverRefs.current[dn]}
-                                          placement="bottom-end"
-                                          rootClose
-                                          onHide={handlePopoverHide}
-                                        >
-                                          <Popover className="action-menu-popover">
-                                            <Popover.Body className="p-0">
-                                              <div className="action-menu">
-                                                <span className="dropdown-section-title">Monitor Type</span>
-                                                <button 
-                                                  className="dropdown-item disabled" 
-                                                  title="Monitoring available when DN is in a call" 
-                                                  disabled
-                                                >
-                                                  Silent
-                                                </button>
-                                                <button 
-                                                  className="dropdown-item disabled" 
-                                                  title="Monitoring available when DN is in a call" 
-                                                  disabled
-                                                >
-                                                  Whisper
-                                                </button>
-                                                <button 
-                                                  className="dropdown-item disabled" 
-                                                  title="Monitoring available when DN is in a call" 
-                                                  disabled
-                                                >
-                                                  Barge In
-                                                </button>
-                                                <hr className="dropdown-divider" />
-                                                <span className="dropdown-section-title">Tone</span>
-                                                <button 
-                                                  className="dropdown-item disabled" 
-                                                  title="Monitoring available when DN is in a call" 
-                                                  disabled
-                                                >
-                                                  No Tone
-                                                </button>
-                                                <button 
-                                                  className="dropdown-item disabled" 
-                                                  title="Monitoring available when DN is in a call" 
-                                                  disabled
-                                                >
-                                                  Notify Me
-                                                </button>
-                                                <button 
-                                                  className="dropdown-item disabled" 
-                                                  title="Monitoring available when DN is in a call" 
-                                                  disabled
-                                                >
-                                                  Notify Agent
-                                                </button>
-                                                <button 
-                                                  className="dropdown-item disabled" 
-                                                  title="Monitoring available when DN is in a call" 
-                                                  disabled
-                                                >
-                                                  Notify Both
-                                                </button>
-                                                <div className="dropdown-caption">Monitoring available when DN is in a call</div>
-                                              </div>
-                                            </Popover.Body>
-                                          </Popover>
-                                        </Overlay>
-                                      </div>
+                                      </div> */}
                                     </div>
+
+                                    {active && call && (
+                                    <div className="card-timer-section" style={{ color: callColor }}>
+                                   
+                                          <p className=" mb-0">
+                                            {(() => {
+                                            
+                                              const result = getText(
+                                                call.currentState || '',
+                                                call.isConference || false,
+                                                call.isOneToOne || false,
+                                                call.parties || [],
+                                                dn
+                                              )
+                                              
+                                              return result
+                                            })()}
+                                          </p>
+                                       
+                                        <CallTimer 
+                                          dn={dn}
+                                          isActive={active && call ? true : false} 
+                                        />
+                                    </div>
+                                     )}
 
                                     {/* Section 2: Device Dropdown Section */}
                                     {/* <div className="device-dropdown-section">
@@ -1815,8 +2010,6 @@ const CtiDashboard = () => {
                   </div>
                 )}
               </div>
-            </div>
-          </div>
         </Col>
       </Row>
 
