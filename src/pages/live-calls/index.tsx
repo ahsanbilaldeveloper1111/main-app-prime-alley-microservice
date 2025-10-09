@@ -18,7 +18,7 @@ import { useSession } from 'next-auth/react';
 import { startMonitoring, stopMonitoring as stopMonitoringAPI, startBargeInMonitoring, stopBargeInMonitoring as stopBargeInMonitoringAPI } from '@utils/dialer'
 
 import '@assets/scss/common.scss';
-import '@assets/scss/cti-dashboard.scss';
+import '@assets/scss/live-calls.scss';
 
 
 interface CtiDevice {
@@ -887,6 +887,7 @@ const CtiDashboard = () => {
     .anim-moving {
       z-index: 1000 !important;
       pointer-events: none !important;
+      border-width: 3px !important;
     }
     
     .return-glow {
@@ -1709,21 +1710,7 @@ const CtiDashboard = () => {
         <Col md={12}>
         <div className="container-fluid pt-3 pb-3">
                 {(() => {
-                  // Helper function to get section color (defined locally for IIFE scope)
-                  const getSectionColor = (section: string) => {
-                    switch (section) {
-                      case 'supervision':
-                        return '#ffc107' // Amber for supervision
-                      case 'onCall':
-                        return '#dc3545' // Red for active calls
-                      case 'activeIdle':
-                        return '#28a745' // Green for active/idle
-                      case 'downOffline':
-                        return '#6c757d' // Gray for down/offline
-                      default:
-                        return '#6c757d'
-                    }
-                  }
+                  // Use the global getSectionColor function
 
                   // Group DNs by sections
                   const dnsList = Object.values(dnsMap).filter(({ dn }) => dn !== userAddress)
@@ -1816,8 +1803,8 @@ const CtiDashboard = () => {
                                     }`}
                                     data-dn={dn}
                                     style={{
-                                      ['--call-border-color' as string]: callColor,
-                                      ['--call-shadow-color' as string]: `${callColor}40`,
+                                      borderColor: getSectionColor(sectionKey),
+                                      boxShadow: `${getSectionColor(sectionKey)}40`,
                                       height: '100%',
                                       minHeight: '140px'
                                     }}
