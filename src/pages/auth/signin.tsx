@@ -93,7 +93,7 @@ const Signin = () => {
             <Head>
                 <title>Sign In - Business Contact Center</title>
             </Head>
-            <Script 
+            {/* <Script 
                 src="https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js"
                 strategy="afterInteractive"
                 onLoad={() => {
@@ -168,7 +168,7 @@ const Signin = () => {
                         });
                     }
                 }}
-            />
+            /> */}
             <div id="particles-js"></div>
     <div className="login-main-container">
         <header className="login-info-panel">
