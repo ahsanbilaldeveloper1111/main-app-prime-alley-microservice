@@ -1315,8 +1315,23 @@ const CtiDashboard = () => {
                                     onClick={() => {
                                       if (isDeviceActiveCall) {
                                         console.log('Opening popup for:', dn, deviceName)
+                                        // Clear any existing selections for this DN
+                                        setSelectedMonitor((prev) => {
+                                          const newState = { ...prev }
+                                          delete newState[dn]
+                                          return newState
+                                        })
+                                        setTempMonitorSelection((prev) => {
+                                          const newState = { ...prev }
+                                          delete newState[dn]
+                                          return newState
+                                        })
+                                        setSelectedTone((prev) => {
+                                          const newState = { ...prev }
+                                          delete newState[dn]
+                                          return newState
+                                        })
                                         setShowPopup({ dn: dn, deviceName })
-                                        handleMonitorSelect(dn, 'SILENT', Object.values(dnsMap[dn]?.devices || {}))
                                       } else if (terminalState === 'STALE') {
                                         console.log('Device is STALE, popup disabled')
                                       } else {
@@ -1437,7 +1452,6 @@ const CtiDashboard = () => {
                     <Button
                       variant={selectedMonitor[showPopup.dn] === 'WHISPER' ? 'primary' : 'outline-primary'}
                       disabled={
-                        (tempMonitorSelection[showPopup.dn] && tempMonitorSelection[showPopup.dn] !== 'WHISPER') ||
                         !isDnInActiveCall(showPopup.dn)
                       }
                       onClick={() =>
