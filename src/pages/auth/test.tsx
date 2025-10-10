@@ -205,7 +205,7 @@ const Signin = () => {
         <div id="particles-js"></div>
 
          {/* Session Loading Overlay */}
-         {sessionLoading && status !== "authenticated" && (
+         {sessionLoading || status !== "authenticated" && (
            <div className="session-loading-overlay">
              <div className="session-loading-content">
                <div className="session-loading-spinner">
