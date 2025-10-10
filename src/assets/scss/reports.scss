@@ -1,0 +1,194 @@
+ /* --- 1. PALETTE & CORE STYLES (Sleek/Professional) --- */
+ :root{
+    --bg-light:#f9fafb; /* Very light background */
+    --card-light:#ffffff;
+    
+    --text-primary:#1e293b; /* Deep Charcoal Blue */
+    --muted:#64748b;
+    --subtle-border:#e5e7eb; /* Lighter, less intrusive border */
+    
+    /* Subtle Shadow for Modern Look */
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.05);
+    --shadow-hover: 0 10px 30px rgba(0,0,0,0.1); /* Slightly more pronounced lift */
+    
+    --card-border:var(--subtle-border); 
+    --radius:16px; 
+    --ease:cubic-bezier(.2,.9,.2,1);
+
+    /* Accent Colors */
+    --accent-blue: #2563eb; 
+    --accent-green: #059669; 
+    --accent-yellow: #d97706; 
+  }
+  
+  /* --- 2. GLOBAL & STICKY STYLES --- */
+  *{box-sizing:border-box}
+  body{
+   
+  }
+  .dashboard{max-width:1600px;margin:0 auto;display:flex;flex-direction:column;gap:50px} /* Increased overall gap */
+  .control-bar-sticky {
+      position: sticky; top: 0; z-index: 1000; padding-bottom: 25px; 
+      background: linear-gradient(180deg, var(--bg-light) 80%, rgba(249, 250, 251, 0) 100%);
+  }
+  .control-bar{
+    display:flex;align-items:center;justify-content:space-between;
+    background:var(--card-light);padding:20px 30px;border-radius:var(--radius);
+    box-shadow:var(--shadow-sm);
+    border: 1px solid var(--subtle-border);
+    width: 100%;
+  }
+  .control-bar h1{
+    margin:0;
+    font-size:30px; 
+    font-weight:700; 
+    letter-spacing: -0.8px; 
+    display:flex;align-items:center;gap:12px;
+  }
+  .control-right{
+    display:flex;
+    align-items:center;
+    gap: 15px; 
+  }
+
+  /* Action Button Styling */
+  .action-btn {
+    background: none;
+    border: 1px solid var(--subtle-border);
+    cursor: pointer;
+    padding: 8px 10px;
+    border-radius: 10px;
+    color: var(--muted);
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    height: 40px; 
+  }
+  .action-btn:hover {
+    background: #f1f5f9;
+    color: var(--text-primary);
+    border-color: #cbd5e1;
+  }
+  .action-btn .material-icons {
+    font-size: 24px;
+  }
+  
+  /* Search Container */
+  .search-container{position: relative;width: 280px;}
+  .search-container input{
+    width: 100%;padding: 10px 10px 10px 40px;border: 1px solid var(--subtle-border);
+    border-radius: 10px;font-size: 16px;background-color: #fefefe;
+    color: var(--text-primary);transition: all 0.2s ease;
+    height: 40px; 
+  }
+  .search-container input:focus{border-color: var(--accent-blue);box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);outline: none;}
+  .search-container .material-icons{position: absolute;left: 10px;top: 50%;transform: translateY(-50%);color: var(--muted);font-size: 24px;}
+  
+  /* --- 4. SECTIONS & HEADERS --- */
+  .dashboard-section{
+    background:var(--card-light);
+    border-radius:var(--radius);
+    box-shadow:var(--shadow-sm);
+    border: 1px solid var(--subtle-border);
+    padding:40px; /* Increased overall section padding */
+  }
+  .section-header{
+    display:flex;align-items:center;gap:12px;
+    font-weight:700; 
+    font-size:24px; 
+    letter-spacing: -0.5px;
+    padding-bottom:20px; /* Increased padding below header */
+    margin-bottom:15px; /* Increased margin below separator */
+    color:var(--text-primary);
+    border-bottom:2px solid #f1f5f9; 
+  }
+  .section-header .material-icons {color: var(--muted); font-size: 28px;}
+  
+
+  
+  /* --- 5. REPORT CARD STYLES --- */
+  .report-card {
+    display: block; 
+    text-decoration: none;
+    background: var(--card-light);
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-sm);
+    padding: 30px; /* Increased card internal padding */
+    transition: all 0.2s var(--ease);
+    color: var(--text-primary);
+    min-height: 17rem; /* Ensure a minimum card height */
+    margin-bottom: 1.3rem;
+  }
+
+  .report-card:hover {
+    transform: translateY(-5px); /* Increased hover lift */
+    box-shadow: var(--shadow-hover);
+    border-color: var(--accent-blue); 
+  }
+
+  .report-header {
+    display: flex;
+    align-items: center;
+    gap: 18px; /* Increased gap in header */
+    margin-bottom: 20px; /* Increased margin below header */
+    border-bottom: none; /* Removed internal border to keep card clean */
+    padding-bottom: 0;
+  }
+
+  .report-icon {
+    font-size: 2rem; /* Slightly larger icon */
+    background-color: var(--accent-blue);
+    line-height: 1;
+  }
+
+  .report-title {
+    font-size: 1.2rem; /* Slightly larger title */
+    font-weight: 800;
+    margin: 0;
+    line-height: 1.2;
+    letter-spacing: 0;
+  }
+ 
+  .report-description {
+    font-size: 16px; /* Slightly larger, more readable description */
+    color: var(--muted);
+    margin-bottom: 30px; /* Increased margin below description */
+    line-height: 1.5; /* Increased line height for readability */
+    min-height: 60px; 
+  }
+
+  .report-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 20px; /* Increased padding above divider */
+    border-top: 1px solid var(--subtle-border);
+  }
+
+  .meta-item {
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+  .meta-item span {
+    display: block;
+    font-weight: 400;
+    color: var(--muted);
+    text-transform: none;
+    margin-top: 3px;
+  }
+
+  .view-button {
+    background: var(--accent-blue);
+    color: var(--card-light);
+    padding: 10px 20px; /* Increased button size */
+    border-radius: 8px;
+    font-weight: 600;
+    transition: background 0.2s ease;
+  }
+  .view-button:hover {
+    background: #1d4ed8; 
+  }

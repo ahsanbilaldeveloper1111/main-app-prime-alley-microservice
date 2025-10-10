@@ -16,6 +16,8 @@ export const routePermissions: RoutePermission[] = [
     {path: '/coming-soon',permissions: ['']},
     {path: '/plan-upgrade',permissions: ['']},
 
+    {path: '/reports',permissions: [PERMISSIONS.REPORTS_SERVICES]},
+
     //netops services start
     {
         path: '/netops',

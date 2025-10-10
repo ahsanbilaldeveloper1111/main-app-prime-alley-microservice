@@ -558,6 +558,8 @@ const Header = ({ themeMode }: HeaderProps) => {
         icon: string;
         label: string;
         target: string;
+        isMain: boolean;
+        url: string;
     }
 
     interface SubmenuItem {
@@ -583,14 +585,18 @@ const Header = ({ themeMode }: HeaderProps) => {
             permission: PERMISSIONS.CRM_SERVICES,
             icon: ICONS.CRM,
             label: MENU_LABELS.CRM,
-            target: '#pc-tab-7'
+            target: '#pc-tab-7',
+            isMain:false,
+            url: ''
         },
         {
             key: 'cti',
             permission: PERMISSIONS.CTI_SERVICES,
             icon: ICONS.LIVE_CALLS,
             label: MENU_LABELS.LIVE_CALLS,
-            target: '#pc-tab-9'
+            target: '#pc-tab-9',
+            isMain:false,
+            url: ''
         },
         // {
         //     key: 'call-logs',
@@ -611,7 +617,9 @@ const Header = ({ themeMode }: HeaderProps) => {
                 permission: PERMISSIONS.CALL_HISTORY_SERVICES,
                 icon: ICONS.CALL_HISTORY,
                 label: MENU_LABELS.CALL_HISTORY,
-                target: '#pc-tab-2'
+                target: '#pc-tab-2',
+                isMain:false,
+                url: ''
             },
 
         {
@@ -619,7 +627,9 @@ const Header = ({ themeMode }: HeaderProps) => {
             permission: PERMISSIONS.REPORTS_SERVICES,
             icon: ICONS.REPORTS,
             label: MENU_LABELS.REPORTS,
-            target: '#pc-tab-5'
+            target: '',
+            isMain:true,
+            url: '/reports'
         },
         
         {
@@ -627,21 +637,27 @@ const Header = ({ themeMode }: HeaderProps) => {
             permission: PERMISSIONS.AI_ML_SERVICES,
             icon: ICONS.AI_INSIGHTS,
             label: MENU_LABELS.AI_INSIGHTS,
-            target: '#pc-tab-4'
+            target: '#pc-tab-4',
+            isMain:false,
+            url: ''
         },
         {
             key: 'dncr',
             permission: PERMISSIONS.DNCR_SERVICES,
             icon: ICONS.DNCR,
             label: MENU_LABELS.DNCR,
-            target: '#pc-tab-10'
+            target: '#pc-tab-10',
+            isMain:false,
+            url: ''
         },
         {
             key: 'accounts',
             permission: 'accounts-services',
             icon: 'ph-duotone ph-link',
             label: 'Billing',
-            target: '#pc-tab-15'
+            target: '#pc-tab-15',
+            isMain:false,
+            url: ''
         },
         
         {
@@ -649,28 +665,36 @@ const Header = ({ themeMode }: HeaderProps) => {
             permission: PERMISSIONS.TICKETS_SERVICES,
             icon: ICONS.TICKETS,
             label: MENU_LABELS.TICKETS,
-            target: '#pc-tab-14'
+            target: '#pc-tab-14',
+            isMain:false,
+            url: ''
         },
         {
             key: 'gsm',
             permission: PERMISSIONS.GSM_SERVICES,
             icon: ICONS.SIM_GATEWAY,
             label: MENU_LABELS.SIM_GATEWAY,
-            target: '#pc-tab-1'
+            target: '#pc-tab-1',
+            isMain:false,
+            url: ''
         },
         {
             key: 'tms',
             permission: PERMISSIONS.TMS_SERVICES,
             icon: ICONS.AUTOMATION,
             label: MENU_LABELS.AUTOMATION,
-            target: '#pc-tab-6'
+            target: '#pc-tab-6',
+            isMain:false,
+            url: ''
         },
         {
             key: 'netops',
             permission: PERMISSIONS.NETOPS_SERVICES,
             icon: ICONS.NETOPS,
             label: MENU_LABELS.NETOPS,
-            target: '#pc-tab-16'
+            target: '#pc-tab-16',
+            isMain:false,
+            url: ''
         },
 
         {
@@ -678,7 +702,9 @@ const Header = ({ themeMode }: HeaderProps) => {
             permission: PERMISSIONS.CONTROL_HUB_SERVICES,
             icon: ICONS.CONTROL_HUB,
             label: MENU_LABELS.CONTROL_HUB,
-            target: '#pc-tab-controlhub'
+            target: '#pc-tab-controlhub',
+            isMain:false,
+            url: ''
         },
        
     
@@ -1534,25 +1560,44 @@ const Header = ({ themeMode }: HeaderProps) => {
                                             {navigationItems.map((item) => {
                                                 // Special handling for Accounts and NetOps - show if user has any permissions or is admin
                                                 const shouldShow =  session?.user?.permissions?.includes(item.permission);
-                                                
-                                                return shouldShow && (
-                                                    <li key={item.key} className="pc-item nav-item" role="presentation">
-                                                <Link 
-                                                            className={`pc-link nav-link${router.asPath.includes(item.key) ? ' active' : ''}`} 
-                                                    href="#!" 
-                                                            id={`pc-tab-link-${item.key}`} 
-                                                            data-bs-target={item.target} 
-                                                    role="tab" 
-                                                    data-bs-toggle="tab" 
-                                                    aria-selected="false"
-                                                >
-                                                <span className="pc-micon">
-                                                                <i className={item.icon}></i>
-                                                </span>
-                                                            <span className="pc-mtext">{item.label}</span>
-                                        </Link>
-                                    </li>
-                                                );
+
+                                                if (!shouldShow) return null;
+
+                                                if (item.isMain === true) {
+                                                    return (
+                                                        <li key={item.key} className="pc-item nav-item NoTab">
+                                                            <Link 
+                                                                className={`pc-link nav-link${router.asPath.includes(item.key) ? ' active' : ''}`} 
+                                                                href={`${BASE_URL}${item.url}`} 
+                                                                id={`pc-tab-link-${item.key}`} 
+                                                            >
+                                                                <span className="pc-micon">
+                                                                    <i className={item.icon}></i>
+                                                                </span>
+                                                                <span className="pc-mtext">{item.label}</span>
+                                                            </Link>
+                                                        </li>
+                                                    );
+                                                } else {
+                                                    return (
+                                                        <li key={item.key} className="pc-item nav-item" role="presentation">
+                                                            <Link 
+                                                                className={`pc-link nav-link${router.asPath.includes(item.key) ? ' active' : ''}`} 
+                                                                href="#!" 
+                                                                id={`pc-tab-link-${item.key}`} 
+                                                                data-bs-target={item.target} 
+                                                                role="tab" 
+                                                                data-bs-toggle="tab" 
+                                                                aria-selected="false"
+                                                            >
+                                                                <span className="pc-micon">
+                                                                    <i className={item.icon}></i>
+                                                                </span>
+                                                                <span className="pc-mtext">{item.label}</span>
+                                                            </Link>
+                                                        </li>
+                                                    );
+                                                }
                                             })}
                                 </ul>
                                         

@@ -376,7 +376,7 @@ const Dashboard = () => {
 
                     {/* Action Button */}
                     <div className="text-left mt-3">
-                        <Link href="plan-upgrade" className={` locked-btn`}
+                        <Link href="plan-upgrade" className="btn app-button btn-primary d-inline-block"
                             >
                             
                             Upgrade to Unlock
@@ -404,7 +404,7 @@ const Dashboard = () => {
             <div className="card-body">
                 <h5 className="card-title">Community Support</h5>
                 <p>Join our community to get help from other users.</p>
-                <Link href="!#" className='btn btn-primary'>Visit Community</Link>
+                <Link href="!#" className='btn btn-primary app-button d-inline-block'>Visit Community</Link>
             </div>
         </div>
     </div>
@@ -414,7 +414,7 @@ const Dashboard = () => {
             <div className="card-body">
                 <h5 className="card-title">Knowledge Base</h5>
                 <p>Find answers to common questions and tutorials.</p>
-                <Link href="!#" className='btn btn-primary'>Visit Knowledge Base</Link>
+                <Link href="!#" className='btn btn-primary app-button d-inline-block'>Visit Knowledge Base</Link>
             </div>
         </div>
     </div>
