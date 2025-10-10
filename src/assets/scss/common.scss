@@ -466,6 +466,26 @@
         box-shadow: none;
     }
 
+    &.btn-default {
+        background-image: linear-gradient(135deg, var(--card-bg), var(--card-bg));
+        color: #000;
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+    }
+    &.btn-default:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.55);
+    }
+    &.btn-default:disabled {
+        background: var(--light-text);
+        cursor: not-allowed;
+        transform: none;
+        box-shadow: none;
+    }
+
+
+
+
+
     &.btn-outline-primary {
         background-color: var(--card-bg);
         color: var(--main-text);

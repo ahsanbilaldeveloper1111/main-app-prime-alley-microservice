@@ -1,4 +1,4 @@
-import React, { ReactElement, useEffect, useState, useCallback, useRef } from 'react'
+import React, { ReactElement, useEffect, useState, useCallback, useRef, useMemo, useLayoutEffect } from 'react'
 import Layout from '@layout/index'
 import BreadcrumbItem from '@common/BreadcrumbItem'
 import { Button, Card, Col, Form, Modal, Row, Dropdown } from 'react-bootstrap'
@@ -19,6 +19,7 @@ import { startMonitoring, stopMonitoring as stopMonitoringAPI, startBargeInMonit
 
 import '@assets/scss/common.scss';
 import '@assets/scss/live-calls.scss';
+import { FiX } from 'react-icons/fi'
 
 
 interface CtiDevice {
@@ -39,7 +40,7 @@ const CallTimer: React.FC<{ dn: string; isActive: boolean }> = ({ dn, isActive }
   const { elapsedTime, isRunning } = useGlobalCallTimer(dn, isActive)
   
   // Debug logging
-  console.log('CallTimer render:', { dn, isActive, elapsedTime, isRunning })
+  //console.log('CallTimer render:', { dn, isActive, elapsedTime, isRunning })
   
   if (!isActive) {
     return null
@@ -50,7 +51,7 @@ const CallTimer: React.FC<{ dn: string; isActive: boolean }> = ({ dn, isActive }
   )
 }
 
-const CtiDashboard = () => {
+const LiveCallDashboard = () => {
   const { data:session, status } = useSession();
   const {
     summaryData,
@@ -94,9 +95,47 @@ const CtiDashboard = () => {
   const [cardPositions, setCardPositions] = useState<{ [dn: string]: { x: number; y: number; width: number; height: number } }>({})
   const [lastPositions, setLastPositions] = useState<{ [dn: string]: { [section: string]: number } }>({})
   
+  // Use ref to store card positions to avoid dependency issues
+  const cardPositionsRef = useRef<{ [dn: string]: { x: number; y: number; width: number; height: number } }>({})
+  
+  // Use ref to track previous sections to avoid infinite loops
+  const previousSectionsRef = useRef<{ [dn: string]: string }>({})
+  
+  // Helper functions
+  const getCardLevelStatus = (devices: CtiDevice[]) => {
+    if (!devices || devices.length === 0) return 'unregistered'
+    if (devices.some(d => d.terminalState === 'REGISTERED')) return 'registered'
+    if (devices.some(d => d.terminalState === 'STALE')) return 'stale'
+    return 'unregistered'
+  }
+
+  // Helper function to categorize DNs into sections
+  const categorizeDns = (dn: string, devices: CtiDevice[], call: any, active: boolean) => {
+    const cls = getCardLevelStatus(devices)
+    
+    // Check if DN is being monitored (In Supervision)
+    if (activeMonitoring.dn === dn && activeMonitoring.type && activeMonitoring.deviceName) {
+      return 'supervision'
+    }
+    
+    // Check if DN has active calls (On Call)
+    if (active && call) {
+      return 'onCall'
+    }
+    
+    // Check device status (Active/Idle vs Down/Offline)
+    if (cls === 'registered') {
+      return 'activeIdle'
+    } else if (cls === 'unregistered' || cls === 'stale') {
+      return 'downOffline'
+    }
+    
+    return 'downOffline' // Default fallback
+  }
+  
   // Initialize previous sections when data is first loaded
   useEffect(() => {
-    if (isInitialized && dnsMap && Object.keys(previousSections).length === 0) {
+    if (isInitialized && dnsMap && Object.keys(previousSectionsRef.current).length === 0) {
       const dnsList = Object.values(dnsMap).filter(({ dn }) => dn !== userAddress)
       const initialSections: { [dn: string]: string } = {}
       
@@ -108,9 +147,9 @@ const CtiDashboard = () => {
         initialSections[dn] = section
       })
       
-      setPreviousSections(initialSections)
+      previousSectionsRef.current = initialSections
     }
-  }, [isInitialized, dnsMap, userAddress, getDnCallState, hasActiveCalls, previousSections])
+  }, [isInitialized, dnsMap, userAddress, getDnCallState, hasActiveCalls])
   
   // Fullscreen state
   const [isFullscreen, setIsFullscreen] = useState(false)
@@ -183,30 +222,6 @@ const CtiDashboard = () => {
     return activeMonitoring.dn && activeMonitoring.type && activeMonitoring.deviceName ? 1 : 0
   }
 
-  // Helper function to categorize DNs into sections
-  const categorizeDns = (dn: string, devices: CtiDevice[], call: any, active: boolean) => {
-    const cls = getCardLevelStatus(devices)
-    
-    // Check if DN is being monitored (In Supervision)
-    if (activeMonitoring.dn === dn && activeMonitoring.type && activeMonitoring.deviceName) {
-      return 'supervision'
-    }
-    
-    // Check if DN has active calls (On Call)
-    if (active && call) {
-      return 'onCall'
-    }
-    
-    // Check device status (Active/Idle vs Down/Offline)
-    if (cls === 'registered') {
-      return 'activeIdle'
-    } else if (cls === 'unregistered' || cls === 'stale') {
-      return 'downOffline'
-    }
-    
-    return 'downOffline' // Default fallback
-  }
-
   // Helper function to get section title
   const getSectionTitle = (section: string) => {
     switch (section) {
@@ -266,24 +281,53 @@ const CtiDashboard = () => {
     }
   }
 
-  // FLIP Animation functions
+  // FLIP Animation functions - Exact copy from reference code
   const animateCardMove = useCallback((dn: string, fromSection: string, toSection: string) => {
     console.log(`Starting FLIP animation for ${dn} from ${fromSection} to ${toSection}`)
     
-    // Get the stored first position
-    const first = cardPositions[dn]
+    // Get the stored BEFORE position from ref
+    const first = cardPositionsRef.current[dn]
     if (!first) {
-      console.log(`No stored position for ${dn}`)
+      console.log(`No stored BEFORE position for ${dn}`)
+      return
+    }
+    
+    console.log(`Using stored BEFORE position for ${dn}:`, first)
+
+    // Get the card in its new position
+    const card = document.querySelector(`[data-dn="${dn}"]`) as HTMLElement
+    if (!card) {
+      console.log(`Card not found for ${dn} during animation`)
       return
     }
 
     // Mark as animating
     setAnimatingCards(prev => new Set(Array.from(prev).concat(dn)))
 
-    // Get the card in its new position
-    const card = document.querySelector(`[data-dn="${dn}"]`) as HTMLElement
-    if (!card) {
-  
+    console.log(`Found card for ${dn} during animation:`, card)
+    
+    // Get the LAST position (where the card is now after DOM update)
+    const lastRect = card.getBoundingClientRect()
+    const last = {
+      x: lastRect.left,
+      y: lastRect.top,
+      width: lastRect.width,
+      height: lastRect.height
+    }
+    
+    console.log(`Card LAST position for ${dn}:`, last)
+
+    // Calculate the transform needed (exact same as reference)
+    const dx = first.x - last.x
+    const dy = first.y - last.y
+    const sx = first.width / last.width
+    const sy = first.height / last.height
+
+    console.log(`Animation calculations for ${dn}:`, { dx, dy, sx, sy })
+
+    // Check if there's actually movement to animate
+    if (dx === 0 && dy === 0 && sx === 1 && sy === 1) {
+      console.log(`No movement detected for ${dn} - skipping animation`)
       setAnimatingCards(prev => {
         const newSet = new Set(Array.from(prev))
         newSet.delete(dn)
@@ -292,55 +336,41 @@ const CtiDashboard = () => {
       return
     }
 
-    const last = card.getBoundingClientRect()
-
-    // Calculate the difference
-    const dx = first.x - last.left
-    const dy = first.y - last.top
-    const sx = first.width / last.width
-    const sy = first.height / last.height
-
-
-    // Apply the FLIP animation
+    // Apply FLIP animation exactly like reference code
     card.style.transition = 'none'
     card.style.transform = `translate(${dx}px, ${dy}px) scale(${sx}, ${sy})`
     card.classList.add('anim-moving')
-
-    // Force reflow
+    card.style.backgroundColor = 'rgba(255, 255, 0, 0.3)' // Temporary visual indicator
+    
+    // Add status glow animation (from reference)
+    card.classList.add('status-glow')
+    
+    // Force reflow (same as reference)
     card.offsetHeight
-
-    // Animate to final position
+    
+    // Animate to final position (exact same as reference)
     requestAnimationFrame(() => {
-      card.style.transition = 'transform 0.6s cubic-bezier(0.4, 0, 0.2, 1)'
-      card.style.transform = 'translate(0, 0) scale(1)'
+      card.style.transition = 'transform 0.55s cubic-bezier(0.2, 0.9, 0.2, 1)'
+      card.style.transform = 'none'
+      console.log(`Applied final transform for ${dn}`)
     })
 
-    // Add return glow if returning to a known position
-    setLastPositions(prevLastPositions => {
-      const remembered = prevLastPositions[dn]?.[toSection]
-      if (remembered !== undefined) {
-        card.classList.add('return-glow')
-        setTimeout(() => card.classList.remove('return-glow'), 600)
-      }
-      return prevLastPositions
-    })
-
-    // Clean up after animation
-    const handleTransitionEnd = () => {
+    // Clean up after animation (exact same as reference)
+    card.addEventListener('transitionend', () => {
+      console.log(`Animation completed for ${dn}`)
       card.classList.remove('anim-moving')
+      card.classList.remove('status-glow')
+      card.style.backgroundColor = '' // Remove visual indicator
       card.style.transition = ''
       card.style.transform = ''
+      
       setAnimatingCards(prev => {
         const newSet = new Set(Array.from(prev))
         newSet.delete(dn)
         return newSet
       })
-      card.removeEventListener('transitionend', handleTransitionEnd)
-     
-    }
-
-    card.addEventListener('transitionend', handleTransitionEnd, { once: true })
-  }, [cardPositions])
+    }, { once: true })
+  }, [])
 
   const getSectionKey = (section: string) => {
     switch (section) {
@@ -395,61 +425,82 @@ const CtiDashboard = () => {
     }
   }, [])
 
-  // Handle FLIP animations when cards change sections
-  useEffect(() => {
-    if (!isInitialized || !dnsMap) return
-
+  // Memoize the expensive calculations to prevent unnecessary re-renders
+  const categorizedDns = useMemo(() => {
+    if (!isInitialized || !dnsMap) return {}
+    
     const dnsList = Object.values(dnsMap).filter(({ dn }) => dn !== userAddress)
-    const newPreviousSections: { [dn: string]: string } = {}
-    const animationsToTrigger: Array<{ dn: string; fromSection: string; toSection: string }> = []
+    const result: { [dn: string]: string } = {}
     
     dnsList.forEach(({ dn, devices }) => {
       const deviceList = Object.values(devices || {})
       const call = getDnCallState(dn)
       const active = hasActiveCalls(dn)
-      const currentSection = categorizeDns(dn, deviceList, call, active)
-      const previousSection = previousSections[dn]
+      result[dn] = categorizeDns(dn, deviceList, call, active)
+    })
+    
+    return result
+  }, [dnsMap, isInitialized, userAddress, hasActiveCalls, getDnCallState, activeMonitoring])
+
+  // Handle FLIP animations when cards change sections
+  useEffect(() => {
+    if (!isInitialized || !dnsMap) return
+
+    console.log('Animation useEffect triggered, categorizedDns:', categorizedDns)
+    const animationsToTrigger: Array<{ dn: string; fromSection: string; toSection: string }> = []
+    
+    // First pass: Check for changes and capture positions
+    Object.entries(categorizedDns).forEach(([dn, currentSection]) => {
+      const previousSection = previousSectionsRef.current[dn]
       
-      // Store the new section for this DN
-      newPreviousSections[dn] = currentSection
+      console.log(`DN ${dn}: previous=${previousSection}, current=${currentSection}`)
       
-      // If section changed, trigger FLIP animation
+      // If section changed, capture BEFORE position and queue animation
       if (previousSection && previousSection !== currentSection) {
+        console.log(`🎯 SECTION CHANGE DETECTED for ${dn}: ${previousSection} -> ${currentSection}`)
         
-        // Get the current position BEFORE React re-renders
+        // Capture the BEFORE position immediately (before DOM updates)
         const card = document.querySelector(`[data-dn="${dn}"]`) as HTMLElement
         if (card) {
-          const first = card.getBoundingClientRect()
-          
-          // Store the position for the animation
-          setCardPositions(prev => ({
-            ...prev,
-            [dn]: { x: first.left, y: first.top, width: first.width, height: first.height }
-          }))
-          
-          // Queue animation to trigger after state updates
-          animationsToTrigger.push({ dn, fromSection: previousSection, toSection: currentSection })
+          const rect = card.getBoundingClientRect()
+          cardPositionsRef.current[dn] = {
+            x: rect.left,
+            y: rect.top,
+            width: rect.width,
+            height: rect.height
+          }
+          console.log(`📍 Captured BEFORE position for ${dn}:`, cardPositionsRef.current[dn])
         } else {
-          
+          console.log(`❌ Card not found for ${dn} during position capture`)
         }
+        
+        // Queue animation to trigger after state updates
+        animationsToTrigger.push({ dn, fromSection: previousSection, toSection: currentSection })
+        console.log(`✅ Queued animation for ${dn}`)
+      } else if (!previousSection) {
+        console.log(`🔄 Initializing previous section for ${dn}: ${currentSection}`)
       }
     })
     
-    // Update all previous sections in one batch
-    setPreviousSections(prev => ({
-      ...prev,
-      ...newPreviousSections
-    }))
+    // Second pass: Update the ref with new previous sections
+    Object.entries(categorizedDns).forEach(([dn, currentSection]) => {
+      previousSectionsRef.current[dn] = currentSection
+    })
     
-    // Trigger animations after state updates with longer delay
+    console.log(`Total animations to trigger: ${animationsToTrigger.length}`)
+    
+    // Trigger animations after DOM has been updated
     if (animationsToTrigger.length > 0) {
-      setTimeout(() => {
+      // Use requestAnimationFrame to ensure DOM is fully updated
+      requestAnimationFrame(() => {
+        console.log('Triggering animations after RAF:', animationsToTrigger)
         animationsToTrigger.forEach(({ dn, fromSection, toSection }) => {
           animateCardMove(dn, fromSection, toSection)
         })
-      }, 100) // Increased delay to ensure DOM is updated
+      })
     }
-  }, [dnsMap, isInitialized, userAddress, hasActiveCalls, getDnCallState, activeMonitoring, animateCardMove, getSectionKey])
+  }, [categorizedDns, animateCardMove])
+
 
 
   // Clear CTI call states on page load
@@ -877,24 +928,32 @@ const CtiDashboard = () => {
       color: #6f42c1 !important; /* Purple for conference */
     }
     
-    /* FLIP Animation Styles */
+    /* FLIP Animation Styles - Based on reference code */
     .anim-moving {
-      z-index: 1000 !important;
+      transition: transform 0.55s cubic-bezier(0.2, 0.9, 0.2, 1), opacity 0.3s cubic-bezier(0.2, 0.9, 0.2, 1) !important;
+      z-index: 9999 !important;
+      box-shadow: 0 15px 40px rgba(0,0,0,0.35) !important;
+      opacity: 1 !important;
       pointer-events: none !important;
-      border-width: 3px !important;
+      border-width:3px;
     }
     
-    .return-glow {
-      box-shadow: 0 0 20px rgba(255, 193, 7, 0.6) !important;
-      animation: returnGlow 0.6s ease-out;
+    .status-glow {
+      animation: statusGlow 0.6s ease-out;
     }
     
-    @keyframes returnGlow {
+    @keyframes statusGlow {
       0% {
-        box-shadow: 0 0 20px rgba(255, 193, 7, 0.6);
+        box-shadow: 0 0 0 0 currentColor;
+        border-color: #e5e7eb;
+      }
+      40% {
+        box-shadow: 0 0 0 4px currentColor;
+        border-color: currentColor;
       }
       100% {
-        box-shadow: 0 0 0 rgba(255, 193, 7, 0);
+        box-shadow: 0 0 0 0 currentColor;
+        border-color: #e5e7eb;
       }
     }
     
@@ -982,14 +1041,6 @@ const CtiDashboard = () => {
     BOTH: 'Notify Both'
   }
 
-  // Helper functions
-  const getCardLevelStatus = (devices: CtiDevice[]) => {
-    if (!devices || devices.length === 0) return 'unregistered'
-    if (devices.some(d => d.terminalState === 'REGISTERED')) return 'registered'
-    if (devices.some(d => d.terminalState === 'STALE')) return 'stale'
-    return 'unregistered'
-  }
-
   const getDeviceIconClass = (deviceType: string) => {
     switch (deviceType) {
       case 'SOFT':
@@ -1018,10 +1069,6 @@ const CtiDashboard = () => {
   const handleToneSelect = (dn: string, toneType: string) => {
     setSelectedTone((prev) => ({ ...prev, [dn]: toneType }))
 
-    if (tempMonitorSelection[dn] && toneType) {
-      startMonitoringLocal(dn, tempMonitorSelection[dn] as 'SILENT' | 'WHISPER' | 'BARGE_IN', toneType)
-    }
-
     console.log('Selected Tone:', dn, toneType)
     console.log('dn:', dn)
   }
@@ -1033,6 +1080,14 @@ const CtiDashboard = () => {
     console.log('Selected Barge In:', dn)
     console.log('dn:', dn)
     console.log('Barge In selected, waiting for tone selection...')
+  }
+
+  const resetMonitorSelection = () => {
+    if (showPopup?.dn) {
+      setSelectedMonitor((prev) => ({ ...prev, [showPopup.dn]: '' }))
+      setTempMonitorSelection((prev) => ({ ...prev, [showPopup.dn]: '' }))
+      setSelectedTone((prev) => ({ ...prev, [showPopup.dn]: '' }))
+    }
   }
 
   // Helper function to create API payload
@@ -1933,8 +1988,11 @@ const CtiDashboard = () => {
                                               onClick={() => {
                                                 if (isDeviceActiveCall) {
                                                   console.log('Opening popup for:', dn, deviceName)
+                                                  // Reset monitor selection when opening popup
+                                                  setSelectedMonitor((prev) => ({ ...prev, [dn]: '' }))
+                                                  setTempMonitorSelection((prev) => ({ ...prev, [dn]: '' }))
+                                                  setSelectedTone((prev) => ({ ...prev, [dn]: '' }))
                                                   setShowPopup({ dn: dn, deviceName })
-                                                  handleMonitorSelect(dn, 'SILENT', Object.values(dnsMap[dn]?.devices || {}))
                                                 } else if (terminalState === 'STALE') {
                                                   console.log('Device is STALE, popup disabled')
                                                 } else {
@@ -2015,13 +2073,13 @@ const CtiDashboard = () => {
         centered
         backdrop="static"
       >
-        <Modal.Header>
+        <Modal.Header className="d-flex align-items-center justify-content-between">
           <Modal.Title>
-            <div className="d-flex align-items-center">
-              <i className="ti ti-settings me-2"></i>
-              <span>Extension - {showPopup?.dn}</span>
+            <div className="text-center">
+              <span className="small">Agent - {showPopup?.dn} - Monitoring</span>
             </div>
           </Modal.Title>
+            <FiX size={20} onClick={() => setShowPopup(null)} style={{ cursor: 'pointer' }} />
         </Modal.Header>
         <Modal.Body>
           {showPopup && activeMonitoring.dn === showPopup.dn && activeMonitoring.type ? (
@@ -2050,11 +2108,11 @@ const CtiDashboard = () => {
           ) : showPopup ? (
             <>
               <div className="mb-4">
-                <h6 className="fw-bold mb-3 text-center">Monitor Type</h6>
+                <h6 className="fw-bold mb-3 text-left">Monitor Type Selection</h6>
                 <div className="row g-2">
                   <div className="col-6">
                     <Button
-                      variant={selectedMonitor[showPopup.dn] === 'SILENT' ? 'primary' : 'outline-primary'}
+                      variant={selectedMonitor[showPopup.dn] === 'SILENT' ? 'danger' : 'primary'}
                       disabled={
                         (tempMonitorSelection[showPopup.dn] && tempMonitorSelection[showPopup.dn] !== 'SILENT') ||
                         !isDnInActiveCall(showPopup.dn)
@@ -2062,7 +2120,7 @@ const CtiDashboard = () => {
                       onClick={() =>
                         handleMonitorSelect(showPopup.dn, 'SILENT', Object.values(dnsMap[showPopup.dn]?.devices || {}))
                       }
-                      className="w-100"
+                      className="w-100 text-center d-inline-block app-button"
                       size="sm"
                     >
                       Silent
@@ -2070,7 +2128,7 @@ const CtiDashboard = () => {
                   </div>
                   <div className="col-6">
                     <Button
-                      variant={selectedMonitor[showPopup.dn] === 'WHISPER' ? 'primary' : 'outline-primary'}
+                      variant={selectedMonitor[showPopup.dn] === 'WHISPER' ? 'danger' : 'primary'}
                       disabled={
                         (tempMonitorSelection[showPopup.dn] && tempMonitorSelection[showPopup.dn] !== 'WHISPER') ||
                         !isDnInActiveCall(showPopup.dn)
@@ -2078,7 +2136,7 @@ const CtiDashboard = () => {
                       onClick={() =>
                         handleMonitorSelect(showPopup.dn, 'WHISPER', Object.values(dnsMap[showPopup.dn]?.devices || {}))
                       }
-                      className="w-100"
+                      className="w-100 text-center d-inline-block app-button"
                       size="sm"
                     >
                       Whisper
@@ -2086,10 +2144,10 @@ const CtiDashboard = () => {
                   </div>
                   <div className="col-12">
                     <Button
-                      variant={selectedMonitor[showPopup.dn] === 'BARGE_IN' ? 'primary' : 'outline-primary'}
+                      variant={selectedMonitor[showPopup.dn] === 'BARGE_IN' ? 'danger' : 'primary'}
                       disabled={!isDnInActiveCall(showPopup.dn)}
                       onClick={() => handleBargeInSelect(showPopup.dn)}
-                      className="w-100"
+                      className="w-100 text-center d-inline-block app-button"
                       size="sm"
                     >
                       Barge In
@@ -2099,7 +2157,7 @@ const CtiDashboard = () => {
               </div>
 
               <div className="mb-4">
-                <h6 className="fw-bold mb-3 text-center">Tone</h6>
+                <h6 className="fw-bold mb-3 text-left">Tone Selection</h6>
                 <div className="row g-2">
                   {Object.entries(toneLabels).map(([key, label]) => {
                     const isDisabled = !tempMonitorSelection[showPopup.dn] || !isDnInActiveCall(showPopup.dn)
@@ -2107,11 +2165,11 @@ const CtiDashboard = () => {
                     return (
                       <div key={key} className="col-6">
                         <Button
-                          variant={selectedTone[showPopup.dn] === key ? 'success' : 'outline-secondary'}
+                          variant={selectedTone[showPopup.dn] === key ? 'success' : 'info'}
                           disabled={isDisabled}
                           onClick={isDisabled ? undefined : () => handleToneSelect(showPopup.dn, key)}
                           size="sm"
-                          className="w-100"
+                          className="w-100 text-center d-inline-block app-button"
                         >
                           {label}
                         </Button>
@@ -2123,10 +2181,13 @@ const CtiDashboard = () => {
 
               {tempMonitorSelection[showPopup.dn] && (
                 <div className="">
-                  <div className="d-flex align-items-center justify-content-center">
-                    <i className="material-icons-two-tone me-2">info</i>
-                    <span>
-                      Monitor type selected: <strong>{tempMonitorSelection[showPopup.dn]}</strong>
+                  <div className="d-flex flex-column align-items-center justify-content-center">
+                    
+                    <span className="small text-muted d-block me-2 mb-1">
+                      Monitor type selected
+                    </span>
+                    <span className="small status-badge primary d-block">
+                    <strong>{tempMonitorSelection[showPopup.dn]}</strong>
                     </span>
                   </div>
                 </div>
@@ -2135,8 +2196,26 @@ const CtiDashboard = () => {
           ) : null}
         </Modal.Body>
         <Modal.Footer>
-          <Button variant="secondary" onClick={() => setShowPopup(null)}>
-            Close
+          <Button 
+            variant="default" 
+            className="app-button btn-sm"
+            disabled={!showPopup?.dn || (!tempMonitorSelection[showPopup.dn] && !selectedTone[showPopup.dn])}
+            onClick={() => resetMonitorSelection()}
+          >
+            Reset
+          </Button>
+          <Button 
+            variant="primary" 
+            className="app-button btn-sm" 
+            onClick={() => {
+              if (showPopup?.dn && tempMonitorSelection[showPopup.dn] && selectedTone[showPopup.dn]) {
+                startMonitoringLocal(showPopup.dn, tempMonitorSelection[showPopup.dn] as 'SILENT' | 'WHISPER' | 'BARGE_IN', selectedTone[showPopup.dn])
+                setShowPopup(null)
+              }
+            }}
+            disabled={!showPopup?.dn || !tempMonitorSelection[showPopup.dn] || !selectedTone[showPopup.dn]}
+          >
+            Start Monitoring
           </Button>
         </Modal.Footer>
       </Modal>
@@ -2157,8 +2236,8 @@ const CtiDashboard = () => {
   )
 }
 
-CtiDashboard.getLayout = (page: ReactElement) => {
+LiveCallDashboard.getLayout = (page: ReactElement) => {
   return <Layout>{page}</Layout>
 }
 
-export default CtiDashboard
+export default LiveCallDashboard

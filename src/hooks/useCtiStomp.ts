@@ -546,23 +546,23 @@ export default function useCtiStomp(wsPath = '/ws') {
   }, [handleCallEvent]);
 
   // Helper: Get devices array for a DN
-  const getDevicesForDn = (dn: string) => {
+  const getDevicesForDn = useCallback((dn: string) => {
     const devices = dnsMap[dn] ? Object.values(dnsMap[dn].devices) : [];
     console.log(`Getting devices for DN ${dn}:`, devices);
     return devices;
-  };
+  }, [dnsMap]);
 
   // Helper: Get calls involving a DN (any device)
-  const getCallStatesForDn = (dn: string) => {
+  const getCallStatesForDn = useCallback((dn: string) => {
     return Object.values(callStateMap).filter(call =>
       call.parties?.some(
         (p: any) => p.callingAddress === dn || p.calledAddress === dn
       )
     );
-  };
+  }, [callStateMap]);
 
   // Helper: Check if DN has any active calls
-  const hasActiveCalls = (dn: string) => {
+  const hasActiveCalls = useCallback((dn: string) => {
     return Object.values(callStateMap).some(call =>
       call.parties?.some(
         (p: any) =>
@@ -570,10 +570,10 @@ export default function useCtiStomp(wsPath = '/ws') {
           p.callStatus !== 'DROPPED'
       )
     );
-  };
+  }, [callStateMap]);
 
   // Helper: Get call state for DN (most recent call)
-  const getDnCallState = (dn: string) => {
+  const getDnCallState = useCallback((dn: string) => {
     const calls = getCallStatesForDn(dn);
     if (!calls.length) return null;
 
@@ -593,10 +593,10 @@ export default function useCtiStomp(wsPath = '/ws') {
       role: matchedParty.callingAddress === dn ? 'calling' : 'called',
       isActive: true, // presence implies active, absence is dropped
     };
-  };
+  }, [getCallStatesForDn]);
 
   // Helper: Get call state for specific DN-device pair
-  const getCallStateForDevice = (dn: string, deviceName: string) => {
+  const getCallStateForDevice = useCallback((dn: string, deviceName: string) => {
     const calls = Object.values(callStateMap);
     // Find calls where any party matches dn + deviceName
     const filtered = calls.filter(call =>
@@ -627,7 +627,7 @@ export default function useCtiStomp(wsPath = '/ws') {
       role: matchedParty.callingAddress === dn ? 'calling' : 'called',
       isActive: true,
     };
-  };
+  }, [callStateMap]);
 
   // Clear expired call states from localStorage
   const clearExpiredCallStates = useCallback(() => {
