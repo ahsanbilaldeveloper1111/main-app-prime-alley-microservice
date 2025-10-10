@@ -413,7 +413,7 @@
       left: 0;
       width: 100%;
       height: 100%;
-      background: linear-gradient(135deg, var(--primary-accent), var(--primary-accent-dark));
+      background: white;
       display: flex;
       justify-content: center;
       align-items: center;
@@ -431,7 +431,7 @@
 
   .session-loading-spinner {
       font-size: 4rem;
-      color: white;
+      color: var(--primary-accent);
       animation: pulse 2s infinite;
   }
 
