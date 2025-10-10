@@ -943,7 +943,7 @@ const Header = ({ themeMode }: HeaderProps) => {
                     permission: 'view-cti',
                     icon: ICONS.CRM,
                     label: SUBMENU_LABELS.LIVE_VIEW,
-                    href: '/cti'
+                    href: '/live-calls'
                 },
                 {
                     key: 'view-cti-monitoring',
