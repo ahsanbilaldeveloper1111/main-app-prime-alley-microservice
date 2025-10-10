@@ -109,20 +109,8 @@ export const authAPI = {
   logout: async () => {
     //console.log('Logging out...');
     try {
-      // Call logout API to invalidate tokens on backend
-      const token = getCurrentAccessToken();
-     // console.log(token);
-      //return false;
-      if (token) {
-        
-        //  const response = await apiClient.get('/auth/logout', {
-        //   headers: {
-        //     Authorization: `Bearer ${token}`
-        //   }
-        // });
-        
-        //console.log('Logout API called successfully');
-      }
+      sessionStorage.clear();
+      clearAllLocalStorage();
     } catch (error) {
       console.error('Logout API call failed:', error);
       // Continue with logout even if API call fails

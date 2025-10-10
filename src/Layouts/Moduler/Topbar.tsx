@@ -30,7 +30,7 @@ const TopBar = ({ handleOffcanvasToggle, changeThemeMode, toogleSidebarHide, too
     const handleLogout = async () => {
         try {
           // Call logout API to invalidate tokens on backend
-          //await authAPI.logout();
+          await authAPI.logout();
           
           // Use the centralized logout function
           await logout();
