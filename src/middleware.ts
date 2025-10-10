@@ -90,6 +90,8 @@ export const config = {
         // Add paths that should be protected
         '/controlhub/:path*',
         '/ai-ml/analysis/:path*',
+        '/live-calls/:path*',
+        '/cti/:path*',
         // Add other protected paths
         '/dashboard/:path*',
         // Exclude paths that don't need permission checks
