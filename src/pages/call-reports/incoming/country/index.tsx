@@ -170,7 +170,7 @@ const CallIncomingCountry = () => {
 
     const [refreshKey, setRefreshKey] = useState<number>(0);
     const [currentFilters, setCurrentFilters] = useState({
-      is_incoming_only: 'false'
+      is_incoming_only: 'true'
     });
     
     // Debug current filters state
