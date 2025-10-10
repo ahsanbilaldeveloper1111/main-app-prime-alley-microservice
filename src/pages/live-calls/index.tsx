@@ -268,16 +268,14 @@ const CtiDashboard = () => {
 
   // FLIP Animation functions
   const animateCardMove = useCallback((dn: string, fromSection: string, toSection: string) => {
-    console.log(`🎭 Starting FLIP animation for ${dn} from ${fromSection} to ${toSection}`)
+    console.log(`Starting FLIP animation for ${dn} from ${fromSection} to ${toSection}`)
     
     // Get the stored first position
     const first = cardPositions[dn]
     if (!first) {
-      console.log(`❌ No stored position for ${dn}`)
+      console.log(`No stored position for ${dn}`)
       return
     }
-
-    console.log(`📍 Using stored first position:`, first)
 
     // Mark as animating
     setAnimatingCards(prev => new Set(Array.from(prev).concat(dn)))
@@ -285,7 +283,7 @@ const CtiDashboard = () => {
     // Get the card in its new position
     const card = document.querySelector(`[data-dn="${dn}"]`) as HTMLElement
     if (!card) {
-      console.log(`❌ Card not found for ${dn}`)
+  
       setAnimatingCards(prev => {
         const newSet = new Set(Array.from(prev))
         newSet.delete(dn)
@@ -295,7 +293,6 @@ const CtiDashboard = () => {
     }
 
     const last = card.getBoundingClientRect()
-    console.log(`📍 Last position:`, last)
 
     // Calculate the difference
     const dx = first.x - last.left
@@ -303,7 +300,6 @@ const CtiDashboard = () => {
     const sx = first.width / last.width
     const sy = first.height / last.height
 
-    console.log(`📐 Transform: translate(${dx}px, ${dy}px) scale(${sx}, ${sy})`)
 
     // Apply the FLIP animation
     card.style.transition = 'none'
@@ -340,7 +336,7 @@ const CtiDashboard = () => {
         return newSet
       })
       card.removeEventListener('transitionend', handleTransitionEnd)
-      console.log(`✅ Animation completed for ${dn}`)
+     
     }
 
     card.addEventListener('transitionend', handleTransitionEnd, { once: true })
@@ -419,13 +415,11 @@ const CtiDashboard = () => {
       
       // If section changed, trigger FLIP animation
       if (previousSection && previousSection !== currentSection) {
-        console.log(`🎬 Section change detected for ${dn} from ${previousSection} to ${currentSection}`)
         
         // Get the current position BEFORE React re-renders
         const card = document.querySelector(`[data-dn="${dn}"]`) as HTMLElement
         if (card) {
           const first = card.getBoundingClientRect()
-          console.log(`📍 Storing first position for ${dn}:`, first)
           
           // Store the position for the animation
           setCardPositions(prev => ({
@@ -436,7 +430,7 @@ const CtiDashboard = () => {
           // Queue animation to trigger after state updates
           animationsToTrigger.push({ dn, fromSection: previousSection, toSection: currentSection })
         } else {
-          console.log(`❌ Card not found for ${dn} during position capture`)
+          
         }
       }
     })
@@ -465,7 +459,7 @@ const CtiDashboard = () => {
         // Clear specific CTI call states
         localStorage.removeItem('cti_call_states')
         localStorage.removeItem('cti_call_states_timestamp')
-        //console.log('🧹 Cleared CTI call states on page load')
+        
       } catch (error) {
         console.error('Error clearing call states:', error)
       }
@@ -1147,18 +1141,18 @@ const CtiDashboard = () => {
     )
 
     // Console log the payload
-    console.log('🎯 Monitoring API Payload:', payload)
+    console.log('Monitoring API Payload:', payload)
 
     try {
       let response;
       
       // Use appropriate API based on monitoring type
       if (monitorType === 'BARGE_IN') {
-        console.log('🚀 Calling startBargeInMonitoring API...')
+        console.log('Calling startBargeInMonitoring API...')
         response = await startBargeInMonitoring(payload)
       } else {
         // For SILENT and WHISPER monitoring
-        console.log('🚀 Calling startMonitoring API...')
+        console.log('Calling startMonitoring API...')
         response = await startMonitoring(payload)
       }
 
@@ -1202,7 +1196,7 @@ const CtiDashboard = () => {
         monitor: userAddress || ''
       }
 
-      console.log('🛑 Stopping silent monitoring with params:', stopParams)
+      console.log('Stopping silent monitoring with params:', stopParams)
       const response = await stopMonitoringAPI(stopParams)
       
       if (response.success) {
@@ -1234,7 +1228,7 @@ const CtiDashboard = () => {
         monitor: userAddress || ''
       }
 
-      console.log('🛑 Stopping whisper monitoring with params:', stopParams)
+      console.log('Stopping whisper monitoring with params:', stopParams)
       const response = await stopMonitoringAPI(stopParams)
       
       if (response.success) {
@@ -1266,7 +1260,7 @@ const CtiDashboard = () => {
         monitor: userAddress || ''
       }
 
-      console.log('🛑 Stopping barge-in monitoring with params:', stopParams)
+      console.log('Stopping barge-in monitoring with params:', stopParams)
       const response = await stopBargeInMonitoringAPI(stopParams)
       
       if (response.success) {
@@ -1284,7 +1278,7 @@ const CtiDashboard = () => {
 
   // Device selection handlers
   const handleDeviceSelect = (device: any) => {
-    console.log('🎯 Device selected for monitoring:', device)
+    console.log('Device selected for monitoring:', device)
     
     if (!pendingMonitoringData) {
       console.error('No pending monitoring data found')
@@ -1790,7 +1784,7 @@ const CtiDashboard = () => {
                               cls
                             ) : 'black'
 
-                            console.log('callColor', callColor)
+                            //console.log('callColor', callColor)
 
                             const cardClasses = `card-wrapper position-relative ${animatingCards.has(dn) ? 'animating' : ''}`
 

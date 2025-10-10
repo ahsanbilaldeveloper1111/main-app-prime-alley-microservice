@@ -117,6 +117,8 @@ const Header = ({ themeMode }: HeaderProps) => {
             // Hide immediately without animation
             submenuPopup.classList.remove('active');
             submenuPopup.style.display = 'none';
+            // submenuPopup.style.opacity = '0';
+            // submenuPopup.style.visibility = 'hidden';
             // Reset positioning flag when hiding
             submenuPositionedRef.current = false;
         }
@@ -229,18 +231,16 @@ const Header = ({ themeMode }: HeaderProps) => {
             
             // Only hide if mouse is completely outside both sidebar and submenu
             if (!isOverSidebar && !isOverSubmenu) {
-                hideTimeoutRef.current = setTimeout(() => {
-                    const currentSubmenuPopup = document.querySelector(DOM_SELECTORS.SUBMENU_POPUP) as HTMLElement;
-                    if (currentSubmenuPopup && currentSubmenuPopup.classList.contains('active')) {
-                        const currentTarget = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement;
-                        const stillOutsideSidebar = !currentTarget?.closest(DOM_SELECTORS.SIDEBAR);
-                        const stillOutsideSubmenu = !currentTarget?.closest('.pc-submenu-popup');
-                        
-                        if (stillOutsideSidebar && stillOutsideSubmenu) {
-                            hideSubmenuPopup();
-                        }
+                const currentSubmenuPopup = document.querySelector(DOM_SELECTORS.SUBMENU_POPUP) as HTMLElement;
+                if (currentSubmenuPopup && currentSubmenuPopup.classList.contains('active')) {
+                    const currentTarget = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement;
+                    const stillOutsideSidebar = !currentTarget?.closest(DOM_SELECTORS.SIDEBAR);
+                    const stillOutsideSubmenu = !currentTarget?.closest('.pc-submenu-popup');
+                    
+                    if (stillOutsideSidebar && stillOutsideSubmenu) {
+                        hideSubmenuPopup();
                     }
-                }, 50); // Reduced delay from 200ms to 50ms
+                }
             }
         };
 
@@ -262,10 +262,28 @@ const Header = ({ themeMode }: HeaderProps) => {
     const createMouseEnterHandler = useCallback(() => {
         return function(e: Event) {
                         const target = e.target as HTMLElement;
+                        
             if (!target || !target.closest(DOM_SELECTORS.NAV_LINKS.split(' > ')[0]) || 
                 !target.classList.contains('pc-link') || target.tagName === 'BUTTON') {
+                            
                             return;
                         }
+                        
+                        console.log('Passed initial checks');
+                        // Check if pc-link nav-link parent has NoTab class
+                        const parentLi = target.closest('li');
+                        if (parentLi && parentLi.classList.contains('NoTab')) {
+                            console.log('yes');
+                            // Hide submenu popup for NoTab elements
+                            const submenuPopup = document.querySelector(DOM_SELECTORS.SUBMENU_POPUP) as HTMLElement;
+                            if (submenuPopup) {
+                                submenuPopup.classList.remove('active');
+                                submenuPopup.style.display = 'none';
+                                // submenuPopup.style.opacity = '0';
+                                // submenuPopup.style.visibility = 'hidden';
+                                submenuPositionedRef.current = false;
+                            }
+                        } 
                         
                         const computedStyle = window.getComputedStyle(target);
                         if (computedStyle.position === 'absolute' || computedStyle.position === 'fixed') {
@@ -424,10 +442,8 @@ const Header = ({ themeMode }: HeaderProps) => {
                         hideTimeoutRef.current = null;
                     }
                     
-                    // Hide with minimal delay to prevent flickering
-                    hideTimeoutRef.current = setTimeout(() => {
-                        hideSubmenuPopup();
-                    }, 10);
+                    // Hide immediately
+                    hideSubmenuPopup();
                 };
 
                 submenuPopup.addEventListener('mouseenter', submenuEnterHandler);
@@ -438,6 +454,25 @@ const Header = ({ themeMode }: HeaderProps) => {
             const addSidebarMouseLeaveEvent = () => {
                 const sidebar = document.querySelector(DOM_SELECTORS.SIDEBAR) as HTMLElement;
                 if (!sidebar) return;
+                
+                // Add general mouse enter debug for all elements in sidebar
+                sidebar.addEventListener('mouseenter', (e) => {
+                    const target = e.target as HTMLElement;
+                    if (target.classList.contains('pc-link')) {
+                        const parentLi = target.closest('li');
+                        if (parentLi && parentLi.classList.contains('NoTab')) {
+                            // Hide submenu popup for NoTab elements
+                            const submenuPopup = document.querySelector(DOM_SELECTORS.SUBMENU_POPUP) as HTMLElement;
+                            if (submenuPopup) {
+                                submenuPopup.classList.remove('active');
+                                submenuPopup.style.display = 'none';
+                                // submenuPopup.style.opacity = '0';
+                                // submenuPopup.style.visibility = 'hidden';
+                                submenuPositionedRef.current = false;
+                            }
+                        }
+                    }
+                }, true); // Use capture phase
                 
                 sidebar.addEventListener('mouseleave', (e) => {
                     const mouseEvent = e as MouseEvent;
@@ -455,10 +490,8 @@ const Header = ({ themeMode }: HeaderProps) => {
                         hideTimeoutRef.current = null;
                     }
                     
-                    // Hide with minimal delay to prevent flickering
-                    hideTimeoutRef.current = setTimeout(() => {
-                        hideSubmenuPopup();
-                    }, 10);
+                    // Hide immediately
+                    hideSubmenuPopup();
                 });
             };
 
