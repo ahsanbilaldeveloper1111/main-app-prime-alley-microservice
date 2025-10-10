@@ -632,7 +632,7 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
   const handleAnalysis = async (props: any) => {
     try {
       const { Id, AudioTrack } = props;
-      window.open(`/ai-ml/analysis?id=${Id}&file=${AudioTrack}&direction=${props.Direction}&phone=${props.RemotePartyNumber}`, '_blank');
+      window.open(`/ai-ml/analysis?id=${Id}&file=${AudioTrack}&direction=${props.Direction}&phone=${props.RemotePartyNumber}&imagicle=${props.imagicle}`, '_blank');
     } catch (error) {
       console.error('Error navigating to analysis:', error);
     }

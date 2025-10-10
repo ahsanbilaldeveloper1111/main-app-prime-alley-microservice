@@ -9,6 +9,7 @@ interface SSEConfig {
   date?: string;
   localPartyNumber?: string;
   ownerUsername?: string;
+  imagicle?: string;
   preventAutoConnect?: boolean;
 }
 
@@ -42,12 +43,12 @@ export const useAnalysisSSE = (config: SSEConfig) => {
 
   // Check if parameters are ready
   useEffect(() => {
-    const hasAllParams = !!(config.uuid && config.date && config.localPartyNumber && config.ownerUsername);
+    const hasAllParams = !!(config.uuid && config.date && config.localPartyNumber && config.ownerUsername && config.imagicle);
     setState(prev => ({
       ...prev,
       parametersReady: hasAllParams
     }));
-  }, [config.uuid, config.date, config.localPartyNumber, config.ownerUsername]);
+  }, [config.uuid, config.date, config.localPartyNumber, config.ownerUsername, config.imagicle]);
 
   const connect = useCallback(() => {
     if (eventSourceRef.current?.readyState === EventSource.OPEN) {
@@ -55,19 +56,20 @@ export const useAnalysisSSE = (config: SSEConfig) => {
     }
 
     // Check if required parameters are available
-    if (!configRef.current.uuid || !configRef.current.date || !configRef.current.localPartyNumber || !configRef.current.ownerUsername) {
+    if (!configRef.current.uuid || !configRef.current.date || !configRef.current.localPartyNumber || !configRef.current.ownerUsername || !configRef.current.imagicle) {
       console.warn('⚠️ Cannot connect: Missing required parameters', {
         uuid: configRef.current.uuid,
         date: configRef.current.date,
         localPartyNumber: configRef.current.localPartyNumber,
-        ownerUsername: configRef.current.ownerUsername
+        ownerUsername: configRef.current.ownerUsername,
+        imagicle: configRef.current.imagicle
       });
       setState(prev => ({
         ...prev,
         connecting: false,
-        error: 'Missing required parameters: uuid, date, localPartyNumber, ownerUsername'
+        error: 'Missing required parameters: uuid, date, localPartyNumber, ownerUsername, imagicle'
       }));
-      configRef.current.onError?.('Missing required parameters: uuid, date, localPartyNumber, ownerUsername');
+      configRef.current.onError?.('Missing required parameters: uuid, date, localPartyNumber, ownerUsername, imagicle');
       return;
     }
 
@@ -84,6 +86,7 @@ export const useAnalysisSSE = (config: SSEConfig) => {
       if (configRef.current.date) params.append('date', configRef.current.date);
       if (configRef.current.localPartyNumber) params.append('localPartyNumber', configRef.current.localPartyNumber);
       if (configRef.current.ownerUsername) params.append('ownerUsername', configRef.current.ownerUsername);
+      if (configRef.current.imagicle) params.append('imagicle', configRef.current.imagicle);
       
       const sseUrl = `/api/analysis-stream?${params.toString()}`;
       

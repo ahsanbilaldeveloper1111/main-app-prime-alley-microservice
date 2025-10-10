@@ -7,7 +7,7 @@ export default function handler(req, res) {
   }
 
   // Get parameters from query string
-  const { uuid, date, localPartyNumber, ownerUsername } = req.query;
+  const { uuid, date, localPartyNumber, ownerUsername, imagicle } = req.query;
   
   // Get WebSocket protocol configuration
   const websocketProtocol = process.env.WEBSOCKET_PROTOCOL || 'wss';
@@ -21,16 +21,16 @@ export default function handler(req, res) {
   }
   
   // Log connection for monitoring
-  console.log('SSE connection request:', { uuid, date, localPartyNumber, ownerUsername });
+  console.log('SSE connection request:', { uuid, date, localPartyNumber, ownerUsername, imagicle });
   console.log('Analysis server config:', { 
     host: process.env.NEXT_PUBLIC_PRIVATE_AIML_SOCKET_URL, 
     protocol: websocketProtocol 
   });
   
   // Validate required parameters
-  if (!uuid || !date || !localPartyNumber || !ownerUsername) {
-    console.error('❌ Missing required parameters:', { uuid, date, localPartyNumber, ownerUsername });
-    res.write(`data: ${JSON.stringify({ type: 'error', status: 'error', message: 'Missing required parameters: uuid, date, localPartyNumber, ownerUsername' })}\n\n`);
+  if (!uuid || !date || !localPartyNumber || !ownerUsername || !imagicle) {
+    console.error('❌ Missing required parameters:', { uuid, date, localPartyNumber, ownerUsername, imagicle });
+    res.write(`data: ${JSON.stringify({ type: 'error', status: 'error', message: 'Missing required parameters: uuid, date, localPartyNumber, ownerUsername, imagicle' })}\n\n`);
     res.end();
     return;
   }
@@ -48,7 +48,7 @@ export default function handler(req, res) {
 
   // Create WebSocket connection to analysis server
   const analysisServerHost = process.env.NEXT_PUBLIC_PRIVATE_AIML_SOCKET_URL;
-  const analysisServerUrl = `${websocketProtocol}://${analysisServerHost}/ws/analysis/${uuid}/${date}/${localPartyNumber}/${ownerUsername}/`;
+  const analysisServerUrl = `${websocketProtocol}://${analysisServerHost}/ws/analysis/${uuid}/${date}/${localPartyNumber}/${ownerUsername}/${imagicle}/`;
   
   console.log('🔗 Connecting to analysis server:', analysisServerUrl);
   
@@ -94,7 +94,8 @@ export default function handler(req, res) {
       uuid: uuid,
       date: date,
       localPartyNumber: localPartyNumber,
-      ownerUsername: ownerUsername
+      ownerUsername: ownerUsername,
+      imagicle: imagicle
     };
     
     wsAnalysis.send(JSON.stringify(analysisCommand));

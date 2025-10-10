@@ -97,7 +97,7 @@ const CallAnalysis = () => {
   const [date, setDate] = useState('');
   const [localPartyNumber, setLocalPartyNumber] = useState('');
   const [ownerUsername, setOwnerUsername] = useState('');
-
+  const [imagicle, setImagicle] = useState('');
   const [audioTrackId, setAudioTrackId] = useState('');
   const [audioUrl, setAudioUrl] = useState<string>('');
   const [audioLoading, setAudioLoading] = useState(false);
@@ -124,6 +124,7 @@ const CallAnalysis = () => {
     date: date,
     localPartyNumber: localPartyNumber,
     ownerUsername: ownerUsername,
+    imagicle: imagicle,
     preventAutoConnect: analysisComplete,
     onMessage: (data) => {
       if (!data) return;
@@ -195,7 +196,7 @@ const CallAnalysis = () => {
     if (!router.isReady) return;
 
     try {
-      const { id, file, direction, phone } = router.query;
+      const { id, file, direction, phone, imagicle } = router.query;
       
       // Set basic parameters
       if (id) {
@@ -207,6 +208,10 @@ const CallAnalysis = () => {
       }
       if (phone) {
         setLocalPartyNumber(phone as string);
+      }
+
+      if (imagicle) {
+        setImagicle(imagicle as string);
       }
       
       // Parse file path for additional parameters
@@ -235,7 +240,7 @@ const CallAnalysis = () => {
             setDate(formattedDate);
             
             // Trigger analysis
-            handleGetCallAnalysisWithData(formattedDate, extension, user, id as string);
+            handleGetCallAnalysisWithData(formattedDate, extension, user, id as string, imagicle as string);
           }
         }
       }
@@ -274,13 +279,13 @@ const CallAnalysis = () => {
     }
   };
 
-  const handleGetCallAnalysisWithData = async (dateParam: string, localPartyNumberParam: string, ownerUsernameParam: string, uuidParam: string) => {
+  const handleGetCallAnalysisWithData = async (dateParam: string, localPartyNumberParam: string, ownerUsernameParam: string, uuidParam: string, imagicleParam: string) => {
     // Set the parameters
     setUuid(uuidParam);
     setDate(dateParam);
     setLocalPartyNumber(localPartyNumberParam);
     setOwnerUsername(ownerUsernameParam);
-    
+    setImagicle(imagicleParam);
     // Set loading state
     setLoading(true);
     setError(null);
@@ -429,7 +434,7 @@ const CallAnalysis = () => {
           <Card.Body>
             <Form onSubmit={handleFormSubmit}>
               <Row>
-                <Col md={3}>
+                <Col md={4}>
                   <Form.Group className="mb-3">
                     <Form.Label>UUID</Form.Label>
                     <Form.Control
@@ -442,7 +447,7 @@ const CallAnalysis = () => {
                     />
                   </Form.Group>
                 </Col>
-                <Col md={3}>
+                <Col md={2}>
                   <Form.Group className="mb-3">
                     <Form.Label>Date</Form.Label>
                     <Form.Control
@@ -454,7 +459,7 @@ const CallAnalysis = () => {
                     />
                   </Form.Group>
                 </Col>
-                <Col md={3}>
+                <Col md={2}>
                   <Form.Group className="mb-3">
                     <Form.Label>Extension</Form.Label>
                     <Form.Control
@@ -466,7 +471,7 @@ const CallAnalysis = () => {
                     />
                   </Form.Group>
                 </Col>
-                <Col md={3}>
+                <Col md={2}>
                   <Form.Group className="mb-3">
                     <Form.Label>Username</Form.Label>
                     <Form.Control
@@ -474,6 +479,19 @@ const CallAnalysis = () => {
                       value={ownerUsername}
                       onChange={(e) => setOwnerUsername(e.target.value)}
                       placeholder="Enter Username"
+                      required
+                    />
+                  </Form.Group>
+                </Col>
+
+                <Col md={2}>
+                  <Form.Group className="mb-3">
+                    <Form.Label>Node</Form.Label>
+                    <Form.Control
+                      type="text"
+                      value={imagicle}
+                      onChange={(e) => setImagicle(e.target.value)}
+                      placeholder="Enter Node"
                       required
                     />
                   </Form.Group>
