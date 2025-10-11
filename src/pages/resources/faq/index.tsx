@@ -79,7 +79,7 @@ const FAQ = () => {
     }
   ];
 
-  const categories = [...new Set(faqData.map(faq => faq.category))];
+  const categories = Array.from(new Set(faqData.map(faq => faq.category)));
 
   const filteredFAQs = faqData.filter(faq => 
     faq.question.toLowerCase().includes(searchTerm.toLowerCase()) ||

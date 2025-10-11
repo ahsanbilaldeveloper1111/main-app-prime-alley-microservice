@@ -5,7 +5,7 @@ import BreadcrumbItem from "@common/BreadcrumbItem";
 import { Button, Modal, Row, Card, Tab, Tabs } from "react-bootstrap";
 import { Col } from "react-bootstrap";
 import { useSession } from "next-auth/react";
-import { FiDownload, FiPlay, FiExternalLink, FiBookOpen, FiFileText, FiVideo, FiCode, FiGraduationCap } from "react-icons/fi";
+import { FiDownload, FiPlay, FiExternalLink, FiBookOpen, FiFileText, FiVideo, FiCode, FiBook } from "react-icons/fi";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
@@ -109,7 +109,7 @@ const HelpMaterials = () => {
       duration: "2 hours",
       lessons: 12,
       progress: 0,
-      icon: FiGraduationCap,
+      icon: FiBook,
       color: "primary"
     },
     {
@@ -119,7 +119,7 @@ const HelpMaterials = () => {
       duration: "3 hours",
       lessons: 18,
       progress: 0,
-      icon: FiGraduationCap,
+      icon: FiBook,
       color: "success"
     },
     {
@@ -129,7 +129,7 @@ const HelpMaterials = () => {
       duration: "4 hours",
       lessons: 24,
       progress: 0,
-      icon: FiGraduationCap,
+      icon: FiBook,
       color: "warning"
     }
   ];
