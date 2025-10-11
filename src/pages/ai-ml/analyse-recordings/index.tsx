@@ -1495,6 +1495,7 @@ const AnalyseRecordings = () => {
                                         audioSrc={audioUrl}
                                         title={`Call Recording - ${selectedRecording.Id}`}
                                         showWaveform={true}
+                                        autoPlay={true}
                                     />
                                 </div>
                             )}

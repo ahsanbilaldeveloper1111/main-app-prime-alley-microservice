@@ -1106,6 +1106,7 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
                     audioSrc={audioUrl}
                     title={`Call Recording - ${selectedRecording.Id}`}
                     showWaveform={true}
+                    autoPlay={true}
                   />
                 </div>
               )}
