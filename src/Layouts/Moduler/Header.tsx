@@ -8,7 +8,7 @@ import tokenService from "../../utils/tokenService";
 import "../../assets/scss/sidebar.scss";
 
 import CompanyLogo from "@assets/images/ringedge-logo.png";
-import CompanyLogo2 from "@assets/images/ringedge-logo-black-n-blue.png";
+import CompanyLogo2 from "@assets/images/Prime3.png";
 
 import { authAPI } from "@utils/api";
 import { useAuth } from "../../hooks/useAuth";

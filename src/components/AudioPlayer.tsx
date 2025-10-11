@@ -6,6 +6,7 @@ interface AudioPlayerProps {
     audioSrc: string;
     title?: string;
     showWaveform?: boolean;
+    autoPlay?: boolean;
 }
 
 export interface AudioPlayerRef {
@@ -17,7 +18,8 @@ export interface AudioPlayerRef {
 const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(({ 
     audioSrc, 
     title = "Call Recording",
-    showWaveform = false 
+    showWaveform = false ,
+    autoPlay = false
 }, ref) => {
     const [isPlaying, setIsPlaying] = useState(false);
     const [currentTime, setCurrentTime] = useState(0);
@@ -89,7 +91,14 @@ const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(({
         };
     }, []);
 
+    useEffect(() => {
+        if (autoPlay) {
+            togglePlay();
+        }
+    }, [autoPlay]);
+
     const togglePlay = async () => {
+        console.log("REDASDA", audioRef.current);
         if (audioRef.current) {
             try {
                 setIsLoading(true);
@@ -97,7 +106,9 @@ const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(({
                     audioRef.current.pause();
                 } else {
                     // Ensure audio is loaded before playing
+                    console.log("REDASDA 2", audioRef.current.readyState);
                     if (audioRef.current.readyState < 2) {
+                        
                         await new Promise((resolve, reject) => {
                             const audio = audioRef.current!;
                             const handleCanPlay = () => {
@@ -115,6 +126,7 @@ const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(({
                             audio.load();
                         });
                     }
+                    console.log("REDASDA 3", audioRef.current.readyState);
                     await audioRef.current.play();
                 }
             } catch (error) {
