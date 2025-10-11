@@ -84,6 +84,7 @@ const CallIncomingCountry = () => {
     const { data:session, status } = useSession();
     const [loading, setLoading] = useState(false);
     const [activeTab, setActiveTab] = useState('calls_chart');
+    const [showPageLoader, setShowPageLoader] = useState(false);
     
     // Debug session state
     useEffect(() => {
@@ -190,6 +191,7 @@ const CallIncomingCountry = () => {
     });
     
     const fetchCallLogs = useCallback(async (page = 1, perPage = 15, search = "") => {
+        
         // Only fetch if filters are ready
         if (!filtersReady) {
             console.log('Filters not ready yet, skipping fetch');
@@ -197,10 +199,13 @@ const CallIncomingCountry = () => {
         }
         
         setLoading(true);
+        setShowPageLoader(true);
         
         try {
             const response = await ListCallLogs({ page, perPage, search, filters: currentFilters, reportType: 'incomingStatsCountry', 
-                moduleSlug: ModuleSlug.CALL_REPORTS }, 'call-logs/statsIncomingByCountry');
+                moduleSlug: ModuleSlug.CALL_REPORTS }, 'call-logs/statsIncomingByCountry').finally(() => {
+                  setShowPageLoader(false);
+                });
             
             if (response?.summary) {
                 setSummary(response.summary);
@@ -556,7 +561,7 @@ const CallIncomingCountry = () => {
     
     return (
         <React.Fragment>
-            <BreadcrumbItem mainTitle="" mainLink="" subTitle="Call Incoming By Country" />
+            <BreadcrumbItem mainTitle="" mainLink="" subTitle="Call Incoming By Country" showPageLoader={showPageLoader} />
 
 
             <Row className="mb-3">

@@ -27,6 +27,7 @@ import moment from 'moment';
 import Link from 'next/link';
 import NProgress from "nprogress";
 import "nprogress/nprogress.css";
+import PageLoader from '@components/PageLoader';
 
 
 import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
@@ -83,6 +84,7 @@ const formatSecondsToTime = (seconds: number): string => {
 
 const CallDashboard = () => {
     const { data:session, status } = useSession();
+    const [showPageLoader, setShowPageLoader] = useState(false);
     const [showCountryChartModal, setShowCountryChartModal] = useState(false);
     const [showDepartmentChartModal, setShowDepartmentChartModal] = useState(false);
     const [showExtensionChartModal, setShowExtensionChartModal] = useState(false);
@@ -210,7 +212,11 @@ const CallDashboard = () => {
         fetchGeneralStats();
     }, []);
     const fetchGeneralStats = async () => {
-      const response = await ListCallLogs({ page:  page, perPage: perPage, search: "", filters: currentFilters,reportType: 'statsDashboard' }, 'call-logs/generalStats');
+      setShowPageLoader(true);
+      const response = await ListCallLogs({ page:  page, perPage: perPage, search: "", filters: currentFilters,reportType: 'statsDashboard' }, 
+        'call-logs/generalStats').finally(() => {
+          setShowPageLoader(false);
+        });
 
       if(response.success){
         const responseData = response.data;
@@ -686,8 +692,7 @@ const [ExtensionChart, setExtensionChart] = React.useState({
     return (
         <React.Fragment>
             {/* Removed LoadingBar component */}
-            <BreadcrumbItem mainTitle="Call Logs" mainLink="/call-logs/dashboard" subTitle="Call Dashboard" />
-
+            <BreadcrumbItem mainTitle="Call Logs" mainLink="/call-logs/dashboard" subTitle="Call Dashboard" showPageLoader={showPageLoader} />
 
 
             <Row className="mb-3">

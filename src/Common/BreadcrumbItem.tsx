@@ -3,19 +3,22 @@ import Link from "next/link";
 import React from "react";
 import { Row, Col } from "react-bootstrap";
 const baseUrl = process.env.NEXT_PUBLIC_BASE_URL;
+import PageLoader from '@components/PageLoader';
 
 interface BreadcrumbItemProps {
   mainTitle: string;
   mainLink: string;
   subTitle: string;
+  showPageLoader?: boolean;
 }
 
-const BreadcrumbItem: React.FC<BreadcrumbItemProps> = ({ mainTitle,mainLink, subTitle }) => {
+const BreadcrumbItem: React.FC<BreadcrumbItemProps> = ({ mainTitle,mainLink, subTitle, showPageLoader=false }) => {
   return (
     <React.Fragment>
     <Head>
       <title>{subTitle} | Business Contact Center</title>
     </Head>
+    <PageLoader isLoading={showPageLoader} />
     {/* <div className="page-header">
       <div className="page-block">
         <Row className="row align-items-center">

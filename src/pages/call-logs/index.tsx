@@ -18,6 +18,7 @@ import imgStatus2 from '@assets/images/widget/img-status-2.svg'
 import imgStatus3 from '@assets/images/widget/img-status-3.svg'
 import imgStatus4 from '@assets/images/widget/img-status-4.svg'
 import moment from 'moment';
+import PageLoader from '@components/PageLoader';
 
 
 import '@assets/scss/common.scss';
@@ -35,6 +36,7 @@ interface Summary {
 
 const CallLogs = () => {
     const { data:session, status } = useSession();
+    const [showPageLoader, setShowPageLoader] = useState(false);
    
     const columns: Column[] = [
         { key: 'Date', name: 'Date', selector: (row: any) => row.Date, sortable: true,
@@ -126,7 +128,9 @@ const CallLogs = () => {
     ];
     
     const fetchCallLogs = useCallback(async (page = 1, perPage = 15, search = "") => {
+        setShowPageLoader(true);
         const response = await ListCallLogs({ page, perPage, search, filters: currentFilters, moduleSlug: ModuleSlug.CALL_LOGS }, 'call-logs/list');
+        setShowPageLoader(false);
         //console.log(response);
         if(response?.summary){
             setSummary(response.summary);
@@ -142,7 +146,7 @@ const CallLogs = () => {
 
     const handleExport = async (exportType: string, filters: Record<string, any>) => {
      
-
+        setShowPageLoader(true);
       try {
             if (exportType === 'excel') {
              
@@ -150,7 +154,9 @@ const CallLogs = () => {
                 { filters: currentFilters, isExport: true, exportType, moduleSlug: ModuleSlug.CALL_LOGS },
                 'call-logs/list',
                 'downlaodCallLogs'
-              );
+              ).finally(() => {
+                setShowPageLoader(false);
+              });
             }
           } catch (error) {
             console.error('Export error:', error);
@@ -161,9 +167,8 @@ const CallLogs = () => {
     
     return (
         <React.Fragment>
-            <BreadcrumbItem mainTitle="" mainLink="" subTitle="Call Logs" />
+            <BreadcrumbItem mainTitle="" mainLink="" subTitle="Call Logs" showPageLoader={showPageLoader} />
            
-
 
             <Row className="mb-3">
             <Col md={12}>

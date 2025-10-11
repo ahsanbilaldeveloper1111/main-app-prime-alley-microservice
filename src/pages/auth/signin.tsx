@@ -10,6 +10,7 @@ import { toast } from "react-toastify";
 import { FaSpinner } from "react-icons/fa";
 import "@assets/scss/login.scss";
 import Footer from "@components/Footer";
+import PageLoader from "@components/PageLoader";
 
 const Signin = () => {
   const [credentials, setCredentials] = useState({
@@ -206,13 +207,7 @@ const Signin = () => {
 
          {/* Session Loading Overlay */}
          {(sessionLoading || (status === "authenticated" || status === "loading")) && (
-           <div className="session-loading-overlay">
-             <div className="session-loading-content">
-               <div className="session-loading-spinner">
-                 <FaSpinner className="fa-spin" />
-               </div>
-             </div>
-           </div>
+          <PageLoader isLoading={true} />
          )}
 
         {!sessionLoading && (

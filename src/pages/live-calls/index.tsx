@@ -11,6 +11,7 @@ import moment from 'moment'
 import useCtiStomp from '../../hooks/useCtiStomp'
 import useGlobalCallTimer from '../../hooks/useGlobalCallTimer'
 import dynamic from 'next/dynamic'
+import PageLoader from '@components/PageLoader'
 
 import Link from 'next/link'
 import { clearAllLocalStorage, getLocalStorageInfo } from '../../utils/localStorageUtils'
@@ -101,6 +102,11 @@ const LiveCallDashboard = () => {
   // Use ref to track previous sections to avoid infinite loops
   const previousSectionsRef = useRef<{ [dn: string]: string }>({})
   
+  // Simulation state
+  const [isSimulationMode, setIsSimulationMode] = useState(false)
+  const [simulationUsers, setSimulationUsers] = useState<Array<{ id: number; name: string; status: 'supervision' | 'oncall' | 'online' | 'offline' }>>([])
+  const simulationIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  
   // Helper functions
   const getCardLevelStatus = (devices: CtiDevice[]) => {
     if (!devices || devices.length === 0) return 'unregistered'
@@ -136,7 +142,7 @@ const LiveCallDashboard = () => {
   // Initialize previous sections when data is first loaded
   useEffect(() => {
     if (isInitialized && dnsMap && Object.keys(previousSectionsRef.current).length === 0) {
-      const dnsList = Object.values(dnsMap).filter(({ dn }) => dn !== userAddress)
+      const dnsList = Object.values(dnsMap)
       const initialSections: { [dn: string]: string } = {}
       
       dnsList.forEach(({ dn, devices }) => {
@@ -429,7 +435,7 @@ const LiveCallDashboard = () => {
   const categorizedDns = useMemo(() => {
     if (!isInitialized || !dnsMap) return {}
     
-    const dnsList = Object.values(dnsMap).filter(({ dn }) => dn !== userAddress)
+    const dnsList = Object.values(dnsMap)
     const result: { [dn: string]: string } = {}
     
     dnsList.forEach(({ dn, devices }) => {
@@ -1581,16 +1587,19 @@ const LiveCallDashboard = () => {
 
   if (!isInitialized) {
     return (
+      <>
+      <PageLoader isLoading={true} />
       <div className="alert alert-info m-3">
         Connecting to server...
       </div>
+      </>
     )
   }
 
   return (
     <React.Fragment>
       <style dangerouslySetInnerHTML={{ __html: customStyles }} />
-      <BreadcrumbItem mainTitle="CTI" mainLink="/cti" subTitle="Live Calls" />
+      <BreadcrumbItem mainTitle="CTI" mainLink="/cti" subTitle="Live Calls"  />
 
       {/* Header */}
       
@@ -1649,95 +1658,6 @@ const LiveCallDashboard = () => {
             </Col>
             </Row>
 
-     
-
-
-       {/* CTI Summary Cards */}
-       {/* <PageSummaryGrid 
-         cards={[
-           {
-             id: 'total-extensions',
-             title: 'Total Extensions',
-             value: summaryData.extensions,
-             description: 'All extensions in the system',
-             delay: 0.1,
-             animationDuration: 1000,
-             fontStyle: 'style-2'
-           },
-          //  {
-          //    id: 'in-supervision',
-          //    title: 'In Supervision',
-          //    value: (() => {
-          //      const dnsList = Object.values(dnsMap).filter(({ dn }) => dn !== userAddress)
-          //      return dnsList.filter(({ dn, devices }) => {
-          //        const deviceList = Object.values(devices || {})
-          //        const call = getDnCallState(dn)
-          //        const active = hasActiveCalls(dn)
-          //        return categorizeDns(dn, deviceList, call, active) === 'supervision'
-          //      }).length
-          //    })(),
-          //    description: 'Extensions being monitored',
-          //    delay: 0.2,
-          //    animationDuration: 1000,
-          //    fontStyle: 'style-2'
-          //  },
-           {
-             id: 'on-call',
-             title: 'On Call',
-             value: (() => {
-               const dnsList = Object.values(dnsMap).filter(({ dn }) => dn !== userAddress)
-               return dnsList.filter(({ dn, devices }) => {
-                 const deviceList = Object.values(devices || {})
-                 const call = getDnCallState(dn)
-                 const active = hasActiveCalls(dn)
-                 return categorizeDns(dn, deviceList, call, active) === 'onCall'
-               }).length
-             })(),
-             description: 'Extensions with active calls',
-             delay: 0.3,
-             animationDuration: 1000,
-             fontStyle: 'style-2'
-           },
-           {
-             id: 'active-idle',
-             title: 'Active/Idle',
-             value: (() => {
-               const dnsList = Object.values(dnsMap).filter(({ dn }) => dn !== userAddress)
-               return dnsList.filter(({ dn, devices }) => {
-                 const deviceList = Object.values(devices || {})
-                 const call = getDnCallState(dn)
-                 const active = hasActiveCalls(dn)
-                 return categorizeDns(dn, deviceList, call, active) === 'activeIdle'
-               }).length
-             })(),
-             description: 'Online and available extensions',
-             delay: 0.4,
-             animationDuration: 1000,
-             fontStyle: 'style-2'
-           },
-           {
-             id: 'down-offline',
-             title: 'Down/Offline',
-             value: (() => {
-               const dnsList = Object.values(dnsMap).filter(({ dn }) => dn !== userAddress)
-               return dnsList.filter(({ dn, devices }) => {
-                 const deviceList = Object.values(devices || {})
-                 const call = getDnCallState(dn)
-                 const active = hasActiveCalls(dn)
-                 return categorizeDns(dn, deviceList, call, active) === 'downOffline'
-               }).length
-             })(),
-             description: 'Offline or down extensions',
-             delay: 0.5,
-             animationDuration: 1000,
-             fontStyle: 'style-2'
-           }
-         ]}
-       /> */}
-
-
-
-
       {/* Notification */}
       {notification && (
         <div className="notification-container">
@@ -1762,7 +1682,7 @@ const LiveCallDashboard = () => {
                   // Use the global getSectionColor function
 
                   // Group DNs by sections
-                  const dnsList = Object.values(dnsMap).filter(({ dn }) => dn !== userAddress)
+                  const dnsList = Object.values(dnsMap)
                   const sections = {
                     supervision: [] as any[],
                     onCall: [] as any[],

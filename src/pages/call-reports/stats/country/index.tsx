@@ -112,12 +112,15 @@ const CallStatsCountry = () => {
   
   ];
 
+  const [showPageLoader, setShowPageLoader] = useState(false);
   const fetchCallLogs = useCallback(async (page = 1, perPage = 15, search = "") => {
+    
     if (!filtersReady) {
       return;
     }
     
     setLoading(true);
+    setShowPageLoader(true);
     
     try {
       const response = await ListCallLogs({ 
@@ -127,7 +130,9 @@ const CallStatsCountry = () => {
         filters: currentFilters, 
         reportType: 'statsCountry',
         moduleSlug: ModuleSlug.CALL_REPORTS
-      }, 'call-logs/statsByCountry');
+      }, 'call-logs/statsByCountry').finally(() => {
+        setShowPageLoader(false);
+      });
       
       if (response?.summary) {
         setSummary(response.summary);
@@ -355,7 +360,7 @@ const CallStatsCountry = () => {
 
   return (
     <React.Fragment>
-      <BreadcrumbItem mainTitle="" mainLink="" subTitle="Call Stats By Country" />
+      <BreadcrumbItem mainTitle="" mainLink="" subTitle="Call Stats By Country" showPageLoader={showPageLoader} />
       
       <Row className="mb-3">
         <Col md={12}>

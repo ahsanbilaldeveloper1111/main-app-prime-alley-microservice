@@ -41,6 +41,7 @@ import router from 'next/router';
 import axiosInstance from '@utils/axios';
 import { toast } from 'react-toastify';
 import { convertUTCToUserTimezone, convertUTCTimeToUserTimezone, convertUTCSeparateDateTimeToUserTime, convertUTCSeparateDateTimeToUserDate, formatDuration, convertUTCDateToUserTimezone, GlobalDateFormat, GlobalTimeFormat } from '@utils/Helper';
+import PageLoader from '@components/PageLoader';
 
 const ReactApexChart = dynamic(() => import('react-apexcharts'), { ssr: false });
 
@@ -88,6 +89,7 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
   const stableGetAccessToken = useCallback(getAccessToken, []);
   const socketRef = useRef<Socket | null>(null);
   const audioPlayerRef = useRef<AudioPlayerRef>(null);
+  const [showPageLoader, setShowPageLoader] = useState(false);
 
   // State declarations
   const [refreshKey, setRefreshKey] = useState<number>(0);
@@ -373,10 +375,13 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
   };
 
   const fetchCallLogsOriginal = useCallback(async (page = 1, perPage = 15, search = "") => {
+    setShowPageLoader(true);
     const response = await ListCallLogs(
       { page, perPage, search, filters: currentFilters, reportType: 'recordings', moduleSlug: ModuleSlug.CALL_RECORDINGS },
       'call-logs/recordings'
-    );
+    ).finally(() => {
+      setShowPageLoader(false);
+    });
     
 
     if (response?.summary) {
@@ -606,6 +611,7 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
   };
 
   const handleExport = async (exportType: string, filters: Record<string, any>) => {
+    setShowPageLoader(true);
     try {
       if (exportType === 'excel') {
        
@@ -613,8 +619,9 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
           { filters: currentFilters, isExport: true, exportType, moduleSlug: ModuleSlug.CALL_RECORDINGS},
           'call-logs/recordings',
           'recordings'
-          
-        );
+        ).finally(() => {
+          setShowPageLoader(false);
+        });
       }
     } catch (error) {
       console.error('Export error:', error);
@@ -624,9 +631,12 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
 
   const handleDownload = async (props: any) => {
     const { Id, AgentExtension } = props;
+    setShowPageLoader(true);
     return await DownloadCallRecording(
       Id,AgentExtension,'call-logs/recordings/download', props.imagicle
-    );
+    ).finally(() => {
+      setShowPageLoader(false);
+    });
   };
 
   const handleAnalysis = async (props: any) => {
@@ -639,6 +649,8 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
   };
 
   const handlePlayRecording = (recording: any) => {
+
+    setShowPageLoader(true);
     const trackId = recording.Id;
     const agentExtension = recording.AgentExtension;
 
@@ -674,6 +686,7 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
           'Accept': 'audio/*, application/octet-stream, */*'
         }
       });
+      setShowPageLoader(false);
       
       console.log('AxiosInstance response received:', response.status, response.headers);
       
@@ -853,7 +866,8 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
         </Modal.Body>
       </Modal>
 
-      <BreadcrumbItem mainTitle="" mainLink="" subTitle="Call Recordings" />
+
+      <BreadcrumbItem mainTitle="" mainLink="" subTitle="Call Recordings" showPageLoader={showPageLoader} />
 
       
       <Row className="mb-3">
