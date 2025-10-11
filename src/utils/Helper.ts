@@ -287,13 +287,13 @@ export const formatDateTimeToLocal = (
     let momentObj: moment.Moment;
     
     if (datetime instanceof Date) {
-      momentObj = moment.utc(datetime);
+      momentObj = moment(datetime);
     } else if (inputFormat) {
       // Parse with specific input format
-      momentObj = moment.utc(datetime, inputFormat);
+      momentObj = moment(datetime, inputFormat);
     } else {
       // Auto-detect format
-      momentObj = moment.utc(datetime);
+      momentObj = moment(datetime);
     }
     
     if (!momentObj.isValid()) {
