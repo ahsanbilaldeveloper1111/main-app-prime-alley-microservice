@@ -22,7 +22,11 @@ export const HEADER_CONSTANTS = {
   // Menu Labels
   MENU_LABELS: {
     DASHBOARD: 'Dashboard',
-    CONTROL_HUB: 'Resources',
+    CONTROL_HUB: 'Control Hub',
+    RESOURCES: 'Resources',
+    HELP_MATERIALS: 'Help Materials',
+    FAQ: 'FAQ',
+    CONTACT_SUPPORT: 'Contact Support',
     SIM_GATEWAY: 'Telco Gateway',
     CALL_LOGS: 'Call Logs',
     CALL_RECORDINGS: 'Call Recordings',
@@ -189,7 +193,11 @@ export const HEADER_CONSTANTS = {
     MEGAPHONE: 'ph-duotone ph-megaphone',
     PHONE: 'ph-duotone ph-phone',
     CARET_RIGHT: 'ph-duotone ph-caret-right',
-    CARET_DOWN: 'ph-duotone ph-caret-down'
+    CARET_DOWN: 'ph-duotone ph-caret-down',
+    RESOURCES: 'ph-duotone ph-notebook',
+    HELP_MATERIALS: 'ph-duotone ph-book',
+    FAQ: 'ph-duotone ph-question',
+    CONTACT_SUPPORT: 'ph-duotone ph-headset'
   } as const,
   
   // Permissions
@@ -207,7 +215,8 @@ export const HEADER_CONSTANTS = {
     DNCR_SERVICES: 'dncr-services',
     ACCOUNTS_SERVICES: 'accounts-services',
     NETOPS_SERVICES: 'health-care-services',
-    CALL_HISTORY_SERVICES: 'call-history-services'
+    CALL_HISTORY_SERVICES: 'call-history-services',
+    RESOURCES_SERVICES: 'resources-services'
   } as const
 } as const;
 

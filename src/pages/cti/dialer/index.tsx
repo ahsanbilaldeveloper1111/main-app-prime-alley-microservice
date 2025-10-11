@@ -19,6 +19,7 @@ import "@assets/scss/pgDialer.scss";
 
 const CtiDialer = () => {
   const router = useRouter()
+  const [showPageLoader, setShowPageLoader] = useState(false)
   
   // CTI Socket hook integration
   const {
@@ -412,11 +413,13 @@ const CtiDialer = () => {
       };
       
       console.log('📞 Making API call with params:', apiParams);
-      
-      const result = await makeCall(apiParams)
+      setShowPageLoader(true);
+      const result = await makeCall(apiParams);
 
       console.log(result, "result cti");
-      if (result.success) { console.log( "yes true");
+      if (result.success) { 
+        setShowPageLoader(false);
+        console.log( "yes true");
         const responseData = result.data.responseData
         const callStatusFromAPI = responseData.status
         
@@ -443,16 +446,19 @@ const CtiDialer = () => {
         
         // toast.success(`Call ${localCallStatus === 'connected' ? 'connected' : 'initiated'} to ${dialedNumber}`)
       } else {
+        setShowPageLoader(false);
         console.error('Dial API error:', result.error)
         setCallStatus('ended')
         toast.error(`Failed to connect: ${result.error}`)
       }
     } catch (error) {
+      setShowPageLoader(false);
       console.error('Error calling dial API:', error)
       setCallStatus('ended')
       toast.error('Failed to connect: Network error')
     } finally {
-      setIsDialing(false)
+      setIsDialing(false);
+      setShowPageLoader(false);
     }
   }
 
@@ -569,7 +575,7 @@ const CtiDialer = () => {
       }
 
       console.log('Calling device:', callingDevice)
-
+      setShowPageLoader(true);
       // Call the holdCall API
       const result = await holdCall({
         callId: call.callId,
@@ -577,9 +583,10 @@ const CtiDialer = () => {
         calledAddress: call.calledAddress || call.number,
         callingDeviceType: callingDevice.callingDeviceType,
         callingDeviceName: callingDevice.callingDeviceName
-      })
+      });
 
       if (result.success) {
+        setShowPageLoader(false);
         // Update local call status to onHold
         setActiveCalls(prev => {
           const newMap = new Map(prev)
@@ -593,13 +600,16 @@ const CtiDialer = () => {
         })
         toast.success('Call put on hold')
       } else {
+        setShowPageLoader(false);
         console.error('Hold call API error:', result.error)
         toast.error(`Failed to hold call: ${result.error}`)
       }
     } catch (error) {
+      setShowPageLoader(false);
       console.error('Error calling hold call API:', error)
       toast.error('Failed to hold call: Network error')
     } finally {
+      setShowPageLoader(false);
       // Clear processing state
       setProcessingCalls(prev => {
         const newSet = new Set(prev)
@@ -633,6 +643,7 @@ const CtiDialer = () => {
         return
       }
 
+      setShowPageLoader(true);
       // Call the resumeCall API
       const result = await resumeCall({
         callId: call.callId,
@@ -643,6 +654,7 @@ const CtiDialer = () => {
       })
 
       if (result.success) {
+        setShowPageLoader(false);
         // Update local call status to connected
         setActiveCalls(prev => {
           const newMap = new Map(prev)
@@ -656,13 +668,16 @@ const CtiDialer = () => {
         })
         toast.success('Call resumed')
       } else {
+        setShowPageLoader(false);
         console.error('Resume call API error:', result.error)
         toast.error(`Failed to resume call: ${result.error}`)
       }
     } catch (error) {
+      setShowPageLoader(false);
       console.error('Error calling resume call API:', error)
       toast.error('Failed to resume call: Network error')
     } finally {
+      setShowPageLoader(false);
       // Clear processing state
       setProcessingCalls(prev => {
         const newSet = new Set(prev)
@@ -715,6 +730,7 @@ const CtiDialer = () => {
     }
 
     try {
+      setShowPageLoader(true);
       // Call the mergeCalls API
       const result = await mergeCalls({
         heldCallId: heldCall.callId,
@@ -722,7 +738,9 @@ const CtiDialer = () => {
         callingAddress: callingDevice.callingAddress,
         callingDeviceType: callingDevice.callingDeviceType,
         callingDeviceName: callingDevice.callingDeviceName
-      })
+      });
+
+      setShowPageLoader(false);
 
       if (result.success) {
         // Create merged call entry
@@ -788,8 +806,11 @@ const CtiDialer = () => {
         toast.error(`Failed to merge calls: ${result.error}`)
       }
     } catch (error) {
+      setShowPageLoader(false);
       console.error('Error calling merge calls API:', error)
       toast.error('Failed to merge calls: Network error')
+    } finally {
+      setShowPageLoader(false);
     }
   }
 
@@ -848,6 +869,7 @@ const CtiDialer = () => {
         return
       }
 
+      setShowPageLoader(true);
       // Call the transfer API
       const result = await transferCalls({
         callId: call.callId,
@@ -860,6 +882,7 @@ const CtiDialer = () => {
       })
 
       if (result.success) {
+        setShowPageLoader(false);
         if (isMergedCallMember) {
           // Handle transfer of merged call member
           // Remove the member from the merged call
@@ -921,6 +944,7 @@ const CtiDialer = () => {
             return newMap
           })
         } else {
+          setShowPageLoader(false);
           // Handle transfer of regular call
           setActiveCalls(prev => {
             const newMap = new Map(prev)
@@ -944,13 +968,16 @@ const CtiDialer = () => {
         
         toast.success(`Call transferred to ${targetExtension} successfully`)
       } else {
+        setShowPageLoader(false);
         console.error('Transfer call API error:', result.error)
         toast.error(`Failed to transfer call: ${result.error}`)
       }
     } catch (error) {
+      setShowPageLoader(false);
       console.error('Error calling transfer call API:', error)
       toast.error('Failed to transfer call: Network error')
     } finally {
+      setShowPageLoader(false);
       // Clear processing state
       setProcessingCalls(prev => {
         const newSet = new Set(prev)
@@ -984,6 +1011,7 @@ const CtiDialer = () => {
         return
       }
 
+      setShowPageLoader(true);
       // Call the endCall API
       const result = await endCall({
         callId: call.callId,
@@ -994,6 +1022,7 @@ const CtiDialer = () => {
       })
 
       if (result.success) {
+        setShowPageLoader(false);
         // Update local call status to ended
         setActiveCalls(prev => {
           const newMap = new Map(prev)
@@ -1010,13 +1039,16 @@ const CtiDialer = () => {
         setTimeout(() => removeCall(callId), 1000)
         toast.success('Call ended successfully')
       } else {
+        setShowPageLoader(false);
         console.error('End call API error:', result.error)
         toast.error(`Failed to end call: ${result.error}`)
       }
     } catch (error) {
+      setShowPageLoader(false);
       console.error('Error calling end call API:', error)
       toast.error('Failed to end call: Network error')
     } finally {
+      setShowPageLoader(false);
       // Clear processing state
       setProcessingCalls(prev => {
         const newSet = new Set(prev)
@@ -2431,7 +2463,7 @@ const CtiDialer = () => {
 
   return (
     <React.Fragment>
-      <BreadcrumbItem mainTitle="CTI" mainLink="/cti" subTitle="Live Dialer" />
+      <BreadcrumbItem mainTitle="CTI" mainLink="/cti" subTitle="Live Dialer" showPageLoader={showPageLoader} />
 
 
       <PageHeader title="Live Dialer"

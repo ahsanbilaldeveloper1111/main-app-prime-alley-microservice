@@ -16,6 +16,12 @@ export const routePermissions: RoutePermission[] = [
     {path: '/coming-soon',permissions: ['']},
     {path: '/plan-upgrade',permissions: ['']},
     {path: '/live-calls-test',permissions: ['']},
+    {path: '/resources',permissions: ['']},
+   
+    {path: '/resources/faq',permissions: ['']},
+    {path: '/resources/help-materials',permissions: ['']},
+    {path: '/resources/contact-support',permissions: ['']},
+
 
     {path: '/reports',permissions: [PERMISSIONS.REPORTS_SERVICES]},
 

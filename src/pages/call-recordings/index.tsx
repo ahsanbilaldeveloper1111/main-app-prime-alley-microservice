@@ -42,6 +42,8 @@ import axiosInstance from '@utils/axios';
 import { toast } from 'react-toastify';
 import { convertUTCToUserTimezone, convertUTCTimeToUserTimezone, convertUTCSeparateDateTimeToUserTime, convertUTCSeparateDateTimeToUserDate, formatDuration, convertUTCDateToUserTimezone, GlobalDateFormat, GlobalTimeFormat } from '@utils/Helper';
 import PageLoader from '@components/PageLoader';
+import CircularProgressLoader from '@components/CircularProgressLoader';
+import CircularProgressCircle from '@components/CircularProgressCircle';
 
 const ReactApexChart = dynamic(() => import('react-apexcharts'), { ssr: false });
 
@@ -104,6 +106,8 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
   const [audioUrl, setAudioUrl] = useState<string>('');
   const [audioError, setAudioError] = useState<string | null>(null);
   const [mediaPlayerShow, setMediaPlayerShow] = useState(false);
+  const [downloadingRecordings, setDownloadingRecordings] = useState<Set<string>>(new Set());
+  const [downloadProgress, setDownloadProgress] = useState<Record<string, number>>({});
   
   // State for managing data and manual additions
   const [currentData, setCurrentData] = useState<any[]>([]);
@@ -297,6 +301,9 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
       selector: (row: any) => row.Action,
       sortable: true,
       cell: (props: any) => {
+        const isDownloading = downloadingRecordings.has(props.Id);
+        const progress = downloadProgress[props.Id] || 0;
+        
         return (
           <div className='d-flex gap-3 action-box'>
             <i
@@ -306,15 +313,29 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
               style={{ fontSize: '1rem', cursor: 'pointer' }}
               onClick={() => handlePlayRecording(props)}
             />
-            <i
-              data-tooltip-id="my-tooltip"
-              data-tooltip-content="Download"
-              className='ph-duotone ph-arrow-line-down text-info'
-              style={{ fontSize: '1rem' }}
-              onClick={() => {
-                handleDownload(props);
-              }}
-            />
+            <div style={{ display: 'inline-flex', alignItems: 'center' }}>
+              {isDownloading ? (
+                <CircularProgressCircle 
+                  progress={progress}
+                  size="small" 
+                  color="#28a745"
+                  backgroundColor="#e9ecef"
+                  textColor="#495057"
+                  showPercentage={false}
+                  className="circular-progress-inline"
+                />
+              ) : (
+                <i
+                  data-tooltip-id="my-tooltip"
+                  data-tooltip-content="Download"
+                  className='ph-duotone ph-arrow-line-down text-info'
+                  style={{ fontSize: '1rem', cursor: 'pointer' }}
+                  onClick={() => {
+                    handleDownload(props);
+                  }}
+                />
+              )}
+            </div>
             <i
               data-tooltip-id="my-tooltip"
               data-tooltip-content="Call Analysis"
@@ -631,12 +652,61 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
 
   const handleDownload = async (props: any) => {
     const { Id, AgentExtension } = props;
-    setShowPageLoader(true);
-    return await DownloadCallRecording(
-      Id,AgentExtension,'call-logs/recordings/download', props.imagicle
-    ).finally(() => {
-      setShowPageLoader(false);
-    });
+    
+    // Add to downloading set and initialize progress
+    setDownloadingRecordings(prev => new Set(prev).add(Id));
+    setDownloadProgress(prev => ({ ...prev, [Id]: 0 }));
+    
+    try {
+      // Simulate progress updates
+      const progressInterval = setInterval(() => {
+        setDownloadProgress(prev => {
+          const currentProgress = prev[Id] || 0;
+          if (currentProgress < 90) {
+            return { ...prev, [Id]: currentProgress + Math.random() * 15 };
+          }
+          return prev;
+        });
+      }, 200);
+
+      await DownloadCallRecording(
+        Id, AgentExtension, 'call-logs/recordings/download', props.imagicle
+      );
+      
+      // Complete the progress
+      clearInterval(progressInterval);
+      setDownloadProgress(prev => ({ ...prev, [Id]: 100 }));
+      
+      // Show completion briefly before hiding
+      setTimeout(() => {
+        setDownloadingRecordings(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(Id);
+          return newSet;
+        });
+        setDownloadProgress(prev => {
+          const newProgress = { ...prev };
+          delete newProgress[Id];
+          return newProgress;
+        });
+      }, 1000);
+      
+    } catch (error) {
+      console.error('Download error:', error);
+      toast.error('Download failed');
+      
+      // Remove from downloading set on error
+      setDownloadingRecordings(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(Id);
+        return newSet;
+      });
+      setDownloadProgress(prev => {
+        const newProgress = { ...prev };
+        delete newProgress[Id];
+        return newProgress;
+      });
+    }
   };
 
   const handleAnalysis = async (props: any) => {

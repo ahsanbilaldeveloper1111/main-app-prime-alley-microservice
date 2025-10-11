@@ -15,6 +15,8 @@ import { useAuth } from "../../hooks/useAuth";
 import { useTmsPermissions } from "../../hooks/useTmsPermissions";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
 
+import { FiChevronDown } from "react-icons/fi";
+
 // Destructure constants for easier use
 const { BASE_URL, DOM_SELECTORS, TIMING, MENU_LABELS, SUBMENU_LABELS, ICONS, PERMISSIONS } = HEADER_CONSTANTS;
 
@@ -739,6 +741,15 @@ const Header = ({ themeMode }: HeaderProps) => {
             isMain:false,
             url: ''
         },
+        {
+            key: 'resources',
+            permission: "",
+            icon: ICONS.RESOURCES,
+            label: MENU_LABELS.RESOURCES,
+            target: '#pc-tab-resources',
+            isMain:false,
+            url: ''
+        },
        
     
         
@@ -1054,11 +1065,38 @@ const Header = ({ themeMode }: HeaderProps) => {
                 }
             ]
         },
+        {
+            id: 'pc-tab-resources',
+            title: MENU_LABELS.RESOURCES,
+            items: [
+                {
+                    key: 'faq',
+                    permission: '',
+                    icon: ICONS.FAQ,
+                    label: MENU_LABELS.FAQ,
+                    href: '/resources/faq'
+                },
+                {
+                    key: 'help-materials',
+                    permission: '',
+                    icon: ICONS.HELP_MATERIALS,
+                    label: MENU_LABELS.HELP_MATERIALS,
+                    href: '/resources/help-materials'
+                },
+                {
+                    key: 'contact-support',
+                    permission: '',
+                    icon: ICONS.CONTACT_SUPPORT,
+                    label: MENU_LABELS.CONTACT_SUPPORT,
+                    href: '/resources/contact-support'
+                }
+            ]
+        }
     ], []);
 
     // Reusable submenu item component
     const SubmenuItem = useCallback(({ item }: { item: SubmenuItem }) => {
-        if (!session?.user?.permissions?.includes(item.permission)) return null;
+        if (item.permission && !session?.user?.permissions?.includes(item.permission)) return null;
         
         const isActive = item.pathMatch ? router.asPath.includes(item.pathMatch) : false;
         
@@ -1588,11 +1626,29 @@ const Header = ({ themeMode }: HeaderProps) => {
                                                 <span className="pc-mtext">{MENU_LABELS.DASHBOARD}</span>
                                         </Link>
                                     </li>
+
+                                    {/* <li className="pc-item pc-caption" style={{
+                                        textAlign: "center",
+                                        backgroundColor: "#f8f9fa",
+                                        fontSize: "12px !important",
+                                        display: "flex",
+                                        alignItems: "between",
+                                        justifyContent: "center",
+                                        gap: "5px"
+                                    }}>
+                                        <span>Services</span> <i className="material-icons-two-tone" style={{display: "block",fontSize: "14px"}}>arrow_downward</i>
+                                    </li> */}
                                             
                                             {/* Dynamic Navigation Items */}
                                             {navigationItems.map((item) => {
                                                 // Special handling for Accounts and NetOps - show if user has any permissions or is admin
-                                                const shouldShow =  session?.user?.permissions?.includes(item.permission);
+                                                
+                                                let shouldShow: boolean = false;
+                                                if(item.permission !== ""){
+                                                 shouldShow =  session?.user?.permissions?.includes(item.permission) ||  false;
+                                                }else{
+                                                    shouldShow = true;
+                                                }
 
                                                 if (!shouldShow) return null;
 

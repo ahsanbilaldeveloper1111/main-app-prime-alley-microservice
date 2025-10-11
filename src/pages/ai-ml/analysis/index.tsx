@@ -1272,7 +1272,7 @@ const CallAnalysis = () => {
       <div className="analysis-container">
         {loading ? (
           <Row>
-            <PageLoader isLoading={true} />
+            {/* <PageLoader isLoading={true} /> */}
             <Col md={12}>
               <div className="text-center p-5">
                 <Spinner animation="border" role="status">

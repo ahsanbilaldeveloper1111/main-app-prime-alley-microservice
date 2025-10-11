@@ -54,6 +54,7 @@ const CallTimer: React.FC<{ dn: string; isActive: boolean }> = ({ dn, isActive }
 
 const LiveCallDashboard = () => {
   const { data:session, status } = useSession();
+  const [showPageLoader, setShowPageLoader] = useState(false)
   const {
     summaryData,
     dnsMap,
@@ -1140,6 +1141,7 @@ const LiveCallDashboard = () => {
   }
 
   const startMonitoringLocal = async (dn: string, monitorType: string, toneType?: string) => {
+   
     if (!toneType) {
       console.error('Tone is required for all monitoring types')
       setNotification({ type: 'danger', message: 'Tone selection is required to start monitoring' })
@@ -1177,6 +1179,7 @@ const LiveCallDashboard = () => {
       }
       
       const monitorDevice = userDevices[0]
+    
       return await executeMonitoring(dn, monitorType, toneType, monitorDevice, monitoredDevice)
     }
   }
@@ -1202,7 +1205,9 @@ const LiveCallDashboard = () => {
     )
 
     // Console log the payload
-    console.log('Monitoring API Payload:', payload)
+    console.log('Monitoring API Payload:', payload);
+    setShowPageLoader(true);
+
 
     try {
       let response;
@@ -1210,14 +1215,19 @@ const LiveCallDashboard = () => {
       // Use appropriate API based on monitoring type
       if (monitorType === 'BARGE_IN') {
         console.log('Calling startBargeInMonitoring API...')
-        response = await startBargeInMonitoring(payload)
+        response = await startBargeInMonitoring(payload).finally(() => {
+          setShowPageLoader(false);
+        });
       } else {
         // For SILENT and WHISPER monitoring
         console.log('Calling startMonitoring API...')
-        response = await startMonitoring(payload)
+        response = await startMonitoring(payload).finally(() => {
+          setShowPageLoader(false);
+        });
       }
 
       if (response.success) {
+        setShowPageLoader(false);
         console.log(`${monitorType} monitoring started successfully for:`, dn)
         setActiveMonitoring({ 
           dn, 
@@ -1230,11 +1240,13 @@ const LiveCallDashboard = () => {
         setNotification({ type: 'success', message })
         return true
       } else {
+        setShowPageLoader(false);
         console.error('Failed to start monitoring:', response.error)
         setNotification({ type: 'danger', message: response.error || 'Failed to start monitoring' })
         return false
       }
     } catch (error) {
+      setShowPageLoader(false);
       console.error('Error starting monitoring:', error)
       setNotification({ type: 'danger', message: 'Error starting monitoring' })
       return false
@@ -1257,10 +1269,14 @@ const LiveCallDashboard = () => {
         monitor: userAddress || ''
       }
 
+      setShowPageLoader(true);
       console.log('Stopping silent monitoring with params:', stopParams)
-      const response = await stopMonitoringAPI(stopParams)
+      const response = await stopMonitoringAPI(stopParams).finally(() => {
+        setShowPageLoader(false);
+      });
       
       if (response.success) {
+        setShowPageLoader(false);
         console.log('Silent monitoring stopped successfully for:', dn)
         return true
       } else {
@@ -1268,6 +1284,7 @@ const LiveCallDashboard = () => {
         return false
       }
     } catch (error) {
+      setShowPageLoader(false);
       console.error('Error stopping silent monitoring:', error)
       return false
     }
@@ -1290,16 +1307,22 @@ const LiveCallDashboard = () => {
       }
 
       console.log('Stopping whisper monitoring with params:', stopParams)
-      const response = await stopMonitoringAPI(stopParams)
+      setShowPageLoader(true);
+      const response = await stopMonitoringAPI(stopParams).finally(() => {
+        setShowPageLoader(false);
+      });
       
       if (response.success) {
+        setShowPageLoader(false);
         console.log('Whisper monitoring stopped successfully for:', dn)
         return true
       } else {
+        setShowPageLoader(false);
         console.error('Failed to stop whisper monitoring:', response.error)
         return false
       }
     } catch (error) {
+      setShowPageLoader(false);
       console.error('Error stopping whisper monitoring:', error)
       return false
     }
@@ -1321,17 +1344,23 @@ const LiveCallDashboard = () => {
         monitor: userAddress || ''
       }
 
+      setShowPageLoader(true);
       console.log('Stopping barge-in monitoring with params:', stopParams)
-      const response = await stopBargeInMonitoringAPI(stopParams)
+      const response = await stopBargeInMonitoringAPI(stopParams).finally(() => {
+        setShowPageLoader(false);
+      });
       
       if (response.success) {
+        setShowPageLoader(false);
         console.log('Barge-in monitoring stopped successfully for:', dn)
         return true
       } else {
+        setShowPageLoader(false);
         console.error('Failed to stop barge-in monitoring:', response.error)
         return false
       }
     } catch (error) {
+      setShowPageLoader(false);
       console.error('Error stopping barge-in monitoring:', error)
       return false
     }
@@ -1599,7 +1628,7 @@ const LiveCallDashboard = () => {
   return (
     <React.Fragment>
       <style dangerouslySetInnerHTML={{ __html: customStyles }} />
-      <BreadcrumbItem mainTitle="CTI" mainLink="/cti" subTitle="Live Calls"  />
+      <BreadcrumbItem mainTitle="CTI" mainLink="/cti" subTitle="Live Calls" showPageLoader={showPageLoader} />
 
       {/* Header */}
       

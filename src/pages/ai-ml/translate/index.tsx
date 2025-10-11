@@ -2,7 +2,7 @@ import '@assets/scss/datatable-style.scss';
 import React, { ReactElement, useEffect, useState } from 'react';
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
-import { Button, Form, InputGroup, Modal, Row } from 'react-bootstrap';
+import { Button, Form, InputGroup, Modal, Row, Spinner } from 'react-bootstrap';
 import { Col } from 'react-bootstrap';
 import { toast } from 'react-toastify';
 import { useSession } from 'next-auth/react';
@@ -23,6 +23,7 @@ const CallTranslations = () => {
     const [uuid, setUuid] = useState('');
     const [target, setTarget] = useState('');
     const [isError, setIsError] = useState(false);
+    const [showPageLoader, setShowPageLoader] = useState(false);
 
     const handleGetTranslations = async () => {
         setLoading(true);
@@ -41,7 +42,10 @@ const CallTranslations = () => {
         }
         
         try {
-            const response = await GetTranslations(uuid,target);
+            //setShowPageLoader(true);
+            const response = await GetTranslations(uuid,target).finally(() => {
+                setLoading(false);
+            });
             setTranslations(response);
             if(response.error){
                 toast.error(response.error);
@@ -62,7 +66,7 @@ const CallTranslations = () => {
     
     return (
         <React.Fragment>
-            <BreadcrumbItem mainTitle="" mainLink="" subTitle="Call Translations" />
+            <BreadcrumbItem mainTitle="" mainLink="" subTitle="Call Translations"  />
             <Row className="mb-3">
             <Col md={12}>
                 <div className="page-header-title">
@@ -97,13 +101,18 @@ const CallTranslations = () => {
                             <option value="en">English</option>
                         </Form.Select>
                         <Button variant="primary" onClick={handleGetTranslations} disabled={loading}>
-                            {loading ? 'Loading...' : 'Get Translations'}
+                            {loading ? 
+                            <Spinner animation="border" role="status" size="sm" />
+                             : 'Get Translations'}
                         </Button>
                     </InputGroup>
                 </Col>
             </Row>
 
-            {translations && (
+          
+                    
+
+            {translations  && (
             <Row>
                 <Col md={12}>
                     {isError && (
