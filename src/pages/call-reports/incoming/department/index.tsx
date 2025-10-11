@@ -694,7 +694,7 @@ const CallIncomingDepartment = () => {
                         activeKey={activeTab}
                         onSelect={handleTabChange}
                     >
-                        <Tab eventKey="calls_chart" title="Calls by Country">
+                        <Tab eventKey="calls_chart" title="Calls by Department">
                            <AnimatePresence mode="wait">
                              {activeTab === 'calls_chart' && (
                                <motion.div
@@ -725,7 +725,7 @@ const CallIncomingDepartment = () => {
                                                   showViewAllButton={true}
                                                   viewAllButtonText="View All"
                                                   showFullScreenButton={true}
-                                                  onFullScreenClick={() => handleOpenChartModal(chartCalls, 'Calls by Country', 'calls')}
+                                                  onFullScreenClick={() => handleOpenChartModal(chartCalls, 'Calls by Department', 'calls')}
                                               />
                                           ) : (
                                             <div className=""></div>
@@ -740,7 +740,7 @@ const CallIncomingDepartment = () => {
                         </Tab>
 
 
-                        <Tab eventKey="duration_chart" title="Duration by Country">
+                        <Tab eventKey="duration_chart" title="Duration by Department">
                            <AnimatePresence mode="wait">
                              {activeTab === 'duration_chart' && (
                                <motion.div
@@ -771,7 +771,7 @@ const CallIncomingDepartment = () => {
                                                   showViewAllButton={true}
                                                   viewAllButtonText="View All"
                                                   showFullScreenButton={true}
-                                                  onFullScreenClick={() => handleOpenChartModal(chartDuration, 'Duration by Country', 'time')}
+                                                  onFullScreenClick={() => handleOpenChartModal(chartDuration, 'Duration by Department', 'time')}
                                               />
                                           ) : (
                                             <div className=""></div>
@@ -785,7 +785,7 @@ const CallIncomingDepartment = () => {
                            </AnimatePresence>
                         </Tab>
 
-                        <Tab eventKey="ring_chart" title="Ring Time by Country">
+                        <Tab eventKey="ring_chart" title="Ring Time by Department">
                            <AnimatePresence mode="wait">
                              {activeTab === 'ring_chart' && (
                                <motion.div
@@ -816,7 +816,7 @@ const CallIncomingDepartment = () => {
                                                   showViewAllButton={true}
                                                   viewAllButtonText="View All"
                                                   showFullScreenButton={true}
-                                                  onFullScreenClick={() => handleOpenChartModal(chartRingTime, 'Ring Time by Country', 'time')}
+                                                  onFullScreenClick={() => handleOpenChartModal(chartRingTime, 'Ring Time by Department', 'time')}
                                               />
                                           ) : (
                                               <div className=""></div>
@@ -830,7 +830,7 @@ const CallIncomingDepartment = () => {
                            </AnimatePresence>
                         </Tab>
 
-                        <Tab eventKey="cost_chart" title="Cost by Country">
+                        <Tab eventKey="cost_chart" title="Cost by Department">
                            <AnimatePresence mode="wait">
                              {activeTab === 'cost_chart' && (
                                <motion.div
@@ -861,7 +861,7 @@ const CallIncomingDepartment = () => {
                                                   showViewAllButton={true}
                                                   viewAllButtonText="View All"
                                                   showFullScreenButton={true}
-                                                  onFullScreenClick={() => handleOpenChartModal(chartCost, 'Cost by Country', 'cost')}
+                                                  onFullScreenClick={() => handleOpenChartModal(chartCost, 'Cost by Department', 'cost')}
                                               />
                                           ) : (
                                             <div className=""></div>
