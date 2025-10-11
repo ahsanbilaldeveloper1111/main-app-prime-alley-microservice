@@ -98,8 +98,8 @@ const AnalyseRecordings = () => {
     
     const [refreshKey, setRefreshKey] = useState<number>(0);
     const [currentFilters, setCurrentFilters] = useState({
-      start_date: moment().startOf("week").format('YYYY-MM-DD hh:mm:ss A'),
-      end_date: moment().format('YYYY-MM-DD hh:mm:ss A'),
+      start_date: moment().subtract(1, 'day').startOf('day').format('YYYY-MM-DD hh:mm:ss A'),
+      end_date: moment().endOf('day').format('YYYY-MM-DD hh:mm:ss A'),
     });
     const [generalStats, setGeneralStats] = useState<GeneralStats>({
         totalCalls: 0,
@@ -218,7 +218,7 @@ const AnalyseRecordings = () => {
     const [selectedDirection, setSelectedDirection] = useState<string>('');
     const [selectedStatus, setSelectedStatus] = useState<string>('');
     const [dateRange, setDateRange] = useState({
-        start: moment().startOf("week").format('YYYY-MM-DD'),
+        start: moment().subtract(1, 'day').format('YYYY-MM-DD'),
         end: moment().format('YYYY-MM-DD')
     });
 
