@@ -114,7 +114,15 @@ export interface DashboardData {
   total_leads: number;
   total_opportunities: number;
   total_meetings: number;
+  total_campaigns: number;
+  meetings_next_24h: number;
+  meetings_last_24h: number;
   leads_by_stage: Array<{
+    stage_name: string;
+    count: number;
+    color: string;
+  }>;
+  opportunities_by_stage: Array<{
     stage_name: string;
     count: number;
     color: string;
@@ -151,25 +159,54 @@ function extractData<T>(response: any): T {
 export const getCrmDashboard = async (): Promise<DashboardData> => {
   try {
     // Get data from available APIs
-    const [leads, opportunities, meetings, stages] = await Promise.all([
+    const [leads, opportunities, meetings, stages, campaigns] = await Promise.all([
       getLeads({ per_page: 1000 }),
       getOpportunities({ per_page: 1000 }),
       getMeetings().then(meetings => meetings.data),
-      getStages()
+      getStages(),
+      getCampaigns({ per_page: 1000 })
     ]);
     console.log("ZE MEETINGS", meetings);
+    
     // Calculate dashboard data
     const totalLeads = leads?.total || 0;
     const totalOpportunities = opportunities?.total || 0;
     const totalMeetings = meetings?.length || 0;
+    const totalCampaigns = campaigns?.total || 0;
     
-    // Group leads by stage
+    // Calculate meetings in next 24h and last 24h
+    const now = new Date();
+    const next24h = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+    const last24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    
+    const meetingsNext24h = meetings.filter((meeting: MeetingData) => {
+      // meeting_date is already a full ISO date string, combine with meeting_time
+      const meetingDateTime = new Date(`${meeting.meeting_date.split('T')[0]}T${meeting.meeting_time}`);
+      return meetingDateTime >= now && meetingDateTime <= next24h;
+    }).length;
+    
+    const meetingsLast24h = meetings.filter((meeting: MeetingData) => {
+      // meeting_date is already a full ISO date string, combine with meeting_time
+      const meetingDateTime = new Date(`${meeting.meeting_date.split('T')[0]}T${meeting.meeting_time}`);
+      return meetingDateTime >= last24h && meetingDateTime <= now;
+    }).length;
+    
+    // Group leads by stage (only actual leads, not opportunities)
     const leadsByStage = stages.map((stage: StageData) => ({
       stage_name: stage.name,
-      count: leads.data.filter((lead: LeadData) => lead.stage_id == stage.id).length,
+      count: leads.data.filter((lead: LeadData) => lead.stage_id == stage.id && lead.type === 'lead').length,
       color: stage.color
     }));
+    
+    // Group opportunities by stage (only opportunities, not leads)
+    const opportunitiesByStage = stages.map((stage: StageData) => ({
+      stage_name: stage.name,
+      count: opportunities.data.filter((opportunity: OpportunityData) => opportunity.stage_id == stage.id && opportunity.type === 'opportunity').length,
+      color: stage.color
+    }));
+    
     console.log("ZE LEADS BY STAGE", leadsByStage, leads.data);
+    console.log("ZE OPPORTUNITIES BY STAGE", opportunitiesByStage, opportunities.data);
     
     // Get recent data
     const recentLeads = leads.data.slice(0, 5);
@@ -180,7 +217,11 @@ export const getCrmDashboard = async (): Promise<DashboardData> => {
       total_leads: totalLeads,
       total_opportunities: totalOpportunities,
       total_meetings: totalMeetings,
+      total_campaigns: totalCampaigns,
+      meetings_next_24h: meetingsNext24h,
+      meetings_last_24h: meetingsLast24h,
       leads_by_stage: leadsByStage,
+      opportunities_by_stage: opportunitiesByStage,
       recent_leads: recentLeads,
       recent_opportunities: recentOpportunities,
       recent_meetings: recentMeetings

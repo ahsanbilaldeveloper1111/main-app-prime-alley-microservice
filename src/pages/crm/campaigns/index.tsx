@@ -103,6 +103,29 @@ const CrmCampaigns = () => {
     fetchExtensions();
   }, []);
 
+  // Helper function to get user names from extensions
+  const getUserNames = (userExtensions: any[]) => {
+    if (!userExtensions || userExtensions.length === 0) {
+      return "No users assigned";
+    }
+
+    const maxDisplay = 2; // Show first 2 names
+    const userNames = userExtensions
+      .map(ue => {
+        const extension = extensions.find(ext => ext.id.toString() === ue.user_extension);
+        return extension?.display_name || extension?.name || `Extension ${ue.user_extension}`;
+      })
+      .filter(Boolean);
+
+    if (userNames.length <= maxDisplay) {
+      return userNames.join(", ");
+    }
+
+    const displayedNames = userNames.slice(0, maxDisplay);
+    const remainingCount = userNames.length - maxDisplay;
+    return `${displayedNames.join(", ")} +${remainingCount} more`;
+  };
+
   // Handle filter changes
   const handleFiltersChange = useCallback((filters: Record<string, any>) => {
     setCurrentFilters(filters);
@@ -354,6 +377,24 @@ const CrmCampaigns = () => {
         ),
       },
       {
+        key: "campaign_users",
+        name: "Campaign Users",
+        selector: (row: any) => row.user_extensions?.length || 0,
+        sortable: true,
+        cell: (props: any) => (
+          <div>
+            <span className="text-muted small">
+              {getUserNames(props.user_extensions || [])}
+            </span>
+            {props.user_extensions && props.user_extensions.length > 0 && (
+              <div className="text-muted small">
+                {props.user_extensions.length} user{props.user_extensions.length !== 1 ? 's' : ''} assigned
+              </div>
+            )}
+          </div>
+        ),
+      },
+      {
         key: "created_at",
         name: "Created",
         selector: (row: any) => row.created_at,
@@ -570,7 +611,6 @@ const CrmCampaigns = () => {
                       onChange={(e) => setNewField({...newField, field_type: e.target.value})}
                     >
                       <option value="string">Text</option>
-                      <option value="text">Long Text</option>
                       <option value="integer">Number</option>
                       <option value="date">Date</option>
                       <option value="email">Email</option>
@@ -608,7 +648,6 @@ const CrmCampaigns = () => {
                         onChange={(e) => handleFieldTypeChange(index, e.target.value)}
                       >
                         <option value="string">Text</option>
-                        <option value="text">Long Text</option>
                         <option value="integer">Number</option>
                         <option value="date">Date</option>
                         <option value="email">Email</option>
@@ -750,6 +789,23 @@ const CrmCampaigns = () => {
                   <pre className="mt-2 bg-light p-2 rounded" style={{fontSize: '0.9em'}}>
                     {JSON.stringify(selectedCampaign.options, null, 2)}
                   </pre>
+                </div>
+              )}
+
+              {selectedCampaign.user_extensions && selectedCampaign.user_extensions.length > 0 && (
+                <div className="mb-3">
+                  <strong>Campaign Users ({selectedCampaign.user_extensions.length}):</strong>
+                  <div className="mt-2">
+                    {selectedCampaign.user_extensions.map((ue: any, index: number) => {
+                      const extension = extensions.find(ext => ext.id.toString() === ue.user_extension);
+                      const userName = extension?.display_name || extension?.name || `Extension ${ue.user_extension}`;
+                      return (
+                        <span key={index} className="status-badge info me-1 mb-1">
+                          {userName}
+                        </span>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
 

@@ -11,7 +11,7 @@ import {
 } from "@utils/crm";
 import { Column } from "@components/CustomDataTable";
 import { Button, Modal, Row, Col, Badge, Form, Alert } from "react-bootstrap";
-import { FiEdit, FiTrash2, FiPlus, FiSave } from "react-icons/fi";
+import { FiEdit, FiTrash2, FiPlus, FiSave, FiEdit2 } from "react-icons/fi";
 import { toast } from "react-toastify";
 
 import "@assets/scss/common.scss";
@@ -27,9 +27,7 @@ interface LostReason {
   id: number;
   name: string;
   description?: string;
-  active: boolean;
   color: string;
-  sequence: number;
   created_at: string;
   updated_at: string;
   ticket_count?: number;
@@ -37,18 +35,16 @@ interface LostReason {
 
 const LostReasonsManagement = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
+  const [showUpdateModal, setShowUpdateModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [editingReason, setEditingReason] = useState<LostReason | null>(null);
+  const [reasonToUpdate, setReasonToUpdate] = useState<LostReason | null>(null);
   const [reasonToDelete, setReasonToDelete] = useState<LostReason | null>(null);
   const [refreshKey, setRefreshKey] = useState<number>(0);
   const [currentFilters, setCurrentFilters] = useState({ search: "" });
   const [formData, setFormData] = useState({
     name: "",
     description: "",
-    active: true,
     color: "#dc3545",
-    sequence: 1,
   });
 
 
@@ -108,9 +104,7 @@ const LostReasonsManagement = () => {
       setFormData({
         name: "",
         description: "",
-        active: true,
         color: "#dc3545",
-        sequence: 1,
       });
       setShowSuccessfulModal(true);
       setSuccessModalTitle("Lost Reason Created");
@@ -119,6 +113,30 @@ const LostReasonsManagement = () => {
     } catch (error) {
       toast.error("Failed to create lost reason");
       console.error("Create lost reason error:", error);
+    }
+  };
+
+  const handleUpdateReason = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!reasonToUpdate) return;
+
+    try {
+      await updateLostReason(reasonToUpdate.id, formData);
+      toast.success("Lost reason updated successfully!");
+      setShowUpdateModal(false);
+      setReasonToUpdate(null);
+      setFormData({
+        name: "",
+        description: "",
+        color: "#dc3545",
+      });
+      setShowSuccessfulModal(true);
+      setSuccessModalTitle("Lost Reason Updated");
+      setSuccessModalDescription("Lost reason updated successfully!");
+      setRefreshKey((oldKey) => oldKey + 1);
+    } catch (error) {
+      toast.error("Failed to update lost reason");
+      console.error("Update lost reason error:", error);
     }
   };
 
@@ -147,12 +165,6 @@ const LostReasonsManagement = () => {
     }));
   };
 
-  const getStatusBadge = (reason: LostReason) => {
-    if (reason.active) {
-      return <span className="status-badge success">Active</span>;
-    }
-    return <span className="status-badge danger">Inactive</span>;
-  };
 
   // Memoized columns for the table
   const columns: Column[] = useMemo(
@@ -162,15 +174,6 @@ const LostReasonsManagement = () => {
         name: "Reason",
         selector: (row: LostReason) => row.name,
         sortable: true
-      },
-      {
-        key: "sequence",
-        name: "Sequence",
-        selector: (row: LostReason) => row.sequence,
-        sortable: true,
-        cell: (props: LostReason) => (
-          <span className="status-badge info">{props.sequence}</span>
-        ),
       },
       {
         key: "color",
@@ -191,13 +194,6 @@ const LostReasonsManagement = () => {
             <span className="status-badge info">{props.color}</span>
           </div>
         ),
-      },
-      {
-        key: "status",
-        name: "Status",
-        selector: (row: LostReason) => (row.active ? "active" : "inactive"),
-        sortable: true,
-        cell: (props: LostReason) => getStatusBadge(props),
       },
       {
         key: "description",
@@ -230,6 +226,20 @@ const LostReasonsManagement = () => {
           <div className="d-flex gap-1">
             <DatatableActionButton
               actions={[
+                {
+                  label: 'Edit',
+                  className: 'text-primary',
+                  icon: <FiEdit2 />,
+                  onClick: () => {
+                    setReasonToUpdate(props);
+                    setFormData({
+                      name: props.name,
+                      description: props.description || "",
+                      color: props.color,
+                    });
+                    setShowUpdateModal(true);
+                  },
+                },
                 {
                   label: 'Delete',
                   className: 'text-danger',
@@ -350,21 +360,63 @@ const LostReasonsManagement = () => {
               </Col>
               <Col md={6}>
                 <Form.Group className="mb-3">
-                  <Form.Label>Sequence *</Form.Label>
+                  <Form.Label>Color</Form.Label>
                   <Form.Control
-                    type="number"
-                    value={formData.sequence}
-                    onChange={(e) =>
-                      handleInputChange("sequence", parseInt(e.target.value))
-                    }
-                    min="1"
-                    required
+                    type="color"
+                    value={formData.color}
+                    onChange={(e) => handleInputChange("color", e.target.value)}
                   />
                 </Form.Group>
               </Col>
             </Row>
 
+
+            <Form.Group className="mb-3">
+              <Form.Label>Description</Form.Label>
+              <Form.Control
+                as="textarea"
+                rows={3}
+                value={formData.description}
+                onChange={(e) =>
+                  handleInputChange("description", e.target.value)
+                }
+                placeholder="Enter reason description (optional)"
+              />
+            </Form.Group>
+          </Form>
+          </>
+        }
+      />
+
+      {/* Update Lost Reason Modal */}
+      <FormModal
+        show={showUpdateModal}
+        onHide={() => setShowUpdateModal(false)}
+        title="Update Lost Reason"
+        desc="Please update the details below for this lost reason."
+        submitButtonText="Update Lost Reason"
+        cancelButtonText="Cancel"
+        onSubmit={() => { 
+          const mockEvent = { preventDefault: () => {} } as React.FormEvent;
+          handleUpdateReason(mockEvent); 
+        }}
+        onCancel={() => setShowUpdateModal(false)}
+        formHtml={
+          <>
+          <Form onSubmit={handleUpdateReason}>
             <Row>
+              <Col md={6}>
+                <Form.Group className="mb-3">
+                  <Form.Label>Reason Name *</Form.Label>
+                  <Form.Control
+                    type="text"
+                    value={formData.name}
+                    onChange={(e) => handleInputChange("name", e.target.value)}
+                    placeholder="Enter reason name"
+                    required
+                  />
+                </Form.Group>
+              </Col>
               <Col md={6}>
                 <Form.Group className="mb-3">
                   <Form.Label>Color</Form.Label>
@@ -375,22 +427,8 @@ const LostReasonsManagement = () => {
                   />
                 </Form.Group>
               </Col>
-              <Col md={6}>
-                <Form.Group className="mb-3">
-                  <Form.Label>Status</Form.Label>
-                  <div>
-                    <Form.Check
-                      type="checkbox"
-                      label="Active"
-                      checked={formData.active}
-                      onChange={(e) =>
-                        handleInputChange("active", e.target.checked)
-                      }
-                    />
-                  </div>
-                </Form.Group>
-              </Col>
             </Row>
+
 
             <Form.Group className="mb-3">
               <Form.Label>Description</Form.Label>
