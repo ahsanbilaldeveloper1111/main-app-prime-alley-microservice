@@ -703,7 +703,7 @@ export const createGsmPortFiltersConfig = (hierarchyData?: any): FilterTab[] => 
         name: 'company',
         label: 'Company',
         options: hierarchyData?.company?.map((company: { id: string; name: string }) => ({
-          value: company.name,
+          value: (company as any)?.identifier || company.id,
           label: company.name
         })) || []
       }
