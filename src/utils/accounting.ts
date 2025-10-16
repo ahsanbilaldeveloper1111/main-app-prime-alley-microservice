@@ -229,16 +229,21 @@ export interface ProductData {
   id: number;
   name: string;
   description?: string;
-  currency_code: string;
-  is_active: boolean;
-  created_at: string;
+  currency_code?: string;
+  currency?: string;
+  is_active?: boolean;
+  created_at?: string;
   category_id: string;
   is_service: boolean;
   base_price: string;
-  updated_at: string;
-  deleted_at: string | null;
-  invoice_items: any[];
+  effective_price: string;
+  vat_rate: string;
+  pricing_type: string;
+  updated_at?: string;
+  deleted_at?: string | null;
+  invoice_items?: any[];
   category?: ProductCategoryData;
+  company_pricing?: any | null;
 }
 
 export interface ProductCategoryData {
@@ -267,6 +272,7 @@ export interface ProductCreateUpdatePayload {
   base_price: string;
   is_active: boolean;
   is_service: boolean;
+  currency: string;
 }
 
 export interface InventoryData {
@@ -1428,12 +1434,13 @@ export const getActiveProducts = async (): Promise<ProductData[]> => {
 };
 
 export const getProductsWithCompanyPricing = async (
+  companyId?: number,
   params: PaginationParams = {}
 ): Promise<PaginationWrapper<ProductData>> => {
   try {
     const response = await axiosInstance.get(
       "/accounting/products/with-company-pricing",
-      { params }
+      { params: { ...params, company_id: companyId } }
     );
     return extractData<PaginationWrapper<ProductData>>(response.data);
   } catch (error: any) {
@@ -1597,6 +1604,7 @@ export const getProductWithPricing = async (
     throw error;
   }
 };
+
 
 // Product Categories (separate from products)
 export const getProductCategories = async (

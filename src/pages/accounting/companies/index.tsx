@@ -1179,6 +1179,7 @@ const CompanyList = () => {
         submitButtonText="Submit"
         cancelButtonText="Cancel"
         onSubmit={handleCreateCompany}
+        isSubmitting={isLoading}
       />
 
       {/* Edit Modal */}
@@ -1779,6 +1780,7 @@ const CompanyList = () => {
         submitButtonText="Submit"
         cancelButtonText="Cancel"
         onSubmit={handleUpdateCompany}
+        isSubmitting={isLoading}
       />
       {/* Delete Modal */}
       <ConfirmModal

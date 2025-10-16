@@ -169,31 +169,6 @@ const ExpenseList = () => {
         ),
       },
       {
-        key: "payment_status",
-        name: "Status",
-        selector: (row: ExpenseData) => row.payment_status,
-        sortable: true,
-        cell: (props: ExpenseData) => {
-          const statusColors = {
-            pending: "warning",
-            paid: "success",
-            failed: "danger",
-            cancelled: "secondary",
-          };
-          return (
-            <span
-              className={`status-badge text-capitalize ${
-                statusColors[
-                  props.payment_status as keyof typeof statusColors
-                ] || "info"
-              }`}
-            >
-              {props.payment_status}
-            </span>
-          );
-        },
-      },
-      {
         key: "expense_date",
         name: "Date",
         selector: (row: ExpenseData) => row.expense_date,
