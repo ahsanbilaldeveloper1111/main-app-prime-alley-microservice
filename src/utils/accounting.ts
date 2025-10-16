@@ -121,7 +121,6 @@ export interface InvoiceData {
   tax_amount: string;
   total_amount: string;
   currency_code: string;
-  exchange_rate: string;
   notes: string | null;
   terms_conditions: string | null;
   is_recurring: boolean;
@@ -145,7 +144,6 @@ export interface InvoiceCreateUpdatePayload {
   due_date: string;
   payment_mode: string;
   currency_code: string;
-  exchange_rate: string;
   tax_amount: number;
   notes: string;
   terms_conditions: string;
@@ -171,7 +169,6 @@ export interface ExpenseData {
   description: string;
   amount: string;
   currency_code: string;
-  exchange_rate: string;
   tax_amount: string;
   tax_type: "amount" | "percentage";
   total_amount: string;

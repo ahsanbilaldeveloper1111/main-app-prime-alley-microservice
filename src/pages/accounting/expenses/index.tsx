@@ -385,6 +385,21 @@ const ExpenseList = () => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   }, []);
 
+  // Calculate total amount based on amount, tax_type, and tax_amount
+  const calculateTotalAmount = useCallback((amount: string, taxAmount: string, taxType: string) => {
+    const baseAmount = parseFloat(amount) || 0;
+    const taxValue = parseFloat(taxAmount) || 0;
+    
+    let calculatedTax = 0;
+    if (taxType === 'percentage') {
+      calculatedTax = (baseAmount * taxValue) / 100;
+    } else {
+      calculatedTax = taxValue;
+    }
+    
+    return (baseAmount + calculatedTax).toFixed(2);
+  }, []);
+
   const handleSubmitEditExpense = useCallback(async () => {
     if (!selectedExpense) return;
 
@@ -539,22 +554,50 @@ const ExpenseList = () => {
   // Input handlers
   const handleNewExpenseChange = useCallback(
     (field: keyof ExpenseCreateUpdatePayload, value: any) => {
-      setNewExpense((prev: ExpenseCreateUpdatePayload) => ({
-        ...prev,
-        [field]: value,
-      }));
+      setNewExpense((prev: ExpenseCreateUpdatePayload) => {
+        const updatedExpense = {
+          ...prev,
+          [field]: value,
+        };
+        
+        // Auto-calculate total when amount, tax_amount, or tax_type changes
+        if (field === 'amount' || field === 'tax_amount' || field === 'tax_type') {
+          updatedExpense.total_amount = calculateTotalAmount(
+            field === 'amount' ? value : updatedExpense.amount,
+            field === 'tax_amount' ? value : updatedExpense.tax_amount,
+            field === 'tax_type' ? value : updatedExpense.tax_type
+          );
+        }
+        
+        return updatedExpense;
+      });
     },
-    []
+    [calculateTotalAmount]
   );
 
   const handleEditExpenseChange = useCallback(
     (field: keyof ExpenseData, value: any) => {
-      setSelectedExpense((prev: ExpenseData | null) => ({
-        ...prev!,
-        [field]: value,
-      }));
+      setSelectedExpense((prev: ExpenseData | null) => {
+        if (!prev) return prev;
+        
+        const updatedExpense = {
+          ...prev,
+          [field]: value,
+        };
+        
+        // Auto-calculate total when amount, tax_amount, or tax_type changes
+        if (field === 'amount' || field === 'tax_amount' || field === 'tax_type') {
+          updatedExpense.total_amount = calculateTotalAmount(
+            field === 'amount' ? value : updatedExpense.amount,
+            field === 'tax_amount' ? value : updatedExpense.tax_amount,
+            field === 'tax_type' ? value : updatedExpense.tax_type
+          );
+        }
+        
+        return updatedExpense;
+      });
     },
-    []
+    [calculateTotalAmount]
   );
 
   // Expense Delete Handlers
@@ -890,11 +933,13 @@ const ExpenseList = () => {
                     className="form-control"
                     id="newExpenseTotalAmount"
                     value={newExpense.total_amount}
-                    onChange={(e) =>
-                      handleNewExpenseChange("total_amount", e.target.value)
-                    }
+                    readOnly
+                    style={{ backgroundColor: '#f8f9fa', cursor: 'not-allowed' }}
                     placeholder="0.00"
                   />
+                  <small className="form-text text-muted">
+                    Automatically calculated based on amount and tax
+                  </small>
                 </div>
               </div>
             </div>
@@ -1092,11 +1137,13 @@ const ExpenseList = () => {
                     className="form-control"
                     id="editExpenseTotalAmount"
                     value={selectedExpense?.total_amount || ""}
-                    onChange={(e) =>
-                      handleEditExpenseChange("total_amount", e.target.value)
-                    }
+                    readOnly
+                    style={{ backgroundColor: '#f8f9fa', cursor: 'not-allowed' }}
                     placeholder="0.00"
                   />
+                  <small className="form-text text-muted">
+                    Automatically calculated based on amount and tax
+                  </small>
                 </div>
               </div>
             </div>

@@ -98,6 +98,36 @@ const formatCurrency = (amount: number, currency: string): string => {
   }).format(amount);
 };
 
+// Exchange rate interface
+interface ExchangeRate {
+  from: string;
+  to: string;
+  rate: number;
+  timestamp: number;
+}
+
+// Function to fetch exchange rates from Stripe
+const fetchExchangeRates = async (fromCurrency: string, toCurrency: string): Promise<ExchangeRate | null> => {
+  try {
+    // Using a free exchange rate API as Stripe doesn't provide public exchange rate API
+    const response = await fetch(`https://api.exchangerate-api.com/v4/latest/${fromCurrency}`);
+    const data = await response.json();
+    
+    if (data.rates && data.rates[toCurrency]) {
+      return {
+        from: fromCurrency,
+        to: toCurrency,
+        rate: data.rates[toCurrency],
+        timestamp: Date.now()
+      };
+    }
+    return null;
+  } catch (error) {
+    console.error('Error fetching exchange rates:', error);
+    return null;
+  }
+};
+
 
 // Custom hook for creating invoice payments
 const useCreateInvoicePayment = (): UseCreateInvoicePaymentReturn => {
@@ -527,6 +557,11 @@ const InvoiceList = () => {
   const [isProcessingPayment, setIsProcessingPayment] = useState<boolean>(false);
   const [paymentMode, setPaymentMode] = useState<'saved' | 'direct'>('saved');
   const [stripePublishableKey, setStripePublishableKey] = useState<string>("");
+  
+  // Exchange rate states
+  const [exchangeRates, setExchangeRates] = useState<ExchangeRate[]>([]);
+  const [isLoadingExchangeRates, setIsLoadingExchangeRates] = useState<boolean>(false);
+  const [baseCurrency, setBaseCurrency] = useState<string>("USD");
 
   const columns: Column[] = useMemo(
     () => [
@@ -718,6 +753,51 @@ const InvoiceList = () => {
     }
   }, []);
 
+  // Load exchange rates
+  const loadExchangeRates = useCallback(async (fromCurrency: string) => {
+    const currencies = ['USD', 'EUR', 'GBP', 'AED', 'PKR'];
+    setIsLoadingExchangeRates(true);
+    
+    try {
+      const rates: ExchangeRate[] = [];
+      
+      for (const toCurrency of currencies) {
+        if (toCurrency !== fromCurrency) {
+          const rate = await fetchExchangeRates(fromCurrency, toCurrency);
+          if (rate) {
+            rates.push(rate);
+          }
+        }
+      }
+      
+      setExchangeRates(rates);
+      setBaseCurrency(fromCurrency);
+    } catch (error) {
+      console.error("Error loading exchange rates:", error);
+    } finally {
+      setIsLoadingExchangeRates(false);
+    }
+  }, []);
+
+  // Get exchange rate for a specific currency pair
+  const getExchangeRate = useCallback((fromCurrency: string, toCurrency: string): number => {
+    if (fromCurrency === toCurrency) return 1;
+    
+    const rate = exchangeRates.find(r => r.from === fromCurrency && r.to === toCurrency);
+    if (rate) return rate.rate;
+    
+    // If no rate found and we're loading, return 1 to avoid showing wrong amounts
+    if (isLoadingExchangeRates) return 1;
+    
+    // If no rate found and not loading, try to fetch it immediately
+    if (exchangeRates.length === 0) {
+      console.warn(`Exchange rate not found for ${fromCurrency} to ${toCurrency}`);
+      return 1;
+    }
+    
+    return 1;
+  }, [exchangeRates, isLoadingExchangeRates]);
+
   useEffect(() => {
     const fetchCompanies = async () => {
       try {
@@ -742,7 +822,9 @@ const InvoiceList = () => {
     fetchCompanies();
     fetchProducts();
     loadStripePublishableKey();
-  }, [loadStripePublishableKey]);
+    loadExchangeRates('USD'); // Load exchange rates with USD as base
+  }, [loadStripePublishableKey, loadExchangeRates]);
+
 
   const memoizedFilters = useMemo(() => currentFilters, [currentFilters]);
 
@@ -784,6 +866,7 @@ const InvoiceList = () => {
   const [showEditInvoiceModal, setShowEditInvoiceModal] =
     useState<boolean>(false);
   const [editingInvoice, setEditingInvoice] = useState<boolean>(false);
+
 
   // Delete Invoice Modal
   const [showDeleteInvoiceModal, setShowDeleteInvoiceModal] = useState<boolean>(false);
@@ -834,14 +917,18 @@ const InvoiceList = () => {
 
     setEditingInvoice(true);
     try {
-      const totals = calculateTotals(selectedInvoice.items);
+      // Get company VAT rate and exemption status
+      const selectedCompany = companies.find(c => c.id.toString() === selectedInvoice.company_id);
+      const companyVatRate = selectedCompany?.profile?.vat_rate ? parseFloat(selectedCompany.profile.vat_rate) : 0;
+      const isVatExempt = selectedCompany?.profile?.vat_exemption || false;
+      
+      const totals = calculateTotals(selectedInvoice.items, companyVatRate, isVatExempt, 'USD', selectedInvoice.currency_code || 'USD');
       const invoiceData: InvoiceCreateUpdatePayload = {
         company_id: selectedInvoice.company_id,
         invoice_date: selectedInvoice.invoice_date,
         due_date: selectedInvoice.due_date,
         payment_mode: selectedInvoice.payment_mode,
         currency_code: selectedInvoice.currency_code,
-        exchange_rate: selectedInvoice.exchange_rate,
         tax_amount: totals.tax_amount,
         notes: selectedInvoice.notes || "",
         terms_conditions: selectedInvoice.terms_conditions || "",
@@ -849,7 +936,7 @@ const InvoiceList = () => {
           product_id: item.product_id,
           quantity: item.quantity,
           unit_price: item.unit_price,
-          tax_rate: item.tax_rate,
+          tax_rate: companyVatRate.toString(), // Use company VAT rate for all items
         })),
         subtotal: totals.subtotal,
         total_amount: totals.total_amount,
@@ -881,7 +968,6 @@ const InvoiceList = () => {
     due_date: "",
     payment_mode: "one_time",
     currency_code: "USD",
-    exchange_rate: "1.000000",
     tax_amount: 0,
     notes: "",
     terms_conditions: "",
@@ -890,25 +976,61 @@ const InvoiceList = () => {
     total_amount: 0,
   });
 
-  // Helper function to calculate totals
-  const calculateTotals = (items: InvoiceItemCreateUpdatePayload[]) => {
+  // Recalculate totals when exchange rates change
+  useEffect(() => {
+    if (exchangeRates.length > 0 && !isLoadingExchangeRates) {
+      // Recalculate new invoice totals if currency is not USD
+      if (newInvoice.currency_code && newInvoice.currency_code !== 'USD' && newInvoice.items.length > 0) {
+        const selectedCompany = companies.find(c => c.id.toString() === newInvoice.company_id);
+        const companyVatRate = selectedCompany?.profile?.vat_rate ? parseFloat(selectedCompany.profile.vat_rate) : 0;
+        const isVatExempt = selectedCompany?.profile?.vat_exemption || false;
+        const totals = calculateTotals(newInvoice.items, companyVatRate, isVatExempt, 'USD', newInvoice.currency_code);
+        
+        setNewInvoice(prev => ({
+          ...prev,
+          ...totals
+        }));
+      }
+      
+      // Recalculate selected invoice totals if currency is not USD
+      if (selectedInvoice?.currency_code && selectedInvoice.currency_code !== 'USD' && selectedInvoice.items.length > 0) {
+        const selectedCompany = companies.find(c => c.id.toString() === selectedInvoice.company_id);
+        const companyVatRate = selectedCompany?.profile?.vat_rate ? parseFloat(selectedCompany.profile.vat_rate) : 0;
+        const isVatExempt = selectedCompany?.profile?.vat_exemption || false;
+        const totals = calculateTotals(selectedInvoice.items, companyVatRate, isVatExempt, 'USD', selectedInvoice.currency_code);
+        
+        setSelectedInvoice(prev => ({
+          ...prev!,
+          subtotal: totals.subtotal.toString(),
+          tax_amount: totals.tax_amount.toString(),
+          total_amount: totals.total_amount.toString(),
+        }));
+      }
+    }
+  }, [exchangeRates, isLoadingExchangeRates, newInvoice.currency_code, newInvoice.company_id, newInvoice.items, selectedInvoice?.currency_code, selectedInvoice?.company_id, selectedInvoice?.items, companies]);
+
+  // Helper function to calculate totals using company VAT rate, exemption status, and exchange rate
+  const calculateTotals = (items: InvoiceItemCreateUpdatePayload[], companyVatRate: number = 0, isVatExempt: boolean = false, fromCurrency: string = 'USD', toCurrency: string = 'USD') => {
     const subtotal = items.reduce((sum, item) => {
       const quantity = parseFloat(item.quantity) || 0;
       const unitPrice = parseFloat(item.unit_price) || 0;
       return sum + (quantity * unitPrice);
     }, 0);
     
-    const taxAmount = items.reduce((sum, item) => {
-      const quantity = parseFloat(item.quantity) || 0;
-      const unitPrice = parseFloat(item.unit_price) || 0;
-      const taxRate = parseFloat(item.tax_rate) || 0;
-      return sum + (quantity * unitPrice * taxRate / 100);
-    }, 0);
+    // Calculate tax amount based on VAT exemption status
+    const taxAmount = isVatExempt ? 0 : subtotal * (companyVatRate / 100);
+    const totalBeforeConversion = subtotal + taxAmount;
+    
+    // Apply exchange rate conversion if currency is different from USD
+    const exchangeRate = getExchangeRate(fromCurrency, toCurrency);
+    const convertedSubtotal = subtotal * exchangeRate;
+    const convertedTaxAmount = taxAmount * exchangeRate;
+    const convertedTotal = totalBeforeConversion * exchangeRate;
     
     return {
-      subtotal: parseFloat(subtotal.toFixed(2)),
-      tax_amount: parseFloat(taxAmount.toFixed(2)),
-      total_amount: parseFloat((subtotal + taxAmount).toFixed(2))
+      subtotal: parseFloat(convertedSubtotal.toFixed(2)),
+      tax_amount: parseFloat(convertedTaxAmount.toFixed(2)),
+      total_amount: parseFloat(convertedTotal.toFixed(2))
     };
   };
 
@@ -933,7 +1055,12 @@ const InvoiceList = () => {
 
     setCreatingInvoice(true);
     try {
-      const totals = calculateTotals(newInvoice.items);
+      // Get company VAT rate and exemption status
+      const selectedCompany = companies.find(c => c.id.toString() === newInvoice.company_id);
+      const companyVatRate = selectedCompany?.profile?.vat_rate ? parseFloat(selectedCompany.profile.vat_rate) : 0;
+      const isVatExempt = selectedCompany?.profile?.vat_exemption || false;
+      
+      const totals = calculateTotals(newInvoice.items, companyVatRate, isVatExempt, 'USD', newInvoice.currency_code);
       const invoiceData: InvoiceCreateUpdatePayload = {
         ...newInvoice,
         ...totals
@@ -947,7 +1074,6 @@ const InvoiceList = () => {
           due_date: "",
           payment_mode: "one_time",
           currency_code: "USD",
-          exchange_rate: "1.000000",
           tax_amount: 0,
           notes: "",
           terms_conditions: "",
@@ -980,7 +1106,6 @@ const InvoiceList = () => {
       due_date: "",
       payment_mode: "one_time",
       currency_code: "USD",
-      exchange_rate: "1.000000",
       tax_amount: 0,
       notes: "",
       terms_conditions: "",
@@ -1117,18 +1242,22 @@ const InvoiceList = () => {
       product_id: "",
       quantity: "1",
       unit_price: "0.00",
-      tax_rate: "0.00",
+      tax_rate: "0.00", // This will be overridden by company VAT rate
     };
     
     const updatedItems = [...newInvoice.items, newItem];
-    const totals = calculateTotals(updatedItems);
+    // Get company VAT rate and exemption status
+    const selectedCompany = companies.find(c => c.id.toString() === newInvoice.company_id);
+    const companyVatRate = selectedCompany?.profile?.vat_rate ? parseFloat(selectedCompany.profile.vat_rate) : 0;
+    const isVatExempt = selectedCompany?.profile?.vat_exemption || false;
+    const totals = calculateTotals(updatedItems, companyVatRate, isVatExempt, 'USD', newInvoice.currency_code);
     
     setNewInvoice(prev => ({
       ...prev,
       items: updatedItems,
       ...totals
     }));
-  }, [newInvoice.items]);
+  }, [newInvoice.items, newInvoice.company_id, companies]);
 
   const updateNewInvoiceItem = useCallback((index: number, field: keyof InvoiceItemCreateUpdatePayload, value: string) => {
     const updatedItems = [...newInvoice.items];
@@ -1145,25 +1274,33 @@ const InvoiceList = () => {
       }
     }
     
-    const totals = calculateTotals(updatedItems);
+    // Get company VAT rate and exemption status
+    const selectedCompany = companies.find(c => c.id.toString() === newInvoice.company_id);
+    const companyVatRate = selectedCompany?.profile?.vat_rate ? parseFloat(selectedCompany.profile.vat_rate) : 0;
+    const isVatExempt = selectedCompany?.profile?.vat_exemption || false;
+    const totals = calculateTotals(updatedItems, companyVatRate, isVatExempt, 'USD', newInvoice.currency_code);
     
     setNewInvoice(prev => ({
       ...prev,
       items: updatedItems,
       ...totals
     }));
-  }, [newInvoice.items, products]);
+  }, [newInvoice.items, newInvoice.company_id, products, companies]);
 
   const removeNewInvoiceItem = useCallback((index: number) => {
     const updatedItems = newInvoice.items.filter((_, i) => i !== index);
-    const totals = calculateTotals(updatedItems);
+    // Get company VAT rate and exemption status
+    const selectedCompany = companies.find(c => c.id.toString() === newInvoice.company_id);
+    const companyVatRate = selectedCompany?.profile?.vat_rate ? parseFloat(selectedCompany.profile.vat_rate) : 0;
+    const isVatExempt = selectedCompany?.profile?.vat_exemption || false;
+    const totals = calculateTotals(updatedItems, companyVatRate, isVatExempt, 'USD', newInvoice.currency_code);
     
     setNewInvoice(prev => ({
       ...prev,
       items: updatedItems,
       ...totals
     }));
-  }, [newInvoice.items]);
+  }, [newInvoice.items, newInvoice.company_id, companies]);
 
   const addEditInvoiceItem = useCallback(() => {
     if (!selectedInvoice) return;
@@ -1172,11 +1309,15 @@ const InvoiceList = () => {
       product_id: "",
       quantity: "1",
       unit_price: "0.00",
-      tax_rate: "0.00",
+      tax_rate: "0.00", // This will be overridden by company VAT rate
     };
     
     const updatedItems = [...selectedInvoice.items, newItem];
-    const totals = calculateTotals(updatedItems);
+    // Get company VAT rate and exemption status
+    const selectedCompany = companies.find(c => c.id.toString() === selectedInvoice.company_id);
+    const companyVatRate = selectedCompany?.profile?.vat_rate ? parseFloat(selectedCompany.profile.vat_rate) : 0;
+    const isVatExempt = selectedCompany?.profile?.vat_exemption || false;
+    const totals = calculateTotals(updatedItems, companyVatRate, isVatExempt, 'USD', selectedInvoice.currency_code || 'USD');
     
     setSelectedInvoice(prev => ({
       ...prev!,
@@ -1185,7 +1326,7 @@ const InvoiceList = () => {
       tax_amount: totals.tax_amount.toString(),
       total_amount: totals.total_amount.toString(),
     }));
-  }, [selectedInvoice]);
+  }, [selectedInvoice, companies]);
 
   const updateEditInvoiceItem = useCallback((index: number, field: keyof InvoiceItemCreateUpdatePayload, value: string) => {
     if (!selectedInvoice) return;
@@ -1204,7 +1345,11 @@ const InvoiceList = () => {
       }
     }
     
-    const totals = calculateTotals(updatedItems);
+    // Get company VAT rate and exemption status
+    const selectedCompany = companies.find(c => c.id.toString() === selectedInvoice.company_id);
+    const companyVatRate = selectedCompany?.profile?.vat_rate ? parseFloat(selectedCompany.profile.vat_rate) : 0;
+    const isVatExempt = selectedCompany?.profile?.vat_exemption || false;
+    const totals = calculateTotals(updatedItems, companyVatRate, isVatExempt, 'USD', selectedInvoice.currency_code || 'USD');
     
     setSelectedInvoice(prev => ({
       ...prev!,
@@ -1213,13 +1358,17 @@ const InvoiceList = () => {
       tax_amount: totals.tax_amount.toString(),
       total_amount: totals.total_amount.toString(),
     }));
-  }, [selectedInvoice, products]);
+  }, [selectedInvoice, products, companies]);
 
   const removeEditInvoiceItem = useCallback((index: number) => {
     if (!selectedInvoice) return;
     
     const updatedItems = selectedInvoice.items.filter((_, i) => i !== index);
-    const totals = calculateTotals(updatedItems);
+    // Get company VAT rate and exemption status
+    const selectedCompany = companies.find(c => c.id.toString() === selectedInvoice.company_id);
+    const companyVatRate = selectedCompany?.profile?.vat_rate ? parseFloat(selectedCompany.profile.vat_rate) : 0;
+    const isVatExempt = selectedCompany?.profile?.vat_exemption || false;
+    const totals = calculateTotals(updatedItems, companyVatRate, isVatExempt, 'USD', selectedInvoice.currency_code || 'USD');
     
     setSelectedInvoice(prev => ({
       ...prev!,
@@ -1228,43 +1377,121 @@ const InvoiceList = () => {
       tax_amount: totals.tax_amount.toString(),
       total_amount: totals.total_amount.toString(),
     }));
-  }, [selectedInvoice]);
+  }, [selectedInvoice, companies]);
 
   // Input handlers
   const handleNewInvoiceChange = useCallback(
     (field: keyof InvoiceCreateUpdatePayload, value: any) => {
-      setNewInvoice((prev: InvoiceCreateUpdatePayload) => ({
-        ...prev,
-        [field]: value,
-      }));
+      setNewInvoice((prev: InvoiceCreateUpdatePayload) => {
+        const updatedInvoice = {
+          ...prev,
+          [field]: value,
+        };
+        
+        // Recalculate totals when company changes
+        if (field === 'company_id' && value) {
+          const selectedCompany = companies.find(c => c.id.toString() === value);
+          const companyVatRate = selectedCompany?.profile?.vat_rate ? parseFloat(selectedCompany.profile.vat_rate) : 0;
+          const isVatExempt = selectedCompany?.profile?.vat_exemption || false;
+          const totals = calculateTotals(updatedInvoice.items, companyVatRate, isVatExempt, 'USD', updatedInvoice.currency_code || 'USD');
+          return {
+            ...updatedInvoice,
+            ...totals
+          };
+        }
+        
+        // Recalculate totals when currency changes
+        if (field === 'currency_code' && value) {
+          const selectedCompany = companies.find(c => c.id.toString() === updatedInvoice.company_id);
+          const companyVatRate = selectedCompany?.profile?.vat_rate ? parseFloat(selectedCompany.profile.vat_rate) : 0;
+          const isVatExempt = selectedCompany?.profile?.vat_exemption || false;
+          const totals = calculateTotals(updatedInvoice.items, companyVatRate, isVatExempt, 'USD', value);
+          return {
+            ...updatedInvoice,
+            ...totals
+          };
+        }
+        
+        return updatedInvoice;
+      });
       
       // Load payment methods when company is selected
       if (field === 'company_id' && value) {
         console.log("Company selected in create modal:", value);
         loadPaymentMethods(parseInt(value));
       }
+      
+      // Load exchange rates when currency changes
+      if (field === 'currency_code' && value) {
+        console.log("Currency changed in create modal:", value);
+        loadExchangeRates(value);
+        setBaseCurrency(value);
+      }
     },
-    [loadPaymentMethods]
+    [loadPaymentMethods, loadExchangeRates, companies]
   );
 
   const handleEditInvoiceChange = useCallback(
     (field: keyof InvoiceFormData, value: any) => {
-      setSelectedInvoice((prev: InvoiceFormData | null) => ({
-        ...prev!,
-        [field]: value,
-      }));
+      setSelectedInvoice((prev: InvoiceFormData | null) => {
+        const updatedInvoice = {
+          ...prev!,
+          [field]: value,
+        };
+        
+        // Recalculate totals when company changes
+        if (field === 'company_id' && value) {
+          const selectedCompany = companies.find(c => c.id.toString() === value);
+          const companyVatRate = selectedCompany?.profile?.vat_rate ? parseFloat(selectedCompany.profile.vat_rate) : 0;
+          const isVatExempt = selectedCompany?.profile?.vat_exemption || false;
+          const totals = calculateTotals(updatedInvoice.items, companyVatRate, isVatExempt, 'USD', updatedInvoice.currency_code || 'USD');
+          return {
+            ...updatedInvoice,
+            subtotal: totals.subtotal.toString(),
+            tax_amount: totals.tax_amount.toString(),
+            total_amount: totals.total_amount.toString(),
+          };
+        }
+        
+        // Recalculate totals when currency changes
+        if (field === 'currency_code' && value) {
+          const selectedCompany = companies.find(c => c.id.toString() === updatedInvoice.company_id);
+          const companyVatRate = selectedCompany?.profile?.vat_rate ? parseFloat(selectedCompany.profile.vat_rate) : 0;
+          const isVatExempt = selectedCompany?.profile?.vat_exemption || false;
+          const totals = calculateTotals(updatedInvoice.items, companyVatRate, isVatExempt, 'USD', value);
+          return {
+            ...updatedInvoice,
+            subtotal: totals.subtotal.toString(),
+            tax_amount: totals.tax_amount.toString(),
+            total_amount: totals.total_amount.toString(),
+          };
+        }
+        
+        return updatedInvoice;
+      });
       
       // Load payment methods when company is selected
       if (field === 'company_id' && value) {
         console.log("Company selected in edit modal:", value);
         loadPaymentMethods(parseInt(value));
       }
+      
+      // Load exchange rates when currency changes
+      if (field === 'currency_code' && value) {
+        console.log("Currency changed in edit modal:", value);
+        loadExchangeRates(value);
+        setBaseCurrency(value);
+      }
     },
-    [loadPaymentMethods]
+    [loadPaymentMethods, loadExchangeRates, companies]
   );
 
 
   const generateInvoiceHTML = useCallback((invoice: InvoiceData) => {
+    // Get company VAT rate
+    const companyVatRate = invoice.company?.profile?.vat_rate ? parseFloat(invoice.company.profile.vat_rate) : 0;
+    const isVatExempt = invoice.company?.profile?.vat_exemption;
+    
     return `
       <!DOCTYPE html>
       <html>
@@ -1286,6 +1513,7 @@ const InvoiceList = () => {
           .total-amount { font-size: 18px; font-weight: bold; color: #2c3e50; }
           .notes-section { margin-top: 30px; }
           .notes-section h4 { margin-bottom: 10px; color: #2c3e50; }
+          .vat-info { margin-bottom: 20px; padding: 10px; background-color: #f8f9fa; border-left: 4px solid #007bff; }
           @media print {
             body { margin: 0; padding: 15px; }
             .no-print { display: none; }
@@ -1306,6 +1534,11 @@ const InvoiceList = () => {
         <div class="company-info">
           <h3>Bill To:</h3>
           <div><strong>${invoice.company?.name || 'N/A'}</strong></div>
+          ${invoice.company?.profile?.tax_id ? `<div><strong>Tax ID:</strong> ${invoice.company.profile.tax_id}</div>` : ''}
+        </div>
+
+        <div class="vat-info">
+          <strong>VAT Information:</strong> ${isVatExempt ? 'VAT Exempt' : `VAT Rate: ${companyVatRate}%`}
         </div>
 
         <table class="invoice-table">
@@ -1314,20 +1547,20 @@ const InvoiceList = () => {
               <th>Product</th>
               <th>Quantity</th>
               <th>Unit Price</th>
-              <th>Tax Rate</th>
               <th>Line Total</th>
             </tr>
           </thead>
           <tbody>
             ${invoice.items.map(item => {
               const product = products.find(p => p.id.toString() === item.product_id.toString());
-              const lineTotal = parseFloat(item.quantity) * parseFloat(item.unit_price);
+              const lineTotalUSD = parseFloat(item.quantity) * parseFloat(item.unit_price);
+              const exchangeRate = getExchangeRate('USD', invoice.currency_code || 'USD');
+              const lineTotal = lineTotalUSD * exchangeRate;
               return `
                 <tr>
                   <td>${product?.name || 'Unknown Product'}</td>
                   <td>${item.quantity}</td>
-                  <td>${invoice.currency_code} ${parseFloat(item.unit_price).toFixed(2)}</td>
-                  <td>${item.tax_rate}%</td>
+                  <td>${invoice.currency_code} ${(parseFloat(item.unit_price) * exchangeRate).toFixed(2)}</td>
                   <td>${invoice.currency_code} ${lineTotal.toFixed(2)}</td>
                 </tr>
               `;
@@ -1337,7 +1570,7 @@ const InvoiceList = () => {
 
         <div class="totals">
           <div><strong>Subtotal:</strong> ${invoice.currency_code} ${parseFloat(invoice.subtotal || '0').toFixed(2)}</div>
-          <div><strong>Tax Amount:</strong> ${invoice.currency_code} ${parseFloat(invoice.tax_amount || '0').toFixed(2)}</div>
+          <div><strong>VAT Amount (${isVatExempt ? 'Exempt' : companyVatRate + '%'}):</strong> ${invoice.currency_code} ${parseFloat(invoice.tax_amount || '0').toFixed(2)}</div>
           <div class="total-amount"><strong>Total Amount:</strong> ${invoice.currency_code} ${parseFloat(invoice.total_amount || '0').toFixed(2)}</div>
         </div>
 
@@ -1378,6 +1611,10 @@ const InvoiceList = () => {
       const pageHeight = doc.internal.pageSize.getHeight();
       let yPosition = 20;
 
+      // Get company VAT rate
+      const companyVatRate = invoice.company?.profile?.vat_rate ? parseFloat(invoice.company.profile.vat_rate) : 0;
+      const isVatExempt = invoice.company?.profile?.vat_exemption;
+
       // Add company header
       doc.setFontSize(20);
       doc.setFont('helvetica', 'bold');
@@ -1396,22 +1633,35 @@ const InvoiceList = () => {
       doc.text(`Status: ${(invoice.status || '').toUpperCase()}`, 20, yPosition);
       yPosition += 8;
       doc.text(`Company: ${invoice.company?.name || 'N/A'}`, 20, yPosition);
+      yPosition += 8;
+      if (invoice.company?.profile?.tax_id) {
+        doc.text(`Tax ID: ${invoice.company.profile.tax_id}`, 20, yPosition);
+        yPosition += 8;
+      }
+      yPosition += 7;
+
+      // VAT Information
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`VAT Information: ${isVatExempt ? 'VAT Exempt' : `VAT Rate: ${companyVatRate}%`}`, 20, yPosition);
       yPosition += 15;
 
       // Invoice items table
       const tableData = invoice.items.map(item => {
         const product = products.find(p => p.id.toString() === item.product_id.toString());
+        const lineTotalUSD = parseFloat(item.quantity) * parseFloat(item.unit_price);
+        const exchangeRate = getExchangeRate('USD', invoice.currency_code || 'USD');
+        const lineTotal = lineTotalUSD * exchangeRate;
         return [
           product?.name || 'Unknown Product',
           item.quantity,
-          `${invoice.currency_code} ${parseFloat(item.unit_price).toFixed(2)}`,
-          `${item.tax_rate}%`,
-          `${invoice.currency_code} ${(parseFloat(item.quantity) * parseFloat(item.unit_price)).toFixed(2)}`
+          `${invoice.currency_code} ${(parseFloat(item.unit_price) * exchangeRate).toFixed(2)}`,
+          `${invoice.currency_code} ${lineTotal.toFixed(2)}`
         ];
       });
 
       autoTable(doc, {
-        head: [['Product', 'Quantity', 'Unit Price', 'Tax Rate', 'Line Total']],
+        head: [['Product', 'Quantity', 'Unit Price', 'Line Total']],
         body: tableData,
         startY: yPosition,
         styles: {
@@ -1424,11 +1674,10 @@ const InvoiceList = () => {
           fontStyle: 'bold',
         },
         columnStyles: {
-          0: { cellWidth: 60 },
-          1: { cellWidth: 20, halign: 'center' },
-          2: { cellWidth: 30, halign: 'right' },
-          3: { cellWidth: 20, halign: 'center' },
-          4: { cellWidth: 30, halign: 'right' },
+          0: { cellWidth: 70 },
+          1: { cellWidth: 25, halign: 'center' },
+          2: { cellWidth: 35, halign: 'right' },
+          3: { cellWidth: 35, halign: 'right' },
         },
       });
 
@@ -1438,7 +1687,7 @@ const InvoiceList = () => {
       doc.setFontSize(12);
       doc.setFont('helvetica', 'bold');
       doc.text(`Subtotal: ${invoice.currency_code} ${parseFloat(invoice.subtotal || '0').toFixed(2)}`, pageWidth - 60, finalY + 10);
-      doc.text(`Tax Amount: ${invoice.currency_code} ${parseFloat(invoice.tax_amount || '0').toFixed(2)}`, pageWidth - 60, finalY + 20);
+      doc.text(`VAT Amount (${isVatExempt ? 'Exempt' : companyVatRate + '%'}): ${invoice.currency_code} ${parseFloat(invoice.tax_amount || '0').toFixed(2)}`, pageWidth - 60, finalY + 20);
       doc.text(`Total Amount: ${invoice.currency_code} ${parseFloat(invoice.total_amount || '0').toFixed(2)}`, pageWidth - 60, finalY + 30);
 
       // Notes and terms
@@ -1609,7 +1858,6 @@ const InvoiceList = () => {
                             <th colSpan={2}>Product</th>
                             <th>Quantity</th>
                             <th>Unit Price</th>
-                            <th>Tax Rate (%)</th>
                             <th>Line Total</th>
                             <th>Action</th>
                           </tr>
@@ -1619,10 +1867,9 @@ const InvoiceList = () => {
                             const product = products.find(p => p.id.toString() === item.product_id);
                             const quantity = parseFloat(item.quantity) || 0;
                             const unitPrice = parseFloat(item.unit_price) || 0;
-                            const taxRate = parseFloat(item.tax_rate) || 0;
-                            const lineTotal = quantity * unitPrice;
-                            const lineTax = lineTotal * taxRate / 100;
-                            const lineTotalWithTax = lineTotal + lineTax;
+                            const lineTotalUSD = quantity * unitPrice;
+                            const exchangeRate = getExchangeRate('USD', newInvoice.currency_code);
+                            const lineTotal = lineTotalUSD * exchangeRate;
                             
                             return (
                               <tr key={index}>
@@ -1661,18 +1908,15 @@ const InvoiceList = () => {
                                   />
                                 </td>
                                 <td>
-                                  <input
-                                    type="number"
-                                    step="0.01"
-                                    className="form-control form-control-sm"
-                                    value={item.tax_rate}
-                                    onChange={(e) => updateNewInvoiceItem(index, "tax_rate", e.target.value)}
-                                    placeholder="0.00"
-                                  />
-                                </td>
-                                <td>
                                   <span className="fw-bold">
-                                    {newInvoice.currency_code} {lineTotalWithTax.toFixed(2)}
+                                    {isLoadingExchangeRates && newInvoice.currency_code !== 'USD' ? (
+                                      <span className="text-muted">
+                                        <Spinner animation="border" size="sm" className="me-1" />
+                                        Loading...
+                                      </span>
+                                    ) : (
+                                      `${newInvoice.currency_code} ${lineTotal.toFixed(2)}`
+                                    )}
                                   </span>
                                 </td>
                                 <td>
@@ -1704,7 +1948,7 @@ const InvoiceList = () => {
                     step="0.01"
                     className="form-control"
                     id="newInvoiceSubtotal"
-                    value={newInvoice.subtotal}
+                    value={isLoadingExchangeRates && newInvoice.currency_code !== 'USD' ? 'Loading...' : newInvoice.subtotal}
                     readOnly
                     placeholder="0.00"
                   />
@@ -1718,7 +1962,7 @@ const InvoiceList = () => {
                     step="0.01"
                     className="form-control"
                     id="newInvoiceTaxAmount"
-                    value={newInvoice.tax_amount}
+                    value={isLoadingExchangeRates && newInvoice.currency_code !== 'USD' ? 'Loading...' : newInvoice.tax_amount}
                     readOnly
                     placeholder="0.00"
                   />
@@ -1732,7 +1976,7 @@ const InvoiceList = () => {
                     step="0.01"
                     className="form-control"
                     id="newInvoiceTotalAmount"
-                    value={newInvoice.total_amount}
+                    value={isLoadingExchangeRates && newInvoice.currency_code !== 'USD' ? 'Loading...' : newInvoice.total_amount}
                     readOnly
                     placeholder="0.00"
                   />
@@ -1762,6 +2006,82 @@ const InvoiceList = () => {
               </div>
             </div>
 
+            {/* Exchange Rates Display */}
+            {exchangeRates.length > 0 && (
+              <div className="row">
+                <div className="col-md-12">
+                  <div className="form-group mb-3">
+                    <label>Exchange Rates (Base: {newInvoice.currency_code})</label>
+                    <div className="card">
+                      <div className="card-body">
+                        {isLoadingExchangeRates ? (
+                          <div className="text-center py-2">
+                            <Spinner animation="border" size="sm" className="me-2" />
+                            <span>Loading exchange rates...</span>
+                          </div>
+                        ) : (
+                          <div className="row">
+                            {exchangeRates.map((rate) => (
+                              <div key={`${rate.from}-${rate.to}`} className="col-md-2 mb-2">
+                                <div className="text-center p-2 border rounded">
+                                  <div className="fw-bold text-primary">{rate.to}</div>
+                                  <div className="text-muted small">
+                                    {rate.rate.toFixed(4)}
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        <div className="mt-2">
+                          <small className="text-muted">
+                            <i className="fas fa-info-circle me-1"></i>
+                            Exchange rates are updated in real-time. Last updated: {new Date().toLocaleTimeString()}
+                          </small>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Company VAT Information */}
+            {newInvoice.company_id && (
+              <div className="row">
+                <div className="col-md-12">
+                  <div className="form-group mb-3">
+                    <label>Company VAT Information</label>
+                    <div className="card">
+                      <div className="card-body">
+                        {(() => {
+                          const selectedCompany = companies.find(c => c.id.toString() === newInvoice.company_id);
+                          const vatRate = selectedCompany?.profile?.vat_rate ? parseFloat(selectedCompany.profile.vat_rate) : 0;
+                          const isVatExempt = selectedCompany?.profile?.vat_exemption;
+                          
+                          return (
+                            <div className="d-flex justify-content-between align-items-center">
+                              <div>
+                                <strong>VAT Rate:</strong> {isVatExempt ? 'Exempt' : `${vatRate}%`}
+                                {selectedCompany?.profile?.tax_id && (
+                                  <div className="text-muted small">
+                                    <strong>Tax ID:</strong> {selectedCompany.profile.tax_id}
+                                  </div>
+                                )}
+                              </div>
+                              <div className="text-muted small">
+                                Tax will be calculated automatically based on company VAT rate
+                              </div>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Payment Methods Section */}
             {newInvoice.company_id && (
               <div className="row">
@@ -1777,24 +2097,6 @@ const InvoiceList = () => {
               </div>
             )}
 
-            <div className="row">
-              <div className="col-md-6">
-                <div className="form-group mb-3">
-                  <label htmlFor="newInvoiceExchangeRate">Exchange Rate</label>
-                  <input
-                    type="number"
-                    step="0.000001"
-                    className="form-control"
-                    id="newInvoiceExchangeRate"
-                    value={newInvoice.exchange_rate}
-                    onChange={(e) =>
-                      handleNewInvoiceChange("exchange_rate", e.target.value)
-                    }
-                    placeholder="1.000000"
-                  />
-                </div>
-              </div>
-            </div>
 
             <div className="row">
               <div className="col-md-12">
@@ -1968,7 +2270,6 @@ const InvoiceList = () => {
                             <th colSpan={2}>Product</th>
                             <th>Quantity</th>
                             <th>Unit Price</th>
-                            <th>Tax Rate (%)</th>
                             <th>Line Total</th>
                             <th>Action</th>
                           </tr>
@@ -1978,10 +2279,9 @@ const InvoiceList = () => {
                             const product = products.find(p => p.id.toString() === item.product_id);
                             const quantity = parseFloat(item.quantity) || 0;
                             const unitPrice = parseFloat(item.unit_price) || 0;
-                            const taxRate = parseFloat(item.tax_rate) || 0;
-                            const lineTotal = quantity * unitPrice;
-                            const lineTax = lineTotal * taxRate / 100;
-                            const lineTotalWithTax = lineTotal + lineTax;
+                            const lineTotalUSD = quantity * unitPrice;
+                            const exchangeRate = getExchangeRate('USD', selectedInvoice?.currency_code || 'USD');
+                            const lineTotal = lineTotalUSD * exchangeRate;
                             
                             return (
                               <tr key={index}>
@@ -2020,18 +2320,15 @@ const InvoiceList = () => {
                                   />
                                 </td>
                                 <td>
-                                  <input
-                                    type="number"
-                                    step="0.01"
-                                    className="form-control form-control-sm"
-                                    value={item.tax_rate}
-                                    onChange={(e) => updateEditInvoiceItem(index, "tax_rate", e.target.value)}
-                                    placeholder="0.00"
-                                  />
-                                </td>
-                                <td>
                                   <span className="fw-bold">
-                                    {selectedInvoice.currency_code} {lineTotalWithTax.toFixed(2)}
+                                    {isLoadingExchangeRates && selectedInvoice?.currency_code !== 'USD' ? (
+                                      <span className="text-muted">
+                                        <Spinner animation="border" size="sm" className="me-1" />
+                                        Loading...
+                                      </span>
+                                    ) : (
+                                      `${selectedInvoice.currency_code} ${lineTotal.toFixed(2)}`
+                                    )}
                                   </span>
                                 </td>
                                 <td>
@@ -2063,7 +2360,7 @@ const InvoiceList = () => {
                     step="0.01"
                     className="form-control"
                     id="editInvoiceSubtotal"
-                    value={selectedInvoice.subtotal || ""}
+                    value={isLoadingExchangeRates && selectedInvoice?.currency_code !== 'USD' ? 'Loading...' : (selectedInvoice.subtotal || "")}
                     readOnly
                     placeholder="0.00"
                   />
@@ -2077,7 +2374,7 @@ const InvoiceList = () => {
                     step="0.01"
                     className="form-control"
                     id="editInvoiceTaxAmount"
-                    value={selectedInvoice.tax_amount || ""}
+                    value={isLoadingExchangeRates && selectedInvoice?.currency_code !== 'USD' ? 'Loading...' : (selectedInvoice.tax_amount || "")}
                     readOnly
                     placeholder="0.00"
                   />
@@ -2091,7 +2388,7 @@ const InvoiceList = () => {
                     step="0.01"
                     className="form-control"
                     id="editInvoiceTotalAmount"
-                    value={selectedInvoice.total_amount || ""}
+                    value={isLoadingExchangeRates && selectedInvoice?.currency_code !== 'USD' ? 'Loading...' : (selectedInvoice.total_amount || "")}
                     readOnly
                     placeholder="0.00"
                   />
@@ -2121,6 +2418,82 @@ const InvoiceList = () => {
               </div>
             </div>
 
+            {/* Exchange Rates Display */}
+            {exchangeRates.length > 0 && (
+              <div className="row">
+                <div className="col-md-12">
+                  <div className="form-group mb-3">
+                    <label>Exchange Rates (Base: {newInvoice.currency_code})</label>
+                    <div className="card">
+                      <div className="card-body">
+                        {isLoadingExchangeRates ? (
+                          <div className="text-center py-2">
+                            <Spinner animation="border" size="sm" className="me-2" />
+                            <span>Loading exchange rates...</span>
+                          </div>
+                        ) : (
+                          <div className="row">
+                            {exchangeRates.map((rate) => (
+                              <div key={`${rate.from}-${rate.to}`} className="col-md-2 mb-2">
+                                <div className="text-center p-2 border rounded">
+                                  <div className="fw-bold text-primary">{rate.to}</div>
+                                  <div className="text-muted small">
+                                    {rate.rate.toFixed(4)}
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        <div className="mt-2">
+                          <small className="text-muted">
+                            <i className="fas fa-info-circle me-1"></i>
+                            Exchange rates are updated in real-time. Last updated: {new Date().toLocaleTimeString()}
+                          </small>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Company VAT Information */}
+            {selectedInvoice.company_id && (
+              <div className="row">
+                <div className="col-md-12">
+                  <div className="form-group mb-3">
+                    <label>Company VAT Information</label>
+                    <div className="card">
+                      <div className="card-body">
+                        {(() => {
+                          const selectedCompany = companies.find(c => c.id.toString() === selectedInvoice.company_id);
+                          const vatRate = selectedCompany?.profile?.vat_rate ? parseFloat(selectedCompany.profile.vat_rate) : 0;
+                          const isVatExempt = selectedCompany?.profile?.vat_exemption;
+                          
+                          return (
+                            <div className="d-flex justify-content-between align-items-center">
+                              <div>
+                                <strong>VAT Rate:</strong> {isVatExempt ? 'Exempt' : `${vatRate}%`}
+                                {selectedCompany?.profile?.tax_id && (
+                                  <div className="text-muted small">
+                                    <strong>Tax ID:</strong> {selectedCompany.profile.tax_id}
+                                  </div>
+                                )}
+                              </div>
+                              <div className="text-muted small">
+                                Tax will be calculated automatically based on company VAT rate
+                              </div>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Payment Methods Section */}
             {selectedInvoice.company_id && (
               <div className="row">
@@ -2136,24 +2509,6 @@ const InvoiceList = () => {
               </div>
             )}
 
-            <div className="row">
-              <div className="col-md-6">
-                <div className="form-group mb-3">
-                  <label htmlFor="editInvoiceExchangeRate">Exchange Rate</label>
-                  <input
-                    type="number"
-                    step="0.000001"
-                    className="form-control"
-                    id="editInvoiceExchangeRate"
-                    value={selectedInvoice.exchange_rate || "1.000000"}
-                    onChange={(e) =>
-                      handleEditInvoiceChange("exchange_rate", e.target.value)
-                    }
-                    placeholder="1.000000"
-                  />
-                </div>
-              </div>
-            </div>
 
             <div className="row">
               <div className="col-md-12">
@@ -2282,6 +2637,21 @@ const InvoiceList = () => {
                     <p><strong>Subtotal:</strong> {selectedInvoiceForPayment.currency_code} {parseFloat(selectedInvoiceForPayment.subtotal || '0').toFixed(2)}</p>
                     <p><strong>Tax Amount:</strong> {selectedInvoiceForPayment.currency_code} {parseFloat(selectedInvoiceForPayment.tax_amount || '0').toFixed(2)}</p>
                     <p><strong className="text-primary">Total Amount:</strong> {selectedInvoiceForPayment.currency_code} {parseFloat(selectedInvoiceForPayment.total_amount || '0').toFixed(2)}</p>
+                    
+                    {/* Currency Conversion Display */}
+                    {exchangeRates.length > 0 && baseCurrency !== selectedInvoiceForPayment.currency_code && (
+                      <div className="mt-3 p-2 bg-light rounded">
+                        <small className="text-muted">Converted to {baseCurrency}:</small>
+                        <div className="mt-1">
+                          <div><strong>Subtotal:</strong> {baseCurrency} {(parseFloat(selectedInvoiceForPayment.subtotal || '0') * getExchangeRate(selectedInvoiceForPayment.currency_code || 'USD', baseCurrency)).toFixed(2)}</div>
+                          <div><strong>Tax Amount:</strong> {baseCurrency} {(parseFloat(selectedInvoiceForPayment.tax_amount || '0') * getExchangeRate(selectedInvoiceForPayment.currency_code || 'USD', baseCurrency)).toFixed(2)}</div>
+                          <div><strong className="text-primary">Total Amount:</strong> {baseCurrency} {(parseFloat(selectedInvoiceForPayment.total_amount || '0') * getExchangeRate(selectedInvoiceForPayment.currency_code || 'USD', baseCurrency)).toFixed(2)}</div>
+                        </div>
+                        <small className="text-muted">
+                          Exchange Rate: 1 {selectedInvoiceForPayment.currency_code} = {getExchangeRate(selectedInvoiceForPayment.currency_code || 'USD', baseCurrency).toFixed(4)} {baseCurrency}
+                        </small>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

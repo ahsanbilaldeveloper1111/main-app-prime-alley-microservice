@@ -5,7 +5,6 @@ import React, {
   useCallback,
   useMemo,
   useEffect,
-  useRef,
 } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
@@ -16,32 +15,17 @@ import {
   deleteCompany,
   importCompanies,
   exportCompanies,
-  generateTemplate,
   downloadTemplate,
   getResellers,
   getCompany,
-  getPaymentMethods,
-  createPaymentMethod,
-  getPublishableKey,
-  setDefaultPaymentMethod,
-  deletePaymentMethod,
   CompanyData,
-  PaymentMethodData,
-  createAndConfirmPaymentMethod,
 } from "@utils/accounting";
 import { Column } from "@components/CustomDataTable";
-import { Button, Modal, Row, Col, Form, Alert, Spinner } from "react-bootstrap";
+import { Button, Modal, Alert, Spinner } from "react-bootstrap";
 import { toast } from "react-toastify";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/router";
 import moment from "moment";
-import { loadStripe } from "@stripe/stripe-js";
-import {
-  Elements,
-  CardElement,
-  useStripe,
-  useElements,
-} from "@stripe/react-stripe-js";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
@@ -49,205 +33,10 @@ import PageHeader from "@components/PageHeader";
 import FormModal from "../../partial/FormModal";
 import ConfirmModal from "@pages/partial/ConfirmModal";
 import SuccessfulModal from "@pages/partial/SuccessfulModal";
-import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
 import DatatableActionButton from "@components/DatatableActionButton";
-import { FiEdit, FiTrash2, FiEye,FiPlus } from "react-icons/fi";
-
-
-import TableAction from "@components/TableAction";
+import { FiEdit, FiTrash2 } from "react-icons/fi";
 import CompaniesFilters from "@components/filters/CompaniesFilters";
 
-// Stripe Card Form Component
-const StripeCardForm = ({
-  cardData,
-  onCardDataChange,
-  onSaveCard,
-  isSavingCard,
-  stripePublishableKey,
-}: {
-  cardData: { cardholderName: string; isDefault: boolean };
-  onCardDataChange: (field: string, value: any) => void;
-  onSaveCard: (stripeToken: string) => void;
-  isSavingCard: boolean;
-  stripePublishableKey: string;
-}) => {
-  const stripe = useStripe();
-  const elements = useElements();
-  const [cardError, setCardError] = useState<string>("");
-  const [isCardComplete, setIsCardComplete] = useState<boolean>(false);
-  const [cardBrand, setCardBrand] = useState<string>("");
-
-  const handleCardChange = (event: any) => {
-    setCardError(event.error ? event.error.message : "");
-    setIsCardComplete(event.complete);
-
-    // Extract card brand from the event
-    if (event.brand) {
-      setCardBrand(event.brand);
-    }
-  };
-
-  const handleSubmit = async (event: React.FormEvent) => {
-    event.preventDefault();
-
-    if (!stripe || !elements) {
-      toast.error("Stripe is not initialized");
-      return;
-    }
-
-    if (!cardData.cardholderName.trim()) {
-      toast.error("Please enter cardholder name");
-      return;
-    }
-
-    if (!isCardComplete) {
-      toast.error("Please complete the card details");
-      return;
-    }
-
-    const cardElement = elements.getElement(CardElement);
-    if (!cardElement) {
-      toast.error("Card element not found");
-      return;
-    }
-
-    try {
-      const { token, error } = await stripe.createToken(cardElement, {
-        name: cardData.cardholderName,
-      });
-
-      if (error) {
-        toast.error(error.message || "Failed to create card token");
-        return;
-      }
-
-      if (token) {
-        onSaveCard(token.id);
-      }
-    } catch (error) {
-      console.error("Error creating token:", error);
-      toast.error("Failed to process card");
-    }
-  };
-
-  return (
-    <form onSubmit={handleSubmit}>
-      <div className="row">
-        <div className="col-md-6">
-          <div className="form-group mb-3">
-            <label htmlFor="cardholderName">Cardholder Name *</label>
-            <input
-              type="text"
-              className="form-control"
-              id="cardholderName"
-              value={cardData.cardholderName}
-              onChange={(e) =>
-                onCardDataChange("cardholderName", e.target.value)
-              }
-              placeholder="Enter cardholder name"
-              required
-            />
-          </div>
-        </div>
-        <div className="col-md-6">
-          <div className="form-group mb-3">
-            <div className="form-check mt-4">
-              <input
-                className="form-check-input"
-                type="checkbox"
-                id="isDefault"
-                checked={cardData.isDefault}
-                onChange={(e) =>
-                  onCardDataChange("isDefault", e.target.checked)
-                }
-              />
-              <label className="form-check-label" htmlFor="isDefault">
-                Set as Default Payment Method
-              </label>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="row">
-        <div className="col-12">
-          <div className="form-group mb-3">
-            <label>Card Details *</label>
-            {cardBrand && (
-              <div className="mb-2">
-                <span className="badge bg-primary me-2">
-                  {cardBrand.toUpperCase()}
-                </span>
-                {isCardComplete && (
-                  <span className="text-success">
-                    <i className="fas fa-check-circle me-1"></i>
-                    Card details complete
-                  </span>
-                )}
-              </div>
-            )}
-            <div
-              className={`border rounded p-3 ${
-                cardError
-                  ? "border-danger"
-                  : isCardComplete
-                  ? "border-success"
-                  : ""
-              }`}
-            >
-              <CardElement
-                options={{
-                  style: {
-                    base: {
-                      fontSize: "16px",
-                      color: "#424770",
-                      fontFamily: '"Helvetica Neue", Helvetica, sans-serif',
-                      "::placeholder": {
-                        color: "#aab7c4",
-                      },
-                    },
-                    invalid: {
-                      color: "#9e2146",
-                      iconColor: "#9e2146",
-                    },
-                    complete: {
-                      color: "#4caf50",
-                      iconColor: "#4caf50",
-                    },
-                  },
-                  hidePostalCode: true,
-                }}
-                onChange={handleCardChange}
-              />
-            </div>
-            {cardError && (
-              <div className="text-danger mt-2">
-                <small>{cardError}</small>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      <div className="row">
-        <div className="col-12">
-          <Button
-            type="submit"
-            variant="primary"
-            disabled={
-              isSavingCard ||
-              !stripe ||
-              !isCardComplete ||
-              !cardData.cardholderName.trim()
-            }
-          >
-            {isSavingCard ? "Saving Card..." : "Save Card"}
-          </Button>
-        </div>
-      </div>
-    </form>
-  );
-};
 
 const CompanyList = () => {
   const { data: session, status } = useSession();
@@ -270,29 +59,28 @@ const CompanyList = () => {
     phone: "",
     country: "",
     reseller_id: "",
-    profile: {
-      currency: "USD",
-      vat_rate: "0.00",
-      vat_exemption: false,
-      tax_id: "",
-      discount_type: "flat_percentage",
-      address: "",
-      discount_limit: "0.00",
-      discount_applicability: [] as string[],
-      payment_methods: [] as string[],
-      payment_mode: "one_time",
-      credit_limit: "0.00",
-      early_payment_discount: "0.00",
-      late_fee_rule: "0.00",
-      payment_terms: 30,
-      outstanding_invoices: "0.00",
-      discounts_applied_ytd: "0.00",
-      vat_collected: "0.00",
-      active_subscriptions: "0",
-      last_refund_date: "",
-      profile_status: "incomplete",
-      selected_products: [] as string[],
-    },
+      profile: {
+        currency: "USD",
+        vat_rate: "0.00",
+        vat_exemption: false,
+        tax_id: "",
+        discount_type: "flat_percentage",
+        address: "",
+        discount_limit: "0.00",
+        discount_applicability: [] as string[],
+        payment_methods: [] as string[],
+        payment_mode: "one_time",
+        credit_limit: "0.00",
+        early_payment_discount: "0.00",
+        late_fee_rule: "0.00",
+        payment_terms: 30,
+        outstanding_invoices: "0.00",
+        discounts_applied_ytd: "0.00",
+        vat_collected: "0.00",
+        active_subscriptions: "0",
+        last_refund_date: "",
+        selected_products: [] as string[],
+      },
   });
 
   // Import states
@@ -306,17 +94,6 @@ const CompanyList = () => {
     []
   );
   const [activeTab, setActiveTab] = useState<string>("basic-info");
-
-  // Stripe payment methods state
-  const [paymentMethods, setPaymentMethods] = useState<PaymentMethodData[]>([]);
-  const [isLoadingPaymentMethods, setIsLoadingPaymentMethods] =
-    useState<boolean>(false);
-  const [isSavingCard, setIsSavingCard] = useState<boolean>(false);
-  const [stripePublishableKey, setStripePublishableKey] = useState<string>("");
-  const [cardData, setCardData] = useState({
-    cardholderName: "",
-    isDefault: false,
-  });
 
   // Load resellers on component mount
   useEffect(() => {
@@ -334,34 +111,6 @@ const CompanyList = () => {
     loadResellers();
   }, []);
 
-  // Load Stripe publishable key from environment
-  useEffect(() => {
-    const key = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
-    if (key) {
-      setStripePublishableKey(key);
-    } else {
-      console.error(
-        "Stripe publishable key not found in environment variables"
-      );
-    }
-  }, []);
-
-  // Load payment methods when editing a company
-  const loadPaymentMethods = useCallback(async (profileId: number) => {
-    if (!profileId) return;
-
-    setIsLoadingPaymentMethods(true);
-    try {
-      const methods = await getPaymentMethods(profileId);
-      console.log("ZE Payment methods loaded:", methods);
-      setPaymentMethods(methods);
-    } catch (error) {
-      console.error("Error loading payment methods:", error);
-      setPaymentMethods([]);
-    } finally {
-      setIsLoadingPaymentMethods(false);
-    }
-  }, []);
 
   // Table columns
   const columns: Column[] = useMemo(
@@ -492,7 +241,6 @@ const CompanyList = () => {
         vat_collected: "0.00",
         active_subscriptions: "0",
         last_refund_date: "",
-        profile_status: "incomplete",
         selected_products: [] as string[],
       },
     });
@@ -579,17 +327,11 @@ const CompanyList = () => {
             active_subscriptions:
               freshCompanyData.profile?.active_subscriptions?.toString() ?? "0",
             last_refund_date: freshCompanyData.profile?.last_refund_date ?? "",
-            profile_status:
-              freshCompanyData.profile?.profile_status ?? "incomplete",
             selected_products:
               freshCompanyData.profile?.selected_products ?? ([] as string[]),
           },
         });
 
-        // Load payment methods if profile exists
-        if (freshCompanyData.id) {
-          await loadPaymentMethods(freshCompanyData.id);
-        }
       } catch (error) {
         console.error("Error loading company data:", error);
         toast.error("Failed to load company data");
@@ -598,7 +340,7 @@ const CompanyList = () => {
         setIsLoadingCompany(false);
       }
     },
-    [loadPaymentMethods]
+    []
   );
 
   // Handle update company
@@ -723,11 +465,6 @@ const CompanyList = () => {
     setShowEditModal(false);
     setSelectedCompany(null);
     setIsLoadingCompany(false);
-    setPaymentMethods([]);
-    setCardData({
-      cardholderName: "",
-      isDefault: false,
-    });
     resetFormData();
   }, [resetFormData]);
 
@@ -772,97 +509,6 @@ const CompanyList = () => {
     []
   );
 
-  // Card data handlers
-  const handleCardDataChange = useCallback((field: string, value: any) => {
-    setCardData((prev) => ({
-      ...prev,
-      [field]: value,
-    }));
-  }, []);
-
-  // Handle save card with Stripe token
-  const handleSaveCard = useCallback(
-    async (stripeToken: string) => {
-      if (!selectedCompany?.id) {
-        toast.error("No profile found for this company");
-        return;
-      }
-
-      setIsSavingCard(true);
-      try {
-        const payload = {
-          cardholderName: cardData.cardholderName,
-          isDefault: cardData.isDefault,
-          stripeToken: stripeToken,
-        };
-
-        await createAndConfirmPaymentMethod(selectedCompany.id, payload);
-        toast.success("Card saved successfully");
-
-        // Reload payment methods
-        await loadPaymentMethods(selectedCompany.id);
-
-        // Reset card data
-        setCardData({
-          cardholderName: "",
-          isDefault: false,
-        });
-      } catch (error) {
-        console.error("Error saving card:", error);
-        toast.error("Failed to save card");
-      } finally {
-        setIsSavingCard(false);
-      }
-    },
-    [selectedCompany, cardData, loadPaymentMethods]
-  );
-
-  // Handle set default payment method
-  const handleSetDefaultPaymentMethod = useCallback(
-    async (paymentMethodId: string) => {
-      if (!selectedCompany?.id) {
-        toast.error("No company selected");
-        return;
-      }
-
-      try {
-        await setDefaultPaymentMethod(selectedCompany.id, paymentMethodId);
-        toast.success("Default payment method updated");
-
-        // Reload payment methods
-        await loadPaymentMethods(selectedCompany.id);
-      } catch (error) {
-        console.error("Error setting default payment method:", error);
-        toast.error("Failed to set default payment method");
-      }
-    },
-    [selectedCompany, loadPaymentMethods]
-  );
-
-  // Handle remove payment method
-  const handleRemovePaymentMethod = useCallback(
-    async (paymentMethodId: string) => {
-      if (
-        !window.confirm("Are you sure you want to remove this payment method?")
-      ) {
-        return;
-      }
-
-      try {
-        await deletePaymentMethod(paymentMethodId);
-        toast.success("Payment method removed");
-
-        // Reload payment methods
-        if (selectedCompany?.id) {
-          await loadPaymentMethods(selectedCompany.id);
-        }
-      } catch (error) {
-        console.error("Error removing payment method:", error);
-        toast.error("Failed to remove payment method");
-      }
-    },
-    [selectedCompany, loadPaymentMethods]
-  );
 
   const [currentFilters, setCurrentFilters] = useState<any>({});
   
@@ -1146,6 +792,7 @@ const CompanyList = () => {
                             <option value="EUR">EUR</option>
                             <option value="GBP">GBP</option>
                             <option value="CAD">CAD</option>
+                            <option value="AED">AED</option>
                           </select>
                         </div>
                       </div>
@@ -1233,30 +880,6 @@ const CompanyList = () => {
                       </div>
                     </div>
 
-                    <div className="row">
-                      <div className="col-md-6">
-                        <div className="form-group mb-3">
-                          <label htmlFor="createProfileStatus">
-                            Profile Status
-                          </label>
-                          <select
-                            className="form-control"
-                            id="createProfileStatus"
-                            value={formData.profile.profile_status}
-                            onChange={(e) =>
-                              handleProfileInputChange(
-                                "profile_status",
-                                e.target.value
-                              )
-                            }
-                          >
-                            <option value="incomplete">Incomplete</option>
-                            <option value="complete">Complete</option>
-                            <option value="verified">Verified</option>
-                          </select>
-                        </div>
-                      </div>
-                    </div>
                   </div>
 
                   {/* Payment & Billing Tab */}
@@ -1631,19 +1254,6 @@ const CompanyList = () => {
                         Discounts & Terms
                       </button>
                     </li>
-                    <li className="nav-item" role="presentation">
-                      <button
-                        className={`nav-link ${
-                          activeTab === "payment-methods" ? "active" : ""
-                        }`}
-                        id="payment-methods-tab"
-                        type="button"
-                        role="tab"
-                        onClick={() => setActiveTab("payment-methods")}
-                      >
-                        Payment Methods
-                      </button>
-                    </li>
                   </ul>
 
                   <div className="tab-content" id="editCompanyTabsContent">
@@ -1868,30 +1478,6 @@ const CompanyList = () => {
                         </div>
                       </div>
 
-                      <div className="row">
-                        <div className="col-md-6">
-                          <div className="form-group mb-3">
-                            <label htmlFor="editProfileStatus">
-                              Profile Status
-                            </label>
-                            <select
-                              className="form-control"
-                              id="editProfileStatus"
-                              value={formData.profile.profile_status}
-                              onChange={(e) =>
-                                handleProfileInputChange(
-                                  "profile_status",
-                                  e.target.value
-                                )
-                              }
-                            >
-                              <option value="incomplete">Incomplete</option>
-                              <option value="complete">Complete</option>
-                              <option value="verified">Verified</option>
-                            </select>
-                          </div>
-                        </div>
-                      </div>
                     </div>
 
                     {/* Payment & Billing Tab */}
@@ -2184,218 +1770,6 @@ const CompanyList = () => {
                       </div>
                     </div>
 
-                    {/* Payment Methods Tab */}
-                    <div
-                      className={`tab-pane fade ${
-                        activeTab === "payment-methods" ? "show active" : ""
-                      }`}
-                      id="payment-methods"
-                      role="tabpanel"
-                      aria-labelledby="payment-methods-tab"
-                    >
-                      <div className="row mt-3">
-                        <div className="col-12">
-                          <h5 className="mb-3">Payment Methods</h5>
-
-                          {/* Add New Card Form */}
-                          <div className="card mb-4">
-                            <div className="card-header">
-                              <h6 className="mb-0">Add New Card</h6>
-                            </div>
-                            <div className="card-body">
-                              {stripePublishableKey ? (
-                                <Elements
-                                  stripe={loadStripe(stripePublishableKey)}
-                                >
-                                  <StripeCardForm
-                                    cardData={cardData}
-                                    onCardDataChange={handleCardDataChange}
-                                    onSaveCard={handleSaveCard}
-                                    isSavingCard={isSavingCard}
-                                    stripePublishableKey={stripePublishableKey}
-                                  />
-                                </Elements>
-                              ) : (
-                                <div className="text-center py-3">
-                                  <Spinner
-                                    animation="border"
-                                    size="sm"
-                                    className="me-2"
-                                  />
-                                  <span>Loading Stripe...</span>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Existing Payment Methods */}
-                          <div className="card">
-                            <div className="card-header">
-                              <h6 className="mb-0">Existing Payment Methods</h6>
-                            </div>
-                            <div className="card-body">
-                              {isLoadingPaymentMethods ? (
-                                <div className="text-center py-3">
-                                  <Spinner
-                                    animation="border"
-                                    size="sm"
-                                    className="me-2"
-                                  />
-                                  <span>Loading payment methods...</span>
-                                </div>
-                              ) : paymentMethods.length > 0 ? (
-                                <div className="table-responsive">
-                                  <table className="table table-sm">
-                                    <thead>
-                                      <tr>
-                                        <th>Type</th>
-                                        <th>Details</th>
-                                        <th>Default</th>
-                                        <th>Created</th>
-                                        <th>Actions</th>
-                                      </tr>
-                                    </thead>
-                                    <tbody>
-                                      {paymentMethods.map((method) => (
-                                        <tr key={method.id}>
-                                          <td>
-                                            <span className="badge bg-primary">
-                                              {method.type === "card"
-                                                ? "Card"
-                                                : "Bank Account"}
-                                            </span>
-                                          </td>
-                                          <td>
-                                            {method.type === "card" &&
-                                            method.card ? (
-                                              <div>
-                                                <div className="fw-bold">
-                                                  {method.card.brand.toUpperCase()}{" "}
-                                                  •••• {method.card.last4}
-                                                </div>
-                                                <small className="text-muted">
-                                                  Expires{" "}
-                                                  {method.card.exp_month}/
-                                                  {method.card.exp_year}
-                                                </small>
-                                                {method.billing_details
-                                                  ?.name && (
-                                                  <div className="mt-1">
-                                                    <small className="text-info">
-                                                      <i className="fas fa-user me-1"></i>
-                                                      {
-                                                        method.billing_details
-                                                          .name
-                                                      }
-                                                    </small>
-                                                  </div>
-                                                )}
-                                              </div>
-                                            ) : method.type ===
-                                                "bank_account" &&
-                                              method.bank_account ? (
-                                              <div>
-                                                <div className="fw-bold">
-                                                  {
-                                                    method.bank_account
-                                                      .bank_name
-                                                  }{" "}
-                                                  ••••{" "}
-                                                  {method.bank_account.last4}
-                                                </div>
-                                                <small className="text-muted">
-                                                  Routing:{" "}
-                                                  {
-                                                    method.bank_account
-                                                      .routing_number
-                                                  }
-                                                </small>
-                                                {method.billing_details
-                                                  ?.name && (
-                                                  <div className="mt-1">
-                                                    <small className="text-info">
-                                                      <i className="fas fa-user me-1"></i>
-                                                      {
-                                                        method.billing_details
-                                                          .name
-                                                      }
-                                                    </small>
-                                                  </div>
-                                                )}
-                                              </div>
-                                            ) : (
-                                              <span className="text-muted">
-                                                Unknown
-                                              </span>
-                                            )}
-                                          </td>
-                                          <td>
-                                            {method.is_default ? (
-                                              <span className="badge bg-success">
-                                                Default
-                                              </span>
-                                            ) : (
-                                              <span className="text-muted">
-                                                -
-                                              </span>
-                                            )}
-                                          </td>
-                                          <td>
-                                            <small className="text-muted">
-                                              {moment(method.created_at).format(
-                                                "MMM DD, YYYY"
-                                              )}
-                                            </small>
-                                          </td>
-                                          <td>
-                                            <div className="btn-group btn-group-sm">
-                                              <Button
-                                                variant="outline-primary"
-                                                size="sm"
-                                                disabled={method.is_default}
-                                                onClick={() =>
-                                                  handleSetDefaultPaymentMethod(
-                                                    method.id
-                                                  )
-                                                }
-                                              >
-                                                {method.is_default
-                                                  ? "Default"
-                                                  : "Set Default"}
-                                              </Button>
-                                              <Button
-                                                variant="outline-danger"
-                                                size="sm"
-                                                onClick={() =>
-                                                  handleRemovePaymentMethod(
-                                                    method.id
-                                                  )
-                                                }
-                                              >
-                                                Remove
-                                              </Button>
-                                            </div>
-                                          </td>
-                                        </tr>
-                                      ))}
-                                    </tbody>
-                                  </table>
-                                </div>
-                              ) : (
-                                <div className="text-center py-4">
-                                  <p className="text-muted mb-0">
-                                    No payment methods found
-                                  </p>
-                                  <small className="text-muted">
-                                    Add a card above to get started
-                                  </small>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
                   </div>
                 </div>
               </div>
