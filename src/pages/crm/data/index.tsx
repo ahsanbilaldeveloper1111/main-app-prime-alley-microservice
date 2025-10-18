@@ -1138,21 +1138,6 @@ const CrmDataManagement = () => {
         ),
       },
       {
-        key: "is_viewed",
-        name: "Status",
-        selector: (row: any) => row.is_viewed,
-        sortable: true,
-        cell: (props: any) => (
-          <div>
-            {props.is_viewed ? (
-              <span className="status-badge warning">Viewed</span>
-            ) : (
-              <span className="status-badge success">New</span>
-            )}
-          </div>
-        ),
-      },
-      {
         key: "campaign",
         name: "Campaign",
         selector: (row: any) => row.campaign_id,
@@ -1173,20 +1158,41 @@ const CrmDataManagement = () => {
         },
       },
       {
-        key: "tags",
-        name: "Tags",
-        selector: (row: any) => row.tags,
-        sortable: false,
+        key: "last_called_at",
+        name: "Last Called",
+        selector: (row: any) => row.last_called_at,
+        sortable: true,
         cell: (props: any) => {
-          // Show hardcoded tags for now
-          const tags = props.tags;
+          // Randomize: 30% chance of no call, 70% chance of call in last week
+          const hasCall = Math.random() > 0.3;
+          
+          if (!hasCall) {
+            return (
+              <div className="d-flex align-items-center">
+                <span className="text-muted">N/A</span>
+              </div>
+            );
+          }
+          
+          // Generate random date within last week
+          const now = moment();
+          const oneWeekAgo = moment().subtract(7, 'days');
+          const randomDays = Math.floor(Math.random() * 7);
+          const randomHours = Math.floor(Math.random() * 24);
+          const randomMinutes = Math.floor(Math.random() * 60);
+          
+          const lastCalled = oneWeekAgo
+            .add(randomDays, 'days')
+            .add(randomHours, 'hours')
+            .add(randomMinutes, 'minutes')
+            .toISOString();
+            
           return (
-            <div className="d-flex flex-wrap gap-1">
-              {tags?.map((tag: any, index: any) => (
-                <span key={index} className="status-badge info">
-                  {tag.name}
-                </span>
-              ))}
+            <div className="d-flex align-items-center">
+             
+              <span className="">
+                {moment(lastCalled).format("MMM DD, HH:mm")}
+              </span>
             </div>
           );
         },
@@ -1246,48 +1252,8 @@ const CrmDataManagement = () => {
         },
       },
       {
-        key: "last_called_at",
-        name: "Last Called",
-        selector: (row: any) => row.last_called_at,
-        sortable: true,
-        cell: (props: any) => {
-          // Randomize: 30% chance of no call, 70% chance of call in last week
-          const hasCall = Math.random() > 0.3;
-          
-          if (!hasCall) {
-            return (
-              <div className="d-flex align-items-center">
-                <span className="text-muted">N/A</span>
-              </div>
-            );
-          }
-          
-          // Generate random date within last week
-          const now = moment();
-          const oneWeekAgo = moment().subtract(7, 'days');
-          const randomDays = Math.floor(Math.random() * 7);
-          const randomHours = Math.floor(Math.random() * 24);
-          const randomMinutes = Math.floor(Math.random() * 60);
-          
-          const lastCalled = oneWeekAgo
-            .add(randomDays, 'days')
-            .add(randomHours, 'hours')
-            .add(randomMinutes, 'minutes')
-            .toISOString();
-            
-          return (
-            <div className="d-flex align-items-center">
-             
-              <span className="">
-                {moment(lastCalled).format("MMM DD, HH:mm")}
-              </span>
-            </div>
-          );
-        },
-      },
-      {
         key: "scheduled_call_at",
-        name: "Next Call Scheduled",
+        name: "Next Call",
         selector: (row: any) => row.scheduled_call_at,
         sortable: true,
         cell: (props: any) => {
@@ -1319,62 +1285,38 @@ const CrmDataManagement = () => {
         },
       },
       {
-        key: "recording",
-        name: "Recording",
-        selector: (row: any) => row.recording,
+        key: "view_action",
+        name: "View",
+        selector: (row: any) => row.id,
         sortable: false,
-        cell: (props: any) => {
-          // Static data for now
-          const hasRecording = true;
-          const recordingUrl = "https://example.com/recording1.mp3";
-
-          return (
-            <div>
-              {hasRecording ? (
-                <Button
-                  variant="info"
-                  className="btn-sm app-button"
-                  size="sm"
-                  onClick={() => handlePlayRecording(recordingUrl)}
-                  title="Play Recording"
-                >
-                  <FiPlay size={12} /> Play
-                </Button>
-              ) : (
-                <span className="text-muted small">No recording</span>
-              )}
-            </div>
-          );
-        },
+        cell: (props: any) => (
+          <Button
+            variant="primary"
+            className="app-button"
+            size="sm"
+            onClick={() => handleViewData(props)}
+            title="View Details"
+          >
+            <FiEye size={14} />
+          </Button>
+        ),
       },
       {
-        key: "actions",
-        name: "Actions",
+        key: "call_action",
+        name: "Call",
         selector: (row: any) => row.id,
         sortable: false,
         cell: (props: any) => (
           <div className="d-flex gap-1">
             <Button
-              variant="primary"
+              variant="success"
               className="app-button"
               size="sm"
-              onClick={() => handleViewData(props)}
-              title="View Details"
+              onClick={() => handleCallClick(props)}
+              title="Call Now"
             >
-              <FiEye size={14} />
+              <FiPhone size={14} />
             </Button>
-            <>
-              <Button
-                variant="success"
-                className="app-button"
-                size="sm"
-                onClick={() => handleCallClick(props)}
-                title="Call Now"
-              >
-                <FiPhone size={14} />
-              </Button>
-              
-            </>
             {props.scheduled_call_at ? (
               <Button
                 variant="warning"
@@ -1396,15 +1338,6 @@ const CrmDataManagement = () => {
                 <FiCalendar size={14} />
               </Button>
             )}
-            <Button
-              variant="danger"
-              className="app-button"
-              size="sm"
-              onClick={() => handleDeleteData(props)}
-              title="Delete Entry"
-            >
-              <FiTrash2 size={14} />
-            </Button>
             <DatatableActionButton
                 actions={[
                   {
@@ -1440,6 +1373,42 @@ const CrmDataManagement = () => {
                 ]}
               />
           </div>
+        ),
+      },
+      {
+        key: "tags",
+        name: "Tags",
+        selector: (row: any) => row.tags,
+        sortable: false,
+        cell: (props: any) => {
+          // Show hardcoded tags for now
+          const tags = props.tags;
+          return (
+            <div className="d-flex flex-wrap gap-1">
+              {tags?.map((tag: any, index: any) => (
+                <span key={index} className="status-badge info">
+                  {tag.name}
+                </span>
+              ))}
+            </div>
+          );
+        },
+      },
+      {
+        key: "delete_action",
+        name: "Delete",
+        selector: (row: any) => row.id,
+        sortable: false,
+        cell: (props: any) => (
+          <Button
+            variant="danger"
+            className="app-button"
+            size="sm"
+            onClick={() => handleDeleteData(props)}
+            title="Delete Entry"
+          >
+            <FiTrash2 size={14} />
+          </Button>
         ),
       },
     ],
@@ -2485,12 +2454,11 @@ const CrmDataManagement = () => {
                   <option value="">Select Disposition</option>
                   <option value="interested">Interested</option>
                   <option value="not_interested">Not Interested</option>
-                  <option value="callback_requested">Callback Requested</option>
-                  <option value="no_answer">No Answer</option>
-                  <option value="busy">Busy</option>
+                  <option value="callback_requested">Call Back Requested</option>
+                  <option value="follow_up">Follow Up</option>
                   <option value="do_not_call">Do Not Call</option>
                   <option value="wrong_number">Wrong Number</option>
-                  <option value="follow_up">Follow Up</option>
+                  <option value="spam">Spam</option>
                 </Form.Select>
               </Form.Group>
             </Col>
@@ -2511,8 +2479,8 @@ const CrmDataManagement = () => {
                   <option value="no_answer">No Answer</option>
                   <option value="busy">Busy</option>
                   <option value="voicemail">Voicemail</option>
-                  <option value="wrong_number">Wrong Number</option>
                   <option value="disconnected">Disconnected</option>
+                  <option value="network_error">Network Error</option>
                 </Form.Select>
               </Form.Group>
             </Col>
