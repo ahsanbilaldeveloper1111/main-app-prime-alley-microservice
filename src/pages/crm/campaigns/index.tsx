@@ -439,6 +439,24 @@ const CrmCampaigns = () => {
     []
   );
 
+
+  const getFieldTypeText = (_fieldType: string) => {
+    const fieldType = _fieldType.toLowerCase();
+    switch (fieldType) {
+      case "string":
+        return "Text";
+      case "integer":
+        return "Number";
+      case "date":
+        return "Date";
+      case "email":
+        return "Email";
+      case "dropdown":
+        return "Dropdown";
+      default:
+        return fieldType;
+    }
+  };
   return (
     <React.Fragment>
       <BreadcrumbItem
@@ -826,7 +844,7 @@ const CrmCampaigns = () => {
                           <tr key={index}>
                             <td>{field.field_name}</td>
                             <td>
-                              <span className="status-badge primary text-capitalize">{field.field_type}</span>
+                              <span className="status-badge primary text-capitalize">{getFieldTypeText(field.field_type)}</span>
                             </td>
                             <td>
                               {field.field_type === "dropdown" && field.field_options ? (
