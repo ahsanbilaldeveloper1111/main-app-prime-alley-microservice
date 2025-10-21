@@ -263,11 +263,6 @@ const ProductView = () => {
                 </div>
               )}
 
-              <div className="d-flex gap-2">
-                <Badge bg={product.active ? "success" : "danger"}>
-                  {product.active ? "Active" : "Inactive"}
-                </Badge>
-              </div>
             </CardBody>
           </Card>
 
@@ -299,7 +294,6 @@ const ProductView = () => {
                         <th>SKU</th>
                         <th>Price Adjustment</th>
                         <th>Quantity</th>
-                        <th>Status</th>
                         <th>Actions</th>
                       </tr>
                     </thead>
@@ -323,11 +317,6 @@ const ProductView = () => {
                           <td>
                             <Badge bg={variant.available_quantity > 0 ? "success" : "danger"}>
                               {variant.available_quantity}
-                            </Badge>
-                          </td>
-                          <td>
-                            <Badge bg={variant.active ? "success" : "danger"}>
-                              {variant.active ? "Active" : "Inactive"}
                             </Badge>
                           </td>
                           <td>
@@ -519,16 +508,6 @@ const ProductView = () => {
               </Col>
             </Row>
 
-            <Form.Group className="mb-3">
-              <Form.Check
-                type="checkbox"
-                label="Active Variant"
-                checked={variantFormData.active}
-                onChange={(e) =>
-                  setVariantFormData((prev) => ({ ...prev, active: e.target.checked }))
-                }
-              />
-            </Form.Group>
           </Form>
         </Modal.Body>
         <Modal.Footer>

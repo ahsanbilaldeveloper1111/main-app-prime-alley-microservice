@@ -133,7 +133,7 @@ const Devices = () => {
         
         try {
             // Create promises for all devices in parallel
-            const statusPromises = devices.map(async (device) => {
+            const statusPromises = devices.map(async (device) =>     {
                 try {
                     const monitoringStatus = await getDeviceMonitoringStatus(device.id);
                     const updatedDevice = {

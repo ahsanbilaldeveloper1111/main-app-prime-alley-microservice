@@ -21,6 +21,7 @@ import {
   deleteExpenseCategory,
   downloadFile,
   downloadReceipt,
+  deleteExpenseFile,
   ExpenseData,
   ExpenseCreateUpdatePayload,
   ExpenseCategoryData,
@@ -79,7 +80,6 @@ const ExpenseList = () => {
       name: "",
       description: "",
       color: "#007bff",
-      is_active: true,
     });
 
   // Expense Delete Modal
@@ -93,6 +93,9 @@ const ExpenseList = () => {
   const [selectedExpenseForAttachments, setSelectedExpenseForAttachments] =
     useState<ExpenseData | null>(null);
   const [downloadingFile, setDownloadingFile] = useState<number | null>(null);
+  const [uploadingFile, setUploadingFile] = useState<boolean>(false);
+  const [deletingFile, setDeletingFile] = useState<number | null>(null);
+  const [newAttachmentFiles, setNewAttachmentFiles] = useState<File[]>([]);
 
   const columns: Column[] = useMemo(
     () => [
@@ -165,6 +168,17 @@ const ExpenseList = () => {
           <span>
             {props.currency_code}{" "}
             {parseFloat(props.total_amount || "0").toFixed(2)}
+          </span>
+        ),
+      },
+      {
+        key: "currency",
+        name: "Currency",
+        selector: (row: ExpenseData) => row.currency,
+        sortable: true,
+        cell: (props: ExpenseData) => (
+          <span className="badge bg-primary">
+            {props.currency || props.currency_code || "USD"}
           </span>
         ),
       },
@@ -322,6 +336,9 @@ const ExpenseList = () => {
     setShowViewAttachmentsModal(false);
     setSelectedExpenseForAttachments(null);
     setDownloadingFile(null);
+    setUploadingFile(false);
+    setDeletingFile(null);
+    setNewAttachmentFiles([]);
   }, []);
 
   const handleDownloadFile = useCallback(async (expenseId: number, fileIndex: number) => {
@@ -359,6 +376,81 @@ const ExpenseList = () => {
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   }, []);
+
+  // File handling for attachments modal
+  const handleAttachmentFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    const validFiles = files.filter(validateFile);
+    setNewAttachmentFiles(prev => [...prev, ...validFiles]);
+  }, [validateFile]);
+
+  const removeAttachmentFile = useCallback((index: number) => {
+    setNewAttachmentFiles(prev => prev.filter((_, i) => i !== index));
+  }, []);
+
+  const handleUploadNewFiles = useCallback(async () => {
+    if (!selectedExpenseForAttachments || newAttachmentFiles.length === 0) return;
+
+    setUploadingFile(true);
+    try {
+      // Create FormData for file upload
+      const formData = new FormData();
+      formData.append('category_id', selectedExpenseForAttachments.category_id);
+      formData.append('expense_date', selectedExpenseForAttachments.expense_date);
+      formData.append('description', selectedExpenseForAttachments.description);
+      formData.append('amount', selectedExpenseForAttachments.amount);
+      formData.append('tax_amount', selectedExpenseForAttachments.tax_amount || '0');
+      formData.append('tax_type', selectedExpenseForAttachments.tax_type || 'amount');
+      formData.append('total_amount', selectedExpenseForAttachments.total_amount || '0');
+      formData.append('currency', selectedExpenseForAttachments.currency);
+
+      // Add new files
+      newAttachmentFiles.forEach((file, index) => {
+        formData.append(`receipt_files[${index}]`, file);
+      });
+
+      const response = await updateExpense(selectedExpenseForAttachments.id, formData);
+
+      if (response) {
+        // Update the selected expense with new files
+        setSelectedExpenseForAttachments(response);
+        setNewAttachmentFiles([]);
+        setRefreshKey((prev) => prev + 1);
+        toast.success("Files uploaded successfully");
+        // Close the modal after successful upload
+        closeViewAttachmentsModal();
+      }
+    } catch (error) {
+      console.error("Error uploading files:", error);
+      toast.error("Failed to upload files");
+    } finally {
+      setUploadingFile(false);
+    }
+  }, [selectedExpenseForAttachments, newAttachmentFiles]);
+
+  const handleDeleteAttachmentFile = useCallback(async (expenseId: number, fileIndex: number) => {
+    setDeletingFile(fileIndex);
+    try {
+      await deleteExpenseFile(expenseId, fileIndex);
+      
+      // Update the selected expense by removing the deleted file
+      if (selectedExpenseForAttachments) {
+        const updatedFiles = selectedExpenseForAttachments.files.filter((_, index) => index !== fileIndex);
+        setSelectedExpenseForAttachments({
+          ...selectedExpenseForAttachments,
+          files: updatedFiles
+        });
+      }
+      
+      setRefreshKey((prev) => prev + 1);
+      toast.success("File deleted successfully");
+    } catch (error) {
+      console.error("Error deleting file:", error);
+      toast.error("Failed to delete file");
+    } finally {
+      setDeletingFile(null);
+    }
+  }, [selectedExpenseForAttachments]);
 
   // Calculate total amount based on amount, tax_type, and tax_amount
   const calculateTotalAmount = useCallback((amount: string, taxAmount: string, taxType: string) => {
@@ -629,7 +721,6 @@ const ExpenseList = () => {
       name: "",
       description: "",
       color: "#007bff",
-      is_active: true,
     });
     setShowCreateCategoryModal(true);
   }, []);
@@ -647,7 +738,6 @@ const ExpenseList = () => {
         name: "",
         description: "",
         color: "#007bff",
-        is_active: true,
       });
       setShowCreateCategoryModal(false);
       await openCategoryModal(); // Refresh the list
@@ -685,7 +775,6 @@ const ExpenseList = () => {
         name: selectedCategory.name,
         description: selectedCategory.description || "",
         color: selectedCategory.color,
-        is_active: selectedCategory.is_active,
       };
 
       await updateExpenseCategory(selectedCategory.id, categoryData);
@@ -1188,7 +1277,6 @@ const ExpenseList = () => {
                     <th>Name</th>
                     <th>Description</th>
                     <th>Color</th>
-                    <th>Status</th>
                     <th>Expenses Count</th>
                     <th>Actions</th>
                   </tr>
@@ -1210,15 +1298,6 @@ const ExpenseList = () => {
                           style={{ backgroundColor: category.color }}
                         >
                           {category.color}
-                        </span>
-                      </td>
-                      <td>
-                        <span
-                          className={`status-badge ${
-                            category.is_active ? "success" : "danger"
-                          }`}
-                        >
-                          {category.is_active ? "Active" : "Inactive"}
                         </span>
                       </td>
                       <td>
@@ -1325,23 +1404,6 @@ const ExpenseList = () => {
                 />
               </div>
             </div>
-            <div className="form-group mb-3">
-              <label htmlFor="editCategoryStatus">Status</label>
-              <select
-                className="form-control"
-                id="editCategoryStatus"
-                value={selectedCategory?.is_active ? "active" : "inactive"}
-                onChange={(e) =>
-                  selectedCategory && setSelectedCategory({
-                    ...selectedCategory,
-                    is_active: e.target.value === "active",
-                  } as ExpenseCategoryData)
-                }
-              >
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-              </select>
-            </div>
           </>
         }
       />
@@ -1430,23 +1492,6 @@ const ExpenseList = () => {
                 />
               </div>
             </div>
-            <div className="form-group mb-3">
-              <label htmlFor="newCategoryStatus">Status</label>
-              <select
-                className="form-control"
-                id="newCategoryStatus"
-                value={newCategory.is_active ? "active" : "inactive"}
-                onChange={(e) =>
-                  handleNewCategoryChange(
-                    "is_active",
-                    e.target.value === "active"
-                  )
-                }
-              >
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-              </select>
-            </div>
           </>
         }
       />
@@ -1456,16 +1501,62 @@ const ExpenseList = () => {
         show={showViewAttachmentsModal}
         onHide={closeViewAttachmentsModal}
         title={`Attachments - ${selectedExpenseForAttachments?.description || ""}`}
-        desc="View and download receipt files attached to this expense."
-        submitButtonText="Close"
-        ShowSubmitButton={false}
-        cancelButtonText=" close"
-        onSubmit={closeViewAttachmentsModal}
+        desc="View, download, upload, and manage receipt files attached to this expense."
+        submitButtonText={uploadingFile ? "Uploading..." : "Upload Files"}
+        cancelButtonText="Close"
+        onSubmit={handleUploadNewFiles}
         onCancel={closeViewAttachmentsModal}
         formHtml={
           <>
+            {/* Upload New Files Section */}
+            <div className="mb-4">
+              <h6>Add New Files</h6>
+              <div className="form-group mb-3">
+                <input
+                  type="file"
+                  className="form-control"
+                  multiple
+                  accept=".pdf,.png,.jpg,.jpeg"
+                  onChange={handleAttachmentFileChange}
+                />
+                <small className="form-text text-muted">
+                  Upload PDF, PNG, or JPEG files (max 10MB each)
+                </small>
+              </div>
+              {newAttachmentFiles.length > 0 && (
+                <div className="mt-2">
+                  <h6>Files to Upload:</h6>
+                  <div className="list-group">
+                    {newAttachmentFiles.map((file, index) => (
+                      <div key={index} className="list-group-item d-flex justify-content-between align-items-center">
+                        <div className="d-flex align-items-center">
+                          <span className="me-2" style={{ fontSize: '1.2em' }}>
+                            {getFileIcon(file.type)}
+                          </span>
+                          <div>
+                            <div className="fw-bold">{file.name}</div>
+                            <small className="text-muted">
+                              {formatFileSize(file.size)} • {file.type}
+                            </small>
+                          </div>
+                        </div>
+                        <Button
+                          variant="outline-danger"
+                          size="sm"
+                          onClick={() => removeAttachmentFile(index)}
+                        >
+                          Remove
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Existing Files Section */}
             <div className="mb-3">
-              <h6>Receipt Files</h6>
+              <h6>Current Receipt Files</h6>
               {selectedExpenseForAttachments?.files && selectedExpenseForAttachments.files.length > 0 ? (
                 <div className="list-group">
                   {selectedExpenseForAttachments.files.map((file, index) => (
@@ -1485,24 +1576,44 @@ const ExpenseList = () => {
                           </small>
                         </div>
                       </div>
-                      <Button
-                        variant="outline-primary"
-                        size="sm"
-                        onClick={() => handleDownloadFile(selectedExpenseForAttachments.id, index)}
-                        disabled={downloadingFile === index}
-                      >
-                        {downloadingFile === index ? (
-                          <>
-                            <span className="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
-                            Downloading...
-                          </>
-                        ) : (
-                          <>
-                            <FiDownload className="me-1" />
-                            Download
-                          </>
-                        )}
-                      </Button>
+                      <div className="d-flex gap-2">
+                        <Button
+                          variant="outline-primary"
+                          size="sm"
+                          onClick={() => handleDownloadFile(selectedExpenseForAttachments.id, index)}
+                          disabled={downloadingFile === index}
+                        >
+                          {downloadingFile === index ? (
+                            <>
+                              <span className="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                              Downloading...
+                            </>
+                          ) : (
+                            <>
+                              <FiDownload className="me-1" />
+                              Download
+                            </>
+                          )}
+                        </Button>
+                        <Button
+                          variant="outline-danger"
+                          size="sm"
+                          onClick={() => handleDeleteAttachmentFile(selectedExpenseForAttachments.id, index)}
+                          disabled={deletingFile === index}
+                        >
+                          {deletingFile === index ? (
+                            <>
+                              <span className="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                              Deleting...
+                            </>
+                          ) : (
+                            <>
+                              <FiTrash2 className="me-1" />
+                              Delete
+                            </>
+                          )}
+                        </Button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -1518,9 +1629,15 @@ const ExpenseList = () => {
               <h6>Summary</h6>
               <div className="row">
                 <div className="col-md-6">
-                  <small className="text-muted">Total Files:</small>
+                  <small className="text-muted">Current Files:</small>
                   <div className="fw-bold">
-                    {(selectedExpenseForAttachments?.files?.length || 0) }
+                    {(selectedExpenseForAttachments?.files?.length || 0)}
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <small className="text-muted">Files to Upload:</small>
+                  <div className="fw-bold">
+                    {newAttachmentFiles.length}
                   </div>
                 </div>
                 <div className="col-md-6">
@@ -1528,6 +1645,14 @@ const ExpenseList = () => {
                   <div className="fw-bold">
                     {formatFileSize(
                       (selectedExpenseForAttachments?.files?.reduce((total, file) => total + file.size, 0) || 0)
+                    )}
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <small className="text-muted">New Files Size:</small>
+                  <div className="fw-bold">
+                    {formatFileSize(
+                      newAttachmentFiles.reduce((total, file) => total + file.size, 0)
                     )}
                   </div>
                 </div>

@@ -74,7 +74,6 @@ const ProductList = () => {
   const [newCategory, setNewCategory] = useState<ProductCategoryCreateUpdatePayload>({
     name: "",
     description: "",
-    is_active: true,
   });
 
   // Product Delete Modal
@@ -130,28 +129,6 @@ const ProductList = () => {
             {props.is_service ? "Service" : "Product"}
           </span>
         ),
-      },
-      {
-        key: "is_active",
-        name: "Status",
-        selector: (row: ProductData) => row.is_active,
-        sortable: true,
-        cell: (props: ProductData) => {
-          const statusColors = {
-            true: "success",
-            false: "danger",
-          };
-          return (
-            <span
-              className={`status-badge ${
-                statusColors[String(props.is_active) as keyof typeof statusColors] ||
-                "secondary"
-              }`}
-            >
-              {props.is_active ? "Active" : "Inactive"}
-            </span>
-          );
-        },
       },
       {
         key: "created_at",
@@ -275,7 +252,6 @@ const ProductList = () => {
         description: selectedProduct.description || "",
         category_id: selectedProduct.category_id,
         base_price: selectedProduct.base_price,
-        is_active: selectedProduct.is_active ?? true,
         is_service: selectedProduct.is_service,
         currency: selectedProduct.currency || "USD",
       };
@@ -305,7 +281,6 @@ const ProductList = () => {
     description: "",
     category_id: "",
     base_price: "",
-    is_active: true,
     is_service: false,
     currency: "USD",
   });
@@ -334,7 +309,6 @@ const ProductList = () => {
           description: "",
           category_id: "",
           base_price: "",
-          is_active: true,
           is_service: false,
           currency: "USD",
         });
@@ -362,7 +336,6 @@ const ProductList = () => {
       description: "",
       category_id: "",
       base_price: "",
-      is_active: true,
       is_service: false,
       currency: "USD",
     });
@@ -499,7 +472,6 @@ const ProductList = () => {
     setNewCategory({
       name: "",
       description: "",
-      is_active: true,
     });
     setShowCreateCategoryModal(true);
   }, []);
@@ -509,7 +481,6 @@ const ProductList = () => {
     setNewCategory({
       name: "",
       description: "",
-      is_active: true,
     });
   }, []);
 
@@ -535,7 +506,6 @@ const ProductList = () => {
       setNewCategory({
         name: "",
         description: "",
-        is_active: true,
       });
       setShowCreateCategoryModal(false);
       await openCategoryModal(); // Refresh the list
@@ -685,20 +655,6 @@ const ProductList = () => {
                 </div>
               </div>
               <div className="col-md-6">
-                <div className="form-group mb-3">
-                  <label htmlFor="newProductStatus">Status</label>
-                  <select
-                    className="form-control"
-                    id="newProductStatus"
-                    value={newProduct.is_active ? "active" : "inactive"}
-                    onChange={(e) =>
-                      handleNewProductChange("is_active", e.target.value === "active")
-                    }
-                  >
-                    <option value="active">Active</option>
-                    <option value="inactive">Inactive</option>
-                  </select>
-                </div>
               </div>
             </div>
 
@@ -831,22 +787,6 @@ const ProductList = () => {
                     </select>
                   </div>
                 </div>
-                <div className="col-md-6">
-                  <div className="form-group mb-3">
-                    <label htmlFor="editProductStatus">Status</label>
-                    <select
-                      className="form-control"
-                      id="editProductStatus"
-                      value={selectedProduct.is_active ? "active" : "inactive"}
-                      onChange={(e) =>
-                        handleEditProductChange("is_active", e.target.value === "active")
-                      }
-                    >
-                      <option value="active">Active</option>
-                      <option value="inactive">Inactive</option>
-                    </select>
-                  </div>
-                </div>
               </div>
 
               <div className="row">
@@ -919,13 +859,6 @@ const ProductList = () => {
                         </div>
                       </td>
                       <td>
-                        <span
-                          className={`status-badge ${
-                            category.is_active ? "success" : "danger"
-                          }`}
-                        >
-                          {category.is_active ? "Active" : "Inactive"}
-                        </span>
                       </td>
                       <td>
                         <span className="badge bg-info">
@@ -1004,23 +937,6 @@ const ProductList = () => {
                   rows={3}
                   placeholder="Enter category description..."
                 />
-              </div>
-              <div className="form-group mb-3">
-                <label htmlFor="editCategoryStatus">Status</label>
-                <select
-                  className="form-control"
-                  id="editCategoryStatus"
-                  value={selectedCategory.is_active ? "active" : "inactive"}
-                  onChange={(e) =>
-                    setSelectedCategory({
-                      ...selectedCategory,
-                      is_active: e.target.value === "active",
-                    })
-                  }
-                >
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
-                </select>
               </div>
             </>
           }
@@ -1108,20 +1024,6 @@ const ProductList = () => {
                 rows={3}
                 placeholder="Enter category description..."
               />
-            </div>
-            <div className="form-group mb-3">
-              <label htmlFor="newCategoryStatus">Status</label>
-              <select
-                className="form-control"
-                id="newCategoryStatus"
-                value={newCategory.is_active ? "active" : "inactive"}
-                onChange={(e) =>
-                  handleNewCategoryChange("is_active", e.target.value === "active")
-                }
-              >
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-              </select>
             </div>
           </>
         }

@@ -316,16 +316,6 @@ const EditProduct = () => {
                   )}
                 </Form.Group>
 
-                <Form.Group className="mb-3">
-                  <Form.Check
-                    type="checkbox"
-                    label="Active Product"
-                    checked={formData.active}
-                    onChange={(e) =>
-                      handleInputChange("active", e.target.checked)
-                    }
-                  />
-                </Form.Group>
               </CardBody>
             </Card>
           </Col>

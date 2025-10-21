@@ -94,6 +94,8 @@ const CompanyList = () => {
     []
   );
   const [activeTab, setActiveTab] = useState<string>("basic-info");
+  const [showCustomVatRate, setShowCustomVatRate] = useState<boolean>(false);
+  const [showEditCustomVatRate, setShowEditCustomVatRate] = useState<boolean>(false);
 
   // Load resellers on component mount
   useEffect(() => {
@@ -244,6 +246,8 @@ const CompanyList = () => {
         selected_products: [] as string[],
       },
     });
+    setShowCustomVatRate(false);
+    setShowEditCustomVatRate(false);
   }, []);
 
   // Handle create company
@@ -278,6 +282,7 @@ const CompanyList = () => {
       setActiveTab("basic-info"); // Reset to first tab
       setIsLoadingCompany(true);
       setShowEditModal(true);
+      setShowEditCustomVatRate(false); // Reset custom VAT state
 
       try {
         // Fetch fresh company data by ID
@@ -458,6 +463,7 @@ const CompanyList = () => {
 
   const closeCreateModal = useCallback(() => {
     setShowCreateModal(false);
+    setShowCustomVatRate(false);
     resetFormData();
   }, [resetFormData]);
 
@@ -465,6 +471,7 @@ const CompanyList = () => {
     setShowEditModal(false);
     setSelectedCompany(null);
     setIsLoadingCompany(false);
+    setShowEditCustomVatRate(false);
     resetFormData();
   }, [resetFormData]);
 
@@ -838,20 +845,51 @@ const CompanyList = () => {
                       <div className="col-md-6">
                         <div className="form-group mb-3">
                           <label htmlFor="createVatRate">VAT Rate (%)</label>
-                          <input
-                            type="number"
-                            step="0.01"
-                            className="form-control"
-                            id="createVatRate"
-                            value={formData.profile.vat_rate}
-                            onChange={(e) =>
-                              handleProfileInputChange(
-                                "vat_rate",
-                                e.target.value
-                              )
-                            }
-                            placeholder="0.00"
-                          />
+                          <select
+                            className="form-control mb-2"
+                            id="createVatRateSelect"
+                            value={formData.profile.vat_rate === '0' || formData.profile.vat_rate === '0.00' ? '0' : formData.profile.vat_rate === '5' || formData.profile.vat_rate === '5.00' ? '5' : formData.profile.vat_rate === '20' || formData.profile.vat_rate === '20.00' ? '20' : 'custom'}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              if (value === 'custom') {
+                                setShowCustomVatRate(true);
+                                // Set a default value if current value is a preset
+                                if (formData.profile.vat_rate === '0' || formData.profile.vat_rate === '0.00' || 
+                                    formData.profile.vat_rate === '5' || formData.profile.vat_rate === '5.00' || 
+                                    formData.profile.vat_rate === '20' || formData.profile.vat_rate === '20.00') {
+                                  handleProfileInputChange("vat_rate", "");
+                                }
+                                return;
+                              }
+                              setShowCustomVatRate(false);
+                              handleProfileInputChange("vat_rate", value);
+                            }}
+                          >
+                            <option value="0">Zero Rated (0%)</option>
+                            <option value="5">Standard (5%)</option>
+                            <option value="20">Higher (20%)</option>
+                            <option value="custom">Custom</option>
+                          </select>
+                          {(showCustomVatRate || (formData.profile.vat_rate !== '0' && formData.profile.vat_rate !== '0.00' && formData.profile.vat_rate !== '5' && formData.profile.vat_rate !== '5.00' && formData.profile.vat_rate !== '20' && formData.profile.vat_rate !== '20.00')) && (
+                            <input
+                              type="number"
+                              step="0.01"
+                              className="form-control"
+                              id="createVatRate"
+                              value={formData.profile.vat_rate}
+                              onChange={(e) =>
+                                handleProfileInputChange(
+                                  "vat_rate",
+                                  e.target.value
+                                )
+                              }
+                              placeholder="Enter custom VAT rate"
+                            />
+                          )}
+                          <small className="text-muted">
+                            <i className="fas fa-info-circle me-1"></i>
+                            Select preset or enter custom rate
+                          </small>
                         </div>
                       </div>
                       <div className="col-md-6">
@@ -1437,20 +1475,51 @@ const CompanyList = () => {
                         <div className="col-md-6">
                           <div className="form-group mb-3">
                             <label htmlFor="editVatRate">VAT Rate (%)</label>
-                            <input
-                              type="number"
-                              step="0.01"
-                              className="form-control"
-                              id="editVatRate"
-                              value={formData.profile.vat_rate}
-                              onChange={(e) =>
-                                handleProfileInputChange(
-                                  "vat_rate",
-                                  e.target.value
-                                )
-                              }
-                              placeholder="0.00"
-                            />
+                            <select
+                              className="form-control mb-2"
+                              id="editVatRateSelect"
+                              value={formData.profile.vat_rate === '0' || formData.profile.vat_rate === '0.00' ? '0' : formData.profile.vat_rate === '5' || formData.profile.vat_rate === '5.00' ? '5' : formData.profile.vat_rate === '20' || formData.profile.vat_rate === '20.00' ? '20' : 'custom'}
+                              onChange={(e) => {
+                                const value = e.target.value;
+                                if (value === 'custom') {
+                                  setShowEditCustomVatRate(true);
+                                  // Set a default value if current value is a preset
+                                  if (formData.profile.vat_rate === '0' || formData.profile.vat_rate === '0.00' || 
+                                      formData.profile.vat_rate === '5' || formData.profile.vat_rate === '5.00' || 
+                                      formData.profile.vat_rate === '20' || formData.profile.vat_rate === '20.00') {
+                                    handleProfileInputChange("vat_rate", "");
+                                  }
+                                  return;
+                                }
+                                setShowEditCustomVatRate(false);
+                                handleProfileInputChange("vat_rate", value);
+                              }}
+                            >
+                              <option value="0">Zero Rated (0%)</option>
+                              <option value="5">Standard (5%)</option>
+                              <option value="20">Higher (20%)</option>
+                              <option value="custom">Custom</option>
+                            </select>
+                            {(showEditCustomVatRate || (formData.profile.vat_rate !== '0' && formData.profile.vat_rate !== '0.00' && formData.profile.vat_rate !== '5' && formData.profile.vat_rate !== '5.00' && formData.profile.vat_rate !== '20' && formData.profile.vat_rate !== '20.00')) && (
+                              <input
+                                type="number"
+                                step="0.01"
+                                className="form-control"
+                                id="editVatRate"
+                                value={formData.profile.vat_rate}
+                                onChange={(e) =>
+                                  handleProfileInputChange(
+                                    "vat_rate",
+                                    e.target.value
+                                  )
+                                }
+                                placeholder="Enter custom VAT rate"
+                              />
+                            )}
+                            <small className="text-muted">
+                              <i className="fas fa-info-circle me-1"></i>
+                              Select preset or enter custom rate
+                            </small>
                           </div>
                         </div>
                         <div className="col-md-6">

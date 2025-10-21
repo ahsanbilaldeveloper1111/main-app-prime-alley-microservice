@@ -110,21 +110,6 @@ const SupplierList = () => {
         ),
       },
       {
-        key: "is_active",
-        name: "Status",
-        selector: (row: InventorySupplierData) => row.is_active,
-        sortable: true,
-        cell: (props: InventorySupplierData) => (
-          <span
-            className={`status-badge text-capitalize ${
-              props.is_active ? "success" : "danger"
-            }`}
-          >
-            {props.is_active ? "Active" : "Inactive"}
-          </span>
-        ),
-      },
-      {
         key: "created_at",
         name: "Created",
         selector: (row: InventorySupplierData) => row.created_at,
@@ -218,7 +203,6 @@ const SupplierList = () => {
         email: selectedSupplier.email || "",
         phone: selectedSupplier.phone || "",
         address: selectedSupplier.address || "",
-        is_active: selectedSupplier.is_active ?? true,
       };
 
       const response = await updateInventorySupplier(selectedSupplier.id, supplierData);
@@ -243,7 +227,6 @@ const SupplierList = () => {
     email: "",
     phone: "",
     address: "",
-    is_active: true,
   });
 
   const handleSubmitCreateSupplier = useCallback(async () => {
@@ -262,7 +245,6 @@ const SupplierList = () => {
           email: "",
           phone: "",
           address: "",
-          is_active: true,
         });
         setShowCreateSupplierModal(false);
         setRefreshKey((prev) => prev + 1);
@@ -288,7 +270,6 @@ const SupplierList = () => {
       email: "",
       phone: "",
       address: "",
-      is_active: true,
     });
   }, []);
 
@@ -427,22 +408,6 @@ const SupplierList = () => {
                     />
                   </div>
                 </div>
-                <div className="col-md-6">
-                  <div className="form-group mb-3">
-                    <label htmlFor="newSupplierStatus">Status</label>
-                    <select
-                      className="form-control"
-                      id="newSupplierStatus"
-                      value={newSupplier.is_active ? "active" : "inactive"}
-                      onChange={(e) =>
-                        handleNewSupplierChange("is_active", e.target.value === "active")
-                      }
-                    >
-                      <option value="active">Active</option>
-                      <option value="inactive">Inactive</option>
-                    </select>
-                  </div>
-                </div>
               </div>
 
               <div className="row">
@@ -529,22 +494,6 @@ const SupplierList = () => {
                       }
                       placeholder="Enter phone number"
                     />
-                  </div>
-                </div>
-                <div className="col-md-6">
-                  <div className="form-group mb-3">
-                    <label htmlFor="editSupplierStatus">Status</label>
-                    <select
-                      className="form-control"
-                      id="editSupplierStatus"
-                      value={selectedSupplier.is_active ? "active" : "inactive"}
-                      onChange={(e) =>
-                        handleEditSupplierChange("is_active", e.target.value === "active")
-                      }
-                    >
-                      <option value="active">Active</option>
-                      <option value="inactive">Inactive</option>
-                    </select>
                   </div>
                 </div>
               </div>

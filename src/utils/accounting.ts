@@ -96,6 +96,7 @@ export interface InvoiceItemData {
   created_at: string;
   updated_at: string;
   tax_rate: string;
+  tax_amount?: string;
   product: ProductData;
 }
 
@@ -116,11 +117,11 @@ export interface InvoiceData {
   invoice_number: string;
   invoice_date: string;
   due_date: string;
-  status: "draft" | "sent" | "paid" | "overdue" | "cancelled";
   subtotal: string;
   tax_amount: string;
   total_amount: string;
   currency_code: string;
+  vat_rate: number;
   notes: string | null;
   terms_conditions: string | null;
   is_recurring: boolean;
@@ -132,6 +133,7 @@ export interface InvoiceData {
   created_at: string;
   updated_at: string;
   payment_mode: string;
+  status: string;
   company: CompanyData;
   reseller: ResellerData | null;
   items: InvoiceItemData[];
@@ -145,11 +147,13 @@ export interface InvoiceCreateUpdatePayload {
   payment_mode: string;
   currency_code: string;
   tax_amount: number;
+  vat_rate?: number;
   notes: string;
   terms_conditions: string;
   items: InvoiceItemCreateUpdatePayload[];
   subtotal: number;
   total_amount: number;
+  status: string;
 }
 
 export interface InvoiceItemCreateUpdatePayload {
@@ -157,6 +161,34 @@ export interface InvoiceItemCreateUpdatePayload {
   quantity: string;
   unit_price: string;
   tax_rate: string;
+  vat_rate?: string; // For API compatibility - maps to tax_rate
+  tax_amount?: string;
+}
+
+// API-specific interface for invoice items (uses vat_rate instead of tax_rate)
+export interface InvoiceItemAPIPayload {
+  product_id: string;
+  quantity: string;
+  unit_price: string;
+  vat_rate: string;
+  tax_amount?: string;
+}
+
+// API-specific interface for invoice creation/update (uses vat_rate for items)
+export interface InvoiceCreateUpdateAPIPayload {
+  company_id: string;
+  invoice_date: string;
+  due_date: string;
+  payment_mode: string;
+  currency_code: string;
+  tax_amount: number;
+  vat_rate?: number;
+  notes: string;
+  terms_conditions: string;
+  items: InvoiceItemAPIPayload[];
+  subtotal: number;
+  total_amount: number;
+  status: string;
 }
 
 export interface ExpenseData {
@@ -173,7 +205,6 @@ export interface ExpenseData {
   tax_type: "amount" | "percentage";
   total_amount: string;
   payment_method: string | null;
-  payment_status: "pending" | "paid" | "failed" | "cancelled";
   receipt_path: string | null;
   notes: string | null;
   is_billable: string;
@@ -199,7 +230,6 @@ export interface ExpenseCategoryData {
   name: string;
   description: string;
   color: string;
-  is_active: boolean;
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
@@ -222,7 +252,6 @@ export interface ExpenseCategoryCreateUpdatePayload {
   name: string;
   description: string;
   color: string;
-  is_active: boolean;
 }
 
 export interface ProductData {
@@ -231,7 +260,6 @@ export interface ProductData {
   description?: string;
   currency_code?: string;
   currency?: string;
-  is_active?: boolean;
   created_at?: string;
   category_id: string;
   is_service: boolean;
@@ -250,7 +278,6 @@ export interface ProductCategoryData {
   id: number;
   name: string;
   description: string | null;
-  is_active: boolean;
   parent_id: number | null;
   created_at: string;
   updated_at: string;
@@ -262,7 +289,6 @@ export interface ProductCategoryData {
 export interface ProductCategoryCreateUpdatePayload {
   name: string;
   description: string;
-  is_active: boolean;
 }
 
 export interface ProductCreateUpdatePayload {
@@ -270,7 +296,6 @@ export interface ProductCreateUpdatePayload {
   description?: string;
   category_id: string;
   base_price: string;
-  is_active: boolean;
   is_service: boolean;
   currency: string;
 }
@@ -281,6 +306,7 @@ export interface InventoryData {
   name: string;
   description?: string;
   base_price: string;
+  currency: string;
   category_id: string;
   created_at: string;
   updated_at: string;
@@ -291,7 +317,6 @@ export interface InventoryData {
   minimum_stock: number;
   maximum_stock: number;
   reorder_point: number | null;
-  status: "in_stock" | "low_stock" | "out_of_stock";
   notes: string | null;
   last_updated: string;
   category?: ProductCategoryData;
@@ -303,6 +328,7 @@ export interface InventoryCreateUpdatePayload {
   name: string;
   description?: string;
   base_price: string;
+  currency: string;
   category_id: string;
   location_id?: number | null;
   supplier_id?: number | null;
@@ -310,7 +336,6 @@ export interface InventoryCreateUpdatePayload {
   minimum_stock: number;
   maximum_stock: number;
   reorder_point?: number | null;
-  status: "in_stock" | "low_stock" | "out_of_stock";
   notes?: string | null;
 }
 
@@ -364,7 +389,6 @@ export interface InventorySupplierData {
   zip_code?: string | null;
   country?: string | null;
   payment_terms?: string | null;
-  is_active?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -374,7 +398,6 @@ export interface InventorySupplierCreateUpdatePayload {
   email?: string;
   phone?: string;
   address?: string;
-  is_active: boolean;
 }
 
 export interface PaymentMethodData {
@@ -417,7 +440,6 @@ export interface DiscountApplicabilityData {
     company_id: string;
     product_id: string;
     selling_price: string;
-    is_active: boolean;
     created_at: string;
     updated_at: string;
     discount_applicability_id: string;
@@ -426,7 +448,6 @@ export interface DiscountApplicabilityData {
       name: string;
       description: string;
       currency_code: string;
-      is_active: boolean;
       created_at: string;
       category_id: string;
       is_service: boolean;
@@ -467,7 +488,6 @@ export interface ProductPricingData {
   company_id: string;
   product_id: string;
   selling_price: string;
-  is_active: boolean;
   created_at: string;
   updated_at: string;
   discount_applicability_id: number | null;
@@ -476,7 +496,6 @@ export interface ProductPricingData {
     name: string;
     description: string | null;
     currency_code: string;
-    is_active: boolean;
     created_at: string;
     category_id: string;
     is_service: boolean;
@@ -487,7 +506,6 @@ export interface ProductPricingData {
       id: number;
       name: string;
       description: string | null;
-      is_active: boolean;
       parent_id: number | null;
       created_at: string;
       updated_at: string;
@@ -499,7 +517,6 @@ export interface ProductPricingData {
 export interface ProductPricingCreateUpdatePayload {
   product_id: string;
   selling_price: string;
-  is_active: boolean;
 }
 
 export interface PaginationParams extends Record<string, any> {
@@ -603,7 +620,7 @@ export const deleteReseller = async (id: number): Promise<void> => {
 
 // Company Management
 export const getCompanies = async (
-  params: PaginationParams = {}
+  params: PaginationParams & { load_profile?: boolean } = {}
 ): Promise<PaginationWrapper<CompanyData>> => {
   try {
     const response = await axiosInstance.get("/accounting/company", { params });
@@ -1044,7 +1061,7 @@ export const getInvoices = async (
 };
 
 export const createInvoice = async (
-  data: InvoiceCreateUpdatePayload
+  data: InvoiceCreateUpdateAPIPayload
 ): Promise<InvoiceData> => {
   try {
     const response = await axiosInstance.post("/accounting/invoices", data);
@@ -1109,7 +1126,7 @@ export const generateInvoicePdf = async (id: number): Promise<Blob> => {
 
 export const updateInvoice = async (
   id: number,
-  data: InvoiceCreateUpdatePayload
+  data: InvoiceCreateUpdateAPIPayload
 ): Promise<InvoiceData> => {
   try {
     const response = await axiosInstance.put(
@@ -1436,13 +1453,13 @@ export const getActiveProducts = async (): Promise<ProductData[]> => {
 export const getProductsWithCompanyPricing = async (
   companyId?: number,
   params: PaginationParams = {}
-): Promise<PaginationWrapper<ProductData>> => {
+): Promise<ProductData[]> => {
   try {
     const response = await axiosInstance.get(
       "/accounting/products/with-company-pricing",
       { params: { ...params, company_id: companyId } }
     );
-    return extractData<PaginationWrapper<ProductData>>(response.data);
+    return extractData<PaginationWrapper<ProductData>>(response.data) as any;
   } catch (error: any) {
     toast.error(
       error?.message || "Failed to fetch products with company pricing"
@@ -2560,6 +2577,15 @@ export const createDirectPayment = async (data: CreateDirectPaymentData): Promis
   } catch (error: any) {
     console.log(error, "error.createDirectPayment");
     toast.error(error?.message || "Failed to create direct payment");
+    throw error;
+  }
+};
+
+export const deleteExpenseFile = async (id: number, fileIndex: number): Promise<void> => {
+  try {
+    await axiosInstance.delete(`/accounting/expenses/${id}/files/${fileIndex}/delete`);
+  } catch (error: any) {
+    toast.error(error?.message || "Failed to delete expense file");
     throw error;
   }
 };

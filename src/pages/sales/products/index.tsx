@@ -136,17 +136,6 @@ const ProductsList = () => {
         },
       },
       {
-        key: "active",
-        name: "Status",
-        selector: (row: any) => row.active,
-        sortable: true,
-        cell: (props: any) => (
-          <Badge bg={props.active ? "success" : "danger"}>
-            {props.active ? "Active" : "Inactive"}
-          </Badge>
-        ),
-      },
-      {
         key: "created_at",
         name: "Created",
         selector: (row: any) => row.created_at,

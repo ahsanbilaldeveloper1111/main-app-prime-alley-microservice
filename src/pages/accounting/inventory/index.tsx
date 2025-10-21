@@ -115,32 +115,9 @@ const InventoryList = () => {
         sortable: true,
         cell: (props: InventoryData) => (
           <span>
-            ${parseFloat(props.base_price || "0").toFixed(2)}
+            {props.currency || "USD"} {parseFloat(props.base_price || "0").toFixed(2)}
           </span>
         ),
-      },
-      {
-        key: "status",
-        name: "Status",
-        selector: (row: InventoryData) => row.status,
-        sortable: true,
-        cell: (props: InventoryData) => {
-          const statusColors = {
-            in_stock: "success",
-            low_stock: "warning",
-            out_of_stock: "danger",
-          };
-          return (
-            <span
-              className={`text-capitalize status-badge ${
-                statusColors[props.status as keyof typeof statusColors] ||
-                "secondary"
-              }`}
-            >
-              {props.status.replace('_', ' ')}
-            </span>
-          );
-        },
       },
       {
         key: "last_updated",
@@ -278,6 +255,7 @@ const InventoryList = () => {
         name: selectedInventory.name,
         description: selectedInventory.description || "",
         base_price: selectedInventory.base_price,
+        currency: selectedInventory.currency || "USD",
         category_id: selectedInventory.category_id,
         location_id: selectedInventory.location_id,
         supplier_id: selectedInventory.supplier_id,
@@ -285,7 +263,6 @@ const InventoryList = () => {
         minimum_stock: selectedInventory.minimum_stock,
         maximum_stock: selectedInventory.maximum_stock,
         reorder_point: selectedInventory.reorder_point,
-        status: selectedInventory.status,
         notes: selectedInventory.notes,
       };
 
@@ -310,6 +287,7 @@ const InventoryList = () => {
     name: "",
     description: "",
     base_price: "",
+    currency: "USD",
     category_id: "",
     location_id: null,
     supplier_id: null,
@@ -317,7 +295,6 @@ const InventoryList = () => {
     minimum_stock: 0,
     maximum_stock: 0,
     reorder_point: null,
-    status: "in_stock",
     notes: "",
   });
 
@@ -344,6 +321,7 @@ const InventoryList = () => {
           name: "",
           description: "",
           base_price: "",
+          currency: "USD",
           category_id: "",
           location_id: null,
           supplier_id: null,
@@ -351,7 +329,6 @@ const InventoryList = () => {
           minimum_stock: 0,
           maximum_stock: 0,
           reorder_point: null,
-          status: "in_stock",
           notes: "",
         });
         setShowCreateInventoryModal(false);
@@ -377,6 +354,7 @@ const InventoryList = () => {
       name: "",
       description: "",
       base_price: "",
+      currency: "USD",
       category_id: "",
       location_id: null,
       supplier_id: null,
@@ -384,7 +362,6 @@ const InventoryList = () => {
       minimum_stock: 0,
       maximum_stock: 0,
       reorder_point: null,
-      status: "in_stock",
       notes: "",
     });
   }, []);
@@ -550,6 +527,25 @@ const InventoryList = () => {
               </div>
               <div className="col-md-4">
                 <div className="form-group mb-3">
+                  <label htmlFor="newInventoryCurrency">Currency</label>
+                  <select
+                    className="form-control"
+                    id="newInventoryCurrency"
+                    value={newInventory.currency}
+                    onChange={(e) =>
+                      handleNewInventoryChange("currency", e.target.value)
+                    }
+                  >
+                    <option value="USD">USD</option>
+                    <option value="EUR">EUR</option>
+                    <option value="GBP">GBP</option>
+                    <option value="CAD">CAD</option>
+                    <option value="AED">AED</option>
+                  </select>
+                </div>
+              </div>
+              <div className="col-md-4">
+                <div className="form-group mb-3">
                   <label htmlFor="newInventoryCurrentStock">Current Stock</label>
                   <input
                     type="number"
@@ -561,23 +557,6 @@ const InventoryList = () => {
                     }
                     placeholder="0"
                   />
-                </div>
-              </div>
-              <div className="col-md-4">
-                <div className="form-group mb-3">
-                  <label htmlFor="newInventoryStatus">Status</label>
-                  <select
-                    className="form-control"
-                    id="newInventoryStatus"
-                    value={newInventory.status}
-                    onChange={(e) =>
-                      handleNewInventoryChange("status", e.target.value)
-                    }
-                  >
-                    <option value="in_stock">In Stock</option>
-                    <option value="low_stock">Low Stock</option>
-                    <option value="out_of_stock">Out of Stock</option>
-                  </select>
                 </div>
               </div>
             </div>
@@ -784,6 +763,25 @@ const InventoryList = () => {
                 </div>
                 <div className="col-md-4">
                   <div className="form-group mb-3">
+                    <label htmlFor="editInventoryCurrency">Currency</label>
+                    <select
+                      className="form-control"
+                      id="editInventoryCurrency"
+                      value={selectedInventory.currency || "USD"}
+                      onChange={(e) =>
+                        handleEditInventoryChange("currency", e.target.value)
+                      }
+                    >
+                      <option value="USD">USD</option>
+                      <option value="EUR">EUR</option>
+                      <option value="GBP">GBP</option>
+                      <option value="CAD">CAD</option>
+                      <option value="AED">AED</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="col-md-4">
+                  <div className="form-group mb-3">
                     <label htmlFor="editInventoryCurrentStock">Current Stock</label>
                     <input
                       type="number"
@@ -795,23 +793,6 @@ const InventoryList = () => {
                       }
                       placeholder="0"
                     />
-                  </div>
-                </div>
-                <div className="col-md-4">
-                  <div className="form-group mb-3">
-                    <label htmlFor="editInventoryStatus">Status</label>
-                    <select
-                      className="form-control"
-                      id="editInventoryStatus"
-                      value={selectedInventory.status || ""}
-                      onChange={(e) =>
-                        handleEditInventoryChange("status", e.target.value)
-                      }
-                    >
-                      <option value="in_stock">In Stock</option>
-                      <option value="low_stock">Low Stock</option>
-                      <option value="out_of_stock">Out of Stock</option>
-                    </select>
                   </div>
                 </div>
               </div>
