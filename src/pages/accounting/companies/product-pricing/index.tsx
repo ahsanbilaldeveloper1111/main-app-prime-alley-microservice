@@ -65,7 +65,6 @@ const CompanyProductPricing = () => {
   const [formData, setFormData] = useState<ProductPricingCreateUpdatePayload>({
     product_id: "",
     selling_price: "",
-    is_active: true,
   });
 
   const [discountFormData, setDiscountFormData] = useState<DiscountApplicabilityCreateUpdatePayload>({
@@ -369,7 +368,6 @@ const CompanyProductPricing = () => {
     setFormData({
       product_id: "",
       selling_price: "",
-      is_active: true,
     });
   }, []);
 
@@ -423,7 +421,6 @@ const CompanyProductPricing = () => {
     setFormData({
       product_id: pricing.product_id,
       selling_price: pricing.selling_price,
-      is_active: pricing.is_active,
     });
     setShowEditModal(true);
   }, []);
@@ -853,24 +850,6 @@ const CompanyProductPricing = () => {
               </div>
             </div>
 
-            <div className="row">
-              <div className="col-md-6">
-                <div className="form-group mb-3">
-                  <div className="form-check">
-                    <input
-                      className="form-check-input"
-                      type="checkbox"
-                      id="createIsActive"
-                      checked={formData.is_active}
-                      onChange={(e) => handleInputChange("is_active", e.target.checked)}
-                    />
-                    <label className="form-check-label" htmlFor="createIsActive">
-                      Active
-                    </label>
-                  </div>
-                </div>
-              </div>
-            </div>
           </>
         }
         submitButtonText={isLoading || isLoadingProducts ? "Creating..." : "Create Pricing"}
@@ -932,24 +911,6 @@ const CompanyProductPricing = () => {
               </div>
             </div>
 
-            <div className="row">
-              <div className="col-md-6">
-                <div className="form-group mb-3">
-                  <div className="form-check">
-                    <input
-                      className="form-check-input"
-                      type="checkbox"
-                      id="editIsActive"
-                      checked={formData.is_active}
-                      onChange={(e) => handleInputChange("is_active", e.target.checked)}
-                    />
-                    <label className="form-check-label" htmlFor="editIsActive">
-                      Active
-                    </label>
-                  </div>
-                </div>
-              </div>
-            </div>
           </>
         }
         submitButtonText={isLoading || isLoadingProducts ? "Updating..." : "Update Pricing"}
