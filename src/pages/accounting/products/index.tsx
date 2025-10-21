@@ -431,7 +431,6 @@ const ProductList = () => {
       const categoryData: ProductCategoryCreateUpdatePayload = {
         name: selectedCategory.name,
         description: selectedCategory.description || "",
-        is_active: selectedCategory.is_active,
       };
 
       await updateProductCategory(selectedCategory.id, categoryData);
