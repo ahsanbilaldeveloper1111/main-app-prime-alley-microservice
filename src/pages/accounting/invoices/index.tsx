@@ -26,6 +26,7 @@ import {
   getPaymentMethods,
   payInvoice,
   createDirectPayment,
+  downloadInvoicePdf,
   InvoiceData,
   InvoiceCreateUpdatePayload,
   InvoiceCreateUpdateAPIPayload,
@@ -67,8 +68,6 @@ import SuccessfulModal from "@pages/partial/SuccessfulModal";
 import { motion } from "framer-motion";
 import { FiEdit, FiTrash2, FiPrinter, FiDownload, FiCreditCard, FiDollarSign } from "react-icons/fi";
 import TableAction, { Action } from "@components/TableAction";
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
 import { Spinner } from "react-bootstrap";
 
 // Rich Text Editor Component for Terms and Conditions
@@ -198,12 +197,6 @@ const RichTextEditor: React.FC<{
   );
 };
 
-// Extend jsPDF type to include autoTable
-declare module 'jspdf' {
-  interface jsPDF {
-    autoTable: (options: any) => jsPDF;
-  }
-}
 
 interface SelectOption {
   value: number;
@@ -2287,218 +2280,14 @@ const InvoiceList = () => {
     printWindow.print();
   }, [generateInvoiceHTML]);
 
-  const handleDownloadPDF = useCallback((invoice: InvoiceData) => {
+  const handleDownloadPDF = useCallback(async (invoice: InvoiceData) => {
     try {
-      const doc = new jsPDF();
-      const pageWidth = doc.internal.pageSize.getWidth();
-      const pageHeight = doc.internal.pageSize.getHeight();
-      const margin = 20;
-      const contentWidth = pageWidth - (margin * 2);
-      let yPosition = margin;
-
-      // Get company VAT rate
-      const companyVatRate = invoice.company?.profile?.vat_rate ? parseFloat(invoice.company.profile.vat_rate) : 0;
-      const isVatExempt = invoice.company?.profile?.vat_exemption;
-
-      // Add header with company branding
-      doc.setFillColor(66, 139, 202);
-      doc.rect(0, 0, pageWidth, 40, 'F');
-      
-      // Company name/logo area
-      doc.setTextColor(255, 255, 255);
-      doc.setFontSize(24);
-      doc.setFont('helvetica', 'bold');
-      doc.text('INVOICE', margin, 25);
-      
-      // Reset text color
-      doc.setTextColor(0, 0, 0);
-      yPosition = 50;
-
-      // Invoice details section aligned to the left
-      const invoiceDetailsX = margin;
-      const invoiceDetailsY = 50;
-      
-      // Invoice number (prominent)
-      doc.setFontSize(16);
-      doc.setFont('helvetica', 'bold');
-      doc.text(`Invoice #${invoice.invoice_number}`, invoiceDetailsX, invoiceDetailsY);
-      
-      // Invoice details in a clean format
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'normal');
-      const details = [
-        `Date: ${moment(invoice.invoice_date).format('DD/MM/YYYY')}`,
-        `Due Date: ${invoice.due_date ? moment(invoice.due_date).format('DD/MM/YYYY') : 'N/A'}`,
-        `Currency: ${invoice.currency_code || 'USD'}`
-      ];
-      
-      details.forEach((detail, index) => {
-        doc.text(detail, invoiceDetailsX, invoiceDetailsY + 15 + (index * 8));
-      });
-
-      yPosition = 90;
-
-      // Bill To section
-      doc.setFontSize(12);
-      doc.setFont('helvetica', 'bold');
-      doc.text('Bill To:', margin, yPosition);
-      yPosition += 8;
-      
-      doc.setFontSize(11);
-      doc.setFont('helvetica', 'normal');
-      doc.text(invoice.company?.name || 'N/A', margin, yPosition);
-      yPosition += 6;
-      
-      if (invoice.company?.profile?.tax_id) {
-        doc.text(`Tax ID: ${invoice.company.profile.tax_id}`, margin, yPosition);
-        yPosition += 6;
-      }
-      
-      // VAT Information in a highlighted box
-      yPosition += 10;
-      doc.setFillColor(248, 249, 250);
-      doc.rect(margin, yPosition - 5, contentWidth, 15, 'F');
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'bold');
-      doc.text(`VAT Information: ${isVatExempt ? 'VAT Exempt' : `VAT Rate: ${companyVatRate}%`}`, margin + 5, yPosition + 3);
-      yPosition += 20;
-
-      // Invoice items table with improved styling
-      const tableData = invoice.items.map(item => {
-        const product = companyProducts.find(p => p.id.toString() === item.product_id.toString());
-        const productInfo = getEffectiveProductPrice(item.product_id.toString(), invoice.company_id);
-        const productCurrency = productInfo.currency;
-        const lineTotalUSD = parseFloat(item.quantity) * parseFloat(item.unit_price);
-        const exchangeRate = getExchangeRate(productCurrency, invoice.currency_code || 'USD');
-        const lineTotal = lineTotalUSD * exchangeRate;
-        return [
-          product?.name || 'Unknown Product',
-          item.quantity,
-          `${(parseFloat(item.unit_price) * exchangeRate).toFixed(2)}`,
-          `${lineTotal.toFixed(2)}`
-        ];
-      });
-
-      autoTable(doc, {
-        head: [['Description', 'Qty', 'Unit Price', 'Amount']],
-        body: tableData,
-        startY: yPosition,
-        styles: {
-          fontSize: 10,
-          cellPadding: 6,
-          lineColor: [200, 200, 200],
-          lineWidth: 0.5,
-        },
-        headStyles: {
-          fillColor: [52, 73, 94],
-          textColor: 255,
-          fontStyle: 'bold',
-          halign: 'center',
-        },
-        columnStyles: {
-          0: { cellWidth: 80, halign: 'left' },
-          1: { cellWidth: 20, halign: 'center' },
-          2: { cellWidth: 30, halign: 'right' },
-          3: { cellWidth: 30, halign: 'right' },
-        },
-        alternateRowStyles: {
-          fillColor: [248, 249, 250],
-        },
-        margin: { left: margin, right: margin },
-      });
-
-      const finalY = (doc as any).lastAutoTable?.finalY || yPosition + (tableData.length * 15) + 20;
-
-      // Totals section aligned to the left
-      const totalsX = margin;
-      const totalsY = finalY + 10;
-      
-      // Subtotal
-      doc.setFontSize(11);
-      doc.setFont('helvetica', 'normal');
-      doc.text('Subtotal:', totalsX, totalsY);
-      doc.text(`${invoice.currency_code || 'USD'} ${parseFloat(invoice.subtotal || '0').toFixed(2)}`, totalsX + 60, totalsY);
-      
-      // VAT Amount
-      doc.text(`VAT (${isVatExempt ? 'Exempt' : companyVatRate + '%'}):`, totalsX, totalsY + 8);
-      doc.text(`${invoice.currency_code || 'USD'} ${parseFloat(invoice.tax_amount || '0').toFixed(2)}`, totalsX + 60, totalsY + 8);
-      
-      // Total Amount (highlighted)
-      doc.setFontSize(12);
-      doc.setFont('helvetica', 'bold');
-      doc.text('Total Amount:', totalsX, totalsY + 20);
-      doc.text(`${invoice.currency_code || 'USD'} ${parseFloat(invoice.total_amount || '0').toFixed(2)}`, totalsX + 60, totalsY + 20);
-      
-      // Draw a line above total
-      doc.setDrawColor(0, 0, 0);
-      doc.setLineWidth(0.5);
-      doc.line(totalsX, totalsY + 15, totalsX + 100, totalsY + 15);
-
-      // Notes and terms section
-      let notesY = totalsY + 40;
-      
-      if (invoice.notes) {
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(10);
-        doc.text('Notes:', margin, notesY);
-        doc.setFont('helvetica', 'normal');
-        const splitNotes = doc.splitTextToSize(invoice.notes || '', contentWidth);
-        doc.text(splitNotes, margin, notesY + 8);
-        notesY += 8 + (splitNotes.length * 4) + 10;
-      }
-
-      if (invoice.terms_conditions) {
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(10);
-        doc.text('Terms & Conditions:', margin, notesY);
-        doc.setFont('helvetica', 'normal');
-        
-        // Format terms and conditions with proper line breaks and bullet points
-        const formattedTerms = invoice.terms_conditions
-          .split('\n')
-          .map(line => {
-            const trimmedLine = line.trim();
-            
-            // Handle bullet points
-            if (trimmedLine.startsWith('•') || trimmedLine.startsWith('-') || trimmedLine.startsWith('*')) {
-              return `• ${trimmedLine.substring(1).trim()}`;
-            }
-            
-            // Handle numbered lists
-            if (/^\d+\./.test(trimmedLine)) {
-              return trimmedLine; // Keep as is
-            }
-            
-            // Handle empty lines
-            if (trimmedLine === '') {
-              return '';
-            }
-            
-            // Regular lines
-            return trimmedLine;
-          })
-          .join('\n');
-        
-        const splitTerms = doc.splitTextToSize(formattedTerms, contentWidth);
-        doc.text(splitTerms, margin, notesY + 8);
-      }
-
-      // Footer aligned to the left
-      const footerY = pageHeight - 20;
-      doc.setFontSize(8);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(128, 128, 128);
-      doc.text('Thank you for your business!', margin, footerY);
-      doc.text(`Generated on ${moment().format('DD/MM/YYYY HH:mm')}`, margin, footerY + 8);
-
-      // Save PDF
-      doc.save(`invoice-${invoice.invoice_number}.pdf`);
-      toast.success('PDF downloaded successfully');
+      await downloadInvoicePdf(invoice.id);
     } catch (error) {
-      console.error('PDF generation error:', error);
-      toast.error('Failed to generate PDF');
+      console.error('PDF download error:', error);
+      // Error is already handled in the downloadInvoicePdf function
     }
-  }, [companyProducts]);
+  }, []);
 
 
 

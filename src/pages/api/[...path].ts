@@ -204,7 +204,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         res.setHeader(key, value);
       }
     });
-
+    console.log("ZEZEZE", response.data instanceof Buffer , response.data instanceof ArrayBuffer);
     // Handle different response types
     if (isAudioDownload || response.data instanceof Buffer || response.data instanceof ArrayBuffer) {
       // For binary data (audio files, blobs, etc.)
