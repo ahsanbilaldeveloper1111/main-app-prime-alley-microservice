@@ -18,6 +18,7 @@ import {
   downloadTemplate,
   getResellers,
   getCompany,
+  uploadCompanyFile,
   CompanyData,
 } from "@utils/accounting";
 import { Column } from "@components/CustomDataTable";
@@ -48,6 +49,7 @@ const CompanyList = () => {
   const [showEditModal, setShowEditModal] = useState<boolean>(false);
   const [showDeleteModal, setShowDeleteModal] = useState<boolean>(false);
   const [showImportModal, setShowImportModal] = useState<boolean>(false);
+  const [showBulkImportModal, setShowBulkImportModal] = useState<boolean>(false);
   const [selectedCompany, setSelectedCompany] = useState<CompanyData | null>(
     null
   );
@@ -87,6 +89,11 @@ const CompanyList = () => {
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importProgress, setImportProgress] = useState<number>(0);
   const [isImporting, setIsImporting] = useState<boolean>(false);
+
+  // Bulk import states
+  const [bulkImportFile, setBulkImportFile] = useState<File | null>(null);
+  const [bulkImportProgress, setBulkImportProgress] = useState<number>(0);
+  const [isBulkImporting, setIsBulkImporting] = useState<boolean>(false);
 
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isLoadingCompany, setIsLoadingCompany] = useState<boolean>(false);
@@ -439,20 +446,75 @@ const CompanyList = () => {
   // Handle download template
   const handleDownloadTemplate = useCallback(async () => {
     try {
-      const blob = await downloadTemplate();
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = "companies-template.xlsx";
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
+      await downloadTemplate();
       toast.success("Template downloaded successfully");
     } catch (error) {
       console.error("Error downloading template:", error);
+      toast.error("Failed to download template");
     }
   }, []);
+
+  // Handle bulk import companies
+  const handleBulkImportCompanies = useCallback(async () => {
+    if (!bulkImportFile) {
+      toast.error("Please select a file to import");
+      return;
+    }
+
+    // Validate file size (10MB limit)
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    if (bulkImportFile.size > maxSize) {
+      toast.error("File size must be less than 10MB");
+      return;
+    }
+
+    // Validate file type
+    const allowedTypes = [
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
+      'application/vnd.ms-excel', // .xls
+      'text/csv' // .csv
+    ];
+    if (!allowedTypes.includes(bulkImportFile.type)) {
+      toast.error("Please select a valid file (Excel or CSV)");
+      return;
+    }
+
+    setIsBulkImporting(true);
+    setBulkImportProgress(0);
+    
+    try {
+      // Simulate progress for better UX
+      const progressInterval = setInterval(() => {
+        setBulkImportProgress((prev) => {
+          if (prev >= 90) {
+            clearInterval(progressInterval);
+            return prev;
+          }
+          return prev + 10;
+        });
+      }, 200);
+
+      // Create FormData with file under 'file' key
+      const formData = new FormData();
+      formData.append('file', bulkImportFile);
+
+      await uploadCompanyFile(formData);
+      
+      clearInterval(progressInterval);
+      setBulkImportProgress(100);
+      
+      toast.success("Companies imported successfully");
+      setShowBulkImportModal(false);
+      setBulkImportFile(null);
+      setRefreshKey((prev) => prev + 1);
+    } catch (error) {
+      console.error("Error importing companies:", error);
+      // toast.error("Failed to import companies");
+    } finally {
+      setIsBulkImporting(false);
+      setBulkImportProgress(0);
+    }
+  }, [bulkImportFile]);
 
   // Modal handlers
   const openCreateModal = useCallback(() => {
@@ -486,6 +548,18 @@ const CompanyList = () => {
     setImportProgress(0);
   }, []);
 
+  const openBulkImportModal = useCallback(() => {
+    setBulkImportFile(null);
+    setBulkImportProgress(0);
+    setShowBulkImportModal(true);
+  }, []);
+
+  const closeBulkImportModal = useCallback(() => {
+    setShowBulkImportModal(false);
+    setBulkImportFile(null);
+    setBulkImportProgress(0);
+  }, []);
+
   // Form input handlers
   const handleInputChange = useCallback((field: string, value: string) => {
     setFormData((prev) => ({
@@ -511,6 +585,17 @@ const CompanyList = () => {
       const file = e.target.files?.[0];
       if (file) {
         setImportFile(file);
+      }
+    },
+    []
+  );
+
+  // Bulk import file handler
+  const handleBulkImportFileChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (file) {
+        setBulkImportFile(file);
       }
     },
     []
@@ -584,6 +669,12 @@ const CompanyList = () => {
               showExport={false}
               onExport={handleExportCompanies}
             />
+            <Button variant="info" size="sm" onClick={handleDownloadTemplate}>
+              Download Template
+            </Button>
+            <Button variant="success" size="sm" onClick={openBulkImportModal}>
+              Bulk Import
+            </Button>
             <Button variant="primary" size="sm" onClick={openCreateModal}>
               New Company
             </Button>
@@ -1939,6 +2030,124 @@ const CompanyList = () => {
             disabled={!importFile || isImporting}
           >
             {isImporting ? "Importing..." : "Import Companies"}
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
+      {/* Bulk Import Modal */}
+      <Modal show={showBulkImportModal} onHide={closeBulkImportModal} size="lg">
+        <Modal.Header closeButton>
+          <Modal.Title>Bulk Import Companies</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <Alert variant="info">
+            <strong>Bulk Import Instructions:</strong>
+            <div className="mt-2">
+              <p className="mb-2">Upload a CSV or Excel file with the required columns:</p>
+              <div className="row">
+                <div className="col-md-6">
+                  <strong>Required Headers:</strong>
+                  <ul className="mb-2 small">
+                    <li><strong>Name</strong> (Required)</li>
+                    <li>Email</li>
+                    <li>Phone</li>
+                    <li>Address</li>
+                    <li>Country</li>
+                    <li>Payment Mode</li>
+                    <li>Payment Terms</li>
+                    <li>Credit Limit</li>
+                  </ul>
+                </div>
+                <div className="col-md-6">
+                  <strong>Optional Headers:</strong>
+                  <ul className="mb-2 small">
+                    <li>Discount Type</li>
+                    <li>Discount Limit</li>
+                    <li>Early Payment Discount</li>
+                    <li>Late Fee Rule</li>
+                    <li>Currency</li>
+                    <li>Vat Rate</li>
+                    <li>Vat Exemption</li>
+                    <li>Tax Id</li>
+                    <li>Reseller Name</li>
+                  </ul>
+                </div>
+              </div>
+              <div className="mt-2">
+                <strong>Valid Values:</strong>
+                <ul className="mb-2 small">
+                  <li><strong>Payment Mode:</strong> one_time, recurring, subscription</li>
+                  <li><strong>Discount Type:</strong> flat_percentage, flat_amount</li>
+                  <li><strong>VAT Exemption:</strong> true, false</li>
+                </ul>
+              </div>
+              <div className="mt-2">
+                <strong>Important Notes:</strong>
+                <ul className="mb-0 small">
+                  <li>First row should contain headers exactly as shown above</li>
+                  <li>Only <strong>Name</strong> field is required, all others are optional</li>
+                  <li>Use <strong>Reseller Name</strong> to automatically create/link resellers</li>
+                  <li>Existing companies (by email) will be updated, new ones will be created</li>
+                  <li>Large files (1000+ rows) will be processed in the background</li>
+                  <li>Maximum file size: 10MB</li>
+                </ul>
+              </div>
+            </div>
+          </Alert>
+
+          <div className="form-group mb-3">
+            <label htmlFor="bulkImportFile">Select File *</label>
+            <input
+              type="file"
+              className="form-control"
+              id="bulkImportFile"
+              accept=".xlsx,.xls,.csv"
+              onChange={handleBulkImportFileChange}
+            />
+            <small className="text-muted">Maximum file size: 10MB</small>
+          </div>
+
+          {bulkImportFile && (
+            <Alert variant="success">
+              <strong>Selected file:</strong> {bulkImportFile.name}
+              <br />
+              <small>
+                Size: {(bulkImportFile.size / 1024 / 1024).toFixed(2)} MB
+              </small>
+            </Alert>
+          )}
+
+          {isBulkImporting && (
+            <div className="mt-3">
+              <div className="d-flex align-items-center">
+                <Spinner animation="border" size="sm" className="me-2" />
+                <span>Importing companies...</span>
+              </div>
+              <div className="progress mt-2">
+                <div
+                  className="progress-bar bg-success"
+                  role="progressbar"
+                  style={{ width: `${bulkImportProgress}%` }}
+                  aria-valuenow={bulkImportProgress}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                >
+                  {bulkImportProgress}%
+                </div>
+              </div>
+            </div>
+          )}
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={closeBulkImportModal}>
+            Cancel
+          </Button>
+          <Button
+            variant="success"
+            onClick={handleBulkImportCompanies}
+            disabled={!bulkImportFile || isBulkImporting}
+          >
+            {isBulkImporting ? "Importing..." : "Import Companies"}
           </Button>
         </Modal.Footer>
       </Modal>

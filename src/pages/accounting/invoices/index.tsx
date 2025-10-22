@@ -2285,16 +2285,7 @@ const InvoiceList = () => {
   }, [companyProducts]);
 
   // Print and PDF functions
-  const handlePrintInvoice = useCallback((invoice: InvoiceData) => {
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) return;
-
-    const invoiceContent = generateInvoiceHTML(invoice);
-    printWindow.document.write(invoiceContent);
-    printWindow.document.close();
-    printWindow.focus();
-    printWindow.print();
-  }, [generateInvoiceHTML]);
+  
 
   const handleDownloadPDF = useCallback(async (invoice: InvoiceData) => {
     try {

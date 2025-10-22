@@ -714,20 +714,6 @@ export const generateTemplate = async (): Promise<Blob> => {
   }
 };
 
-export const downloadTemplate = async (): Promise<Blob> => {
-  try {
-    const response = await axiosInstance.get(
-      "/accounting/company/download-template",
-      {
-        responseType: "blob",
-      }
-    );
-    return response.data;
-  } catch (error: any) {
-    toast.error(error?.message || "Failed to download template");
-    throw error;
-  }
-};
 
 export const createUpdateProfile = async (data: any): Promise<any> => {
   try {
@@ -1174,6 +1160,53 @@ export const downloadInvoicePdf = async (id: number): Promise<void> => {
   }
 };
 
+export const downloadTemplate = async (): Promise<void> => {
+  try {
+    const response = await axiosInstance.get(`/accounting/company/template/download`,  {
+      responseType: "blob",
+      headers: {
+        Accept: "blob",
+      },
+    });
+    
+    // Check if response is valid
+    if (!response.data || response.data.size === 0) {
+      throw new Error('Empty response received');
+    }
+    
+    // Extract filename from content-disposition header if available
+    let filename = `company-template.csv`;
+    const contentDisposition = response.headers['content-disposition'];
+    if (contentDisposition) {
+      const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+      if (filenameMatch && filenameMatch[1]) {
+        filename = filenameMatch[1].replace(/['"]/g, '');
+      }
+    }
+    
+    // response.data is already a blob when responseType is "blob"
+    const blob = response.data;
+    
+    // Verify blob type
+    
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.style.display = 'none';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+    
+    // toast.success('PDF downloaded successfully');
+  } catch (error: any) {
+    console.error('PDF download error:', error);
+    toast.error(error?.message || "Failed to download File");
+    throw error;
+  }
+};
+
 export const updateInvoice = async (
   id: number,
   data: InvoiceCreateUpdateAPIPayload
@@ -1244,6 +1277,31 @@ export const createExpense = async (
     return extractData<ExpenseData>(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to create expense");
+    throw error;
+  }
+};
+
+export const uploadCompanyFile = async (
+  data:FormData
+): Promise<ExpenseData> => {
+  try {
+    const response = await axiosInstance.post("/accounting/company/file/upload", data, {
+      headers:
+        data instanceof FormData
+          ? { "Content-Type": "multipart/form-data" }
+          : {},
+    });
+    
+    // Handle the actual API response structure
+    if (response.data?.code === 200 && response.data?.data?.success === false) {
+      // Show error toast for failed upload
+      // toast.error(response.data.data.message || "File upload failed");
+      throw new Error(response.data.data.message || "File upload failed");
+    }
+    
+    return extractData<any>(response.data);
+  } catch (error: any) {
+    toast.error(error?.message || "Failed to upload company file");
     throw error;
   }
 };
