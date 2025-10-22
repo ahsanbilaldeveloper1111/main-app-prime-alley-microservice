@@ -481,6 +481,7 @@ export interface DiscountApplicabilityCreateUpdatePayload {
   valid_from: string;
   valid_until: string;
   pricing_ids: number[];
+  company_id?: number;
 }
 
 export interface ProductPricingData {
@@ -517,6 +518,7 @@ export interface ProductPricingData {
 export interface ProductPricingCreateUpdatePayload {
   product_id: string;
   selling_price: string;
+  company_id?: number;
 }
 
 export interface PaginationParams extends Record<string, any> {
@@ -833,7 +835,7 @@ export const createDiscountApplicability = async (
   try {
     const response = await axiosInstance.post(
       `/accounting/company/${companyId}/discount-applicability`,
-      data
+      { ...data, company_id: companyId }
     );
     return extractData<DiscountApplicabilityData>(response.data);
   } catch (error: any) {
@@ -850,7 +852,7 @@ export const updateDiscountApplicability = async (
   try {
     const response = await axiosInstance.put(
       `/accounting/company/${companyId}/discount-applicability/${applicabilityId}`,
-      data
+      { ...data, company_id: companyId }
     );
     return extractData<DiscountApplicabilityData>(response.data);
   } catch (error: any) {
@@ -975,7 +977,7 @@ export const updateProductPricing = async (
   try {
     const response = await axiosInstance.post(
       `/accounting/company/${companyId}/product-pricing`,
-      data
+      { ...data, company_id: companyId }
     );
     return extractData<ProductPricingData>(response.data);
   } catch (error: any) {
@@ -991,7 +993,7 @@ export const bulkUpdateProductPricing = async (
   try {
     const response = await axiosInstance.post(
       `/accounting/company/${companyId}/product-pricing/bulk-update`,
-      data
+      data.map(item => ({ ...item, company_id: companyId }))
     );
     return extractData<ProductPricingData[]>(response.data);
   } catch (error: any) {
@@ -1510,7 +1512,7 @@ export const getProducts = async (
 ): Promise<PaginationWrapper<ProductData>> => {
   try {
     const response = await axiosInstance.get("/accounting/products", {
-      params,
+      params: { ...params },
     });
 
     // Handle the actual API response structure

@@ -65,6 +65,7 @@ const CompanyProductPricing = () => {
   const [formData, setFormData] = useState<ProductPricingCreateUpdatePayload>({
     product_id: "",
     selling_price: "",
+    company_id: Number(companyId),
   });
 
   const [discountFormData, setDiscountFormData] = useState<DiscountApplicabilityCreateUpdatePayload>({
@@ -77,6 +78,7 @@ const CompanyProductPricing = () => {
     valid_from: "",
     valid_until: "",
     pricing_ids: [],
+    company_id: Number(companyId),
   });
 
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -368,8 +370,9 @@ const CompanyProductPricing = () => {
     setFormData({
       product_id: "",
       selling_price: "",
+      company_id: Number(companyId),
     });
-  }, []);
+  }, [companyId]);
 
   const resetDiscountFormData = useCallback(() => {
     setDiscountFormData({
@@ -382,8 +385,9 @@ const CompanyProductPricing = () => {
       valid_from: "",
       valid_until: "",
       pricing_ids: [],
+      company_id: Number(companyId),
     });
-  }, []);
+  }, [companyId]);
 
   // Handle create pricing
   const handleCreatePricing = useCallback(async () => {
@@ -421,9 +425,10 @@ const CompanyProductPricing = () => {
     setFormData({
       product_id: pricing.product_id,
       selling_price: pricing.selling_price,
+      company_id: Number(companyId),
     });
     setShowEditModal(true);
-  }, []);
+  }, [companyId]);
 
   // Handle update pricing
   const handleUpdatePricing = useCallback(async () => {
@@ -539,9 +544,10 @@ const CompanyProductPricing = () => {
       valid_from: moment(discount.valid_from).format("YYYY-MM-DD"),
       valid_until: moment(discount.valid_until).format("YYYY-MM-DD"),
       pricing_ids: discount.product_pricings.map(p => p.id),
+      company_id: Number(companyId),
     });
     setShowEditDiscountModal(true);
-  }, []);
+  }, [companyId]);
 
   const handleUpdateDiscount = useCallback(async () => {
     if (!selectedDiscount || !companyId) return;
