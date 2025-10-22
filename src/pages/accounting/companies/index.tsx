@@ -947,8 +947,8 @@ const CompanyList = () => {
                             }
                           >
                             <option value="one_time">One Time</option>
-                            <option value="recurring">Recurring</option>
-                            <option value="subscription">Subscription</option>
+                            {/* <option value="recurring">Recurring</option> */}
+                            {/* <option value="subscription">Subscription</option> */}
                           </select>
                         </div>
                       </div>
@@ -1577,8 +1577,8 @@ const CompanyList = () => {
                               }
                             >
                               <option value="one_time">One Time</option>
-                              <option value="recurring">Recurring</option>
-                              <option value="subscription">Subscription</option>
+                              {/* <option value="recurring">Recurring</option>
+                              <option value="subscription">Subscription</option> */}
                             </select>
                           </div>
                         </div>

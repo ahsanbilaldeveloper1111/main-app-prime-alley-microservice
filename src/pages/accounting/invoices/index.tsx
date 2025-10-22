@@ -1837,13 +1837,21 @@ const InvoiceList = () => {
           const selectedCompany = companies.find(c => c.id.toString() === value);
           const companyVatRate = selectedCompany?.profile?.vat_rate ? parseFloat(selectedCompany.profile.vat_rate) : 0;
           const isVatExempt = selectedCompany?.profile?.vat_exemption || false;
-          const totals = calculateTotals(updatedInvoice.items, companyVatRate, isVatExempt, updatedInvoice.currency_code || 'USD', value.toString());
+          
+          // Update existing items' VAT rates to match the new company's VAT rate
+          const updatedItems = updatedInvoice.items.map(item => ({
+            ...item,
+            tax_rate: companyVatRate.toString(), // Update VAT rate for all existing items
+          }));
+          
+          const totals = calculateTotals(updatedItems, companyVatRate, isVatExempt, updatedInvoice.currency_code || 'USD', value.toString());
           
           // Store processed items for table display
           setProcessedInvoiceItems(totals.processedItems || []);
           
           return {
             ...updatedInvoice,
+            items: updatedItems, // Use updated items with new VAT rates
             vat_rate: companyVatRate, // Auto-populate VAT rate from company
             ...totals
           };
@@ -1898,9 +1906,17 @@ const InvoiceList = () => {
           const selectedCompany = companies.find(c => c.id.toString() === value);
           const companyVatRate = selectedCompany?.profile?.vat_rate ? parseFloat(selectedCompany.profile.vat_rate) : 0;
           const isVatExempt = selectedCompany?.profile?.vat_exemption || false;
-          const totals = calculateTotals(updatedInvoice.items, companyVatRate, isVatExempt, updatedInvoice.currency_code || 'USD', value.toString());
+          
+          // Update existing items' VAT rates to match the new company's VAT rate
+          const updatedItems = updatedInvoice.items.map(item => ({
+            ...item,
+            tax_rate: companyVatRate.toString(), // Update VAT rate for all existing items
+          }));
+          
+          const totals = calculateTotals(updatedItems, companyVatRate, isVatExempt, updatedInvoice.currency_code || 'USD', value.toString());
           return {
             ...updatedInvoice,
+            items: updatedItems, // Use updated items with new VAT rates
             vat_rate: companyVatRate, // Auto-populate VAT rate from company
             subtotal: totals.subtotal.toString(),
             tax_amount: totals.tax_amount.toString(),
@@ -2398,13 +2414,13 @@ const InvoiceList = () => {
                     }
                   >
                     <option value="one_time">One Time</option>
-                    <option value="recurring">Recurring</option>
+                    {/* <option value="recurring">Recurring</option> */}
                   </select>
                 </div>
               </div>
             </div>
 
-            <div className="row">
+            {/* <div className="row">
               <div className="col-md-6">
                 <div className="form-group mb-3">
                   <label htmlFor="newInvoiceStatus">Status</label>
@@ -2424,7 +2440,7 @@ const InvoiceList = () => {
                   </select>
                 </div>
               </div>
-            </div>
+            </div> */}
 
             {/* Invoice Items Section */}
             <div className="row">
@@ -2887,13 +2903,13 @@ const InvoiceList = () => {
                     }
                   >
                     <option value="one_time">One Time</option>
-                    <option value="recurring">Recurring</option>
+                    {/* <option value="recurring">Recurring</option> */}
                   </select>
                 </div>
               </div>
             </div>
 
-            <div className="row">
+            {/* <div className="row">
               <div className="col-md-6">
                 <div className="form-group mb-3">
                   <label htmlFor="editInvoiceStatus">Status</label>
@@ -2913,7 +2929,7 @@ const InvoiceList = () => {
                   </select>
                 </div>
               </div>
-            </div>
+            </div> */}
 
             {/* Invoice Items Section */}
             <div className="row">
