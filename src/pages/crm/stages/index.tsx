@@ -155,6 +155,7 @@ const StagesManagement = () => {
       description: "",
       is_default: false,
       active: true,
+      type: 'lead' as 'lead' | 'opportunity',
     });
   }
 
