@@ -368,7 +368,7 @@ const CrmDashboard = () => {
       const [leadsData, opportunitiesData, meetingsData] = await Promise.all([
         getLeads({ per_page: 5 }),
         getOpportunities({ per_page: 5 }),
-        getMeetings(),
+        getMeetings({per_page: 5}),
       ]);
 
       setRecentLeads(leadsData?.data || []);

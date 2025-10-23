@@ -77,7 +77,7 @@ const formatSecondsToTime = (seconds: number): string => {
   return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
 };
 
-const AnalyseRecordings = () => {
+const AnalyzeRecordings = () => {
     const { data:session, status } = useSession();
     const [showCountryChartModal, setShowCountryChartModal] = useState(false);
     const [showDepartmentChartModal, setShowDepartmentChartModal] = useState(false);
@@ -1033,14 +1033,14 @@ const AnalyseRecordings = () => {
 
     return (
         <React.Fragment>
-            <BreadcrumbItem mainTitle="AI Insights" mainLink="/ai-ml" subTitle="Analyse Recordings" showPageLoader={showPageLoader} />
+            <BreadcrumbItem mainTitle="AI Insights" mainLink="/ai-ml" subTitle="Analyze Recordings" showPageLoader={showPageLoader} />
 
             <Row className="mb-3">
                 <Col md={12}>
                     <div className="page-header-title style-2">
                         <Row className="d-flex justify-content-between align-items-center">
                             <Col md={4}>
-                                <h2 className="mb-0">Analyse Recordings</h2>
+                                <h2 className="mb-0">Analyze Recordings</h2>
                             </Col>
 
                             <Col md={8} className="d-flex justify-content-end">
@@ -1512,8 +1512,8 @@ const AnalyseRecordings = () => {
     );
 };
 
-AnalyseRecordings.getLayout = (page: ReactElement) => {
+AnalyzeRecordings.getLayout = (page: ReactElement) => {
     return <Layout>{page}</Layout>;
 };
 
-export default AnalyseRecordings;
+export default AnalyzeRecordings;

@@ -1394,23 +1394,23 @@ const CrmDataManagement = () => {
           );
         },
       },
-      {
-        key: "delete_action",
-        name: "Delete",
-        selector: (row: any) => row.id,
-        sortable: false,
-        cell: (props: any) => (
-          <Button
-            variant="danger"
-            className="app-button"
-            size="sm"
-            onClick={() => handleDeleteData(props)}
-            title="Delete Entry"
-          >
-            <FiTrash2 size={14} />
-          </Button>
-        ),
-      },
+      // {
+      //   key: "delete_action",
+      //   name: "Delete",
+      //   selector: (row: any) => row.id,
+      //   sortable: false,
+      //   cell: (props: any) => (
+      //     <Button
+      //       variant="danger"
+      //       className="app-button"
+      //       size="sm"
+      //       onClick={() => handleDeleteData(props)}
+      //       title="Delete Entry"
+      //     >
+      //       <FiTrash2 size={14} />
+      //     </Button>
+      //   ),
+      // },
     ],
     [
       handleViewData,
@@ -1637,7 +1637,7 @@ const CrmDataManagement = () => {
                   filters={memoizedFilters}
                   refreshKey={refreshKey}
                   search={false}
-                  rowSelection={true}
+                  rowSelection={false}
                   onSelectionChange={handleItemSelection}
                   clearSelectedRows={clearSelectedRows}
                   tableStyle="table-style-2"

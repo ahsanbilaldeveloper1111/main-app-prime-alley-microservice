@@ -76,7 +76,7 @@ const CrmLeads = () => {
 
   const fetchStages = async () => {
     try {
-      const stagesData = await getStages();
+      const stagesData = await getStages('lead');
       setStages(stagesData || []);
     } catch (error) {
       console.error("Failed to fetch stages:", error);
@@ -304,36 +304,44 @@ const CrmLeads = () => {
         selector: (row: any) => row.stage?.name || "New",
         sortable: true,
         cell: (props: any) => (
+          <>
           <span className="status-badge text-capitalize primary">{props.stage?.name || "New"}</span>
+          <br />
+          <small className="text-muted">{props?.lost_reason?.name}</small>
+          </>
         ),
       },
       {
         key: "status",
         name: "Status",
-        selector: (row: any) => row.status,
+        selector: (row: any) => {
+          const stageName = (row.stage?.name || "New").toLowerCase();
+          
+          if (stageName.includes("new")) return "New";
+          if (stageName.includes("lost") || stageName.includes("won")) return "Closed";
+          return "In Progress";
+        },
         sortable: true,
         cell: (props: any) => {
-          const status = props.status || "new";
-          const isLost = props.is_lost || false;
+          const stageName = (props.stage?.name || "New").toLowerCase();
+          let status = "In Progress";
+          let statusClass = "info";
 
-          if (isLost) {
-            return (
-              <div>
-                <span className="status-badge text-capitalize danger">Lost</span>
-                {props.lost_reason && (
-                  <div className="mt-1">
-                    <small className="text-muted">
-                      Reason: {props.lost_reason.name}
-                    </small>
-                  </div>
-                )}
-              </div>
-            );
+          if (stageName.includes("new")) {
+            status = "New";
+            statusClass = "primary";
+          } else if (stageName.includes("lost") || stageName.includes("won")) {
+            status = "Closed";
+            statusClass = "danger";
+          }
+          if(props?.is_lost) {
+            status = "Lost";
+            statusClass = "danger";
           }
 
           return (
-            <span className={`status-badge text-capitalize ${status === "new" ? "primary" : "info"}`}>
-              {status.charAt(0).toUpperCase() + status.slice(1)}
+            <span className={`status-badge text-capitalize ${statusClass}`}>
+              {status}
             </span>
           );
         },
@@ -370,7 +378,7 @@ const CrmLeads = () => {
                 onClick: () => handleConvertLead(props),
               }] : []),
               ...(!props.is_lost ? [{
-                label: 'Mark as Lost',
+                label: 'Mark Lost Reason',
                 icon: <FiXCircle className="me-2" />,
                 onClick: () => handleMarkLost(props),
               }] : []),
@@ -399,7 +407,7 @@ const CrmLeads = () => {
       <PageHeader
         title="Leads"
         filters={
-          <CrmFilters onFiltersChange={handleFiltersChange} />
+          <CrmFilters onFiltersChange={handleFiltersChange} type="lead" />
         }
         showSearch={true}
         searchValue={currentFilters.search || ""}
@@ -582,7 +590,7 @@ const CrmLeads = () => {
         }
         onSubmit={handleMarkLostSubmit}
         onCancel={() => setShowMarkLostModal(false)}
-        submitButtonText="Mark as Lost"
+        submitButtonText="Mark Lost Reason"
         cancelButtonText="Cancel"
       />
 

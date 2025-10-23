@@ -420,7 +420,7 @@ const OrdersList = () => {
             onClick={handleMarkLostSubmit}
             disabled={!lostReasonId}
           >
-            Mark as Lost
+            Mark Lost Reason
           </Button>
         </Modal.Footer>
       </Modal>

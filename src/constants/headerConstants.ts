@@ -70,7 +70,7 @@ export const HEADER_CONSTANTS = {
     ANALYSIS: 'Analysis',
     TRANSCRIPTION: 'Transcription',
     TRANSLATE: 'Translate',
-    ANALYSE_RECORDINGS: 'Analyse Recordings',
+    ANALYZE_RECORDINGS: 'Analyze Recordings',
     
     // Sales
     SALES_DASHBOARD: 'Dashboard',

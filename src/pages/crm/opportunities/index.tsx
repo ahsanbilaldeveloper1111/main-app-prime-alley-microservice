@@ -131,36 +131,42 @@ const CrmOpportunities = () => {
         selector: (row: any) => row.stage?.name || "New",
         sortable: true,
         cell: (props: any) => (
-          <span className="status-badge primary">{props.stage?.name || "New"}</span>
+          <><span className="status-badge primary">{props.stage?.name || "New"}</span>
+          <br />
+          <small className="text-muted">{props?.lost_reason?.name}</small>
+          </>
         ),
       },
       {
         key: "status",
         name: "Status",
-        selector: (row: any) => row.status,
+        selector: (row: any) => {
+          const stageName = (row.stage?.name || "New").toLowerCase();
+          if (stageName.includes("new")) return "New";
+          if (stageName.includes("lost") || stageName.includes("won")) return "Closed";
+          return "In Progress";
+        },
         sortable: true,
         cell: (props: any) => {
-          const status = props.status || "new";
-          const isLost = props.is_lost || false;
+          const stageName = (props.stage?.name || "New").toLowerCase();
+          let status = "In Progress";
+          let statusClass = "info";
 
-          if (isLost) {
-            return (
-              <div>
-                <Badge bg="danger">Lost</Badge>
-                {props.lost_reason && (
-                  <div className="mt-1">
-                    <small className="text-muted">
-                      Reason: {props.lost_reason.name}
-                    </small>
-                  </div>
-                )}
-              </div>
-            );
+          if (stageName.includes("new")) {
+            status = "New";
+            statusClass = "primary";
+          } else if (stageName.includes("lost") || stageName.includes("won")) {
+            status = "Closed";
+            statusClass = "danger";
           }
 
+          if(props?.is_lost) {
+            status = "Lost";
+            statusClass = "danger";
+          }
           return (
-            <span className={`status-badge ${status === "new" ? "primary" : "info"}`}>
-              {status.charAt(0).toUpperCase() + status.slice(1)}
+            <span className={`status-badge text-capitalize ${statusClass}`}>
+              {status}
             </span>
           );
         },
@@ -192,7 +198,7 @@ const CrmOpportunities = () => {
                 onClick: () => window.location.href = `/crm/leads/${props.id}/edit`,
               },
               ...(!props.is_lost ? [{
-                label: 'Mark as Lost',
+                label: 'Mark Lost Reason',
                 icon: <FiXCircle className="me-2" />,
                 onClick: () => handleMarkLost(props),
               }] : []),
@@ -273,7 +279,7 @@ const CrmOpportunities = () => {
        <PageHeader
          title="Opportunities"
          filters={
-           <CrmFilters onFiltersChange={setCurrentFilters} />
+           <CrmFilters onFiltersChange={setCurrentFilters} type="opportunity" />
          }
          showSearch={true}
          searchPlaceholder="Search opportunities..."
@@ -376,7 +382,7 @@ const CrmOpportunities = () => {
             Cancel
           </Button>
           <Button variant="warning" onClick={handleMarkLostSubmit}>
-            Mark as Lost
+            Mark Lost Reason
           </Button>
         </Modal.Footer>
       </Modal>

@@ -41,6 +41,7 @@ interface Stage {
   description?: string;
   is_default: boolean;
   active: boolean;
+  type: 'lead' | 'opportunity';
   created_at: string;
   updated_at: string;
 }
@@ -61,6 +62,7 @@ const StagesManagement = () => {
     description: "",
     is_default: false,
     active: true,
+    type: 'lead' as 'lead' | 'opportunity',
   });
 
   const [currentFilters, setCurrentFilters] = useState({search: ""});
@@ -122,6 +124,7 @@ const StagesManagement = () => {
         description: "",
         is_default: false,
         active: true,
+        type: 'lead' as 'lead' | 'opportunity',
       });
       setShowSuccessfulModal(true);
       setSuccessModalTitle("Stage Created");
@@ -173,6 +176,7 @@ const StagesManagement = () => {
         description: "",
         is_default: false,
         active: true,
+        type: 'lead' as 'lead' | 'opportunity',
       });
       setShowSuccessfulModal(true);
       setSuccessModalTitle("Stage Updated");
@@ -241,6 +245,17 @@ const StagesManagement = () => {
         ),
       },
       {
+        key: "type",
+        name: "Type",
+        selector: (row: Stage) => row.type,
+        sortable: true,
+        cell: (props: Stage) => (
+          <span className={`status-badge ${props.type === 'lead' ? 'primary' : 'success'}`}>
+            {props.type.charAt(0).toUpperCase() + props.type.slice(1)}
+          </span>
+        ),
+      },
+      {
         key: "color",
         name: "Color",
         selector: (row: Stage) => row.color,
@@ -304,6 +319,7 @@ const StagesManagement = () => {
                     description: props.description || "",
                     is_default: props.is_default,
                     active: props.active,
+                    type: props.type,
                   });
                   setShowUpdateModal(true);
                 },
@@ -430,6 +446,19 @@ const StagesManagement = () => {
             <Row>
               <Col md={6}>
                 <Form.Group className="mb-3">
+                  <Form.Label>Type *</Form.Label>
+                  <Form.Select
+                    value={formData.type}
+                    onChange={(e) => handleInputChange("type", e.target.value as 'lead' | 'opportunity')}
+                    required
+                  >
+                    <option value="lead">Lead</option>
+                    <option value="opportunity">Opportunity</option>
+                  </Form.Select>
+                </Form.Group>
+              </Col>
+              <Col md={6}>
+                <Form.Group className="mb-3">
                   <Form.Label>Color</Form.Label>
                   <Form.Control
                     type="color"
@@ -527,6 +556,19 @@ const StagesManagement = () => {
             </Row>
 
             <Row>
+              <Col md={6}>
+                <Form.Group className="mb-3">
+                  <Form.Label>Type *</Form.Label>
+                  <Form.Select
+                    value={formData.type}
+                    onChange={(e) => handleInputChange("type", e.target.value as 'lead' | 'opportunity')}
+                    required
+                  >
+                    <option value="lead">Lead</option>
+                    <option value="opportunity">Opportunity</option>
+                  </Form.Select>
+                </Form.Group>
+              </Col>
               <Col md={6}>
                 <Form.Group className="mb-3">
                   <Form.Label>Color</Form.Label>

@@ -34,6 +34,7 @@ export interface StageData {
   active: boolean;
   created_at: string;
   updated_at: string;
+  type: 'lead' | 'opportunity';
 }
 
 export interface LostReasonData {
@@ -163,7 +164,7 @@ export const getCrmDashboard = async (): Promise<DashboardData> => {
       getLeads({ per_page: 1000 }),
       getOpportunities({ per_page: 1000 }),
       getMeetings().then(meetings => meetings.data),
-      getStages(),
+      getStages(), // Get all stages for dashboard
       getCampaigns({ per_page: 1000 })
     ]);
     console.log("ZE MEETINGS", meetings);
@@ -192,21 +193,19 @@ export const getCrmDashboard = async (): Promise<DashboardData> => {
     }).length;
     
     // Group leads by stage (only actual leads, not opportunities)
-    const leadsByStage = stages.map((stage: StageData) => ({
+    const leadsByStage = stages.filter(stage => stage.type === 'lead').map((stage: StageData) => ({
       stage_name: stage.name,
       count: leads.data.filter((lead: LeadData) => lead.stage_id == stage.id && lead.type === 'lead').length,
       color: stage.color
     }));
     
     // Group opportunities by stage (only opportunities, not leads)
-    const opportunitiesByStage = stages.map((stage: StageData) => ({
+    const opportunitiesByStage = stages.filter(stage => stage.type === 'opportunity').map((stage: StageData) => ({
       stage_name: stage.name,
       count: opportunities.data.filter((opportunity: OpportunityData) => opportunity.stage_id == stage.id && opportunity.type === 'opportunity').length,
       color: stage.color
     }));
     
-    console.log("ZE LEADS BY STAGE", leadsByStage, leads.data);
-    console.log("ZE OPPORTUNITIES BY STAGE", opportunitiesByStage, opportunities.data);
     
     // Get recent data
     const recentLeads = leads.data.slice(0, 5);
@@ -406,10 +405,11 @@ export const getAssigneeComments = async (leadId: number): Promise<any[]> => {
 };
 
 // Stage Management
-export const getStages = async (): Promise<StageData[]> => {
+export const getStages = async (type?: 'lead' | 'opportunity'): Promise<StageData[]> => {
   try {
     console.log("getStages: Making API call to /crm/stages");
-    const response = await axiosInstance.get("/crm/stages");
+    const params = type ? { type } : {};
+    const response = await axiosInstance.get("/crm/stages", { params });
     console.log("getStages: Raw axios response:", response);
     console.log("getStages: Response data:", response.data);
 
@@ -523,7 +523,7 @@ export const getLostLeads = async (
 
 // Meeting Management
 export const getMeetings = async (
-  params: { lead_id?: number; extension?: string } = {}
+  params: { lead_id?: number; extension?: string; per_page?: number } = {}
 ): Promise<{
   data: MeetingData[];
 }> => {

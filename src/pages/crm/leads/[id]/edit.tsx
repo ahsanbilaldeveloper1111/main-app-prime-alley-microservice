@@ -47,7 +47,7 @@ import {
 import Link from "next/link";
 import { toast } from "react-toastify";
 import { useRouter } from "next/router";
-import moment from "moment";
+import moment from 'moment-timezone';
 import Select from "react-select";
 
 import "@assets/scss/custom-datatable.scss";
@@ -127,6 +127,13 @@ const EditLead = () => {
       fetchCrmData();
   }, []);
 
+  // Refetch stages when lead data changes (to get correct type)
+  useEffect(() => {
+    if (lead?.type) {
+      fetchStages();
+    }
+  }, [lead?.type]);
+
   // Set selected campaign when lead data is available
   useEffect(() => {
     const fetchCampaignForLead = async () => {
@@ -180,7 +187,7 @@ const EditLead = () => {
 
   const fetchStages = async () => {
     try {
-      const stagesData = await getStages();
+      const stagesData = await getStages(lead?.type);
       setStages(stagesData || []);
     } catch (error) {
       console.error("Failed to fetch stages:", error);
@@ -609,12 +616,12 @@ const handleCloseSuccessfulModal = () => {
           <Col md={6}>
             <Card className="border-0 shadow-sm mb-4">
               <Card.Header>
-                <h5 className="mb-0 app-title-heading">Lead Information</h5>
+                <h5 className="mb-0 app-title-heading">{isOpportunity ? "Opportunity" : "Lead"} Information</h5>
               </Card.Header>
               <Card.Body>
                 <Form onSubmit={handleSubmit}>
                   <Form.Group className="mb-3">
-                    <Form.Label>Lead Name *</Form.Label>
+                    <Form.Label>{isOpportunity ? "Opportunity" : "Lead"} Name *</Form.Label>
                     <Form.Control
                       type="text"
                       value={lead.name}
@@ -823,7 +830,7 @@ const handleCloseSuccessfulModal = () => {
                           <small>
                             Fill in the custom fields for the selected campaign.
                             These fields will be stored with the
-                            lead/opportunity.
+                            {isOpportunity ? "opportunity" : "lead"}.
                           </small>
                         </Alert>
                         <Row>
@@ -852,7 +859,7 @@ const handleCloseSuccessfulModal = () => {
                     ) : (
                       <>
                         <FiSave className="me-2" />
-                        Update Lead
+                        Update {isOpportunity ? "Opportunity" : "Lead"}
                       </>
                     )}
                   </Button>
@@ -991,10 +998,10 @@ const handleCloseSuccessfulModal = () => {
                     <Card.Body>
                       <div className="">
                         <Alert variant="success" className="mb-3">
-                          <small>
-                            This lead/opportunity will be attributed to the
-                            selected CRM data record.
-                          </small>
+                        <small>
+                          This {isOpportunity ? "opportunity" : "lead"} will be attributed to the
+                          selected CRM data record.
+                        </small>
                         </Alert>
                       </div>
                       <Row>
@@ -1042,7 +1049,7 @@ const handleCloseSuccessfulModal = () => {
                           <div className="d-flex justify-content-between align-items-start mb-2">
                             <h6 className="mb-1">{entry.description}</h6>
                             <small className="text-muted">
-                              {entry.created_at_human}
+                              {moment.utc(entry.created_at).local().format("YYYY-MM-DD hh:mm:ss A")} - {entry.created_at_human}
                             </small>
                           </div>
                           <div className="text-muted small mb-2">

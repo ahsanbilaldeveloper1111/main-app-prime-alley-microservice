@@ -1118,37 +1118,6 @@ export const createCrmFiltersConfig = (
       ]
     },
     {
-      id: 'tags',
-      title: 'Tags',
-      icon: 'ti ti-tag',
-      fields: [
-        {
-          type: 'select',
-          isMulti: true,
-          name: 'tags',
-          label: 'Tags',
-          options: staticTags || []
-        }
-      ]
-    },
-    {
-      id: 'assignment-status',
-      title: 'Assignment Status',
-      icon: 'ti ti-user-check',
-      fields: [
-        {
-          type: 'select',
-          name: 'assignment_status',
-          label: 'Assignment Status',
-          options: [
-            { value: '', label: 'All' },
-            { value: 'assigned', label: 'Assigned' },
-            { value: 'unassigned', label: 'Unassigned' }
-          ]
-        }
-      ]
-    },
-    {
       id: 'user-extensions',
       title: 'Users',
       icon: 'ti ti-users',
