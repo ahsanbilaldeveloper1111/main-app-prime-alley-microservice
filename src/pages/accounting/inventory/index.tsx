@@ -120,17 +120,6 @@ const InventoryList = () => {
         ),
       },
       {
-        key: "last_updated",
-        name: "Last Updated",
-        selector: (row: InventoryData) => row.last_updated,
-        sortable: true,
-        cell: (props: InventoryData) => (
-          <span className="text-muted">
-            {moment(props.last_updated).format("DD/MM/YYYY HH:mm")}
-          </span>
-        ),
-      },
-      {
         key: "Action",
         name: "ACTION",
         selector: (row: InventoryData) => row.id,

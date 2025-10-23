@@ -198,6 +198,7 @@ export interface ExpenseData {
   category_id: string;
   expense_number: string | null;
   expense_date: string;
+  payment_date: string | null;
   description: string;
   amount: string;
   currency_code: string;
@@ -239,7 +240,9 @@ export interface ExpenseCategoryData {
 
 export interface ExpenseCreateUpdatePayload {
   category_id: string;
+  vendor_id?: string;
   expense_date: string;
+  payment_date?: string;
   description: string;
   amount: string;
   tax_amount: string;

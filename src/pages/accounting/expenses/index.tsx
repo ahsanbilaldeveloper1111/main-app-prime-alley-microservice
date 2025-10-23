@@ -22,10 +22,12 @@ import {
   downloadFile,
   downloadReceipt,
   deleteExpenseFile,
+  getInventorySuppliers,
   ExpenseData,
   ExpenseCreateUpdatePayload,
   ExpenseCategoryData,
   ExpenseCategoryCreateUpdatePayload,
+  InventorySupplierData,
 } from "@utils/accounting";
 import { Column } from "@components/CustomDataTable";
 import { Button, Modal, Row } from "react-bootstrap";
@@ -58,6 +60,7 @@ const ExpenseList = () => {
   const [currentFilters, setCurrentFilters] = useState<{ search?: string }>({});
 
   const [categories, setCategories] = useState<ExpenseCategoryData[]>([]);
+  const [suppliers, setSuppliers] = useState<InventorySupplierData[]>([]);
 
   // Category Management
   const [showCategoryModal, setShowCategoryModal] = useState<boolean>(false);
@@ -128,6 +131,7 @@ const ExpenseList = () => {
           </>
         ),
       },
+
       {
         key: "amount",
         name: "Amount",
@@ -135,7 +139,7 @@ const ExpenseList = () => {
         sortable: true,
         cell: (props: ExpenseData) => (
           <span>
-            {props.currency_code} {parseFloat(props.amount || "0").toFixed(2)}
+            {props.currency} {parseFloat(props.amount || "0").toFixed(2)}
           </span>
         ),
       },
@@ -147,8 +151,7 @@ const ExpenseList = () => {
         cell: (props: ExpenseData) => (
           <div>
             <span>
-              {props.currency_code}{" "}
-              {parseFloat(props.tax_amount || "0").toFixed(2)}
+              {props.currency} {parseFloat(props.tax_amount || "0").toFixed(2)}
             </span>
             <br />
             <small className="text-muted">({props.tax_type || "amount"})</small>
@@ -180,11 +183,24 @@ const ExpenseList = () => {
       },
       {
         key: "expense_date",
-        name: "Date",
+        name: "Expense Date",
         selector: (row: ExpenseData) => row.expense_date,
         sortable: true,
         cell: (props: ExpenseData) => (
           <span>{moment(props.expense_date).format("DD/MM/YYYY")}</span>
+        ),
+      },
+      {
+        key: "payment_date",
+        name: "Payment Date",
+        selector: (row: ExpenseData) => row.payment_date,
+        sortable: true,
+        cell: (props: ExpenseData) => (
+          <span>
+            {props.payment_date
+              ? moment(props.payment_date).format("DD/MM/YYYY")
+              : "Not Paid"}
+          </span>
         ),
       },
       {
@@ -229,9 +245,19 @@ const ExpenseList = () => {
     }
   }, []);
 
+  const fetchSuppliers = useCallback(async () => {
+    try {
+      const suppliersData = await getInventorySuppliers();
+      setSuppliers(suppliersData.data || []);
+    } catch (error) {
+      console.error("Error fetching suppliers:", error);
+    }
+  }, []);
+
   useEffect(() => {
     fetchCategories();
-  }, [fetchCategories]);
+    fetchSuppliers();
+  }, [fetchCategories, fetchSuppliers]);
 
   const memoizedFilters = useMemo(() => currentFilters, [currentFilters]);
 
@@ -409,10 +435,22 @@ const ExpenseList = () => {
       // Create FormData for file upload
       const formData = new FormData();
       formData.append("category_id", selectedExpenseForAttachments.category_id);
+      if (selectedExpenseForAttachments.vendor_id) {
+        formData.append(
+          "vendor_id",
+          selectedExpenseForAttachments.vendor_id.toString()
+        );
+      }
       formData.append(
         "expense_date",
         selectedExpenseForAttachments.expense_date
       );
+      if (selectedExpenseForAttachments.payment_date) {
+        formData.append(
+          "payment_date",
+          selectedExpenseForAttachments.payment_date
+        );
+      }
       formData.append("description", selectedExpenseForAttachments.description);
       formData.append("amount", selectedExpenseForAttachments.amount);
       formData.append(
@@ -524,7 +562,13 @@ const ExpenseList = () => {
       // Create FormData for file upload
       const formData = new FormData();
       formData.append("category_id", selectedExpense.category_id);
+      if (selectedExpense.vendor_id) {
+        formData.append("vendor_id", selectedExpense.vendor_id.toString());
+      }
       formData.append("expense_date", selectedExpense.expense_date);
+      if (selectedExpense.payment_date) {
+        formData.append("payment_date", selectedExpense.payment_date);
+      }
       formData.append("description", selectedExpense.description);
       formData.append("amount", selectedExpense.amount);
       formData.append("tax_amount", selectedExpense.tax_amount || "0");
@@ -560,7 +604,9 @@ const ExpenseList = () => {
   const [creatingExpense, setCreatingExpense] = useState<boolean>(false);
   const [newExpense, setNewExpense] = useState<ExpenseCreateUpdatePayload>({
     category_id: "",
+    vendor_id: "",
     expense_date: moment().format("YYYY-MM-DD"),
+    payment_date: "",
     description: "",
     amount: "",
     tax_amount: "",
@@ -589,7 +635,13 @@ const ExpenseList = () => {
       // Create FormData for file upload
       const formData = new FormData();
       formData.append("category_id", newExpense.category_id);
+      if (newExpense.vendor_id) {
+        formData.append("vendor_id", newExpense.vendor_id);
+      }
       formData.append("expense_date", newExpense.expense_date);
+      if (newExpense.payment_date) {
+        formData.append("payment_date", newExpense.payment_date);
+      }
       formData.append("description", newExpense.description);
       formData.append("amount", newExpense.amount);
       formData.append("tax_amount", newExpense.tax_amount || "0");
@@ -607,7 +659,9 @@ const ExpenseList = () => {
       if (response) {
         setNewExpense({
           category_id: "",
+          vendor_id: "",
           expense_date: moment().format("YYYY-MM-DD"),
+          payment_date: "",
           description: "",
           amount: "",
           tax_amount: "",
@@ -637,7 +691,9 @@ const ExpenseList = () => {
     setShowCreateExpenseModal(false);
     setNewExpense({
       category_id: "",
+      vendor_id: "",
       expense_date: moment().format("YYYY-MM-DD"),
+      payment_date: "",
       description: "",
       amount: "",
       tax_amount: "",
@@ -936,6 +992,26 @@ const ExpenseList = () => {
               </div>
               <div className="col-md-6">
                 <div className="form-group mb-3">
+                  <label htmlFor="newExpenseSupplier">Supplier</label>
+                  <select
+                    className="form-control"
+                    id="newExpenseSupplier"
+                    value={newExpense.vendor_id || ""}
+                    onChange={(e) =>
+                      handleNewExpenseChange("vendor_id", e.target.value)
+                    }
+                  >
+                    <option value="">Select Supplier</option>
+                    {suppliers.map((supplier: InventorySupplierData) => (
+                      <option key={supplier.id} value={supplier.id}>
+                        {supplier.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div className="col-md-6">
+                <div className="form-group mb-3">
                   <label htmlFor="newExpenseDate">Expense Date</label>
                   <input
                     type="date"
@@ -946,6 +1022,24 @@ const ExpenseList = () => {
                       handleNewExpenseChange("expense_date", e.target.value)
                     }
                   />
+                </div>
+              </div>
+
+              <div className="col-md-6">
+                <div className="form-group mb-3">
+                  <label htmlFor="newPaymentDate">Payment Date</label>
+                  <input
+                    type="date"
+                    className="form-control"
+                    id="newPaymentDate"
+                    value={newExpense.payment_date || ""}
+                    onChange={(e) =>
+                      handleNewExpenseChange("payment_date", e.target.value)
+                    }
+                  />
+                  <small className="form-text text-muted">
+                    Optional - when the expense was paid
+                  </small>
                 </div>
               </div>
             </div>
@@ -1141,6 +1235,27 @@ const ExpenseList = () => {
                   </select>
                 </div>
               </div>
+
+              <div className="col-md-6">
+                <div className="form-group mb-3">
+                  <label htmlFor="editExpenseSupplier">Supplier</label>
+                  <select
+                    className="form-control"
+                    id="editExpenseSupplier"
+                    value={selectedExpense?.vendor_id || ""}
+                    onChange={(e) =>
+                      handleEditExpenseChange("vendor_id", e.target.value)
+                    }
+                  >
+                    <option value="">Select Supplier</option>
+                    {suppliers.map((supplier: InventorySupplierData) => (
+                      <option key={supplier.id} value={supplier.id}>
+                        {supplier.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
               <div className="col-md-6">
                 <div className="form-group mb-3">
                   <label htmlFor="editExpenseDate">Expense Date</label>
@@ -1159,6 +1274,30 @@ const ExpenseList = () => {
                       handleEditExpenseChange("expense_date", e.target.value)
                     }
                   />
+                </div>
+              </div>
+
+              <div className="col-md-6">
+                <div className="form-group mb-3">
+                  <label htmlFor="editPaymentDate">Payment Date</label>
+                  <input
+                    type="date"
+                    className="form-control"
+                    id="editPaymentDate"
+                    value={
+                      selectedExpense?.payment_date
+                        ? moment(selectedExpense.payment_date).format(
+                            "YYYY-MM-DD"
+                          )
+                        : ""
+                    }
+                    onChange={(e) =>
+                      handleEditExpenseChange("payment_date", e.target.value)
+                    }
+                  />
+                  <small className="form-text text-muted">
+                    Optional - when the expense was paid
+                  </small>
                 </div>
               </div>
             </div>
@@ -1219,7 +1358,12 @@ const ExpenseList = () => {
               </div>
               <div className="col-md-6">
                 <div className="form-group mb-3">
-                  <label htmlFor="editExpenseTaxAmount">Tax {selectedExpense?.tax_type === "percentage" ? "Rate" : "Amount"}</label>
+                  <label htmlFor="editExpenseTaxAmount">
+                    Tax{" "}
+                    {selectedExpense?.tax_type === "percentage"
+                      ? "Rate"
+                      : "Amount"}
+                  </label>
                   <input
                     type="number"
                     step="0.01"

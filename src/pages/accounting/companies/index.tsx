@@ -2076,7 +2076,6 @@ const CompanyList = () => {
               <div className="mt-2">
                 <strong>Valid Values:</strong>
                 <ul className="mb-2 small">
-                  <li><strong>Payment Mode:</strong> one_time, recurring, subscription</li>
                   <li><strong>Discount Type:</strong> flat_percentage, flat_amount</li>
                   <li><strong>VAT Exemption:</strong> true, false</li>
                 </ul>
