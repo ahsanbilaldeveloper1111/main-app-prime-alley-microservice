@@ -682,8 +682,17 @@ const InvoiceList = () => {
     const directRate = exchangeRates.find(r => r.from === fromCurrency && r.to === toCurrency);
     if (directRate) return directRate.rate;
     
-    // If we have USD as base, calculate via USD
-    if (fromCurrency !== 'USD' && toCurrency !== 'USD') {
+    // Try to find rates via the base currency
+    const baseToTarget = exchangeRates.find(r => r.from === baseCurrency && r.to === toCurrency);
+    const fromToBase = exchangeRates.find(r => r.from === fromCurrency && r.to === baseCurrency);
+    
+    if (baseToTarget && fromToBase) {
+      // Convert: fromCurrency -> baseCurrency -> toCurrency
+      return fromToBase.rate * baseToTarget.rate;
+    }
+    
+    // If we have USD as base, calculate via USD as fallback
+    if (baseCurrency !== 'USD' && fromCurrency !== 'USD' && toCurrency !== 'USD') {
       const fromUSD = exchangeRates.find(r => r.from === 'USD' && r.to === toCurrency);
       const toUSD = exchangeRates.find(r => r.from === fromCurrency && r.to === 'USD');
       
@@ -697,9 +706,9 @@ const InvoiceList = () => {
     if (isLoadingExchangeRates) return 1;
     
     // If no rate found, return 1 (no conversion)
-    console.warn(`Exchange rate not found for ${fromCurrency} to ${toCurrency}`);
+    console.warn(`Exchange rate not found for ${fromCurrency} to ${toCurrency}, baseCurrency: ${baseCurrency}`);
     return 1;
-  }, [exchangeRates, isLoadingExchangeRates]);
+  }, [exchangeRates, isLoadingExchangeRates, baseCurrency]);
 
   // Get effective price and currency for a product (company pricing if available, otherwise base price)
   const getEffectiveProductPrice = useCallback((productId: string, companyId?: string): { price: string; currency: string; includesVat: boolean } => {
@@ -755,10 +764,9 @@ const InvoiceList = () => {
   const loadExchangeRates = useCallback(async (invoiceCurrency: string) => {
     console.log('Loading exchange rates for:', invoiceCurrency, 'Loaded currencies:', Array.from(loadedCurrencies));
     
-    // If we already have rates loaded, just update base currency
-    if (exchangeRates.length > 0 && !isInitialLoad) {
-      console.log('Rates already loaded, just updating base currency to', invoiceCurrency);
-      setBaseCurrency(invoiceCurrency);
+    // If we already have rates loaded for this currency, don't reload
+    if (exchangeRates.length > 0 && baseCurrency === invoiceCurrency && !isInitialLoad) {
+      console.log('Rates already loaded for currency:', invoiceCurrency);
       return;
     }
 
@@ -769,9 +777,9 @@ const InvoiceList = () => {
       const rates: ExchangeRate[] = [];
       const currencies = ['USD', 'EUR', 'GBP', 'AED', 'PKR'];
       
-      // Use free exchange rate API directly from frontend
-      console.log('Fetching exchange rates from free API');
-      const response = await fetch('https://api.exchangerate-api.com/v4/latest/USD');
+      // Use free exchange rate API with the selected currency as base
+      console.log('Fetching exchange rates from free API with base:', invoiceCurrency);
+      const response = await fetch(`https://api.exchangerate-api.com/v4/latest/${invoiceCurrency}`);
       
       if (!response.ok) {
         throw new Error(`Exchange rate API error: ${response.status}`);
@@ -783,27 +791,93 @@ const InvoiceList = () => {
       // Process all currency pairs from the API response
       if (data.rates) {
         for (const currency of currencies) {
-          if (currency !== 'USD' && data.rates[currency]) {
-            // USD to other currencies
+          if (currency !== invoiceCurrency && data.rates[currency]) {
+            // Selected currency to other currencies
             rates.push({
-              from: 'USD',
+              from: invoiceCurrency,
               to: currency,
               rate: data.rates[currency],
               timestamp: Date.now()
             });
             
-            // Other currencies to USD (inverse)
+            // Other currencies to selected currency (inverse)
             rates.push({
               from: currency,
-              to: 'USD',
+              to: invoiceCurrency,
               rate: 1 / data.rates[currency],
               timestamp: Date.now()
             });
           }
         }
+        
+        // Add self-conversion rate
+        rates.push({
+          from: invoiceCurrency,
+          to: invoiceCurrency,
+          rate: 1,
+          timestamp: Date.now()
+        });
+        
+        // If the selected currency is not USD, also load USD-based rates for better coverage
+        if (invoiceCurrency !== 'USD') {
+          try {
+            console.log('Loading USD-based rates for better coverage...');
+            const usdResponse = await fetch('https://api.exchangerate-api.com/v4/latest/USD');
+            if (usdResponse.ok) {
+              const usdData = await usdResponse.json();
+              if (usdData.rates) {
+                // Add USD to selected currency rate
+                if (usdData.rates[invoiceCurrency]) {
+                  rates.push({
+                    from: 'USD',
+                    to: invoiceCurrency,
+                    rate: usdData.rates[invoiceCurrency],
+                    timestamp: Date.now()
+                  });
+                  
+                  // Add selected currency to USD rate (inverse)
+                  rates.push({
+                    from: invoiceCurrency,
+                    to: 'USD',
+                    rate: 1 / usdData.rates[invoiceCurrency],
+                    timestamp: Date.now()
+                  });
+                }
+                
+                // Add other currencies to USD rates for cross-conversion
+                for (const currency of currencies) {
+                  if (currency !== 'USD' && currency !== invoiceCurrency && usdData.rates[currency]) {
+                    // Only add if we don't already have this rate
+                    const existingRate = rates.find(r => r.from === currency && r.to === 'USD');
+                    if (!existingRate) {
+                      rates.push({
+                        from: currency,
+                        to: 'USD',
+                        rate: 1 / usdData.rates[currency],
+                        timestamp: Date.now()
+                      });
+                    }
+                    
+                    const existingRateReverse = rates.find(r => r.from === 'USD' && r.to === currency);
+                    if (!existingRateReverse) {
+                      rates.push({
+                        from: 'USD',
+                        to: currency,
+                        rate: usdData.rates[currency],
+                        timestamp: Date.now()
+                      });
+                    }
+                  }
+                }
+              }
+            }
+          } catch (usdError) {
+            console.warn('Failed to load USD-based rates:', usdError);
+          }
+        }
       }
       
-      console.log('All rates loaded:', rates);
+      console.log('All rates loaded for base currency:', invoiceCurrency, rates);
       
       // Update state with all rates
       setExchangeRates(rates);
@@ -816,7 +890,7 @@ const InvoiceList = () => {
       // Fallback to another free API
       try {
         console.log('Falling back to alternative exchange rate API');
-        const fallbackResponse = await fetch('https://api.fxratesapi.com/latest?base=USD');
+        const fallbackResponse = await fetch(`https://api.fxratesapi.com/latest?base=${invoiceCurrency}`);
         const fallbackData = await fallbackResponse.json();
         
         const fallbackRates: ExchangeRate[] = [];
@@ -824,27 +898,35 @@ const InvoiceList = () => {
         
         if (fallbackData.rates) {
           for (const currency of currencies) {
-            if (currency !== 'USD' && fallbackData.rates[currency]) {
-              // USD to other currencies
+            if (currency !== invoiceCurrency && fallbackData.rates[currency]) {
+              // Selected currency to other currencies
               fallbackRates.push({
-                from: 'USD',
+                from: invoiceCurrency,
                 to: currency,
                 rate: fallbackData.rates[currency],
                 timestamp: Date.now()
               });
               
-              // Other currencies to USD (inverse)
+              // Other currencies to selected currency (inverse)
               fallbackRates.push({
                 from: currency,
-                to: 'USD',
+                to: invoiceCurrency,
                 rate: 1 / fallbackData.rates[currency],
                 timestamp: Date.now()
               });
             }
           }
+          
+          // Add self-conversion rate
+          fallbackRates.push({
+            from: invoiceCurrency,
+            to: invoiceCurrency,
+            rate: 1,
+            timestamp: Date.now()
+          });
         }
         
-        console.log('Fallback rates loaded:', fallbackRates);
+        console.log('Fallback rates loaded for base currency:', invoiceCurrency, fallbackRates);
         
         // Update state with fallback rates
         setExchangeRates(fallbackRates);
@@ -872,7 +954,7 @@ const InvoiceList = () => {
     } finally {
       setIsLoadingExchangeRates(false);
     }
-  }, [exchangeRates.length, isInitialLoad]);
+  }, [exchangeRates.length, isInitialLoad, baseCurrency]);
 
   // Debounced version to prevent too many API calls
   const debouncedLoadExchangeRates = useCallback((invoiceCurrency: string) => {
@@ -911,8 +993,8 @@ const InvoiceList = () => {
     fetchCompanies();
     loadStripePublishableKey();
     
-    // Load exchange rates on initial mount
-    loadExchangeRates('USD'); // Load exchange rates with USD as base
+    // Load exchange rates on initial mount with USD as default base
+    loadExchangeRates('USD'); // Load exchange rates with USD as base initially
   }, [loadStripePublishableKey, loadExchangeRates, loadCompanyProducts]);
 
   // Cleanup timeout on unmount
@@ -2177,6 +2259,7 @@ const InvoiceList = () => {
                           <tr>
                             <th colSpan={2}>Product</th>
                             <th>Quantity</th>
+                            <th>Base Price</th>
                             <th>Unit Price</th>
                             <th>VAT %</th>
                             <th>VAT Amount</th>
@@ -2238,14 +2321,37 @@ const InvoiceList = () => {
                                   />
                                 </td>
                                 <td>
+                                  <div className="text-center">
+                                    <div className="fw-bold text-muted">
+                                      {productInfo.currency} {productInfo.price}
+                                    </div>
+                                    <small className="text-muted">
+                                      {isLoadingExchangeRates && productCurrency !== newInvoice.currency_code && (
+                                        <span>
+                                          <Spinner animation="border" size="sm" className="me-1" />
+                                          Converting...
+                                        </span>
+                                      )}
+                                    </small>
+                                  </div>
+                                </td>
+                                <td>
                                   <input
                                     type="number"
                                     step="0.01"
                                     className="form-control form-control-sm"
-                                    value={item.unit_price}
-                                    onChange={(e) => updateNewInvoiceItem(index, "unit_price", e.target.value)}
+                                    value={convertedUnitPrice.toFixed(2)}
+                                    onChange={(e) => {
+                                      // Convert back to original currency for storage
+                                      const convertedValue = parseFloat(e.target.value) || 0;
+                                      const originalValue = convertedValue / exchangeRate;
+                                      updateNewInvoiceItem(index, "unit_price", originalValue.toFixed(2));
+                                    }}
                                     placeholder="0.00"
                                   />
+                                  <small className="text-muted">
+                                    {newInvoice.currency_code}
+                                  </small>
                                 </td>
                                 <td>
                                   <input
@@ -2379,45 +2485,6 @@ const InvoiceList = () => {
               </div>
             </div>
 
-            {/* Exchange Rates Display */}
-            {exchangeRates.length > 0 && (
-              <div className="row">
-                <div className="col-md-12">
-                  <div className="form-group mb-3">
-                    <label>Exchange Rates (Base: {newInvoice.currency_code})</label>
-                    <div className="card">
-                      <div className="card-body">
-                        {isLoadingExchangeRates ? (
-                          <div className="text-center py-2">
-                            <Spinner animation="border" size="sm" className="me-2" />
-                            <span>Loading exchange rates...</span>
-                          </div>
-                        ) : (
-                          <div className="row">
-                            {exchangeRates.map((rate) => (
-                              <div key={`${rate.from}-${rate.to}`} className="col-md-2 mb-2">
-                                <div className="text-center p-2 border rounded">
-                                  <div className="fw-bold text-primary">{rate.to}</div>
-                                  <div className="text-muted small">
-                                    {rate.rate.toFixed(4)}
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                        <div className="mt-2">
-                          <small className="text-muted">
-                            <i className="fas fa-info-circle me-1"></i>
-                            Exchange rates are updated in real-time. Last updated: {new Date().toLocaleTimeString()}
-                          </small>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
 
             {/* Company VAT Information - Read Only */}
             {newInvoice.company_id && (
@@ -2666,6 +2733,7 @@ const InvoiceList = () => {
                           <tr>
                             <th colSpan={2}>Product</th>
                             <th>Quantity</th>
+                            <th>Base Price</th>
                             <th>Unit Price</th>
                             <th>VAT %</th>
                             <th>VAT Amount</th>
@@ -2728,14 +2796,37 @@ const InvoiceList = () => {
                                   />
                                 </td>
                                 <td>
+                                  <div className="text-center">
+                                    <div className="fw-bold text-muted">
+                                      {productInfo.currency} {productInfo.price}
+                                    </div>
+                                    <small className="text-muted">
+                                      {isLoadingExchangeRates && productCurrency !== selectedInvoice?.currency_code && (
+                                        <span>
+                                          <Spinner animation="border" size="sm" className="me-1" />
+                                          Converting...
+                                        </span>
+                                      )}
+                                    </small>
+                                  </div>
+                                </td>
+                                <td>
                                   <input
                                     type="number"
                                     step="0.01"
                                     className="form-control form-control-sm"
-                                    value={item.unit_price}
-                                    onChange={(e) => updateEditInvoiceItem(index, "unit_price", e.target.value)}
+                                    value={convertedUnitPrice.toFixed(2)}
+                                    onChange={(e) => {
+                                      // Convert back to original currency for storage
+                                      const convertedValue = parseFloat(e.target.value) || 0;
+                                      const originalValue = convertedValue / exchangeRate;
+                                      updateEditInvoiceItem(index, "unit_price", originalValue.toFixed(2));
+                                    }}
                                     placeholder="0.00"
                                   />
+                                  <small className="text-muted">
+                                    {selectedInvoice?.currency_code}
+                                  </small>
                                 </td>
                                 <td>
                                   <input
@@ -2869,45 +2960,6 @@ const InvoiceList = () => {
               </div>
             </div>
 
-            {/* Exchange Rates Display */}
-            {exchangeRates.length > 0 && (
-              <div className="row">
-                <div className="col-md-12">
-                  <div className="form-group mb-3">
-                    <label>Exchange Rates (Base: {newInvoice.currency_code})</label>
-                    <div className="card">
-                      <div className="card-body">
-                        {isLoadingExchangeRates ? (
-                          <div className="text-center py-2">
-                            <Spinner animation="border" size="sm" className="me-2" />
-                            <span>Loading exchange rates...</span>
-                          </div>
-                        ) : (
-                          <div className="row">
-                            {exchangeRates.map((rate) => (
-                              <div key={`${rate.from}-${rate.to}`} className="col-md-2 mb-2">
-                                <div className="text-center p-2 border rounded">
-                                  <div className="fw-bold text-primary">{rate.to}</div>
-                                  <div className="text-muted small">
-                                    {rate.rate.toFixed(4)}
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                        <div className="mt-2">
-                          <small className="text-muted">
-                            <i className="fas fa-info-circle me-1"></i>
-                            Exchange rates are updated in real-time. Last updated: {new Date().toLocaleTimeString()}
-                          </small>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
 
             {/* Company VAT Information - Read Only */}
             {selectedInvoice.company_id && (
