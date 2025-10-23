@@ -62,9 +62,6 @@ const LocationList = () => {
         cell: (props: InventoryLocationData) => (
           <div>
             <div>{props.name}</div>
-            {props.contact_person && (
-              <div className="text-muted small">Contact: {props.contact_person}</div>
-            )}
           </div>
         ),
       },
@@ -85,6 +82,28 @@ const LocationList = () => {
               </div>
             ) : (
               "No address"
+            )}
+          </div>
+        ),
+      },
+      {
+        key: "contact",
+        name: "Contact",
+        selector: (row: InventoryLocationData) => row.contact_person || row.email || row.phone,
+        sortable: true,
+        cell: (props: InventoryLocationData) => (
+          <div>
+            {props.contact_person && (
+              <div className="fw-medium">{props.contact_person}</div>
+            )}
+            {props.email && (
+              <div className="text-muted small">{props.email}</div>
+            )}
+            {props.phone && (
+              <div className="text-muted small">{props.phone}</div>
+            )}
+            {!props.contact_person && !props.email && !props.phone && (
+              <span className="text-muted">No contact info</span>
             )}
           </div>
         ),
@@ -186,6 +205,9 @@ const LocationList = () => {
         state: selectedLocation.state || "",
         zip_code: selectedLocation.zip_code || "",
         country: selectedLocation.country || "",
+        contact_person: selectedLocation.contact_person || "",
+        email: selectedLocation.email || "",
+        phone: selectedLocation.phone || "",
       };
 
       const response = await updateInventoryLocation(selectedLocation.id, locationData);
@@ -212,6 +234,9 @@ const LocationList = () => {
     state: "",
     zip_code: "",
     country: "",
+    contact_person: "",
+    email: "",
+    phone: "",
   });
 
   const handleSubmitCreateLocation = useCallback(async () => {
@@ -232,6 +257,9 @@ const LocationList = () => {
           state: "",
           zip_code: "",
           country: "",
+          contact_person: "",
+          email: "",
+          phone: "",
         });
         setShowCreateLocationModal(false);
         setRefreshKey((prev) => prev + 1);
@@ -259,6 +287,9 @@ const LocationList = () => {
       state: "",
       zip_code: "",
       country: "",
+      contact_person: "",
+      email: "",
+      phone: "",
     });
   }, []);
 
@@ -450,6 +481,57 @@ const LocationList = () => {
                   </div>
                 </div>
               </div>
+
+              <div className="row">
+                <div className="col-md-12">
+                  <div className="form-group mb-3">
+                    <label htmlFor="newLocationContactPerson">Contact Person</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      id="newLocationContactPerson"
+                      value={newLocation.contact_person || ""}
+                      onChange={(e) =>
+                        handleNewLocationChange("contact_person", e.target.value)
+                      }
+                      placeholder="Enter contact person name"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="row">
+                <div className="col-md-6">
+                  <div className="form-group mb-3">
+                    <label htmlFor="newLocationEmail">Email</label>
+                    <input
+                      type="email"
+                      className="form-control"
+                      id="newLocationEmail"
+                      value={newLocation.email || ""}
+                      onChange={(e) =>
+                        handleNewLocationChange("email", e.target.value)
+                      }
+                      placeholder="Enter email address"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group mb-3">
+                    <label htmlFor="newLocationPhone">Phone</label>
+                    <input
+                      type="tel"
+                      className="form-control"
+                      id="newLocationPhone"
+                      value={newLocation.phone || ""}
+                      onChange={(e) =>
+                        handleNewLocationChange("phone", e.target.value)
+                      }
+                      placeholder="Enter phone number"
+                    />
+                  </div>
+                </div>
+              </div>
             </>
           }
           submitButtonText={creatingLocation ? "Creating..." : "Create Location"}
@@ -567,6 +649,57 @@ const LocationList = () => {
                         handleEditLocationChange("country", e.target.value)
                       }
                       placeholder="Enter country"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="row">
+                <div className="col-md-12">
+                  <div className="form-group mb-3">
+                    <label htmlFor="editLocationContactPerson">Contact Person</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      id="editLocationContactPerson"
+                      value={selectedLocation.contact_person || ""}
+                      onChange={(e) =>
+                        handleEditLocationChange("contact_person", e.target.value)
+                      }
+                      placeholder="Enter contact person name"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="row">
+                <div className="col-md-6">
+                  <div className="form-group mb-3">
+                    <label htmlFor="editLocationEmail">Email</label>
+                    <input
+                      type="email"
+                      className="form-control"
+                      id="editLocationEmail"
+                      value={selectedLocation.email || ""}
+                      onChange={(e) =>
+                        handleEditLocationChange("email", e.target.value)
+                      }
+                      placeholder="Enter email address"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group mb-3">
+                    <label htmlFor="editLocationPhone">Phone</label>
+                    <input
+                      type="tel"
+                      className="form-control"
+                      id="editLocationPhone"
+                      value={selectedLocation.phone || ""}
+                      onChange={(e) =>
+                        handleEditLocationChange("phone", e.target.value)
+                      }
+                      placeholder="Enter phone number"
                     />
                   </div>
                 </div>

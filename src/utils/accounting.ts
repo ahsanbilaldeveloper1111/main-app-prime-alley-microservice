@@ -361,6 +361,9 @@ export interface InventoryLocationCreateUpdatePayload {
   state?: string;
   zip_code?: string;
   country?: string;
+  contact_person?: string;
+  email?: string;
+  phone?: string;
 }
 
 export interface InventoryItemData {
