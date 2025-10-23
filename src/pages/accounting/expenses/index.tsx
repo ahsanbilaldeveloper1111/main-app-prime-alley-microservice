@@ -183,6 +183,17 @@ const ExpenseList = () => {
         ),
       },
       {
+        key: "accounting_basis",
+        name: "Accounting Basis",
+        selector: (row: ExpenseData) => row.accounting_basis,
+        sortable: true,
+        cell: (props: ExpenseData) => (
+          <span className={`badge ${props.accounting_basis === "cash" ? "bg-success" : "bg-info"}`}>
+            {props.accounting_basis || "cash"}
+          </span>
+        ),
+      },
+      {
         key: "expense_date",
         name: "Expense Date",
         selector: (row: ExpenseData) => row.expense_date,
@@ -473,6 +484,7 @@ const ExpenseList = () => {
         selectedExpenseForAttachments.total_amount || "0"
       );
       formData.append("currency", selectedExpenseForAttachments.currency);
+      formData.append("accounting_basis", selectedExpenseForAttachments.accounting_basis || "cash");
 
       // Add new files
       newAttachmentFiles.forEach((file, index) => {
@@ -582,6 +594,7 @@ const ExpenseList = () => {
       formData.append("tax_type", selectedExpense.tax_type || "amount");
       formData.append("total_amount", selectedExpense.total_amount || "0");
       formData.append("currency", selectedExpense.currency);
+      formData.append("accounting_basis", selectedExpense.accounting_basis || "cash");
 
       // Add receipt files
       editExpenseFiles.forEach((file, index) => {
@@ -620,6 +633,7 @@ const ExpenseList = () => {
     tax_type: "amount",
     total_amount: "",
     currency: "USD",
+    accounting_basis: "cash",
   });
   const [newExpenseFiles, setNewExpenseFiles] = useState<File[]>([]);
 
@@ -655,6 +669,7 @@ const ExpenseList = () => {
       formData.append("tax_type", newExpense.tax_type);
       formData.append("total_amount", newExpense.total_amount || "0");
       formData.append("currency", newExpense.currency);
+      formData.append("accounting_basis", newExpense.accounting_basis);
 
       // Add receipt files
       newExpenseFiles.forEach((file, index) => {
@@ -675,6 +690,7 @@ const ExpenseList = () => {
           tax_type: "amount",
           total_amount: "",
           currency: "USD",
+          accounting_basis: "cash",
         });
         setNewExpenseFiles([]);
         setShowCreateExpenseModal(false);
@@ -707,6 +723,7 @@ const ExpenseList = () => {
       tax_type: "amount",
       total_amount: "",
       currency: "USD",
+      accounting_basis: "cash",
     });
     setNewExpenseFiles([]);
   }, []);
@@ -1100,6 +1117,22 @@ const ExpenseList = () => {
               </div>
               <div className="col-md-6">
                 <div className="form-group mb-3">
+                  <label htmlFor="newExpenseAccountingBasis">Accounting Basis</label>
+                  <select
+                    className="form-control"
+                    id="newExpenseAccountingBasis"
+                    value={newExpense.accounting_basis}
+                    onChange={(e) =>
+                      handleNewExpenseChange("accounting_basis", e.target.value)
+                    }
+                  >
+                    <option value="cash">Cash</option>
+                    <option value="accrual">Accrual</option>
+                  </select>
+                </div>
+              </div>
+              <div className="col-md-6">
+                <div className="form-group mb-3">
                   <label htmlFor="newExpenseAmount">Amount</label>
                   <input
                     type="number"
@@ -1353,6 +1386,22 @@ const ExpenseList = () => {
                     <option value="AED">AED</option>
                     <option value="EUR">EUR</option>
                     <option value="GBP">GBP</option>
+                  </select>
+                </div>
+              </div>
+              <div className="col-md-6">
+                <div className="form-group mb-3">
+                  <label htmlFor="editExpenseAccountingBasis">Accounting Basis</label>
+                  <select
+                    className="form-control"
+                    id="editExpenseAccountingBasis"
+                    value={selectedExpense?.accounting_basis || "cash"}
+                    onChange={(e) =>
+                      handleEditExpenseChange("accounting_basis", e.target.value)
+                    }
+                  >
+                    <option value="cash">Cash</option>
+                    <option value="accrual">Accrual</option>
                   </select>
                 </div>
               </div>

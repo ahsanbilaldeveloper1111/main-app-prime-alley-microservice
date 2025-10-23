@@ -210,6 +210,7 @@ export interface ExpenseData {
   notes: string | null;
   is_billable: string;
   service_id: number | null;
+  accounting_basis: "cash" | "accrual";
   created_at: string;
   updated_at: string;
   files: {
@@ -249,6 +250,7 @@ export interface ExpenseCreateUpdatePayload {
   tax_type: "amount" | "percentage";
   total_amount: string;
   currency: string;
+  accounting_basis: "cash" | "accrual";
 }
 
 export interface ExpenseCategoryCreateUpdatePayload {
