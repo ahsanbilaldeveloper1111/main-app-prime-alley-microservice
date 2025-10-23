@@ -22,6 +22,7 @@ import {
   downloadFile,
   downloadReceipt,
   deleteExpenseFile,
+  downloadExpensePdf,
   getInventorySuppliers,
   ExpenseData,
   ExpenseCreateUpdatePayload,
@@ -215,6 +216,12 @@ const ExpenseList = () => {
                 label: "View Attachments",
                 icon: <FiEye />,
                 onClick: () => handleViewAttachments(props),
+                className: "gap-2",
+              },
+              {
+                label: "Download PDF",
+                icon: <FiDownload />,
+                onClick: () => handleDownloadPDF(props),
                 className: "gap-2",
               },
               {
@@ -791,6 +798,16 @@ const ExpenseList = () => {
     },
     [selectedExpense]
   );
+
+  // Download PDF handler
+  const handleDownloadPDF = useCallback(async (expense: ExpenseData) => {
+    try {
+      await downloadExpensePdf(expense.id);
+    } catch (error) {
+      console.error('PDF download error:', error);
+      // Error is already handled in the downloadExpensePdf function
+    }
+  }, []);
 
   // Category Management Handlers
   const openCategoryModal = useCallback(async () => {

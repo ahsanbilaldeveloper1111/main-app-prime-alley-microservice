@@ -1168,6 +1168,57 @@ export const downloadInvoicePdf = async (id: number): Promise<void> => {
   }
 };
 
+
+export const downloadExpensePdf = async (id: number): Promise<void> => {
+  try {
+    const response = await axiosInstance.get(`/accounting/expenses/${id}/download-pdf`,  {
+      responseType: "blob",
+      headers: {
+        Accept: "blob",
+      },
+    });
+    
+    // Check if response is valid
+    if (!response.data || response.data.size === 0) {
+      throw new Error('Empty PDF response received');
+    }
+    
+    // Extract filename from content-disposition header if available
+    let filename = `expense-${id}.pdf`;
+    const contentDisposition = response.headers['content-disposition'];
+    if (contentDisposition) {
+      const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+      if (filenameMatch && filenameMatch[1]) {
+        filename = filenameMatch[1].replace(/['"]/g, '');
+      }
+    }
+    
+    // response.data is already a blob when responseType is "blob"
+    const blob = response.data;
+    
+    // Verify blob type
+    if (blob.type !== 'application/pdf') {
+      console.warn('Unexpected blob type:', blob.type, 'Expected: application/pdf');
+    }
+    
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.style.display = 'none';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+    
+    toast.success('PDF downloaded successfully');
+  } catch (error: any) {
+    console.error('PDF download error:', error);
+    toast.error(error?.message || "Failed to download expense PDF");
+    throw error;
+  }
+};
+
 export const downloadTemplate = async (): Promise<void> => {
   try {
     const response = await axiosInstance.get(`/accounting/company/template/download`,  {
