@@ -14,7 +14,7 @@ import { useSession } from 'next-auth/react';
 import CallLogsFilters from '@components/filters/CallLogsFilters';
 import AnimatedNumber from '@components/AnimatedNumber';
 import EmptyState from '@components/EmptyState';
-import { formatDateTimeToLocal, GlobalDateTimeFormat } from '@utils/Helper';
+import { formatDateTimeToLocal, GlobalDateTimeFormat, ModuleSlug } from '@utils/Helper';
 import '@assets/scss/common.scss';
 
 import imgStatus1 from '@assets/images/widget/img-status-1.svg'
@@ -28,7 +28,6 @@ import Link from 'next/link';
 import NProgress from "nprogress";
 import "nprogress/nprogress.css";
 import PageLoader from '@components/PageLoader';
-
 
 import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
 import { motion } from 'framer-motion';
@@ -213,7 +212,7 @@ const CallDashboard = () => {
     }, []);
     const fetchGeneralStats = async () => {
       setShowPageLoader(true);
-      const response = await ListCallLogs({ page:  page, perPage: perPage, search: "", filters: currentFilters,reportType: 'statsDashboard' }, 
+      const response = await ListCallLogs({ page:  page, perPage: perPage, search: "", filters: currentFilters,reportType: 'statsDashboard', moduleSlug: ModuleSlug.CALL_LOGS }, 
         'call-logs/generalStats').finally(() => {
           setShowPageLoader(false);
         });
