@@ -181,7 +181,7 @@
             connectionStartTime = Date.now();
             
             eventSource.onopen = () => {
-                updateStatus('Connected to CTI server', 'connected');
+                updateStatus('Connected to server', 'connected');
                 document.getElementById('connectBtn').disabled = true;
                 document.getElementById('disconnectBtn').disabled = false;
                 addEvent('connection', { status: 'connected', message: 'SSE connection established' });

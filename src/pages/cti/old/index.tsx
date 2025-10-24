@@ -998,7 +998,7 @@ const CtiDashboard = () => {
   if (!isInitialized) {
     return (
       <div className="alert alert-info m-3">
-        Connecting to CTI server...
+        Connecting to server...
       </div>
     )
   }

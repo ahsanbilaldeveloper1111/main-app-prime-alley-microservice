@@ -20,6 +20,7 @@ export interface CompanyCreateUpdate {
     id: number;
     
     fac_code?: number|null;
+    cluster_name?: string;
 }
 export interface CallingAccess {
     id?: number;

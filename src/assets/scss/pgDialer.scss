@@ -131,11 +131,11 @@
 
   /* Transfer modal styles */
   .modal-overlay {
-    animation: fadeIn 0.2s ease-in-out;
+    //animation: fadeIn 0.2s ease-in-out;
   }
   
   .modal-content {
-    animation: slideIn 0.2s ease-in-out;
+    //animation: slideIn 0.2s ease-in-out;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
   }
   
@@ -209,3 +209,9 @@
       }
     }
   }
+  .popExtension {
+    max-height: 300px;
+    overflow: hidden;
+    overflow-y: auto;
+    padding-bottom:2rem;
+}

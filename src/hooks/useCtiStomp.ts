@@ -63,10 +63,10 @@ export default function useCtiStomp(wsPath = '/ws') {
   // Load persisted call states from localStorage
   const loadPersistedCallStates = useCallback(() => {
     try {
-      console.log('Loading persisted call states from localStorage...')
+      //console.log('Loading persisted call states from localStorage...')
       const storedTimestamp = localStorage.getItem(CALL_STATES_TIMESTAMP_KEY);
       if (!storedTimestamp) {
-        console.log('No stored timestamp found, no persisted call states to load')
+       // console.log('No stored timestamp found, no persisted call states to load')
         return;
       }
 
@@ -216,12 +216,12 @@ export default function useCtiStomp(wsPath = '/ws') {
 
       // Process parties to ensure callingDeviceType is included
       const processedParties = (evt.parties || base.parties || []).map((party: any) => {
-        console.log(`🔍 Processing party:`, {
-          callingAddress: party.callingAddress,
-          callingDeviceName: party.callingDeviceName,
-          callingDeviceType: party.callingDeviceType,
-          hasDeviceType: !!party.callingDeviceType
-        });
+        // console.log(`🔍 Processing party:`, {
+        //   callingAddress: party.callingAddress,
+        //   callingDeviceName: party.callingDeviceName,
+        //   callingDeviceType: party.callingDeviceType,
+        //   hasDeviceType: !!party.callingDeviceType
+        // });
         
         // First try to get device info from stored caller info
         let storedCallerInfo = null;
@@ -247,13 +247,13 @@ export default function useCtiStomp(wsPath = '/ws') {
         }
         // If callingDeviceType is still missing, try to get it from the dnsMap
         else if (!party.callingDeviceType && party.callingAddress && party.callingDeviceName) {
-          console.log(`🔍 Looking up device type for:`, {
-            callingAddress: party.callingAddress,
-            callingDeviceName: party.callingDeviceName,
-            dnsMapHasAddress: !!dnsMap[party.callingAddress],
-            dnsMapKeys: Object.keys(dnsMap),
-            dnsMapForAddress: dnsMap[party.callingAddress]
-          });
+          // console.log(`🔍 Looking up device type for:`, {
+          //   callingAddress: party.callingAddress,
+          //   callingDeviceName: party.callingDeviceName,
+          //   dnsMapHasAddress: !!dnsMap[party.callingAddress],
+          //   dnsMapKeys: Object.keys(dnsMap),
+          //   dnsMapForAddress: dnsMap[party.callingAddress]
+          // });
           
           const userDevices = dnsMap[party.callingAddress]?.devices;
           if (userDevices) {
@@ -280,25 +280,25 @@ export default function useCtiStomp(wsPath = '/ws') {
                 fullDevice: device
               });
             } else {
-              console.log(`❌ Device not found in dnsMap:`, {
-                callingDeviceName: party.callingDeviceName,
-                availableDevices: Object.keys(userDevices),
-                allDevices: Object.values(userDevices)
-              });
+              // console.log(`❌ Device not found in dnsMap:`, {
+              //   callingDeviceName: party.callingDeviceName,
+              //   availableDevices: Object.keys(userDevices),
+              //   allDevices: Object.values(userDevices)
+              // });
             }
           } else {
-            console.log(`❌ No devices found for address:`, {
-              callingAddress: party.callingAddress,
-              dnsMapHasAddress: !!dnsMap[party.callingAddress],
-              dnsMap: dnsMap
-            });
+            // console.log(`❌ No devices found for address:`, {
+            //   callingAddress: party.callingAddress,
+            //   dnsMapHasAddress: !!dnsMap[party.callingAddress],
+            //   dnsMap: dnsMap
+            // });
           }
         } else {
-          console.log(`ℹ️ Device type already present or missing required data:`, {
-            callingDeviceType: party.callingDeviceType,
-            callingAddress: party.callingAddress,
-            callingDeviceName: party.callingDeviceName
-          });
+          // console.log(`ℹ️ Device type already present or missing required data:`, {
+          //   callingDeviceType: party.callingDeviceType,
+          //   callingAddress: party.callingAddress,
+          //   callingDeviceName: party.callingDeviceName
+          // });
         }
         
         // Fallback: If still no device type, try to infer from device name
@@ -317,13 +317,13 @@ export default function useCtiStomp(wsPath = '/ws') {
           }
           
           party.callingDeviceType = inferredType;
-          console.log(`🔄 Inferred device type:`, {
-            deviceName: party.callingDeviceName,
-            inferredType: inferredType
-          });
+          // console.log(`🔄 Inferred device type:`, {
+          //   deviceName: party.callingDeviceName,
+          //   inferredType: inferredType
+          // });
         }
         
-        console.log(`🔍 Final party data:`, party);
+        //console.log(`Final party data:`, party);
         return party;
       });
 
@@ -439,13 +439,13 @@ export default function useCtiStomp(wsPath = '/ws') {
       });
 
       client.onConnect = () => {
-        console.log('STOMP Connected successfully');
+        console.log('Connected successfully');
         setIsInitialized(true);
         setError(null);
-        console.log('isInitialized set to true');
+       // console.log('isInitialized set to true');
 
         try {
-          console.log('Setting up STOMP subscriptions...');
+          //console.log('Setting up STOMP subscriptions...');
           
           client.subscribe('/user/topic/complete-state', ({ body }) => {
             try {
@@ -475,7 +475,7 @@ export default function useCtiStomp(wsPath = '/ws') {
           });
 
           // Send initial-state request
-          console.log('Sending initial-state request...');
+          //console.log('Sending initial-state request...');
           client.publish({ destination: '/app/request/initial-state' });
 
           client.subscribe('/user/topic/dns-states', ({ body }) => {
@@ -531,7 +531,7 @@ export default function useCtiStomp(wsPath = '/ws') {
     };
 
     const initialize = async () => {
-      console.log('Initializing CTI STOMP connection...');
+      console.log('Initializing connection...');
       const token = await getBearerToken();
       if (token) {
         //console.log('Bearer token received, connecting to STOMP...');

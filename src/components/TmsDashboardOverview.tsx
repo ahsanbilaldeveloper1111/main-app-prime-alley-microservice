@@ -585,7 +585,7 @@ const TmsDashboardOverview = React.memo(() => {
                                     <div className="mb-3">
                                         <label className="form-label">&nbsp;</label>
                                         <button 
-                                            className="btn btn-primary w-100"
+                                            className="app-button btn text-center btn-primary d-block w-100"
                                             onClick={handleSearch}
                                             disabled={isSearching}
                                         >
@@ -619,8 +619,9 @@ const TmsDashboardOverview = React.memo(() => {
                                     <p className="text-muted mb-0">Create, Update, and Delete actions by company</p>
                                 </div>
                                 <Button
-                                    variant="outline-primary"
+                                    variant="primary"
                                     size="sm"
+                                    className="app-button"
                                     onClick={() => handleExpandChart({
                                         title: "Company Monthly Interactions",
                                         description: "Create, Update, and Delete actions by company",
@@ -738,7 +739,8 @@ const TmsDashboardOverview = React.memo(() => {
                                     <p className="text-muted mb-0">Mobile vs Non-Mobile Users</p>
                                 </div>
                                 <Button
-                                    variant="outline-primary"
+                                    variant="primary"
+                                    className="app-button"
                                     size="sm"
                                     onClick={() => handleExpandChart({
                                         title: "Mobile User Statistics",
@@ -893,8 +895,9 @@ const TmsDashboardOverview = React.memo(() => {
                                     <p className="text-muted mb-0">Active vs Inactive users by company</p>
                                 </div>
                                 <Button
-                                    variant="outline-primary"
+                                    variant="primary"
                                     size="sm"
+                                    className="app-button"
                                     onClick={() => handleExpandChart({
                                         title: "User Activity by Company",
                                         description: "Active vs Inactive users by company",
@@ -1019,7 +1022,8 @@ const TmsDashboardOverview = React.memo(() => {
                                     <p className="text-muted mb-0">Companies ranked by total user count</p>
                                 </div>
                                 <Button
-                                    variant="outline-primary"
+                                    variant="primary"
+                                    className="app-button"
                                     size="sm"
                                     onClick={() => handleExpandChart({
                                         title: "Top Companies by User Count",
@@ -1147,7 +1151,8 @@ const TmsDashboardOverview = React.memo(() => {
                                     <p className="text-muted mb-0">Create, Update, and Delete actions by company</p>
                                 </div>
                                 <Button
-                                    variant="outline-primary"
+                                    variant="primary"
+                                    className="app-button"
                                     size="sm"
                                     onClick={() => handleExpandChart({
                                         title: `Recent Activity Summary (Last ${selectedDay} Days)`,

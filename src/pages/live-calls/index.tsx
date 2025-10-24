@@ -1936,12 +1936,22 @@ const LiveCallDashboard = () => {
                                               title={`${deviceName} (${terminalState})`}
                                               onClick={() => {
                                                 if (isDeviceActiveCall) {
-                                                  console.log('Opening popup for:', dn, deviceName)
-                                                  // Reset monitor selection when opening popup
-                                                  setSelectedMonitor((prev) => ({ ...prev, [dn]: '' }))
-                                                  setTempMonitorSelection((prev) => ({ ...prev, [dn]: '' }))
-                                                  setSelectedTone((prev) => ({ ...prev, [dn]: '' }))
-                                                  setShowPopup({ dn: dn, deviceName })
+                                                  // Check if user has any monitoring permissions
+                                                  const hasMonitoringPermissions = session?.user?.permissions?.some(permission => 
+                                                    ['silent-monitoring-cti', 'whisper-monitoring-cti', 'barge-in-cti'].includes(permission)
+                                                  )
+                                                  
+                                                  if (hasMonitoringPermissions) {
+                                                    console.log('Opening popup for:', dn, deviceName)
+                                                    // Reset monitor selection when opening popup
+                                                    setSelectedMonitor((prev) => ({ ...prev, [dn]: '' }))
+                                                    setTempMonitorSelection((prev) => ({ ...prev, [dn]: '' }))
+                                                    setSelectedTone((prev) => ({ ...prev, [dn]: '' }))
+                                                    setShowPopup({ dn: dn, deviceName })
+                                                  } else {
+                                                    console.log('User does not have monitoring permissions')
+                                                    setNotification({ type: 'warning', message: 'You do not have permission to monitor calls' })
+                                                  }
                                                 } else if (terminalState === 'STALE') {
                                                   console.log('Device is STALE, popup disabled')
                                                 } else {
@@ -2056,90 +2066,108 @@ const LiveCallDashboard = () => {
             </div>
           ) : showPopup ? (
             <>
-              <div className="mb-4">
-                <h6 className="fw-bold mb-3 text-left">Monitor Type Selection</h6>
-                <div className="row g-2">
-                  <div className="col-6">
-                    <Button
-                      variant={selectedMonitor[showPopup.dn] === 'SILENT' ? 'danger' : 'primary'}
-                      disabled={
-                        (tempMonitorSelection[showPopup.dn] && tempMonitorSelection[showPopup.dn] !== 'SILENT') ||
-                        !isDnInActiveCall(showPopup.dn)
-                      }
-                      onClick={() =>
-                        handleMonitorSelect(showPopup.dn, 'SILENT', Object.values(dnsMap[showPopup.dn]?.devices || {}))
-                      }
-                      className="w-100 text-center d-inline-block app-button"
-                      size="sm"
-                    >
-                      Silent
-                    </Button>
-                  </div>
-                  <div className="col-6">
-                    <Button
-                      variant={selectedMonitor[showPopup.dn] === 'WHISPER' ? 'danger' : 'primary'}
-                      disabled={
-                        (tempMonitorSelection[showPopup.dn] && tempMonitorSelection[showPopup.dn] !== 'WHISPER') ||
-                        !isDnInActiveCall(showPopup.dn)
-                      }
-                      onClick={() =>
-                        handleMonitorSelect(showPopup.dn, 'WHISPER', Object.values(dnsMap[showPopup.dn]?.devices || {}))
-                      }
-                      className="w-100 text-center d-inline-block app-button"
-                      size="sm"
-                    >
-                      Whisper
-                    </Button>
-                  </div>
-                  <div className="col-12">
-                    <Button
-                      variant={selectedMonitor[showPopup.dn] === 'BARGE_IN' ? 'danger' : 'primary'}
-                      disabled={!isDnInActiveCall(showPopup.dn)}
-                      onClick={() => handleBargeInSelect(showPopup.dn)}
-                      className="w-100 text-center d-inline-block app-button"
-                      size="sm"
-                    >
-                      Barge In
-                    </Button>
-                  </div>
+              {!session?.user?.permissions?.some(permission => 
+                ['silent-monitoring-cti', 'whisper-monitoring-cti', 'barge-in-cti'].includes(permission)
+              ) ? (
+                <div className="text-center text-muted">
+                  <i className="material-icons-two-tone mb-2" style={{ fontSize: '2rem' }}>lock</i>
+                  <p>You do not have permission to monitor calls.</p>
+                  <small>Contact your administrator to request monitoring permissions.</small>
                 </div>
-              </div>
+              ) : (
+                <>
+                  <div className="mb-4">
+                    <h6 className="fw-bold mb-3 text-left">Monitor Type Selection</h6>
+                    <div className="row g-2">
+                  {session?.user?.permissions?.includes('silent-monitoring-cti') && (
+                    <div className="col-6">
+                      <Button
+                        variant={selectedMonitor[showPopup.dn] === 'SILENT' ? 'danger' : 'primary'}
+                        disabled={
+                          (tempMonitorSelection[showPopup.dn] && tempMonitorSelection[showPopup.dn] !== 'SILENT') ||
+                          !isDnInActiveCall(showPopup.dn)
+                        }
+                        onClick={() =>
+                          handleMonitorSelect(showPopup.dn, 'SILENT', Object.values(dnsMap[showPopup.dn]?.devices || {}))
+                        }
+                        className="w-100 text-center d-inline-block app-button"
+                        size="sm"
+                      >
+                        Silent
+                      </Button>
+                    </div>
+                  )}
+                  {session?.user?.permissions?.includes('whisper-monitoring-cti') && (
+                    <div className="col-6">
+                      <Button
+                        variant={selectedMonitor[showPopup.dn] === 'WHISPER' ? 'danger' : 'primary'}
+                        disabled={
+                          (tempMonitorSelection[showPopup.dn] && tempMonitorSelection[showPopup.dn] !== 'WHISPER') ||
+                          !isDnInActiveCall(showPopup.dn)
+                        }
+                        onClick={() =>
+                          handleMonitorSelect(showPopup.dn, 'WHISPER', Object.values(dnsMap[showPopup.dn]?.devices || {}))
+                        }
+                        className="w-100 text-center d-inline-block app-button"
+                        size="sm"
+                      >
+                        Whisper
+                      </Button>
+                    </div>
+                  )}
+                  {session?.user?.permissions?.includes('barge-in-cti') && (
+                    <div className="col-12">
+                      <Button
+                        variant={selectedMonitor[showPopup.dn] === 'BARGE_IN' ? 'danger' : 'primary'}
+                        disabled={!isDnInActiveCall(showPopup.dn)}
+                        onClick={() => handleBargeInSelect(showPopup.dn)}
+                        className="w-100 text-center d-inline-block app-button"
+                        size="sm"
+                      >
+                        Barge In
+                      </Button>
+                    </div>
+                  )}
+                    </div>
+                  </div>
 
-              <div className="mb-4">
-                <h6 className="fw-bold mb-3 text-left">Tone Selection</h6>
-                <div className="row g-2">
-                  {Object.entries(toneLabels).map(([key, label]) => {
-                    const isDisabled = !tempMonitorSelection[showPopup.dn] || !isDnInActiveCall(showPopup.dn)
+                  <div className="mb-4">
+                    <h6 className="fw-bold mb-3 text-left">Tone Selection</h6>
+                    <div className="row g-2">
+                      {Object.entries(toneLabels).map(([key, label]) => {
+                        const isDisabled = !tempMonitorSelection[showPopup.dn] || !isDnInActiveCall(showPopup.dn)
 
-                    return (
-                      <div key={key} className="col-6">
-                        <Button
-                          variant={selectedTone[showPopup.dn] === key ? 'success' : 'info'}
-                          disabled={isDisabled}
-                          onClick={isDisabled ? undefined : () => handleToneSelect(showPopup.dn, key)}
-                          size="sm"
-                          className="w-100 text-center d-inline-block app-button"
-                        >
-                          {label}
-                        </Button>
+                        return (
+                          <div key={key} className="col-6">
+                            <Button
+                              variant={selectedTone[showPopup.dn] === key ? 'success' : 'info'}
+                              disabled={isDisabled}
+                              onClick={isDisabled ? undefined : () => handleToneSelect(showPopup.dn, key)}
+                              size="sm"
+                              className="w-100 text-center d-inline-block app-button"
+                            >
+                              {label}
+                            </Button>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+
+                  {tempMonitorSelection[showPopup.dn] && (
+                    <div className="">
+                      <div className="d-flex flex-column align-items-center justify-content-center">
+                        
+                        <span className="small text-muted d-block me-2 mb-1">
+                          Monitor type selected
+                        </span>
+                        <span className="small status-badge primary d-block">
+                        <strong>{tempMonitorSelection[showPopup.dn]}</strong>
+                        </span>
                       </div>
-                    )
-                  })}
-                </div>
-              </div>
-
-              {tempMonitorSelection[showPopup.dn] && (
-                <div className="">
-                  <div className="d-flex flex-column align-items-center justify-content-center">
-                    
-                    <span className="small text-muted d-block me-2 mb-1">
-                      Monitor type selected
-                    </span>
-                    <span className="small status-badge primary d-block">
-                    <strong>{tempMonitorSelection[showPopup.dn]}</strong>
-                    </span>
-                  </div>
-                </div>
+                    </div>
+                  )}
+                </>
               )}
             </>
           ) : null}
@@ -2162,7 +2190,16 @@ const LiveCallDashboard = () => {
                 setShowPopup(null)
               }
             }}
-            disabled={!showPopup?.dn || !tempMonitorSelection[showPopup.dn] || !selectedTone[showPopup.dn]}
+            disabled={
+              !showPopup?.dn || 
+              !tempMonitorSelection[showPopup.dn] || 
+              !selectedTone[showPopup.dn] ||
+              !session?.user?.permissions?.includes(
+                tempMonitorSelection[showPopup.dn] === 'SILENT' ? 'silent-monitoring-cti' :
+                tempMonitorSelection[showPopup.dn] === 'WHISPER' ? 'whisper-monitoring-cti' :
+                tempMonitorSelection[showPopup.dn] === 'BARGE_IN' ? 'barge-in-cti' : ''
+              )
+            }
           >
             Start Monitoring
           </Button>

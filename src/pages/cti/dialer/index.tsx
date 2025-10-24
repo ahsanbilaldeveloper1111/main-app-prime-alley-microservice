@@ -6,10 +6,11 @@ import { Button, Card, Col, Row, Alert, Badge } from 'react-bootstrap'
 import { toast } from 'react-toastify'
 import Link from 'next/link'
 import useCtiStomp from '../../../hooks/useCtiStomp'
-import { makeCall, endCall, holdCall, resumeCall, getCallingDeviceInfo, getAllUserDevices, mergeCalls,transferCalls, RemoveCall} from '../../../utils/dialer'
+import { makeCall, endCall, holdCall, resumeCall, getCallingDeviceInfo, getAllUserDevices, mergeCalls,transferCalls, RemoveCall, attendCall} from '../../../utils/dialer'
 import DeviceSelectionModal from '../../../components/DeviceSelectionModal'
 import Select from 'react-select'
 import { FaLastfmSquare } from 'react-icons/fa'
+import { usePermissions } from '../../../utils/permissionUtils'
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
@@ -20,6 +21,9 @@ import "@assets/scss/pgDialer.scss";
 const CtiDialer = () => {
   const router = useRouter()
   const [showPageLoader, setShowPageLoader] = useState(false)
+  
+  // Permission checks
+  const { hasPermission } = usePermissions()
   
   // CTI Socket hook integration
   const {
@@ -50,13 +54,25 @@ const CtiDialer = () => {
     callingDeviceType?: string
     duration?: number
   }>>(new Map())
-  const [extensionSearch, setExtensionSearch] = useState('')
+  const [extensionSearch, setExtensionSearch] = useState('');
+  const [extensionPopSearch, setExtensionPopSearch] = useState('');
   const [processingCalls, setProcessingCalls] = useState<Set<string>>(new Set())
   const [selectedCallsForMerge, setSelectedCallsForMerge] = useState<Set<string>>(new Set())
   const [isInProtectedMode, setIsInProtectedMode] = useState(false)
   const [transferCallId, setTransferCallId] = useState<string | null>(null)
   const [showTransferModal, setShowTransferModal] = useState(false)
   const [transferTarget, setTransferTarget] = useState('')
+  const [incomingCall, setIncomingCall] = useState<{
+    callId: string
+    callingAddress: string
+    calledAddress: string
+    controllerAddress: string
+    controllerDeviceName: string
+    controllerDeviceType: string
+    startTime: Date
+  } | null>(null)
+  const [showIncomingCallModal, setShowIncomingCallModal] = useState(false)
+  const [incomingCallTimer, setIncomingCallTimer] = useState<NodeJS.Timeout | null>(null)
   const [mergedCalls, setMergedCalls] = useState<Map<string, {
     id: string
     conferenceCallId?: string
@@ -89,15 +105,15 @@ const CtiDialer = () => {
 
   // Debug: Monitor activeCalls changes
   useEffect(() => {
-    console.log(`📊 Active calls state changed:`, {
-      count: activeCalls.size,
-      calls: Array.from(activeCalls.values()).map(call => ({
-        id: call.id,
-        number: call.number,
-        status: call.status,
-        callId: call.callId
-      }))
-    })
+    // console.log(`📊 Active calls state changed:`, {
+    //   count: activeCalls.size,
+    //   calls: Array.from(activeCalls.values()).map(call => ({
+    //     id: call.id,
+    //     number: call.number,
+    //     status: call.status,
+    //     callId: call.callId
+    //   }))
+    // })
   }, [activeCalls])
 
   // Helper functions
@@ -106,7 +122,7 @@ const CtiDialer = () => {
       const stored = localStorage.getItem('cti_caller_info')
       if (stored) {
         const callerInfo = JSON.parse(stored)
-        console.log('📋 Retrieved stored caller info:', callerInfo)
+        //console.log('📋 Retrieved stored caller info:', callerInfo)
         return callerInfo
       }
     } catch (error) {
@@ -152,7 +168,7 @@ const CtiDialer = () => {
   // Save call states to localStorage
   const saveCallStatesToStorage = (calls: Map<string, any>) => {
     try {
-      console.log('Saving call states to localStorage...')
+      //console.log('Saving call states to localStorage...')
       
       // Convert activeCalls to the format expected by localStorage
       const callsToPersist: Record<string, any> = {}
@@ -180,6 +196,9 @@ const CtiDialer = () => {
         mergedCalls.forEach((mergedCall, mergedCallId) => {
           mergedCallsToPersist[mergedCallId] = {
             callId: mergedCallId,
+            conferenceCallId: mergedCall.conferenceCallId,
+            callingDeviceName: mergedCall.callingDeviceName,
+            callingDeviceType: mergedCall.callingDeviceType,
             eventTime: mergedCall.startTime.toISOString(),
             parties: mergedCall.members.map(member => ({
               callId: member.callId,
@@ -197,7 +216,7 @@ const CtiDialer = () => {
         
         // Save merged calls to separate localStorage key
         localStorage.setItem('cti_merged_calls', JSON.stringify(mergedCallsToPersist))
-        console.log('Saved merged calls to localStorage:', mergedCallsToPersist)
+       console.log('Saved merged calls to localStorage:', mergedCallsToPersist)
       } else {
         localStorage.removeItem('cti_merged_calls')
         console.log('Cleared merged calls from localStorage')
@@ -345,6 +364,12 @@ const CtiDialer = () => {
   }
 
   const handleDial = async () => {
+    // Check permission for dialing calls
+    if (!hasPermission('dial-call-cti')) {
+      toast.error('You do not have permission to dial calls')
+      return
+    }
+
     // Check if we can dial this number
     const dialCheck = canDialNumber(dialedNumber)
     if (!dialCheck.canDial) {
@@ -377,14 +402,19 @@ const CtiDialer = () => {
       return
     }
 
+    if(dialedNumber.length ===0) {
+      toast.error('Please enter a number to dial')
+      return
+    }
+
     await performDial(callingDevice, dialedNumber)
   }
 
   const performDial = async (callingDevice: any, numberToDial: string) => {
-    console.log('📞 performDial called with:', {
-      callingDevice,
-      numberToDial
-    });
+    // console.log('📞 performDial called with:', {
+    //   callingDevice,
+    //   numberToDial
+    // });
     
     setIsDialing(true)
     setCallStatus('dialing')
@@ -396,7 +426,7 @@ const CtiDialer = () => {
     // Auto-exit protected mode after 30 seconds to prevent indefinite protection
     setTimeout(() => {
       if (isInProtectedMode) {
-        console.log('Auto-exiting protected mode after 30 seconds')
+       // console.log('Auto-exiting protected mode after 30 seconds')
         setIsInProtectedMode(false)
       }
     }, 30000)
@@ -412,18 +442,18 @@ const CtiDialer = () => {
         callingDeviceName: callingDevice.callingDeviceName
       };
       
-      console.log('📞 Making API call with params:', apiParams);
+      //console.log('📞 Making API call with params:', apiParams);
       setShowPageLoader(true);
       const result = await makeCall(apiParams);
 
-      console.log(result, "result cti");
+      //console.log(result, "result cti");
       if (result.success) { 
         setShowPageLoader(false);
-        console.log( "yes true");
+        //console.log( "yes true");
         const responseData = result.data.responseData
         const callStatusFromAPI = responseData.status
         
-        console.log('Dial API response:', responseData)
+       // console.log('Dial API response:', responseData)
         
         let localCallStatus: 'dialing' | 'connected' | 'onHold' | 'ended' | 'ringing'
         switch (callStatusFromAPI) {
@@ -463,18 +493,18 @@ const CtiDialer = () => {
   }
 
   const removeCall = (callId: string) => {
-    console.log(`🗑️ Removing call from active calls:`, callId)
+    console.log(`Removing call from active calls:`, callId)
     setActiveCalls(prev => {
       const newMap = new Map(prev)
       // Only remove if the call still exists
       if (newMap.has(callId)) {
         const callToRemove = newMap.get(callId)
-        console.log(`🗑️ Call removed:`, {
-          id: callToRemove?.id,
-          number: callToRemove?.number,
-          status: callToRemove?.status,
-          callId: callToRemove?.callId
-        })
+        // console.log(`Call removed:`, {
+        //   id: callToRemove?.id,
+        //   number: callToRemove?.number,
+        //   status: callToRemove?.status,
+        //   callId: callToRemove?.callId
+        // })
         newMap.delete(callId)
       }
       // Save to localStorage after updating
@@ -516,14 +546,14 @@ const CtiDialer = () => {
 
   // Device selection handlers
   const handleDeviceSelect = (device: any) => {
-    console.log('🎯 Device selected:', device)
+    //console.log('🎯 Device selected:', device)
     const callingDevice = {
       callingAddress: userAddress,
       callingDeviceType: device.deviceType,
       callingDeviceName: device.deviceName
     }
     
-    console.log('🎯 Calling device info for API:', callingDevice)
+   // console.log('🎯 Calling device info for API:', callingDevice)
     
     // Store the selected device info in localStorage for consistent use
     const callerInfo = {
@@ -534,7 +564,7 @@ const CtiDialer = () => {
     }
     
     localStorage.setItem('cti_caller_info', JSON.stringify(callerInfo))
-    console.log('💾 Stored caller info in localStorage:', callerInfo)
+   // console.log('💾 Stored caller info in localStorage:', callerInfo)
     
     setSelectedDevice(device)
     setShowDeviceSelectionModal(false)
@@ -551,6 +581,12 @@ const CtiDialer = () => {
   }
 
   const handleHoldCall = async (callId: string) => {
+    // Check permission for holding calls
+    if (!hasPermission('hold-call-cti')) {
+      toast.error('You do not have permission to hold calls')
+      return
+    }
+
     const call = activeCalls.get(callId)
     if (!call) {
       toast.error('Call not found')
@@ -567,22 +603,37 @@ const CtiDialer = () => {
     setProcessingCalls(prev => new Set(prev).add(callId))
 
     try {
-      // Get calling device info for the API call
-      const callingDevice = getCallingDeviceInfoForAPI()
-      if (!callingDevice) {
-        toast.error('No calling device information available')
-        return
+      // For incoming calls, use the call's stored addresses
+      // For outgoing calls, get calling device info
+      let callingAddress, calledAddress, callingDeviceType, callingDeviceName;
+      
+      if (call.callingAddress && call.calledAddress) {
+        // This is an incoming call - use stored addresses
+        callingAddress = call.callingAddress;
+        calledAddress = call.calledAddress;
+        callingDeviceType = call.callingDeviceType || 'SOFT';
+        callingDeviceName = call.callingDeviceName || 'WebCTI';
+      } else {
+        // This is an outgoing call - get calling device info
+        const callingDevice = getCallingDeviceInfoForAPI()
+        if (!callingDevice) {
+          toast.error('No calling device information available')
+          return
+        }
+        callingAddress = callingDevice.callingAddress;
+        calledAddress = call.calledAddress || call.number;
+        callingDeviceType = callingDevice.callingDeviceType;
+        callingDeviceName = callingDevice.callingDeviceName;
       }
 
-      console.log('Calling device:', callingDevice)
       setShowPageLoader(true);
       // Call the holdCall API
       const result = await holdCall({
         callId: call.callId,
-        callingAddress: callingDevice.callingAddress,
-        calledAddress: call.calledAddress || call.number,
-        callingDeviceType: callingDevice.callingDeviceType,
-        callingDeviceName: callingDevice.callingDeviceName
+        callingAddress: callingAddress,
+        calledAddress: calledAddress,
+        callingDeviceType: callingDeviceType,
+        callingDeviceName: callingDeviceName
       });
 
       if (result.success) {
@@ -620,6 +671,12 @@ const CtiDialer = () => {
   }
 
   const handleResumeCall = async (callId: string) => {
+    // Check permission for resuming calls
+    if (!hasPermission('resume-call-cti')) {
+      toast.error('You do not have permission to resume calls')
+      return
+    }
+
     const call = activeCalls.get(callId)
     if (!call) {
       toast.error('Call not found')
@@ -636,21 +693,37 @@ const CtiDialer = () => {
     setProcessingCalls(prev => new Set(prev).add(callId))
 
     try {
-      // Get calling device info for the API call
-      const callingDevice = getCallingDeviceInfoForAPI()
-      if (!callingDevice) {
-        toast.error('No calling device information available')
-        return
+      // For incoming calls, use the call's stored addresses
+      // For outgoing calls, get calling device info
+      let callingAddress, calledAddress, callingDeviceType, callingDeviceName;
+      
+      if (call.callingAddress && call.calledAddress) {
+        // This is an incoming call - use stored addresses
+        callingAddress = call.callingAddress;
+        calledAddress = call.calledAddress;
+        callingDeviceType = call.callingDeviceType || 'SOFT';
+        callingDeviceName = call.callingDeviceName || 'WebCTI';
+      } else {
+        // This is an outgoing call - get calling device info
+        const callingDevice = getCallingDeviceInfoForAPI()
+        if (!callingDevice) {
+          toast.error('No calling device information available')
+          return
+        }
+        callingAddress = callingDevice.callingAddress;
+        calledAddress = call.calledAddress || call.number;
+        callingDeviceType = callingDevice.callingDeviceType;
+        callingDeviceName = callingDevice.callingDeviceName;
       }
 
       setShowPageLoader(true);
       // Call the resumeCall API
       const result = await resumeCall({
         callId: call.callId,
-        callingAddress: callingDevice.callingAddress,
-        calledAddress: call.calledAddress || call.number,
-        callingDeviceType: callingDevice.callingDeviceType,
-        callingDeviceName: callingDevice.callingDeviceName
+        callingAddress: callingAddress,
+        calledAddress: calledAddress,
+        callingDeviceType: callingDeviceType,
+        callingDeviceName: callingDeviceName
       })
 
       if (result.success) {
@@ -688,6 +761,12 @@ const CtiDialer = () => {
   }
 
   const handleMergeCalls = async () => {
+    // Check permission for merging calls
+    if (!hasPermission('merge-call-cti')) {
+      toast.error('You do not have permission to merge calls')
+      return
+    }
+
     if (selectedCallsForMerge.size !== 2) {
       toast.error('Please select exactly 2 calls to merge')
       return
@@ -815,6 +894,12 @@ const CtiDialer = () => {
   }
 
   const handleTransferCall = async (callId: string, targetExtension: string) => {
+    // Check permission for transferring calls
+    if (!hasPermission('transfer-call-cti')) {
+      toast.error('You do not have permission to transfer calls')
+      return
+    }
+
     // Check if this is a call from activeCalls or a member from mergedCalls
     let call = activeCalls.get(callId)
     let isMergedCallMember = false
@@ -896,7 +981,7 @@ const CtiDialer = () => {
                 if (updatedMembers.length === 0) {
                   // If no members left, remove the entire merged call
                   newMap.delete(mergedCallId)
-                  console.log('Removed merged call with no members left after transfer')
+                 // console.log('Removed merged call with no members left after transfer')
                 } else if (updatedMembers.length === 1) {
                   // If only one member left, convert back to regular call
                   const remainingMember = updatedMembers[0]
@@ -922,14 +1007,14 @@ const CtiDialer = () => {
                   
                   // Remove the merged call
                   newMap.delete(mergedCallId)
-                  console.log('Converted merged call back to regular call after transfer')
+                 // console.log('Converted merged call back to regular call after transfer')
                 } else {
                   // Update the merged call with remaining members
                   newMap.set(mergedCallId, {
                     ...mergedCall,
                     members: updatedMembers
                   })
-                  console.log('Updated merged call after member transfer')
+                  //console.log('Updated merged call after member transfer')
                 }
                 break
               }
@@ -988,6 +1073,12 @@ const CtiDialer = () => {
   }
 
   const handleEndCall = async (callId: string) => {
+    // Check permission for ending calls
+    if (!hasPermission('end-call-cti')) {
+      toast.error('You do not have permission to end calls')
+      return
+    }
+
     const call = activeCalls.get(callId)
     if (!call) {
       toast.error('Call not found')
@@ -1004,21 +1095,37 @@ const CtiDialer = () => {
     setProcessingCalls(prev => new Set(prev).add(callId))
 
     try {
-      // Get calling device info for the API call
-      const callingDevice = getCallingDeviceInfoForAPI()
-      if (!callingDevice) {
-        toast.error('No calling device information available')
-        return
+      // For incoming calls, use the call's stored addresses
+      // For outgoing calls, get calling device info
+      let callingAddress, calledAddress, callingDeviceType, callingDeviceName;
+      
+      if (call.callingAddress && call.calledAddress) {
+        // This is an incoming call - use stored addresses
+        callingAddress = call.callingAddress;
+        calledAddress = call.calledAddress;
+        callingDeviceType = call.callingDeviceType || 'SOFT';
+        callingDeviceName = call.callingDeviceName || 'WebCTI';
+      } else {
+        // This is an outgoing call - get calling device info
+        const callingDevice = getCallingDeviceInfoForAPI()
+        if (!callingDevice) {
+          toast.error('No calling device information available')
+          return
+        }
+        callingAddress = callingDevice.callingAddress;
+        calledAddress = call.calledAddress || call.number;
+        callingDeviceType = callingDevice.callingDeviceType;
+        callingDeviceName = callingDevice.callingDeviceName;
       }
 
       setShowPageLoader(true);
       // Call the endCall API
       const result = await endCall({
         callId: call.callId,
-        callingAddress: callingDevice.callingAddress,
-        calledAddress: call.calledAddress || call.number,
-        callingDeviceType: callingDevice.callingDeviceType,
-        callingDeviceName: callingDevice.callingDeviceName
+        callingAddress: callingAddress,
+        calledAddress: calledAddress,
+        callingDeviceType: callingDeviceType,
+        callingDeviceName: callingDeviceName
       })
 
       if (result.success) {
@@ -1058,6 +1165,94 @@ const CtiDialer = () => {
     }
   }
 
+  const handleAttendCall = async () => {
+    // Check permission for attending calls
+    if (!hasPermission('answer-call-cti')) {
+      toast.error('You do not have permission to answer calls')
+      return
+    }
+
+    if (!incomingCall) {
+      toast.error('No incoming call to attend')
+      return
+    }
+
+    // Clear the timer
+    if (incomingCallTimer) {
+      clearTimeout(incomingCallTimer)
+      setIncomingCallTimer(null)
+    }
+
+    try {
+      setShowPageLoader(true);
+      
+     // console.log(incomingCall, "incomingCall");
+      // Call the attendCall API with the required payload
+      const result = await attendCall({
+        callId: incomingCall.callId,
+        callingAddress: incomingCall.callingAddress,
+        calledAddress: incomingCall.calledAddress,
+        controllerAddress: incomingCall.controllerAddress,
+        controllerDeviceName: incomingCall.controllerDeviceName,
+        controllerDeviceType: incomingCall.controllerDeviceType
+      })
+
+      if (result.success) {
+        setShowPageLoader(false);
+        
+        // Close the incoming call modal
+        setShowIncomingCallModal(false)
+        setIncomingCall(null)
+        
+        // Create a new call entry in activeCalls
+        const newCallId = `incoming_${Date.now()}`
+        const newCall = {
+          id: newCallId,
+          number: incomingCall.callingAddress,
+          status: 'connected',
+          startTime: new Date(),
+          callId: incomingCall.callId,
+          callingAddress: incomingCall.callingAddress,
+          calledAddress: incomingCall.calledAddress,
+          callingDeviceName: incomingCall.controllerDeviceName,
+          callingDeviceType: incomingCall.controllerDeviceType,
+          duration: 0
+        }
+
+        setActiveCalls(prev => {
+          const newMap = new Map(prev)
+          newMap.set(newCallId, newCall)
+          // Save to localStorage after updating
+          setTimeout(() => saveCallStatesToStorage(newMap), 0)
+          return newMap
+        })
+        
+        toast.success('Call attended successfully')
+      } else {
+        setShowPageLoader(false);
+        console.error('Attend call API error:', result.error)
+        toast.error(`Failed to attend call: ${result.error}`)
+      }
+    } catch (error) {
+      setShowPageLoader(false);
+      console.error('Error calling attend call API:', error)
+      toast.error('Failed to attend call: Network error')
+    }
+  }
+
+  const handleRejectCall = () => {
+    // Clear the timer
+    if (incomingCallTimer) {
+      clearTimeout(incomingCallTimer)
+      setIncomingCallTimer(null)
+    }
+    
+    // Close the incoming call modal without attending
+    setShowIncomingCallModal(false)
+    setIncomingCall(null)
+    toast.info('Call rejected')
+  }
+
     // Event handling for CTI events
   useEffect(() => {
     if (eventLog && eventLog.length > 0) {
@@ -1075,7 +1270,7 @@ const CtiDialer = () => {
       
       // Skip if we've already processed this event
       if (processedEventsRef.current.has(eventId)) {
-        console.log('Event already processed, skipping:', eventId)
+       // console.log('Event already processed, skipping:', eventId)
         return
       }
       
@@ -1092,28 +1287,27 @@ const CtiDialer = () => {
       if (processedEventsRef.current.size % 10 === 0) {
         setTimeout(() => cleanupDuplicateCalls(), 100)
         setTimeout(() => cleanupEndedCalls(), 150)
-        setTimeout(() => cleanupDuplicateMergedMembers(), 200)
       }
       
       // Log current state after processing event
-      console.log('Active calls after processing event:', Array.from(activeCalls.values()).map(call => ({
-        id: call.id,
-        number: call.number,
-        status: call.status,
-        callId: call.callId,
-        startTime: call.startTime.toLocaleTimeString(),
-        duration: call.duration
-      })))
+      // console.log('Active calls after processing event:', Array.from(activeCalls.values()).map(call => ({
+      //   id: call.id,
+      //   number: call.number,
+      //   status: call.status,
+      //   callId: call.callId,
+      //   startTime: call.startTime.toLocaleTimeString(),
+      //   duration: call.duration
+      // })))
       
       // Special logging for RINGING calls to track status preservation
       const ringingCalls = Array.from(activeCalls.values()).filter(call => call.status === 'ringing')
       if (ringingCalls.length > 0) {
-        console.log('RINGING calls that should maintain their status:', ringingCalls.map(call => ({
-          id: call.id,
-          number: call.number,
-          status: call.status,
-          callId: call.callId
-        })))
+        // console.log('RINGING calls that should maintain their status:', ringingCalls.map(call => ({
+        //   id: call.id,
+        //   number: call.number,
+        //   status: call.status,
+        //   callId: call.callId
+        // })))
       }
       
       // Log the specific event that was processed
@@ -1163,7 +1357,7 @@ const CtiDialer = () => {
           call.callId === callId && callId
         )
         
-        console.log(`🔍 findOrCreateCall - Looking for call:`, {
+        console.log(`findOrCreateCall - Looking for call:`, {
           eventCallId: callId,
           callingAddress,
           calledAddress,
@@ -1195,7 +1389,7 @@ const CtiDialer = () => {
           )
         }
         
-        console.log(`🔍 findOrCreateCall - Result:`, {
+        console.log(`findOrCreateCall - Result:`, {
           found: !!existingCall,
           callId: existingCall?.id,
           number: existingCall?.number,
@@ -1242,7 +1436,7 @@ const CtiDialer = () => {
             
             // Special protection for RINGING status - only allow CONNECTED to override it
             if (currentStatus === 'ringing' && newStatus === 'connected' && eventData?.callStatus !== 'CONNECTED') {
-              console.warn(`🚫 BLOCKED: Preventing status override from RINGING to CONNECTED without explicit CONNECTED event`, {
+              console.warn(`BLOCKED: Preventing status override from RINGING to CONNECTED without explicit CONNECTED event`, {
                 callId: existingCall.id,
                 number: existingCall.number,
                 oldStatus: currentStatus,
@@ -1475,6 +1669,32 @@ const CtiDialer = () => {
         
         // Check if this is an incoming call to our user address
         if (eventData.calledAddress === userAddress) {
+          // Clear any existing timer
+          if (incomingCallTimer) {
+            clearTimeout(incomingCallTimer)
+          }
+          
+          // Show incoming call modal with attend/reject options
+          setIncomingCall({
+            callId: eventData.callId || `incoming_${Date.now()}`,
+            callingAddress: eventData.callingAddress,
+            calledAddress: eventData.calledAddress,
+            controllerAddress: eventData.controllerAddress || userAddress,
+            controllerDeviceName: eventData.controllerDeviceName || 'WebCTI',
+            controllerDeviceType: eventData.controllerDeviceType || 'SOFT_HARD',
+            startTime: new Date()
+          })
+          setShowIncomingCallModal(true)
+          
+          // Set auto-dismiss timer (30 seconds)
+          const timer = setTimeout(() => {
+            setShowIncomingCallModal(false)
+            setIncomingCall(null)
+            toast.info('Incoming call timed out')
+          }, 30000)
+          setIncomingCallTimer(timer)
+          
+          // Also create a call entry for tracking
           const newCallId = createNewCall(eventData, 'ringing')
           if (newCallId) {
             setTimeout(() => {
@@ -1512,26 +1732,48 @@ const CtiDialer = () => {
         
         // Check if this is an incoming call to our user address
         if (eventData.calledAddress === userAddress) {
-          // Try to find existing call first
-          const existingCall = findOrCreateCall(eventData)
+          console.log('Incoming RINGING call detected for user:', userAddress)
           
-          if (existingCall) {
-            updateCallStatus(existingCall.id, 'ringing', eventData)
+          // Clear any existing timer
+          if (incomingCallTimer) {
+            clearTimeout(incomingCallTimer)
+          }
+          
+          // Get device information for user 109 from dnsMap
+          const userDeviceInfo = dnsMap[userAddress]
+          const userDevices = userDeviceInfo ? Object.values(userDeviceInfo.devices || {}) : []
+          const activeUserDevice = userDevices.find(device => device.terminalState === 'REGISTERED')
+          
+          // Show incoming call modal with attend/reject options
+          setIncomingCall({
+            callId: eventData.callId || `incoming_${Date.now()}`,
+            callingAddress: eventData.callingAddress,
+            calledAddress: eventData.calledAddress,
+            controllerAddress: userAddress,
+            controllerDeviceName: activeUserDevice?.deviceName || '',
+            controllerDeviceType: activeUserDevice?.deviceType || '',
+            startTime: new Date()
+          })
+          setShowIncomingCallModal(true)
+          
+          // Set auto-dismiss timer (30 seconds)
+          const timer = setTimeout(() => {
+            setShowIncomingCallModal(false)
+            setIncomingCall(null)
+            toast.info('Incoming call timed out')
+          }, 30000)
+          setIncomingCallTimer(timer)
+          
+          // Also create a call entry for tracking
+          const newCallId = createNewCall(eventData, 'ringing')
+          if (newCallId) {
             setTimeout(() => {
-              toast.info(`Incoming call from ${eventData.callingAddress} is ringing...`)
+              toast.info(`Incoming call from ${eventData.callingAddress}`)
             }, 0)
-          } else {
-            // Create new call entry if none exists
-            const newCallId = createNewCall(eventData, 'ringing')
-            if (newCallId) {
-              setTimeout(() => {
-                toast.info(`Incoming call from ${eventData.callingAddress} is ringing...`)
-              }, 0)
-            }
           }
         }
         // Check if this is an outgoing call from our user address
-        if (eventData.callingAddress === userAddress) {
+        else if (eventData.callingAddress === userAddress) {
           // Try to find existing call first
           const existingCall = findOrCreateCall(eventData)
           
@@ -1662,6 +1904,28 @@ const CtiDialer = () => {
         hasParties: !!latestEvent.parties,
         isTerminationEvent: ['DISCONNECTED', 'DROPPED', 'ENDED'].includes(latestEvent.eventType)
       })
+      
+      // Check if incoming call was terminated by caller
+      if (['DISCONNECTED', 'DROPPED', 'ENDED'].includes(latestEvent.eventType) && latestEvent.parties && incomingCall) {
+        const eventData = latestEvent.parties[0]
+        if (eventData.callId === incomingCall.callId || 
+            (eventData.callingAddress === incomingCall.callingAddress && eventData.calledAddress === incomingCall.calledAddress)) {
+          console.log('Incoming call terminated by caller')
+          
+          // Clear the timer
+          if (incomingCallTimer) {
+            clearTimeout(incomingCallTimer)
+            setIncomingCallTimer(null)
+          }
+          
+          // Close the incoming call modal
+          setShowIncomingCallModal(false)
+          setIncomingCall(null)
+          
+          toast.info('Incoming call ended by caller')
+          return
+        }
+      }
       
       if (['DISCONNECTED', 'DROPPED', 'ENDED'].includes(latestEvent.eventType) && latestEvent.parties) {
         const eventData = latestEvent.parties[0]
@@ -1819,153 +2083,48 @@ const CtiDialer = () => {
     }
   }, [router.isReady, router.query.dialedNumber, dialedNumber])
 
-  // Clear call data only on page refresh
+  // Clear call data on every page load
   useEffect(() => {
-    // Check if this is a page refresh using performance navigation API
-    const isPageRefresh = () => {
-      if (window.performance && window.performance.navigation) {
-        return window.performance.navigation.type === 1 // TYPE_RELOAD
-      }
-      return false
-    }
-
-    // Clear data only on page refresh
-    if (isPageRefresh()) {
-      //console.log('Page refresh detected - clearing call data')
-      // Clear all call-related data
-      setActiveCalls(new Map())
-      // Clear merged calls
-      setMergedCalls(new Map())
-      // Clear localStorage
-      localStorage.removeItem('cti_call_states')
-      localStorage.removeItem('cti_call_states_timestamp')
-      localStorage.removeItem('cti_merged_calls')
-      
-      setCallStatus('idle')
-      setDialedNumber('')
-      setShowInvalidWarning(false)
-      setCallStartTime(null)
-      setCallDuration(0)
-      setProcessingCalls(new Set())
-      setSelectedCallsForMerge(new Set())
-      processedEventsRef.current.clear()
-      hasAutoDialedRef.current = false
-      
-      //console.log('Cleared all call-related data on page refresh')
-    } else {
-      //console.log('Page navigation detected - preserving call data')
-    }
-  }, [])
-
-  // Restore call states from localStorage on component mount
-  useEffect(() => {
-    // Clear stored caller info on page load to start fresh
-    localStorage.removeItem('cti_caller_info')
-    console.log('🧹 Cleared stored caller info on page load')
+    //console.log('Page load detected - clearing call data from localStorage')
     
-    const restoreCallStatesFromStorage = () => {
-      try {
-        const storedCallStates = localStorage.getItem('cti_call_states')
-        const storedTimestamp = localStorage.getItem('cti_call_states_timestamp')
-        
-        if (!storedCallStates || !storedTimestamp) {
-          console.log('No stored call states found in localStorage')
-          return
-        }
+    // Clear all call-related data
+    setActiveCalls(new Map())
+    // Clear merged calls
+    setMergedCalls(new Map())
+    // Clear localStorage
+    localStorage.removeItem('cti_call_states')
+    localStorage.removeItem('cti_call_states_timestamp')
+    localStorage.removeItem('cti_merged_calls')
+    
+    setCallStatus('idle')
+    setDialedNumber('')
+    setShowInvalidWarning(false)
+    setCallStartTime(null)
+    setCallDuration(0)
+    setProcessingCalls(new Set())
+    setSelectedCallsForMerge(new Set())
+    processedEventsRef.current.clear()
+    hasAutoDialedRef.current = false
+    
+   // console.log('Cleared all call-related data on page load')
+  }, [])
 
-        const timestamp = new Date(storedTimestamp)
-        const now = new Date()
-        const hoursDiff = (now.getTime() - timestamp.getTime()) / (1000 * 60 * 60)
+  // Clear stored caller info on page load to start fresh
+  useEffect(() => {
+    localStorage.removeItem('cti_caller_info')
+   // console.log('🧹 Cleared stored caller info on page load')
+  }, [])
 
-        // Check if stored data is still valid (not expired - 24 hours)
-        if (hoursDiff > 24) {
-          console.log('Stored call states expired, clearing localStorage')
-          localStorage.removeItem('cti_call_states')
-          localStorage.removeItem('cti_call_states_timestamp')
-          return
-        }
-
-        const parsedCallStates = JSON.parse(storedCallStates)
-        console.log('Restoring call states from localStorage:', parsedCallStates)
-        
-        // Convert stored call states to activeCalls format
-        const restoredCalls = new Map()
-        Object.entries(parsedCallStates).forEach(([callId, callEvent]: [string, any]) => {
-          if (callEvent.parties && callEvent.parties.length > 0) {
-            const party = callEvent.parties[0]
-            if (party.callStatus && ['CONNECTED', 'RETRIEVED'].includes(party.callStatus)) {
-              const callData = {
-                id: callId,
-                number: party.calledAddress || party.callingAddress || 'Unknown',
-                startTime: new Date(callEvent.eventTime || Date.now()),
-                status: party.callStatus.toLowerCase(),
-                callId: callId,
-                callingAddress: party.callingAddress,
-                calledAddress: party.calledAddress,
-                callingDeviceName: party.callingDeviceName,
-                callingDeviceType: party.callingDeviceType,
-                duration: 0
-              }
-              restoredCalls.set(callId, callData)
-            }
-          }
-        })
-
-        if (restoredCalls.size > 0) {
-          setActiveCalls(restoredCalls)
-          console.log(`Restored ${restoredCalls.size} call states from localStorage`)
-        }
-
-        // Also restore merged calls
-        const storedMergedCalls = localStorage.getItem('cti_merged_calls')
-        if (storedMergedCalls) {
-          try {
-            const parsedMergedCalls = JSON.parse(storedMergedCalls)
-            const restoredMergedCalls = new Map()
-            
-            Object.entries(parsedMergedCalls).forEach(([mergedCallId, mergedCallData]: [string, any]) => {
-              if (mergedCallData.members && Array.isArray(mergedCallData.members)) {
-                const mergedCall = {
-                  id: mergedCallId,
-                  mergedCallId: mergedCallId,
-                  members: mergedCallData.members.map((member: any) => ({
-                    id: member.id,
-                    number: member.number,
-                    callId: member.callId,
-                    callingAddress: member.callingAddress,
-                    calledAddress: member.calledAddress,
-                    callingDeviceName: member.callingDeviceName,
-                    callingDeviceType: member.callingDeviceType,
-                    startTime: new Date(member.startTime || Date.now()),
-                    status: member.status
-                  })),
-                  startTime: new Date(mergedCallData.eventTime || Date.now()),
-                  status: 'connected'
-                }
-                restoredMergedCalls.set(mergedCallId, mergedCall)
-              }
-            })
-
-            if (restoredMergedCalls.size > 0) {
-              setMergedCalls(restoredMergedCalls)
-              console.log(`Restored ${restoredMergedCalls.size} merged call states from localStorage`)
-            }
-          } catch (error) {
-            console.error('Error restoring merged call states from localStorage:', error)
-            localStorage.removeItem('cti_merged_calls')
-          }
-        }
-      } catch (error) {
-        console.error('Error restoring call states from localStorage:', error)
-        // Clear corrupted data
-        localStorage.removeItem('cti_call_states')
-        localStorage.removeItem('cti_call_states_timestamp')
+  // Cleanup incoming call timer on unmount
+  useEffect(() => {
+    return () => {
+      if (incomingCallTimer) {
+        clearTimeout(incomingCallTimer)
       }
     }
+  }, [incomingCallTimer])
 
-    // Restore call states on component mount
-    restoreCallStatesFromStorage()
-  }, [])
+  // Note: Call state restoration is disabled - all call states are cleared on page load
 
   // Timer effect for call duration - now handles multiple calls
   useEffect(() => {
@@ -2167,42 +2326,7 @@ const CtiDialer = () => {
     })
   }
 
-  // Clean up duplicate members in merged calls
-  const cleanupDuplicateMergedMembers = () => {
-    setMergedCalls(prev => {
-      const newMap = new Map(prev)
-      let hasChanges = false
-      
-      newMap.forEach((mergedCall, mergedCallId) => {
-        const memberIds = mergedCall.members.map(m => m.id)
-        const uniqueMemberIds = Array.from(new Set(memberIds))
-        
-        if (memberIds.length !== uniqueMemberIds.length) {
-          console.log(`🧹 Cleaning up duplicate members in merged call ${mergedCallId}`)
-          const uniqueMembers = mergedCall.members.filter((member, index) => 
-            memberIds.indexOf(member.id) === index
-          )
-          
-          newMap.set(mergedCallId, {
-            ...mergedCall,
-            members: uniqueMembers
-          })
-          hasChanges = true
-        }
-      })
-      
-      if (hasChanges) {
-        console.log('🧹 Cleaned up duplicate members in merged calls')
-        // Save to localStorage after cleanup
-        setTimeout(() => {
-          const currentActiveCalls = new Map(activeCalls)
-          saveCallStatesToStorage(currentActiveCalls)
-        }, 0)
-      }
-      
-      return newMap
-    })
-  }
+
 
   // Check if a call is part of a merged call
   const isCallMerged = (callId: string) => {
@@ -2213,6 +2337,12 @@ const CtiDialer = () => {
 
   // Remove a member from a merged call
   const removeMemberFromMergedCall = async (mergedCallId: string, memberId: string) => {
+    // Check permission for removing from conference calls
+    if (!hasPermission('remove-from-call-cti')) {
+      toast.error('You do not have permission to remove participants from conference calls')
+      return
+    }
+
     const mergedCall = mergedCalls.get(mergedCallId);
     
     if (!mergedCall) {
@@ -2225,15 +2355,21 @@ const CtiDialer = () => {
     console.log(memberId, "memberId cti");
     console.log( "=====================");
     
-    const updatedMembers = mergedCall.members.filter(member => member.id === memberId);
-    console.log(updatedMembers, "updatedMembers cti");
-    console.log(updatedMembers?.[0], "updatedMembers[0] cti");
+    const memberToRemove = mergedCall.members.find(member => member.id === memberId);
+    console.log(memberToRemove, "memberToRemove cti");
+    console.log( "=====================");
+
+    // Find the corresponding party callId for this member
+    const partyCallId = mergedCall.members.find(member => member.id === memberId)?.callId || '';
+    console.log(partyCallId, "partyCallId cti");
     console.log( "=====================");
 
     const payloadRemoveCall={
-      callId: mergedCall.conferenceCallId || '',
-      callingAddress: updatedMembers?.[0]?.callingAddress,
-      calledAddress: updatedMembers?.[0]?.calledAddress || '',
+      callId: partyCallId || mergedCall.conferenceCallId || '',
+      
+      calledAddress: memberToRemove?.calledAddress || '',
+
+      callingAddress: memberToRemove?.callingAddress,
       callingDeviceType: mergedCall.callingDeviceType || '',
       callingDeviceName: mergedCall.callingDeviceName || ''
     };
@@ -2354,37 +2490,7 @@ const CtiDialer = () => {
     )
   }
 
-  // Debug function to inspect merged call state
-  const debugMergedCalls = () => {
-    console.log('Debug: Current merged calls state:')
-    mergedCalls.forEach((mergedCall, mergedCallId) => {
-      console.log(`  Merged Call ${mergedCallId}:`, {
-        id: mergedCall.id,
-        mergedCallId: mergedCall.mergedCallId,
-        startTime: mergedCall.startTime,
-        status: mergedCall.status,
-        members: mergedCall.members.map(m => ({
-          id: m.id,
-          number: m.number,
-          callId: m.callId,
-          callingAddress: m.callingAddress,
-          calledAddress: m.calledAddress
-        }))
-      })
-    })
-    
-    console.log('Debug: Current active calls state:')
-    activeCalls.forEach((call, callId) => {
-      console.log(`  Active Call ${callId}:`, {
-        id: call.id,
-        number: call.number,
-        status: call.status,
-        callId: call.callId,
-        callingAddress: call.callingAddress,
-        calledAddress: call.calledAddress
-      })
-    })
-  }
+  
 
   // Check if a termination event is legitimate or a false positive
   const checkIfTerminationIsLegitimate = (event: any, call: any) => {
@@ -2433,14 +2539,14 @@ const CtiDialer = () => {
     }
     
     // Default to legitimate if we can't determine
-    console.log(`Termination legitimacy unclear:`, {
-      callId: call.id,
-      callNumber: call.number,
-      callAge: `${Math.round(callAge / 1000)}s`,
-      eventAge: `${Math.round(eventAge / 1000)}s`,
-      otherActiveCalls: otherActiveCalls.length,
-      isCurrentlyDialing
-    })
+    // console.log(`Termination legitimacy unclear:`, {
+    //   callId: call.id,
+    //   callNumber: call.number,
+    //   callAge: `${Math.round(callAge / 1000)}s`,
+    //   eventAge: `${Math.round(eventAge / 1000)}s`,
+    //   otherActiveCalls: otherActiveCalls.length,
+    //   isCurrentlyDialing
+    // })
     return true
   }
 
@@ -2456,7 +2562,7 @@ const CtiDialer = () => {
   if (!isInitialized) {
     return (
       <div className="alert alert-info m-3">
-        Connecting to CTI server...
+        Connecting to server...
       </div>
     )
   }
@@ -2709,11 +2815,18 @@ const CtiDialer = () => {
                      
                       className="w-100 py-3 app-button text-center d-block mb-4 btnDial"
                       onClick={handleDial}
-                     
+                      disabled={!hasPermission('dial-call-cti')}
                     >
                       <i className="material-icons-two-tone me-2" style={{ backgroundColor: '#fff' }}>call</i>
                       {isDialing ? 'Dialing...' : 'Dial'}
                     </Button>
+                    
+                    {!hasPermission('dial-call-cti') && (
+                      <div className="alert alert-warning py-2">
+                        <i className="material-icons-two-tone me-2">warning</i>
+                        <small>You do not have permission to dial calls</small>
+                      </div>
+                    )}
                     
                     {/* Show warning if number is already in active call */}
                     {/* {dialedNumber && !canDialNumber(dialedNumber).canDial && (
@@ -2739,7 +2852,6 @@ const CtiDialer = () => {
                   Active Calls ({getActiveCallsCount()})
                   {canMergeCalls() && (
                     <Badge bg="info" className="ms-2">
-                      <i className="material-icons-two-tone me-1">call_merge</i>
                       Merge Available
                     </Badge>
                   )}
@@ -2749,7 +2861,7 @@ const CtiDialer = () => {
             </Card.Header>
             <Card.Body>
               {/* Merge Calls Section */}
-              {canMergeCalls() && (
+              {canMergeCalls() && hasPermission('merge-call-cti') && (
                 <div className="mb-4">
                   <Alert variant="info">
                     <h6 className="mb-3">
@@ -2797,6 +2909,7 @@ const CtiDialer = () => {
                       <Button
                         variant="primary"
                         size="sm"
+                        className="app-button text-center d-inline-block"
                         onClick={handleMergeCalls}
                         disabled={selectedCallsForMerge.size !== 2}
                       >
@@ -2805,9 +2918,9 @@ const CtiDialer = () => {
                       </Button>
                       {selectedCallsForMerge.size > 0 && (
                         <Button
-                          variant="outline-secondary"
+                          variant="secondary"
                           size="sm"
-                          className="ms-2"
+                          className="ms-2 app-button text-center"
                           onClick={() => setSelectedCallsForMerge(new Set())}
                         >
                           Clear Selection
@@ -2826,26 +2939,7 @@ const CtiDialer = () => {
                       <i className="material-icons-two-tone me-2">call_merge</i>
                       Merged Calls
                     </h6>
-                    <div className="d-flex gap-2">
-                      <Button
-                        variant="outline-secondary"
-                        size="sm"
-                        onClick={() => cleanupDuplicateMergedMembers()}
-                        title="Clean up duplicate members"
-                      >
-                        <i className="material-icons-two-tone me-1">cleaning_services</i>
-                        Clean
-                      </Button>
-                      <Button
-                        variant="outline-info"
-                        size="sm"
-                        onClick={() => debugMergedCalls()}
-                        title="Debug merged calls state"
-                      >
-                        <i className="material-icons-two-tone me-1">bug_report</i>
-                        Debug
-                      </Button>
-                    </div>
+                    
                   </div>
                   {Array.from(mergedCalls.values()).map((mergedCall) => (
                     <div key={mergedCall.id} className="mb-3">
@@ -2869,7 +2963,7 @@ const CtiDialer = () => {
                                 <div className="d-flex justify-content-between align-items-center mb-2">
                                   <h6 className="mb-0">Call to {member.number}</h6>
                                   <div className="d-flex gap-1">
-                                    <Button
+                                    {/* <Button
                                       variant="outline-info"
                                       size="sm"
                                       className="transfer-member-btn"
@@ -2879,12 +2973,13 @@ const CtiDialer = () => {
                                       }}
                                       title="Transfer call"
                                     >
-                                    </Button>
+                                    </Button> */}
                                     <Button
                                       variant="outline-danger"
                                       size="sm"
                                       className="remove-member-btn"
                                       onClick={() => removeMemberFromMergedCall(mergedCall.id, member.id)}
+                                      disabled={!hasPermission('remove-from-call-cti')}
                                       title="Remove from conference"
                                     >
                                       <i className="material-icons-two-tone">call_end</i>
@@ -2907,13 +3002,7 @@ const CtiDialer = () => {
                     </div>
                   ))}
                   
-                  {/* Debug Information */}
-                  <div className="mt-3 p-2 bg-light rounded">
-                    <small className="text-muted">
-                      <strong>Debug Info:</strong> {mergedCalls.size} merged call(s) with{' '}
-                      {Array.from(mergedCalls.values()).reduce((total, mc) => total + mc.members.length, 0)} total members
-                    </small>
-                  </div>
+                 
                 </div>
               )}
 
@@ -2922,16 +3011,16 @@ const CtiDialer = () => {
                 const activeCallsToRender = Array.from(activeCalls.values()).filter(call => 
                   ['dialing', 'ringing', 'connected', 'onHold'].includes(call.status) && !isCallMerged(call.id)
                 )
-                console.log(`🎨 Rendering active calls:`, {
-                  totalActiveCalls: activeCalls.size,
-                  callsToRender: activeCallsToRender.length,
-                  calls: activeCallsToRender.map(call => ({
-                    id: call.id,
-                    number: call.number,
-                    status: call.status,
-                    callId: call.callId
-                  }))
-                })
+                // console.log(`🎨 Rendering active calls:`, {
+                //   totalActiveCalls: activeCalls.size,
+                //   callsToRender: activeCallsToRender.length,
+                //   calls: activeCallsToRender.map(call => ({
+                //     id: call.id,
+                //     number: call.number,
+                //     status: call.status,
+                //     callId: call.callId
+                //   }))
+                // })
                 return activeCallsToRender
               })().map((call) => (
                 <Col md={6} key={`${call.id}-${call.status}-${call.callId}`} className="mb-4">
@@ -2988,9 +3077,9 @@ const CtiDialer = () => {
                           <Button
                             variant="warning"
                             size="sm"
-                            className="w-100"
+                            className="w-100 app-button text-center d-block"
                             onClick={() => handleHoldCall(call.id)}
-                            disabled={processingCalls.has(call.id)}
+                            disabled={processingCalls.has(call.id) || !hasPermission('hold-call-cti')}
                           >
                             {processingCalls.has(call.id) ? 'Processing...' : 'Hold Call'}
                           </Button>
@@ -2999,12 +3088,12 @@ const CtiDialer = () => {
                           <Button
                             variant="info"
                             size="sm"
-                            className="w-100"
+                            className="w-100 app-button text-center d-block"
                             onClick={() => {
                               setTransferCallId(call.id)
                               setShowTransferModal(true)
                             }}
-                            disabled={processingCalls.has(call.id)}
+                            disabled={processingCalls.has(call.id) || !hasPermission('transfer-call-cti')}
                           >
                             {processingCalls.has(call.id) ? 'Processing...' : 'Transfer'}
                           </Button>
@@ -3013,9 +3102,9 @@ const CtiDialer = () => {
                           <Button
                             variant="danger"
                             size="sm"
-                            className="w-100"
+                            className="w-100 app-button text-center d-block"
                             onClick={() => handleEndCall(call.id)}
-                            disabled={processingCalls.has(call.id)}
+                            disabled={processingCalls.has(call.id) || !hasPermission('end-call-cti')}
                           >
                             {processingCalls.has(call.id) ? 'Processing...' : 'End Call'}
                           </Button>
@@ -3029,9 +3118,9 @@ const CtiDialer = () => {
                           <Button
                             variant="success"
                             size="sm"
-                            className="w-100"
+                            className="w-100 app-button text-center d-block"
                             onClick={() => handleResumeCall(call.id)}
-                            disabled={processingCalls.has(call.id)}
+                            disabled={processingCalls.has(call.id) || !hasPermission('resume-call-cti')}
                           >
                             {processingCalls.has(call.id) ? 'Processing...' : 'Resume Call'}
                           </Button>
@@ -3040,9 +3129,9 @@ const CtiDialer = () => {
                           <Button
                             variant="danger"
                             size="sm"
-                            className="w-100"
+                            className="w-100 app-button text-center d-block"
                             onClick={() => handleEndCall(call.id)}
-                            disabled={processingCalls.has(call.id)}
+                            disabled={processingCalls.has(call.id) || !hasPermission('end-call-cti')}
                           >
                             {processingCalls.has(call.id) ? 'Processing...' : 'End Call'}
                           </Button>
@@ -3055,9 +3144,9 @@ const CtiDialer = () => {
                         <Button
                           variant="danger"
                           size="sm"
-                          className="w-100"
+                          className="w-100 app-button text-center d-block"
                           onClick={() => handleEndCall(call.id)}
-                          disabled={processingCalls.has(call.id)}
+                          disabled={processingCalls.has(call.id) || !hasPermission('end-call-cti')}
                         >
                           {processingCalls.has(call.id) ? 'Processing...' : 'Cancel'}
                         </Button>
@@ -3069,9 +3158,9 @@ const CtiDialer = () => {
                         <Button
                           variant="danger"
                           size="sm"
-                          className="w-100"
+                          className="w-100 app-button text-center d-block"
                           onClick={() => handleEndCall(call.id)}
-                          disabled={processingCalls.has(call.id)}
+                          disabled={processingCalls.has(call.id) || !hasPermission('end-call-cti')}
                         >
                           {processingCalls.has(call.id) ? 'Processing...' : 'Cancel'}
                         </Button>
@@ -3094,9 +3183,30 @@ const CtiDialer = () => {
       </Row>
 
       <style jsx>{`
+        @keyframes ring {
+          0% { transform: scale(1); }
+          50% { transform: scale(1.1); }
+          100% { transform: scale(1); }
+        }
         
+        @keyframes pulse {
+          0% { transform: scale(1); }
+          50% { transform: scale(1.02); }
+          100% { transform: scale(1); }
+        }
         
+        .incoming-call-content {
+          position: relative;
+        }
         
+        .modal-overlay {
+          backdrop-filter: blur(5px);
+        }
+        
+        .modal-content {
+          //border: 2px solid #28a745;
+          //animation: pulse 2s infinite;
+        }
       `}</style>
 
       {/* Transfer Call Modal */}
@@ -3139,26 +3249,43 @@ const CtiDialer = () => {
             
             <div className="modal-body">
               <div className="mb-3">
-                <label className="form-label">Select Target Extension:</label>
+                
                 <div className="row g-2">
                   
                   
-                  <div className="popExtension">
-                    <input type="text" className="form-control" placeholder="Search extensions" onChange={(e) => setExtensionSearch(e.target.value)} />
-                    {getAvailableExtensionsForTransfer().filter(extension => 
-                      extension.toLowerCase().includes(extensionSearch.toLowerCase())
-                    ).map((extension) => (
-                      <div key={extension} className="col-4 popExtensioList">
-                        <button
-                          type="button"
-                          className={`btn w-100 ${transferTarget === extension ? 'btn-primary' : 'btn-outline-primary'}`}
-                          onClick={() => setTransferTarget(extension)}
-                        >
-                          {extension}
-                        </button>
-                      </div>
-                    ))}
-                  </div>
+                    <div className="popExtension">
+                      <input type="text" className="form-control" placeholder="Search extensions" onChange={(e) => setExtensionPopSearch(e.target.value)} />
+                     <Row>
+                      <Col md={12} className="mt-2 popExtensioList">
+                      {getAvailableExtensionsForTransfer().filter(extension => 
+                        extension.toLowerCase().includes(extensionPopSearch.toLowerCase())
+                      ).map((extension) => {
+                        // Get extension status from dnsMap
+                        const extensionData = dnsMap[extension]
+                        const deviceList = extensionData ? Object.values(extensionData.devices || {}) : []
+                        const status = getCardLevelStatus(deviceList)
+                        const isOnline = status === 'registered'
+                        
+                        return (
+                          <div key={extension} className="mt-2">
+                            <button
+                              type="button"
+                              className={`btn btn-sm d-block app-button  w-100 ${transferTarget === extension ? 'btn-primary' : 'btn-default'}`}
+                              onClick={() => setTransferTarget(extension)}
+                            >
+                              <div className="d-flex justify-content-between align-items-center">
+                                <span className="fw-bold">{extension}</span>
+                                <small className={isOnline ? 'text-success' : 'text-muted'}>
+                                  {isOnline ? 'ONLINE' : 'OFFLINE'}
+                                </small>
+                              </div>
+                            </button>
+                          </div>
+                        )
+                      })}
+                      </Col>
+                     </Row>
+                    </div>
 
 
 
@@ -3182,7 +3309,7 @@ const CtiDialer = () => {
             <div className="modal-footer">
               <button
                 type="button"
-                className="btn btn-secondary"
+                className="btn btn-default app-button"
                 onClick={() => {
                   setShowTransferModal(false)
                   setTransferCallId(null)
@@ -3193,7 +3320,7 @@ const CtiDialer = () => {
               </button>
               <button
                 type="button"
-                className="btn btn-primary"
+                className="btn btn-primary app-button"
                 disabled={!transferTarget || !transferCallId}
                 onClick={() => {
                   if (transferCallId && transferTarget) {
@@ -3203,6 +3330,94 @@ const CtiDialer = () => {
               >
                 Transfer Call
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Incoming Call Modal */}
+      {showIncomingCallModal && incomingCall && (
+        <div className="modal-overlay" style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.7)',
+          zIndex: 1060,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}>
+          <div className="modal-content" style={{
+            backgroundColor: 'white',
+            borderRadius: '1rem',
+            padding: '2rem',
+            maxWidth: '400px',
+            width: '90%',
+            textAlign: 'center',
+            boxShadow: '0 10px 30px rgba(0, 0, 0, 0.3)',
+            //animation: 'pulse 2s infinite'
+          }}>
+            <div className="incoming-call-content">
+              <div className="mb-4">
+                <i className="material-icons-two-tone" style={{ 
+                  fontSize: '4rem', 
+                  color: '#28a745',
+                  animation: 'ring 1s infinite'
+                }}>
+                  call
+                </i>
+              </div>
+              
+              <h4 className="mb-3 text-primary">Incoming Call</h4>
+              
+              <div className="mb-4">
+                <h5 className="mb-2">
+                  <i className="material-icons-two-tone me-2">phone</i>
+                  {incomingCall.callingAddress}
+                </h5>
+                <p className="text-muted mb-0">
+                  Calling to {incomingCall.calledAddress}
+                </p>
+                <small className="text-muted">
+                  Started: {incomingCall.startTime.toLocaleTimeString()}
+                </small>
+              </div>
+              
+              <div className="mb-4">
+                <div className="row g-2">
+                  <div className="col-6">
+                    <Button
+                      variant="success"
+                    
+                      className="w-100 py-3 app-button text-center d-block"
+                      onClick={handleAttendCall}
+                      disabled={showPageLoader || !hasPermission('answer-call-cti')}
+                    >
+                      <i className="material-icons-two-tone me-2" style={{ backgroundColor: '#fff' }}>call</i>
+                      {showPageLoader ? 'Answering...' : 'Answer Call'}
+                    </Button>
+                  </div>
+                  <div className="col-6">
+                    <Button
+                      variant="secondary"
+                      className="w-100 py-3 app-button text-center d-block"
+                      onClick={handleRejectCall}
+                      disabled={showPageLoader}
+                    >
+                      <i className="material-icons-two-tone me-2" style={{ backgroundColor: '#fff' }}>call_end</i>
+                      Ignore Call
+                    </Button>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="small text-muted">
+                <div>Call ID: {incomingCall.callId}</div>
+                <div>Controller: {incomingCall.controllerDeviceName}</div>
+                <div>Device Type: {incomingCall.controllerDeviceType}</div>
+              </div>
             </div>
           </div>
         </div>

@@ -125,10 +125,10 @@ export default function useCtiStompSSE() {
   // Load persisted call states from localStorage
   const loadPersistedCallStates = useCallback(() => {
     try {
-      console.log('Loading persisted call states from localStorage...')
+      //console.log('Loading persisted call states from localStorage...')
       const storedTimestamp = localStorage.getItem(CALL_STATES_TIMESTAMP_KEY);
       if (!storedTimestamp) {
-        console.log('No stored timestamp found, no persisted call states to load')
+       // console.log('No stored timestamp found, no persisted call states to load')
         return;
       }
 
@@ -138,7 +138,7 @@ export default function useCtiStompSSE() {
 
       // Check if stored data is still valid (not expired)
       if (hoursDiff > STORAGE_EXPIRY_HOURS) {
-        console.log('Stored call states expired, clearing localStorage');
+        //console.log('Stored call states expired, clearing localStorage');
         localStorage.removeItem(CALL_STATES_STORAGE_KEY);
         localStorage.removeItem(CALL_STATES_TIMESTAMP_KEY);
         return;

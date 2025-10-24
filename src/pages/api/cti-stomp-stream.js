@@ -249,7 +249,7 @@ export default function handler(req, res) {
   }, 15000);
   
   // Send initial connection status
-  res.write(`data: ${JSON.stringify({ type: 'connection', status: 'connecting', message: 'Connecting to CTI server...' })}\n\n`);
+  res.write(`data: ${JSON.stringify({ type: 'connection', status: 'connecting', message: 'Connecting to server...' })}\n\n`);
   
   let currentAttempt = 0;
   let client = null;

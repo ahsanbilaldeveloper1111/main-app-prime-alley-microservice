@@ -371,6 +371,7 @@ export const routePermissions: RoutePermission[] = [
             { path: '/audit-logs',permissions: [PERMISSIONS.TMS_SERVICES]},
             { path: '/dashboard',permissions: [PERMISSIONS.TMS_SERVICES]},
             { path: '/settings',permissions: [PERMISSIONS.TMS_SERVICES]},
+            { path: '/profile',permissions: [PERMISSIONS.TMS_SERVICES]},
             { path: '/unified-ops',permissions: [PERMISSIONS.TMS_SERVICES]},
             { path: '/verification',permissions: [PERMISSIONS.TMS_SERVICES]},
             { 
@@ -443,7 +444,7 @@ export const routePermissions: RoutePermission[] = [
         children: [
             { path: '/',permissions: ['view-cti']},
             { path: '/monitoring',permissions: ['view-cti']},
-            { path: '/dialer',permissions: ['dial-call-cti']},
+            { path: '/dialer',permissions: ['dial-call-cti', 'hold-call-cti', 'resume-call-cti', 'end-call-cti', 'merge-call-cti', 'transfer-call-cti', 'remove-from-call-cti', 'answer-call-cti']},
 
         ]
     },
@@ -454,7 +455,7 @@ export const routePermissions: RoutePermission[] = [
         permissions: [PERMISSIONS.CTI_SERVICES],
         children: [
             { path: '/',permissions: ['view-cti']},
-            { path: '/dialer',permissions: ['dial-call-cti']},
+            { path: '/dialer',permissions: ['dial-call-cti', 'hold-call-cti', 'resume-call-cti', 'end-call-cti', 'merge-call-cti', 'transfer-call-cti', 'remove-from-call-cti', 'answer-call-cti']},
 
         ]
     }

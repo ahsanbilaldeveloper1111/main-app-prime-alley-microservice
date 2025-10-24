@@ -403,7 +403,9 @@ export const ModuleSlug = {
   CALL_RECORDINGS: 'call-recordings',
   TICKET:'tickets',
   CRM:'crm',
-  REPORTS:'reports'
+  BILLING:'accounts',
+  LIVE_CALLS:'cti',
+  USER_DIRECTORY:'users',
 }
 
 export const formatCurrency = (amount: number | null): string => {

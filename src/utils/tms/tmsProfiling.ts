@@ -352,3 +352,31 @@ export const GetAvailableExtensions = async (companyId: number) => {
     handleTmsAuthError(response);
     return response?.data?.data;
 }
+
+export const generateFacCode = async (data: any): Promise<any> => {
+    try {
+      const response = await axiosInstance.post(
+        "/tms/company/generate-fac-code",
+        data
+      );
+      handleTmsAuthError(response);
+    return response?.data?.data;
+    } catch (error: any) {
+      toast.error(error?.message || "Failed to generate FAC code");
+      throw error;
+    }
+  };
+  
+  export const createUpdateCompany = async (data: any): Promise<any> => {
+    try {
+      const response = await axiosInstance.post(
+        "/tms/createUpdateCompanyProfile",
+        data
+      );
+      handleTmsAuthError(response);
+      return response?.data?.data;
+    } catch (error: any) {
+      toast.error(error?.message || "Failed to create/update company");
+      throw error;
+    }
+  };

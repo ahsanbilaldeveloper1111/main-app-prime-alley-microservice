@@ -7,7 +7,7 @@ import { FaQrcode } from "react-icons/fa";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import { User, UserSettingUpdate } from "@models/tms/User";
-import { tmsSession } from "@utils/tmsSession";
+import { loadTmsSession, getTmsSessionId, isTmsSessionValid, getTmsUser } from "@utils/tmsSessionHelper";
 import axiosInstance from "@utils/axios";
 
 // Constants
@@ -33,6 +33,7 @@ const TmsSettings = () => {
   
   // State management
   const [user, setUser] = useState<User | null>(null);
+  const [tmsSession, setTmsSession] = useState<any | null>(null);
   const [userSetting, setUserSetting] = useState<UserSettingsState>({
     enable_email_notification: false,
     enable_sms_notification: false,
@@ -48,10 +49,12 @@ const TmsSettings = () => {
   
   const [hasInitialized2FA, setHasInitialized2FA] = useState(false);
 
+
   // Memoized functions
   const updateUserSetting = useCallback(async (data: Partial<UserSettingsState>) => {
     try {
-      const updatedSettings = { ...userSetting, ...data };
+      const updatedSettings = { ...userSetting, ...data, user_id: tmsSession?.user?.id as number };
+      console.log("updatedSettings", updatedSettings);
       const response = await axiosInstance.post('tms/updateUserSettings', updatedSettings);
       
       if (response.status === 200 && response.data.success) {
@@ -64,36 +67,36 @@ const TmsSettings = () => {
       console.error('Error updating settings:', error);
       toast.error('Failed to update settings. Please try again.');
     }
-  }, [userSetting]);
+  }, [userSetting, user]);
 
   // Initialize user data
   useEffect(() => {
     const initializeUser = async () => {
-      // Use NextAuth session data instead of localStorage
-      if (session?.user?.tmsSession?.user) {
-        setUser(session.user.tmsSession.user as User);
-        await getUserDetails(session.user.tmsSession.user as User);
-      } else if (session?.user) {
-        setUser(session.user as User);
+      // Load TMS session using helper function
+      const tmsSessionData = await loadTmsSession();
+      
+      if (tmsSessionData && isTmsSessionValid(tmsSessionData)) {
+        const user = getTmsUser(tmsSessionData);
+        //console.log('TMS user data from session:', user);
+        // You can use the TMS session user data here
+        setTmsSession(tmsSessionData);
+        getUserDetails(user);
       }
     };
-
     initializeUser();
-  }, [session]);
+  }, []);
 
   const getUserDetails = useCallback(async (userData?: User) => {
-    const currentUser = userData || user;
-    if (!currentUser?.id) return;
-
     try {
-      const response = await axiosInstance.get('tms/getTmsUsers', {
-        params: { id: currentUser.id as number }
-      });
+      const response = await axiosInstance.get('tms/getTmsUsers',{params: {auth:true}});
       
-      const fetchedUserData = response.data?.data?.data as User;
+      const fetchedUserData = response.data?.data?.data?.user as User;
       if (fetchedUserData) {
         setUser(fetchedUserData);
       }
+      //console.log("response getUserDetails", response?.data?.data?.data);
+      //console.log("response getUserDetails", fetchedUserData);
+      
     } catch (error) {
       console.error('Error fetching user details:', error);
     }
@@ -101,36 +104,41 @@ const TmsSettings = () => {
 
 
 
-  // Generate 2FA when user is loaded
-  useEffect(() => {
-    if (user?.id && !hasInitialized2FA) {
-      generateInitial2FA();
-      setHasInitialized2FA(true);
-    }
-  }, [user, hasInitialized2FA]);
+useEffect(() => {
+  if (user?.id) {
+    generateInitial2FA();
+    setHasInitialized2FA(true);
+  }
+}, [user]);
 
   const generateInitial2FA = useCallback(async () => {
-    if (!tmsSession.isValid() || !user?.id) {
-      console.log('TMS session is not valid or user not available, skipping 2FA generation');
-      return;
-    }
+    //console.log("generateInitial2FA", user);
+    // if (!tmsSession.isValid() || !user?.id) {
+    //   console.log('TMS session is not valid or user not available, skipping 2FA generation');
+    //   return;
+    // }
 
     try {
+     // console.log("generateInitial2FA", user);
       const response = await axiosInstance.post('tms/enableGoogle2Fa', {
-        user_id: user.id
+        user_id: user?.id as number
       });
       
       if (response.status === 200 && response.data) {
         const data = response.data.data;
+       // console.log("data generateInitial2FA", data);
         
         // Update user settings
         if (data?.user?.settings) {
           setUserSetting(data.user.settings as UserSettingsState);
+          console.log("userSetting", userSetting);
         }
         
+        console.log("data.qr_code_url", data.qr_code_url);
         // Handle QR code
         if (data.qr_code_url) {
           const qrCodeImageUrl = `${QR_CODE_API_URL}/?size=${QR_CODE_SIZE}x${QR_CODE_SIZE}&data=${encodeURIComponent(data.qr_code_url)}`;
+          console.log("qrCodeImageUrl", qrCodeImageUrl);
           
           setQrCodeState(prev => ({
             ...prev,
@@ -138,13 +146,15 @@ const TmsSettings = () => {
             secretKey: data.secret || '',
             showQRCode: true
           }));
+          console.log("qrCodeState", qrCodeState);
         }
       }
     } catch (error: any) {
       console.error('Failed to generate 2FA:', error);
-      toast.error('Failed to generate 2FA setup. Please try again.');
+      //toast.error('Failed to generate 2FA setup. Please try again.');
     }
   }, [user]);
+
   const handleResendCode = useCallback(async () => {
     if (!user?.id) return;
 

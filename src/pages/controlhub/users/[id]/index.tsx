@@ -9,11 +9,13 @@ import { useSession } from 'next-auth/react'
 import { getUserById, assignRoleToUser,assignGroupToUser, updateUserStatus,getUserPermissions,UpdateExtendedPermission,UpdateBlockedPermission,getParentUsers,linkUsers,unlinkUsers,GetCustomFields, AddCustomFields,UpdateCustomFields,DeleteCustomFields, GetModules,MarkAsCompanyAdmin } from '@utils/users'
 import { getAllRoles } from '@utils/roles'
 import { getAllGroups } from '@utils/groups'
+import { ModuleSlug } from '@utils/Helper'
 
 import { useRouter } from 'next/router'
 import moment from 'moment';
 import { selectRowsFn } from '@tanstack/react-table'
-import Select from 'react-select';
+import Select, { MultiValue } from 'react-select';
+import AsyncSelect from 'react-select/async';
 import '@assets/scss/tabs.scss'
 
 import imgStatus1 from '@assets/images/user/avatar-2.jpg'
@@ -21,6 +23,7 @@ import { formatDateTimeToLocal, GlobalDateTimeFormat } from '@utils/Helper';
 import FormModal from "@pages/partial/FormModal";
 import '@assets/scss/common.scss';
 import SuccessfulModal from '@pages/partial/SuccessfulModal'
+import ConfirmModal from '@pages/partial/ConfirmModal'
 
 
 
@@ -360,23 +363,24 @@ const UserView = () => {
         setShowAddLinkedUserModal(false)
     }
 
-    const [selectedParentUser, setSelectedParentUser] = useState<string>("");
-    const [selectedModule, setSelectedModule] = useState<string>("");
+    const [selectedParentUsers, setSelectedParentUsers] = useState<string[]>([]);
+    const [selectedModules, setSelectedModules] = useState<string[]>([]);
     
-    const handleLinkedUserChange = (selectedOption: SelectOption | null) => {
-        if (selectedOption) {
-            setSelectedParentUser(selectedOption.value.toString());
-            //console.log("Selected Parent User:", selectedOption.value);
-        } else {
-            setSelectedParentUser("");
-        }
+    const handleLinkedUserChange = (selectedOptions: MultiValue<SelectOption>) => {
+        const values = (selectedOptions || []).map((opt) => opt.value.toString());
+        setSelectedParentUsers(values);
     };
 
-    const handleModuleChange = (selectedOption: any) => {
-        if (selectedOption) {
-            setSelectedModule(selectedOption.value);
+    const handleModuleChange = (selectedOptions: MultiValue<{ value: string; label: string }>) => {
+        const values = (selectedOptions || []).map((opt) => opt.value);
+        
+        // Check if "All" option is selected
+        if (values.includes('all')) {
+            // If "All" is selected, select all modules
+            const allModuleIds = filteredModules.map(module => module.id.toString());
+            setSelectedModules(allModuleIds);
         } else {
-            setSelectedModule("");
+            setSelectedModules(values);
         }
     };
 
@@ -394,28 +398,32 @@ const UserView = () => {
 
     // Filter modules based on user permissions
     const filteredModules = modules.filter(module => {
-        return session?.user?.permissions?.includes(module.slug+'-services');
+        const moduleSlug = Object.values(ModuleSlug).find(slug => slug === module.slug);
+        return moduleSlug && session?.user?.permissions?.includes("view-"+moduleSlug);
     });
 
     const handleSubmitAddLinkedUser = async () => {
 
-        if(selectedParentUser === ""){
-            toast.error('Please select a user to link');
+        if(selectedParentUsers.length === 0){
+            toast.error('Please select at least one user to link');
             return;
         }
 
-        if(selectedModule === ""){
+        if(selectedModules.length === 0){
             toast.error('Please select at least one module');
             return;
         }
 
-        const response = await linkUsers(id as string, selectedParentUser, selectedModule);
-        if(response){
+        const responses = await Promise.all(
+            selectedParentUsers.flatMap((parentId) =>
+                selectedModules.map((moduleId) => linkUsers(id as string, parentId, moduleId))
+            )
+        );
+        if(responses.every(Boolean)){
             setShowAddLinkedUserModal(false);
             fetchUser();
-            
-            setSuccessModalTitle('Linked User Added');
-            setSuccessModalDescription('The user has been linked successfully');
+            setSuccessModalTitle('Linked Users Added');
+            setSuccessModalDescription('Selected users have been linked successfully');
             setShowSuccessfulModal(true);
         }
     }
@@ -429,27 +437,134 @@ const UserView = () => {
         setShowEditLinkedUserModal(false)
     }
 
+    const [showDeleteLinkedUserModal, setShowDeleteLinkedUserModal] = useState(false)
+    const [deleteLinkedUserData, setDeleteLinkedUserData] = useState<{delinkedUser: number, moduleId: number} | null>(null)
+    
+    const [selectedLinkedUsers, setSelectedLinkedUsers] = useState<string[]>([])
+    const [showBulkDeleteLinkedUserModal, setShowBulkDeleteLinkedUserModal] = useState(false)
+    
+    const handleCloseDeleteLinkedUserModal = () => {
+        setShowDeleteLinkedUserModal(false)
+        setDeleteLinkedUserData(null)
+    }
+
+    const handleDeleteLinkedUserClick = (delinkedUser: number, moduleId: number) => {
+        setDeleteLinkedUserData({delinkedUser, moduleId})
+        setShowDeleteLinkedUserModal(true)
+    }
+
+    const handleLinkedUserCheckboxChange = (linkedUserId: string, isChecked: boolean) => {
+        if (isChecked) {
+            setSelectedLinkedUsers(prev => [...prev, linkedUserId])
+        } else {
+            setSelectedLinkedUsers(prev => prev.filter(id => id !== linkedUserId))
+        }
+    }
+
+    const handleSelectAllLinkedUsers = (isChecked: boolean) => {
+        if (isChecked) {
+            const allLinkedUserIds = linkedUsers?.map(linkedUser => `${linkedUser.linked_user.id}-${linkedUser.module.id}`) || []
+            setSelectedLinkedUsers(allLinkedUserIds)
+        } else {
+            setSelectedLinkedUsers([])
+        }
+    }
+
+    const handleBulkDeleteLinkedUsersClick = () => {
+        if (selectedLinkedUsers.length === 0) {
+            toast.error('Please select at least one linked user to delete')
+            return
+        }
+        setShowBulkDeleteLinkedUserModal(true)
+    }
+
+    const handleCloseBulkDeleteLinkedUserModal = () => {
+        setShowBulkDeleteLinkedUserModal(false)
+    }
+
     const handleSubmitEditLinkedUser = () => {
         toast.success('Linked user edited successfully');
     }
 
-    const handleDeleteLinkedUser = async (delinkedUser: number, moduleId: number) => {
-        const response = await unlinkUsers(id as string, delinkedUser+"", moduleId+"");
+    const handleDeleteLinkedUser = async () => {
+        if (!deleteLinkedUserData) return;
+        
+        const response = await unlinkUsers(id as string, deleteLinkedUserData.delinkedUser+"", deleteLinkedUserData.moduleId+"");
         if(response){
+            setShowDeleteLinkedUserModal(false);
+            setDeleteLinkedUserData(null);
             fetchUser();
+            setSuccessModalTitle('User Unlinked');
+            setSuccessModalDescription('The user has been unlinked successfully');
+            setTimeout(() => {
+              setShowSuccessfulModal(true);
+            }, 100);
+        }
+    }
+
+    const handleBulkDeleteLinkedUsers = async () => {
+        if (selectedLinkedUsers.length === 0) return;
+        
+        try {
+            const deletePromises = selectedLinkedUsers.map(linkedUserId => {
+                const [userId, moduleId] = linkedUserId.split('-');
+                return unlinkUsers(id as string, userId, moduleId);
+            });
+            
+            const responses = await Promise.all(deletePromises);
+            
+            if (responses.every(Boolean)) {
+                setShowBulkDeleteLinkedUserModal(false);
+                setSelectedLinkedUsers([]);
+                fetchUser();
+                setSuccessModalTitle('Linked Users Deleted');
+                setSuccessModalDescription(`${selectedLinkedUsers.length} linked user(s) have been unlinked successfully`);
+                setTimeout(() => {
+                  setShowSuccessfulModal(true);
+                }, 100);
+            }
+        } catch (error) {
+            console.error('Error deleting linked users:', error);
+            toast.error('Error deleting linked users');
         }
     }
 
     const [parentUsers, setParentUsers] = useState<User[]>([]);
+    const [isParentUsersLoading, setIsParentUsersLoading] = useState(true);
     useEffect(() => {
         fetchParentUsers();
     }, [id]);
 
     const fetchParentUsers = async () => {
+        setIsParentUsersLoading(true);
         const response = await getParentUsers();
         if(response){
             setParentUsers(response);
         }
+        setIsParentUsersLoading(false);
+    };
+
+    const loadParentUserOptions = (inputValue: string): Promise<SelectOption[]> => {
+        const trimmed = (inputValue || '').trim();
+        if (trimmed.length < 2) {
+            return Promise.resolve([]);
+        }
+        const ensureData = parentUsers.length === 0 && !isParentUsersLoading
+            ? fetchParentUsers()
+            : Promise.resolve();
+        return ensureData.then(() => {
+            const lower = trimmed.toLowerCase();
+            const options = parentUsers
+                .filter((user) => !linkedUsers.some((lu) => lu.id === user.id))
+                .filter((user) =>
+                    (user.name && user.name.toLowerCase().includes(lower)) ||
+                    (user.username && user.username.toLowerCase().includes(lower)) ||
+                    (user.email && user.email.toLowerCase().includes(lower))
+                )
+                .slice(0, 200)
+                .map((user) => ({ value: user.id, label: `${user.name} (${user.username})` }));
+            return options;
+        });
     };
 
     const [showChangeCompanyAdminModal, setShowChangeCompanyAdminModal] = useState(false)
@@ -1011,20 +1126,23 @@ const UserView = () => {
                             <>
                             <div className="form-group">
                                 <label htmlFor="linkedUser">Select User</label>
-                                <Select
+                                <AsyncSelect
                                     className="basic-single"
                                     classNamePrefix="select"
-                                    isLoading={isLoading}
+                                    cacheOptions
+                                    defaultOptions={false}
                                     isClearable={isClearable}
                                     isSearchable={isSearchable}
-                                    onChange={handleLinkedUserChange}
-                                    name="color"
-                                    options={parentUsers
-                                        .filter((user) => !linkedUsers.some(linkedUser => linkedUser.id === user.id))
-                                        .map((user) => ({
-                                    value: user.id,
-                                    label: `${user.name} (${user.username})`
-                                    }))}
+                                    isMulti={true}
+                                    loadOptions={loadParentUserOptions as any}
+                                    onChange={(opts) => handleLinkedUserChange(opts as MultiValue<SelectOption>)}
+                                    name="users"
+                                    value={selectedParentUsers.map((idStr) => {
+                                        const u = parentUsers.find((pu) => pu.id.toString() === idStr);
+                                        return u ? { value: u.id, label: `${u.name} (${u.username})` } : { value: Number(idStr), label: idStr };
+                                    })}
+                                    noOptionsMessage={() => 'Type at least 2 characters'}
+                                    placeholder={'Type at least 2 characters to search users'}
                                 />
                               </div>
 
@@ -1036,13 +1154,29 @@ const UserView = () => {
                                     isLoading={isLoading}
                                     isClearable={isClearable}
                                     isSearchable={isSearchable}
-                                    onChange={handleModuleChange}
+                                    onChange={(opts) => handleModuleChange(opts as MultiValue<{ value: string; label: string }>)}
                                     name="module"
-                                    isMulti={false}
-                                    options={filteredModules.map((module) => ({
-                                        value: module.id.toString(),
-                                        label: `${module.name}`
-                                    }))}
+                                    isMulti={true}
+                                    value={(() => {
+                                        // Check if all modules are selected
+                                        const allModuleIds = filteredModules.map(module => module.id.toString());
+                                        const isAllSelected = allModuleIds.length > 0 && allModuleIds.every(id => selectedModules.includes(id));
+                                        
+                                        if (isAllSelected) {
+                                            return [{ value: 'all', label: 'All Modules' }];
+                                        } else {
+                                            return filteredModules
+                                                .filter((m) => selectedModules.includes(m.id.toString()))
+                                                .map((m) => ({ value: m.id.toString(), label: `${m.name}` }));
+                                        }
+                                    })()}
+                                    options={[
+                                        { value: 'all', label: 'All Modules' },
+                                        ...filteredModules.map((module) => ({
+                                            value: module.id.toString(),
+                                            label: `${module.name}`
+                                        }))
+                                    ]}
                                     placeholder="Select Module"
                                 />
                               </div>
@@ -1087,14 +1221,28 @@ const UserView = () => {
                         <Card.Body>
                             <h5 className="d-flex justify-content-between">
                               Linked Users 
-                              <Button variant="primary" onClick={() => {
-                                setShowAddLinkedUserModal(true)
-                              }}>Add Linked User</Button>
+                              <div className="d-flex gap-2">
+                                {selectedLinkedUsers.length > 0 && session?.user?.is_admin && session?.user?.permissions?.includes('unlink-users') && (
+                                  <Button variant="danger" className="app-button" size="sm" onClick={handleBulkDeleteLinkedUsersClick}>
+                                    Delete Selected ({selectedLinkedUsers.length})
+                                  </Button>
+                                )}
+                                <Button variant="primary" className="app-button" size="sm" onClick={() => {
+                                  setShowAddLinkedUserModal(true)
+                                }}>Add Linked User</Button>
+                              </div>
                             </h5>
 
                             <table className="table table-bordered">
                               <thead>
                                 <tr>
+                                  <th>
+                                    <input
+                                      type="checkbox"
+                                      checked={selectedLinkedUsers.length > 0 && selectedLinkedUsers.length === (linkedUsers?.length || 0)}
+                                      onChange={(e) => handleSelectAllLinkedUsers(e.target.checked)}
+                                    />
+                                  </th>
                                   <th>Name</th>
                                   <th>Email</th>
                                   <th>Phone</th>
@@ -1109,6 +1257,13 @@ const UserView = () => {
                                   linkedUsers.map((obj) => (
                                    
                                     <tr key={obj.id}>
+                                          <td>
+                                            <input
+                                              type="checkbox"
+                                              checked={selectedLinkedUsers.includes(`${obj?.linked_user?.id}-${obj?.module?.id}`)}
+                                              onChange={(e) => handleLinkedUserCheckboxChange(`${obj?.linked_user?.id}-${obj?.module?.id}`, e.target.checked)}
+                                            />
+                                          </td>
                                           <td>{obj?.linked_user?.name}</td>
                                           <td>{obj?.linked_user?.email}</td>
                                           <td>{obj?.linked_user?.phone}</td>
@@ -1123,8 +1278,8 @@ const UserView = () => {
                                                         handleEditLinkedUser(1)
                                                       }}>Edit</Button> */}
                                                       {session?.user?.is_admin && session?.user?.permissions?.includes('unlink-users') && (
-                                                        <Button size="sm" variant="danger" onClick={() => {
-                                                          handleDeleteLinkedUser(obj?.linked_user?.id, obj?.module?.id)
+                                                        <Button size="sm" className="app-button" variant="danger" onClick={() => {
+                                                          handleDeleteLinkedUserClick(obj?.linked_user?.id, obj?.module?.id)
                                                         }}>DeLink</Button>
                                                       )}
                                                 </div>
@@ -1218,7 +1373,7 @@ const UserView = () => {
                             <h5 className="d-flex justify-content-between">
                               Custom Fields 
                               {session?.user?.permissions?.includes('add-custom-field-users') && (
-                                <Button size="sm" variant="outline-primary" onClick={() => {
+                                <Button size="sm" variant="primary" className="app-button" onClick={() => {
                                   setShowAddCustomFieldModal(true)
                                 }}>Add Custom Field</Button>
                               )}
@@ -1242,13 +1397,13 @@ const UserView = () => {
                                         <div className="d-flex gap-2 justify-content-end">
                                           
                                           {session?.user?.permissions?.includes('delete-custom-field-users') && (
-                                            <Button size="sm" variant="outline-danger" onClick={() => {
+                                            <Button size="sm" variant="danger" className="app-button" onClick={() => {
                                               handleDeleteCustomField(field.id)
                                             }}>Delete</Button>
                                           )}
                                           
                                           {session?.user?.permissions?.includes('edit-custom-field-users') && (
-                                            <Button size="sm" variant="outline-primary" onClick={() => {
+                                            <Button size="sm" variant="primary" className="app-button" onClick={() => {
                                               handleEditCustomField(field)
                                             }}>Edit</Button>
                                           )}
@@ -1282,6 +1437,40 @@ const UserView = () => {
 
                 </Col>
             </Row>
+
+            <ConfirmModal
+                show={showDeleteLinkedUserModal}
+                onHide={handleCloseDeleteLinkedUserModal}
+                title="Unlink User"
+                description="Are you sure you want to unlink this user from the module? This action cannot be undone."
+                targetName="this user"
+                confirmButtonText="Yes, Unlink"
+                cancelButtonText="Cancel"
+                onConfirm={handleDeleteLinkedUser}
+                onCancel={handleCloseDeleteLinkedUserModal}
+                confirmButtonVariant="danger"
+                requireTextConfirmation={true}
+                requiredConfirmationText="unlink"
+                confirmationPlaceholder="Type 'unlink' to confirm"
+                confirmationLabel="Confirmation Required"
+            />
+
+            <ConfirmModal
+                show={showBulkDeleteLinkedUserModal}
+                onHide={handleCloseBulkDeleteLinkedUserModal}
+                title="Bulk Unlink Users"
+                description="Are you sure you want to unlink {selectedLinkedUsers.length} selected user(s) from their modules? This action cannot be undone."
+                targetName={`${selectedLinkedUsers.length} selected user(s)`}
+                confirmButtonText="Yes, Unlink All"
+                cancelButtonText="Cancel"
+                onConfirm={handleBulkDeleteLinkedUsers}
+                onCancel={handleCloseBulkDeleteLinkedUserModal}
+                confirmButtonVariant="danger"
+                requireTextConfirmation={true}
+                requiredConfirmationText="unlink all"
+                confirmationPlaceholder="Type 'unlink all' to confirm"
+                confirmationLabel="Confirmation Required"
+            />
 
             <SuccessfulModal
           show={showSuccessfulModal}

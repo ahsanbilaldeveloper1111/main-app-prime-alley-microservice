@@ -81,9 +81,17 @@ const Signin = () => {
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    let nextValue = value;
+
+    if (name === "email") {
+      const atIndex = value.indexOf("@");
+      nextValue = atIndex === -1 ? value.replace(/@/g, "") : value.slice(0, atIndex);
+    }
+
     setCredentials({
       ...credentials,
-      [e.target.name]: e.target.value,
+      [name]: nextValue,
     });
   };
 
@@ -251,7 +259,7 @@ const Signin = () => {
                         value={credentials.email}
                         onChange={handleChange}
                       />
-                      <label htmlFor="email">Email Address</label>
+                      <label htmlFor="email">Username</label>
                       <small className="form-error" id="emailError"></small>
                     </div>
                     <div className="input-group">

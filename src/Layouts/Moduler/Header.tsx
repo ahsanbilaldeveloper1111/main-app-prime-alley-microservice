@@ -271,11 +271,11 @@ const Header = ({ themeMode }: HeaderProps) => {
                             return;
                         }
                         
-                        console.log('Passed initial checks');
+                        //console.log('Passed initial checks');
                         // Check if pc-link nav-link parent has NoTab class
                         const parentLi = target.closest('li');
                         if (parentLi && parentLi.classList.contains('NoTab')) {
-                            console.log('yes');
+                            //console.log('yes');
                             // Hide submenu popup for NoTab elements
                             const submenuPopup = document.querySelector(DOM_SELECTORS.SUBMENU_POPUP) as HTMLElement;
                             if (submenuPopup) {
@@ -500,14 +500,22 @@ const Header = ({ themeMode }: HeaderProps) => {
             // Add tab pane menu events
             const addTabPaneMenuEvents = () => {
                 const menuItems = document.querySelectorAll(DOM_SELECTORS.MENU_ITEMS);
+                //console.log('Found menu items:', menuItems.length);
+                //console.log('Selector used:', DOM_SELECTORS.MENU_ITEMS);
                 
                 menuItems.forEach((menuItem) => {
+                    //console.log('Processing menu item:', menuItem);
                     const submenu = menuItem.querySelector('.pc-submenu') as HTMLElement;
-                    if (!submenu) return;
+                    if (!submenu) {
+                        //console.log('No submenu found for item:', menuItem);
+                        return;
+                    }
 
                     const parentLink = menuItem.querySelector('.pc-link') as HTMLElement;
                     if (parentLink && parentLink.parentElement === menuItem) {
+                        //console.log('Adding click handler to:', parentLink.textContent?.trim());
                         parentLink.addEventListener('click', function(e) {
+                            //console.log('Click event triggered on:', parentLink.textContent?.trim());
                             e.preventDefault();
                             e.stopPropagation();
                             
@@ -561,6 +569,7 @@ const Header = ({ themeMode }: HeaderProps) => {
                     }
                 });
             };
+
             
             // Initialize all events
             const navigationSuccess = addNavigationEvents();
@@ -576,9 +585,16 @@ const Header = ({ themeMode }: HeaderProps) => {
                     arrow.className = 'ph-duotone ph-caret-right';
                 }
             });
+
             
             if (!navigationSuccess) {
                 setTimeout(() => addNavigationEvents(), TIMING.RETRY_DELAY);
+            }
+
+            // Also retry tab pane menu events if no items found
+            if (document.querySelectorAll(DOM_SELECTORS.MENU_ITEMS).length === 0) {
+                //console.log('No menu items found, retrying...');
+                setTimeout(() => addTabPaneMenuEvents(), TIMING.RETRY_DELAY);
             }
         }, TIMING.DOM_RENDER_DELAY);
         

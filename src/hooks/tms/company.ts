@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Company, IndexCompanyParams, CallingAccess } from '../../Models/tms/Company';
 import { ListCompanies, createUpdateCompanyCallingAccess as createUpdateCompanyCallingAccessAPI, createUpdateCompanyProfile, GetCompany, GetAvailableCompanyIccids, GetAvailableExtensions } from '@utils/tms/tmsProfiling';
 import { toast } from 'react-toastify';
+import { createUpdateCompany, generateFacCode } from '@utils/accounting';
 
 export const useCompanyList = (params: IndexCompanyParams) => {
     const [data, setData] = useState<any>(null);
@@ -197,4 +198,27 @@ export const useGetAvailableExtensions = (companyId: number) => {
     }, [companyId]);
 
     return { data, isLoading, error, refetch: fetchData };
+};
+
+export const useCreateUpdateFacCode = () => {
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<any>(null);
+
+    const createUpdateFacCode = async (data: any) => {
+        try {
+            setIsLoading(true);
+            setError(null);
+            const response = await generateFacCode(data);
+            if(response.success){
+                toast.success("Fac code generated successfully");
+            }
+        } catch (err) {
+            setError(err);
+            throw err;
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    return { createUpdateFacCode, isLoading, error, refetch: createUpdateFacCode };
 };
