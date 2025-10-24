@@ -582,7 +582,7 @@ const CtiDialer = () => {
 
   const handleHoldCall = async (callId: string) => {
     // Check permission for holding calls
-    if (!hasPermission('hold-call-cti')) {
+    if (!hasPermission('dial-call-cti')) {
       toast.error('You do not have permission to hold calls')
       return
     }
@@ -672,7 +672,7 @@ const CtiDialer = () => {
 
   const handleResumeCall = async (callId: string) => {
     // Check permission for resuming calls
-    if (!hasPermission('resume-call-cti')) {
+    if (!hasPermission('dial-call-cti')) {
       toast.error('You do not have permission to resume calls')
       return
     }
@@ -1074,7 +1074,7 @@ const CtiDialer = () => {
 
   const handleEndCall = async (callId: string) => {
     // Check permission for ending calls
-    if (!hasPermission('end-call-cti')) {
+    if (!hasPermission('dial-call-cti')) {
       toast.error('You do not have permission to end calls')
       return
     }
@@ -1167,7 +1167,7 @@ const CtiDialer = () => {
 
   const handleAttendCall = async () => {
     // Check permission for attending calls
-    if (!hasPermission('answer-call-cti')) {
+    if (!hasPermission('dial-call-cti')) {
       toast.error('You do not have permission to answer calls')
       return
     }
@@ -2338,7 +2338,7 @@ const CtiDialer = () => {
   // Remove a member from a merged call
   const removeMemberFromMergedCall = async (mergedCallId: string, memberId: string) => {
     // Check permission for removing from conference calls
-    if (!hasPermission('remove-from-call-cti')) {
+    if (!hasPermission('merge-call-cti')) {
       toast.error('You do not have permission to remove participants from conference calls')
       return
     }
@@ -2979,7 +2979,7 @@ const CtiDialer = () => {
                                       size="sm"
                                       className="remove-member-btn"
                                       onClick={() => removeMemberFromMergedCall(mergedCall.id, member.id)}
-                                      disabled={!hasPermission('remove-from-call-cti')}
+                                      disabled={!hasPermission('merge-call-cti')}
                                       title="Remove from conference"
                                     >
                                       <i className="material-icons-two-tone">call_end</i>
@@ -3079,7 +3079,7 @@ const CtiDialer = () => {
                             size="sm"
                             className="w-100 app-button text-center d-block"
                             onClick={() => handleHoldCall(call.id)}
-                            disabled={processingCalls.has(call.id) || !hasPermission('hold-call-cti')}
+                            disabled={processingCalls.has(call.id) || !hasPermission('dial-call-cti')}
                           >
                             {processingCalls.has(call.id) ? 'Processing...' : 'Hold Call'}
                           </Button>
@@ -3104,7 +3104,7 @@ const CtiDialer = () => {
                             size="sm"
                             className="w-100 app-button text-center d-block"
                             onClick={() => handleEndCall(call.id)}
-                            disabled={processingCalls.has(call.id) || !hasPermission('end-call-cti')}
+                            disabled={processingCalls.has(call.id) || !hasPermission('dial-call-cti')}
                           >
                             {processingCalls.has(call.id) ? 'Processing...' : 'End Call'}
                           </Button>
@@ -3120,7 +3120,7 @@ const CtiDialer = () => {
                             size="sm"
                             className="w-100 app-button text-center d-block"
                             onClick={() => handleResumeCall(call.id)}
-                            disabled={processingCalls.has(call.id) || !hasPermission('resume-call-cti')}
+                            disabled={processingCalls.has(call.id) || !hasPermission('dial-call-cti')}
                           >
                             {processingCalls.has(call.id) ? 'Processing...' : 'Resume Call'}
                           </Button>
@@ -3131,7 +3131,7 @@ const CtiDialer = () => {
                             size="sm"
                             className="w-100 app-button text-center d-block"
                             onClick={() => handleEndCall(call.id)}
-                            disabled={processingCalls.has(call.id) || !hasPermission('end-call-cti')}
+                            disabled={processingCalls.has(call.id) || !hasPermission('dial-call-cti')}
                           >
                             {processingCalls.has(call.id) ? 'Processing...' : 'End Call'}
                           </Button>
@@ -3146,7 +3146,7 @@ const CtiDialer = () => {
                           size="sm"
                           className="w-100 app-button text-center d-block"
                           onClick={() => handleEndCall(call.id)}
-                          disabled={processingCalls.has(call.id) || !hasPermission('end-call-cti')}
+                          disabled={processingCalls.has(call.id) || !hasPermission('dial-call-cti')}
                         >
                           {processingCalls.has(call.id) ? 'Processing...' : 'Cancel'}
                         </Button>
@@ -3160,7 +3160,7 @@ const CtiDialer = () => {
                           size="sm"
                           className="w-100 app-button text-center d-block"
                           onClick={() => handleEndCall(call.id)}
-                          disabled={processingCalls.has(call.id) || !hasPermission('end-call-cti')}
+                          disabled={processingCalls.has(call.id) || !hasPermission('dial-call-cti')}
                         >
                           {processingCalls.has(call.id) ? 'Processing...' : 'Cancel'}
                         </Button>
@@ -3393,7 +3393,7 @@ const CtiDialer = () => {
                     
                       className="w-100 py-3 app-button text-center d-block"
                       onClick={handleAttendCall}
-                      disabled={showPageLoader || !hasPermission('answer-call-cti')}
+                      disabled={showPageLoader || !hasPermission('dial-call-cti')}
                     >
                       <i className="material-icons-two-tone me-2" style={{ backgroundColor: '#fff' }}>call</i>
                       {showPageLoader ? 'Answering...' : 'Answer Call'}
