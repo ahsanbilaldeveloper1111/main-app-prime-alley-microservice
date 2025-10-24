@@ -455,6 +455,23 @@ const CrmCampaigns = () => {
     [session?.user?.permissions]
   );
 
+  const getFieldTypeText = (_fieldType: string) => {
+    const fieldType = _fieldType.toLowerCase();
+    switch (fieldType) {
+      case "string":
+        return "Text";
+      case "integer":
+        return "Number";
+      case "date":
+        return "Date";
+      case "email":
+        return "Email";
+      case "dropdown":
+        return "Dropdown";
+      default:
+        return fieldType;
+    }
+  };
 
   return (
     <React.Fragment>
