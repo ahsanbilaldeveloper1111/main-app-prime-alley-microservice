@@ -73,7 +73,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           if (file.filepath && file.mimetype) {
             // Read file buffer and append with proper MIME type
             const fileBuffer = await fs.readFile(file.filepath);
-            const blob = new Blob([fileBuffer], { type: file.mimetype });
+            // Convert Buffer to Uint8Array for proper Blob compatibility
+            const blob = new Blob([new Uint8Array(fileBuffer)], { type: file.mimetype });
             formData.append(key, blob, file.originalFilename || 'file');
             
             // Clean up temporary file

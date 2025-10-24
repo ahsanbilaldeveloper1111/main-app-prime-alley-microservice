@@ -31,6 +31,7 @@ import {
   Alert,
   Card,
 } from "react-bootstrap";
+import { ModuleSlug } from "@utils/Helper";
 import {
   FiEdit,
   FiTrash2,
@@ -97,7 +98,7 @@ const CrmLeads = () => {
 
   const fetchExtensions = async () => {
     try {
-      const hierarchyData = await GetHierarchyData();
+      const hierarchyData = await GetHierarchyData(ModuleSlug.CRM_LEADS);
       if (hierarchyData?.extensions) {
         setExtensions(hierarchyData.extensions);
       }

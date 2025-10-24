@@ -35,7 +35,8 @@ const parseFormData = async (req: NextApiRequest) => {
         const fileBuffer = await fs.readFile(file.filepath);
         
         // Create a Blob with the correct MIME type
-        const blob = new Blob([fileBuffer], { type: file.mimetype });
+        // Convert Buffer to Uint8Array for proper Blob compatibility
+        const blob = new Blob([new Uint8Array(fileBuffer)], { type: file.mimetype });
         
         // Append to FormData with filename and proper MIME type
         formData.append(key, blob, file.originalFilename || 'file');

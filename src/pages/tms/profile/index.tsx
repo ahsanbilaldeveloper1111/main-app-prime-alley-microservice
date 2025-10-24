@@ -23,6 +23,48 @@ const TmsProfile = () => {
   
   
   
+    const [formData, setFormData] = useState<any>({});
+    const [fac_code_mobile, setFacCodeMobile] = useState<number>(0);
+    const [fac_code, setFacCode] = useState<number>(0);
+    const [selectedCluster, setSelectedCluster] = useState<string>("SIPZON");
+
+    const getUserDetails = useCallback(async (userData?: User) => {
+      try {
+        const response = await axiosInstance.get('tms/getTmsUsers',{params: {auth:true}});
+        
+        const fetchedUserData = response.data?.data?.data?.user as User;
+        if (fetchedUserData) {
+          setUser(fetchedUserData);
+          return fetchedUserData;
+        }
+        //console.log("response getUserDetails", response?.data?.data?.data);
+        //console.log("response getUserDetails", fetchedUserData);
+        
+      } catch (error) {
+        console.error('Error fetching user details:', error);
+      }
+    }, []);
+
+    const getCompanyDetails = useCallback(async () => {
+      if (!user?.company_id) {
+        console.log('No company_id available yet');
+        return;
+      }
+      
+      try {
+        const response = await axiosInstance.get(`tms/getCompany?id=${user.company_id}`);
+        console.log("response getCompanyDetails", response);
+        const data= response?.data?.data;
+        if(data?.success===true){
+          setFacCode(data?.data?.profile?.fac_code);
+          setFacCodeMobile(data?.data?.profile?.fac_code_mobile);
+        }
+        console.log("data getCompanyDetails", data);
+      } catch (error) {
+        console.error('Error fetching company details:', error);
+      }
+    }, [user?.company_id]);
+
 // Initialize user data
 useEffect(() => {
       const initializeUser = async () => {
@@ -46,48 +88,6 @@ useEffect(() => {
         getCompanyDetails();
       }
     }, [user?.company_id, getCompanyDetails]);
-  
-    const getUserDetails = useCallback(async (userData?: User) => {
-      try {
-        const response = await axiosInstance.get('tms/getTmsUsers',{params: {auth:true}});
-        
-        const fetchedUserData = response.data?.data?.data?.user as User;
-        if (fetchedUserData) {
-          setUser(fetchedUserData);
-          return fetchedUserData;
-        }
-        //console.log("response getUserDetails", response?.data?.data?.data);
-        //console.log("response getUserDetails", fetchedUserData);
-        
-      } catch (error) {
-        console.error('Error fetching user details:', error);
-      }
-    }, []);
-
-    const [formData, setFormData] = useState<any>({});
-    const [fac_code_mobile, setFacCodeMobile] = useState<number>(0);
-    const [fac_code, setFacCode] = useState<number>(0);
-    const [selectedCluster, setSelectedCluster] = useState<string>("SIPZON");
-
-    const getCompanyDetails = useCallback(async () => {
-      if (!user?.company_id) {
-        console.log('No company_id available yet');
-        return;
-      }
-      
-      try {
-        const response = await axiosInstance.get(`tms/getCompany?id=${user.company_id}`);
-        console.log("response getCompanyDetails", response);
-        const data= response?.data?.data;
-        if(data?.success===true){
-          setFacCode(data?.data?.profile?.fac_code);
-          setFacCodeMobile(data?.data?.profile?.fac_code_mobile);
-        }
-        console.log("data getCompanyDetails", data);
-      } catch (error) {
-        console.error('Error fetching company details:', error);
-      }
-    }, [user?.company_id]);
 
 
 
