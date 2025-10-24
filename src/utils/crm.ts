@@ -1063,12 +1063,13 @@ export const getCampaigns = async (
   params: PaginationParams = {}
 ): Promise<PaginationWrapper<CampaignData>> => {
   try {
-    const { page = 1, per_page = 15, search = "", filters = {} } = params;
+    const { page = 1, per_page = 15, search = "", filters = {}, module_slug = "" } = params;
     
     // Build query parameters
     const queryParams: any = {
       page,
       per_page,
+      module_slug,
       ...filters
     };
     

@@ -402,10 +402,14 @@ export const ModuleSlug = {
   CALL_LOGS: 'call-logs',
   CALL_RECORDINGS: 'call-recordings',
   TICKET:'tickets',
-  CRM:'crm',
   BILLING:'accounts',
   LIVE_CALLS:'cti',
   USER_DIRECTORY:'users',
+
+  CRM:'crm',
+  CRM_CAMPAIGNS:'crm-campaigns',
+  CRM_DATA_MANAGEMENT:'crm-data-management',
+  CM_OPPORTUNITIES:'crm-opportunities',
 }
 
 export const formatCurrency = (amount: number | null): string => {

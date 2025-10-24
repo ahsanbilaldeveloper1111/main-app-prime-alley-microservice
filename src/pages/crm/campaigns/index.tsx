@@ -53,8 +53,15 @@ import SuccessfulModal from '@pages/partial/SuccessfulModal'
 import PageHeader from "@components/PageHeader";
 import ConfirmModal from "@pages/partial/ConfirmModal";
 import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
+import { ModuleSlug } from "@utils/Helper";
+import { useSession } from "next-auth/react";
+
 
 const CrmCampaigns = () => {
+
+  const { data:session, status } = useSession();
+
+
   const [refreshKey, setRefreshKey] = useState(0);
   const [currentFilters, setCurrentFilters] = useState<Record<string, any>>({});
 
@@ -93,7 +100,7 @@ const CrmCampaigns = () => {
   useEffect(() => {
     const fetchExtensions = async () => {
       try {
-        const hierarchyData = await GetHierarchyData();
+        const hierarchyData = await GetHierarchyData(ModuleSlug.CRM_CAMPAIGNS);
         setExtensions(hierarchyData?.extensions || []);
       } catch (error) {
         console.error('Failed to fetch extensions:', error);
@@ -141,6 +148,7 @@ const CrmCampaigns = () => {
         per_page: perPage,
         search,
         filters: memoizedFilters,
+        module_slug: ModuleSlug.CRM_CAMPAIGNS,
       });
     },
     [memoizedFilters]
@@ -407,56 +415,47 @@ const CrmCampaigns = () => {
           </span>
         ),
       },
+      ...(session?.user?.permissions?.includes('view-crm-campaigns') || session?.user?.permissions?.includes('edit-crm-campaigns') || session?.user?.permissions?.includes('delete-crm-campaigns') ? [
       {
         key: "Action",
         name: "ACTION",
         selector: (row: any) => row.id,
         sortable: false,
         cell: (props: any) => (
+          <>
+          
           <DatatableActionButton
             actions={[
-              {
+              ...(session?.user?.permissions?.includes('view-crm-campaigns') ? [{
                 label: 'View',
                 icon: <FiEye className="me-2" />,
                 onClick: () => handleViewCampaign(props),
-              },
-              {
+                className: 'gap-2'
+              }] : []),
+
+              ...(session?.user?.permissions?.includes('edit-crm-campaigns') ? [{
                 label: 'Edit',
                 icon: <FiEdit className="me-2" />,
                 onClick: () => handleEditCampaign(props),
-              },
-              {
+              }] : []),
+
+              ...(session?.user?.permissions?.includes('delete-crm-campaigns') ? [{
                 label: 'Delete',
                 icon: <FiTrash2 className="me-2" />,
                 onClick: () => handleDeleteCampaign(props),
                 className: 'text-danger',
-              },
+              }] : []),
+
             ]}
           />
+          </>
         ),
-      },
+      }] : []),
     ],
-    []
+    [session?.user?.permissions]
   );
 
 
-  const getFieldTypeText = (_fieldType: string) => {
-    const fieldType = _fieldType.toLowerCase();
-    switch (fieldType) {
-      case "string":
-        return "Text";
-      case "integer":
-        return "Number";
-      case "date":
-        return "Date";
-      case "email":
-        return "Email";
-      case "dropdown":
-        return "Dropdown";
-      default:
-        return fieldType;
-    }
-  };
   return (
     <React.Fragment>
       <BreadcrumbItem
@@ -467,7 +466,7 @@ const CrmCampaigns = () => {
 
       <PageHeader
         title="Campaigns"
-        showSearch={true}
+        showSearch={session?.user?.permissions?.includes('list-crm-campaigns')}
         searchPlaceholder="Search campaigns..."
         searchValue={currentFilters.search || ""}
         onSearchChange={(value) => handleFiltersChange({...currentFilters, search: value})}
@@ -475,12 +474,16 @@ const CrmCampaigns = () => {
         buttons={
           <>
           
+          {session?.user?.permissions?.includes('list-crm-campaigns') && (
           <CampaignFilters onFiltersChange={handleFiltersChange} />
+          )}
           
-          <Button onClick={handleCreateCampaign} className="btn btn-primary">
+          {session?.user?.permissions?.includes('add-crm-campaigns') && (
+            <Button onClick={handleCreateCampaign} className="btn btn-primary">
             <FiPlus className="me-2" />
             New Campaign
           </Button>
+          )}
           </>
         }
       />
@@ -488,6 +491,7 @@ const CrmCampaigns = () => {
 
 
         {/* Campaigns List */}
+        {session?.user?.permissions?.includes('list-crm-campaigns') && (
         <GenericListPage
                   columns={columns}
                   fetchData={fetchCampaigns}
@@ -499,6 +503,7 @@ const CrmCampaigns = () => {
                   search={false}
                   tableStyle="table-style-2"
                 />
+                )}
 
       {/* Create/Edit Campaign Modal */}
      
