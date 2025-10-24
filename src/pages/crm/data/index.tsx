@@ -84,6 +84,8 @@ import ConfirmModal from "@pages/partial/ConfirmModal";
 import SuccessfulModal from "@pages/partial/SuccessfulModal";
 import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
 import DatatableActionButton from "@components/DatatableActionButton";
+import { parseValueFromTransform } from "framer-motion";
+import { ModuleSlug } from "@utils/Helper";
 
 const CrmDataManagement = () => {
   const { data: session } = useSession();
@@ -291,7 +293,8 @@ const CrmDataManagement = () => {
         const batch = campaignIds.slice(i, i + batchSize);
         const campaignsResponse = await getCampaigns({
           per_page: 1000,
-          filters: { ids: batch },
+          filters: { ids: batch},
+          module_slug: ModuleSlug.CRM_CAMPAIGNS,
         });
 
         campaignsResponse.data.forEach((campaign) => {
@@ -383,7 +386,7 @@ const CrmDataManagement = () => {
   useEffect(() => {
     const fetchExtensions = async () => {
       try {
-        const hierarchyData = await GetHierarchyData();
+        const hierarchyData = await GetHierarchyData(ModuleSlug.CRM_DATA_MANAGEMENT);
         if (hierarchyData?.extensions) {
           setExtensions(hierarchyData.extensions);
         }
@@ -525,6 +528,9 @@ const CrmDataManagement = () => {
       if (memoizedFilters.end_date) {
         params.date_to = memoizedFilters.end_date;
       }
+
+      params.module_slug = ModuleSlug.CRM_DATA_MANAGEMENT;
+      console.log("Sending params with module_slug:", params);
 
       const response = await getCrmData(params);
       console.log("CRM Data Response:", response);
@@ -1284,6 +1290,8 @@ const CrmDataManagement = () => {
           );
         },
       },
+
+      ...(session?.user?.permissions?.includes('view-crm-data-management') ? [
       {
         key: "view_action",
         name: "View",
@@ -1301,6 +1309,9 @@ const CrmDataManagement = () => {
           </Button>
         ),
       },
+      ] : []),
+
+     
       {
         key: "call_action",
         name: "Call",
@@ -1308,6 +1319,8 @@ const CrmDataManagement = () => {
         sortable: false,
         cell: (props: any) => (
           <div className="d-flex gap-1">
+           
+           {session?.user?.permissions?.includes('call-service-crm-data-management') && (
             <Button
               variant="success"
               className="app-button"
@@ -1317,27 +1330,34 @@ const CrmDataManagement = () => {
             >
               <FiPhone size={14} />
             </Button>
-            {props.scheduled_call_at ? (
-              <Button
-                variant="warning"
-                size="sm"
-                className="app-button"
-                onClick={() => handleUnscheduleCall(props)}
-                title="Unschedule Call"
-              >
-                <FiX size={14} />
-              </Button>
-            ) : (
-              <Button
-                variant="info"
-                className="app-button"
-                size="sm"
-                onClick={() => handleScheduleCall(props)}
-                title="Schedule Call"
-              >
-                <FiCalendar size={14} />
-              </Button>
             )}
+            
+            {session?.user?.permissions?.includes('call-service-crm-data-management') && (
+              props.scheduled_call_at ? (
+                <Button
+                  variant="warning"
+                  size="sm"
+                  className="app-button"
+                  onClick={() => handleUnscheduleCall(props)}
+                  title="Unschedule Call"
+                >
+                  <FiX size={14} />
+                </Button>
+              ) : (
+                <Button
+                  variant="info"
+                  className="app-button"
+                  size="sm"
+                  onClick={() => handleScheduleCall(props)}
+                  title="Schedule Call"
+                >
+                  <FiCalendar size={14} />
+                </Button>
+              )
+            )}
+
+          {session?.user?.permissions?.includes('message-service-crm-data-management') && (
+
             <DatatableActionButton
                 actions={[
                   {
@@ -1372,9 +1392,12 @@ const CrmDataManagement = () => {
                   },
                 ]}
               />
+              )}
           </div>
         ),
       },
+      
+
       {
         key: "tags",
         name: "Tags",
@@ -1461,10 +1484,14 @@ const CrmDataManagement = () => {
           <>
           
          
+         {session?.user?.permissions?.includes('data-assignment-crm-data-management') && (
                 <Button variant="success" onClick={handleDataAssignment}>
                   <FiUsers className="me-2" />
                   Data Assignment
                 </Button>
+                )}
+
+                {session?.user?.permissions?.includes('call-service-crm-data-management') && (
                 <Button
                   variant="info"
                   onClick={() => setShowAfterCallModal(true)}
@@ -1472,6 +1499,9 @@ const CrmDataManagement = () => {
                   <FiPhone className="me-2" />
                   After Call
                 </Button>
+                )}
+
+                {session?.user?.permissions?.includes('view-history-crm-data-management') && (
                 <Button
                   variant="secondary"
                   onClick={() => setShowHistoryModal(true)}
@@ -1479,6 +1509,9 @@ const CrmDataManagement = () => {
                   <FiClock className="me-2" />
                   View History
                 </Button>
+                )}
+
+                {session?.user?.permissions?.includes('add-crm-data-management') && (
                 <Button
                   variant="primary"
                   onClick={() => setShowUploadModal(true)}
@@ -1486,6 +1519,7 @@ const CrmDataManagement = () => {
                   <FiUpload className="me-2" />
                   Upload CSV
                 </Button>
+                )}
           </>
         }
       />
@@ -1590,12 +1624,19 @@ const CrmDataManagement = () => {
                     <Col md={12} className="d-flex justify-content-end">
                       
                     <div className="action-buttons">
+                    
+                    {session?.user?.permissions?.includes('list-crm-data-management') && (
                     <div className="search-container">
                             <i className="fas fa-search search-icon"></i>
                             <input type="text" className="search-bar" placeholder="Search by phone number..." onChange={(e) => handleFiltersChange({...currentFilters, search: e.target.value})}/>
                         </div>
+                        )}
+
                     
+                    {session?.user?.permissions?.includes('list-crm-data-management') && (
                     <CrmDataFilters onFiltersChange={handleFiltersChange} />
+                    )}
+
                     {selectedItems.length > 0 && (
                   <Button
                     variant="danger"
@@ -1622,13 +1663,8 @@ const CrmDataManagement = () => {
        
         
         
-
-        {/* CRM Data List */}
-        <div className="row">
-          <div className="col-12">
-            <Card className="border-0 shadow-sm">
-              <Card.Body>
-                <GenericListPage
+        {session?.user?.permissions?.includes('list-crm-data-management') && (
+            <GenericListPage
                   columns={columns}
                   fetchData={fetchCrmData}
                   title="CRM Data"
@@ -1643,10 +1679,7 @@ const CrmDataManagement = () => {
                   tableStyle="table-style-2"
 
                 />
-              </Card.Body>
-            </Card>
-          </div>
-        </div>
+                )}
       </div>
 
       {/* Upload Modal */}

@@ -28,8 +28,12 @@ import {
   FiXCircle,
 } from "react-icons/fi";
 import Link from "next/link";
+import { useSession } from "next-auth/react";
+import { ModuleSlug } from "@utils/Helper";
 
 const CrmOpportunities = () => {
+
+  const { data: session } = useSession();
   const [refreshKey, setRefreshKey] = useState<number>(0);
   const [currentFilters, setCurrentFilters] = useState<Record<string, any>>({});
   const [selectedOpportunity, setSelectedOpportunity] = useState<any>(null);
@@ -63,7 +67,7 @@ const CrmOpportunities = () => {
 
   const fetchExtensions = async () => {
     try {
-      const hierarchyData = await GetHierarchyData();
+      const hierarchyData = await GetHierarchyData(ModuleSlug.CRM_OPPORTUNITIES);
       if (hierarchyData?.extensions) {
         setExtensions(hierarchyData.extensions);
       }
@@ -184,36 +188,47 @@ const CrmOpportunities = () => {
           </span>
         ),
       },
+      
       {
         key: "Action",
         name: "ACTION",
         selector: (row: any) => row.id,
         sortable: false,
         cell: (props: any) => (
+
+          <>
+          {session?.user?.permissions?.includes('view-crm-opportunities') || session?.user?.permissions?.includes('edit-crm-opportunities') || session?.user?.permissions?.includes('mark-as-lost-crm-opportunities') || session?.user?.permissions?.includes('delete-crm-opportunities') ? (
           <DatatableActionButton
             actions={[
-              {
+
+              ...(session?.user?.permissions?.includes('edit-crm-opportunities') ? [{
                 label: 'Edit',
                 icon: <FiEdit className="me-2" />,
                 onClick: () => window.location.href = `/crm/leads/${props.id}/edit`,
-              },
-              ...(!props.is_lost ? [{
+              }] : []),
+              
+              ...(session?.user?.permissions?.includes('mark-as-lost-crm-opportunities') ? [{
                 label: 'Mark Lost Reason',
                 icon: <FiXCircle className="me-2" />,
                 onClick: () => handleMarkLost(props),
               }] : []),
-              {
+
+              ...(session?.user?.permissions?.includes('delete-crm-opportunities') ? [{
                 label: 'Delete',
                 icon: <FiTrash2 className="me-2" />,
                 onClick: () => handleDeleteOpportunity(props),
                 className: 'text-danger',
-              },
+              }] : []),
             ]}
           />
+          ) : (
+            <></>
+            )}
+          </>
         ),
       },
     ],
-    [extensions] 
+    [extensions, session?.user?.permissions] 
   );
 
   const fetchOpportunities = useCallback(
@@ -279,22 +294,33 @@ const CrmOpportunities = () => {
        <PageHeader
          title="Opportunities"
          filters={
-           <CrmFilters onFiltersChange={setCurrentFilters} type="opportunity" />
+          session?.user?.permissions?.includes('list-crm-opportunities') ? (
+            <CrmFilters onFiltersChange={setCurrentFilters} type="opportunity" />
+          ) : (
+            <></>
+          )
          }
-         showSearch={true}
+         showSearch={session?.user?.permissions?.includes('list-crm-opportunities')}
          searchPlaceholder="Search opportunities..."
          searchValue={currentFilters?.search || ""}
          onSearchChange={(value) => setCurrentFilters({...currentFilters, search: value})}
          buttons={
+          <>
+          {session?.user?.permissions?.includes('add-crm-opportunities') ? (
            <Link href="/crm/leads/create?type=opportunity" className="btn btn-primary">
              <FiPlus className="me-2" />
              New Opportunity
            </Link>
+           ) : (
+            <></>
+           )}
+           </>
          }
          leftGrid={3}
          rightGrid={9}
        />
 
+         {session?.user?.permissions?.includes('list-crm-opportunities') ? (
       <GenericListPage
         columns={columns}
         fetchData={fetchOpportunities}
@@ -305,6 +331,9 @@ const CrmOpportunities = () => {
         search={false}
         tableStyle="table-style-2"
       />
+      ) : (
+        <></>
+      )}
 
       {/* Delete Confirmation Modal */}
       <Modal show={showDeleteModal} onHide={() => setShowDeleteModal(false)}>

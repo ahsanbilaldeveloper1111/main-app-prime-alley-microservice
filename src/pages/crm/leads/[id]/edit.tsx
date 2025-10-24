@@ -2,6 +2,7 @@ import "@assets/scss/datatable-style.scss";
 import React, { ReactElement, useState, useCallback, useEffect } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
+import { ModuleSlug } from "@utils/Helper";
 import {
   getLead,
   updateLead,
@@ -59,6 +60,7 @@ import ConfirmModal from "@pages/partial/ConfirmModal";
 import SuccessfulModal from "@pages/partial/SuccessfulModal";
 import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
 import DatatableActionButton from "@components/DatatableActionButton";
+import { useSession } from "next-auth/react";
 
 
 interface Meeting {
@@ -87,6 +89,7 @@ interface AuditLogEntry {
 }
 
 const EditLead = () => {
+  const { data: session } = useSession();
   const router = useRouter();
   const { id } = router.query;
   const [lead, setLead] = useState<any>(null);
@@ -205,7 +208,7 @@ const EditLead = () => {
 
   const fetchExtensions = async () => {
     try {
-      const hierarchyData = await GetHierarchyData();
+      const hierarchyData = await GetHierarchyData(ModuleSlug.CRM_OPPORTUNITIES);
       if (hierarchyData?.extensions) {
         setExtensions(hierarchyData.extensions);
       }
@@ -601,10 +604,16 @@ const handleCloseSuccessfulModal = () => {
       <PageHeader
         title={`Edit ${isOpportunity ? "Opportunity" : "Lead"}`}
         buttons={
+          <>
+          {session?.user?.permissions?.includes('view-crm-leads') || session?.user?.permissions?.includes('view-crm-opportunities') ? (
           <Link href={isOpportunity ? "/crm/opportunities" : "/crm/leads"} className="btn btn-primary me-2">
             <FiArrowLeft className="me-2" />
             Back to {isOpportunity ? "Opportunities" : "Leads"}
           </Link>
+          ) : (
+            <></>
+          )}
+          </>
         }
       />
 
@@ -873,6 +882,8 @@ const handleCloseSuccessfulModal = () => {
             <Card className="border-0 shadow-sm">
               <Card.Header className="d-flex justify-content-between align-items-center p-3">
                 <h5 className="mb-0 app-title-heading">Meetings</h5>
+
+                {session?.user?.permissions?.includes('add-meeting-crm-opportunities')  ? (
                 <Button
                   variant="primary"
                   size="sm"
@@ -882,9 +893,14 @@ const handleCloseSuccessfulModal = () => {
                   <FiPlus className="me-2" />
                   New Meeting
                 </Button>
+                ) : (
+                  <></>
+                )}
+
+
               </Card.Header>
               <Card.Body>
-                {meetings.length == 0 ? (
+                {meetings.length == 0  && session?.user?.permissions?.includes('meeting-crm-opportunities') ? (
                   <p className="text-muted text-center">
                     No meetings scheduled
                   </p>
@@ -944,7 +960,9 @@ const handleCloseSuccessfulModal = () => {
                             <td>
                               <DatatableActionButton
                                 actions={[
-                                  {
+                                 
+                                 
+                                  ...(session?.user?.permissions?.includes('edit-meeting-crm-opportunities') ? [{
                                     label: 'Edit',
                                     icon: <FiEdit className="me-2" />,
                                     onClick: () => {
@@ -960,8 +978,12 @@ const handleCloseSuccessfulModal = () => {
                                       });
                                       setShowMeetingModal(true);
                                     },
-                                  },
-                                  {
+                                  }] : []),
+
+
+
+
+                                  ...(session?.user?.permissions?.includes('delete-meeting-crm-opportunities') ? [{
                                     label: 'Delete',
                                     icon: <FiTrash2 className="me-2" />,
                                     onClick: () => {
@@ -969,7 +991,7 @@ const handleCloseSuccessfulModal = () => {
                                       setShowDeleteMeetingModal(true);
                                     },
                                     className: 'text-danger',
-                                  },
+                                  }] : []),
                                 ]}
                               />
                             </td>

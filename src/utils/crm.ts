@@ -1,5 +1,6 @@
 import { toast } from "react-toastify";
 import axiosInstance from "./axios";
+import { ModuleSlug } from "./Helper";
 
 // API Response Structure from Controlhub
 interface ControlhubResponse<T> {
@@ -108,6 +109,7 @@ export interface PaginationParams extends Record<string, any> {
   page?: number;
   per_page?: number;
   search?: string;
+  module_slug?: string;
 }
 
 // CRM Dashboard Data
@@ -602,6 +604,7 @@ export const getOpportunities = async (
   params: PaginationParams = {}
 ): Promise<PaginationWrapper<OpportunityData>> => {
   try {
+    params.module_slug = ModuleSlug.CRM_OPPORTUNITIES;
     const response = await axiosInstance.get("/crm/opportunities", { params });
     return extractData<PaginationWrapper<OpportunityData>>(response.data);
   } catch (error: any) {
@@ -697,6 +700,7 @@ export interface CrmDataUploadResponse {
 
 export const getCrmData = async (params: PaginationParams = {}): Promise<CrmDataResponse> => {
   try {
+    params.module_slug = ModuleSlug.CRM_DATA_MANAGEMENT;
     const response = await axiosInstance.get("/crm/crm-data", { params });
     return response.data?.data;
   } catch (error: any) {
@@ -1069,7 +1073,7 @@ export const getCampaigns = async (
     const queryParams: any = {
       page,
       per_page,
-      module_slug,
+      module_slug:ModuleSlug.CRM_CAMPAIGNS,
       ...filters
     };
     
