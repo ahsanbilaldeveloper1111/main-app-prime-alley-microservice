@@ -50,9 +50,12 @@ import ConfirmModal from "@pages/partial/ConfirmModal";
 import SuccessfulModal from "@pages/partial/SuccessfulModal";
 import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
 import DatatableActionButton from "@components/DatatableActionButton";
+import { useSession } from "next-auth/react";
 
 
 const CrmLeads = () => {
+  const { data: session } = useSession();
+
   const [stages, setStages] = useState<any[]>([]);
   const [lostReasons, setLostReasons] = useState<
     { id: number; name: string }[]
@@ -367,33 +370,38 @@ const CrmLeads = () => {
         cell: (props: any) => (
           <DatatableActionButton
             actions={[
-              {
+              ...(session?.user?.permissions?.includes('view-crm-leads') ? [{
+                label: 'View',
+                icon: <FiEye className="me-2" />,
+                onClick: () => window.location.href = `/crm/leads/${props.id}`,
+              }] : []),
+              ...(session?.user?.permissions?.includes('edit-crm-leads') ? [{
                 label: 'Edit',
                 icon: <FiEdit className="me-2" />,
                 onClick: () => window.location.href = `/crm/leads/${props.id}/edit`,
-              },
-              ...(!props.is_lost && !props.is_opportunity ? [{
+              }] : []),
+              ...(session?.user?.permissions?.includes('convert-to-opportunity-crm-leads') ? [{
                 label: 'Convert to Opportunity',
                 icon: <FiTarget className="me-2" />,
                 onClick: () => handleConvertLead(props),
               }] : []),
-              ...(!props.is_lost ? [{
+              ...(session?.user?.permissions?.includes('mark-as-lost-crm-leads') ? [{
                 label: 'Mark Lost Reason',
                 icon: <FiXCircle className="me-2" />,
                 onClick: () => handleMarkLost(props),
               }] : []),
-              {
+              ...(session?.user?.permissions?.includes('delete-crm-leads') ? [{
                 label: 'Delete',
                 icon: <FiTrash2 className="me-2" />,
                 onClick: () => handleDeleteLead(props.id),
                 className: 'text-danger',
-              },
+              }] : []),
             ]}
           />
         ),
       },
     ],
-    [extensions]
+    [extensions, session?.user?.permissions]
   );
 
   return (
@@ -407,22 +415,32 @@ const CrmLeads = () => {
       <PageHeader
         title="Leads"
         filters={
+          session?.user?.permissions?.includes('list-crm-leads') ? (
           <CrmFilters onFiltersChange={handleFiltersChange} type="lead" />
-        }
-        showSearch={true}
+        ) : (
+          <></>
+        )}
+        showSearch={session?.user?.permissions?.includes('list-crm-leads')}
         searchValue={currentFilters.search || ""}
         onSearchChange={(value) => handleFiltersChange({...currentFilters, search: value})}
         searchPlaceholder="Search leads..."
         buttons={
+          <>
+          {session?.user?.permissions?.includes('add-crm-leads') ? (
           <Link href="/crm/leads/create" className="btn btn-primary">
                   <FiPlus className="me-2" />
                   New Lead
                 </Link>
+                ) : (
+                  <></>
+                )}
+                </>
         }
         leftGrid={3}
         rightGrid={9}
       />
 
+{session?.user?.permissions?.includes('list-crm-leads') ? (
 <GenericListPage
                   columns={columns}
                   fetchData={fetchLeads}
@@ -434,6 +452,9 @@ const CrmLeads = () => {
                   search={false}
                   tableStyle="table-style-2"
                 />
+                ) : (
+                  <></>
+                )}
 
       <ConfirmModal
         show={showDeleteModal}
