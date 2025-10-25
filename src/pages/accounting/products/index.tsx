@@ -150,18 +150,24 @@ const ProductList = () => {
           <>  
           <DatatableActionButton
                     actions={[
+
+                      ...(session?.user?.permissions?.includes('edit-products-billing') ? [
                         {
                             label: 'Edit',
                             icon: <FiEdit />,
                             onClick: () => handleEditProduct(props),
                             className: 'gap-2'
                         },
+                        ] : []),
+
+                        ...(session?.user?.permissions?.includes('delete-products-billing') ? [
                         {
                             label: 'Delete',
                             icon: <FiTrash2 />,
                             onClick: () => handleDeleteProduct(props),
                             className: 'text-danger gap-2'
                         }
+                        ] : []),
                     ]}
                 />
           </>
@@ -527,19 +533,27 @@ const ProductList = () => {
 
       <PageHeader
         title="Products"
-        showSearch={true}
+        showSearch={session?.user?.permissions?.includes('list-products-billing')}
         searchPlaceholder="Search products..."
         searchValue={currentFilters.search || ""}
         onSearchChange={(value) => handleFiltersChange({...currentFilters, search: value})}
         buttons={
           <>
+          {session?.user?.permissions?.includes('add-products-billing') && (
           <Button variant="primary" size="sm" onClick={openCreateProductModal}>New Product</Button>
+          )}
+
+
+          {session?.user?.permissions?.includes('products-categories-products-billing') && (
           <Button variant="secondary" size="sm" onClick={openCategoryModal}>Manage Categories</Button>
+          )}
           </>
         }
       />
 
 
+      
+      {session?.user?.permissions?.includes('list-products-billing') && (
       <GenericListPage
         columns={columns}
         fetchData={fetchProducts}
@@ -551,6 +565,7 @@ const ProductList = () => {
         search={false }
         tableStyle="table-style-2"
       />
+      )}
 
       {/* Create Product Modal */}
       <FormModal

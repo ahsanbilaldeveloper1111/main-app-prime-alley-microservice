@@ -182,24 +182,33 @@ const ResellerList = () => {
         cell: (props: any) => (
           <DatatableActionButton
             actions={[
+
+              ...(session?.user?.permissions?.includes('edit-resellers-billing') ? [
               {
                 label: 'Edit',
                 icon: <FiEdit />,
                 onClick: () => handleEditReseller(props),
                 className: 'gap-2'
               },
+              ] : []),
+
+              ...(session?.user?.permissions?.includes('view-as-resellers-billing') ? [
               {
                 label: 'View As Reseller',
                 icon: <FiEye />,
                 onClick: () => handleViewAsReseller(props),
                 className: 'gap-2'
               },
+              ] : []),
+
+              ...(session?.user?.permissions?.includes('delete-resellers-billing') ? [
               {
                 label: 'Delete',
                 icon: <FiTrash2 />,
                 onClick: () => handleDeleteReseller(props),
                 className: 'text-danger gap-2'
               }
+              ] : []),
             ]}
           />
         ),
@@ -456,16 +465,20 @@ const ResellerList = () => {
 
       <PageHeader
         title="Resellers"
-        showSearch={true}
+        showSearch={session?.user?.permissions?.includes('list-resellers-billing')}
         searchPlaceholder="Search reseller..."
         searchValue={currentFilters.search || ""}
         onSearchChange={(value) =>
           handleFiltersChange({ ...currentFilters, search: value })
         }
         buttons={
-          <Button variant="primary" size="sm" onClick={openCreateModal}>
+          <>
+          {session?.user?.permissions?.includes('add-resellers-billing') && (
+            <Button variant="primary" size="sm" onClick={openCreateModal}>
             New Reseller
           </Button>
+          )}
+          </>
         }
       />
 
@@ -503,6 +516,7 @@ const ResellerList = () => {
         </Card.Body>
       </Card>
 
+      {session?.user?.permissions?.includes('list-resellers-billing') && (
       <GenericListPage
         columns={columns}
         fetchData={fetchResellers}
@@ -514,6 +528,7 @@ const ResellerList = () => {
         filters={filters}
         tableStyle="table-style-2"
       />
+      )}
 
       {showCreateModal && (
         <FormModal

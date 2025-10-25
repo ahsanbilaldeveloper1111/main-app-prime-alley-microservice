@@ -597,22 +597,30 @@ const InvoiceList = () => {
         cell: (props: InvoiceData) => {
           const isUnpaid = true; // All invoices can be paid
           const actions = [
+
+            ...(session?.user?.permissions?.includes('edit-invoices-billing') ? [
             {
               label: 'Edit',
               icon: FiEdit,
               onClick: () => handleEditInvoice(props),
               variant: 'edit'
             },
+            ] : []),
+            
+            ...(session?.user?.permissions?.includes('download-invoice-invoices-billing') ? [
             {
               label: 'Download PDF',
               icon: FiDownload,
               onClick: () => handleDownloadPDF(props),
               variant: 'default'
             }
+            ] : []),
+
+            
           ];
 
           // Add Pay action for unpaid invoices
-          if (isUnpaid) {
+          if (isUnpaid && session?.user?.permissions?.includes('pay-invoice-invoices-billing')) {
             actions.push({
               label: 'Pay',
               icon: FiDollarSign,
@@ -621,13 +629,14 @@ const InvoiceList = () => {
             });
           }
 
-          // Add Delete action
+          {session?.user?.permissions?.includes('delete-invoices-billing') && (
           actions.push({
             label: 'Delete',
             icon: FiTrash2,
             onClick: () => handleDeleteInvoice(props),
             variant: 'delete'
-          });
+          })
+          )}
 
           return (
             <TableAction actions={actions as Action[]} />
@@ -2105,18 +2114,21 @@ const InvoiceList = () => {
 
       <PageHeader
         title="Invoices"
-        showSearch={true}
+        showSearch={session?.user?.permissions?.includes('list-invoices-billing')}
         searchPlaceholder="Search invoices..."
         searchValue={currentFilters.search || ""}
         onSearchChange={(value) => handleFiltersChange({...currentFilters, search: value})}
         buttons={
-          <Button variant="primary" size="sm" onClick={openCreateInvoiceModal}>New Invoice</Button>
+          <>
+          {session?.user?.permissions?.includes('add-invoices-billing') && (
+            <Button variant="primary" size="sm" onClick={openCreateInvoiceModal}>New Invoice</Button>
+          )}
+          </>
         }
       />
 
       
-     
-
+      {session?.user?.permissions?.includes('list-invoices-billing') && (
       <GenericListPage
         columns={columns}
         fetchData={fetchInvoices}
@@ -2128,6 +2140,7 @@ const InvoiceList = () => {
         search={false}
         tableStyle="table-style-2"
       />
+      )}
 
       {/* Create Invoice Modal */}
       {showCreateInvoiceModal && (

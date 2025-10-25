@@ -129,19 +129,25 @@ const SupplierList = () => {
           <>  
           <DatatableActionButton
                     actions={[
+                      ...(session?.user?.permissions?.includes('edit-suppliers-billing') ? [
                         {
                             label: 'Edit',
                             icon: <FiEdit />,
                             onClick: () => handleEditSupplier(props),
                             className: 'gap-2'
                         },
+                        ] : []),
+
+                      ...(session?.user?.permissions?.includes('delete-suppliers-billing') ? [
                         {
                             label: 'Delete',
                             icon: <FiTrash2 />,
                             onClick: () => handleDeleteSupplier(props),
                             className: 'text-danger gap-2'
                         },
+                        ] : []),
                     ]}
+
                 />
           </>
 
@@ -328,16 +334,20 @@ const SupplierList = () => {
 
       <PageHeader
         title="Suppliers"
-        showSearch={true}
+        showSearch={session?.user?.permissions?.includes('list-suppliers-billing')}
         searchPlaceholder="Search suppliers..."
         searchValue={currentFilters.search || ""}
         onSearchChange={(value) => handleFiltersChange({...currentFilters, search: value})}
         buttons={
-          <Button variant="primary" size="sm" onClick={openCreateSupplierModal}>New Supplier</Button>
+          <>
+          {session?.user?.permissions?.includes('add-suppliers-billing') && (
+            <Button variant="primary" size="sm" onClick={openCreateSupplierModal}>New Supplier</Button>
+          )}
+          </>
         }
       />
 
-
+      {session?.user?.permissions?.includes('list-suppliers-billing') && (
       <GenericListPage
         columns={columns}
         fetchData={fetchSuppliers}
@@ -349,6 +359,7 @@ const SupplierList = () => {
         search={true}
         tableStyle="table-style-2"
       />
+      )}
 
       {/* Create Supplier Modal */}
       {showCreateSupplierModal && (

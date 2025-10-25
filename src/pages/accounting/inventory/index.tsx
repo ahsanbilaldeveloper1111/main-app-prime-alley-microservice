@@ -128,18 +128,24 @@ const InventoryList = () => {
           <>
           <DatatableActionButton
                     actions={[
+
+                      ...(session?.user?.permissions?.includes('edit-inventory-billing') ? [
                         {
                             label: 'Edit',
                             icon: <FiEdit />,
                             onClick: () => handleEditInventory(props),
                             className: 'gap-2'
                         },
+                        ] : []),
+
+                      ...(session?.user?.permissions?.includes('delete-inventory-billing') ? [
                         {
                             label: 'Delete',
                             icon: <FiTrash2 />,
                             onClick: () => handleDeleteInventory(props),
                             className: 'text-danger gap-2'
                         }
+                        ] : []),
                     ]}
                 />
           </>
@@ -410,16 +416,21 @@ const InventoryList = () => {
 
       <PageHeader
         title="Inventory"
-        showSearch={true}
+        showSearch={session?.user?.permissions?.includes('list-inventory-billing')}
         searchPlaceholder="Search inventory..."
         searchValue={currentFilters.search || ""}
         onSearchChange={(value) => handleFiltersChange({...currentFilters, search: value})}
         buttons={
-          <Button variant="primary" size="sm" onClick={openCreateInventoryModal}>New Inventory Item</Button>
+          <>
+          {session?.user?.permissions?.includes('add-inventory-billing') && (
+            <Button variant="primary" size="sm" onClick={openCreateInventoryModal}>New Inventory Item</Button>
+          )}
+          </>
         }
       />
 
      
+      {session?.user?.permissions?.includes('list-inventory-billing') && (
 
       <GenericListPage
         columns={columns}
@@ -432,6 +443,8 @@ const InventoryList = () => {
         search={false}
         tableStyle="table-style-2"
       />
+      )}
+
 
       {/* Create Inventory Modal */}
       <FormModal

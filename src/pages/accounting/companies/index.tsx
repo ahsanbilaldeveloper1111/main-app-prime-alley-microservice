@@ -187,30 +187,41 @@ const CompanyList = () => {
           <>
             <DatatableActionButton
               actions={[
-                {
-                  label: "Edit",
-                  icon: <FiEdit />,
-                  onClick: () => handleEditCompany(props),
-                  //  permission: 'edit-companies',
-                  className: "gap-2",
-                },
-                {
-                  label: "Pricing",
-                  icon: <FiEdit />,
-                  onClick: () =>
-                    router.push(
-                      `/accounting/companies/product-pricing?companyId=${props.id}`
-                    ),
-                  //  permission: 'edit-companies',
-                  className: "gap-2",
-                },
-                {
-                  label: "Delete",
-                  icon: <FiTrash2 />,
-                  onClick: () => handleDeleteCompany(props),
-                  //  permission: 'delete-companies',
-                  className: "text-danger gap-2",
-                },
+
+
+                ...(session?.user?.permissions?.includes('edit-companies-billing') ? [
+                  {
+                    label: "Edit",
+                    icon: <FiEdit />,
+                    onClick: () => handleEditCompany(props),
+                    //  permission: 'edit-companies',
+                    className: "gap-2",
+                  },
+                ] : []),
+
+
+                ...(session?.user?.permissions?.includes('manage-pricing-companies-billing') ? [
+                  {
+                    label: "Pricing",
+                    icon: <FiEdit />,
+                    onClick: () =>
+                      router.push(
+                        `/accounting/companies/product-pricing?companyId=${props.id}`
+                      ),
+                    //  permission: 'edit-companies',
+                    className: "gap-2",
+                  },
+                ] : []),
+
+                ...(session?.user?.permissions?.includes('delete-companies-billing') ? [
+                  {
+                    label: "Delete",
+                    icon: <FiTrash2 />,
+                    onClick: () => handleDeleteCompany(props),
+                    //  permission: 'delete-companies',
+                    className: "text-danger gap-2",
+                  },
+                ] : []),
               ]}
             />
           </>
@@ -655,7 +666,7 @@ const CompanyList = () => {
 
       <PageHeader
         title="Companies"
-        showSearch={true}
+        showSearch={session?.user?.permissions?.includes('list-companies-billing')}
         searchPlaceholder="Search companies..."
         searchValue={currentFilters.search || ""}
         onSearchChange={(value) =>
@@ -663,25 +674,40 @@ const CompanyList = () => {
         }
         buttons={
           <div className="d-flex align-items-center gap-2">
+            
+            {session?.user?.permissions?.includes('list-companies-billing') && (
             <CompaniesFilters
               onFiltersChange={handleFiltersChange}
               showFilters={true}
               showExport={false}
               onExport={handleExportCompanies}
             />
+            )}
+
+            {session?.user?.permissions?.includes('bulk-import-companies-billing') && (
+            <>
             <Button variant="info" size="sm" onClick={handleDownloadTemplate}>
               Download Template
             </Button>
             <Button variant="success" size="sm" onClick={openBulkImportModal}>
               Bulk Import
             </Button>
-            <Button variant="primary" size="sm" onClick={openCreateModal}>
-              New Company
-            </Button>
+            </>
+            )}
+
+            {session?.user?.permissions?.includes('add-companies-billing') && (
+              <Button variant="primary" className="app-button" size="sm" onClick={openCreateModal}>
+                New Company
+              </Button>
+            )}
+
           </div>
         }
+        leftGrid={3}
+        rightGrid={9}
       />
 
+{session?.user?.permissions?.includes('list-companies-billing') && (
       <GenericListPage
         columns={columns}
         fetchData={fetchCompanies}
@@ -693,6 +719,7 @@ const CompanyList = () => {
         filters={currentFilters}
         tableStyle="table-style-2"
       />
+      )}
 
       {/* Create Modal */}
       <FormModal

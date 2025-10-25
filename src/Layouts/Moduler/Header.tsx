@@ -1309,54 +1309,80 @@ const Header = ({ themeMode }: HeaderProps) => {
                         <span className="pc-mtext">Dashboard</span>
                     </Link>
                 </li> */}
+
+                {session?.user?.permissions?.includes(PERMISSIONS.VIEW_INVOICES_BILLING) && (
                 <li className="pc-item">
                     <Link className="pc-link" href={`${BASE_URL}/accounting/invoices`} >
                         <span className="pc-micon"><i className="ph-duotone ph-file-text"></i></span>
                         <span className="pc-mtext">Invoices</span>
                     </Link>
                 </li>
+                )}
+
+
+                {session?.user?.permissions?.includes(PERMISSIONS.VIEW_EXPENSES_BILLING) && (
                 <li className="pc-item">
                     <Link className="pc-link" href={`${BASE_URL}/accounting/expenses`} >
                         <span className="pc-micon"><i className="ph-duotone ph-credit-card"></i></span>
                         <span className="pc-mtext">Expenses</span>
                     </Link>
                 </li>
+                )}
+
+                {session?.user?.permissions?.includes(PERMISSIONS.VIEW_PRODUCTS_BILLING) && (
                 <li className="pc-item">
                     <Link className="pc-link" href={`${BASE_URL}/accounting/products`} >
                         <span className="pc-micon"><i className="ph-duotone ph-package"></i></span>
                         <span className="pc-mtext">Products</span>
                     </Link>
                 </li>
+                )}
+
+                {session?.user?.permissions?.includes(PERMISSIONS.VIEW_INVENTORY_BILLING) && (
                 <li className="pc-item">
                     <Link className="pc-link" href={`${BASE_URL}/accounting/inventory`} >
                         <span className="pc-micon"><i className="ph-duotone ph-warehouse"></i></span>
                         <span className="pc-mtext">Inventory</span>
                     </Link>
                 </li>
+                )}
+
+                {session?.user?.permissions?.includes(PERMISSIONS.VIEW_COMPANIES_BILLING) && (
                 <li className="pc-item">
                     <Link className="pc-link" href={`${BASE_URL}/accounting/companies`} >
                         <span className="pc-micon"><i className="ph-duotone ph-buildings"></i></span>
                         <span className="pc-mtext">Companies</span>
                     </Link>
                 </li>
+                )}
+
+                {session?.user?.permissions?.includes(PERMISSIONS.VIEW_RESSELLERS_BILLING) && (
                 <li className="pc-item">
                     <Link className="pc-link" href={`${BASE_URL}/accounting/resellers`} >
                         <span className="pc-micon"><i className="ph-duotone ph-users"></i></span>
                         <span className="pc-mtext">Resellers</span>
                     </Link>
                 </li>
+                )}
+
+                {session?.user?.permissions?.includes(PERMISSIONS.VIEW_LOCATIONS_BILLING) && (
                 <li className="pc-item">
                     <Link className="pc-link" href={`${BASE_URL}/accounting/locations`} >
                         <span className="pc-micon"><i className="ph-duotone ph-map-pin"></i></span>
                         <span className="pc-mtext">Locations</span>
                     </Link>
                 </li>
+                )}
+
+                {session?.user?.permissions?.includes(PERMISSIONS.VIEW_SUPPLIERS_BILLING) && (
                 <li className="pc-item">
                     <Link className="pc-link" href={`${BASE_URL}/accounting/suppliers`} >
                         <span className="pc-micon"><i className="ph-duotone ph-truck"></i></span>
                         <span className="pc-mtext">Suppliers</span>
                     </Link>
                 </li>
+                )}
+                
             </ul>                       
         </div>
     ), []);

@@ -216,7 +216,19 @@ export const HEADER_CONSTANTS = {
     ACCOUNTS_SERVICES: 'accounts-services',
     NETOPS_SERVICES: 'health-care-services',
     CALL_HISTORY_SERVICES: 'call-history-services',
-    RESOURCES_SERVICES: 'resources-services'
+    RESOURCES_SERVICES: 'resources-services',
+
+    VIEW_COMPANIES_BILLING: 'view-companies-billing',
+    VIEW_INVOICES_BILLING: 'view-invoices-billing',
+    VIEW_EXPENSES_BILLING: 'view-expenses-billing',
+    VIEW_PRODUCTS_BILLING: 'view-products-billing',
+    VIEW_SUPPLIERS_BILLING: 'view-suppliers-billing',
+    VIEW_LOCATIONS_BILLING: 'view-locations-billing',
+    VIEW_RESSELLERS_BILLING: 'view-resellers-billing',
+    VIEW_INVENTORY_BILLING: 'view-inventory-billing',
+    VIEW_PRODUCT_PRICING_COMPANIES_BILLING: 'manage-pricing-companies-billing',
+
+    
   } as const
 } as const;
 

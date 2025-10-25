@@ -278,38 +278,38 @@ export const routePermissions: RoutePermission[] = [
         children: [
             {
                 path: '/companies',
-                permissions: [PERMISSIONS.ACCOUNTS_SERVICES],
+                permissions: [PERMISSIONS.VIEW_COMPANIES_BILLING],
                 children: [
-                    { path: '/product-pricing',permissions: [PERMISSIONS.ACCOUNTS_SERVICES]}
+                    { path: '/product-pricing',permissions: [PERMISSIONS.VIEW_PRODUCT_PRICING_COMPANIES_BILLING]}
                 ]
             },
             {
                 path: '/expenses',
-                permissions: [PERMISSIONS.ACCOUNTS_SERVICES]
+                permissions: [PERMISSIONS.VIEW_EXPENSES_BILLING]
             },
             {
                 path: '/invoices',
-                permissions: [PERMISSIONS.ACCOUNTS_SERVICES]
+                permissions: [PERMISSIONS.VIEW_INVOICES_BILLING]
             },
             {
                 path: '/inventory',
-                permissions: [PERMISSIONS.ACCOUNTS_SERVICES]
+                permissions: [PERMISSIONS.VIEW_INVENTORY_BILLING]
             },
             {
                 path: '/locations',
-                permissions: [PERMISSIONS.ACCOUNTS_SERVICES]
+                permissions: [PERMISSIONS.VIEW_LOCATIONS_BILLING]
             },
             {
                 path: '/products',
-                permissions: [PERMISSIONS.ACCOUNTS_SERVICES]
+                permissions: [PERMISSIONS.VIEW_PRODUCTS_BILLING]
             },
             {
                 path: '/resellers',
-                permissions: [PERMISSIONS.ACCOUNTS_SERVICES]
+                permissions: [PERMISSIONS.VIEW_RESSELLERS_BILLING]
             },
             {
                 path: '/suppliers',
-                permissions: [PERMISSIONS.ACCOUNTS_SERVICES]
+                permissions: [PERMISSIONS.VIEW_SUPPLIERS_BILLING]
             }
         ]
     },

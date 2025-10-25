@@ -223,30 +223,43 @@ const ExpenseList = () => {
         cell: (props: ExpenseData) => (
           <DatatableActionButton
             actions={[
+
+              ...(session?.user?.permissions?.includes('attachments-expenses-billing') ? [
               {
                 label: "View Attachments",
                 icon: <FiEye />,
                 onClick: () => handleViewAttachments(props),
                 className: "gap-2",
               },
+              ] : []),
+
+
+              ...(session?.user?.permissions?.includes('download-expenses-billing') ? [
               {
                 label: "Download PDF",
                 icon: <FiDownload />,
                 onClick: () => handleDownloadPDF(props),
                 className: "gap-2",
               },
+              ] : []),
+
+              ...(session?.user?.permissions?.includes('edit-expenses-billing') ? [
               {
                 label: "Edit",
                 icon: <FiEdit />,
                 onClick: () => handleEditExpense(props),
                 className: "gap-2",
               },
+              ] : []),
+
+              ...(session?.user?.permissions?.includes('delete-expenses-billing') ? [
               {
                 label: "Delete",
                 icon: <FiTrash2 />,
                 onClick: () => handleDeleteExpense(props),
                 className: "text-danger gap-2",
               },
+              ] : []),
             ]}
           />
         ),
@@ -956,7 +969,7 @@ const ExpenseList = () => {
         title="Expenses"
         leftGrid={3}
         rightGrid={9}
-        showSearch={true}
+        showSearch={session?.user?.permissions?.includes('list-expenses-billing')}
         searchPlaceholder="Search expenses..."
         searchValue={currentFilters.search || ""}
         onSearchChange={(value) =>
@@ -964,6 +977,7 @@ const ExpenseList = () => {
         }
         buttons={
           <>
+          {session?.user?.permissions?.includes('add-expenses-billing') && (
             <Button
               variant="primary"
               size="sm"
@@ -971,14 +985,18 @@ const ExpenseList = () => {
             >
               New Expense
             </Button>
+            )}
 
+            {session?.user?.permissions?.includes('expense-categories-expenses-billing') && (
             <Button variant="secondary" size="sm" onClick={openCategoryModal}>
               Categories
             </Button>
+            )}
           </>
         }
       />
 
+{session?.user?.permissions?.includes('list-expenses-billing') && (
       <GenericListPage
         columns={columns}
         fetchData={fetchExpenses}
@@ -990,6 +1008,7 @@ const ExpenseList = () => {
         search={false}
         tableStyle="table-style-2"
       />
+      )}
 
       {/* Create Expense Modal */}
       <FormModal

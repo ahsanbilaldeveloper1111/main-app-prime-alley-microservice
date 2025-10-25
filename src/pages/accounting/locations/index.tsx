@@ -128,18 +128,23 @@ const LocationList = () => {
           <>
           <DatatableActionButton
                     actions={[
+                      ...(session?.user?.permissions?.includes('edit-locations-billing') ? [
                         {
                             label: 'Edit',
                             icon: <FiEdit />,
                             onClick: () => handleEditLocation(props),
                             className: 'gap-2'
                         },
+                        ] : []),
+
+                        ...(session?.user?.permissions?.includes('delete-locations-billing') ? [
                         {
                             label: 'Delete',
                             icon: <FiTrash2 />,
                             onClick: () => handleDeleteLocation(props),
                             className: 'text-danger gap-2'
                         },
+                        ] : []),
                     ]}
                 />
           </>
@@ -348,17 +353,21 @@ const LocationList = () => {
 
       <PageHeader
         title="Locations"
-        showSearch={true}
+        showSearch={session?.user?.permissions?.includes('list-locations-billing')}
         searchPlaceholder="Search locations..."
         searchValue={currentFilters.search || ""}
         onSearchChange={(value) => handleFiltersChange({...currentFilters, search: value})}
         buttons={
-          <Button variant="primary" size="sm" onClick={openCreateLocationModal}>New Location</Button>
+          <>
+          {session?.user?.permissions?.includes('add-locations-billing') && (
+            <Button variant="primary" size="sm" onClick={openCreateLocationModal}>New Location</Button>
+          )}
+          </>
         }
       />
 
      
-
+      {session?.user?.permissions?.includes('list-locations-billing') && (
       <GenericListPage
         columns={columns}
         fetchData={fetchLocations}
@@ -370,6 +379,7 @@ const LocationList = () => {
         search={false}
         tableStyle="table-style-2"
       />
+      )}
 
       {/* Create Location Modal */}
       {showCreateLocationModal && (
