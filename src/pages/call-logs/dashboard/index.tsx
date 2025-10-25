@@ -245,16 +245,12 @@ const CallDashboard = () => {
         
         // Map extension data to chart format
         const extensionLabels = chartExtension.map((item: any) => item.label || 'Unknown');
-        const shortestData = chartExtension.map((item: any) => item.shortest ? parseInt(item.shortest) : 0);
-        const longestData = chartExtension.map((item: any) => item.longest ? parseInt(item.longest) : 0);
+        const values = chartExtension.map((item: any) => item.value ? parseInt(item.value) : 0);
         
         setExtensionChart({
           series: [{
-            name: 'Shortest',
-            data: shortestData
-          }, {
-            name: 'Longest', 
-            data: longestData
+            name: 'Call Count',
+            data: values
           }],
           options: {
             ...ExtensionChart.options,
@@ -263,10 +259,7 @@ const CallDashboard = () => {
               categories: extensionLabels,
               labels: {
                 show: true,
-                formatter: function(value: string) {
-                  const numValue = parseFloat(value);
-                  return isNaN(numValue) ? value : formatSecondsToTime(numValue);
-                },
+                
                 style: {
                   fontSize: '11px',
                   colors: '#666'
@@ -275,11 +268,7 @@ const CallDashboard = () => {
             },
             tooltip: {
               ...ExtensionChart.options.tooltip,
-              y: {
-                formatter: function(value: number) {
-                  return formatSecondsToTime(value);
-                }
-              }
+              
             }
           }
         });
@@ -292,20 +281,12 @@ const CallDashboard = () => {
         
         // Map department data to chart format
         const departmentLabels = chartDepartment.map((item: any) => item.label || 'Unknown');
-        const shortestData = chartDepartment.map((item: any) => item.shortest ? parseInt(item.shortest) : 0);
-        const longestData = chartDepartment.map((item: any) => item.longest ? parseInt(item.longest) : 0);
-        const averageData = chartDepartment.map((item: any) => item.average ? parseInt(item.average) : 0);
+        const values = chartDepartment.map((item: any) => item.value ? parseInt(item.value) : 0);
         
         setDepartmentChart({
           series: [{
-            name: 'Shortest',
-            data: shortestData
-          }, {
-            name: 'Average',
-            data: averageData
-          }, {
-            name: 'Longest',
-            data: longestData
+            name: 'Call Count',
+            data: values
           }],
           options: {
             ...DepartmentChart.options,
@@ -314,10 +295,7 @@ const CallDashboard = () => {
                 categories: departmentLabels as string[],
                 labels: {
                   show: true,
-                  formatter: function(value: string) {
-                    const numValue = parseFloat(value);
-                    return isNaN(numValue) ? value : formatSecondsToTime(numValue);
-                  },
+                  
                   style: {
                     fontSize: '11px',
                     colors: '#666'
@@ -350,11 +328,7 @@ const CallDashboard = () => {
               enabled: false,
             },
             tooltip: {
-              y: {
-                formatter: function(value: number) {
-                  return formatSecondsToTime(value);
-                }
-              }
+               
             }
           }
         });
@@ -367,23 +341,13 @@ const CallDashboard = () => {
         
         // Map country data to chart format
         const countryLabels = chartCountry.map((item: any) => item.label || 'Unknown');
-        const shortestData = chartCountry.map((item: any) => item.shortest ? parseInt(item.shortest) : 0);
-        const longestData = chartCountry.map((item: any) => item.longest ? parseInt(item.longest) : 0);
-        const averageData = chartCountry.map((item: any) => item.average ? parseInt(item.average) : 0);
+        const values = chartCountry.map((item: any) => item.value ? parseInt(item.value) : 0);
         
         setCountryChart({
           series: [
             {
-              name: 'Shortest',
-              data: shortestData
-            },
-            {
-              name: 'Average',
-              data: averageData
-            },
-            {
-              name: 'Longest',
-              data: longestData
+              name: 'Call Count',
+              data: values
             }
           ],
           options: {
@@ -393,10 +357,7 @@ const CallDashboard = () => {
               categories: countryLabels,
               labels: {
                 show: true,
-                formatter: function(value: string) {
-                  const numValue = parseFloat(value);
-                  return isNaN(numValue) ? value : formatSecondsToTime(numValue);
-                },
+                
                 style: {
                   fontSize: '11px',
                   colors: '#666'
@@ -404,11 +365,7 @@ const CallDashboard = () => {
               }
             },
             tooltip: {
-              y: {
-                formatter: function(value: number) {
-                  return formatSecondsToTime(value);
-                }
-              }
+              
             }
           }
         });
@@ -447,20 +404,12 @@ const CallDashboard = () => {
         enabled: false
       },
       tooltip: {
-        y: {
-          formatter: function(value: number) {
-            return formatSecondsToTime(value);
-          }
-        }
+        
       },
       xaxis: {
         categories: [] as string[],
         labels: {
           show: true,
-          formatter: function(value: string) {
-            const numValue = parseFloat(value);
-            return isNaN(numValue) ? value : formatSecondsToTime(numValue);
-          },
           style: {
             fontSize: '11px',
             colors: '#666'
@@ -508,20 +457,12 @@ const [DepartmentChart, setDepartmentChart] = React.useState({
           enabled: false
         },
         tooltip: {
-          y: {
-            formatter: function(value: number) {
-              return formatSecondsToTime(value);
-            }
-          }
+          
         },
         xaxis: {
           categories: [] as string[],
           labels: {
             show: true,
-            formatter: function(value: string) {
-              const numValue = parseFloat(value);
-              return isNaN(numValue) ? value : formatSecondsToTime(numValue);
-            },
             style: {
               fontSize: '11px',
               colors: '#666'
@@ -584,20 +525,12 @@ const [ExtensionChart, setExtensionChart] = React.useState({
     tooltip: {
       shared: false,
       intersect: false,
-      y: {
-        formatter: function(value: number) {
-          return formatSecondsToTime(value);
-        }
-      }
+      
     },
     xaxis: {
       categories: [] as string[],
       labels: {
         show: true,
-        formatter: function(value: string) {
-          const numValue = parseFloat(value);
-          return isNaN(numValue) ? value : formatSecondsToTime(numValue);
-        },
         style: {
           fontSize: '11px',
           colors: '#666'

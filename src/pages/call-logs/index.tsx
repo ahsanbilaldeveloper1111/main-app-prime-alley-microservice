@@ -25,6 +25,7 @@ import '@assets/scss/common.scss';
 
 import { convertUTCToUserTimezone, convertUTCTimeToUserTimezone, convertUTCSeparateDateTimeToUserTime, convertUTCSeparateDateTimeToUserDate, formatDuration, GlobalDateFormat, GlobalTimeFormat } from '@utils/Helper';
 import { ModuleSlug } from '@utils/Helper';
+import { useHierarchyData } from '@components/filters/useHierarchyData';
 
 
 interface Summary {
@@ -83,12 +84,18 @@ const CallLogs = () => {
         outbound: 0
     });
 
+    const {hierarchyDataUsers} = useHierarchyData(ModuleSlug.CALL_LOGS);
+    const [totalUsers, setTotalUsers] = useState(0);
+    useEffect(() => {
+        setTotalUsers(hierarchyDataUsers.length);
+    }, [hierarchyDataUsers]);
+
     // Create cards data for PageSummaryGrid
     const summaryCards: SummaryCard[] = [
         {
             id: 'total-users',
             title: 'Total Users',
-            value: summary?.users || 0,
+            value: totalUsers || 0,
             description: 'Total users who made calls',
             delay: 0.1,
             showAnimatedNumber: true,
