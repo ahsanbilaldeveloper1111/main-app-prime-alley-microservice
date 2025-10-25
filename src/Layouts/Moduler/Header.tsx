@@ -810,49 +810,49 @@ const Header = ({ themeMode }: HeaderProps) => {
             items: [
                 {
                     key: 'dashboard-gsm-management',
-                    permission: 'dashboard-gsm-management',
+                    permission: PERMISSIONS.VIEW_GSM_DASHBOARD,
                     icon: ICONS.GAUGE,
                     label: SUBMENU_LABELS.GSM_DASHBOARD,
                     href: '/gsm/dashboard'
                 },
                 {
                     key: 'view-gsm-management',
-                    permission: 'view-gsm-management',
+                    permission: PERMISSIONS.VIEW_GSM_MANAGEMENT,
                     icon: ICONS.LIST,
                     label: SUBMENU_LABELS.GSM_LIST,
                     href: '/gsm/list'
                 },
                 {
                     key: 'view-gsm-assignment',
-                    permission: 'view-gsm-assignment',
+                    permission: PERMISSIONS.VIEW_GSM_ASSIGNMENT,
                     icon: ICONS.LIST,
                     label: SUBMENU_LABELS.COMPANY_ASSIGN,
                     href: '/gsm/assign'
                 },
                 {
                     key: 'view-gsm-ports',
-                    permission: 'view-gsm-ports',
+                    permission: PERMISSIONS.VIEW_GSM_PORTS,
                     icon: ICONS.LIST,
                     label: SUBMENU_LABELS.PORTS,
                     href: '/gsm/ports'
                 },
                 {
                     key: 'view-gsm-inbox',
-                    permission: 'view-gsm-inbox',
+                    permission: PERMISSIONS.VIEW_GSM_INBOX,
                     icon: ICONS.ENVELOPE,
                     label: SUBMENU_LABELS.INBOX,
                     href: '/gsm/inbox'
                 },
                 {
                     key: 'view-gsm-sync',
-                    permission: 'view-gsm-port-sync',
+                    permission: PERMISSIONS.VIEW_GSM_SYNC,
                     icon: ICONS.ARROWS_CLOCKWISE,
                     label: SUBMENU_LABELS.SYNC_GSM,
                     href: '/gsm/sync'
                 },
                 {
                     key: 'view-company-po',
-                    permission: 'view-gsm-company-profilling',
+                    permission: PERMISSIONS.VIEW_GSM_COMPANY_PROFILLING,
                     icon: ICONS.BUILDING,
                     label: SUBMENU_LABELS.COMPANY_PO,
                     href: '/gsm/company/po'
