@@ -29,6 +29,7 @@ import ConfirmModal from "@pages/partial/ConfirmModal";
 import SuccessfulModal from "@pages/partial/SuccessfulModal";
 import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
 import DatatableActionButton from "@components/DatatableActionButton";
+import { useSession } from "next-auth/react";
 
 
 interface Stage {
@@ -47,6 +48,7 @@ interface Stage {
 }
 
 const StagesManagement = () => {
+  const { data: session } = useSession();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showUpdateModal, setShowUpdateModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -306,6 +308,8 @@ const StagesManagement = () => {
         cell: (props: Stage) => (
           <DatatableActionButton
             actions={[
+
+              ...(session?.user?.permissions?.includes('edit-crm-stages') ? [
               {
                 label: 'Edit',
                 icon: <FiEdit2 />,
@@ -326,6 +330,9 @@ const StagesManagement = () => {
                 },
                 className: 'text-primary',
               },
+              ] : []),
+
+              ...(session?.user?.permissions?.includes('delete-crm-stages') ? [
               {
                 label: 'Delete',
                 icon: <FiTrash2 />,
@@ -335,6 +342,7 @@ const StagesManagement = () => {
                 },
                 className: 'text-danger',
               },
+              ] : []),
             ]}
           />
         ),
@@ -355,24 +363,25 @@ const StagesManagement = () => {
 
       <PageHeader
         title="Stages"
-        showSearch={true}
+        showSearch={session?.user?.permissions?.includes('list-crm-stages')}
         searchPlaceholder="Search stages..."
         searchValue={currentFilters.search || ""}
         onSearchChange={(value) => handleFiltersChange({...currentFilters, search: value})}
         buttons={
+          <>
+          {session?.user?.permissions?.includes('add-crm-stages') && (
           <Button variant="primary" onClick={() => setShowCreateModal(true)}>
             <FiPlus className="me-2" />
             New Stage
           </Button>
+          )}
+          </>
         }
       />
 
-      <div className="container-fluid">
-        
-        {/* Stages List */}
-        <div className="row">
-          <div className="col-12">
-            <GenericListPage
+
+{session?.user?.permissions?.includes('list-crm-stages') && (
+<GenericListPage
               columns={columns}
               fetchData={fetchStagesForTable}
               title="Stages"
@@ -384,9 +393,7 @@ const StagesManagement = () => {
               tableStyle="table-style-2"
              
             />
-          </div>
-        </div>
-      </div>
+            )}
 
       {/* Create Stage Modal */}
       {/* <Modal show={showCreateModal} onHide={() => setShowCreateModal(false)} size="lg">

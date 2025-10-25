@@ -228,6 +228,17 @@ export const HEADER_CONSTANTS = {
     VIEW_INVENTORY_BILLING: 'view-inventory-billing',
     VIEW_PRODUCT_PRICING_COMPANIES_BILLING: 'manage-pricing-companies-billing',
 
+    VIEW_CRM_DASHBOARD: 'dashboard-crm',
+    VIEW_CRM_CAMPAIGNS: 'view-crm-campaigns',
+    VIEW_CRM_DATA_MANAGEMENT: 'view-crm-data-management',
+    CREATE_CRM_DATA_MANAGEMENT: 'add-crm-data-management',
+    VIEW_CRM_OPPORTUNITIES: 'view-crm-opportunities',
+    CREATE_CRM_OPPORTUNITIES: 'add-crm-opportunities',
+    VIEW_CRM_LEADS: 'view-crm-leads',
+    CREATE_CRM_LEADS: 'add-crm-leads',
+    VIEW_CRM_STAGES: 'view-crm-stages',
+    VIEW_CRM_LOST_REASONS: 'view-crm-lost-reasons',
+
     
   } as const
 } as const;

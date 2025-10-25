@@ -230,32 +230,32 @@ export const routePermissions: RoutePermission[] = [
         permissions: [PERMISSIONS.CRM_SERVICES],
         children: [
             { 
-                path: '/dashboard',permissions: [PERMISSIONS.CRM_SERVICES]
+                path: '/dashboard',permissions: [PERMISSIONS.VIEW_CRM_DASHBOARD]
             },
             { 
-                path: '/campaigns',permissions: [PERMISSIONS.CRM_SERVICES],
+                path: '/campaigns',permissions: [PERMISSIONS.VIEW_CRM_CAMPAIGNS],
                 children: [
-                    { path: '/',permissions: [PERMISSIONS.CRM_SERVICES]}
+                    { path: '/',permissions: [PERMISSIONS.VIEW_CRM_CAMPAIGNS]}
                 ]
             },
             { 
-                path: '/data',permissions: [PERMISSIONS.CRM_SERVICES],
+                path: '/data',permissions: [PERMISSIONS.VIEW_CRM_DATA_MANAGEMENT],
                 children: [
-                    { path: '/',permissions: [PERMISSIONS.CRM_SERVICES]},
-                    { path: '/create',permissions: [PERMISSIONS.CRM_SERVICES]},
+                    { path: '/',permissions: [PERMISSIONS.VIEW_CRM_DATA_MANAGEMENT]},
+                    { path: '/create',permissions: [PERMISSIONS.CREATE_CRM_DATA_MANAGEMENT]},
                 ]
             },
             { 
-                path: '/leads',permissions: [PERMISSIONS.CRM_SERVICES],
+                path: '/leads',permissions: [PERMISSIONS.VIEW_CRM_LEADS],
                 children: [
-                    { path: '/',permissions: [PERMISSIONS.CRM_SERVICES]},
-                    { path: '/create',permissions: [PERMISSIONS.CRM_SERVICES]},
+                    { path: '/',permissions: [PERMISSIONS.VIEW_CRM_LEADS]},
+                    { path: '/create',permissions: [PERMISSIONS.CREATE_CRM_LEADS]},
                 ]
             },
-            { path: '/lost-reasons',permissions: [PERMISSIONS.CRM_SERVICES]},
-            { path: '/opportunities',permissions: [PERMISSIONS.CRM_SERVICES]},
-            { path: '/opportunities/create',permissions: [PERMISSIONS.CRM_SERVICES]},
-            { path: '/stages',permissions: [PERMISSIONS.CRM_SERVICES]},
+            { path: '/lost-reasons',permissions: [PERMISSIONS.VIEW_CRM_LOST_REASONS]},
+            { path: '/opportunities',permissions: [PERMISSIONS.VIEW_CRM_OPPORTUNITIES]},
+            { path: '/opportunities/create',permissions: [PERMISSIONS.CREATE_CRM_OPPORTUNITIES]},
+            { path: '/stages',permissions: [PERMISSIONS.VIEW_CRM_STAGES]},
         ]
     },
     

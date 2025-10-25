@@ -1250,48 +1250,71 @@ const Header = ({ themeMode }: HeaderProps) => {
         <div className="tab-pane" id="pc-tab-7" role="tabpanel" aria-labelledby="pc-tab-link-7" tabIndex={1}>
             <div className="pc-submenu-title">{MENU_LABELS.CRM}</div>
             <ul className="pc-navbar">
+
+                {session?.user?.permissions?.includes(PERMISSIONS.VIEW_CRM_DASHBOARD) && (
                                     <li className="pc-item">
                                         <Link className="pc-link" href={`${BASE_URL}/crm/dashboard`}>
                                             <span className="pc-micon"><i className={ICONS.GAUGE}></i></span>
                                             <span className="pc-mtext">{SUBMENU_LABELS.CRM_DASHBOARD}</span>
                                                 </Link>
                                             </li>
+                                            )}
+
+                {session?.user?.permissions?.includes(PERMISSIONS.VIEW_CRM_CAMPAIGNS) && (
                                             <li className="pc-item">
                                         <Link className="pc-link" href={`${BASE_URL}/crm/campaigns`}>
                                             <span className="pc-micon"><i className={ICONS.MEGAPHONE}></i></span>
                                             <span className="pc-mtext">{SUBMENU_LABELS.CAMPAIGNS}</span>
                                         </Link>
                                     </li>
+                                    )}
+
+
+                {session?.user?.permissions?.includes(PERMISSIONS.VIEW_CRM_DATA_MANAGEMENT) && (
                                     <li className="pc-item">
                                         <Link className="pc-link" href={`${BASE_URL}/crm/data`}>
                                             <span className="pc-micon"><i className={ICONS.DATABASE}></i></span>
                                             <span className="pc-mtext">{SUBMENU_LABELS.DATA_MANAGEMENT}</span>
                                                 </Link>
                                             </li>
+                                            )}
+
+
+                {session?.user?.permissions?.includes(PERMISSIONS.VIEW_CRM_LEADS) && (
                                     <li className="pc-item">
                                         <Link className="pc-link" href={`${BASE_URL}/crm/leads`}>
                                             <span className="pc-micon"><i className={ICONS.USERS}></i></span>
                                             <span className="pc-mtext">{SUBMENU_LABELS.LEADS}</span>
                                                 </Link>
                                             </li>
+                                            )}
+
+                {session?.user?.permissions?.includes(PERMISSIONS.VIEW_CRM_OPPORTUNITIES) && (
                                     <li className="pc-item">
                                         <Link className="pc-link" href={`${BASE_URL}/crm/opportunities`}>
                                             <span className="pc-micon"><i className={ICONS.TARGET}></i></span>
                                             <span className="pc-mtext">{SUBMENU_LABELS.OPPORTUNITIES}</span>
                                                 </Link>
                                             </li>
+                                            )}
+
+                {session?.user?.permissions?.includes(PERMISSIONS.VIEW_CRM_STAGES) && (
                                     <li className="pc-item">
                                         <Link className="pc-link" href={`${BASE_URL}/crm/stages`}>
                                             <span className="pc-micon"><i className={ICONS.TRENDING_UP}></i></span>
                                             <span className="pc-mtext">{SUBMENU_LABELS.STAGES}</span>
                                                 </Link>
                                             </li>
+                                            )}
+
+                {session?.user?.permissions?.includes(PERMISSIONS.VIEW_CRM_LOST_REASONS) && (
                                     <li className="pc-item">
                                         <Link className="pc-link" href={`${BASE_URL}/crm/lost-reasons`}>
                                             <span className="pc-micon"><i className={ICONS.X_CIRCLE}></i></span>
                                             <span className="pc-mtext">{SUBMENU_LABELS.LOST_REASONS_CRM}</span>
                                                 </Link>
                                             </li>
+                                            )}
                                 
                                    
                                         </ul>
@@ -1382,7 +1405,7 @@ const Header = ({ themeMode }: HeaderProps) => {
                     </Link>
                 </li>
                 )}
-                
+
             </ul>                       
         </div>
     ), []);
