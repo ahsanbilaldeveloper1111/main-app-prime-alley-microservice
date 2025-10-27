@@ -135,32 +135,7 @@ const CustomError = ({ statusCode }: ErrorProps) => {
                 </Link>
               </div>
 
-              {/* Additional Help */}
-              <div className="mt-5 pt-4" style={{ borderTop: '1px solid rgba(255,255,255,0.2)' }}>
-                <p className="mb-3" style={{ opacity: 0.8 }}>
-                  Need help? Try these popular pages:
-                </p>
-                <div className="d-flex flex-wrap justify-content-center gap-3">
-                  <Link href="/dashboard" className="text-white text-decoration-none">
-                    <span className="badge bg-light text-dark px-3 py-2 rounded-pill">
-                      <i className="fas fa-tachometer-alt me-1"></i>
-                      Dashboard
-                    </span>
-                  </Link>
-                  <Link href="/tms/profiling/customers" className="text-white text-decoration-none">
-                    <span className="badge bg-light text-dark px-3 py-2 rounded-pill">
-                      <i className="fas fa-users me-1"></i>
-                      Customer Profiling
-                    </span>
-                  </Link>
-                  <Link href="/cti" className="text-white text-decoration-none">
-                    <span className="badge bg-light text-dark px-3 py-2 rounded-pill">
-                      <i className="fas fa-phone me-1"></i>
-                      CTI
-                    </span>
-                  </Link>
-                </div>
-              </div>
+              
             </div>
           </Col>
         </Row>

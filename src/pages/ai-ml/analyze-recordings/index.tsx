@@ -378,7 +378,7 @@ const AnalyzeRecordings = () => {
     const [showPageLoader, setShowPageLoader] = useState(false);
     const fetchGeneralStats = async () => {
         setShowPageLoader(true);
-        const response = await ListCallLogs({ page: page, perPage: perPage, search: "", filters: currentFilters, reportType: 'statsDashboard' }, 'call-logs/generalStats').finally(() => {
+        const response = await ListCallLogs({ page: page, perPage: perPage, search: "", filters: currentFilters, reportType: 'statsDashboard', moduleSlug: ModuleSlug.CALL_RECORDINGS }, 'call-logs/generalStats').finally(() => {
             setShowPageLoader(false);
         });
 

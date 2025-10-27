@@ -55,8 +55,8 @@ export const HEADER_CONSTANTS = {
     
     // Sim Gateway
     GSM_DASHBOARD: 'Dashboard',
-    GSM_LIST: 'Gsm List',
-    COMPANY_ASSIGN: 'Company Assign',
+    GSM_LIST: 'Telco Gateway List',
+    COMPANY_ASSIGN: 'Assign',
     PORTS: 'Ports',
     INBOX: 'Inbox',
     SYNC_GSM: 'Sync GSM',
@@ -239,6 +239,13 @@ export const HEADER_CONSTANTS = {
     VIEW_CRM_STAGES: 'view-crm-stages',
     VIEW_CRM_LOST_REASONS: 'view-crm-lost-reasons',
 
+    VIEW_GSM_DASHBOARD: 'dashboard-gsm-management',
+    VIEW_GSM_MANAGEMENT: 'view-gsm-management',
+    VIEW_GSM_ASSIGNMENT: 'view-gsm-assignment',
+    VIEW_GSM_PORTS: 'view-gsm-ports',
+    VIEW_GSM_INBOX: 'view-gsm-inbox',
+    VIEW_GSM_SYNC: 'view-gsm-port-sync',
+    VIEW_GSM_COMPANY_PROFILLING: 'view-gsm-company-profilling',
     
   } as const
 } as const;

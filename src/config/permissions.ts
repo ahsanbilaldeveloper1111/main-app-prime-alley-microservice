@@ -321,33 +321,33 @@ export const routePermissions: RoutePermission[] = [
         children: [
             {
                 path: '/dashboard',
-                permissions: ['dashboard-gsm-management']
+                permissions: [PERMISSIONS.VIEW_GSM_DASHBOARD]
             },
             {
                 path: '/list',
-                permissions: ['view-gsm-management']
+                permissions: [PERMISSIONS.VIEW_GSM_MANAGEMENT]
             },
             {
                 path: '/assign',
-                permissions: ['view-gsm-assignment']
+                permissions: [PERMISSIONS.VIEW_GSM_ASSIGNMENT]
             },
             {
                 path: '/ports',
-                permissions: ['view-gsm-ports']
+                permissions: [PERMISSIONS.VIEW_GSM_PORTS]
             },
             {
                 path: '/inbox',
-                permissions: ['view-gsm-inbox']
+                permissions: [PERMISSIONS.VIEW_GSM_INBOX]
             },
             {
                 path: '/sync',
-                permissions: ['view-gsm-port-sync']
+                permissions: [PERMISSIONS.VIEW_GSM_SYNC]
             },
             {
                 path: '/company',
-                permissions: ['view-gsm-company-profilling'],
+                permissions: [PERMISSIONS.VIEW_GSM_COMPANY_PROFILLING],
                 children: [
-                    { path: '/po',permissions: ['view-gsm-company-profilling']}
+                    { path: '/po',permissions: [PERMISSIONS.VIEW_GSM_COMPANY_PROFILLING]}
                 ]
             }
         ]
@@ -444,7 +444,7 @@ export const routePermissions: RoutePermission[] = [
         children: [
             { path: '/',permissions: ['view-cti']},
             { path: '/monitoring',permissions: ['view-cti']},
-            { path: '/dialer',permissions: ['dial-call-cti', 'hold-call-cti', 'resume-call-cti', 'end-call-cti', 'merge-call-cti', 'transfer-call-cti', 'remove-from-call-cti', 'answer-call-cti']},
+            { path: '/dialer',permissions: ['dial-call-cti']},
 
         ]
     },

@@ -104,24 +104,33 @@ const GsmList = () => {
       cell: (props: any) => (
         <DatatableActionButton
           actions={[
+
+            ...(session?.user?.permissions?.includes('edit-gsm-management') ? [
             {
               label: "Edit",
               icon: <FiEdit className="me-2" />,
               onClick: () => handleEditGsm(props),
               className: "action-edit",
             },
+            ] : []),
+
+            ...(session?.user?.permissions?.includes('view-gsm-management') ? [
             {
               label: "View",
               icon: <FiEye className="me-2" />,
               onClick: () => setShowGsmDetailsModel(true),
               className: "action-view",
             },
+            ] : []),
+
+            ...(session?.user?.permissions?.includes('delete-gsm-management') ? [
             {
               label: "Delete",
               icon: <FiTrash2 className="me-2" />,
               onClick: () => handleDeleteGsm(props),
               className: "action-delete",
             },
+            ] : []),
           ]}
         />
       ),
@@ -350,13 +359,13 @@ const GsmList = () => {
           }
         }
       `}</style>
-      <BreadcrumbItem mainTitle="" mainLink="" subTitle="Call Logs" />
+      <BreadcrumbItem mainTitle="" mainLink="" subTitle="Telco Gateway Management" />
       <Row className="mb-3">
         <Col md={12}>
           <div className="page-header-title style-2">
             <Row className="d-flex justify-content-between align-items-center">
               <Col md={5}>
-                <h2 className="mb-0">Gsm Management</h2>
+                <h2 className="mb-0">Telco Gateway Management</h2>
 
                 {/* {session?.user?.permissions?.includes('add-gsm-management') && (
                           <Button variant="outline-primary" size="sm" className="ms-3" onClick={() => setShowCreateGsmModal(true)}>New Gsm</Button>
@@ -370,6 +379,8 @@ const GsmList = () => {
 
               <Col md={7} className="d-flex justify-content-end">
                 <div className="action-buttons">
+                  
+                  {session?.user?.permissions?.includes('list-gsm-management') && (
                   <div className="search-container">
                     <i className="fas fa-search search-icon"></i>
                     <input
@@ -384,6 +395,9 @@ const GsmList = () => {
                       }
                     />
                   </div>
+                  )}
+
+{session?.user?.permissions?.includes('add-gsm-management') && (
                   <button
                     className="btn btn-primary"
                     id="new-assign-btn"
@@ -391,6 +405,10 @@ const GsmList = () => {
                   >
                     <i className="fas fa-plus"></i> New Assign
                   </button>
+                  )}
+
+
+{session?.user?.permissions?.includes('export-gsm-managements') && (
                   <button
                     className="btn btn-export"
                     id="export-btn"
@@ -398,7 +416,9 @@ const GsmList = () => {
                   >
                     <i className="fas fa-download"></i> Export
                   </button>
+                  )}
                 </div>
+                
               </Col>
             </Row>
           </div>
