@@ -472,7 +472,7 @@ const [DepartmentChart, setDepartmentChart] = React.useState({
         yaxis: {
           show: true,
           title: {
-            text: 'Duration', // <-- Your custom label here
+            text: 'Call Count', // <-- Your custom label here
             style: {
               fontSize: '12px',
               fontWeight: 'bold',
