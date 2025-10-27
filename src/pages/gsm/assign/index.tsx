@@ -74,53 +74,48 @@ const GsmAssign = () => {
       sortable: false,
       cell: (props: any) => (
         <div className="action-buttons-container">
-          {/* gsm_id, company_id , unassigned_ports, assigned_ports*/}
-
-          {/* {session?.user?.permissions?.includes('assign-port-gsm-assignment') && 
-                     props?.unassigned_ports?.length > 0 && (
-                       <button className="btn btn-sm btn-outline-primary" onClick={() => handleAssignPorts(props)}>Assign Ports</button>
-                   )}  
-
-                   {session?.user?.permissions?.includes('unassign-port-gsm-assignment')  && props?.assigned_ports?.length > 0 && (
-                       <button className="btn btn-sm btn-outline-danger" onClick={() => handleUnassignPorts(props)}>Unassign Ports</button>
-                   )} */}
-
-          {/* <button className="btn btn-sm btn-outline-primary" onClick={() => handleAssignPortsNew(props)}>Assign Ports</button>
-
-                   {session?.user?.permissions?.includes('company-unlink-gsm-assignment')  && (
-                       <button className="btn btn-sm btn-outline-danger" onClick={() => handleDelinkCompany(props)}>Delink Company</button>
-                   )}
-                   
-                   {session?.user?.permissions?.includes('edit-link-gsm-assignment')  && (
-                       <button className="btn btn-sm btn-outline-primary" onClick={() => handleEditLink(props)}>Edit</button>
-                   )} */}
+          
 
           <DatatableActionButton
             actions={[
+              
+              ...(session?.user?.permissions?.includes('assign-port-gsm-assignment') 
+              || session?.user?.permissions?.includes('unassign-port-gsm-assignment') ? [
               {
                 label: "Ports",
                 icon: <FiEye className="me-2" />,
                 onClick: () => handleManagePorts(props),
                 className: "action-view",
               },
+              ] : []),
+
+              ...(session?.user?.permissions?.includes('send-ussd-gsm-assignment') ? [
               {
                 label: "Send USSD",
                 icon: <FiSend className="me-2" />,
                 onClick: () => handleSendUssd(props),
                 className: "action-send",
               },
+              ] : []),
+
+              ...(session?.user?.permissions?.includes('send-sms-gsm-assignment') ? [
               {
                 label: "Send SMS",
                 icon: <FiMessageSquare className="me-2" />,
                 onClick: () => handleSendSms(props),
                 className: "action-sms",
               },
+              ] : []),
+
+              ...(session?.user?.permissions?.includes('delete-gsm-assignment') ? [
               {
                 label: "Delete",
                 icon: <FiTrash2 className="me-2" />,
                 onClick: () => handleDelinkCompany(props),
                 className: "action-delete",
               },
+              ] : []),
+
             ]}
           />
         </div>
@@ -568,14 +563,14 @@ const GsmAssign = () => {
 
   return (
     <React.Fragment>
-      <BreadcrumbItem mainTitle="" mainLink="" subTitle="Call Logs" />
+      <BreadcrumbItem mainTitle="" mainLink="" subTitle="Telco Gateway Assign" />
       <Row className="mb-3">
         <Col md={12}>
           <div className="page-header-title style-2">
             <Row className="align-items-center">
               <Col md={5}>
                 <h2 className="mb-0 d-flex align-items-center">
-                  GSM Assign
+                  Telco Gateway Assign
                   {/* {session?.user?.permissions?.includes('company-link-gsm-assignment') && (
                           <Button variant="outline-primary" size="sm" className="ms-3" onClick={() => handleCreateAssignement()}>New Assign</Button>
                       )} */}
@@ -587,18 +582,23 @@ const GsmAssign = () => {
                             <i className="fas fa-search search-icon"></i>
                             <input type="text" className="search-bar" placeholder="Search GSM, Company..." onChange={(e) => handleFiltersChange({...currentFilters, search: e.target.value})}/>
                         </div> */}
+
+{session?.user?.permissions?.includes("list-gsm-assignment") && (
                   <GsmCompanyFilter
                     onFiltersChange={handleFiltersChange}
                     onExport={handleExport}
                     showExport={false}
                   />
+                  )}
 
+{session?.user?.permissions?.includes('company-link-gsm-assignment') || session?.user?.permissions?.includes('company-unlink-gsm-assignment') && (
                   <button
                     className="btn btn-primary btn-sm"
                     onClick={() => handleAssignGsm()}
                   >
                     <i className="fas fa-plus"></i> New Assign
                   </button>
+                  )}
                 </div>
               </Col>
             </Row>

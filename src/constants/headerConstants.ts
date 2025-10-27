@@ -55,8 +55,8 @@ export const HEADER_CONSTANTS = {
     
     // Sim Gateway
     GSM_DASHBOARD: 'Dashboard',
-    GSM_LIST: 'Gsm List',
-    COMPANY_ASSIGN: 'Company Assign',
+    GSM_LIST: 'Telco Gateway List',
+    COMPANY_ASSIGN: 'Assign',
     PORTS: 'Ports',
     INBOX: 'Inbox',
     SYNC_GSM: 'Sync GSM',
