@@ -50,19 +50,20 @@ const Devices = () => {
         { key: 'port', name: 'Port', selector: (row: any) => row.port, sortable: true },
         { key: 'monitoring_status', name: 'Status', selector: (row: any) => row.monitoring_status, sortable: true,
             cell: (props: any) => {
-                if (props.monitoring_status === undefined) {
-                    return (
-                        <span className="status-badge loading">
-                            <i className="fas fa-spinner fa-spin me-1"></i>
-                            Checking...
-                        </span>
-                    );
-                }
-                const status = props.monitoring_status;
+                // if (props.monitoring_status === undefined) {
+                //     return (
+                //         <span className="status-badge loading">
+                //             <i className="fas fa-spinner fa-spin me-1"></i>
+                //             Checking...
+                //         </span>
+                //     );
+                // }
+                const status = props.status;
                 return (
                     <span className={`status-badge ${status === 'UP' ? 'success' : 'danger'}`}>
                         <i className={`fas ${status === 'UP' ? 'fa-check-circle' : 'fa-times-circle'} me-1`}></i>
-                        {status === 'UP' ? 'Online' : 'Offline'}
+                        {status}
+                        {/* {status === 'UP' ? 'Online' : 'Offline'} */}
                     </span>
                 );
             }
@@ -236,7 +237,7 @@ const Devices = () => {
             hasInitialLoad.current = true;
 
             // Start loading monitoring statuses in the background
-            loadMonitoringStatuses(devicesWithStatus);
+            // loadMonitoringStatuses(devicesWithStatus);
 
             // Return devices data in the format expected by GenericListPage
             return {
@@ -257,7 +258,7 @@ const Devices = () => {
                 last_page: 1
             };
         }
-    }, [currentFilters, loadMonitoringStatuses]);
+    }, [currentFilters]);
 
     // Create cards data for PageSummaryGrid
     const summaryCards: SummaryCard[] = [
