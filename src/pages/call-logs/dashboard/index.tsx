@@ -560,7 +560,7 @@ const [ExtensionChart, setExtensionChart] = React.useState({
       fetchExtensionStats();
   }, []);
   const fetchExtensionStats = async () => {
-    const response = await ListCallLogs({ page:  page, perPage: perPage, search: "", filters: currentFilters,reportType: 'statsExtension' }, 'call-logs/statsByExtension');
+    const response = await ListCallLogs({ page:  page, perPage: perPage, search: "", filters: currentFilters,reportType: 'statsExtension',moduleSlug: ModuleSlug.CALL_LOGS }, 'call-logs/statsByExtension');
     if(response?.dataList?.length > 0){
       setExtensionData(response?.dataList);
     } else {
@@ -574,7 +574,7 @@ const [ExtensionChart, setExtensionChart] = React.useState({
   }, []);
 
   const fetchTrendByCountryStats = async () => {
-    const response = await ListCallLogs({ page:  page, perPage: perPage, search: "", filters: currentFilters,reportType: 'statsCountry' }, 'call-logs/statsByCountry');
+    const response = await ListCallLogs({ page:  page, perPage: perPage, search: "", filters: currentFilters,reportType: 'statsCountry', moduleSlug: ModuleSlug.CALL_LOGS }, 'call-logs/statsByCountry');
     if(response?.dataList?.length > 0){
       setTrendByCountryData(response?.dataList);
     }
