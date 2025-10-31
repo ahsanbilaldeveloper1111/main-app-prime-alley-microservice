@@ -305,7 +305,7 @@ export const linkUsers = async (user_id: string, link_id: string, module_id: str
     if(response){
       const responseData = response.data;
       if(responseData.code === 200){
-        toast.success('User linked successfully');
+        //toast.success('User linked successfully');
         return true;
       }else{
         toast.error(responseData.message);
@@ -331,7 +331,6 @@ export const unlinkUsers = async (id: string, linkedUser: string, moduleId: stri
     if(response){
       const responseData = response.data;
       if(responseData.code === 200){
-        toast.success('User unlinked successfully');
         return true;
       }else{
         toast.error(responseData.message);
@@ -524,6 +523,77 @@ export const SyncLdapUsers = async () => {
       }
     }else{
       toast.error('Failed to sync LDAP users');
+      return false;
+    }
+  } catch (error) {
+    console.error('API Error:', error);
+    throw error;
+  }
+}
+
+export const LinkCompany = async (user_id: string, company_id: string, module_id: string) => {
+  try {
+    const response = await axiosInstance.post(`users/linkCompany`, {
+      user_id: user_id,
+      company_id: company_id,
+      module_id: module_id
+    });
+    if(response){
+      const responseData = response.data;
+      if(responseData.code === 200){
+        toast.success('User linked successfully');
+        return true;
+      }else{
+        toast.error(responseData.message);
+        return false;
+      }
+    }else{
+      toast.error('Failed to link users');
+      return false;
+    }
+  } catch (error) {
+    console.error('API Error:', error);
+    throw error;
+  }
+}
+
+export const UnlinkCompany = async (id: string) => {
+  try {
+    const response = await axiosInstance.post(`users/unlinkCompany`, {
+      id: id
+    });
+    if(response){
+      const responseData = response.data;
+      if(responseData.code === 200){
+        toast.success('Company unlinked successfully');
+        return true;
+      }else{
+        toast.error(responseData.message);
+        return false;
+      }
+    }else{
+      toast.error('Failed to unlink company');
+      return false;
+    }   
+  } catch (error) {
+    console.error('API Error:', error);
+    throw error;
+  }
+}
+
+export const GetCompanies = async () => {
+  try {
+    const response = await axiosInstance.get(`users/getCompanies`);
+    if(response){
+      const responseData = response.data;
+      if(responseData.code === 200){
+        return responseData?.data;
+      }else{
+        toast.error(responseData.message);
+        return false;
+      }
+    }else{
+      toast.error('Failed to get companies');
       return false;
     }
   } catch (error) {

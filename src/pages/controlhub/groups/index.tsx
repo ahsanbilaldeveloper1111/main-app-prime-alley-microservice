@@ -219,10 +219,11 @@ const Groups = () => {
                 show={showEditGroupModal}
                 onHide={() => setShowEditGroupModal(false)}
                 title="Edit Group"
-                desc="Please type to add new change"
+                desc="Please fill in the details below to edit the group."
                 formHtml={
                     <>
                         <input className="form-control" type="text" value={selectedGroupName} onChange={(e) => setSelectedGroupName(e.target.value)} />
+                        <p className="text-muted mt-2 small">Change the name of an existing group to better reflect its purpose or purpose in the system</p>
                     </>
                 }
                 submitButtonText="Save changes"
@@ -249,10 +250,11 @@ const Groups = () => {
                         show={showCreateGroupModal}
                         onHide={()=>setShowCreateGroupModal(false)}
                         title="New Group"
-                        desc="Please type to add new change"
+                        desc="Please fill in the details below to create a new group."
                         formHtml={
                             <>
                             <input type="text" className="form-control" id="newGroupName"  value={newGroupName} onChange={(e) => setNewGroupName(e.target.value)} placeholder="Group Name" />
+                            <p className="text-muted mt-2 small">Enter the name of the group you want to create. This will be used to identify the group in the system.</p>
                             </>
                         }
                         submitButtonText="Add Group"

@@ -22,6 +22,7 @@ import ConfirmModal from "@pages/partial/ConfirmModal";
 import SuccessfulModal from "@pages/partial/SuccessfulModal";
 import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
 import DatatableActionButton from "@components/DatatableActionButton";
+import { useSession } from "next-auth/react";
 
 interface LostReason {
   id: number;
@@ -34,6 +35,8 @@ interface LostReason {
 }
 
 const LostReasonsManagement = () => {
+  const { data: session } = useSession();
+
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showUpdateModal, setShowUpdateModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -217,6 +220,8 @@ const LostReasonsManagement = () => {
           </p>
         ),
       },
+
+      ...(session?.user?.permissions?.includes('edit-crm-lost-reasons') || session?.user?.permissions?.includes('delete-crm-lost-reasons') ? [
       {
         key: "actions",
         name: "Actions",
@@ -226,6 +231,7 @@ const LostReasonsManagement = () => {
           <div className="d-flex gap-1">
             <DatatableActionButton
               actions={[
+               ...(session?.user?.permissions?.includes('edit-crm-lost-reasons') ? [
                 {
                   label: 'Edit',
                   className: 'text-primary',
@@ -240,6 +246,8 @@ const LostReasonsManagement = () => {
                     setShowUpdateModal(true);
                   },
                 },
+               ] : []),
+               ...(session?.user?.permissions?.includes('delete-crm-lost-reasons') ? [
                 {
                   label: 'Delete',
                   className: 'text-danger',
@@ -249,12 +257,17 @@ const LostReasonsManagement = () => {
                     setShowDeleteModal(true);
                   },
                 },
+               ] : []),
+               
+                
               ]}
             
             />
           </div>
         ),
       },
+      ] : []),
+
     ],
     []
   );
@@ -271,11 +284,13 @@ const LostReasonsManagement = () => {
 
         <PageHeader
           title="Lost Reasons"
-          showSearch={true}
+          showSearch={session?.user?.permissions?.includes('list-crm-lost-reasons')}
           searchValue={currentFilters.search || ""}
           onSearchChange={(value) => handleFiltersChange({...currentFilters, search: value})}
         searchPlaceholder="Search lost reasons..."
         buttons={
+          <>
+          {session?.user?.permissions?.includes('add-crm-lost-reasons') && (
           <Button
             variant="primary"
             onClick={() => setShowCreateModal(true)}
@@ -283,6 +298,8 @@ const LostReasonsManagement = () => {
             <FiPlus className="me-2" />
             New Lost Reason
           </Button>
+          )}
+          </>
         }
       />
    
