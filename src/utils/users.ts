@@ -541,7 +541,7 @@ export const LinkCompany = async (user_id: string, company_id: string, module_id
     if(response){
       const responseData = response.data;
       if(responseData.code === 200){
-        toast.success('User linked successfully');
+       // toast.success('User linked successfully');
         return true;
       }else{
         toast.error(responseData.message);
@@ -565,7 +565,7 @@ export const UnlinkCompany = async (id: string) => {
     if(response){
       const responseData = response.data;
       if(responseData.code === 200){
-        toast.success('Company unlinked successfully');
+       // toast.success('Company unlinked successfully');
         return true;
       }else{
         toast.error(responseData.message);

@@ -768,6 +768,7 @@ const UserView = () => {
                                     </option>
                                 ))}
                             </select>
+                            <p className="text-muted mt-2 small">Update the assigned group for a user to reflect their new group or permissions within the system</p>
                         </div>
                             </>
                         }
@@ -811,6 +812,7 @@ const UserView = () => {
                                 }))}
                                 placeholder="Select Rank"
                             />
+                            <p className="text-muted mt-2 small">Update the assigned rank for a user to reflect their new role or permissions within the system</p>
 
                             
                         </div>
@@ -840,6 +842,7 @@ const UserView = () => {
                                 <option value="Active" selected={currentUser?.status === "Active"}>Active</option>
                                 <option value="Inactive" selected={currentUser?.status === "Inactive"}>Inactive</option>
                             </select>
+                            <p className="text-muted mt-2 small">Update the status of a user to reflect their current active or inactive status within the system</p>
                         </div>
                     </Modal.Body>
                     <Modal.Footer>
@@ -854,21 +857,7 @@ const UserView = () => {
                 )}
 
             <BreadcrumbItem mainTitle="Controlhub" mainLink="/controlhub/users" subTitle="Users" />
-            {/* <Row className="mb-3">
-                <Col md={12}>
-                    <div className="page-header-title d-flex justify-content-between">
-                        <h4 className="mb-0">
-                            <span className="text-muted me-2">
-                                Details for:
-                            </span>
-
-                            <span className="text-info text-capitalize">
-                                {session?.user?.name}
-                            </span>
-                        </h4>
-                    </div>
-                </Col>
-            </Row> */}
+            
 
             <Row>
                 <Col md={12}>
@@ -1074,6 +1063,8 @@ const UserView = () => {
                         </Tab>
 
 
+
+{session?.user?.is_admin && (session?.user?.permissions?.includes('extend-permission-users') || session?.user?.permissions?.includes('block-permission-users')) && (
                         <Tab eventKey="permissions" title="Permissions">
                             <Tabs
                                 defaultActiveKey="extended"
@@ -1254,9 +1245,13 @@ const UserView = () => {
                             </Tabs>
                         </Tab>
 
+)}
 
+
+
+{session?.user?.is_admin && session?.user?.permissions?.includes('custom-field-users') || session?.user?.permissions?.includes('add-custom-field-users') || session?.user?.permissions?.includes('edit-custom-field-users') || session?.user?.permissions?.includes('delete-custom-field-users') || session?.user?.permissions?.includes('link-users') || session?.user?.permissions?.includes('update-custom-field-users') && (
                         <Tab eventKey="linked-users" title="Linked Users">
-                        {session?.user?.is_admin && session?.user?.permissions?.includes('link-users') && (
+                        {session?.user?.is_admin && session?.user?.permissions?.includes('custom-field-users') || session?.user?.permissions?.includes('add-custom-field-users') || session?.user?.permissions?.includes('edit-custom-field-users') || session?.user?.permissions?.includes('delete-custom-field-users') || session?.user?.permissions?.includes('link-users') || session?.user?.permissions?.includes('update-custom-field-users') && (
             <Row>
 
                  <Col md={12}>
@@ -1456,6 +1451,12 @@ const UserView = () => {
                 
 )}
                         </Tab>
+                        )}
+
+
+
+
+
 
 
                         <Tab eventKey="custom-fields-users" title="Custom Fields">
@@ -1588,8 +1589,11 @@ const UserView = () => {
                         </Tab>
 
 
-                        <Tab eventKey="linked-companies" title="Linked Companies">
-                        {session?.user?.is_admin && session?.user?.permissions?.includes('link-users') && (
+
+{(session?.user?.permissions?.includes('company-link-users') || session?.user?.permissions?.includes('company-unlink-users')) && (
+                        
+                       <Tab eventKey="linked-companies" title="Linked Companies">
+                        
             <Row>
 
                  <Col md={12}>
@@ -1680,7 +1684,7 @@ const UserView = () => {
                             <h5 className="d-flex justify-content-between">
                               Linked Companies 
                               <div className="d-flex gap-2">
-                                {selectedLinkedCompanies.length > 0 && session?.user?.is_admin && session?.user?.permissions?.includes('unlink-users') && (
+                                {selectedLinkedCompanies.length > 0 && session?.user?.is_admin && session?.user?.permissions?.includes('company-unlink-users') && (
                                   <Button variant="danger" className="app-button" size="sm" onClick={handleBulkDeleteLinkedCompaniesClick}>
                                     Unlink Selected ({selectedLinkedCompanies.length})
                                   </Button>
@@ -1722,7 +1726,7 @@ const UserView = () => {
                                           <td>{obj?.module?.name || 'N/A'}</td>
                                           <td>
                                                 <div className="d-flex gap-2 justify-content-end">
-                                                      {session?.user?.is_admin && session?.user?.permissions?.includes('unlink-users') && (
+                                                      {session?.user?.is_admin && session?.user?.permissions?.includes('company-unlink-users') && (
                                                         <Button size="sm" className="app-button" variant="danger" onClick={() => {
                                                           handleDeleteLinkedCompanyClick((obj.id || obj.link_id)?.toString())
                                                         }}>Unlink</Button>
@@ -1745,9 +1749,10 @@ const UserView = () => {
                  </Col>
                  </Row>
                 
-)}
                         </Tab>
 
+
+)}
 
                     </Tabs>
 

@@ -156,12 +156,12 @@ export const createCallLogsFiltersConfig = (hierarchyData?: any, isVisibleCallDi
        
         {
           type: 'radio',
-          name: 'is_answered',
+          name: 'call_status',
           label: 'Choose Call Status',
           options: [
-            { value: 'true', label: 'Answered' },
-            { value: 'false', label: 'Not Answered' },
-            { value: '', label: 'Both' }
+            { value: 'Answered', label: 'Answered' },
+            { value: 'Not Answered', label: 'Not Answered' },
+            { value: 'Both', label: 'Both' }
           ]
         }
       ]
