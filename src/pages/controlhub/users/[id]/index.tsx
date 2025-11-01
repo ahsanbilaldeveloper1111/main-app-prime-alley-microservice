@@ -1249,9 +1249,9 @@ const UserView = () => {
 
 
 
-{session?.user?.is_admin && session?.user?.permissions?.includes('custom-field-users') || session?.user?.permissions?.includes('add-custom-field-users') || session?.user?.permissions?.includes('edit-custom-field-users') || session?.user?.permissions?.includes('delete-custom-field-users') || session?.user?.permissions?.includes('link-users') || session?.user?.permissions?.includes('update-custom-field-users') && (
+{session?.user?.is_admin && (session?.user?.permissions?.includes('link-users') || session?.user?.permissions?.includes('unlink-users') ) && (
                         <Tab eventKey="linked-users" title="Linked Users">
-                        {session?.user?.is_admin && session?.user?.permissions?.includes('custom-field-users') || session?.user?.permissions?.includes('add-custom-field-users') || session?.user?.permissions?.includes('edit-custom-field-users') || session?.user?.permissions?.includes('delete-custom-field-users') || session?.user?.permissions?.includes('link-users') || session?.user?.permissions?.includes('update-custom-field-users') && (
+                        
             <Row>
 
                  <Col md={12}>
@@ -1449,7 +1449,7 @@ const UserView = () => {
                  </Col>
                  </Row>
                 
-)}
+
                         </Tab>
                         )}
 
@@ -1458,9 +1458,9 @@ const UserView = () => {
 
 
 
-
+{session?.user?.is_admin && (session?.user?.permissions?.includes('custom-field-users') || session?.user?.permissions?.includes('add-custom-field-users') || session?.user?.permissions?.includes('edit-custom-field-users') || session?.user?.permissions?.includes('delete-custom-field-users') || session?.user?.permissions?.includes('update-custom-field-users')) && (
                         <Tab eventKey="custom-fields-users" title="Custom Fields">
-                        {session?.user?.is_admin && session?.user?.permissions?.includes('custom-field-users') && (
+                       
             <Row>
               
 
@@ -1585,8 +1585,9 @@ const UserView = () => {
                  </Col>
                  </Row>
                 
-)}
+
                         </Tab>
+                        )}
 
 
 

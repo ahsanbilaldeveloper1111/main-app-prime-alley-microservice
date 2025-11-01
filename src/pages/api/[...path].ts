@@ -148,14 +148,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       console.log('=====================');
     } else if (isJSON) {
       // For JSON requests, parse manually
-      console.log('=== JSON DEBUG ===');
-      console.log('Content-Type:', contentType);
-      console.log('Target URL:', targetUrl);
-      console.log('Request method:', req.method);
+      // console.log('=== JSON DEBUG ===');
+      // console.log('Content-Type:', contentType);
+      // console.log('Target URL:', targetUrl);
+      // console.log('Request method:', req.method);
       
       try {
         requestData = await parseJSON(req);
-        console.log('JSON parsed successfully:', requestData);
+        //console.log('JSON parsed successfully:', requestData);
       } catch (parseError) {
         console.error('Error parsing JSON:', parseError);
         throw new Error('Failed to parse JSON');
@@ -165,7 +165,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       headers['Content-Type'] = 'application/json';
       headers['Accept'] = 'application/json';
       
-      console.log('=====================');
+      //console.log('=====================');
     } else if (isAudioDownload) {
       // Special handling for audio downloads
       headers['Accept'] = 'audio/*, application/octet-stream, */*';
@@ -205,7 +205,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         res.setHeader(key, value);
       }
     });
-    console.log("ZEZEZE", response.data instanceof Buffer , response.data instanceof ArrayBuffer);
+    //console.log("ZEZEZE", response.data instanceof Buffer , response.data instanceof ArrayBuffer);
     // Handle different response types
     if (isAudioDownload || response.data instanceof Buffer || response.data instanceof ArrayBuffer) {
       // For binary data (audio files, blobs, etc.)
