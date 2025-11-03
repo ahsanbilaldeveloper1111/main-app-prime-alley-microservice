@@ -453,18 +453,18 @@ const LiveCallDashboard = () => {
   useEffect(() => {
     if (!isInitialized || !dnsMap) return
 
-    console.log('Animation useEffect triggered, categorizedDns:', categorizedDns)
+    //console.log('Animation useEffect triggered, categorizedDns:', categorizedDns)
     const animationsToTrigger: Array<{ dn: string; fromSection: string; toSection: string }> = []
     
     // First pass: Check for changes and capture positions
     Object.entries(categorizedDns).forEach(([dn, currentSection]) => {
       const previousSection = previousSectionsRef.current[dn]
       
-      console.log(`DN ${dn}: previous=${previousSection}, current=${currentSection}`)
+      //console.log(`DN ${dn}: previous=${previousSection}, current=${currentSection}`)
       
       // If section changed, capture BEFORE position and queue animation
       if (previousSection && previousSection !== currentSection) {
-        console.log(`🎯 SECTION CHANGE DETECTED for ${dn}: ${previousSection} -> ${currentSection}`)
+        //console.log(`🎯 SECTION CHANGE DETECTED for ${dn}: ${previousSection} -> ${currentSection}`)
         
         // Capture the BEFORE position immediately (before DOM updates)
         const card = document.querySelector(`[data-dn="${dn}"]`) as HTMLElement
@@ -476,16 +476,16 @@ const LiveCallDashboard = () => {
             width: rect.width,
             height: rect.height
           }
-          console.log(`📍 Captured BEFORE position for ${dn}:`, cardPositionsRef.current[dn])
+          //console.log(`Captured BEFORE position for ${dn}:`, cardPositionsRef.current[dn])
         } else {
-          console.log(`❌ Card not found for ${dn} during position capture`)
+          //console.log(`Card not found for ${dn} during position capture`)
         }
         
         // Queue animation to trigger after state updates
         animationsToTrigger.push({ dn, fromSection: previousSection, toSection: currentSection })
-        console.log(`✅ Queued animation for ${dn}`)
+        //console.log(`Queued animation for ${dn}`)
       } else if (!previousSection) {
-        console.log(`🔄 Initializing previous section for ${dn}: ${currentSection}`)
+        //console.log(`Initializing previous section for ${dn}: ${currentSection}`)
       }
     })
     
@@ -494,13 +494,13 @@ const LiveCallDashboard = () => {
       previousSectionsRef.current[dn] = currentSection
     })
     
-    console.log(`Total animations to trigger: ${animationsToTrigger.length}`)
+    //console.log(`Total animations to trigger: ${animationsToTrigger.length}`)
     
     // Trigger animations after DOM has been updated
     if (animationsToTrigger.length > 0) {
       // Use requestAnimationFrame to ensure DOM is fully updated
       requestAnimationFrame(() => {
-        console.log('Triggering animations after RAF:', animationsToTrigger)
+        //console.log('Triggering animations after RAF:', animationsToTrigger)
         animationsToTrigger.forEach(({ dn, fromSection, toSection }) => {
           animateCardMove(dn, fromSection, toSection)
         })
@@ -1910,7 +1910,9 @@ const LiveCallDashboard = () => {
                                     <div className="current-devices-section">
                                       
                                       <div className="device-icons">
-                                        {deviceList.map((device: CtiDevice) => {
+                                        {deviceList
+                                        .filter((device: CtiDevice) => device.terminalState === 'REGISTERED' || device.terminalState === 'UNREGISTERED')
+                                        .map((device: CtiDevice) => {
                                           const { deviceName, deviceType, terminalState } = device
                                           const iconClass = getDeviceIconClass(deviceType)
                                           const dotColor =
@@ -1921,6 +1923,21 @@ const LiveCallDashboard = () => {
                                                 : terminalState === 'STALE'
                                                   ? '#f59e0b'
                                                   : '#6b7280'
+
+                                          const getDeviceTypeLabel = (type: string) => {
+                                            switch (type) {
+                                              case 'SOFT':
+                                                return 'Soft'
+                                              case 'HARD':
+                                                return 'Phone'
+                                              case 'ANDROID':
+                                                return 'Android'
+                                              case 'IOS':
+                                                return 'iPhone'
+                                              default:
+                                                return ''
+                                            }
+                                          }
 
                                           const deviceCall = getCallStateForDevice(dn, deviceName)
                                           const isDeviceActiveCall =
@@ -1933,7 +1950,7 @@ const LiveCallDashboard = () => {
                                               className={`device-icon-wrapper position-relative ${isDeviceActiveCall ? 'active' : ''} ${
                                                 activeMonitoring.dn === dn && activeMonitoring.type && activeMonitoring.deviceName === deviceName ? 'monitoring' : ''
                                               }`}
-                                              title={`${deviceName} (${terminalState})`}
+                                              title={`${getDeviceTypeLabel(deviceType)}`}
                                               onClick={() => {
                                                 if (isDeviceActiveCall) {
                                                   // Check if user has any monitoring permissions

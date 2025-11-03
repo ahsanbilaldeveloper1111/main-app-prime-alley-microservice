@@ -7,10 +7,10 @@ export default function handler(req, res) {
   }
 
   // Get parameters from query string
-  const { uuid, date, localPartyNumber, ownerUsername, imagicle } = req.query;
+  const { uuid, callDateTime, localPartyNumber, ownerUsername, imagicle, mlCallDuration, callDirection, callRemoteNumber } = req.query;
   
   // Get WebSocket protocol configuration
-  const websocketProtocol = process.env.WEBSOCKET_PROTOCOL || 'wss';
+  const websocketProtocol = process.env.NEXT_PUBLIC_AIML_WEBSOCKET_PROTOCOL;
   
   // Check if analysis server URL is configured
   if (!process.env.NEXT_PUBLIC_PRIVATE_AIML_SOCKET_URL) {
@@ -21,16 +21,16 @@ export default function handler(req, res) {
   }
   
   // Log connection for monitoring
-  console.log('SSE connection request:', { uuid, date, localPartyNumber, ownerUsername, imagicle });
-  console.log('Analysis server config:', { 
-    host: process.env.NEXT_PUBLIC_PRIVATE_AIML_SOCKET_URL, 
-    protocol: websocketProtocol 
-  });
+  console.log('SSE connection request:', { uuid, callDateTime, localPartyNumber, ownerUsername, imagicle, mlCallDuration, callRemoteNumber,callDirection });
+  // console.log('Analysis server config:', { 
+  //   host: process.env.NEXT_PUBLIC_PRIVATE_AIML_SOCKET_URL, 
+  //   protocol: websocketProtocol 
+  // });
   
   // Validate required parameters
-  if (!uuid || !date || !localPartyNumber || !ownerUsername || !imagicle) {
-    console.error('❌ Missing required parameters:', { uuid, date, localPartyNumber, ownerUsername, imagicle });
-    res.write(`data: ${JSON.stringify({ type: 'error', status: 'error', message: 'Missing required parameters: uuid, date, localPartyNumber, ownerUsername, imagicle' })}\n\n`);
+  if (!uuid  || !localPartyNumber || !ownerUsername || !imagicle || !mlCallDuration || !callRemoteNumber || !callDirection || !callDateTime) {
+    console.error('❌ Missing required parameters:', { uuid,  localPartyNumber, ownerUsername, imagicle, mlCallDuration, callRemoteNumber, callDirection, callDateTime });
+    res.write(`data: ${JSON.stringify({ type: 'error', status: 'error', message: 'Missing required parameters: uuid, localPartyNumber, ownerUsername, imagicle, mlCallDuration, callRemoteNumber, callDirection, callDateTime' })}\n\n`);
     res.end();
     return;
   }
@@ -48,20 +48,20 @@ export default function handler(req, res) {
 
   // Create WebSocket connection to analysis server
   const analysisServerHost = process.env.NEXT_PUBLIC_PRIVATE_AIML_SOCKET_URL;
-  const analysisServerUrl = `${websocketProtocol}://${analysisServerHost}/ws/analysis/${uuid}/${date}/${localPartyNumber}/${ownerUsername}/${imagicle}/`;
+  const analysisServerUrl = `${websocketProtocol}://${analysisServerHost}/ws/analysis/${uuid}/${callDateTime}/${localPartyNumber}/${ownerUsername}/${imagicle}/${mlCallDuration}/${callRemoteNumber}/${callDirection}/`;
   
-  console.log('🔗 Connecting to analysis server:', analysisServerUrl);
+  console.log('Connecting to analysis server:', analysisServerUrl);
   
   // Add connection timeout
   const connectionTimeout = setTimeout(() => {
-    console.log('⏰ Connection timeout to analysis server');
+    console.log('Connection timeout to analysis server');
     res.write(`data: ${JSON.stringify({ type: 'error', status: 'timeout', message: 'Connection timeout to analysis server' })}\n\n`);
   }, 10000);
   
   const wsOptions = {
     headers: {
-      'User-Agent': 'Next.js Analysis Client',
-      'Origin': 'http://localhost:3000'
+      'User-Agent': 'Business Contact Center',
+      'Origin': process.env.NEXT_PUBLIC_BASE_URL
     }
   };
 
@@ -92,10 +92,13 @@ export default function handler(req, res) {
     const analysisCommand = {
       action: 'start_analysis',
       uuid: uuid,
-      date: date,
+      callDateTime: callDateTime,
       localPartyNumber: localPartyNumber,
       ownerUsername: ownerUsername,
-      imagicle: imagicle
+      imagicle: imagicle,
+      mlCallDuration: mlCallDuration,
+      callRemoteNumber: callRemoteNumber,
+      callDirection: callDirection
     };
     
     wsAnalysis.send(JSON.stringify(analysisCommand));

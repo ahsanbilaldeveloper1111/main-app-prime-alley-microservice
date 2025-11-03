@@ -254,7 +254,7 @@ const Users = () => {
                         });
                     });
 
-                   // setCustomFieldColumns(dynamicCols);
+                    setCustomFieldColumns(dynamicCols);
                 } else {
                     setCustomFieldColumns([]);
                 }
