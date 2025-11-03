@@ -120,9 +120,21 @@ const LiveCallDashboard = () => {
   const categorizeDns = (dn: string, devices: CtiDevice[], call: any, active: boolean) => {
     const cls = getCardLevelStatus(devices)
     
-    // Check if DN is being monitored (In Supervision)
+    // Check if DN is being monitored (In Supervision) - only if call is still active
     if (activeMonitoring.dn === dn && activeMonitoring.type && activeMonitoring.deviceName) {
-      return 'supervision'
+      // Check if the monitored device still has an active call
+      const monitoredDevice = devices.find(d => d.deviceName === activeMonitoring.deviceName)
+      if (monitoredDevice) {
+        const deviceCall = getCallStateForDevice(dn, activeMonitoring.deviceName)
+        const isDeviceActiveCall = deviceCall && 
+          ['CONNECTED', 'ON_HOLD', 'ANSWERED', 'RETRIEVED', 'RINGING'].includes(deviceCall.currentState || '')
+        
+        if (isDeviceActiveCall) {
+          return 'supervision'
+        }
+      }
+      // If call ended, clear monitoring state
+      // Note: This will be handled by useEffect below, but we don't return supervision here
     }
     
     // Check if DN has active calls (On Call)
@@ -448,6 +460,61 @@ const LiveCallDashboard = () => {
     
     return result
   }, [dnsMap, isInitialized, userAddress, hasActiveCalls, getDnCallState, activeMonitoring])
+
+  // Auto-clear monitoring state when call ends
+  useEffect(() => {
+    if (!activeMonitoring.dn || !activeMonitoring.deviceName || !isInitialized || !dnsMap) return
+
+    const monitoredDn = activeMonitoring.dn
+    const monitoredDeviceName = activeMonitoring.deviceName
+    const monitoredDevice = dnsMap[monitoredDn]?.devices?.[monitoredDeviceName]
+    
+    if (!monitoredDevice) {
+      // Device not found, clear monitoring
+      setActiveMonitoring({ dn: null, type: null, deviceName: null })
+      setMonitoringStartTime(prev => {
+        const newState = { ...prev }
+        delete newState[monitoredDn]
+        return newState
+      })
+      return
+    }
+
+    // Check if the monitored device still has an active call
+    const deviceCall = getCallStateForDevice(monitoredDn, monitoredDeviceName)
+    const isDeviceActiveCall = deviceCall && 
+      ['CONNECTED', 'ON_HOLD', 'ANSWERED', 'RETRIEVED', 'RINGING'].includes(deviceCall.currentState || '')
+
+    if (!isDeviceActiveCall) {
+      // Call ended, clear monitoring state
+      console.log('Call ended, clearing monitoring state for:', monitoredDn, monitoredDeviceName)
+      setActiveMonitoring({ dn: null, type: null, deviceName: null })
+      setMonitoringStartTime(prev => {
+        const newState = { ...prev }
+        delete newState[monitoredDn]
+        return newState
+      })
+      setSelectedMonitor(prev => {
+        const newState = { ...prev }
+        delete newState[monitoredDn]
+        return newState
+      })
+      setSelectedTone(prev => {
+        const newState = { ...prev }
+        delete newState[monitoredDn]
+        return newState
+      })
+      setTempMonitorSelection(prev => {
+        const newState = { ...prev }
+        delete newState[monitoredDn]
+        return newState
+      })
+      setNotification({
+        type: 'info',
+        message: `Monitoring automatically stopped for ${monitoredDn} - call ended`
+      })
+    }
+  }, [activeMonitoring, dnsMap, isInitialized, getCallStateForDevice, categorizedDns, hasActiveCalls])
 
   // Handle FLIP animations when cards change sections
   useEffect(() => {
@@ -1828,7 +1895,7 @@ const LiveCallDashboard = () => {
                                     {/* {active && call && (
                                           <p className="small mb-0" style={{ color: callColor, padding: '2px',fontWeight: 'bold',textTransform: 'uppercase' }}>
                                             {(() => {
-                                            
+                                              
                                               const result = getText(
                                                 call.currentState || '',
                                                 call.isConference || false,
@@ -1841,6 +1908,29 @@ const LiveCallDashboard = () => {
                                             })()}
                                           </p>
                                         )} */}
+
+                                    {/* Stop Monitoring Button - Visible when monitoring is active */}
+                                    {activeMonitoring.dn === dn && activeMonitoring.type && (
+                                      <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid rgba(255, 255, 255, 0.2)' }}>
+                                        <Button
+                                          variant="danger"
+                                          size="sm"
+                                          onClick={(e) => {
+                                            e.stopPropagation()
+                                            if (activeMonitoring.type) {
+                                              stopMonitoring(dn, activeMonitoring.type)
+                                            }
+                                          }}
+                                          className="w-100"
+                                          style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
+                                        >
+                                          <i className="material-icons-two-tone me-1" style={{ fontSize: '1rem', verticalAlign: 'middle' }}>
+                                            stop
+                                          </i>
+                                          Stop Monitoring
+                                        </Button>
+                                      </div>
+                                    )}
 
                                     </div>
                                     {/* Section 1: Information Section */}
@@ -1874,7 +1964,7 @@ const LiveCallDashboard = () => {
                                    
                                           <p className=" mb-0">
                                             {(() => {
-                                            
+                                              
                                               const result = getText(
                                                 call.currentState || '',
                                                 call.isConference || false,
@@ -1893,6 +1983,29 @@ const LiveCallDashboard = () => {
                                         />
                                     </div>
                                      )}
+
+                                    {/* Stop Monitoring Button - Visible when monitoring is active */}
+                                    {activeMonitoring.dn === dn && activeMonitoring.type && (
+                                      <div className="card-monitoring-section" style={{ padding: '0.5rem', marginTop: '0.5rem' }}>
+                                        <Button
+                                          variant="danger"
+                                          size="sm"
+                                          onClick={(e) => {
+                                            e.stopPropagation()
+                                            if (activeMonitoring.type) {
+                                              stopMonitoring(dn, activeMonitoring.type)
+                                            }
+                                          }}
+                                          className="w-100"
+                                          style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
+                                        >
+                                          <i className="material-icons-two-tone me-1" style={{ fontSize: '1rem', verticalAlign: 'middle' }}>
+                                            stop
+                                          </i>
+                                          Stop Monitoring
+                                        </Button>
+                                      </div>
+                                    )}
 
                                     {/* Section 2: Device Dropdown Section */}
                                     {/* <div className="device-dropdown-section">
@@ -1952,18 +2065,36 @@ const LiveCallDashboard = () => {
                                               }`}
                                               title={`${getDeviceTypeLabel(deviceType)}`}
                                               onClick={() => {
-                                                if (isDeviceActiveCall) {
-                                                  // Check if user has any monitoring permissions
-                                                  const hasMonitoringPermissions = session?.user?.permissions?.some(permission => 
-                                                    ['silent-monitoring-cti', 'whisper-monitoring-cti', 'barge-in-cti'].includes(permission)
-                                                  )
-                                                  
+                                                // Check if user has any monitoring permissions
+                                                const hasMonitoringPermissions = session?.user?.permissions?.some(permission => 
+                                                  ['silent-monitoring-cti', 'whisper-monitoring-cti', 'barge-in-cti'].includes(permission)
+                                                )
+                                                
+                                                // Allow opening popup if:
+                                                // 1. Device has active call (for starting monitoring)
+                                                // 2. This device is currently being monitored (for stopping monitoring)
+                                                const isCurrentlyMonitored = activeMonitoring.dn === dn && 
+                                                                              activeMonitoring.deviceName === deviceName && 
+                                                                              activeMonitoring.type
+                                                
+                                                if (isDeviceActiveCall || isCurrentlyMonitored) {
                                                   if (hasMonitoringPermissions) {
-                                                    console.log('Opening popup for:', dn, deviceName)
-                                                    // Reset monitor selection when opening popup
-                                                    setSelectedMonitor((prev) => ({ ...prev, [dn]: '' }))
-                                                    setTempMonitorSelection((prev) => ({ ...prev, [dn]: '' }))
-                                                    setSelectedTone((prev) => ({ ...prev, [dn]: '' }))
+                                                    console.log('Opening popup for:', dn, deviceName, isCurrentlyMonitored ? '(currently monitored)' : '')
+                                                    // If already monitoring, restore the state so stop button shows in modal
+                                                    if (isCurrentlyMonitored && activeMonitoring.type) {
+                                                      setSelectedMonitor((prev) => ({ ...prev, [dn]: activeMonitoring.type! }))
+                                                      setTempMonitorSelection((prev) => ({ ...prev, [dn]: activeMonitoring.type! }))
+                                                      // Preserve existing tone selection if available
+                                                      if (!selectedTone[dn]) {
+                                                        // Try to get from previous selection or set a default
+                                                        setSelectedTone((prev) => ({ ...prev, [dn]: prev[dn] || 'NONE' }))
+                                                      }
+                                                    } else {
+                                                      // New monitoring session - reset selections
+                                                      setSelectedMonitor((prev) => ({ ...prev, [dn]: '' }))
+                                                      setTempMonitorSelection((prev) => ({ ...prev, [dn]: '' }))
+                                                      setSelectedTone((prev) => ({ ...prev, [dn]: '' }))
+                                                    }
                                                     setShowPopup({ dn: dn, deviceName })
                                                   } else {
                                                     console.log('User does not have monitoring permissions')
@@ -1972,7 +2103,7 @@ const LiveCallDashboard = () => {
                                                 } else if (terminalState === 'STALE') {
                                                   console.log('Device is STALE, popup disabled')
                                                 } else {
-                                                  console.log('Device not in active call, popup disabled')
+                                                  console.log('Device not in active call and not currently monitored, popup disabled')
                                                 }
                                               }}
                                             >
@@ -2058,26 +2189,28 @@ const LiveCallDashboard = () => {
             <FiX size={20} onClick={() => setShowPopup(null)} style={{ cursor: 'pointer' }} />
         </Modal.Header>
         <Modal.Body>
-          {showPopup && activeMonitoring.dn === showPopup.dn && activeMonitoring.type ? (
+          {showPopup && activeMonitoring.dn === showPopup.dn && activeMonitoring.type && 
+           activeMonitoring.deviceName === showPopup.deviceName ? (
             <div className="text-center">
               <p className="mb-3">
                 Currently monitoring with: <strong>{activeMonitoring.type}</strong>
               </p>
               <div>
                 <p className="mb-2 small text-muted">
-                  Tone: <strong>{selectedTone[showPopup.dn] || 'Not selected'}</strong>
+                  Tone: <strong>{selectedTone[showPopup.dn] || 'N/A'}</strong>
+                </p>
+                <p className="mb-3 small text-muted">
+                  Device: <strong>{showPopup.deviceName}</strong>
                 </p>
                 <Button
                   variant="danger"
                   onClick={() => stopMonitoring(showPopup.dn, activeMonitoring.type!)}
-                  disabled={!selectedTone[showPopup.dn]}
+                  className="w-100"
                 >
-                  Stop{' '}
-                  {activeMonitoring.type === 'SILENT'
-                    ? 'Silent'
-                    : activeMonitoring.type === 'WHISPER'
-                      ? 'Barge In'
-                      : 'Barge In'}
+                  {/* <i className="material-icons-two-tone me-2" style={{ fontSize: '1.2rem', verticalAlign: 'middle' }}>
+                    stop
+                  </i> */}
+                  Stop Monitoring
                 </Button>
               </div>
             </div>
