@@ -66,7 +66,7 @@ const PageLoader: React.FC<PageLoaderProps> = ({ isLoading, message = "Loading..
 
   return (
 
-    <div className="loader" style={{ display: 'flex',opacity: 1 }}>
+    <div className="loader" style={{ display: 'flex',opacity: 1,zIndex: 99 }}>
       <div className="p-4 text-center">
         <div className="custom-loader"></div>
         <h2 className="my-3 f-w-400">Loading..</h2>

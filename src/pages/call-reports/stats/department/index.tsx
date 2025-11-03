@@ -25,7 +25,7 @@ import '@assets/scss/tabs.scss';
 import { motion, AnimatePresence } from "framer-motion";
 import { easeInOut, easeOut, easeIn } from "framer-motion";
 import moment from 'moment';
-import { formatCurrency,  formatMinutesAndSeconds, ModuleSlug } from '@utils/Helper';
+import { formatCurrency,  formatMinutesAndSeconds, ModuleSlug, GlobalDateTimeFormat, formatDateTimeToLocal } from '@utils/Helper';
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import PageHeader from "@components/PageHeader";
@@ -71,6 +71,11 @@ const ReactApexChart = dynamic(() => import('react-apexcharts'), { ssr: false })
 
 const CallStatsDepartment = () => {
   const { data: session } = useSession();
+
+  const [showDateRange, setShowDateRange] = useState(false);
+  const [startDateTime, setStartDateTime] = useState<string>('');
+  const [endDateTime, setEndDateTime] = useState<string>('');
+
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('calls_chart');
   const [refreshKey, setRefreshKey] = useState<number>(0);
@@ -141,6 +146,12 @@ const CallStatsDepartment = () => {
       });
       
       if (response?.summary) {
+
+        setShowDateRange(true);
+      const dataFilters = response?.filters;
+      setStartDateTime(dataFilters?.start_datetime);
+      setEndDateTime(dataFilters?.end_datetime);
+
         setSummary(response.summary);
         setDataLoaded(true);
       } else {
@@ -376,6 +387,15 @@ const CallStatsDepartment = () => {
               </Col>
               <Col md={7} className="d-flex justify-content-end">
                 <div className="action-buttons">
+
+                  {showDateRange && (
+                            <>
+                            <p className="mb-0">
+                            Date Range: <span className="status-badge primary">{formatDateTimeToLocal(startDateTime, GlobalDateTimeFormat)}</span> to <span className="status-badge primary">{formatDateTimeToLocal(endDateTime, GlobalDateTimeFormat)}</span>
+                            </p>
+                          
+                            </>
+                          )}
                   <CallLogsFilters
                     onFiltersChange={handleFiltersChange} 
                     onExport={handleExport} 
