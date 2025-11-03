@@ -181,11 +181,6 @@
             }
         }
 
-        .audio-actions {
-            .btn {
-                
-            }
-        }
     }
 
     .download-btn {
@@ -444,31 +439,88 @@
   margin: 0 0px; // Remove side margin for true full width
   min-width: 0;
   width: 100%; // Ensure full width
+  position: relative;
 }
-.waveform-progress-bar {
-  display: flex;
-  align-items: center;
+.audio-seekbar {
   width: 100%;
-  height: 36px; // Make bars taller for a more dynamic look
-  gap: 3px; // Slightly more gap for clarity
-  justify-content: space-between;
-}
-.waveform-dot {
-  width: 5px;
-  height: 16px;
-  border-radius: 2px;
-  background: #90a4bc;
-  opacity: 0.5;
-  transition: background 0.2s, opacity 0.2s, height 0.2s;
-  flex: 1 1 0;
-  min-width: 4px;
-  max-width: 4px;
-}
-.waveform-dot.active {
-  background: #4fc3f7;
-  opacity: 1;
-  height: 25px; // Make active bars taller for a "music bar" effect
-  box-shadow: 0 2px 8px rgba(79, 195, 247, 0.18);
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(144, 164, 188, 0.2);
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+  cursor: pointer;
+  position: relative;
+  z-index: 10;
+  margin: 0;
+  padding: 0;
+
+  &::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #04a9f5;
+    cursor: grab;
+    box-shadow: 0 2px 8px rgba(4, 169, 245, 0.4);
+    transition: all 0.2s ease;
+    margin-top: -6px; // Center the thumb vertically relative to the track
+
+    &:hover {
+      transform: scale(1.2);
+      background: #0288d1;
+      box-shadow: 0 4px 12px rgba(4, 169, 245, 0.6);
+    }
+
+    &:active {
+      cursor: grabbing;
+      transform: scale(1.1);
+    }
+  }
+
+  &::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #04a9f5;
+    cursor: grab;
+    border: none;
+    box-shadow: 0 2px 8px rgba(4, 169, 245, 0.4);
+    transition: all 0.2s ease;
+    // Firefox centers thumb automatically, but we can ensure it
+    vertical-align: middle;
+
+    &:hover {
+      transform: scale(1.2);
+      background: #0288d1;
+      box-shadow: 0 4px 12px rgba(4, 169, 245, 0.6);
+    }
+
+    &:active {
+      cursor: grabbing;
+      transform: scale(1.1);
+    }
+  }
+
+  &::-webkit-slider-runnable-track {
+    width: 100%;
+    height: 6px;
+    cursor: pointer;
+    background: transparent;
+    display: flex;
+    align-items: center;
+  }
+
+  &::-moz-range-track {
+    width: 100%;
+    height: 6px;
+    cursor: pointer;
+    background: transparent;
+    border: none;
+    display: flex;
+    align-items: center;
+  }
 }
 .audio-time {
   color: #000;
