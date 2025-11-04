@@ -195,7 +195,7 @@ const GsmPorts = () => {
     {
       id: "total-gsms-count",
       title: "Total Ports",
-      value: portSummary.total_port,
+      value: portSummary?.total_port,
       description: "Total ports in the system",
       delay: 0.1,
       showAnimatedNumber: true,
@@ -205,7 +205,7 @@ const GsmPorts = () => {
     {
       id: "assigned-gsms-count",
       title: "Registered Ports",
-      value: portSummary.online_port,
+      value: portSummary?.online_port,
       description: "Registered ports in the system",
       delay: 0.3,
       showAnimatedNumber: true,
@@ -215,7 +215,7 @@ const GsmPorts = () => {
     {
       id: "unassigned-gsms-count",
       title: "Unregistered Ports",
-      value: portSummary.offline_port,
+      value: portSummary?.offline_port,
       description: "Unregistered ports in the system",
       delay: 0.5,
       showAnimatedNumber: true,
@@ -225,7 +225,7 @@ const GsmPorts = () => {
     {
       id: "total-ports-count",
       title: "Active Ports",
-      value: portSummary.active_port,
+      value: portSummary?.active_port,
       description: "Active ports in the system",
       delay: 0.7,
       showAnimatedNumber: true,
