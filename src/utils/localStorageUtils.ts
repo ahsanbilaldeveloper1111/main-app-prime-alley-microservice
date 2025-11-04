@@ -11,8 +11,8 @@ export const clearAllLocalStorage = (): void => {
   try {
     if (typeof window !== 'undefined' && window.localStorage) {
       // CTI related localStorage keys
-      localStorage.removeItem('cti_call_states')
-      localStorage.removeItem('cti_call_states_timestamp')
+      //localStorage.removeItem('cti_call_states')
+      //localStorage.removeItem('cti_call_states_timestamp')
       
       // User preferences and settings (add more as needed)
       localStorage.removeItem('user_preferences')

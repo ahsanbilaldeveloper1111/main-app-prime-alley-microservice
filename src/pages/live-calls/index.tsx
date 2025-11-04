@@ -16,7 +16,7 @@ import PageLoader from '@components/PageLoader'
 import Link from 'next/link'
 import { clearAllLocalStorage, getLocalStorageInfo } from '../../utils/localStorageUtils'
 import { useSession } from 'next-auth/react';
-import { startMonitoring, stopMonitoring as stopMonitoringAPI, startBargeInMonitoring, stopBargeInMonitoring as stopBargeInMonitoringAPI } from '@utils/dialer'
+import { startMonitoring, stopMonitoring as stopMonitoringAPI, startBargeInMonitoring, stopBargeInMonitoring as stopBargeInMonitoringAPI, GetCallLegs } from '@utils/dialer'
 
 import '@assets/scss/common.scss';
 import '@assets/scss/live-calls.scss';
@@ -63,9 +63,14 @@ const LiveCallDashboard = () => {
     hasActiveCalls,
     getDnCallState,
     getCallStateForDevice,
+    getCallStatesForDn,
     eventLog,
     userAddress,
-    syncPersistedCallStates
+    syncPersistedCallStates,
+    getActiveCallIdsFromLocalStorage,
+    getAllCallIds,
+    removeTerminatingCalls,
+    onAllLoaded
   } = useCtiStomp()
 
   const [loading, setLoading] = useState(true)
@@ -83,6 +88,9 @@ const LiveCallDashboard = () => {
   const [showPopup, setShowPopup] = useState<{ dn: string; deviceName: string } | null>(null)
   const [showDebugInfo, setShowDebugInfo] = useState(false)
   const [restoredCallStates, setRestoredCallStates] = useState<number>(0)
+  
+  // Ref to track if GetCallLegs has been called to prevent multiple calls
+  const hasCalledGetCallLegsRef = useRef(false)
   
   // Popover state management
   const [activePopover, setActivePopover] = useState<string | null>(null)
@@ -120,13 +128,76 @@ const LiveCallDashboard = () => {
   const categorizeDns = (dn: string, devices: CtiDevice[], call: any, active: boolean) => {
     const cls = getCardLevelStatus(devices)
     
-    // Check if DN is being monitored (In Supervision)
+    // Check if DN is being monitored (In Supervision) - only if call is still active
     if (activeMonitoring.dn === dn && activeMonitoring.type && activeMonitoring.deviceName) {
-      return 'supervision'
+      // Check if the monitored device still has an active call
+      const monitoredDevice = devices.find(d => d.deviceName === activeMonitoring.deviceName)
+      if (monitoredDevice) {
+        const deviceCall = getCallStateForDevice(dn, activeMonitoring.deviceName)
+        const isDeviceActiveCall = deviceCall && 
+          ['CONNECTED', 'ON_HOLD', 'ANSWERED', 'RETRIEVED', 'RINGING'].includes(deviceCall.currentState || '')
+        
+        if (isDeviceActiveCall) {
+          return 'supervision'
+        }
+      }
+      // If call ended, clear monitoring state
+      // Note: This will be handled by useEffect below, but we don't return supervision here
     }
     
     // Check if DN has active calls (On Call)
-    if (active && call) {
+    // CRITICAL: Check ALL calls for this DN, not just the one passed in
+    // A DN should only be "onCall" if it has at least one active (non-DROPPED) party in ANY call
+    const allCallsForDn = getCallStatesForDn(dn)
+    let hasActiveCallForDn = false
+    
+    if (allCallsForDn.length > 0) {
+      // Check each call to see if this DN has any active parties
+      for (const callState of allCallsForDn) {
+        // Skip terminating calls
+        if (callState.isTerminating) continue
+        
+        if (callState.parties && callState.parties.length > 0) {
+          // Filter parties involving this DN and check they are active (not DROPPED/DISCONNECTED)
+          // IMPORTANT: Double-check that parties are truly active (defensive programming)
+          const dnParties = callState.parties.filter((p: any) => {
+            const involvesDn = (p.callingAddress === dn || p.calledAddress === dn)
+            const isActive = p.callStatus !== 'DROPPED' && p.callStatus !== 'DISCONNECTED'
+            return involvesDn && isActive
+          })
+          
+          // If we found active parties for this DN in this call, mark as active
+          if (dnParties.length > 0) {
+            hasActiveCallForDn = true
+            break
+          }
+        }
+      }
+    }
+    
+    // Debug logging for DN 108 (can be removed later) - moved after calculation
+    if (dn === '108') {
+      console.log('🔍 Checking DN 108:', {
+        allCallsCount: allCallsForDn.length,
+        calls: allCallsForDn.map(c => ({
+          callId: c.callId,
+          isTerminating: c.isTerminating,
+          currentState: c.currentState,
+          eventTime: c.eventTime,
+          parties: c.parties?.map((p: any) => ({
+            calling: p.callingAddress,
+            called: p.calledAddress,
+            status: p.callStatus,
+            deviceName: p.callingDeviceName || p.calledDeviceName
+          }))
+        })),
+        hasActiveCallForDn: hasActiveCallForDn,
+        willShowOnCall: hasActiveCallForDn
+      })
+    }
+    
+    // Only show as "onCall" if there are active parties for this DN in any call
+    if (hasActiveCallForDn) {
       return 'onCall'
     }
     
@@ -171,7 +242,7 @@ const LiveCallDashboard = () => {
   }
 
   const handleActionClick = (dn: string, action: string) => {
-    console.log(`${action} action for:`, dn)
+    //console.log(`${action} action for:`, dn)
     setActivePopover(null)
   }
   
@@ -290,28 +361,24 @@ const LiveCallDashboard = () => {
 
   // FLIP Animation functions - Exact copy from reference code
   const animateCardMove = useCallback((dn: string, fromSection: string, toSection: string) => {
-    console.log(`Starting FLIP animation for ${dn} from ${fromSection} to ${toSection}`)
-    
+   
     // Get the stored BEFORE position from ref
     const first = cardPositionsRef.current[dn]
     if (!first) {
-      console.log(`No stored BEFORE position for ${dn}`)
-      return
+     return
     }
     
-    console.log(`Using stored BEFORE position for ${dn}:`, first)
-
+    
     // Get the card in its new position
     const card = document.querySelector(`[data-dn="${dn}"]`) as HTMLElement
     if (!card) {
-      console.log(`Card not found for ${dn} during animation`)
-      return
+     return
     }
 
     // Mark as animating
     setAnimatingCards(prev => new Set(Array.from(prev).concat(dn)))
 
-    console.log(`Found card for ${dn} during animation:`, card)
+    
     
     // Get the LAST position (where the card is now after DOM update)
     const lastRect = card.getBoundingClientRect()
@@ -322,7 +389,6 @@ const LiveCallDashboard = () => {
       height: lastRect.height
     }
     
-    console.log(`Card LAST position for ${dn}:`, last)
 
     // Calculate the transform needed (exact same as reference)
     const dx = first.x - last.x
@@ -330,11 +396,10 @@ const LiveCallDashboard = () => {
     const sx = first.width / last.width
     const sy = first.height / last.height
 
-    console.log(`Animation calculations for ${dn}:`, { dx, dy, sx, sy })
 
     // Check if there's actually movement to animate
     if (dx === 0 && dy === 0 && sx === 1 && sy === 1) {
-      console.log(`No movement detected for ${dn} - skipping animation`)
+
       setAnimatingCards(prev => {
         const newSet = new Set(Array.from(prev))
         newSet.delete(dn)
@@ -359,12 +424,12 @@ const LiveCallDashboard = () => {
     requestAnimationFrame(() => {
       card.style.transition = 'transform 0.55s cubic-bezier(0.2, 0.9, 0.2, 1)'
       card.style.transform = 'none'
-      console.log(`Applied final transform for ${dn}`)
+      
     })
 
     // Clean up after animation (exact same as reference)
     card.addEventListener('transitionend', () => {
-      console.log(`Animation completed for ${dn}`)
+    
       card.classList.remove('anim-moving')
       card.classList.remove('status-glow')
       card.style.backgroundColor = '' // Remove visual indicator
@@ -396,14 +461,14 @@ const LiveCallDashboard = () => {
       document.documentElement.requestFullscreen().then(() => {
         setIsFullscreen(true)
       }).catch((err) => {
-        console.error('Error attempting to enable fullscreen:', err)
+       // console.error('Error attempting to enable fullscreen:', err)
       })
     } else {
       // Exit fullscreen
       document.exitFullscreen().then(() => {
         setIsFullscreen(false)
       }).catch((err) => {
-        console.error('Error attempting to exit fullscreen:', err)
+       // console.error('Error attempting to exit fullscreen:', err)
       })
     }
   }
@@ -433,6 +498,7 @@ const LiveCallDashboard = () => {
   }, [])
 
   // Memoize the expensive calculations to prevent unnecessary re-renders
+  // Note: eventLog is included to trigger recalculation when new events arrive
   const categorizedDns = useMemo(() => {
     if (!isInitialized || !dnsMap) return {}
     
@@ -447,24 +513,79 @@ const LiveCallDashboard = () => {
     })
     
     return result
-  }, [dnsMap, isInitialized, userAddress, hasActiveCalls, getDnCallState, activeMonitoring])
+  }, [dnsMap, isInitialized, userAddress, hasActiveCalls, getDnCallState, getCallStatesForDn, activeMonitoring, eventLog])
+
+  // Auto-clear monitoring state when call ends
+  useEffect(() => {
+    if (!activeMonitoring.dn || !activeMonitoring.deviceName || !isInitialized || !dnsMap) return
+
+    const monitoredDn = activeMonitoring.dn
+    const monitoredDeviceName = activeMonitoring.deviceName
+    const monitoredDevice = dnsMap[monitoredDn]?.devices?.[monitoredDeviceName]
+    
+    if (!monitoredDevice) {
+      // Device not found, clear monitoring
+      setActiveMonitoring({ dn: null, type: null, deviceName: null })
+      setMonitoringStartTime(prev => {
+        const newState = { ...prev }
+        delete newState[monitoredDn]
+        return newState
+      })
+      return
+    }
+
+    // Check if the monitored device still has an active call
+    const deviceCall = getCallStateForDevice(monitoredDn, monitoredDeviceName)
+    const isDeviceActiveCall = deviceCall && 
+      ['CONNECTED', 'ON_HOLD', 'ANSWERED', 'RETRIEVED', 'RINGING'].includes(deviceCall.currentState || '')
+
+    if (!isDeviceActiveCall) {
+      // Call ended, clear monitoring state
+      console.log('Call ended, clearing monitoring state for:', monitoredDn, monitoredDeviceName)
+      setActiveMonitoring({ dn: null, type: null, deviceName: null })
+      setMonitoringStartTime(prev => {
+        const newState = { ...prev }
+        delete newState[monitoredDn]
+        return newState
+      })
+      setSelectedMonitor(prev => {
+        const newState = { ...prev }
+        delete newState[monitoredDn]
+        return newState
+      })
+      setSelectedTone(prev => {
+        const newState = { ...prev }
+        delete newState[monitoredDn]
+        return newState
+      })
+      setTempMonitorSelection(prev => {
+        const newState = { ...prev }
+        delete newState[monitoredDn]
+        return newState
+      })
+      setNotification({
+        type: 'info',
+        message: `Monitoring automatically stopped for ${monitoredDn} - call ended`
+      })
+    }
+  }, [activeMonitoring, dnsMap, isInitialized, getCallStateForDevice, categorizedDns, hasActiveCalls])
 
   // Handle FLIP animations when cards change sections
   useEffect(() => {
     if (!isInitialized || !dnsMap) return
 
-    console.log('Animation useEffect triggered, categorizedDns:', categorizedDns)
+    //console.log('Animation useEffect triggered, categorizedDns:', categorizedDns)
     const animationsToTrigger: Array<{ dn: string; fromSection: string; toSection: string }> = []
     
     // First pass: Check for changes and capture positions
     Object.entries(categorizedDns).forEach(([dn, currentSection]) => {
       const previousSection = previousSectionsRef.current[dn]
       
-      console.log(`DN ${dn}: previous=${previousSection}, current=${currentSection}`)
+      //console.log(`DN ${dn}: previous=${previousSection}, current=${currentSection}`)
       
       // If section changed, capture BEFORE position and queue animation
       if (previousSection && previousSection !== currentSection) {
-        console.log(`🎯 SECTION CHANGE DETECTED for ${dn}: ${previousSection} -> ${currentSection}`)
+        //console.log(`🎯 SECTION CHANGE DETECTED for ${dn}: ${previousSection} -> ${currentSection}`)
         
         // Capture the BEFORE position immediately (before DOM updates)
         const card = document.querySelector(`[data-dn="${dn}"]`) as HTMLElement
@@ -476,16 +597,16 @@ const LiveCallDashboard = () => {
             width: rect.width,
             height: rect.height
           }
-          console.log(`📍 Captured BEFORE position for ${dn}:`, cardPositionsRef.current[dn])
+          //console.log(`Captured BEFORE position for ${dn}:`, cardPositionsRef.current[dn])
         } else {
-          console.log(`❌ Card not found for ${dn} during position capture`)
+          //console.log(`Card not found for ${dn} during position capture`)
         }
         
         // Queue animation to trigger after state updates
         animationsToTrigger.push({ dn, fromSection: previousSection, toSection: currentSection })
-        console.log(`✅ Queued animation for ${dn}`)
+        //console.log(`Queued animation for ${dn}`)
       } else if (!previousSection) {
-        console.log(`🔄 Initializing previous section for ${dn}: ${currentSection}`)
+        //console.log(`Initializing previous section for ${dn}: ${currentSection}`)
       }
     })
     
@@ -494,13 +615,13 @@ const LiveCallDashboard = () => {
       previousSectionsRef.current[dn] = currentSection
     })
     
-    console.log(`Total animations to trigger: ${animationsToTrigger.length}`)
+    //console.log(`Total animations to trigger: ${animationsToTrigger.length}`)
     
     // Trigger animations after DOM has been updated
     if (animationsToTrigger.length > 0) {
       // Use requestAnimationFrame to ensure DOM is fully updated
       requestAnimationFrame(() => {
-        console.log('Triggering animations after RAF:', animationsToTrigger)
+        //console.log('Triggering animations after RAF:', animationsToTrigger)
         animationsToTrigger.forEach(({ dn, fromSection, toSection }) => {
           animateCardMove(dn, fromSection, toSection)
         })
@@ -510,22 +631,6 @@ const LiveCallDashboard = () => {
 
 
 
-  // Clear CTI call states on page load
-  useEffect(() => {
-    const clearCtiCallStates = () => {
-      try {
-        // Clear specific CTI call states
-        localStorage.removeItem('cti_call_states')
-        localStorage.removeItem('cti_call_states_timestamp')
-        
-      } catch (error) {
-        console.error('Error clearing call states:', error)
-      }
-    }
-
-    // Clear on component mount
-    clearCtiCallStates()
-  }, [])
 
   // Custom styles
   const customStyles = `
@@ -981,6 +1086,9 @@ const LiveCallDashboard = () => {
     .section-container .row {
       transition: all 0.3s ease;
     }
+      .device-icon-wrapper.position-relative.active.monitoring {
+    display: none !important;
+}
     
   `
 
@@ -990,6 +1098,38 @@ const LiveCallDashboard = () => {
       setLoading(false)
     }
   }, [isInitialized, dnsMap])
+
+  // Function that runs when all things are loaded - only once
+  useEffect(() => {
+    // Only run if page is fully loaded (loading is false), initialized, we have data, haven't called GetCallLegs yet
+    if (!loading && isInitialized && dnsMap && Object.keys(dnsMap).length > 0 && !hasCalledGetCallLegsRef.current) {
+      onAllLoaded(async () => {
+        console.log('All data loaded successfully!')
+        
+        // Get active call IDs from localStorage (currentState != DISCONNECTED)
+        const activeCallIds = getActiveCallIdsFromLocalStorage()
+        console.log('Active call IDs from localStorage (currentState != DISCONNECTED):', activeCallIds)
+        
+        // Call GetCallLegs with the call IDs if we have any - only once
+        if (activeCallIds && activeCallIds.length > 0 && !hasCalledGetCallLegsRef.current) {
+          hasCalledGetCallLegsRef.current = true // Mark as called before making the request
+          try {
+            const params = {
+              callIds: activeCallIds
+            }
+            console.log('Calling GetCallLegs with params:', params)
+            const response = await GetCallLegs(params)
+            console.log('GetCallLegs response:', response)
+          } catch (error) {
+            console.error('Error calling GetCallLegs:', error)
+            hasCalledGetCallLegsRef.current = false // Reset on error so it can retry if needed
+          }
+        } else {
+          console.log('No active call IDs found in localStorage')
+        }
+      })
+    }
+  }, [loading, isInitialized, dnsMap, onAllLoaded, getActiveCallIdsFromLocalStorage])
 
   useEffect(() => {
     const handleClickOutside = (event: any) => {
@@ -1014,7 +1154,7 @@ const LiveCallDashboard = () => {
   }, [notification])
 
   useEffect(() => {
-    console.log('Popup state changed:', showPopup)
+    //console.log('Popup state changed:', showPopup)
   }, [showPopup])
 
   useEffect(() => {
@@ -1066,34 +1206,26 @@ const LiveCallDashboard = () => {
   const handleMonitorSelect = (dn: string, monitorType: string, devices: CtiDevice[]) => {
     setSelectedMonitor((prev) => ({ ...prev, [dn]: monitorType }))
     setTempMonitorSelection((prev) => ({ ...prev, [dn]: monitorType }))
-
-    console.log('Selected Monitor:', dn, monitorType)
-    console.log('dn:', dn)
-    console.log('devices:', devices)
-    console.log('Monitor type selected, waiting for tone selection...')
+    // Automatically set tone to 'NONE' as default
+    setSelectedTone((prev) => ({ ...prev, [dn]: 'NONE' }))
   }
 
   const handleToneSelect = (dn: string, toneType: string) => {
     setSelectedTone((prev) => ({ ...prev, [dn]: toneType }))
-
-    console.log('Selected Tone:', dn, toneType)
-    console.log('dn:', dn)
   }
 
   const handleBargeInSelect = (dn: string) => {
     setSelectedMonitor((prev) => ({ ...prev, [dn]: 'BARGE_IN' }))
     setTempMonitorSelection((prev) => ({ ...prev, [dn]: 'BARGE_IN' }))
-
-    console.log('Selected Barge In:', dn)
-    console.log('dn:', dn)
-    console.log('Barge In selected, waiting for tone selection...')
+    // Automatically set tone to 'NONE' as default
+    setSelectedTone((prev) => ({ ...prev, [dn]: 'NONE' }))
   }
 
   const resetMonitorSelection = () => {
     if (showPopup?.dn) {
       setSelectedMonitor((prev) => ({ ...prev, [showPopup.dn]: '' }))
       setTempMonitorSelection((prev) => ({ ...prev, [showPopup.dn]: '' }))
-      setSelectedTone((prev) => ({ ...prev, [showPopup.dn]: '' }))
+      setSelectedTone((prev) => ({ ...prev, [showPopup.dn]: 'NONE' }))
     }
   }
 
@@ -1141,12 +1273,8 @@ const LiveCallDashboard = () => {
   }
 
   const startMonitoringLocal = async (dn: string, monitorType: string, toneType?: string) => {
-   
-    if (!toneType) {
-      console.error('Tone is required for all monitoring types')
-      setNotification({ type: 'danger', message: 'Tone selection is required to start monitoring' })
-      return false
-    }
+    // Default tone to 'NONE' if not provided
+    const finalToneType = toneType || 'NONE'
 
     // Get monitored device info
     const monitoredDevice = dnsMap[dn]?.devices?.[showPopup?.deviceName || '']
@@ -1163,7 +1291,7 @@ const LiveCallDashboard = () => {
       setPendingMonitoringData({
         dn,
         monitorType,
-        toneType,
+        toneType: finalToneType,
         monitoredDeviceName: monitoredDevice.deviceName,
         monitoredDeviceType: monitoredDevice.deviceType
       })
@@ -1180,7 +1308,7 @@ const LiveCallDashboard = () => {
       
       const monitorDevice = userDevices[0]
     
-      return await executeMonitoring(dn, monitorType, toneType, monitorDevice, monitoredDevice)
+      return await executeMonitoring(dn, monitorType, finalToneType, monitorDevice, monitoredDevice)
     }
   }
 
@@ -1205,7 +1333,7 @@ const LiveCallDashboard = () => {
     )
 
     // Console log the payload
-    console.log('Monitoring API Payload:', payload);
+    //console.log('Monitoring API Payload:', payload);
     setShowPageLoader(true);
 
 
@@ -1214,13 +1342,13 @@ const LiveCallDashboard = () => {
       
       // Use appropriate API based on monitoring type
       if (monitorType === 'BARGE_IN') {
-        console.log('Calling startBargeInMonitoring API...')
+        //console.log('Calling startBargeInMonitoring API...')
         response = await startBargeInMonitoring(payload).finally(() => {
           setShowPageLoader(false);
         });
       } else {
         // For SILENT and WHISPER monitoring
-        console.log('Calling startMonitoring API...')
+       // console.log('Calling startMonitoring API...')
         response = await startMonitoring(payload).finally(() => {
           setShowPageLoader(false);
         });
@@ -1228,7 +1356,7 @@ const LiveCallDashboard = () => {
 
       if (response.success) {
         setShowPageLoader(false);
-        console.log(`${monitorType} monitoring started successfully for:`, dn)
+       // console.log(`${monitorType} monitoring started successfully for:`, dn)
         setActiveMonitoring({ 
           dn, 
           type: monitorType, 
@@ -1241,13 +1369,13 @@ const LiveCallDashboard = () => {
         return true
       } else {
         setShowPageLoader(false);
-        console.error('Failed to start monitoring:', response.error)
+       // console.error('Failed to start monitoring:', response.error)
         setNotification({ type: 'danger', message: response.error || 'Failed to start monitoring' })
         return false
       }
     } catch (error) {
       setShowPageLoader(false);
-      console.error('Error starting monitoring:', error)
+     // console.error('Error starting monitoring:', error)
       setNotification({ type: 'danger', message: 'Error starting monitoring' })
       return false
     }
@@ -1506,11 +1634,6 @@ const LiveCallDashboard = () => {
   }
 
   const getColor = (state: string, conf: boolean, isOneToOne: boolean, role: string, parties: any[] = [], dn: string, terminalState: string) => {
-    if (conf && !isOneToOne) return '#6f42c1'
-
-    // Handle HELD state directly if no parties or if state is already HELD
-    if (state === 'HELD') return '#2563eb'
-    
     const filtered = parties.filter((p: any) => p.callingAddress === dn || p.calledAddress === dn)
     if (!filtered.length) {
       return terminalState === 'REGISTERED'
@@ -1523,7 +1646,8 @@ const LiveCallDashboard = () => {
     }
 
     const allDropped = filtered.every((p: any) => p.callStatus === 'DROPPED')
-    if ((state === 'DROPPED' || state === 'DISCONNECTED') && allDropped) {
+    // If all parties are dropped, return terminal state color instead of conference/call color
+    if ((state === 'DROPPED' || state === 'DISCONNECTED' || allDropped) && allDropped) {
       switch (terminalState) {
         case 'REGISTERED':
           return '#17ba92'
@@ -1535,6 +1659,12 @@ const LiveCallDashboard = () => {
           return ''
       }
     }
+
+    // Only show conference color if not all parties are dropped
+    if (conf && !isOneToOne && !allDropped) return '#6f42c1'
+
+    // Handle HELD state directly if no parties or if state is already HELD
+    if (state === 'HELD') return '#2563eb'
 
     const activeParty = filtered.find((p: any) => p.callStatus !== 'DROPPED') || filtered[0]
     const effectiveState =
@@ -1556,15 +1686,21 @@ const LiveCallDashboard = () => {
   }
 
   const getText = (state: string, isConference: boolean, isOneToOne: boolean, parties: any[] = [], dn: string) => {
-    if (isConference && !isOneToOne) return 'Conference'
-    
-    // Handle HELD state directly if no parties or if state is already HELD
-    if (state === 'HELD') return 'On Hold'
-    
     const filtered = parties.filter((p: any) => p.callingAddress === dn || p.calledAddress === dn)
     if (!filtered.length) return dn
     
     const allDropped = filtered.every((p: any) => p.callStatus === 'DROPPED')
+    // If all parties are dropped, don't show conference/call text, just return DN
+    if ((state === 'DROPPED' || state === 'DISCONNECTED' || allDropped) && allDropped) {
+      return dn
+    }
+    
+    // Only show Conference text if not all parties are dropped
+    if (isConference && !isOneToOne && !allDropped) return 'Conference'
+    
+    // Handle HELD state directly if no parties or if state is already HELD
+    if (state === 'HELD') return 'On Hold'
+    
     const activeParty = filtered.find((p: any) => p.callStatus !== 'DROPPED') || filtered[0]
     
     let effectiveState = state
@@ -1572,8 +1708,6 @@ const LiveCallDashboard = () => {
       if (activeParty.callStatus === 'CONNECTED') effectiveState = 'ANSWERED'
       else if (activeParty.callStatus === 'ON_HOLD') effectiveState = 'HELD'
     }
-    
-    if ((effectiveState === 'DROPPED' || effectiveState === 'DISCONNECTED') && allDropped) return dn
     
     const isCaller = activeParty.callingAddress === dn
     const isCallee = activeParty.calledAddress === dn
@@ -1806,29 +1940,30 @@ const LiveCallDashboard = () => {
                                       height: '100%',
                                       minHeight: '140px'
                                     }}
-                                  >
-                                    {/* Hover Overlay */}
-                                    <div className="card-hover-overlay">
-                                    <p>
-                                      <strong>EXT:</strong> <span>{dn}</span>
-                                    </p>
+                                    >
+                                    {/* Hover Overlay - Hidden when call is in supervision */}
+                                    {!(sectionKey === 'supervision' || (activeMonitoring.dn === dn && activeMonitoring.type)) && (
+                                      <div className="card-hover-overlay">
+                                        <p>
+                                          <strong>EXT:</strong> <span>{dn}</span>
+                                        </p>
 
-                                    {/* {call?.parties && call?.parties.length > 0 && ( */}
-                                      <>
-                                      <p>
-                                        <strong>From:</strong> <span>{call?.parties[0]?.callingAddress || 'N/A'}</span>
-                                      </p>
-                                   
-                                      <p>
-                                        <strong>To:</strong> <span>{call?.parties[0]?.calledAddress || 'N/A'}</span>
-                                      </p>
-                                      </>
-                                    {/* )} */}
+                                        {/* {call?.parties && call?.parties.length > 0 && ( */}
+                                          <>
+                                          <p>
+                                            <strong>From:</strong> <span>{call?.parties[0]?.callingAddress || 'N/A'}</span>
+                                          </p>
+                                       
+                                          <p>
+                                            <strong>To:</strong> <span>{call?.parties[0]?.calledAddress || 'N/A'}</span>
+                                          </p>
+                                          </>
+                                        {/* )} */}
 
-                                    {/* {active && call && (
+                                        {/* {active && call && (
                                           <p className="small mb-0" style={{ color: callColor, padding: '2px',fontWeight: 'bold',textTransform: 'uppercase' }}>
                                             {(() => {
-                                            
+                                              
                                               const result = getText(
                                                 call.currentState || '',
                                                 call.isConference || false,
@@ -1841,8 +1976,9 @@ const LiveCallDashboard = () => {
                                             })()}
                                           </p>
                                         )} */}
+                                      </div>
+                                    )}
 
-                                    </div>
                                     {/* Section 1: Information Section */}
                                     <div className="card-info-section">
                                       <div className="user-avatar">
@@ -1874,7 +2010,7 @@ const LiveCallDashboard = () => {
                                    
                                           <p className=" mb-0">
                                             {(() => {
-                                            
+                                              
                                               const result = getText(
                                                 call.currentState || '',
                                                 call.isConference || false,
@@ -1894,6 +2030,29 @@ const LiveCallDashboard = () => {
                                     </div>
                                      )}
 
+                                    {/* Stop Monitoring Button - Visible when monitoring is active */}
+                                    {activeMonitoring.dn === dn && activeMonitoring.type && (
+                                      <div className="card-monitoring-section" style={{ padding: '0.5rem', marginTop: '0.5rem' }}>
+                                        <Button
+                                          variant="danger"
+                                          size="sm"
+                                          onClick={(e) => {
+                                            e.stopPropagation()
+                                            if (activeMonitoring.type) {
+                                              stopMonitoring(dn, activeMonitoring.type)
+                                            }
+                                          }}
+                                          className="w-100"
+                                          style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
+                                        >
+                                          <i className="material-icons-two-tone me-1" style={{ fontSize: '1rem', verticalAlign: 'middle' }}>
+                                            stop
+                                          </i>
+                                          Stop Monitoring
+                                        </Button>
+                                      </div>
+                                    )}
+
                                     {/* Section 2: Device Dropdown Section */}
                                     {/* <div className="device-dropdown-section">
                                       <select className="device-dropdown">
@@ -1910,7 +2069,9 @@ const LiveCallDashboard = () => {
                                     <div className="current-devices-section">
                                       
                                       <div className="device-icons">
-                                        {deviceList.map((device: CtiDevice) => {
+                                        {deviceList
+                                        .filter((device: CtiDevice) => device.terminalState === 'REGISTERED' || device.terminalState === 'UNREGISTERED')
+                                        .map((device: CtiDevice) => {
                                           const { deviceName, deviceType, terminalState } = device
                                           const iconClass = getDeviceIconClass(deviceType)
                                           const dotColor =
@@ -1921,6 +2082,21 @@ const LiveCallDashboard = () => {
                                                 : terminalState === 'STALE'
                                                   ? '#f59e0b'
                                                   : '#6b7280'
+
+                                          const getDeviceTypeLabel = (type: string) => {
+                                            switch (type) {
+                                              case 'SOFT':
+                                                return 'Soft'
+                                              case 'HARD':
+                                                return 'Phone'
+                                              case 'ANDROID':
+                                                return 'Android'
+                                              case 'IOS':
+                                                return 'iPhone'
+                                              default:
+                                                return ''
+                                            }
+                                          }
 
                                           const deviceCall = getCallStateForDevice(dn, deviceName)
                                           const isDeviceActiveCall =
@@ -1933,20 +2109,38 @@ const LiveCallDashboard = () => {
                                               className={`device-icon-wrapper position-relative ${isDeviceActiveCall ? 'active' : ''} ${
                                                 activeMonitoring.dn === dn && activeMonitoring.type && activeMonitoring.deviceName === deviceName ? 'monitoring' : ''
                                               }`}
-                                              title={`${deviceName} (${terminalState})`}
+                                              title={`${getDeviceTypeLabel(deviceType)}`}
                                               onClick={() => {
-                                                if (isDeviceActiveCall) {
-                                                  // Check if user has any monitoring permissions
-                                                  const hasMonitoringPermissions = session?.user?.permissions?.some(permission => 
-                                                    ['silent-monitoring-cti', 'whisper-monitoring-cti', 'barge-in-cti'].includes(permission)
-                                                  )
-                                                  
+                                                // Check if user has any monitoring permissions
+                                                const hasMonitoringPermissions = session?.user?.permissions?.some(permission => 
+                                                  ['silent-monitoring-cti', 'whisper-monitoring-cti', 'barge-in-cti'].includes(permission)
+                                                )
+                                                
+                                                // Allow opening popup if:
+                                                // 1. Device has active call (for starting monitoring)
+                                                // 2. This device is currently being monitored (for stopping monitoring)
+                                                const isCurrentlyMonitored = activeMonitoring.dn === dn && 
+                                                                              activeMonitoring.deviceName === deviceName && 
+                                                                              activeMonitoring.type
+                                                
+                                                if (isDeviceActiveCall || isCurrentlyMonitored) {
                                                   if (hasMonitoringPermissions) {
-                                                    console.log('Opening popup for:', dn, deviceName)
-                                                    // Reset monitor selection when opening popup
-                                                    setSelectedMonitor((prev) => ({ ...prev, [dn]: '' }))
-                                                    setTempMonitorSelection((prev) => ({ ...prev, [dn]: '' }))
-                                                    setSelectedTone((prev) => ({ ...prev, [dn]: '' }))
+                                                    console.log('Opening popup for:', dn, deviceName, isCurrentlyMonitored ? '(currently monitored)' : '')
+                                                    // If already monitoring, restore the state so stop button shows in modal
+                                                    if (isCurrentlyMonitored && activeMonitoring.type) {
+                                                      setSelectedMonitor((prev) => ({ ...prev, [dn]: activeMonitoring.type! }))
+                                                      setTempMonitorSelection((prev) => ({ ...prev, [dn]: activeMonitoring.type! }))
+                                                      // Preserve existing tone selection if available
+                                                      if (!selectedTone[dn]) {
+                                                        // Try to get from previous selection or set a default
+                                                        setSelectedTone((prev) => ({ ...prev, [dn]: prev[dn] || 'NONE' }))
+                                                      }
+                                                    } else {
+                                                      // New monitoring session - reset selections, default tone to 'NONE'
+                                                      setSelectedMonitor((prev) => ({ ...prev, [dn]: '' }))
+                                                      setTempMonitorSelection((prev) => ({ ...prev, [dn]: '' }))
+                                                      setSelectedTone((prev) => ({ ...prev, [dn]: 'NONE' }))
+                                                    }
                                                     setShowPopup({ dn: dn, deviceName })
                                                   } else {
                                                     console.log('User does not have monitoring permissions')
@@ -1955,7 +2149,7 @@ const LiveCallDashboard = () => {
                                                 } else if (terminalState === 'STALE') {
                                                   console.log('Device is STALE, popup disabled')
                                                 } else {
-                                                  console.log('Device not in active call, popup disabled')
+                                                  console.log('Device not in active call and not currently monitored, popup disabled')
                                                 }
                                               }}
                                             >
@@ -2041,26 +2235,31 @@ const LiveCallDashboard = () => {
             <FiX size={20} onClick={() => setShowPopup(null)} style={{ cursor: 'pointer' }} />
         </Modal.Header>
         <Modal.Body>
-          {showPopup && activeMonitoring.dn === showPopup.dn && activeMonitoring.type ? (
+          {showPopup && activeMonitoring.dn === showPopup.dn && activeMonitoring.type && 
+           activeMonitoring.deviceName === showPopup.deviceName ? (
             <div className="text-center">
               <p className="mb-3">
-                Currently monitoring with: <strong>{activeMonitoring.type}</strong>
+                Currently monitoring with
               </p>
+              <span className="status-badge primary mb-3 d-block">
+              <strong>{activeMonitoring.type}</strong>
+              </span>
               <div>
-                <p className="mb-2 small text-muted">
-                  Tone: <strong>{selectedTone[showPopup.dn] || 'Not selected'}</strong>
+                {/* <p className="mb-2 small text-muted">
+                  Tone: <strong>{selectedTone[showPopup.dn] || 'N/A'}</strong>
                 </p>
+                <p className="mb-3 small text-muted">
+                  Device: <strong>{showPopup.deviceName}</strong>
+                </p> */}
                 <Button
                   variant="danger"
                   onClick={() => stopMonitoring(showPopup.dn, activeMonitoring.type!)}
-                  disabled={!selectedTone[showPopup.dn]}
+                  className="w-100"
                 >
-                  Stop{' '}
-                  {activeMonitoring.type === 'SILENT'
-                    ? 'Silent'
-                    : activeMonitoring.type === 'WHISPER'
-                      ? 'Barge In'
-                      : 'Barge In'}
+                  {/* <i className="material-icons-two-tone me-2" style={{ fontSize: '1.2rem', verticalAlign: 'middle' }}>
+                    stop
+                  </i> */}
+                  Stop Monitoring
                 </Button>
               </div>
             </div>
@@ -2131,28 +2330,7 @@ const LiveCallDashboard = () => {
                     </div>
                   </div>
 
-                  <div className="mb-4">
-                    <h6 className="fw-bold mb-3 text-left">Tone Selection</h6>
-                    <div className="row g-2">
-                      {Object.entries(toneLabels).map(([key, label]) => {
-                        const isDisabled = !tempMonitorSelection[showPopup.dn] || !isDnInActiveCall(showPopup.dn)
-
-                        return (
-                          <div key={key} className="col-6">
-                            <Button
-                              variant={selectedTone[showPopup.dn] === key ? 'success' : 'info'}
-                              disabled={isDisabled}
-                              onClick={isDisabled ? undefined : () => handleToneSelect(showPopup.dn, key)}
-                              size="sm"
-                              className="w-100 text-center d-inline-block app-button"
-                            >
-                              {label}
-                            </Button>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </div>
+                  {/* Tone Selection is hidden - default tone is 'NONE' */}
 
                   {tempMonitorSelection[showPopup.dn] && (
                     <div className="">
@@ -2176,7 +2354,7 @@ const LiveCallDashboard = () => {
           <Button 
             variant="default" 
             className="app-button btn-sm"
-            disabled={!showPopup?.dn || (!tempMonitorSelection[showPopup.dn] && !selectedTone[showPopup.dn])}
+            disabled={!showPopup?.dn || !tempMonitorSelection[showPopup.dn]}
             onClick={() => resetMonitorSelection()}
           >
             Reset
@@ -2185,15 +2363,16 @@ const LiveCallDashboard = () => {
             variant="primary" 
             className="app-button btn-sm" 
             onClick={() => {
-              if (showPopup?.dn && tempMonitorSelection[showPopup.dn] && selectedTone[showPopup.dn]) {
-                startMonitoringLocal(showPopup.dn, tempMonitorSelection[showPopup.dn] as 'SILENT' | 'WHISPER' | 'BARGE_IN', selectedTone[showPopup.dn])
+              if (showPopup?.dn && tempMonitorSelection[showPopup.dn]) {
+                // Use selected tone or default to 'NONE'
+                const toneToUse = selectedTone[showPopup.dn] || 'NONE'
+                startMonitoringLocal(showPopup.dn, tempMonitorSelection[showPopup.dn] as 'SILENT' | 'WHISPER' | 'BARGE_IN', toneToUse)
                 setShowPopup(null)
               }
             }}
             disabled={
               !showPopup?.dn || 
-              !tempMonitorSelection[showPopup.dn] || 
-              !selectedTone[showPopup.dn] ||
+              !tempMonitorSelection[showPopup.dn] ||
               !session?.user?.permissions?.includes(
                 tempMonitorSelection[showPopup.dn] === 'SILENT' ? 'silent-monitoring-cti' :
                 tempMonitorSelection[showPopup.dn] === 'WHISPER' ? 'whisper-monitoring-cti' :

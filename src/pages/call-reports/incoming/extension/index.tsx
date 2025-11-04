@@ -69,11 +69,16 @@ interface ChartData {
 
 import dynamic from 'next/dynamic';
 import { ApexOptions } from 'apexcharts';
-import { formatCurrency, formatMinutesAndSeconds, ModuleSlug } from '@utils/Helper';
+import { formatCurrency, formatMinutesAndSeconds, ModuleSlug, GlobalDateTimeFormat, formatDateTimeToLocal } from '@utils/Helper';
 const ReactApexChart = dynamic(() => import('react-apexcharts'), { ssr: false });
 
 const CallIncomingExtension = () => {
     const { data:session, status } = useSession();
+
+    const [showDateRange, setShowDateRange] = useState(false);
+    const [startDateTime, setStartDateTime] = useState<string>('');
+    const [endDateTime, setEndDateTime] = useState<string>('');
+
     const [loading, setLoading] = useState(false);
     const [activeTab, setActiveTab] = useState('calls_chart');
     
@@ -200,6 +205,12 @@ const CallIncomingExtension = () => {
                 });
               
             if (response?.summary) {
+
+                setShowDateRange(true);
+                const dataFilters = response?.filters;
+                setStartDateTime(dataFilters?.start_datetime);
+                setEndDateTime(dataFilters?.end_datetime);
+
                 setSummary(response.summary);
                 setDataLoaded(true);
                 console.log('Summary data set:', response.summary);
@@ -564,7 +575,7 @@ const CallIncomingExtension = () => {
     
     return (
         <React.Fragment>
-            <BreadcrumbItem mainTitle="" mainLink="" subTitle="Call Incoming By Extension" showPageLoader={showPageLoader} />
+            <BreadcrumbItem mainTitle="" mainLink="" subTitle="Incoming Calls By Extension" showPageLoader={showPageLoader} />
 
 
             <Row className="mb-3">
@@ -572,10 +583,19 @@ const CallIncomingExtension = () => {
           <div className="page-header-title style-2">
             <Row className="d-flex justify-content-between align-items-center">
               <Col md={5}>
-                <h2 className="mb-0">Call Incoming By Extension</h2>
+                <h2 className="mb-0">Incoming Calls By Extension</h2>
               </Col>
               <Col md={7} className="d-flex justify-content-end">
                 <div className="action-buttons">
+
+                  {showDateRange && (
+                            <>
+                            <p className="mb-0">
+                            Date Range: <span className="status-badge primary">{formatDateTimeToLocal(startDateTime, GlobalDateTimeFormat)}</span> to <span className="status-badge primary">{formatDateTimeToLocal(endDateTime, GlobalDateTimeFormat)}</span>
+                            </p>
+                          
+                            </>
+                          )}
                   <CallLogsFilters
                     onFiltersChange={handleFiltersChange} 
                     onExport={handleExport} 

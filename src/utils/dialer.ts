@@ -282,6 +282,20 @@ export const stopBargeInMonitoring = async (params: StopBargeInMonitoringParams)
   }
 }
 
+
+export const GetCallLegs = async (params: any): Promise<any> => {
+  try {
+    const response = await axiosInstance.post('/cti/getCallLegs', params);
+    return validateResponse(response);
+  } catch (error) {
+    console.error('Error calling get-call-legs API:', error)
+    return {
+      success: false,
+      error: 'Network error occurred while getting call legs'
+    }
+  }
+}
+
 /**
  * Get calling device information from CTI data
  * @param userAddress - The user's extension number

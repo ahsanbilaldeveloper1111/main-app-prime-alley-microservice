@@ -974,7 +974,7 @@ const Header = ({ themeMode }: HeaderProps) => {
                 },
                 {
                     key: 'view-cti-monitoring',
-                    permission: 'view-cti',
+                    permission: 'dashboard-cti',
                     icon: ICONS.PHONE_CALL,
                     label: SUBMENU_LABELS.CALL_MONITORING,
                     href: '/cti/monitoring'

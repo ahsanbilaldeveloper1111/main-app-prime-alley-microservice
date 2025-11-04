@@ -23,7 +23,7 @@ import PageLoader from '@components/PageLoader';
 
 import '@assets/scss/common.scss';
 
-import { convertUTCToUserTimezone, convertUTCTimeToUserTimezone, convertUTCSeparateDateTimeToUserTime, convertUTCSeparateDateTimeToUserDate, formatDuration, GlobalDateFormat, GlobalTimeFormat } from '@utils/Helper';
+import { convertUTCToUserTimezone, convertUTCTimeToUserTimezone, convertUTCSeparateDateTimeToUserTime, convertUTCSeparateDateTimeToUserDate, formatDuration, GlobalDateFormat, GlobalTimeFormat,formatDateTimeToLocal, GlobalDateTimeFormat } from '@utils/Helper';
 import { ModuleSlug } from '@utils/Helper';
 import { useHierarchyData } from '@components/filters/useHierarchyData';
 
@@ -38,6 +38,10 @@ interface Summary {
 const CallLogs = () => {
     const { data:session, status } = useSession();
     const [showPageLoader, setShowPageLoader] = useState(false);
+
+    const [showDateRange, setShowDateRange] = useState(false);
+    const [startDateTime, setStartDateTime] = useState<string>('');
+    const [endDateTime, setEndDateTime] = useState<string>('');
    
     const columns: Column[] = [
         { key: 'Date', name: 'Date', selector: (row: any) => row.Date, sortable: true,
@@ -96,7 +100,7 @@ const CallLogs = () => {
             id: 'total-users',
             title: 'Total Users',
             value: totalUsers || 0,
-            description: 'Total users who made calls',
+            description: 'Show Registered users in the system',
             delay: 0.1,
             showAnimatedNumber: true,
             animationDuration: 1000,
@@ -106,7 +110,7 @@ const CallLogs = () => {
             id: 'extensions',
             title: 'Extensions',
             value: summary?.extensions || 0,
-            description: 'Total extensions used to make calls',
+            description: 'Show Extensions currently engaged or making calls',
             delay: 0.3,
             showAnimatedNumber: true,
             animationDuration: 1000,
@@ -116,7 +120,7 @@ const CallLogs = () => {
             id: 'inbound',
             title: 'Inbound',
             value: summary?.inbound || 0,
-            description: 'Total inbound calls made',
+            description: 'Total received call count',
             delay: 0.5,
             showAnimatedNumber: true,
             animationDuration: 1000,
@@ -126,7 +130,7 @@ const CallLogs = () => {
             id: 'outbound',
             title: 'Outbound',
             value: summary?.outbound || 0,
-            description: 'Total outbound calls made',
+            description: 'Total placed call count',
             delay: 0.7,
             showAnimatedNumber: true,
             animationDuration: 1000,
@@ -140,6 +144,12 @@ const CallLogs = () => {
         setShowPageLoader(false);
         //console.log(response);
         if(response?.summary){
+
+            setShowDateRange(true);
+            const dataFilters = response?.filters;
+            setStartDateTime(dataFilters?.start_datetime);
+            setEndDateTime(dataFilters?.end_datetime);
+
             setSummary(response.summary);
             //console.log(summary);
         }
@@ -189,7 +199,19 @@ const CallLogs = () => {
 
                     <Col md={8} className="d-flex justify-content-end">
                       
+
+                    
+
                     <div className="action-buttons">
+
+                    {showDateRange && (
+                            <>
+                            <p className="mb-0">
+                            Date Range: <span className="status-badge primary">{formatDateTimeToLocal(startDateTime, GlobalDateTimeFormat)}</span> to <span className="status-badge primary">{formatDateTimeToLocal(endDateTime, GlobalDateTimeFormat)}</span>
+                            </p>
+                          
+                            </>
+                          )}
                     {/* <div className="search-container">
                             <i className="fas fa-search search-icon"></i>
                             <input type="text" className="search-bar" placeholder="Search call logs..." onChange={(e) => handleFiltersChange({...currentFilters, search: e.target.value})}/>

@@ -36,7 +36,14 @@ export interface ChartDonutProps {
 const ChartDonut: React.FC<ChartDonutProps> = ({
   series,
   labels,
-  colors = ['#00E396', '#FF4560', '#775DD0', '#FEB019', '#546E7A', '#26a69a'],
+  colors = [
+    '#00E396', 
+    '#FF4560', 
+    '#775DD0', 
+    '#FEB019', 
+    '#546E7A', 
+    '#26a69a'
+  ],
   height = 300,
   width = '100%',
   title,

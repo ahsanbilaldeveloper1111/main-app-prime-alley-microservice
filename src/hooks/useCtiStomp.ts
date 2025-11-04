@@ -122,7 +122,6 @@ export default function useCtiStomp(wsPath = '/ws') {
   // Save call states to localStorage
   const saveCallStatesToStorage = useCallback((callStates: Record<string, CtiCallEvent>) => {
     try {
-      console.log('Saving call states to localStorage:', callStates);
       
       // Only save calls that are CONNECTED or RETRIEVED (not incoming/ringing)
       const callsToPersist = Object.entries(callStates).reduce((acc, [callId, callEvent]) => {
@@ -143,15 +142,15 @@ export default function useCtiStomp(wsPath = '/ws') {
       if (Object.keys(callsToPersist).length > 0) {
         localStorage.setItem(CALL_STATES_STORAGE_KEY, JSON.stringify(callsToPersist));
         localStorage.setItem(CALL_STATES_TIMESTAMP_KEY, new Date().toISOString());
-        console.log('Persisted CONNECTED/RETRIEVED call states to localStorage:', callsToPersist);
+        
       } else {
         // If no active calls, clear storage
         localStorage.removeItem(CALL_STATES_STORAGE_KEY);
         localStorage.removeItem(CALL_STATES_TIMESTAMP_KEY);
-        console.log('No CONNECTED/RETRIEVED calls to persist, cleared localStorage');
+        
       }
     } catch (error) {
-      console.error('Error saving call states to localStorage:', error);
+      
     }
   }, []);
 
@@ -176,11 +175,6 @@ export default function useCtiStomp(wsPath = '/ws') {
     }
 
     if (evt.isTerminating) {
-      console.log(`🔄 useCtiStomp: Processing terminating event:`, {
-        eventType: evt.eventType,
-        callId: evt.callId,
-        isTerminating: evt.isTerminating
-      });
       
       setCallStateMap(prev => {
         const { [callId]: _, ...rest } = prev;
@@ -194,11 +188,6 @@ export default function useCtiStomp(wsPath = '/ws') {
       setEventLog(prev => {
         const log = [...prev, evt];
         if (log.length > 200) log.shift();
-        console.log(`📝 useCtiStomp: Added terminating event to eventLog:`, {
-          eventType: evt.eventType,
-          callId: evt.callId,
-          eventLogLength: log.length
-        });
         return log;
       });
       return;
@@ -214,8 +203,14 @@ export default function useCtiStomp(wsPath = '/ws') {
       const updated = { ...prev };
       const base = updated[callId] || {};
 
+      // IMPORTANT: Always use new parties if provided in event, otherwise fall back to base parties
+      // This ensures that when parties are removed (e.g., barge-in stopped), we use the updated parties
+      const partiesToProcess = evt.parties !== undefined && evt.parties !== null 
+        ? evt.parties 
+        : (base.parties || []);
+
       // Process parties to ensure callingDeviceType is included
-      const processedParties = (evt.parties || base.parties || []).map((party: any) => {
+      const processedParties = partiesToProcess.map((party: any) => {
         // console.log(`🔍 Processing party:`, {
         //   callingAddress: party.callingAddress,
         //   callingDeviceName: party.callingDeviceName,
@@ -257,41 +252,18 @@ export default function useCtiStomp(wsPath = '/ws') {
           
           const userDevices = dnsMap[party.callingAddress]?.devices;
           if (userDevices) {
-            console.log(`🔍 Available devices for ${party.callingAddress}:`, Object.keys(userDevices));
-            console.log(`🔍 Looking for device: "${party.callingDeviceName}"`);
             
-            // Debug: Show all devices and their names
-            Object.values(userDevices).forEach((d: any, index) => {
-              console.log(`🔍 Device ${index}:`, {
-                deviceName: d.deviceName,
-                deviceType: d.deviceType,
-                exactMatch: d.deviceName === party.callingDeviceName,
-                includesMatch: d.deviceName.includes(party.callingDeviceName),
-                reverseMatch: party.callingDeviceName.includes(d.deviceName)
-              });
-            });
+            
             
             const device = Object.values(userDevices).find((d: any) => d.deviceName === party.callingDeviceName);
             if (device) {
               party.callingDeviceType = device.deviceType;
-              console.log(`✅ Found device type:`, {
-                deviceName: party.callingDeviceName,
-                deviceType: device.deviceType,
-                fullDevice: device
-              });
+              
             } else {
-              // console.log(`❌ Device not found in dnsMap:`, {
-              //   callingDeviceName: party.callingDeviceName,
-              //   availableDevices: Object.keys(userDevices),
-              //   allDevices: Object.values(userDevices)
-              // });
+              
             }
           } else {
-            // console.log(`❌ No devices found for address:`, {
-            //   callingAddress: party.callingAddress,
-            //   dnsMapHasAddress: !!dnsMap[party.callingAddress],
-            //   dnsMap: dnsMap
-            // });
+           
           }
         } else {
           // console.log(`ℹ️ Device type already present or missing required data:`, {
@@ -327,6 +299,15 @@ export default function useCtiStomp(wsPath = '/ws') {
         return party;
       });
 
+      // Check if all parties are DROPPED - if so, mark call as terminating
+      const allPartiesDropped = processedParties.length > 0 && 
+        processedParties.every((p: any) => p.callStatus === 'DROPPED' || p.callStatus === 'DISCONNECTED');
+      
+      // Also check hasActiveParticipants flag if available
+      const shouldTerminate = evt.isTerminating || 
+        allPartiesDropped || 
+        (evt.hasActiveParticipants === false && processedParties.length > 0);
+
       updated[callId] = {
         ...base,
         callId,
@@ -336,10 +317,19 @@ export default function useCtiStomp(wsPath = '/ws') {
         isConference: evt.isConference,
         isOneToOne: evt.isOneToOne,
         parties: processedParties,
-        isTerminating: evt.isTerminating,
-        hasActiveParticipants: evt.hasActiveParticipants,
+        isTerminating: shouldTerminate,
+        hasActiveParticipants: evt.hasActiveParticipants !== undefined ? evt.hasActiveParticipants : !allPartiesDropped,
         eventName: evt.eventName,
       };
+
+      // If all parties are dropped or call is terminating, remove the call state
+      if (shouldTerminate) {
+        const { [callId]: _, ...rest } = updated;
+        const cleaned = rest;
+        // Save cleaned state to localStorage
+        saveCallStatesToStorage(cleaned);
+        return cleaned;
+      }
 
       // Save updated state to localStorage
       saveCallStatesToStorage(updated);
@@ -457,7 +447,7 @@ export default function useCtiStomp(wsPath = '/ws') {
               
               // Process the payload and update state
               const grouped = groupDevicesByDnAndDeviceName(payload);
-              console.log('grouped devices:', grouped);
+             // console.log('grouped devices:', grouped);
              // console.log('Number of DNs:', Object.keys(grouped).length);
               
               setDnsMap(grouped);
@@ -501,8 +491,12 @@ export default function useCtiStomp(wsPath = '/ws') {
 
           client.subscribe('/user/topic/call-events', msg => {
             try {
+              
+              console.log('================= STARTING CALL EVENTS ====================');
               console.log('call-events received:', msg.body);
               handleCallEvent(JSON.parse(msg.body));
+              console.log('================= ENDING CALL EVENTS ====================');
+
             } catch (err) {
               console.error('Failed to process call event:', err);
               setError('Failed to process call event');
@@ -577,7 +571,18 @@ export default function useCtiStomp(wsPath = '/ws') {
     const calls = getCallStatesForDn(dn);
     if (!calls.length) return null;
 
-    const mostRecent = calls.reduce((a, b) =>
+    // Filter to only active calls (where at least one party for this DN is not dropped)
+    const activeCalls = calls.filter(call => {
+      const dnParties = call.parties?.filter(
+        (p: any) => p.callingAddress === dn || p.calledAddress === dn
+      ) || [];
+      // Check if all parties for this DN are dropped
+      return dnParties.length > 0 && !dnParties.every((p: any) => p.callStatus === 'DROPPED');
+    });
+
+    if (!activeCalls.length) return null;
+
+    const mostRecent = activeCalls.reduce((a, b) =>
       new Date(b.eventTime) > new Date(a.eventTime) ? b : a
     );
 
@@ -587,6 +592,15 @@ export default function useCtiStomp(wsPath = '/ws') {
     );
 
     if (!matchedParty) return null;
+
+    // Double-check that the matched party is not dropped
+    if (matchedParty.callStatus === 'DROPPED') {
+      // Find an active party for this DN if available
+      const activeParty = mostRecent.parties.find(
+        (p: any) => (p.callingAddress === dn || p.calledAddress === dn) && p.callStatus !== 'DROPPED'
+      );
+      if (!activeParty) return null;
+    }
 
     return {
       ...mostRecent,
