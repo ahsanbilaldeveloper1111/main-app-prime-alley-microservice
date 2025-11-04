@@ -16,7 +16,7 @@ import PageLoader from '@components/PageLoader'
 import Link from 'next/link'
 import { clearAllLocalStorage, getLocalStorageInfo } from '../../utils/localStorageUtils'
 import { useSession } from 'next-auth/react';
-import { startMonitoring, stopMonitoring as stopMonitoringAPI, startBargeInMonitoring, stopBargeInMonitoring as stopBargeInMonitoringAPI } from '@utils/dialer'
+import { startMonitoring, stopMonitoring as stopMonitoringAPI, startBargeInMonitoring, stopBargeInMonitoring as stopBargeInMonitoringAPI, GetCallLegs } from '@utils/dialer'
 
 import '@assets/scss/common.scss';
 import '@assets/scss/live-calls.scss';
@@ -66,7 +66,11 @@ const LiveCallDashboard = () => {
     getCallStatesForDn,
     eventLog,
     userAddress,
-    syncPersistedCallStates
+    syncPersistedCallStates,
+    getActiveCallIdsFromLocalStorage,
+    getAllCallIds,
+    removeTerminatingCalls,
+    onAllLoaded
   } = useCtiStomp()
 
   const [loading, setLoading] = useState(true)
@@ -84,6 +88,9 @@ const LiveCallDashboard = () => {
   const [showPopup, setShowPopup] = useState<{ dn: string; deviceName: string } | null>(null)
   const [showDebugInfo, setShowDebugInfo] = useState(false)
   const [restoredCallStates, setRestoredCallStates] = useState<number>(0)
+  
+  // Ref to track if GetCallLegs has been called to prevent multiple calls
+  const hasCalledGetCallLegsRef = useRef(false)
   
   // Popover state management
   const [activePopover, setActivePopover] = useState<string | null>(null)
@@ -152,11 +159,12 @@ const LiveCallDashboard = () => {
         
         if (callState.parties && callState.parties.length > 0) {
           // Filter parties involving this DN and check they are active (not DROPPED/DISCONNECTED)
-          const dnParties = callState.parties.filter((p: any) => 
-            (p.callingAddress === dn || p.calledAddress === dn) && 
-            p.callStatus !== 'DROPPED' && 
-            p.callStatus !== 'DISCONNECTED'
-          )
+          // IMPORTANT: Double-check that parties are truly active (defensive programming)
+          const dnParties = callState.parties.filter((p: any) => {
+            const involvesDn = (p.callingAddress === dn || p.calledAddress === dn)
+            const isActive = p.callStatus !== 'DROPPED' && p.callStatus !== 'DISCONNECTED'
+            return involvesDn && isActive
+          })
           
           // If we found active parties for this DN in this call, mark as active
           if (dnParties.length > 0) {
@@ -165,6 +173,27 @@ const LiveCallDashboard = () => {
           }
         }
       }
+    }
+    
+    // Debug logging for DN 108 (can be removed later) - moved after calculation
+    if (dn === '108') {
+      console.log('🔍 Checking DN 108:', {
+        allCallsCount: allCallsForDn.length,
+        calls: allCallsForDn.map(c => ({
+          callId: c.callId,
+          isTerminating: c.isTerminating,
+          currentState: c.currentState,
+          eventTime: c.eventTime,
+          parties: c.parties?.map((p: any) => ({
+            calling: p.callingAddress,
+            called: p.calledAddress,
+            status: p.callStatus,
+            deviceName: p.callingDeviceName || p.calledDeviceName
+          }))
+        })),
+        hasActiveCallForDn: hasActiveCallForDn,
+        willShowOnCall: hasActiveCallForDn
+      })
     }
     
     // Only show as "onCall" if there are active parties for this DN in any call
@@ -469,6 +498,7 @@ const LiveCallDashboard = () => {
   }, [])
 
   // Memoize the expensive calculations to prevent unnecessary re-renders
+  // Note: eventLog is included to trigger recalculation when new events arrive
   const categorizedDns = useMemo(() => {
     if (!isInitialized || !dnsMap) return {}
     
@@ -483,7 +513,7 @@ const LiveCallDashboard = () => {
     })
     
     return result
-  }, [dnsMap, isInitialized, userAddress, hasActiveCalls, getDnCallState, getCallStatesForDn, activeMonitoring])
+  }, [dnsMap, isInitialized, userAddress, hasActiveCalls, getDnCallState, getCallStatesForDn, activeMonitoring, eventLog])
 
   // Auto-clear monitoring state when call ends
   useEffect(() => {
@@ -601,22 +631,6 @@ const LiveCallDashboard = () => {
 
 
 
-  // Clear CTI call states on page load
-  useEffect(() => {
-    const clearCtiCallStates = () => {
-      try {
-        // Clear specific CTI call states
-        localStorage.removeItem('cti_call_states')
-        localStorage.removeItem('cti_call_states_timestamp')
-        
-      } catch (error) {
-        console.error('Error clearing call states:', error)
-      }
-    }
-
-    // Clear on component mount
-    clearCtiCallStates()
-  }, [])
 
   // Custom styles
   const customStyles = `
@@ -1084,6 +1098,38 @@ const LiveCallDashboard = () => {
       setLoading(false)
     }
   }, [isInitialized, dnsMap])
+
+  // Function that runs when all things are loaded - only once
+  useEffect(() => {
+    // Only run if page is fully loaded (loading is false), initialized, we have data, haven't called GetCallLegs yet
+    if (!loading && isInitialized && dnsMap && Object.keys(dnsMap).length > 0 && !hasCalledGetCallLegsRef.current) {
+      onAllLoaded(async () => {
+        console.log('All data loaded successfully!')
+        
+        // Get active call IDs from localStorage (currentState != DISCONNECTED)
+        const activeCallIds = getActiveCallIdsFromLocalStorage()
+        console.log('Active call IDs from localStorage (currentState != DISCONNECTED):', activeCallIds)
+        
+        // Call GetCallLegs with the call IDs if we have any - only once
+        if (activeCallIds && activeCallIds.length > 0 && !hasCalledGetCallLegsRef.current) {
+          hasCalledGetCallLegsRef.current = true // Mark as called before making the request
+          try {
+            const params = {
+              callIds: activeCallIds
+            }
+            console.log('Calling GetCallLegs with params:', params)
+            const response = await GetCallLegs(params)
+            console.log('GetCallLegs response:', response)
+          } catch (error) {
+            console.error('Error calling GetCallLegs:', error)
+            hasCalledGetCallLegsRef.current = false // Reset on error so it can retry if needed
+          }
+        } else {
+          console.log('No active call IDs found in localStorage')
+        }
+      })
+    }
+  }, [loading, isInitialized, dnsMap, onAllLoaded, getActiveCallIdsFromLocalStorage])
 
   useEffect(() => {
     const handleClickOutside = (event: any) => {
