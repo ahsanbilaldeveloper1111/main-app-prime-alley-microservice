@@ -82,13 +82,13 @@ export const useGlobalCallTimer = (dn: string, isActive: boolean) => {
 
   useEffect(() => {
     if (isActive) {
-      console.log(`Starting timer for DN: ${dn}`)
+      
       setIsRunning(true)
       timerManager.startTimer(dn, (time) => {
         setElapsedTime(time)
       })
     } else {
-      console.log(`Stopping timer for DN: ${dn}`)
+      
       setIsRunning(false)
       setElapsedTime('00:00:00')
       timerManager.stopTimer(dn)

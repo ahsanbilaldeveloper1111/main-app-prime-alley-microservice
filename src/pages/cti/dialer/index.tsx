@@ -168,7 +168,7 @@ const CtiDialer = () => {
   // Save call states to localStorage
   const saveCallStatesToStorage = (calls: Map<string, any>) => {
     try {
-      //console.log('Saving call states to localStorage...')
+      
       
       // Convert activeCalls to the format expected by localStorage
       const callsToPersist: Record<string, any> = {}
@@ -216,24 +216,24 @@ const CtiDialer = () => {
         
         // Save merged calls to separate localStorage key
         localStorage.setItem('cti_merged_calls', JSON.stringify(mergedCallsToPersist))
-       console.log('Saved merged calls to localStorage:', mergedCallsToPersist)
+       
       } else {
         localStorage.removeItem('cti_merged_calls')
-        console.log('Cleared merged calls from localStorage')
+        
       }
 
       if (Object.keys(callsToPersist).length > 0) {
         localStorage.setItem('cti_call_states', JSON.stringify(callsToPersist))
         localStorage.setItem('cti_call_states_timestamp', new Date().toISOString())
-        console.log('Saved call states to localStorage:', callsToPersist)
+        
       } else {
         // If no active calls, clear storage
         localStorage.removeItem('cti_call_states')
         localStorage.removeItem('cti_call_states_timestamp')
-        console.log('No active calls to persist, cleared localStorage')
+        
       }
     } catch (error) {
-      console.error('Error saving call states to localStorage:', error)
+      
     }
   }
 

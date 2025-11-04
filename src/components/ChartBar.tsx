@@ -38,7 +38,12 @@ export interface ChartBarProps {
 const ChartBar: React.FC<ChartBarProps> = ({
   series,
   categories,
-  colors = ['#4285f4', '#34a853', '#fbbc05', '#ea4335', '#9c27b0', '#ff9800'],
+  colors = [
+    '#fbbc05', //yellow
+    '#008ffb', //blue
+    '#00e396', //green
+    
+  ],
   height = 300,
   title,
   loading = false,

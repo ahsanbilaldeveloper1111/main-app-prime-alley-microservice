@@ -572,7 +572,7 @@ const CallIncomingCountry = () => {
     
     return (
         <React.Fragment>
-            <BreadcrumbItem mainTitle="" mainLink="" subTitle="Call Incoming By Country" showPageLoader={showPageLoader} />
+            <BreadcrumbItem mainTitle="" mainLink="" subTitle="Incoming Calls By Country" showPageLoader={showPageLoader} />
 
 
             <Row className="mb-3">
@@ -580,7 +580,7 @@ const CallIncomingCountry = () => {
           <div className="page-header-title style-2">
             <Row className="d-flex justify-content-between align-items-center">
               <Col md={5}>
-                <h2 className="mb-0">Call Incoming By Country</h2>
+                <h2 className="mb-0">Incoming Calls By Country</h2>
               </Col>
               <Col md={7} className="d-flex justify-content-end">
                 <div className="action-buttons">
