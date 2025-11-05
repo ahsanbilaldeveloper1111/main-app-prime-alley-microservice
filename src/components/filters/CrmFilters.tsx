@@ -8,9 +8,10 @@ import { GetHierarchyData } from "@utils/users";
 interface CrmFiltersProps {
   onFiltersChange?: (filters: Record<string, any>) => void;
   onExport?: (exportType: string, filters: Record<string, any>) => void;
+  type?: 'lead' | 'opportunity';
 }
 
-export default function CrmFilters({ onFiltersChange, onExport }: CrmFiltersProps) {
+export default function CrmFilters({ onFiltersChange, onExport, type }: CrmFiltersProps) {
   const { data: session, status } = useSession();
   const [showExport, setShowExport] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
@@ -38,7 +39,7 @@ export default function CrmFilters({ onFiltersChange, onExport }: CrmFiltersProp
       try {
         setLoading(true);
         const [stagesData, campaignsData, hierarchyData] = await Promise.all([
-          getStages(),
+          getStages(type),
           getCampaigns(),
           GetHierarchyData()
         ]);
@@ -57,7 +58,7 @@ export default function CrmFilters({ onFiltersChange, onExport }: CrmFiltersProp
     if (status === 'authenticated') {
       fetchData();
     }
-  }, [status]);
+  }, [status, type]);
 
   // Create dynamic filter config with all data
   const crmConfig = createCrmFiltersConfig(stages, campaigns, extensions, staticTags);

@@ -41,6 +41,9 @@ import router from 'next/router';
 import axiosInstance from '@utils/axios';
 import { toast } from 'react-toastify';
 import { convertUTCToUserTimezone, convertUTCTimeToUserTimezone, convertUTCSeparateDateTimeToUserTime, convertUTCSeparateDateTimeToUserDate, formatDuration, convertUTCDateToUserTimezone, GlobalDateFormat, GlobalTimeFormat } from '@utils/Helper';
+import PageLoader from '@components/PageLoader';
+import CircularProgressLoader from '@components/CircularProgressLoader';
+import CircularProgressCircle from '@components/CircularProgressCircle';
 
 const ReactApexChart = dynamic(() => import('react-apexcharts'), { ssr: false });
 
@@ -88,6 +91,7 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
   const stableGetAccessToken = useCallback(getAccessToken, []);
   const socketRef = useRef<Socket | null>(null);
   const audioPlayerRef = useRef<AudioPlayerRef>(null);
+  const [showPageLoader, setShowPageLoader] = useState(false);
 
   // State declarations
   const [refreshKey, setRefreshKey] = useState<number>(0);
@@ -102,6 +106,8 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
   const [audioUrl, setAudioUrl] = useState<string>('');
   const [audioError, setAudioError] = useState<string | null>(null);
   const [mediaPlayerShow, setMediaPlayerShow] = useState(false);
+  const [downloadingRecordings, setDownloadingRecordings] = useState<Set<string>>(new Set());
+  const [downloadProgress, setDownloadProgress] = useState<Record<string, number>>({});
   
   // State for managing data and manual additions
   const [currentData, setCurrentData] = useState<any[]>([]);
@@ -295,6 +301,9 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
       selector: (row: any) => row.Action,
       sortable: true,
       cell: (props: any) => {
+        const isDownloading = downloadingRecordings.has(props.Id);
+        const progress = downloadProgress[props.Id] || 0;
+        
         return (
           <div className='d-flex gap-3 action-box'>
             <i
@@ -304,15 +313,29 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
               style={{ fontSize: '1rem', cursor: 'pointer' }}
               onClick={() => handlePlayRecording(props)}
             />
-            <i
-              data-tooltip-id="my-tooltip"
-              data-tooltip-content="Download"
-              className='ph-duotone ph-arrow-line-down text-info'
-              style={{ fontSize: '1rem' }}
-              onClick={() => {
-                handleDownload(props);
-              }}
-            />
+            <div style={{ display: 'inline-flex', alignItems: 'center' }}>
+              {isDownloading ? (
+                <CircularProgressCircle 
+                  progress={progress}
+                  size="small" 
+                  color="#28a745"
+                  backgroundColor="#e9ecef"
+                  textColor="#495057"
+                  showPercentage={false}
+                  className="circular-progress-inline"
+                />
+              ) : (
+                <i
+                  data-tooltip-id="my-tooltip"
+                  data-tooltip-content="Download"
+                  className='ph-duotone ph-arrow-line-down text-info'
+                  style={{ fontSize: '1rem', cursor: 'pointer' }}
+                  onClick={() => {
+                    handleDownload(props);
+                  }}
+                />
+              )}
+            </div>
             <i
               data-tooltip-id="my-tooltip"
               data-tooltip-content="Call Analysis"
@@ -373,10 +396,13 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
   };
 
   const fetchCallLogsOriginal = useCallback(async (page = 1, perPage = 15, search = "") => {
+    setShowPageLoader(true);
     const response = await ListCallLogs(
       { page, perPage, search, filters: currentFilters, reportType: 'recordings', moduleSlug: ModuleSlug.CALL_RECORDINGS },
       'call-logs/recordings'
-    );
+    ).finally(() => {
+      setShowPageLoader(false);
+    });
     
 
     if (response?.summary) {
@@ -606,6 +632,7 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
   };
 
   const handleExport = async (exportType: string, filters: Record<string, any>) => {
+    setShowPageLoader(true);
     try {
       if (exportType === 'excel') {
        
@@ -613,8 +640,9 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
           { filters: currentFilters, isExport: true, exportType, moduleSlug: ModuleSlug.CALL_RECORDINGS},
           'call-logs/recordings',
           'recordings'
-          
-        );
+        ).finally(() => {
+          setShowPageLoader(false);
+        });
       }
     } catch (error) {
       console.error('Export error:', error);
@@ -624,9 +652,61 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
 
   const handleDownload = async (props: any) => {
     const { Id, AgentExtension } = props;
-    return await DownloadCallRecording(
-      Id,AgentExtension,'call-logs/recordings/download', props.imagicle
-    );
+    
+    // Add to downloading set and initialize progress
+    setDownloadingRecordings(prev => new Set(prev).add(Id));
+    setDownloadProgress(prev => ({ ...prev, [Id]: 0 }));
+    
+    try {
+      // Simulate progress updates
+      const progressInterval = setInterval(() => {
+        setDownloadProgress(prev => {
+          const currentProgress = prev[Id] || 0;
+          if (currentProgress < 90) {
+            return { ...prev, [Id]: currentProgress + Math.random() * 15 };
+          }
+          return prev;
+        });
+      }, 200);
+
+      await DownloadCallRecording(
+        Id, AgentExtension, 'call-logs/recordings/download', props.imagicle
+      );
+      
+      // Complete the progress
+      clearInterval(progressInterval);
+      setDownloadProgress(prev => ({ ...prev, [Id]: 100 }));
+      
+      // Show completion briefly before hiding
+      setTimeout(() => {
+        setDownloadingRecordings(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(Id);
+          return newSet;
+        });
+        setDownloadProgress(prev => {
+          const newProgress = { ...prev };
+          delete newProgress[Id];
+          return newProgress;
+        });
+      }, 1000);
+      
+    } catch (error) {
+      console.error('Download error:', error);
+      toast.error('Download failed');
+      
+      // Remove from downloading set on error
+      setDownloadingRecordings(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(Id);
+        return newSet;
+      });
+      setDownloadProgress(prev => {
+        const newProgress = { ...prev };
+        delete newProgress[Id];
+        return newProgress;
+      });
+    }
   };
 
   const handleAnalysis = async (props: any) => {
@@ -639,6 +719,8 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
   };
 
   const handlePlayRecording = (recording: any) => {
+
+    setShowPageLoader(true);
     const trackId = recording.Id;
     const agentExtension = recording.AgentExtension;
 
@@ -674,6 +756,7 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
           'Accept': 'audio/*, application/octet-stream, */*'
         }
       });
+      setShowPageLoader(false);
       
       console.log('AxiosInstance response received:', response.status, response.headers);
       
@@ -853,7 +936,8 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
         </Modal.Body>
       </Modal>
 
-      <BreadcrumbItem mainTitle="" mainLink="" subTitle="Call Recordings" />
+
+      <BreadcrumbItem mainTitle="" mainLink="" subTitle="Call Recordings" showPageLoader={showPageLoader} />
 
       
       <Row className="mb-3">
@@ -1022,6 +1106,7 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
                     audioSrc={audioUrl}
                     title={`Call Recording - ${selectedRecording.Id}`}
                     showWaveform={true}
+                    autoPlay={true}
                   />
                 </div>
               )}

@@ -163,7 +163,7 @@ const CtiMonitoring = () => {
 
 
 
-  const [selectedCompaign, setSelectedCompaign] = useState('All campaigns');
+  const [selectedCampaign, setSelectedCampaign] = useState('All campaigns');
   const [currentCampaignIndex, setCurrentCampaignIndex] = useState(0);
   const [isAutoCycling, setIsAutoCycling] = useState(true);
   const [isSliding, setIsSliding] = useState(false);
@@ -216,7 +216,7 @@ const CtiMonitoring = () => {
 
   const agentInfo = {
     name: 'Alice',
-    compaign: 'Sales Q3',
+    campaign: 'Sales Q3',
     handledCalls: 100,
     csatScore: 80,
     aht: 50,
@@ -234,8 +234,8 @@ const CtiMonitoring = () => {
   // Campaign data
   const campaigns = [
     {
-      id: 'compaign-1',
-      name: 'Compaign 1',
+      id: 'campaign-1',
+      name: 'Campaign 1',
       data: {
         agentOnCall: 100,
         agentIdle: 100,
@@ -259,8 +259,8 @@ const CtiMonitoring = () => {
       }
     },
     {
-      id: 'compaign-2',
-      name: 'Compaign 2',
+      id: 'campaign-2',
+      name: 'Campaign 2',
       data: {
         agentOnCall: 200,
         agentIdle: 10,
@@ -284,8 +284,8 @@ const CtiMonitoring = () => {
       }
     },
     {
-      id: 'compaign-3',
-      name: 'Compaign 3',
+      id: 'campaign-3',
+      name: 'Campaign 3',
       data: {
         agentOnCall: 150,
         agentIdle: 25,
@@ -312,17 +312,17 @@ const CtiMonitoring = () => {
 
   // Get current campaign to display
   const getCurrentCampaign = () => {
-    if (selectedCompaign === 'All campaigns') {
+    if (selectedCampaign === 'All campaigns') {
       return campaigns[currentCampaignIndex] || campaigns[0];
     }
-    return campaigns.find(campaign => campaign.name === selectedCompaign) || campaigns[0];
+    return campaigns.find(campaign => campaign.name === selectedCampaign) || campaigns[0];
   };
 
   const currentCampaign = getCurrentCampaign();
 
   // Auto-cycle through campaigns
   useEffect(() => {
-    if (isAutoCycling && selectedCompaign === 'All campaigns' && campaigns.length > 1) {
+    if (isAutoCycling && selectedCampaign === 'All campaigns' && campaigns.length > 1) {
       intervalRef.current = setInterval(() => {
         const nextIndex = (currentCampaignIndex + 1) % campaigns.length;
         handleCampaignIndexChange(nextIndex);
@@ -340,14 +340,14 @@ const CtiMonitoring = () => {
         intervalRef.current = null;
       }
     };
-  }, [isAutoCycling, selectedCompaign, campaigns.length, currentCampaignIndex]);
+  }, [isAutoCycling, selectedCampaign, campaigns.length, currentCampaignIndex]);
 
   // Handle campaign selection
   const handleCampaignSelect = (campaignName: string) => {
-    if (campaignName !== selectedCompaign) {
+    if (campaignName !== selectedCampaign) {
       setIsSliding(true);
       setTimeout(() => {
-        setSelectedCompaign(campaignName);
+        setSelectedCampaign(campaignName);
         if (campaignName === 'All campaigns') {
           setIsAutoCycling(true);
         } else {
@@ -371,7 +371,7 @@ const CtiMonitoring = () => {
 
   // Toggle auto-cycling
   const toggleAutoCycle = () => {
-    if (selectedCompaign === 'All campaigns') {
+    if (selectedCampaign === 'All campaigns') {
       setIsAutoCycling(!isAutoCycling);
     }
   };
@@ -392,23 +392,23 @@ const CtiMonitoring = () => {
             </h2>
             <div className="monitoring-top-right ">
              <div className="innerbox gap-2 d-flex align-items-center">
-                  <span className="compaign_title text-muted text-uppercase">
-                    Compaign:
+                  <span className="campaign_title text-muted text-uppercase">
+                    Campaign:
                   </span>
                   
-                  <Dropdown  className="compaign-dropdown">
+                  <Dropdown  className="campaign-dropdown">
                     <Dropdown.Toggle variant="outline-primary" size='sm'>
-                      {selectedCompaign}
+                      {selectedCampaign}
                     </Dropdown.Toggle>
                     <Dropdown.Menu>
                       <Dropdown.Item onClick={() => handleCampaignSelect('All campaigns')}>All campaigns</Dropdown.Item>
-                      <Dropdown.Item onClick={() => handleCampaignSelect('Compaign 1')}>Compaign 1</Dropdown.Item>
-                      <Dropdown.Item onClick={() => handleCampaignSelect('Compaign 2')}>Compaign 2</Dropdown.Item>
-                      <Dropdown.Item onClick={() => handleCampaignSelect('Compaign 3')}>Compaign 3</Dropdown.Item>
+                      <Dropdown.Item onClick={() => handleCampaignSelect('Campaign 1')}>Campaign 1</Dropdown.Item>
+                      <Dropdown.Item onClick={() => handleCampaignSelect('Campaign 2')}>Campaign 2</Dropdown.Item>
+                      <Dropdown.Item onClick={() => handleCampaignSelect('Campaign 3')}>Campaign 3</Dropdown.Item>
                     </Dropdown.Menu>
                   </Dropdown>
 
-                  {selectedCompaign !== 'All campaigns' && (
+                  {selectedCampaign !== 'All campaigns' && (
                     <Button
                       variant="outline-secondary"
                       size="sm"
@@ -424,7 +424,7 @@ const CtiMonitoring = () => {
                   
 
                   
-                  {/* {selectedCompaign === 'All campaigns' && (
+                  {/* {selectedCampaign === 'All campaigns' && (
                     <>
                       <Button
                         variant={isAutoCycling ? "success" : "outline-secondary"}
@@ -443,17 +443,17 @@ const CtiMonitoring = () => {
                     </>
                   )} */}
 
-                  {/* {selectedCompaign !== 'All campaigns' && (
+                  {/* {selectedCampaign !== 'All campaigns' && (
                     <span className="badge bg-primary ms-2">
                       <i className="ti ti-eye me-1"></i>
                       Manual Selection
                     </span>
                   )} */}
 
-                  <span className="compaign_title text-muted">
+                  <span className="campaign_title text-muted">
                     Last Updated:
                   </span>
-                  <span className="compaign_title text-bold">
+                  <span className="campaign_title text-bold">
                     {moment().format('hh:mm:ss A')}
                   </span>
              </div>
@@ -473,12 +473,12 @@ const CtiMonitoring = () => {
                 {currentCampaign.name} - Live Metrics
               </h5>
               <div className="d-flex align-items-center gap-2">
-                {selectedCompaign === 'All campaigns' && (
+                {selectedCampaign === 'All campaigns' && (
                   <span className=" small text-white">
                     Showing {currentCampaignIndex + 1} of {campaigns.length} campaigns
                   </span>
                 )}
-                {/* {isAutoCycling && selectedCompaign === 'All campaigns' && (
+                {/* {isAutoCycling && selectedCampaign === 'All campaigns' && (
                   <span className="badge bg-success">
                     <i className="ti ti-rotate-clockwise me-1"></i>
                     Auto-cycling every 5s
@@ -544,7 +544,7 @@ const CtiMonitoring = () => {
                     <Row>
                       <Col md={12}>
                       <h5>{currentCampaign.name}</h5>
-                      <div className="compaign-description mb-3">
+                      <div className="campaign-description mb-3">
                         <ul>
                           <li>Manual</li>
                           <li>Agent:8</li>
@@ -595,7 +595,7 @@ const CtiMonitoring = () => {
                     <Col md={3}>
                     <div className="manual-outbound">
                       <h5>Manual Outbound</h5>
-                    <div className="compaign-description mb-3">
+                    <div className="campaign-description mb-3">
                         <ul>
                           <li>Manual</li>
                           <li>Agent:{currentCampaign.data.manualOutbound.agent}</li>
@@ -622,7 +622,7 @@ const CtiMonitoring = () => {
 
                 <Col md={12}>
                 {/* Navigation Dots for Campaigns */}
-                {selectedCompaign === 'All campaigns' && (
+                {selectedCampaign === 'All campaigns' && (
                     <div className="campaign-navigation d-flex align-items-center gap-2">
                       {/* <Button
                         variant="outline-light"
@@ -695,7 +695,7 @@ const CtiMonitoring = () => {
                               <tr>
                                 <th>Agent</th>
                                 <th>Status</th>
-                                <th>Compaign</th>
+                                <th>Campaign</th>
                               </tr>
                             </thead>
                             <tbody> 
@@ -703,18 +703,18 @@ const CtiMonitoring = () => {
                               <tr onClick={() => setAgentModelShow(true)}>
                                 <td><span className="bg-success statusBox"> </span> John Doe</td>
                                 <td>On Call</td>
-                                <td>Compaign 1</td>
+                                <td>Campaign 1</td>
                               </tr>
 
                               <tr onClick={() => setAgentModelShow(true)}>
                                 <td><span className="bg-warning statusBox"> </span> Jane Doe</td>
                                 <td>Idle</td>
-                                <td>Compaign 1</td>
+                                <td>Campaign 1</td>
                               </tr>
                               <tr onClick={() => setAgentModelShow(true)}>
                                 <td><span className="bg-info statusBox"> </span> Jim Doe</td>
                                 <td>Online</td>
-                                <td>Compaign 1</td>
+                                <td>Campaign 1</td>
                               </tr>
 
 
@@ -736,7 +736,7 @@ const CtiMonitoring = () => {
                                     <tr>
                                           <th className="text-left">Agent</th>
                                           <th className="text-center">Customer</th>
-                                          <th className="text-center">Compaign</th>
+                                          <th className="text-center">Campaign</th>
                                           <th className="text-center">Duration</th>
                                           </tr>
                               </thead>
@@ -745,19 +745,19 @@ const CtiMonitoring = () => {
                                                 <tr>
                                                       <td className="text-left text-bold">Agent 1</td>
                                                       <td className="text-center">Customer 1</td>
-                                                      <td className="text-center">Compaign 1</td>
+                                                      <td className="text-center">Campaign 1</td>
                                                       <td className="text-center">3m 4s</td>
                                                 </tr>
                                                 <tr>
                                                       <td className="text-left text-bold">Agent 2</td>
                                                       <td className="text-center">Customer 2</td>
-                                                      <td className="text-center">Compaign 2</td>
+                                                      <td className="text-center">Campaign 2</td>
                                                       <td className="text-center">3m 4s</td>
                                                 </tr>
                                                 <tr>
                                                       <td className="text-left text-bold">Agent 3</td>
                                                       <td className="text-center">Customer 3</td>
-                                                      <td className="text-center">Compaign 3</td>
+                                                      <td className="text-center">Campaign 3</td>
                                                       <td className="text-center">3m 4s</td>
                                                 </tr>
                                                 
@@ -834,10 +834,10 @@ const CtiMonitoring = () => {
               </Row>
 
 
-              <Row className='compaign-performance'>
+              <Row className='campaign-performance'>
 
                 <Col md={12} className='mb-3 text-center'>
-                  <h3 className="card-title">Compaign Performance</h3>
+                  <h3 className="card-title">Campaign Performance</h3>
                   <p className="text-muted">
                     {currentCampaign.name}
                   </p>
@@ -919,7 +919,7 @@ const CtiMonitoring = () => {
 
           <Modal.Body>
             <div className="agent-model-content">
-              <p>Compaign: <b>Sales Q3</b></p>
+              <p>Campaign: <b>Sales Q3</b></p>
 
               <Row>
               <Col md={4}>

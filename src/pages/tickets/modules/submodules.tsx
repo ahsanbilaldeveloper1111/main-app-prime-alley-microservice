@@ -20,6 +20,7 @@ import SuccessfulModal from "@pages/partial/SuccessfulModal";
 import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
 import DatatableActionButton from "@components/DatatableActionButton";
 import { FiEdit, FiTrash2, FiEye,FiPlus } from "react-icons/fi";
+import { ModuleSlug } from '@utils/Helper';
 
 
 
@@ -80,7 +81,7 @@ const SubmodulesPage = () => {
       try {
         const [modulesData, hierarchyData] = await Promise.all([
           GetAllModules(),
-          GetHierarchyData()
+          GetHierarchyData(ModuleSlug.TICKET)
         ]);
         
         if (modulesData) {

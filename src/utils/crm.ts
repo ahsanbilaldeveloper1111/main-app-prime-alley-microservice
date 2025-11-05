@@ -1,5 +1,6 @@
 import { toast } from "react-toastify";
 import axiosInstance from "./axios";
+import { ModuleSlug } from "./Helper";
 
 // API Response Structure from Controlhub
 interface ControlhubResponse<T> {
@@ -34,6 +35,7 @@ export interface StageData {
   active: boolean;
   created_at: string;
   updated_at: string;
+  type: 'lead' | 'opportunity';
 }
 
 export interface LostReasonData {
@@ -107,6 +109,7 @@ export interface PaginationParams extends Record<string, any> {
   page?: number;
   per_page?: number;
   search?: string;
+  module_slug?: string;
 }
 
 // CRM Dashboard Data
@@ -114,7 +117,15 @@ export interface DashboardData {
   total_leads: number;
   total_opportunities: number;
   total_meetings: number;
+  total_campaigns: number;
+  meetings_next_24h: number;
+  meetings_last_24h: number;
   leads_by_stage: Array<{
+    stage_name: string;
+    count: number;
+    color: string;
+  }>;
+  opportunities_by_stage: Array<{
     stage_name: string;
     count: number;
     color: string;
@@ -151,25 +162,52 @@ function extractData<T>(response: any): T {
 export const getCrmDashboard = async (): Promise<DashboardData> => {
   try {
     // Get data from available APIs
-    const [leads, opportunities, meetings, stages] = await Promise.all([
+    const [leads, opportunities, meetings, stages, campaigns] = await Promise.all([
       getLeads({ per_page: 1000 }),
       getOpportunities({ per_page: 1000 }),
       getMeetings().then(meetings => meetings.data),
-      getStages()
+      getStages(), // Get all stages for dashboard
+      getCampaigns({ per_page: 1000 })
     ]);
     console.log("ZE MEETINGS", meetings);
+    
     // Calculate dashboard data
     const totalLeads = leads?.total || 0;
     const totalOpportunities = opportunities?.total || 0;
     const totalMeetings = meetings?.length || 0;
+    const totalCampaigns = campaigns?.total || 0;
     
-    // Group leads by stage
-    const leadsByStage = stages.map((stage: StageData) => ({
+    // Calculate meetings in next 24h and last 24h
+    const now = new Date();
+    const next24h = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+    const last24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    
+    const meetingsNext24h = meetings.filter((meeting: MeetingData) => {
+      // meeting_date is already a full ISO date string, combine with meeting_time
+      const meetingDateTime = new Date(`${meeting.meeting_date.split('T')[0]}T${meeting.meeting_time}`);
+      return meetingDateTime >= now && meetingDateTime <= next24h;
+    }).length;
+    
+    const meetingsLast24h = meetings.filter((meeting: MeetingData) => {
+      // meeting_date is already a full ISO date string, combine with meeting_time
+      const meetingDateTime = new Date(`${meeting.meeting_date.split('T')[0]}T${meeting.meeting_time}`);
+      return meetingDateTime >= last24h && meetingDateTime <= now;
+    }).length;
+    
+    // Group leads by stage (only actual leads, not opportunities)
+    const leadsByStage = stages.filter(stage => stage.type === 'lead').map((stage: StageData) => ({
       stage_name: stage.name,
-      count: leads.data.filter((lead: LeadData) => lead.stage_id == stage.id).length,
+      count: leads.data.filter((lead: LeadData) => lead.stage_id == stage.id && lead.type === 'lead').length,
       color: stage.color
     }));
-    console.log("ZE LEADS BY STAGE", leadsByStage, leads.data);
+    
+    // Group opportunities by stage (only opportunities, not leads)
+    const opportunitiesByStage = stages.filter(stage => stage.type === 'opportunity').map((stage: StageData) => ({
+      stage_name: stage.name,
+      count: opportunities.data.filter((opportunity: OpportunityData) => opportunity.stage_id == stage.id && opportunity.type === 'opportunity').length,
+      color: stage.color
+    }));
+    
     
     // Get recent data
     const recentLeads = leads.data.slice(0, 5);
@@ -180,7 +218,11 @@ export const getCrmDashboard = async (): Promise<DashboardData> => {
       total_leads: totalLeads,
       total_opportunities: totalOpportunities,
       total_meetings: totalMeetings,
+      total_campaigns: totalCampaigns,
+      meetings_next_24h: meetingsNext24h,
+      meetings_last_24h: meetingsLast24h,
       leads_by_stage: leadsByStage,
+      opportunities_by_stage: opportunitiesByStage,
       recent_leads: recentLeads,
       recent_opportunities: recentOpportunities,
       recent_meetings: recentMeetings
@@ -365,10 +407,11 @@ export const getAssigneeComments = async (leadId: number): Promise<any[]> => {
 };
 
 // Stage Management
-export const getStages = async (): Promise<StageData[]> => {
+export const getStages = async (type?: 'lead' | 'opportunity'): Promise<StageData[]> => {
   try {
     console.log("getStages: Making API call to /crm/stages");
-    const response = await axiosInstance.get("/crm/stages");
+    const params = type ? { type } : {};
+    const response = await axiosInstance.get("/crm/stages", { params });
     console.log("getStages: Raw axios response:", response);
     console.log("getStages: Response data:", response.data);
 
@@ -482,7 +525,7 @@ export const getLostLeads = async (
 
 // Meeting Management
 export const getMeetings = async (
-  params: { lead_id?: number; extension?: string } = {}
+  params: { lead_id?: number; extension?: string; per_page?: number } = {}
 ): Promise<{
   data: MeetingData[];
 }> => {
@@ -561,6 +604,7 @@ export const getOpportunities = async (
   params: PaginationParams = {}
 ): Promise<PaginationWrapper<OpportunityData>> => {
   try {
+    params.module_slug = ModuleSlug.CRM_OPPORTUNITIES;
     const response = await axiosInstance.get("/crm/opportunities", { params });
     return extractData<PaginationWrapper<OpportunityData>>(response.data);
   } catch (error: any) {
@@ -656,6 +700,7 @@ export interface CrmDataUploadResponse {
 
 export const getCrmData = async (params: PaginationParams = {}): Promise<CrmDataResponse> => {
   try {
+    params.module_slug = ModuleSlug.CRM_DATA_MANAGEMENT;
     const response = await axiosInstance.get("/crm/crm-data", { params });
     return response.data?.data;
   } catch (error: any) {
@@ -1016,18 +1061,26 @@ export interface CampaignData {
   created_at: string;
   updated_at: string;
   fields?: CampaignField[];
+  user_extensions?: {
+    id: number;
+    campaign_id: number;
+    user_extension: string;
+    created_at: string;
+    updated_at: string;
+  }[];
 }
 
 export const getCampaigns = async (
   params: PaginationParams = {}
 ): Promise<PaginationWrapper<CampaignData>> => {
   try {
-    const { page = 1, per_page = 15, search = "", filters = {} } = params;
+    const { page = 1, per_page = 15, search = "", filters = {}, module_slug = "" } = params;
     
     // Build query parameters
     const queryParams: any = {
       page,
       per_page,
+      module_slug:ModuleSlug.CRM_CAMPAIGNS,
       ...filters
     };
     

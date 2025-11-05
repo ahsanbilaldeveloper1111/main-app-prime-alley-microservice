@@ -180,7 +180,7 @@ const Users = () => {
             id: 'total-users',
             title: 'Total Users',
             value: summary?.users || 0,
-            description: 'Total users in the system',
+            description: 'Total users currently in the system',
             delay: 0.1,
             showAnimatedNumber: true,
             animationDuration: 1000,
@@ -190,7 +190,7 @@ const Users = () => {
             id: 'departments',
             title: 'Departments',
             value: summary?.departments || 0,
-            description: 'Departments in the system',
+            description: 'Total departments currently in the system',
             delay: 0.3,
             showAnimatedNumber: true,
             animationDuration: 1000,
@@ -200,7 +200,7 @@ const Users = () => {
             id: 'ranks',
             title: 'Ranks',
             value: summary?.ranks || 0,
-            description: 'Ranks in the system',
+            description: 'The ranks were created by you within the system',
             delay: 0.5,
             showAnimatedNumber: true,
             animationDuration: 1000,
@@ -210,7 +210,7 @@ const Users = () => {
             id: 'groups',
             title: 'Groups',
             value: summary?.groups || 0,
-            description: 'Groups in the system',
+            description: 'The groups were created by you within the system',
             delay: 0.7,
             showAnimatedNumber: true,
             animationDuration: 1000,
@@ -254,7 +254,7 @@ const Users = () => {
                         });
                     });
 
-                   // setCustomFieldColumns(dynamicCols);
+                    setCustomFieldColumns(dynamicCols);
                 } else {
                     setCustomFieldColumns([]);
                 }

@@ -86,7 +86,7 @@ const TicketTypes = () => {
               </button>
             )}
             {session?.user?.permissions?.includes(
-              "update-ticket-types-tickets"
+              "delete-ticket-type-tickets"
             ) && (
               <button
                 className="btn btn-sm btn-outline-danger"
@@ -250,7 +250,7 @@ const TicketTypes = () => {
             <h2 className="mb-0 d-flex align-items-center">
               Ticket Types
               {session?.user?.permissions?.includes(
-                "update-ticket-types-tickets"
+                "add-ticket-type-tickets"
               ) && (
                 <Button
                   variant="outline-primary"

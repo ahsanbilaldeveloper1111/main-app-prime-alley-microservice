@@ -34,6 +34,7 @@ import "nprogress/nprogress.css";
 
 import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
 import { motion } from 'framer-motion';
+import CircularProgressCircle from '@components/CircularProgressCircle';
 
 import dynamic from 'next/dynamic';
 import { ApexOptions } from 'apexcharts';
@@ -76,7 +77,7 @@ const formatSecondsToTime = (seconds: number): string => {
   return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
 };
 
-const AnalyseRecordings = () => {
+const AnalyzeRecordings = () => {
     const { data:session, status } = useSession();
     const [showCountryChartModal, setShowCountryChartModal] = useState(false);
     const [showDepartmentChartModal, setShowDepartmentChartModal] = useState(false);
@@ -91,12 +92,14 @@ const AnalyseRecordings = () => {
     const [audioLoading, setAudioLoading] = useState(false);
     const [audioUrl, setAudioUrl] = useState<string>('');
     const [audioError, setAudioError] = useState<string | null>(null);
+    const [downloadingRecordings, setDownloadingRecordings] = useState<Set<string>>(new Set());
+    const [downloadProgress, setDownloadProgress] = useState<Record<string, number>>({});
     const audioPlayerRef = useRef<AudioPlayerRef>(null);
     
     const [refreshKey, setRefreshKey] = useState<number>(0);
     const [currentFilters, setCurrentFilters] = useState({
-      start_date: moment().startOf("week").format('YYYY-MM-DD hh:mm:ss A'),
-      end_date: moment().format('YYYY-MM-DD hh:mm:ss A'),
+      start_date: moment().subtract(1, 'day').startOf('day').format('YYYY-MM-DD hh:mm:ss A'),
+      end_date: moment().endOf('day').format('YYYY-MM-DD hh:mm:ss A'),
     });
     const [generalStats, setGeneralStats] = useState<GeneralStats>({
         totalCalls: 0,
@@ -215,7 +218,7 @@ const AnalyseRecordings = () => {
     const [selectedDirection, setSelectedDirection] = useState<string>('');
     const [selectedStatus, setSelectedStatus] = useState<string>('');
     const [dateRange, setDateRange] = useState({
-        start: moment().startOf("week").format('YYYY-MM-DD'),
+        start: moment().subtract(1, 'day').format('YYYY-MM-DD'),
         end: moment().format('YYYY-MM-DD')
     });
 
@@ -330,15 +333,29 @@ const AnalyseRecordings = () => {
                             style={{ fontSize: '1rem', cursor: 'pointer' }}
                             onClick={() => handlePlayRecording(props)}
                         />
-                        <i
-                            data-tooltip-id="my-tooltip"
-                            data-tooltip-content="Download"
-                            className='ph-duotone ph-arrow-line-down text-info'
-                            style={{ fontSize: '1rem' }}
-                            onClick={() => {
-                                handleDownload(props);
-                            }}
-                        />
+                        <div style={{ display: 'inline-flex', alignItems: 'center' }}>
+                            {downloadingRecordings.has(props.Id) ? (
+                                <CircularProgressCircle 
+                                    progress={downloadProgress[props.Id] || 0}
+                                    size="small" 
+                                    color="#28a745"
+                                    backgroundColor="#e9ecef"
+                                    textColor="#495057"
+                                    showPercentage={false}
+                                    className="circular-progress-inline"
+                                />
+                            ) : (
+                                <i
+                                    data-tooltip-id="my-tooltip"
+                                    data-tooltip-content="Download"
+                                    className='ph-duotone ph-arrow-line-down text-info'
+                                    style={{ fontSize: '1rem', cursor: 'pointer' }}
+                                    onClick={() => {
+                                        handleDownload(props);
+                                    }}
+                                />
+                            )}
+                        </div>
                         <i
                             data-tooltip-id="my-tooltip"
                             data-tooltip-content="Call Analysis"
@@ -358,8 +375,12 @@ const AnalyseRecordings = () => {
         fetchGeneralStats();
     }, []);
 
+    const [showPageLoader, setShowPageLoader] = useState(false);
     const fetchGeneralStats = async () => {
-        const response = await ListCallLogs({ page: page, perPage: perPage, search: "", filters: currentFilters, reportType: 'statsDashboard' }, 'call-logs/generalStats');
+        setShowPageLoader(true);
+        const response = await ListCallLogs({ page: page, perPage: perPage, search: "", filters: currentFilters, reportType: 'statsDashboard', moduleSlug: ModuleSlug.CALL_RECORDINGS }, 'call-logs/generalStats').finally(() => {
+            setShowPageLoader(false);
+        });
 
         if(response.success){
             const responseData = response.data;
@@ -756,10 +777,13 @@ const AnalyseRecordings = () => {
     // Fetch table data function for call recordings
     const fetchTableData = useCallback(async (page = 1, perPage = 15, search = "") => {
         try {
+            setShowPageLoader(true);
             const response = await ListCallLogs(
                 { page, perPage, search, filters: currentFilters, reportType: 'recordings', moduleSlug: ModuleSlug.CALL_RECORDINGS },
                 'call-logs/recordings'
-            );
+            ).finally(() => {
+                setShowPageLoader(false);
+            });
             
             if (response?.dataList) {
                 setTableData(response.dataList);
@@ -847,15 +871,67 @@ const AnalyseRecordings = () => {
 
     const handleDownload = async (props: any) => {
         const { Id, AgentExtension } = props;
-        return await DownloadCallRecording(
-            Id, AgentExtension, 'call-logs/recordings/download'
-        );
+        
+        // Add to downloading set and initialize progress
+        setDownloadingRecordings(prev => new Set(prev).add(Id));
+        setDownloadProgress(prev => ({ ...prev, [Id]: 0 }));
+        
+        try {
+            // Simulate progress updates
+            const progressInterval = setInterval(() => {
+                setDownloadProgress(prev => {
+                    const currentProgress = prev[Id] || 0;
+                    if (currentProgress < 90) {
+                        return { ...prev, [Id]: currentProgress + Math.random() * 15 };
+                    }
+                    return prev;
+                });
+            }, 200);
+
+            await DownloadCallRecording(
+                Id, AgentExtension, 'call-logs/recordings/download', props.imagicle
+            );
+            
+            // Complete the progress
+            clearInterval(progressInterval);
+            setDownloadProgress(prev => ({ ...prev, [Id]: 100 }));
+            
+            // Show completion briefly before hiding
+            setTimeout(() => {
+                setDownloadingRecordings(prev => {
+                    const newSet = new Set(prev);
+                    newSet.delete(Id);
+                    return newSet;
+                });
+                setDownloadProgress(prev => {
+                    const newProgress = { ...prev };
+                    delete newProgress[Id];
+                    return newProgress;
+                });
+            }, 1000);
+            
+        } catch (error) {
+            console.error('Download error:', error);
+            toast.error('Download failed');
+            
+            // Remove from downloading set on error
+            setDownloadingRecordings(prev => {
+                const newSet = new Set(prev);
+                newSet.delete(Id);
+                return newSet;
+            });
+            setDownloadProgress(prev => {
+                const newProgress = { ...prev };
+                delete newProgress[Id];
+                return newProgress;
+            });
+        }
     };
 
     const handleAnalysis = async (props: any) => {
         try {
             const { Id, AudioTrack } = props;
-            window.open(`/ai-ml/analysis?id=${Id}&file=${AudioTrack}&direction=${props.Direction}&phone=${props.RemotePartyNumber}`, '_blank');
+            window.open(`/ai-ml/analysis?id=${Id}&file=${AudioTrack}&direction=${props.Direction}&phone=${props.RemotePartyNumber}&imagicle=${props.imagicle}`, '_blank');
         } catch (error) {
             console.error('Error navigating to analysis:', error);
         }
@@ -865,14 +941,14 @@ const AnalyseRecordings = () => {
         const trackId = recording.Id;
         const agentExtension = recording.AgentExtension;
 
-        loadAuthenticatedAudio(trackId, agentExtension);
+        loadAuthenticatedAudio(trackId, agentExtension, recording.imagicle);
 
         setSelectedRecording(recording);
         setAudioLoading(false);
         setAudioError(null);
     };
 
-    const loadAuthenticatedAudio = async (audioTrackId: string, agentExtension: string) => {
+    const loadAuthenticatedAudio = async (audioTrackId: string, agentExtension: string, node?: string) => {
         if (!audioTrackId) return;
         
         setAudioLoading(true);
@@ -886,7 +962,8 @@ const AnalyseRecordings = () => {
             const response = await axiosInstance.get(`call-logs/recordings/download/${audioTrackId}`, {
                 responseType: 'blob',
                 params: {
-                    extension_number: agentExtension
+                    extension_number: agentExtension,
+                    node: node
                 },
                 headers: {
                     'Accept': 'audio/*, application/octet-stream, */*'
@@ -956,14 +1033,14 @@ const AnalyseRecordings = () => {
 
     return (
         <React.Fragment>
-            <BreadcrumbItem mainTitle="AI Insights" mainLink="/ai-ml" subTitle="Analyse Recordings" />
+            <BreadcrumbItem mainTitle="AI Insights" mainLink="/ai-ml" subTitle="Analyze Recordings" showPageLoader={showPageLoader} />
 
             <Row className="mb-3">
                 <Col md={12}>
                     <div className="page-header-title style-2">
                         <Row className="d-flex justify-content-between align-items-center">
                             <Col md={4}>
-                                <h2 className="mb-0">Analyse Recordings</h2>
+                                <h2 className="mb-0">Analyze Recordings</h2>
                             </Col>
 
                             <Col md={8} className="d-flex justify-content-end">
@@ -1418,6 +1495,7 @@ const AnalyseRecordings = () => {
                                         audioSrc={audioUrl}
                                         title={`Call Recording - ${selectedRecording.Id}`}
                                         showWaveform={true}
+                                        autoPlay={true}
                                     />
                                 </div>
                             )}
@@ -1434,8 +1512,8 @@ const AnalyseRecordings = () => {
     );
 };
 
-AnalyseRecordings.getLayout = (page: ReactElement) => {
+AnalyzeRecordings.getLayout = (page: ReactElement) => {
     return <Layout>{page}</Layout>;
 };
 
-export default AnalyseRecordings;
+export default AnalyzeRecordings;

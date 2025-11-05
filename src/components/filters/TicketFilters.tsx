@@ -6,6 +6,7 @@ import { useSession } from "next-auth/react";
 import { GetAllModules, GetAllSubmodules, GetAllSubmoduleChildren } from "@utils/ticket-module";
 import { GetAllStatuses } from "@utils/ticket-statuses";
 import { GetAllTypes } from "@utils/ticket-types";
+import { ModuleSlug } from "@utils/Helper";
 
 interface GroupsFiltersProps {
   onFiltersChange?: (filters: Record<string, any>) => void;
@@ -14,7 +15,7 @@ interface GroupsFiltersProps {
   moduleSlug?: string;
 }
 
-export default function GroupsFilters({ onFiltersChange, onExport, isVisibleCallDirection = true, moduleSlug }: GroupsFiltersProps) {
+export default function GroupsFilters({ onFiltersChange, onExport, isVisibleCallDirection = true, moduleSlug = ModuleSlug.TICKET }: GroupsFiltersProps) {
   const { data: session, status } = useSession();
   const [showExport, setShowExport] = useState(false);
   const [showFilters, setShowFilters] = useState(false);

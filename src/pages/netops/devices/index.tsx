@@ -1,5 +1,5 @@
 import '@assets/scss/datatable-style.scss';
-import React, { ReactElement, useEffect, useState, useCallback } from 'react';
+import React, { ReactElement, useEffect, useState, useCallback, useRef } from 'react';
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
 import GenericListPage from '@components/GenericListPage';
@@ -8,7 +8,7 @@ import { Button, Row, Col } from 'react-bootstrap';
 import { toast } from 'react-toastify';
 import { useSession } from 'next-auth/react';
 import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
-import { getDevices, getMonitoringDashboard, deleteDevice, createDevice, updateDevice, Device, MonitoringDashboardResponse } from '@utils/netops';
+import { getDevices, getMonitoringDashboard, deleteDevice, createDevice, updateDevice, Device, MonitoringDashboardResponse, getDeviceMonitoringStatus, DeviceMonitoringStatusResponse } from '@utils/netops';
 import { convertUTCToUserTimezone, GlobalDateFormat, GlobalTimeFormat } from '@utils/Helper';
 import "@assets/scss/common.scss";
 import { FiRefreshCw } from 'react-icons/fi';
@@ -32,6 +32,12 @@ interface Summary {
     active_alerts: number;
 }
 
+interface DeviceWithStatus extends Device {
+    monitoring_status?: 'UP' | 'DOWN';
+    last_check?: string | null;
+    uptime_percentage?: number;
+}
+
 const Devices = () => {
     const { data: session, status } = useSession();
     
@@ -42,11 +48,22 @@ const Devices = () => {
         { key: 'device_type', name: 'Device Type', selector: (row: any) => row.device_type, sortable: true },
         { key: 'protocol', name: 'Protocol', selector: (row: any) => row.protocol, sortable: true },
         { key: 'port', name: 'Port', selector: (row: any) => row.port, sortable: true },
-        { key: 'is_active', name: 'Status', selector: (row: any) => row.is_active, sortable: true,
+        { key: 'monitoring_status', name: 'Status', selector: (row: any) => row.monitoring_status, sortable: true,
             cell: (props: any) => {
+                // if (props.monitoring_status === undefined) {
+                //     return (
+                //         <span className="status-badge loading">
+                //             <i className="fas fa-spinner fa-spin me-1"></i>
+                //             Checking...
+                //         </span>
+                //     );
+                // }
+                const status = props.status;
                 return (
-                    <span className={`status-badge ${props.is_active ? 'success' : 'danger'}`}>
-                        {props.is_active ? 'Active' : 'Inactive'}
+                    <span className={`status-badge ${status === 'UP' ? 'success' : 'danger'}`}>
+                        <i className={`fas ${status === 'UP' ? 'fa-check-circle' : 'fa-times-circle'} me-1`}></i>
+                        {status}
+                        {/* {status === 'UP' ? 'Online' : 'Offline'} */}
                     </span>
                 );
             }
@@ -96,6 +113,152 @@ const Devices = () => {
     const [showEditModal, setShowEditModal] = useState(false);
     const [deviceToDelete, setDeviceToDelete] = useState<{id: number, hostname: string} | null>(null);
     const [editingDevice, setEditingDevice] = useState<Device | null>(null);
+    const [devicesWithStatus, setDevicesWithStatus] = useState<DeviceWithStatus[]>([]);
+    const [loadingStatuses, setLoadingStatuses] = useState<boolean>(false);
+    const [statusProgress, setStatusProgress] = useState<{loaded: number, total: number}>({loaded: 0, total: 0});
+    const hasInitialLoad = useRef<boolean>(false);
+    const devicesRef = useRef<DeviceWithStatus[]>([]);
+
+    // Function to handle refresh - clears cache and forces refetch
+    const handleRefresh = useCallback(() => {
+        hasInitialLoad.current = false;
+        setDevicesWithStatus([]);
+        devicesRef.current = [];
+        setStatusProgress({loaded: 0, total: 0});
+        setRefreshKey(prev => prev + 1);
+    }, []);
+
+    const loadMonitoringStatuses = useCallback(async (devices: DeviceWithStatus[]) => {
+        setLoadingStatuses(true);
+        setStatusProgress({loaded: 0, total: devices.length});
+        
+        try {
+            // Create promises for all devices in parallel
+            const statusPromises = devices.map(async (device) =>     {
+                try {
+                    const monitoringStatus = await getDeviceMonitoringStatus(device.id);
+                    const updatedDevice = {
+                        ...device,
+                        monitoring_status: monitoringStatus.status,
+                        last_check: monitoringStatus.last_check,
+                        uptime_percentage: monitoringStatus.uptime_percentage
+                    };
+                    
+                    // Update state immediately as each status is fetched
+                    setDevicesWithStatus(prevDevices => {
+                        const updatedDevices = [...prevDevices];
+                        const index = updatedDevices.findIndex(d => d.id === device.id);
+                        if (index !== -1) {
+                            updatedDevices[index] = updatedDevice;
+                        }
+                        // Also update the ref
+                        devicesRef.current = updatedDevices;
+                        return updatedDevices;
+                    });
+                    
+                    // Update progress
+                    setStatusProgress(prev => ({...prev, loaded: prev.loaded + 1}));
+                    
+                    return updatedDevice;
+                } catch (error) {
+                    console.warn(`Failed to fetch monitoring status for device ${device.id}:`, error);
+                    const updatedDevice = {
+                        ...device,
+                        monitoring_status: 'DOWN' as 'UP' | 'DOWN',
+                        last_check: null,
+                        uptime_percentage: 0
+                    };
+                    
+                    // Update state immediately even for failed requests
+                    setDevicesWithStatus(prevDevices => {
+                        const updatedDevices = [...prevDevices];
+                        const index = updatedDevices.findIndex(d => d.id === device.id);
+                        if (index !== -1) {
+                            updatedDevices[index] = updatedDevice;
+                        }
+                        // Also update the ref
+                        devicesRef.current = updatedDevices;
+                        return updatedDevices;
+                    });
+                    
+                    // Update progress even for failed requests
+                    setStatusProgress(prev => ({...prev, loaded: prev.loaded + 1}));
+                    
+                    return updatedDevice;
+                }
+            });
+
+            // Wait for all promises to complete (though individual updates happen immediately)
+            await Promise.all(statusPromises);
+        } catch (error) {
+            console.error('Error loading monitoring statuses:', error);
+        } finally {
+            setLoadingStatuses(false);
+        }
+    }, []);
+
+    const fetchDevices = useCallback(async (page = 1, perPage = 15, search = "") => {
+        try {
+            // If we already have devices with status, return them to avoid refetching
+            if (hasInitialLoad.current && devicesRef.current.length > 0) {
+                return {
+                    data: devicesRef.current || [],
+                    total: devicesRef.current?.length || 0,
+                    current_page: page,
+                    per_page: perPage,
+                    last_page: Math.ceil((devicesRef.current?.length || 0) / perPage)
+                };
+            }
+
+            const [devicesResponse, dashboardResponse] = await Promise.all([
+                getDevices({ page, perPage, limit: perPage, search, ...currentFilters }),
+                getMonitoringDashboard()
+            ]);
+
+            // Update summary from dashboard data
+            setSummary({
+                total_devices: dashboardResponse.total_devices || 0,
+                devices_up: dashboardResponse.devices_up || 0,
+                devices_down: dashboardResponse.devices_down || 0,
+                active_alerts: dashboardResponse.active_alerts || 0
+            });
+
+            // Convert devices to DeviceWithStatus format without monitoring status initially
+            const devicesWithStatus: DeviceWithStatus[] = (devicesResponse || []).map((device: Device) => ({
+                ...device,
+                monitoring_status: undefined,
+                last_check: undefined,
+                uptime_percentage: undefined
+            }));
+
+            // Store devices in state and ref for progressive loading
+            setDevicesWithStatus(devicesWithStatus);
+            devicesRef.current = devicesWithStatus;
+            hasInitialLoad.current = true;
+
+            // Start loading monitoring statuses in the background
+            // loadMonitoringStatuses(devicesWithStatus);
+
+            // Return devices data in the format expected by GenericListPage
+            return {
+                data: devicesWithStatus || [],
+                total: devicesWithStatus?.length || 0,
+                current_page: page,
+                per_page: perPage,
+                last_page: Math.ceil((devicesWithStatus?.length || 0) / perPage)
+            };
+        } catch (error) {
+            console.error('Error fetching devices:', error);
+            toast.error('Failed to fetch devices');
+            return {
+                data: [],
+                total: 0,
+                current_page: 1,
+                per_page: perPage,
+                last_page: 1
+            };
+        }
+    }, [currentFilters]);
 
     // Create cards data for PageSummaryGrid
     const summaryCards: SummaryCard[] = [
@@ -141,42 +304,6 @@ const Devices = () => {
         }
     ];
     
-    const fetchDevices = useCallback(async (page = 1, perPage = 15, search = "") => {
-        try {
-            const [devicesResponse, dashboardResponse] = await Promise.all([
-                getDevices({ page, perPage, limit: perPage, search, ...currentFilters }),
-                getMonitoringDashboard()
-            ]);
-
-            // Update summary from dashboard data
-            setSummary({
-                total_devices: dashboardResponse.total_devices || 0,
-                devices_up: dashboardResponse.devices_up || 0,
-                devices_down: dashboardResponse.devices_down || 0,
-                active_alerts: dashboardResponse.active_alerts || 0
-            });
-
-            // Return devices data in the format expected by GenericListPage
-            return {
-                data: devicesResponse || [],
-                total: devicesResponse?.length || 0,
-                current_page: page,
-                per_page: perPage,
-                last_page: Math.ceil((devicesResponse?.length || 0) / perPage)
-            };
-        } catch (error) {
-            console.error('Error fetching devices:', error);
-            toast.error('Failed to fetch devices');
-            return {
-                data: [],
-                total: 0,
-                current_page: 1,
-                per_page: perPage,
-                last_page: 1
-            };
-        }
-    }, [currentFilters]);
-
     const handleDeleteDevice = (deviceId: number, hostname: string) => {
         setDeviceToDelete({ id: deviceId, hostname });
         setShowDeleteModal(true);
@@ -188,7 +315,7 @@ const Devices = () => {
         try {
             await deleteDevice(deviceToDelete.id);
             toast.success(`Device ${deviceToDelete.hostname} deleted successfully`);
-            setRefreshKey(prev => prev + 1);
+            handleRefresh();
             setShowDeleteModal(false);
             setDeviceToDelete(null);
         } catch (error) {
@@ -262,7 +389,7 @@ const Devices = () => {
         try {
             await createDevice(createFormData);
             toast.success('Device created successfully');
-            setRefreshKey(prev => prev + 1);
+            handleRefresh();
             setShowCreateModal(false);
             setCreateFormData({
                 hostname: '',
@@ -297,7 +424,7 @@ const Devices = () => {
             
             await updateDevice(editingDevice.id, updateData);
             toast.success('Device updated successfully');
-            setRefreshKey(prev => prev + 1);
+            handleRefresh();
             setShowEditModal(false);
             setEditingDevice(null);
         } catch (error) {
@@ -331,7 +458,15 @@ const Devices = () => {
                             <Col md={4}>
                                 <h2 className="mb-0">Devices</h2>
                             </Col>
-                            <Col md={8} className="d-flex justify-content-end">
+                            <Col md={8} className="d-flex justify-content-end align-items-center">
+                                {loadingStatuses && statusProgress.total > 0 && (
+                                    <div className="me-3">
+                                        <small className="text-muted">
+                                            <i className="fas fa-spinner fa-spin me-1"></i>
+                                            Loading statuses: {statusProgress.loaded}/{statusProgress.total}
+                                        </small>
+                                    </div>
+                                )}
                                 <div className="action-buttons gap-2">
                                     <Button
                                         variant="primary"
@@ -344,7 +479,7 @@ const Devices = () => {
                                     <Button
                                         variant="info"
                                         className="me-2"
-                                        onClick={() => setRefreshKey(prev => prev + 1)}
+                                        onClick={handleRefresh}
                                        
                                     >
                                         <FiRefreshCw size={14} /> Refresh

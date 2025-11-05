@@ -110,32 +110,7 @@ const Error404 = () => {
                                         </Link>
                                     </div>
 
-                                    {/* Quick Navigation */}
-                                    <div className="mt-4 pt-3" style={{ borderTop: '1px solid rgba(255,255,255,0.2)' }}>
-                                        <p className="mb-3 text-white" style={{ opacity: 0.8 }}>
-                                            Need help? Try these popular pages:
-                                        </p>
-                                        <div className="d-flex flex-wrap justify-content-center gap-2">
-                                            <Link href="/dashboard" className="text-white text-decoration-none">
-                                                <span className="badge bg-light text-dark px-3 py-2 rounded-pill">
-                                                    <i className="ph-duotone ph-chart-line me-1"></i>
-                                                    Dashboard
-                                                </span>
-                                            </Link>
-                                            <Link href="/tms/profiling/customers" className="text-white text-decoration-none">
-                                                <span className="badge bg-light text-dark px-3 py-2 rounded-pill">
-                                                    <i className="ph-duotone ph-users me-1"></i>
-                                                    Customer Profiling
-                                                </span>
-                                            </Link>
-                                            <Link href="/cti" className="text-white text-decoration-none">
-                                                <span className="badge bg-light text-dark px-3 py-2 rounded-pill">
-                                                    <i className="ph-duotone ph-phone me-1"></i>
-                                                    CTI
-                                                </span>
-                                            </Link>
-                                        </div>
-                                    </div>
+                                   
                                 </div>
                             </Card.Body>
                         </div>

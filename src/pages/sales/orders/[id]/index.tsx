@@ -442,7 +442,7 @@ const OrderView: React.FC = () => {
               Cancel
             </Button>
             <Button variant="warning" onClick={handleMarkLost}>
-              Mark as Lost
+              Mark Lost Reason
             </Button>
           </Modal.Footer>
         </Modal>

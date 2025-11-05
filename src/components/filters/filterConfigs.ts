@@ -156,12 +156,12 @@ export const createCallLogsFiltersConfig = (hierarchyData?: any, isVisibleCallDi
        
         {
           type: 'radio',
-          name: 'is_answered',
+          name: 'call_status',
           label: 'Choose Call Status',
           options: [
-            { value: 'true', label: 'Answered' },
-            { value: 'false', label: 'Not Answered' },
-            { value: '', label: 'Both' }
+            { value: 'Answered', label: 'Answered' },
+            { value: 'Not Answered', label: 'Not Answered' },
+            { value: 'Both', label: 'Both' }
           ]
         }
       ]
@@ -651,7 +651,7 @@ export const createGsmCompanyFiltersConfig = (hierarchyData?: any): FilterTab[] 
         name: 'company',
         label: 'Company',
         options: hierarchyData?.company?.map((company: { id: string; name: string }) => ({
-          value: company.name,
+          value: (company as any)?.identifier || company.id,
           label: company.name
         })) || []
       }
@@ -703,7 +703,7 @@ export const createGsmPortFiltersConfig = (hierarchyData?: any): FilterTab[] => 
         name: 'company',
         label: 'Company',
         options: hierarchyData?.company?.map((company: { id: string; name: string }) => ({
-          value: company.name,
+          value: (company as any)?.identifier || company.id,
           label: company.name
         })) || []
       }
@@ -1114,37 +1114,6 @@ export const createCrmFiltersConfig = (
             value: campaign.id.toString(),
             label: campaign.name
           })) || []
-        }
-      ]
-    },
-    {
-      id: 'tags',
-      title: 'Tags',
-      icon: 'ti ti-tag',
-      fields: [
-        {
-          type: 'select',
-          isMulti: true,
-          name: 'tags',
-          label: 'Tags',
-          options: staticTags || []
-        }
-      ]
-    },
-    {
-      id: 'assignment-status',
-      title: 'Assignment Status',
-      icon: 'ti ti-user-check',
-      fields: [
-        {
-          type: 'select',
-          name: 'assignment_status',
-          label: 'Assignment Status',
-          options: [
-            { value: '', label: 'All' },
-            { value: 'assigned', label: 'Assigned' },
-            { value: 'unassigned', label: 'Unassigned' }
-          ]
         }
       ]
     },

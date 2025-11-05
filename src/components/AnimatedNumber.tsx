@@ -18,7 +18,7 @@ const AnimatedNumber = ({ value, duration = 1000, textColor = '', suffix = '', p
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = Math.floor(seconds % 60);
     
-    console.log('formatSeconds input:', seconds, 'minutes:', minutes, 'remainingSeconds:', remainingSeconds);
+    //console.log('formatSeconds input:', seconds, 'minutes:', minutes, 'remainingSeconds:', remainingSeconds);
     
     if (minutes > 0) {
       return `${minutes}m ${remainingSeconds}s`;
@@ -33,7 +33,7 @@ const AnimatedNumber = ({ value, duration = 1000, textColor = '', suffix = '', p
     const minutes = Math.floor((seconds % 3600) / 60);
     const remainingSeconds = Math.floor(seconds % 60);
     
-    console.log('formatSeconds input:', seconds, 'hours:', hours, 'minutes:', minutes, 'remainingSeconds:', remainingSeconds);
+    //console.log('formatSeconds input:', seconds, 'hours:', hours, 'minutes:', minutes, 'remainingSeconds:', remainingSeconds);
     
     const parts = [];
     if (hours > 0) {

@@ -3,7 +3,7 @@ import React, { ReactElement, useState, useCallback, useMemo } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericListPage from "@components/GenericListPage";
-import { getStages, createStage, deleteStage } from "@utils/crm";
+import { getStages, createStage, deleteStage, updateStage } from "@utils/crm";
 import { Column } from "@components/CustomDataTable";
 import {
   Button,
@@ -18,6 +18,7 @@ import {
   FiTrash2,
   FiPlus,
   FiSave,
+  FiEdit2,
 } from "react-icons/fi";
 import { toast } from "react-toastify";
 import "@assets/scss/common.scss";
@@ -28,6 +29,7 @@ import ConfirmModal from "@pages/partial/ConfirmModal";
 import SuccessfulModal from "@pages/partial/SuccessfulModal";
 import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
 import DatatableActionButton from "@components/DatatableActionButton";
+import { useSession } from "next-auth/react";
 
 
 interface Stage {
@@ -35,31 +37,34 @@ interface Stage {
   name: string;
   sequence: number;
   is_won: boolean;
-  requirements?: string;
   fold: boolean;
   color: string;
   description?: string;
   is_default: boolean;
   active: boolean;
+  type: 'lead' | 'opportunity';
   created_at: string;
   updated_at: string;
 }
 
 const StagesManagement = () => {
+  const { data: session } = useSession();
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showUpdateModal, setShowUpdateModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [stageToDelete, setStageToDelete] = useState<Stage | null>(null);
+  const [stageToUpdate, setStageToUpdate] = useState<Stage | null>(null);
   const [refreshKey, setRefreshKey] = useState<number>(0);
   const [formData, setFormData] = useState({
     name: "",
     sequence: 1,
     is_won: false,
-    requirements: "",
     fold: false,
     color: "#6c757d",
     description: "",
     is_default: false,
     active: true,
+    type: 'lead' as 'lead' | 'opportunity',
   });
 
   const [currentFilters, setCurrentFilters] = useState({search: ""});
@@ -116,12 +121,12 @@ const StagesManagement = () => {
         name: "",
         sequence: 1,
         is_won: false,
-        requirements: "",
         fold: false,
         color: "#6c757d",
         description: "",
         is_default: false,
         active: true,
+        type: 'lead' as 'lead' | 'opportunity',
       });
       setShowSuccessfulModal(true);
       setSuccessModalTitle("Stage Created");
@@ -139,6 +144,52 @@ const StagesManagement = () => {
   const handleCloseSuccessfulModal = () => {
       setShowSuccessfulModal(false)
   }
+
+  const handleCloseUpdateModal = () => {
+    setShowUpdateModal(false);
+    setStageToUpdate(null);
+    setFormData({
+      name: "",
+      sequence: 1,
+      is_won: false,
+      fold: false,
+      color: "#6c757d",
+      description: "",
+      is_default: false,
+      active: true,
+      type: 'lead' as 'lead' | 'opportunity',
+    });
+  }
+
+  const handleUpdateStage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!stageToUpdate) return;
+
+    try {
+      await updateStage(stageToUpdate.id, formData);
+      toast.success("Stage updated successfully!");
+      setShowUpdateModal(false);
+      setStageToUpdate(null);
+      setFormData({
+        name: "",
+        sequence: 1,
+        is_won: false,
+        fold: false,
+        color: "#6c757d",
+        description: "",
+        is_default: false,
+        active: true,
+        type: 'lead' as 'lead' | 'opportunity',
+      });
+      setShowSuccessfulModal(true);
+      setSuccessModalTitle("Stage Updated");
+      setSuccessModalDescription("Stage updated successfully!");
+      setRefreshKey((oldKey) => oldKey + 1);
+    } catch (error) {
+      toast.error("Failed to update stage");
+      console.error("Update stage error:", error);
+    }
+  };
 
   const handleDeleteStage = async () => {
     if (!stageToDelete) return;
@@ -197,6 +248,17 @@ const StagesManagement = () => {
         ),
       },
       {
+        key: "type",
+        name: "Type",
+        selector: (row: Stage) => row.type,
+        sortable: true,
+        cell: (props: Stage) => (
+          <span className={`status-badge ${props.type === 'lead' ? 'primary' : 'success'}`}>
+            {props.type.charAt(0).toUpperCase() + props.type.slice(1)}
+          </span>
+        ),
+      },
+      {
         key: "color",
         name: "Color",
         selector: (row: Stage) => row.color,
@@ -215,13 +277,6 @@ const StagesManagement = () => {
             <span className="status-badge info">{props.color}</span>
           </div>
         ),
-      },
-      {
-        key: "status",
-        name: "Status",
-        selector: (row: Stage) => row.is_won ? "won" : row.fold ? "fold" : row.is_default ? "default" : "active",
-        sortable: true,
-        cell: (props: Stage) => getStatusBadge(props),
       },
       {
         key: "description",
@@ -253,6 +308,31 @@ const StagesManagement = () => {
         cell: (props: Stage) => (
           <DatatableActionButton
             actions={[
+
+              ...(session?.user?.permissions?.includes('edit-crm-stages') ? [
+              {
+                label: 'Edit',
+                icon: <FiEdit2 />,
+                onClick: () => {
+                  setStageToUpdate(props);
+                  setFormData({
+                    name: props.name,
+                    sequence: props.sequence,
+                    is_won: props.is_won,
+                    fold: props.fold,
+                    color: props.color,
+                    description: props.description || "",
+                    is_default: props.is_default,
+                    active: props.active,
+                    type: props.type,
+                  });
+                  setShowUpdateModal(true);
+                },
+                className: 'text-primary',
+              },
+              ] : []),
+
+              ...(session?.user?.permissions?.includes('delete-crm-stages') ? [
               {
                 label: 'Delete',
                 icon: <FiTrash2 />,
@@ -262,6 +342,7 @@ const StagesManagement = () => {
                 },
                 className: 'text-danger',
               },
+              ] : []),
             ]}
           />
         ),
@@ -282,24 +363,25 @@ const StagesManagement = () => {
 
       <PageHeader
         title="Stages"
-        showSearch={true}
+        showSearch={session?.user?.permissions?.includes('list-crm-stages')}
         searchPlaceholder="Search stages..."
         searchValue={currentFilters.search || ""}
         onSearchChange={(value) => handleFiltersChange({...currentFilters, search: value})}
         buttons={
+          <>
+          {session?.user?.permissions?.includes('add-crm-stages') && (
           <Button variant="primary" onClick={() => setShowCreateModal(true)}>
             <FiPlus className="me-2" />
             New Stage
           </Button>
+          )}
+          </>
         }
       />
 
-      <div className="container-fluid">
-        
-        {/* Stages List */}
-        <div className="row">
-          <div className="col-12">
-            <GenericListPage
+
+{session?.user?.permissions?.includes('list-crm-stages') && (
+<GenericListPage
               columns={columns}
               fetchData={fetchStagesForTable}
               title="Stages"
@@ -311,9 +393,7 @@ const StagesManagement = () => {
               tableStyle="table-style-2"
              
             />
-          </div>
-        </div>
-      </div>
+            )}
 
       {/* Create Stage Modal */}
       {/* <Modal show={showCreateModal} onHide={() => setShowCreateModal(false)} size="lg">
@@ -374,6 +454,19 @@ const StagesManagement = () => {
             <Row>
               <Col md={6}>
                 <Form.Group className="mb-3">
+                  <Form.Label>Type *</Form.Label>
+                  <Form.Select
+                    value={formData.type}
+                    onChange={(e) => handleInputChange("type", e.target.value as 'lead' | 'opportunity')}
+                    required
+                  >
+                    <option value="lead">Lead</option>
+                    <option value="opportunity">Opportunity</option>
+                  </Form.Select>
+                </Form.Group>
+              </Col>
+              <Col md={6}>
+                <Form.Group className="mb-3">
                   <Form.Label>Color</Form.Label>
                   <Form.Control
                     type="color"
@@ -382,7 +475,7 @@ const StagesManagement = () => {
                   />
                 </Form.Group>
               </Col>
-              <Col md={6}>
+              {/* <Col md={6}>
                 <Form.Group className="mb-3">
                   <Form.Label>Status</Form.Label>
                   <div className="d-flex gap-3">
@@ -406,19 +499,9 @@ const StagesManagement = () => {
                     />
                   </div>
                 </Form.Group>
-              </Col>
+              </Col> */}
             </Row>
 
-            <Form.Group className="mb-3">
-              <Form.Label>Requirements</Form.Label>
-              <Form.Control
-                as="textarea"
-                rows={2}
-                value={formData.requirements}
-                onChange={(e) => handleInputChange("requirements", e.target.value)}
-                placeholder="Enter stage requirements (optional)"
-              />
-            </Form.Group>
 
             <Form.Group className="mb-3">
               <Form.Label>Description</Form.Label>
@@ -440,6 +523,93 @@ const StagesManagement = () => {
           handleSubmit(mockEvent);
         }}
         onCancel={() => setShowCreateModal(false)}
+        submitButtonVariant="primary"
+        cancelButtonVariant="secondary"
+      />
+
+      {/* Update Stage Modal */}
+      <FormModal
+        show={showUpdateModal}
+        onHide={handleCloseUpdateModal}
+        title="Update Stage"
+        desc="Please update the details below for this stage."
+        formHtml={
+         <>
+         <Form onSubmit={handleUpdateStage}>
+            <Row>
+              <Col md={6}>
+                <Form.Group className="mb-3">
+                  <Form.Label>Stage Name *</Form.Label>
+                  <Form.Control
+                    type="text"
+                    value={formData.name}
+                    onChange={(e) => handleInputChange("name", e.target.value)}
+                    placeholder="Enter stage name"
+                    required
+                  />
+                </Form.Group>
+              </Col>
+              <Col md={6}>
+                <Form.Group className="mb-3">
+                  <Form.Label>Sequence *</Form.Label>
+                  <Form.Control
+                    type="number"
+                    value={formData.sequence}
+                    onChange={(e) => handleInputChange("sequence", parseInt(e.target.value))}
+                    min="1"
+                    required
+                  />
+                </Form.Group>
+              </Col>
+            </Row>
+
+            <Row>
+              <Col md={6}>
+                <Form.Group className="mb-3">
+                  <Form.Label>Type *</Form.Label>
+                  <Form.Select
+                    value={formData.type}
+                    onChange={(e) => handleInputChange("type", e.target.value as 'lead' | 'opportunity')}
+                    required
+                  >
+                    <option value="lead">Lead</option>
+                    <option value="opportunity">Opportunity</option>
+                  </Form.Select>
+                </Form.Group>
+              </Col>
+              <Col md={6}>
+                <Form.Group className="mb-3">
+                  <Form.Label>Color</Form.Label>
+                  <Form.Control
+                    type="color"
+                    value={formData.color}
+                    onChange={(e) => handleInputChange("color", e.target.value)}
+                  />
+                </Form.Group>
+              </Col>
+            </Row>
+
+
+            <Form.Group className="mb-3">
+              <Form.Label>Description</Form.Label>
+              <Form.Control
+                as="textarea"
+                rows={3}
+                value={formData.description}
+                onChange={(e) => handleInputChange("description", e.target.value)}
+                placeholder="Enter stage description (optional)"
+              />
+            </Form.Group>
+          </Form>
+         </>
+        }
+        submitButtonText="Update Stage"
+        cancelButtonText="Cancel"
+        onSubmit={() => {
+          const mockEvent = { preventDefault: () => {} } as React.FormEvent;
+          handleUpdateStage(mockEvent);
+        }}
+        onCancel={handleCloseUpdateModal}
         submitButtonVariant="primary"
         cancelButtonVariant="secondary"
       />

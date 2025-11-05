@@ -160,8 +160,11 @@ const CallTrendDepartment = () => {
         avg_duration:0,
         avg_ring_time:0
     });
+
+    const [showPageLoader, setShowPageLoader] = useState(false);
     
     const fetchCallLogs = useCallback(async (page = 1, perPage = 15, search = "") => {
+        
         // Only fetch if filters are ready
         if (!filtersReady) {
             console.log('Filters not ready yet, skipping fetch');
@@ -170,14 +173,13 @@ const CallTrendDepartment = () => {
         
         console.log('Fetching call logs with filters:', currentFilters);
         setLoading(true);
+        setShowPageLoader(true);
         
         try {
-            console.log('About to call ListCallLogs with params:', { page, perPage, search, filters: currentFilters, reportType: 'trendStatsDepartment' });
             const response = await ListCallLogs({ page, perPage, search, filters: currentFilters, reportType: 'trendStatsDepartment', 
-                moduleSlug: ModuleSlug.CALL_REPORTS }, 'call-logs/statsTrendByDepartment');
-            console.log('API response:', response);
-            console.log('API response type:', typeof response);
-            console.log('API response keys:', response ? Object.keys(response) : 'null/undefined');
+                moduleSlug: ModuleSlug.CALL_REPORTS }, 'call-logs/statsTrendByDepartment').finally(() => {
+                  setShowPageLoader(false);
+                });
             
             if (response?.summary) {
                 setSummary(response.summary);
@@ -545,7 +547,7 @@ const CallTrendDepartment = () => {
     
     return (
         <React.Fragment>
-            <BreadcrumbItem mainTitle="" mainLink="" subTitle="Call Trend By Department" />
+            <BreadcrumbItem mainTitle="" mainLink="" subTitle="Call Trend By Department" showPageLoader={showPageLoader} />
 
 
             <Row className="mb-3">

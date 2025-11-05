@@ -85,12 +85,12 @@ export default function useCtiStompSSE() {
       if (tokenRef.current && userAddressRef.current && tokenExpiryRef.current) {
         const now = Date.now();
         if (now < tokenExpiryRef.current) {
-          console.log('Using cached CTI token');
+         // console.log('Using cached CTI token');
           return { token: tokenRef.current, userAddress: userAddressRef.current };
         }
       }
 
-      console.log('Getting new CTI token...');
+     /// console.log('Getting new CTI token...');
       const response = await axiosInstance.get('/cti/connect', {
         headers: {
           'Content-Type': 'application/json',
@@ -125,10 +125,10 @@ export default function useCtiStompSSE() {
   // Load persisted call states from localStorage
   const loadPersistedCallStates = useCallback(() => {
     try {
-      console.log('Loading persisted call states from localStorage...')
+      //console.log('Loading persisted call states from localStorage...')
       const storedTimestamp = localStorage.getItem(CALL_STATES_TIMESTAMP_KEY);
       if (!storedTimestamp) {
-        console.log('No stored timestamp found, no persisted call states to load')
+       // console.log('No stored timestamp found, no persisted call states to load')
         return;
       }
 
@@ -138,7 +138,7 @@ export default function useCtiStompSSE() {
 
       // Check if stored data is still valid (not expired)
       if (hoursDiff > STORAGE_EXPIRY_HOURS) {
-        console.log('Stored call states expired, clearing localStorage');
+        //console.log('Stored call states expired, clearing localStorage');
         localStorage.removeItem(CALL_STATES_STORAGE_KEY);
         localStorage.removeItem(CALL_STATES_TIMESTAMP_KEY);
         return;
@@ -166,15 +166,15 @@ export default function useCtiStompSSE() {
 
         if (Object.keys(activeCallStates).length > 0) {
           setCallStateMap(activeCallStates);
-          console.log('Restored active call states:', activeCallStates);
+          //console.log('Restored active call states:', activeCallStates);
         } else {
-          console.log('No active call states found in persisted data')
+         // console.log('No active call states found in persisted data')
         }
       } else {
-        console.log('No stored call states found')
+        //console.log('No stored call states found')
       }
     } catch (error) {
-      console.error('Error loading persisted call states:', error);
+      //console.error('Error loading persisted call states:', error);
       // Clear corrupted data
       localStorage.removeItem(CALL_STATES_STORAGE_KEY);
       localStorage.removeItem(CALL_STATES_TIMESTAMP_KEY);
@@ -184,7 +184,7 @@ export default function useCtiStompSSE() {
   // Save call states to localStorage
   const saveCallStatesToStorage = useCallback((callStates: Record<string, CtiCallEvent>) => {
     try {
-      console.log('Saving call states to localStorage:', callStates);
+      
       
       // Only save calls that are CONNECTED or RETRIEVED (not incoming/ringing)
       const callsToPersist = Object.entries(callStates).reduce((acc, [callId, callEvent]) => {
@@ -205,15 +205,15 @@ export default function useCtiStompSSE() {
       if (Object.keys(callsToPersist).length > 0) {
         localStorage.setItem(CALL_STATES_STORAGE_KEY, JSON.stringify(callsToPersist));
         localStorage.setItem(CALL_STATES_TIMESTAMP_KEY, new Date().toISOString());
-        console.log('Persisted CONNECTED/RETRIEVED call states to localStorage:', callsToPersist);
+        
       } else {
         // If no active calls, clear storage
         localStorage.removeItem(CALL_STATES_STORAGE_KEY);
         localStorage.removeItem(CALL_STATES_TIMESTAMP_KEY);
-        console.log('No CONNECTED/RETRIEVED calls to persist, cleared localStorage');
+        
       }
     } catch (error) {
-      console.error('Error saving call states to localStorage:', error);
+      
     }
   }, []);
 
@@ -258,6 +258,21 @@ export default function useCtiStompSSE() {
       const updated = { ...prev };
       const base = updated[callId] || {};
 
+      // IMPORTANT: Always use new parties if provided in event, otherwise fall back to base parties
+      // This ensures that when parties are removed (e.g., barge-in stopped), we use the updated parties
+      const partiesToProcess = evt.parties !== undefined && evt.parties !== null 
+        ? evt.parties 
+        : (base.parties || []);
+
+      // Check if all parties are DROPPED - if so, mark call as terminating
+      const allPartiesDropped = partiesToProcess.length > 0 && 
+        partiesToProcess.every((p: any) => p.callStatus === 'DROPPED' || p.callStatus === 'DISCONNECTED');
+      
+      // Also check hasActiveParticipants flag if available
+      const shouldTerminate = evt.isTerminating || 
+        allPartiesDropped || 
+        (evt.hasActiveParticipants === false && partiesToProcess.length > 0);
+
       updated[callId] = {
         ...base,
         callId,
@@ -266,11 +281,20 @@ export default function useCtiStompSSE() {
         eventTime: evt.eventTime,
         isConference: evt.isConference,
         isOneToOne: evt.isOneToOne,
-        parties: evt.parties || base.parties || [],
-        isTerminating: evt.isTerminating,
-        hasActiveParticipants: evt.hasActiveParticipants,
+        parties: partiesToProcess,
+        isTerminating: shouldTerminate,
+        hasActiveParticipants: evt.hasActiveParticipants !== undefined ? evt.hasActiveParticipants : !allPartiesDropped,
         eventName: evt.eventName,
       };
+
+      // If all parties are dropped or call is terminating, remove the call state
+      if (shouldTerminate) {
+        const { [callId]: _, ...rest } = updated;
+        const cleaned = rest;
+        // Save cleaned state to localStorage
+        saveCallStatesToStorage(cleaned);
+        return cleaned;
+      }
 
       // Save updated state to localStorage
       saveCallStatesToStorage(updated);
@@ -326,12 +350,13 @@ export default function useCtiStompSSE() {
   // Connect to CTI via SSE
   const connect = useCallback(async () => {
     if (eventSourceRef.current?.readyState === EventSource.OPEN) {
-      console.log('CTI SSE already connected, skipping connection');
+      //console.log('CTI SSE already connected, skipping connection');
       return;
     }
 
     if (isConnectingRef.current) {
-      console.log('CTI SSE connection already in progress, skipping');
+      
+      //console.log('CTI SSE connection already in progress, skipping');
       return;
     }
 
@@ -355,22 +380,22 @@ export default function useCtiStompSSE() {
       
       const sseUrl = `/api/cti-stomp-stream?${params.toString()}`;
       
-      console.log('🔗 Creating EventSource with URL:', sseUrl);
+      //console.log('🔗 Creating EventSource with URL:', sseUrl);
       const eventSource = new EventSource(sseUrl);
       eventSourceRef.current = eventSource;
       
-      console.log('🔗 EventSource created, readyState:', eventSource.readyState);
+     // console.log('🔗 EventSource created, readyState:', eventSource.readyState);
 
       eventSource.onopen = () => {
-        console.log('✅ CTI SSE Connected successfully');
-        console.log('✅ SSE ReadyState:', eventSource.readyState);
-        console.log('✅ SSE URL:', sseUrl);
-        console.log('✅ SSE withCredentials:', eventSource.withCredentials);
-        console.log('✅ SSE CONNECTING state:', EventSource.CONNECTING);
-        console.log('✅ SSE OPEN state:', EventSource.OPEN);
-        console.log('✅ SSE CLOSED state:', EventSource.CLOSED);
-        console.log('✅ EventSource object:', eventSource);
-        console.log('✅ EventSource readyState after open:', eventSource.readyState);
+        // console.log('✅ CTI SSE Connected successfully');
+        // console.log('✅ SSE ReadyState:', eventSource.readyState);
+        // console.log('✅ SSE URL:', sseUrl);
+        // console.log('✅ SSE withCredentials:', eventSource.withCredentials);
+        // console.log('✅ SSE CONNECTING state:', EventSource.CONNECTING);
+        // console.log('✅ SSE OPEN state:', EventSource.OPEN);
+        // console.log('✅ SSE CLOSED state:', EventSource.CLOSED);
+        // console.log('✅ EventSource object:', eventSource);
+        // console.log('✅ EventSource readyState after open:', eventSource.readyState);
         setIsInitialized(true);
         setError(null);
         reconnectAttempts.current = 0;
@@ -390,17 +415,17 @@ export default function useCtiStompSSE() {
           eventCount: 0
         };
         setEventLog(prev => [...prev, testEvent]);
-        console.log('✅ Added connection test event to event log');
+        //console.log('✅ Added connection test event to event log');
       };
 
       eventSource.onmessage = (event) => {
         console.log('🔔 Raw SSE event received:', event);
-        console.log('🔔 Event data:', event.data);
-        console.log('🔔 Event type:', event.type);
-        console.log('🔔 Event lastEventId:', event.lastEventId);
-        console.log('🔔 Event origin:', event.origin);
-        console.log('🔔 Event source:', event.source);
-        console.log('🔔 Event timeStamp:', event.timeStamp);
+        //              console.log('🔔 Event data:', event.data);
+        // console.log('🔔 Event type:', event.type);
+        // console.log('🔔 Event lastEventId:', event.lastEventId);
+        // console.log('🔔 Event origin:', event.origin);
+        // console.log('🔔 Event source:', event.source);
+        // console.log('🔔 Event timeStamp:', event.timeStamp);                
         
         try {
           const data = JSON.parse(event.data);
@@ -408,8 +433,8 @@ export default function useCtiStompSSE() {
           eventCountRef.current += 1;
           
           console.log('✅ Parsed event data:', data);
-          console.log('✅ Event count:', eventCountRef.current);
-          console.log('✅ Current time:', now.toISOString());
+          //console.log('✅ Event count:', eventCountRef.current);
+          //console.log('✅ Current time:', now.toISOString());
           
           // Update event statistics
           setEventStats(prev => {
@@ -440,9 +465,9 @@ export default function useCtiStompSSE() {
           
           // Log event details like test socket
           console.log(`📨 [${eventCountRef.current}] ${data.type} event received:`);
-          console.log('   Data preview:', JSON.stringify(data, null, 2).substring(0, 200) + '...');
-          console.log('   Timestamp:', now.toISOString());
-          console.log('   ---');
+          //console.log('   Data preview:', JSON.stringify(data, null, 2).substring(0, 200) + '...');
+          //console.log('   Timestamp:', now.toISOString());
+          //console.log('   ---');
           
           // Handle different message types with optimized processing
           switch (data.type) {
@@ -587,7 +612,7 @@ export default function useCtiStompSSE() {
             connect();
           }, delay);
         } else {
-          console.error('CTI SSE max reconnection attempts reached, giving up');
+          //console.error('CTI SSE max reconnection attempts reached, giving up');
           setError('CTI connection failed after multiple attempts');
         }
       };
@@ -657,7 +682,18 @@ export default function useCtiStompSSE() {
     const calls = getCallStatesForDn(dn);
     if (!calls.length) return null;
 
-    const mostRecent = calls.reduce((a, b) =>
+    // Filter to only active calls (where at least one party for this DN is not dropped)
+    const activeCalls = calls.filter(call => {
+      const dnParties = call.parties?.filter(
+        (p: any) => p.callingAddress === dn || p.calledAddress === dn
+      ) || [];
+      // Check if all parties for this DN are dropped
+      return dnParties.length > 0 && !dnParties.every((p: any) => p.callStatus === 'DROPPED');
+    });
+
+    if (!activeCalls.length) return null;
+
+    const mostRecent = activeCalls.reduce((a, b) =>
       new Date(b.eventTime) > new Date(a.eventTime) ? b : a
     );
 
@@ -667,6 +703,15 @@ export default function useCtiStompSSE() {
     );
 
     if (!matchedParty) return null;
+
+    // Double-check that the matched party is not dropped
+    if (matchedParty.callStatus === 'DROPPED') {
+      // Find an active party for this DN if available
+      const activeParty = mostRecent.parties.find(
+        (p: any) => (p.callingAddress === dn || p.calledAddress === dn) && p.callStatus !== 'DROPPED'
+      );
+      if (!activeParty) return null;
+    }
 
     return {
       ...mostRecent,
@@ -720,7 +765,7 @@ export default function useCtiStompSSE() {
       const hoursDiff = (now.getTime() - timestamp.getTime()) / (1000 * 60 * 60);
 
       if (hoursDiff > STORAGE_EXPIRY_HOURS) {
-        console.log('Clearing expired call states from localStorage');
+        //console.log('Clearing expired call states from localStorage');
         localStorage.removeItem(CALL_STATES_STORAGE_KEY);
         localStorage.removeItem(CALL_STATES_TIMESTAMP_KEY);
       }
@@ -736,10 +781,10 @@ export default function useCtiStompSSE() {
       if (!storedCallStates) return;
 
       const parsedCallStates = JSON.parse(storedCallStates);
-      console.log('Syncing persisted call states with server:', parsedCallStates);
+     // console.log('Syncing persisted call states with server:', parsedCallStates);
 
       // For SSE, we can't directly send messages, so we'll just log
-      console.log('Persisted call states available for sync:', Object.keys(parsedCallStates));
+     // console.log('Persisted call states available for sync:', Object.keys(parsedCallStates));
     } catch (error) {
       console.error('Error syncing persisted call states:', error);
     }

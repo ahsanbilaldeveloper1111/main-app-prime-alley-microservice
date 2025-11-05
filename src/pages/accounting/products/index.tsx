@@ -67,6 +67,14 @@ const ProductList = () => {
   const [editingCategory, setEditingCategory] = useState<boolean>(false);
   const [showDeleteCategoryModal, setShowDeleteCategoryModal] = useState<boolean>(false);
   const [confirmDeleteCategory, setConfirmDeleteCategory] = useState<string>("");
+  
+  // Create Category Modal
+  const [showCreateCategoryModal, setShowCreateCategoryModal] = useState<boolean>(false);
+  const [creatingCategory, setCreatingCategory] = useState<boolean>(false);
+  const [newCategory, setNewCategory] = useState<ProductCategoryCreateUpdatePayload>({
+    name: "",
+    description: "",
+  });
 
   // Product Delete Modal
   const [showDeleteProductModal, setShowDeleteProductModal] = useState<boolean>(false);
@@ -106,7 +114,7 @@ const ProductList = () => {
         sortable: true,
         cell: (props: ProductData) => (
           <span >
-            {props.currency_code}{" "}
+            {props.currency || "USD"}{" "}
             {parseFloat(props.base_price || "0").toFixed(2)}
           </span>
         ),
@@ -121,28 +129,6 @@ const ProductList = () => {
             {props.is_service ? "Service" : "Product"}
           </span>
         ),
-      },
-      {
-        key: "is_active",
-        name: "Status",
-        selector: (row: ProductData) => row.is_active,
-        sortable: true,
-        cell: (props: ProductData) => {
-          const statusColors = {
-            true: "success",
-            false: "danger",
-          };
-          return (
-            <span
-              className={`status-badge ${
-                statusColors[String(props.is_active) as keyof typeof statusColors] ||
-                "secondary"
-              }`}
-            >
-              {props.is_active ? "Active" : "Inactive"}
-            </span>
-          );
-        },
       },
       {
         key: "created_at",
@@ -164,18 +150,24 @@ const ProductList = () => {
           <>  
           <DatatableActionButton
                     actions={[
+
+                      ...(session?.user?.permissions?.includes('edit-products-billing') ? [
                         {
                             label: 'Edit',
                             icon: <FiEdit />,
                             onClick: () => handleEditProduct(props),
                             className: 'gap-2'
                         },
+                        ] : []),
+
+                        ...(session?.user?.permissions?.includes('delete-products-billing') ? [
                         {
                             label: 'Delete',
                             icon: <FiTrash2 />,
                             onClick: () => handleDeleteProduct(props),
                             className: 'text-danger gap-2'
                         }
+                        ] : []),
                     ]}
                 />
           </>
@@ -266,8 +258,8 @@ const ProductList = () => {
         description: selectedProduct.description || "",
         category_id: selectedProduct.category_id,
         base_price: selectedProduct.base_price,
-        is_active: selectedProduct.is_active,
         is_service: selectedProduct.is_service,
+        currency: selectedProduct.currency || "USD",
       };
 
       const response = await updateProduct(selectedProduct.id, productData);
@@ -295,8 +287,8 @@ const ProductList = () => {
     description: "",
     category_id: "",
     base_price: "",
-    is_active: true,
     is_service: false,
+    currency: "USD",
   });
 
   const handleSubmitCreateProduct = useCallback(async () => {
@@ -323,8 +315,8 @@ const ProductList = () => {
           description: "",
           category_id: "",
           base_price: "",
-          is_active: true,
           is_service: false,
+          currency: "USD",
         });
         setShowCreateProductModal(false);
         setRefreshKey((prev) => prev + 1);
@@ -350,8 +342,8 @@ const ProductList = () => {
       description: "",
       category_id: "",
       base_price: "",
-      is_active: true,
       is_service: false,
+      currency: "USD",
     });
   }, []);
 
@@ -445,7 +437,6 @@ const ProductList = () => {
       const categoryData: ProductCategoryCreateUpdatePayload = {
         name: selectedCategory.name,
         description: selectedCategory.description || "",
-        is_active: selectedCategory.is_active,
       };
 
       await updateProductCategory(selectedCategory.id, categoryData);
@@ -481,6 +472,58 @@ const ProductList = () => {
    
   }, [confirmDeleteCategory, selectedCategory, openCategoryModal]);
 
+  // Create Category Handlers
+  const openCreateCategoryModal = useCallback(() => {
+    setNewCategory({
+      name: "",
+      description: "",
+    });
+    setShowCreateCategoryModal(true);
+  }, []);
+
+  const closeCreateCategoryModal = useCallback(() => {
+    setShowCreateCategoryModal(false);
+    setNewCategory({
+      name: "",
+      description: "",
+    });
+  }, []);
+
+  const handleNewCategoryChange = useCallback(
+    (field: keyof ProductCategoryCreateUpdatePayload, value: any) => {
+      setNewCategory((prev: ProductCategoryCreateUpdatePayload) => ({
+        ...prev,
+        [field]: value,
+      }));
+    },
+    []
+  );
+
+  const handleSubmitCreateCategory = useCallback(async () => {
+    if (!newCategory.name) {
+      toast.error("Please enter a category name");
+      return;
+    }
+
+    setCreatingCategory(true);
+    try {
+      await createProductCategory(newCategory);
+      setNewCategory({
+        name: "",
+        description: "",
+      });
+      setShowCreateCategoryModal(false);
+      await openCategoryModal(); // Refresh the list
+      await fetchCategories(); // Refresh the dropdown
+      toast.success("Category created successfully");
+    } catch (error) {
+      console.error("Error creating category:", error);
+      toast.error("Failed to create category");
+    } finally {
+      setCreatingCategory(false);
+    }
+  }, [newCategory, openCategoryModal]);
+
 
  
 
@@ -490,19 +533,27 @@ const ProductList = () => {
 
       <PageHeader
         title="Products"
-        showSearch={true}
+        showSearch={session?.user?.permissions?.includes('list-products-billing')}
         searchPlaceholder="Search products..."
         searchValue={currentFilters.search || ""}
         onSearchChange={(value) => handleFiltersChange({...currentFilters, search: value})}
         buttons={
           <>
+          {session?.user?.permissions?.includes('add-products-billing') && (
           <Button variant="primary" size="sm" onClick={openCreateProductModal}>New Product</Button>
+          )}
+
+
+          {session?.user?.permissions?.includes('products-categories-products-billing') && (
           <Button variant="secondary" size="sm" onClick={openCategoryModal}>Manage Categories</Button>
+          )}
           </>
         }
       />
 
 
+      
+      {session?.user?.permissions?.includes('list-products-billing') && (
       <GenericListPage
         columns={columns}
         fetchData={fetchProducts}
@@ -514,6 +565,7 @@ const ProductList = () => {
         search={false }
         tableStyle="table-style-2"
       />
+      )}
 
       {/* Create Product Modal */}
       <FormModal
@@ -580,6 +632,28 @@ const ProductList = () => {
               </div>
               <div className="col-md-6">
                 <div className="form-group mb-3">
+                  <label htmlFor="newProductCurrency">Currency</label>
+                  <select
+                    className="form-control"
+                    id="newProductCurrency"
+                    value={newProduct.currency}
+                    onChange={(e) =>
+                      handleNewProductChange("currency", e.target.value)
+                    }
+                  >
+                    <option value="USD">USD</option>
+                    <option value="EUR">EUR</option>
+                    <option value="GBP">GBP</option>
+                    <option value="CAD">CAD</option>
+                    <option value="AUD">AUD</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div className="row">
+              <div className="col-md-6">
+                <div className="form-group mb-3">
                   <label htmlFor="newProductType">Type</label>
                   <select
                     className="form-control"
@@ -594,24 +668,7 @@ const ProductList = () => {
                   </select>
                 </div>
               </div>
-            </div>
-
-            <div className="row">
               <div className="col-md-6">
-                <div className="form-group mb-3">
-                  <label htmlFor="newProductStatus">Status</label>
-                  <select
-                    className="form-control"
-                    id="newProductStatus"
-                    value={newProduct.is_active ? "active" : "inactive"}
-                    onChange={(e) =>
-                      handleNewProductChange("is_active", e.target.value === "active")
-                    }
-                  >
-                    <option value="active">Active</option>
-                    <option value="inactive">Inactive</option>
-                  </select>
-                </div>
               </div>
             </div>
 
@@ -708,6 +765,28 @@ const ProductList = () => {
                 </div>
                 <div className="col-md-6">
                   <div className="form-group mb-3">
+                    <label htmlFor="editProductCurrency">Currency</label>
+                    <select
+                      className="form-control"
+                      id="editProductCurrency"
+                      value={selectedProduct.currency || "USD"}
+                      onChange={(e) =>
+                        handleEditProductChange("currency", e.target.value)
+                      }
+                    >
+                      <option value="USD">USD</option>
+                      <option value="EUR">EUR</option>
+                      <option value="GBP">GBP</option>
+                      <option value="CAD">CAD</option>
+                      <option value="AUD">AUD</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <div className="row">
+                <div className="col-md-6">
+                  <div className="form-group mb-3">
                     <label htmlFor="editProductType">Type</label>
                     <select
                       className="form-control"
@@ -719,25 +798,6 @@ const ProductList = () => {
                     >
                       <option value="product">Product</option>
                       <option value="service">Service</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-
-              <div className="row">
-                <div className="col-md-6">
-                  <div className="form-group mb-3">
-                    <label htmlFor="editProductStatus">Status</label>
-                    <select
-                      className="form-control"
-                      id="editProductStatus"
-                      value={selectedProduct.is_active ? "active" : "inactive"}
-                      onChange={(e) =>
-                        handleEditProductChange("is_active", e.target.value === "active")
-                      }
-                    >
-                      <option value="active">Active</option>
-                      <option value="inactive">Inactive</option>
                     </select>
                   </div>
                 </div>
@@ -779,6 +839,17 @@ const ProductList = () => {
         desc="View and manage your product categories below"
         formHtml={
           <>
+            <div className="d-flex justify-content-between align-items-center mb-3">
+              <h5 className="mb-0">Product Categories</h5>
+              <Button 
+                variant="primary" 
+                size="sm" 
+                onClick={openCreateCategoryModal}
+              >
+                <FiPlus className="me-1" />
+                Create Category
+              </Button>
+            </div>
             <div className="table-responsive">
               <table className="table table-striped">
                 <thead>
@@ -802,13 +873,6 @@ const ProductList = () => {
                         </div>
                       </td>
                       <td>
-                        <span
-                          className={`status-badge ${
-                            category.is_active ? "success" : "danger"
-                          }`}
-                        >
-                          {category.is_active ? "Active" : "Inactive"}
-                        </span>
                       </td>
                       <td>
                         <span className="badge bg-info">
@@ -888,23 +952,6 @@ const ProductList = () => {
                   placeholder="Enter category description..."
                 />
               </div>
-              <div className="form-group mb-3">
-                <label htmlFor="editCategoryStatus">Status</label>
-                <select
-                  className="form-control"
-                  id="editCategoryStatus"
-                  value={selectedCategory.is_active ? "active" : "inactive"}
-                  onChange={(e) =>
-                    setSelectedCategory({
-                      ...selectedCategory,
-                      is_active: e.target.value === "active",
-                    })
-                  }
-                >
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
-                </select>
-              </div>
             </>
           }
           submitButtonText={editingCategory ? "Updating..." : "Update Category"}
@@ -957,6 +1004,51 @@ const ProductList = () => {
           requiredConfirmationText="DELETE"
         />
       )}
+
+      {/* Create Category Modal */}
+      <FormModal
+        show={showCreateCategoryModal}
+        onHide={closeCreateCategoryModal}
+        title="Create New Category"
+        desc="Fill in the details below to create a new product category"
+        formHtml={
+          <>
+            <div className="form-group mb-3">
+              <label htmlFor="newCategoryName">Category Name *</label>
+              <input
+                type="text"
+                className="form-control"
+                id="newCategoryName"
+                value={newCategory.name}
+                onChange={(e) =>
+                  handleNewCategoryChange("name", e.target.value)
+                }
+                placeholder="Enter category name"
+              />
+            </div>
+            <div className="form-group mb-3">
+              <label htmlFor="newCategoryDescription">Description</label>
+              <textarea
+                className="form-control"
+                id="newCategoryDescription"
+                value={newCategory.description}
+                onChange={(e) =>
+                  handleNewCategoryChange("description", e.target.value)
+                }
+                rows={3}
+                placeholder="Enter category description..."
+              />
+            </div>
+          </>
+        }
+        submitButtonText={creatingCategory ? "Creating..." : "Create Category"}
+        cancelButtonText="Cancel"
+        onSubmit={handleSubmitCreateCategory}
+        onCancel={closeCreateCategoryModal}
+        submitButtonVariant="primary"
+        cancelButtonVariant="secondary"
+        isSubmitting={creatingCategory}
+      />
 
     </React.Fragment>
   );

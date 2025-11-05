@@ -1,0 +1,150 @@
+.circular-progress-container {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.circular-progress-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.circular-progress-svg {
+  transform: rotate(-90deg);
+  overflow: visible;
+}
+
+.circular-progress-bg {
+  opacity: 0.3;
+}
+
+.circular-progress-fill {
+  transition: stroke-dashoffset 0.3s ease-in-out;
+  
+  &.animated {
+    animation: circular-progress-pulse 2s ease-in-out infinite;
+  }
+}
+
+.circular-progress-text {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  line-height: 1;
+  text-align: center;
+  user-select: none;
+  pointer-events: none;
+}
+
+// Size variants
+.circular-progress-container {
+  &.small {
+    .circular-progress-text {
+      font-size: 10px;
+    }
+  }
+  
+  &.medium {
+    .circular-progress-text {
+      font-size: 12px;
+    }
+  }
+  
+  &.large {
+    .circular-progress-text {
+      font-size: 16px;
+    }
+  }
+}
+
+// Animation for progress fill
+@keyframes circular-progress-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+// Smooth progress animation
+.circular-progress-fill {
+  transition: stroke-dashoffset 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+// Hover effects
+.circular-progress-container:hover {
+  .circular-progress-fill {
+    filter: brightness(1.1);
+  }
+}
+
+// Loading state
+.circular-progress-container.loading {
+  .circular-progress-fill {
+    animation: circular-progress-rotate 1s linear infinite;
+  }
+}
+
+@keyframes circular-progress-rotate {
+  from {
+    transform: rotate(-90deg);
+  }
+  to {
+    transform: rotate(270deg);
+  }
+}
+
+// Color variants
+.circular-progress-container {
+  &.success {
+    .circular-progress-fill {
+      stroke: #28a745;
+    }
+  }
+  
+  &.info {
+    .circular-progress-fill {
+      stroke: #17a2b8;
+    }
+  }
+  
+  &.warning {
+    .circular-progress-fill {
+      stroke: #ffc107;
+    }
+  }
+  
+  &.danger {
+    .circular-progress-fill {
+      stroke: #dc3545;
+    }
+  }
+  
+  &.primary {
+    .circular-progress-fill {
+      stroke: #007bff;
+    }
+  }
+}
+
+// Inline variant for buttons
+.circular-progress-inline {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 8px;
+}
+
+// Compact variant for small spaces
+.circular-progress-compact {
+  .circular-progress-text {
+    font-size: 10px;
+    font-weight: 500;
+  }
+}

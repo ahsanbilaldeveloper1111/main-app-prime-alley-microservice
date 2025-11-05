@@ -96,6 +96,7 @@ export interface InvoiceItemData {
   created_at: string;
   updated_at: string;
   tax_rate: string;
+  tax_amount?: string;
   product: ProductData;
 }
 
@@ -116,12 +117,11 @@ export interface InvoiceData {
   invoice_number: string;
   invoice_date: string;
   due_date: string;
-  status: "draft" | "sent" | "paid" | "overdue" | "cancelled";
   subtotal: string;
   tax_amount: string;
   total_amount: string;
   currency_code: string;
-  exchange_rate: string;
+  vat_rate: number;
   notes: string | null;
   terms_conditions: string | null;
   is_recurring: boolean;
@@ -133,6 +133,7 @@ export interface InvoiceData {
   created_at: string;
   updated_at: string;
   payment_mode: string;
+  status: string;
   company: CompanyData;
   reseller: ResellerData | null;
   items: InvoiceItemData[];
@@ -145,13 +146,14 @@ export interface InvoiceCreateUpdatePayload {
   due_date: string;
   payment_mode: string;
   currency_code: string;
-  exchange_rate: string;
   tax_amount: number;
+  vat_rate?: number;
   notes: string;
   terms_conditions: string;
   items: InvoiceItemCreateUpdatePayload[];
   subtotal: number;
   total_amount: number;
+  status: string;
 }
 
 export interface InvoiceItemCreateUpdatePayload {
@@ -159,6 +161,34 @@ export interface InvoiceItemCreateUpdatePayload {
   quantity: string;
   unit_price: string;
   tax_rate: string;
+  vat_rate?: string; // For API compatibility - maps to tax_rate
+  tax_amount?: string;
+}
+
+// API-specific interface for invoice items (uses vat_rate instead of tax_rate)
+export interface InvoiceItemAPIPayload {
+  product_id: string;
+  quantity: string;
+  unit_price: string;
+  vat_rate: string;
+  tax_amount?: string;
+}
+
+// API-specific interface for invoice creation/update (uses vat_rate for items)
+export interface InvoiceCreateUpdateAPIPayload {
+  company_id: string;
+  invoice_date: string;
+  due_date: string;
+  payment_mode: string;
+  currency_code: string;
+  tax_amount: number;
+  vat_rate?: number;
+  notes: string;
+  terms_conditions: string;
+  items: InvoiceItemAPIPayload[];
+  subtotal: number;
+  total_amount: number;
+  status: string;
 }
 
 export interface ExpenseData {
@@ -168,19 +198,19 @@ export interface ExpenseData {
   category_id: string;
   expense_number: string | null;
   expense_date: string;
+  payment_date: string | null;
   description: string;
   amount: string;
   currency_code: string;
-  exchange_rate: string;
   tax_amount: string;
   tax_type: "amount" | "percentage";
   total_amount: string;
   payment_method: string | null;
-  payment_status: "pending" | "paid" | "failed" | "cancelled";
   receipt_path: string | null;
   notes: string | null;
   is_billable: string;
   service_id: number | null;
+  accounting_basis: "cash" | "accrual";
   created_at: string;
   updated_at: string;
   files: {
@@ -202,7 +232,6 @@ export interface ExpenseCategoryData {
   name: string;
   description: string;
   color: string;
-  is_active: boolean;
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
@@ -212,43 +241,48 @@ export interface ExpenseCategoryData {
 
 export interface ExpenseCreateUpdatePayload {
   category_id: string;
+  vendor_id?: string;
   expense_date: string;
+  payment_date?: string;
   description: string;
   amount: string;
   tax_amount: string;
   tax_type: "amount" | "percentage";
   total_amount: string;
   currency: string;
+  accounting_basis: "cash" | "accrual";
 }
 
 export interface ExpenseCategoryCreateUpdatePayload {
   name: string;
   description: string;
   color: string;
-  is_active: boolean;
 }
 
 export interface ProductData {
   id: number;
   name: string;
   description?: string;
-  currency_code: string;
-  is_active: boolean;
-  created_at: string;
+  currency_code?: string;
+  currency?: string;
+  created_at?: string;
   category_id: string;
   is_service: boolean;
   base_price: string;
-  updated_at: string;
-  deleted_at: string | null;
-  invoice_items: any[];
+  effective_price: string;
+  vat_rate: string;
+  pricing_type: string;
+  updated_at?: string;
+  deleted_at?: string | null;
+  invoice_items?: any[];
   category?: ProductCategoryData;
+  company_pricing?: any | null;
 }
 
 export interface ProductCategoryData {
   id: number;
   name: string;
   description: string | null;
-  is_active: boolean;
   parent_id: number | null;
   created_at: string;
   updated_at: string;
@@ -260,7 +294,6 @@ export interface ProductCategoryData {
 export interface ProductCategoryCreateUpdatePayload {
   name: string;
   description: string;
-  is_active: boolean;
 }
 
 export interface ProductCreateUpdatePayload {
@@ -268,8 +301,8 @@ export interface ProductCreateUpdatePayload {
   description?: string;
   category_id: string;
   base_price: string;
-  is_active: boolean;
   is_service: boolean;
+  currency: string;
 }
 
 export interface InventoryData {
@@ -278,6 +311,7 @@ export interface InventoryData {
   name: string;
   description?: string;
   base_price: string;
+  currency: string;
   category_id: string;
   created_at: string;
   updated_at: string;
@@ -288,7 +322,6 @@ export interface InventoryData {
   minimum_stock: number;
   maximum_stock: number;
   reorder_point: number | null;
-  status: "in_stock" | "low_stock" | "out_of_stock";
   notes: string | null;
   last_updated: string;
   category?: ProductCategoryData;
@@ -300,6 +333,7 @@ export interface InventoryCreateUpdatePayload {
   name: string;
   description?: string;
   base_price: string;
+  currency: string;
   category_id: string;
   location_id?: number | null;
   supplier_id?: number | null;
@@ -307,7 +341,6 @@ export interface InventoryCreateUpdatePayload {
   minimum_stock: number;
   maximum_stock: number;
   reorder_point?: number | null;
-  status: "in_stock" | "low_stock" | "out_of_stock";
   notes?: string | null;
 }
 
@@ -333,6 +366,9 @@ export interface InventoryLocationCreateUpdatePayload {
   state?: string;
   zip_code?: string;
   country?: string;
+  contact_person?: string;
+  email?: string;
+  phone?: string;
 }
 
 export interface InventoryItemData {
@@ -361,7 +397,6 @@ export interface InventorySupplierData {
   zip_code?: string | null;
   country?: string | null;
   payment_terms?: string | null;
-  is_active?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -371,7 +406,6 @@ export interface InventorySupplierCreateUpdatePayload {
   email?: string;
   phone?: string;
   address?: string;
-  is_active: boolean;
 }
 
 export interface PaymentMethodData {
@@ -414,7 +448,6 @@ export interface DiscountApplicabilityData {
     company_id: string;
     product_id: string;
     selling_price: string;
-    is_active: boolean;
     created_at: string;
     updated_at: string;
     discount_applicability_id: string;
@@ -423,7 +456,6 @@ export interface DiscountApplicabilityData {
       name: string;
       description: string;
       currency_code: string;
-      is_active: boolean;
       created_at: string;
       category_id: string;
       is_service: boolean;
@@ -457,6 +489,7 @@ export interface DiscountApplicabilityCreateUpdatePayload {
   valid_from: string;
   valid_until: string;
   pricing_ids: number[];
+  company_id?: number;
 }
 
 export interface ProductPricingData {
@@ -464,7 +497,6 @@ export interface ProductPricingData {
   company_id: string;
   product_id: string;
   selling_price: string;
-  is_active: boolean;
   created_at: string;
   updated_at: string;
   discount_applicability_id: number | null;
@@ -473,7 +505,6 @@ export interface ProductPricingData {
     name: string;
     description: string | null;
     currency_code: string;
-    is_active: boolean;
     created_at: string;
     category_id: string;
     is_service: boolean;
@@ -484,7 +515,6 @@ export interface ProductPricingData {
       id: number;
       name: string;
       description: string | null;
-      is_active: boolean;
       parent_id: number | null;
       created_at: string;
       updated_at: string;
@@ -496,7 +526,7 @@ export interface ProductPricingData {
 export interface ProductPricingCreateUpdatePayload {
   product_id: string;
   selling_price: string;
-  is_active: boolean;
+  company_id?: number;
 }
 
 export interface PaginationParams extends Record<string, any> {
@@ -600,7 +630,7 @@ export const deleteReseller = async (id: number): Promise<void> => {
 
 // Company Management
 export const getCompanies = async (
-  params: PaginationParams = {}
+  params: PaginationParams & { load_profile?: boolean } = {}
 ): Promise<PaginationWrapper<CompanyData>> => {
   try {
     const response = await axiosInstance.get("/accounting/company", { params });
@@ -694,20 +724,6 @@ export const generateTemplate = async (): Promise<Blob> => {
   }
 };
 
-export const downloadTemplate = async (): Promise<Blob> => {
-  try {
-    const response = await axiosInstance.get(
-      "/accounting/company/download-template",
-      {
-        responseType: "blob",
-      }
-    );
-    return response.data;
-  } catch (error: any) {
-    toast.error(error?.message || "Failed to download template");
-    throw error;
-  }
-};
 
 export const createUpdateProfile = async (data: any): Promise<any> => {
   try {
@@ -827,7 +843,7 @@ export const createDiscountApplicability = async (
   try {
     const response = await axiosInstance.post(
       `/accounting/company/${companyId}/discount-applicability`,
-      data
+      { ...data, company_id: companyId }
     );
     return extractData<DiscountApplicabilityData>(response.data);
   } catch (error: any) {
@@ -844,7 +860,7 @@ export const updateDiscountApplicability = async (
   try {
     const response = await axiosInstance.put(
       `/accounting/company/${companyId}/discount-applicability/${applicabilityId}`,
-      data
+      { ...data, company_id: companyId }
     );
     return extractData<DiscountApplicabilityData>(response.data);
   } catch (error: any) {
@@ -969,7 +985,7 @@ export const updateProductPricing = async (
   try {
     const response = await axiosInstance.post(
       `/accounting/company/${companyId}/product-pricing`,
-      data
+      { ...data, company_id: companyId }
     );
     return extractData<ProductPricingData>(response.data);
   } catch (error: any) {
@@ -985,7 +1001,7 @@ export const bulkUpdateProductPricing = async (
   try {
     const response = await axiosInstance.post(
       `/accounting/company/${companyId}/product-pricing/bulk-update`,
-      data
+      data.map(item => ({ ...item, company_id: companyId }))
     );
     return extractData<ProductPricingData[]>(response.data);
   } catch (error: any) {
@@ -1041,7 +1057,7 @@ export const getInvoices = async (
 };
 
 export const createInvoice = async (
-  data: InvoiceCreateUpdatePayload
+  data: InvoiceCreateUpdateAPIPayload
 ): Promise<InvoiceData> => {
   try {
     const response = await axiosInstance.post("/accounting/invoices", data);
@@ -1104,9 +1120,157 @@ export const generateInvoicePdf = async (id: number): Promise<Blob> => {
   }
 };
 
+export const downloadInvoicePdf = async (id: number): Promise<void> => {
+  try {
+    const response = await axiosInstance.get(`/accounting/invoices/${id}/download-pdf`,  {
+      responseType: "blob",
+      headers: {
+        Accept: "blob",
+      },
+    });
+    
+    // Check if response is valid
+    if (!response.data || response.data.size === 0) {
+      throw new Error('Empty PDF response received');
+    }
+    
+    // Extract filename from content-disposition header if available
+    let filename = `invoice-${id}.pdf`;
+    const contentDisposition = response.headers['content-disposition'];
+    if (contentDisposition) {
+      const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+      if (filenameMatch && filenameMatch[1]) {
+        filename = filenameMatch[1].replace(/['"]/g, '');
+      }
+    }
+    
+    // response.data is already a blob when responseType is "blob"
+    const blob = response.data;
+    
+    // Verify blob type
+    if (blob.type !== 'application/pdf') {
+      console.warn('Unexpected blob type:', blob.type, 'Expected: application/pdf');
+    }
+    
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.style.display = 'none';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+    
+    toast.success('PDF downloaded successfully');
+  } catch (error: any) {
+    console.error('PDF download error:', error);
+    toast.error(error?.message || "Failed to download invoice PDF");
+    throw error;
+  }
+};
+
+
+export const downloadExpensePdf = async (id: number): Promise<void> => {
+  try {
+    const response = await axiosInstance.get(`/accounting/expenses/${id}/download-pdf`,  {
+      responseType: "blob",
+      headers: {
+        Accept: "blob",
+      },
+    });
+    
+    // Check if response is valid
+    if (!response.data || response.data.size === 0) {
+      throw new Error('Empty PDF response received');
+    }
+    
+    // Extract filename from content-disposition header if available
+    let filename = `expense-${id}.pdf`;
+    const contentDisposition = response.headers['content-disposition'];
+    if (contentDisposition) {
+      const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+      if (filenameMatch && filenameMatch[1]) {
+        filename = filenameMatch[1].replace(/['"]/g, '');
+      }
+    }
+    
+    // response.data is already a blob when responseType is "blob"
+    const blob = response.data;
+    
+    // Verify blob type
+    if (blob.type !== 'application/pdf') {
+      console.warn('Unexpected blob type:', blob.type, 'Expected: application/pdf');
+    }
+    
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.style.display = 'none';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+    
+    toast.success('PDF downloaded successfully');
+  } catch (error: any) {
+    console.error('PDF download error:', error);
+    toast.error(error?.message || "Failed to download expense PDF");
+    throw error;
+  }
+};
+
+export const downloadTemplate = async (): Promise<void> => {
+  try {
+    const response = await axiosInstance.get(`/accounting/company/template/download`,  {
+      responseType: "blob",
+      headers: {
+        Accept: "blob",
+      },
+    });
+    
+    // Check if response is valid
+    if (!response.data || response.data.size === 0) {
+      throw new Error('Empty response received');
+    }
+    
+    // Extract filename from content-disposition header if available
+    let filename = `company-template.csv`;
+    const contentDisposition = response.headers['content-disposition'];
+    if (contentDisposition) {
+      const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+      if (filenameMatch && filenameMatch[1]) {
+        filename = filenameMatch[1].replace(/['"]/g, '');
+      }
+    }
+    
+    // response.data is already a blob when responseType is "blob"
+    const blob = response.data;
+    
+    // Verify blob type
+    
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.style.display = 'none';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+    
+    // toast.success('PDF downloaded successfully');
+  } catch (error: any) {
+    console.error('PDF download error:', error);
+    toast.error(error?.message || "Failed to download File");
+    throw error;
+  }
+};
+
 export const updateInvoice = async (
   id: number,
-  data: InvoiceCreateUpdatePayload
+  data: InvoiceCreateUpdateAPIPayload
 ): Promise<InvoiceData> => {
   try {
     const response = await axiosInstance.put(
@@ -1174,6 +1338,31 @@ export const createExpense = async (
     return extractData<ExpenseData>(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to create expense");
+    throw error;
+  }
+};
+
+export const uploadCompanyFile = async (
+  data:FormData
+): Promise<ExpenseData> => {
+  try {
+    const response = await axiosInstance.post("/accounting/company/file/upload", data, {
+      headers:
+        data instanceof FormData
+          ? { "Content-Type": "multipart/form-data" }
+          : {},
+    });
+    
+    // Handle the actual API response structure
+    if (response.data?.code === 200 && response.data?.data?.success === false) {
+      // Show error toast for failed upload
+      // toast.error(response.data.data.message || "File upload failed");
+      throw new Error(response.data.data.message || "File upload failed");
+    }
+    
+    return extractData<any>(response.data);
+  } catch (error: any) {
+    toast.error(error?.message || "Failed to upload company file");
     throw error;
   }
 };
@@ -1382,7 +1571,7 @@ export const getProducts = async (
 ): Promise<PaginationWrapper<ProductData>> => {
   try {
     const response = await axiosInstance.get("/accounting/products", {
-      params,
+      params: { ...params },
     });
 
     // Handle the actual API response structure
@@ -1431,14 +1620,15 @@ export const getActiveProducts = async (): Promise<ProductData[]> => {
 };
 
 export const getProductsWithCompanyPricing = async (
+  companyId?: number,
   params: PaginationParams = {}
-): Promise<PaginationWrapper<ProductData>> => {
+): Promise<ProductData[]> => {
   try {
     const response = await axiosInstance.get(
       "/accounting/products/with-company-pricing",
-      { params }
+      { params: { ...params, company_id: companyId } }
     );
-    return extractData<PaginationWrapper<ProductData>>(response.data);
+    return extractData<PaginationWrapper<ProductData>>(response.data) as any;
   } catch (error: any) {
     toast.error(
       error?.message || "Failed to fetch products with company pricing"
@@ -1600,6 +1790,7 @@ export const getProductWithPricing = async (
     throw error;
   }
 };
+
 
 // Product Categories (separate from products)
 export const getProductCategories = async (
@@ -2555,6 +2746,15 @@ export const createDirectPayment = async (data: CreateDirectPaymentData): Promis
   } catch (error: any) {
     console.log(error, "error.createDirectPayment");
     toast.error(error?.message || "Failed to create direct payment");
+    throw error;
+  }
+};
+
+export const deleteExpenseFile = async (id: number, fileIndex: number): Promise<void> => {
+  try {
+    await axiosInstance.delete(`/accounting/expenses/${id}/files/${fileIndex}/delete`);
+  } catch (error: any) {
+    toast.error(error?.message || "Failed to delete expense file");
     throw error;
   }
 };

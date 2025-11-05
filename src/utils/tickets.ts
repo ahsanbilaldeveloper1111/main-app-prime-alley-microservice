@@ -122,9 +122,11 @@ export const UpdateTicketDetails = async (
   module_id: string,
   submodule_id: string,
   submodule_child_id?: string,
-  user_extension?: string,
+  user_extension?: string | string[],
   priority?: string,
-  due_date?: string
+  due_date?: string,
+  images?: (string | File)[],
+  tags?: string[]
 ) => {
   try {
 
@@ -140,13 +142,38 @@ export const UpdateTicketDetails = async (
       formData.append('submodule_child_id', submodule_child_id);
     }
     if (user_extension) {
-      formData.append('user_extension', user_extension);
+      // Handle both array and single value for backward compatibility
+      if (Array.isArray(user_extension)) {
+        user_extension.forEach((ext) => {
+          formData.append('user_extension[]', ext);
+        });
+      } else {
+        formData.append('user_extension[]', user_extension);
+      }
     }
     if (priority !== undefined) {
       formData.append('priority', priority);
     }
     if (due_date !== undefined) {
       formData.append('due_date', due_date);
+    }
+    if (tags && tags.length > 0) {
+      tags.forEach((tag) => {
+        formData.append('tags[]', tag);
+      });
+    }
+    
+    // Append images if provided - handle both strings (existing) and Files (new)
+    if (images && images.length > 0) {
+      images.forEach((image) => {
+        if (image instanceof File) {
+          // New file - append as File
+          formData.append('image[]', image);
+        } else {
+          // Existing image string - append as string
+          formData.append('image[]', image);
+        }
+      });
     }
 
     const response = await axiosInstance.post(
@@ -292,12 +319,17 @@ export const GetTicketsByStatus = async (statusId: string) => {
   }
 };
 
-export const AddComment = async (ticketId: string, content: string, userExtension: string) => {
+export const AddComment = async (ticketId: string, content: string, userExtension: string, attachment?: File) => {
   try {
-    const response = await axiosInstance.post(`/tickets/${ticketId}/comments`, {
-      content,
-      user_extension: userExtension
-    });
+    const formData = new FormData();
+    formData.append('content', content);
+    formData.append('user_extension', userExtension);
+    
+    if (attachment) {
+      formData.append('attachment', attachment);
+    }
+
+    const response = await axiosInstance.post(`/tickets/${ticketId}/comments`, formData);
     if(response.data){
       const responseData = response.data;
       if(responseData.code == 200){
@@ -317,12 +349,17 @@ export const AddComment = async (ticketId: string, content: string, userExtensio
   }
 };
 
-export const AddAssigneeComment = async (ticketId: string, content: string, userExtension: string) => {
+export const AddAssigneeComment = async (ticketId: string, content: string, userExtension: string, attachment?: File) => {
   try {
-    const response = await axiosInstance.post(`/tickets/${ticketId}/assignee-comments`, {
-      content,
-      user_extension: userExtension
-    });
+    const formData = new FormData();
+    formData.append('content', content);
+    formData.append('user_extension', userExtension);
+    
+    if (attachment) {
+      formData.append('attachment', attachment);
+    }
+
+    const response = await axiosInstance.post(`/tickets/${ticketId}/assignee-comments`, formData);
     if(response.data){
       const responseData = response.data;
       if(responseData.code == 200){

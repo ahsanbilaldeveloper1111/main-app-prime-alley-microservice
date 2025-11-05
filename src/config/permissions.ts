@@ -15,6 +15,13 @@ export const routePermissions: RoutePermission[] = [
     {path: '/profile',permissions: ['']},
     {path: '/coming-soon',permissions: ['']},
     {path: '/plan-upgrade',permissions: ['']},
+    {path: '/live-calls-test',permissions: ['']},
+    {path: '/resources',permissions: ['']},
+   
+    {path: '/resources/faq',permissions: ['']},
+    {path: '/resources/help-materials',permissions: ['']},
+    {path: '/resources/contact-support',permissions: ['']},
+
 
     {path: '/reports',permissions: [PERMISSIONS.REPORTS_SERVICES]},
     {path: '/billing',permissions: [PERMISSIONS.REPORTS_SERVICES]},
@@ -177,7 +184,7 @@ export const routePermissions: RoutePermission[] = [
             },
             {
                 path: '/modules/submodules',
-                permissions: ['ticket-modules-tickets']
+                permissions: ['edit-ticket-module-tickets']
             },
             {
                 path: '/types',
@@ -202,7 +209,7 @@ export const routePermissions: RoutePermission[] = [
                 ]
             },
             {
-                path: '/analyse-recordings',
+                path: '/analyze-recordings',
                 permissions: ['transcriptions-analysis-aiml'],
                 children: [
                     {
@@ -228,32 +235,32 @@ export const routePermissions: RoutePermission[] = [
         permissions: [PERMISSIONS.CRM_SERVICES],
         children: [
             { 
-                path: '/dashboard',permissions: [PERMISSIONS.CRM_SERVICES]
+                path: '/dashboard',permissions: [PERMISSIONS.VIEW_CRM_DASHBOARD]
             },
             { 
-                path: '/campaigns',permissions: [PERMISSIONS.CRM_SERVICES],
+                path: '/campaigns',permissions: [PERMISSIONS.VIEW_CRM_CAMPAIGNS],
                 children: [
-                    { path: '/',permissions: [PERMISSIONS.CRM_SERVICES]}
+                    { path: '/',permissions: [PERMISSIONS.VIEW_CRM_CAMPAIGNS]}
                 ]
             },
             { 
-                path: '/data',permissions: [PERMISSIONS.CRM_SERVICES],
+                path: '/data',permissions: [PERMISSIONS.VIEW_CRM_DATA_MANAGEMENT],
                 children: [
-                    { path: '/',permissions: [PERMISSIONS.CRM_SERVICES]},
-                    { path: '/create',permissions: [PERMISSIONS.CRM_SERVICES]},
+                    { path: '/',permissions: [PERMISSIONS.VIEW_CRM_DATA_MANAGEMENT]},
+                    { path: '/create',permissions: [PERMISSIONS.CREATE_CRM_DATA_MANAGEMENT]},
                 ]
             },
             { 
-                path: '/leads',permissions: [PERMISSIONS.CRM_SERVICES],
+                path: '/leads',permissions: [PERMISSIONS.VIEW_CRM_LEADS],
                 children: [
-                    { path: '/',permissions: [PERMISSIONS.CRM_SERVICES]},
-                    { path: '/create',permissions: [PERMISSIONS.CRM_SERVICES]},
+                    { path: '/',permissions: [PERMISSIONS.VIEW_CRM_LEADS]},
+                    { path: '/create',permissions: [PERMISSIONS.CREATE_CRM_LEADS]},
                 ]
             },
-            { path: '/lost-reasons',permissions: [PERMISSIONS.CRM_SERVICES]},
-            { path: '/opportunities',permissions: [PERMISSIONS.CRM_SERVICES]},
-            { path: '/opportunities/create',permissions: [PERMISSIONS.CRM_SERVICES]},
-            { path: '/stages',permissions: [PERMISSIONS.CRM_SERVICES]},
+            { path: '/lost-reasons',permissions: [PERMISSIONS.VIEW_CRM_LOST_REASONS]},
+            { path: '/opportunities',permissions: [PERMISSIONS.VIEW_CRM_OPPORTUNITIES]},
+            { path: '/opportunities/create',permissions: [PERMISSIONS.CREATE_CRM_OPPORTUNITIES]},
+            { path: '/stages',permissions: [PERMISSIONS.VIEW_CRM_STAGES]},
         ]
     },
     
@@ -276,38 +283,38 @@ export const routePermissions: RoutePermission[] = [
         children: [
             {
                 path: '/companies',
-                permissions: [PERMISSIONS.ACCOUNTS_SERVICES],
+                permissions: [PERMISSIONS.VIEW_COMPANIES_BILLING],
                 children: [
-                    { path: '/product-pricing',permissions: [PERMISSIONS.ACCOUNTS_SERVICES]}
+                    { path: '/product-pricing',permissions: [PERMISSIONS.VIEW_PRODUCT_PRICING_COMPANIES_BILLING]}
                 ]
             },
             {
                 path: '/expenses',
-                permissions: [PERMISSIONS.ACCOUNTS_SERVICES]
+                permissions: [PERMISSIONS.VIEW_EXPENSES_BILLING]
             },
             {
                 path: '/invoices',
-                permissions: [PERMISSIONS.ACCOUNTS_SERVICES]
+                permissions: [PERMISSIONS.VIEW_INVOICES_BILLING]
             },
             {
                 path: '/inventory',
-                permissions: [PERMISSIONS.ACCOUNTS_SERVICES]
+                permissions: [PERMISSIONS.VIEW_INVENTORY_BILLING]
             },
             {
                 path: '/locations',
-                permissions: [PERMISSIONS.ACCOUNTS_SERVICES]
+                permissions: [PERMISSIONS.VIEW_LOCATIONS_BILLING]
             },
             {
                 path: '/products',
-                permissions: [PERMISSIONS.ACCOUNTS_SERVICES]
+                permissions: [PERMISSIONS.VIEW_PRODUCTS_BILLING]
             },
             {
                 path: '/resellers',
-                permissions: [PERMISSIONS.ACCOUNTS_SERVICES]
+                permissions: [PERMISSIONS.VIEW_RESSELLERS_BILLING]
             },
             {
                 path: '/suppliers',
-                permissions: [PERMISSIONS.ACCOUNTS_SERVICES]
+                permissions: [PERMISSIONS.VIEW_SUPPLIERS_BILLING]
             }
         ]
     },
@@ -319,33 +326,33 @@ export const routePermissions: RoutePermission[] = [
         children: [
             {
                 path: '/dashboard',
-                permissions: ['dashboard-gsm-management']
+                permissions: [PERMISSIONS.VIEW_GSM_DASHBOARD]
             },
             {
                 path: '/list',
-                permissions: ['view-gsm-management']
+                permissions: [PERMISSIONS.VIEW_GSM_MANAGEMENT]
             },
             {
                 path: '/assign',
-                permissions: ['view-gsm-assignment']
+                permissions: [PERMISSIONS.VIEW_GSM_ASSIGNMENT]
             },
             {
                 path: '/ports',
-                permissions: ['view-gsm-ports']
+                permissions: [PERMISSIONS.VIEW_GSM_PORTS]
             },
             {
                 path: '/inbox',
-                permissions: ['view-gsm-inbox']
+                permissions: [PERMISSIONS.VIEW_GSM_INBOX]
             },
             {
                 path: '/sync',
-                permissions: ['view-gsm-port-sync']
+                permissions: [PERMISSIONS.VIEW_GSM_SYNC]
             },
             {
                 path: '/company',
-                permissions: ['view-gsm-company-profilling'],
+                permissions: [PERMISSIONS.VIEW_GSM_COMPANY_PROFILLING],
                 children: [
-                    { path: '/po',permissions: ['view-gsm-company-profilling']}
+                    { path: '/po',permissions: [PERMISSIONS.VIEW_GSM_COMPANY_PROFILLING]}
                 ]
             }
         ]
@@ -369,6 +376,7 @@ export const routePermissions: RoutePermission[] = [
             { path: '/audit-logs',permissions: [PERMISSIONS.TMS_SERVICES]},
             { path: '/dashboard',permissions: [PERMISSIONS.TMS_SERVICES]},
             { path: '/settings',permissions: [PERMISSIONS.TMS_SERVICES]},
+            { path: '/profile',permissions: [PERMISSIONS.TMS_SERVICES]},
             { path: '/unified-ops',permissions: [PERMISSIONS.TMS_SERVICES]},
             { path: '/verification',permissions: [PERMISSIONS.TMS_SERVICES]},
             { 
@@ -452,7 +460,7 @@ export const routePermissions: RoutePermission[] = [
         permissions: [PERMISSIONS.CTI_SERVICES],
         children: [
             { path: '/',permissions: ['view-cti']},
-            { path: '/dialer',permissions: ['dial-call-cti']},
+            { path: '/dialer',permissions: ['dial-call-cti', 'merge-call-cti', 'transfer-call-cti']},
 
         ]
     }

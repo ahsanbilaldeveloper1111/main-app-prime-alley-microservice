@@ -2,6 +2,7 @@ import "@assets/scss/datatable-style.scss";
 import React, { ReactElement, useState, useCallback, useEffect } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
+import { ModuleSlug } from "@utils/Helper";
 import {
   getLead,
   updateLead,
@@ -47,7 +48,7 @@ import {
 import Link from "next/link";
 import { toast } from "react-toastify";
 import { useRouter } from "next/router";
-import moment from "moment";
+import moment from 'moment-timezone';
 import Select from "react-select";
 
 import "@assets/scss/custom-datatable.scss";
@@ -59,6 +60,7 @@ import ConfirmModal from "@pages/partial/ConfirmModal";
 import SuccessfulModal from "@pages/partial/SuccessfulModal";
 import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
 import DatatableActionButton from "@components/DatatableActionButton";
+import { useSession } from "next-auth/react";
 
 
 interface Meeting {
@@ -87,6 +89,7 @@ interface AuditLogEntry {
 }
 
 const EditLead = () => {
+  const { data: session } = useSession();
   const router = useRouter();
   const { id } = router.query;
   const [lead, setLead] = useState<any>(null);
@@ -105,6 +108,8 @@ const EditLead = () => {
   });
   const [isOpportunity, setIsOpportunity] = useState(false);
   const [extensions, setExtensions] = useState<any[]>([]);
+  const [extensionsLeads, setExtensionsLeads] = useState<any[]>([]);
+
   const [campaigns, setCampaigns] = useState<CampaignData[]>([]);
   const [crmData, setCrmData] = useState<CrmDataItem[]>([]);
   const [selectedCampaign, setSelectedCampaign] = useState<CampaignData | null>(
@@ -126,6 +131,13 @@ const EditLead = () => {
       fetchCampaigns();
       fetchCrmData();
   }, []);
+
+  // Refetch stages when lead data changes (to get correct type)
+  useEffect(() => {
+    if (lead?.type) {
+      fetchStages();
+    }
+  }, [lead?.type]);
 
   // Set selected campaign when lead data is available
   useEffect(() => {
@@ -180,7 +192,7 @@ const EditLead = () => {
 
   const fetchStages = async () => {
     try {
-      const stagesData = await getStages();
+      const stagesData = await getStages(lead?.type);
       setStages(stagesData || []);
     } catch (error) {
       console.error("Failed to fetch stages:", error);
@@ -198,10 +210,18 @@ const EditLead = () => {
 
   const fetchExtensions = async () => {
     try {
-      const hierarchyData = await GetHierarchyData();
+      const hierarchyData = await GetHierarchyData(ModuleSlug.CRM_OPPORTUNITIES);
       if (hierarchyData?.extensions) {
         setExtensions(hierarchyData.extensions);
       }
+
+      const hierarchyDataLeads = await GetHierarchyData(ModuleSlug.CRM_LEADS);
+      if (hierarchyDataLeads?.extensions) {
+        setExtensionsLeads(hierarchyDataLeads.extensions);
+      }
+
+
+
     } catch (error) {
       console.error("Failed to fetch extensions:", error);
     }
@@ -244,7 +264,11 @@ const EditLead = () => {
         campaign_field_values: lead.campaign_field_values || {},
       });
       toast.success("Lead updated successfully!");
-      router.push("/crm/leads");
+      if(lead?.type === "opportunity") {
+        router.push("/crm/opportunities");
+      } else {
+        router.push("/crm/leads");
+      }
     } catch (error) {
       toast.error("Failed to update lead");
       console.error("Update lead error:", error);
@@ -594,10 +618,16 @@ const handleCloseSuccessfulModal = () => {
       <PageHeader
         title={`Edit ${isOpportunity ? "Opportunity" : "Lead"}`}
         buttons={
+          <>
+          {session?.user?.permissions?.includes('view-crm-leads') || session?.user?.permissions?.includes('view-crm-opportunities') ? (
           <Link href={isOpportunity ? "/crm/opportunities" : "/crm/leads"} className="btn btn-primary me-2">
             <FiArrowLeft className="me-2" />
             Back to {isOpportunity ? "Opportunities" : "Leads"}
           </Link>
+          ) : (
+            <></>
+          )}
+          </>
         }
       />
 
@@ -609,12 +639,12 @@ const handleCloseSuccessfulModal = () => {
           <Col md={6}>
             <Card className="border-0 shadow-sm mb-4">
               <Card.Header>
-                <h5 className="mb-0 app-title-heading">Lead Information</h5>
+                <h5 className="mb-0 app-title-heading">{isOpportunity ? "Opportunity" : "Lead"} Information</h5>
               </Card.Header>
               <Card.Body>
                 <Form onSubmit={handleSubmit}>
                   <Form.Group className="mb-3">
-                    <Form.Label>Lead Name *</Form.Label>
+                    <Form.Label>{isOpportunity ? "Opportunity" : "Lead"} Name *</Form.Label>
                     <Form.Control
                       type="text"
                       value={lead.name}
@@ -627,36 +657,69 @@ const handleCloseSuccessfulModal = () => {
 
                   <Form.Group className="mb-3">
                     <Form.Label>User Extension</Form.Label>
-                    <Select
-                      value={
-                        lead.user_extension
-                          ? {
-                              value: lead.user_extension,
-                              label:
-                                extensions?.find(
-                                  (ext: any) =>
-                                    ext.id.toString() ==
-                                    lead.user_extension?.toString()
-                                )?.display_name || "",
-                            }
-                          : null
-                      }
-                      onChange={(selectedOption: any) => {
-                        setLead({
-                          ...lead,
-                          user_extension: selectedOption?.value || null,
-                        });
-                      }}
-                      options={
-                        extensions?.map((extension: any) => ({
-                          value: extension.id,
-                          label: extension.display_name,
-                        })) || []
-                      }
-                      placeholder="Select User Extension (Optional)"
-                      isClearable
-                      isSearchable
-                    />
+                    {lead.type === "lead" ? (
+                      <Select
+                        value={
+                          lead.user_extension
+                            ? {
+                                value: lead.user_extension,
+                                label:
+                                  extensionsLeads?.find(
+                                    (ext: any) =>
+                                      ext.id.toString() ==
+                                      lead.user_extension?.toString()
+                                  )?.display_name || "",
+                              }
+                            : null
+                        }
+                        onChange={(selectedOption: any) => {
+                          setLead({
+                            ...lead,
+                            user_extension: selectedOption?.value || null,
+                          });
+                        }}
+                        options={
+                          extensionsLeads?.map((extension: any) => ({
+                            value: extension.id,
+                            label: extension.display_name,
+                          })) || []
+                        }
+                        placeholder="Select User Extension (Optional)"
+                        isClearable
+                        isSearchable
+                      />
+                    ) : (
+                      <Select
+                        value={
+                          lead.user_extension
+                            ? {
+                                value: lead.user_extension,
+                                label:
+                                  extensions?.find(
+                                    (ext: any) =>
+                                      ext.id.toString() ==
+                                      lead.user_extension?.toString()
+                                  )?.display_name || "",
+                              }
+                            : null
+                        }
+                        onChange={(selectedOption: any) => {
+                          setLead({
+                            ...lead,
+                            user_extension: selectedOption?.value || null,
+                          });
+                        }}
+                        options={
+                          extensions?.map((extension: any) => ({
+                            value: extension.id,
+                            label: extension.display_name,
+                          })) || []
+                        }
+                        placeholder="Select User Extension (Optional)"
+                        isClearable
+                        isSearchable
+                      />
+                    )}
                   </Form.Group>
 
                   <Form.Group className="mb-3">
@@ -666,6 +729,7 @@ const handleCloseSuccessfulModal = () => {
                       onChange={(e) =>
                         setLead({ ...lead, type: e.target.value })
                       }
+                      
                       required
                     >
                       <option value="lead">Lead</option>
@@ -823,7 +887,7 @@ const handleCloseSuccessfulModal = () => {
                           <small>
                             Fill in the custom fields for the selected campaign.
                             These fields will be stored with the
-                            lead/opportunity.
+                            {isOpportunity ? "opportunity" : "lead"}.
                           </small>
                         </Alert>
                         <Row>
@@ -852,7 +916,7 @@ const handleCloseSuccessfulModal = () => {
                     ) : (
                       <>
                         <FiSave className="me-2" />
-                        Update Lead
+                        Update {isOpportunity ? "Opportunity" : "Lead"}
                       </>
                     )}
                   </Button>
@@ -866,6 +930,8 @@ const handleCloseSuccessfulModal = () => {
             <Card className="border-0 shadow-sm">
               <Card.Header className="d-flex justify-content-between align-items-center p-3">
                 <h5 className="mb-0 app-title-heading">Meetings</h5>
+
+                {session?.user?.permissions?.includes('add-meeting-crm-opportunities')  ? (
                 <Button
                   variant="primary"
                   size="sm"
@@ -875,9 +941,14 @@ const handleCloseSuccessfulModal = () => {
                   <FiPlus className="me-2" />
                   New Meeting
                 </Button>
+                ) : (
+                  <></>
+                )}
+
+
               </Card.Header>
               <Card.Body>
-                {meetings.length == 0 ? (
+                {meetings.length == 0  && session?.user?.permissions?.includes('meeting-crm-opportunities') ? (
                   <p className="text-muted text-center">
                     No meetings scheduled
                   </p>
@@ -937,7 +1008,9 @@ const handleCloseSuccessfulModal = () => {
                             <td>
                               <DatatableActionButton
                                 actions={[
-                                  {
+                                 
+                                 
+                                  ...(session?.user?.permissions?.includes('edit-meeting-crm-opportunities') ? [{
                                     label: 'Edit',
                                     icon: <FiEdit className="me-2" />,
                                     onClick: () => {
@@ -953,8 +1026,12 @@ const handleCloseSuccessfulModal = () => {
                                       });
                                       setShowMeetingModal(true);
                                     },
-                                  },
-                                  {
+                                  }] : []),
+
+
+
+
+                                  ...(session?.user?.permissions?.includes('delete-meeting-crm-opportunities') ? [{
                                     label: 'Delete',
                                     icon: <FiTrash2 className="me-2" />,
                                     onClick: () => {
@@ -962,7 +1039,7 @@ const handleCloseSuccessfulModal = () => {
                                       setShowDeleteMeetingModal(true);
                                     },
                                     className: 'text-danger',
-                                  },
+                                  }] : []),
                                 ]}
                               />
                             </td>
@@ -991,10 +1068,10 @@ const handleCloseSuccessfulModal = () => {
                     <Card.Body>
                       <div className="">
                         <Alert variant="success" className="mb-3">
-                          <small>
-                            This lead/opportunity will be attributed to the
-                            selected CRM data record.
-                          </small>
+                        <small>
+                          This {isOpportunity ? "opportunity" : "lead"} will be attributed to the
+                          selected CRM data record.
+                        </small>
                         </Alert>
                       </div>
                       <Row>
@@ -1042,7 +1119,7 @@ const handleCloseSuccessfulModal = () => {
                           <div className="d-flex justify-content-between align-items-start mb-2">
                             <h6 className="mb-1">{entry.description}</h6>
                             <small className="text-muted">
-                              {entry.created_at_human}
+                              {moment.utc(entry.created_at).local().format("YYYY-MM-DD hh:mm:ss A")} - {entry.created_at_human}
                             </small>
                           </div>
                           <div className="text-muted small mb-2">
@@ -1086,41 +1163,7 @@ const handleCloseSuccessfulModal = () => {
         )}
       </div>
 
-      {/* Meeting Modal */}
-      {/* <Modal
-        show={showMeetingModal}
-        onHide={() => setShowMeetingModal(false)}
-        size="lg"
-      >
-        <Modal.Header closeButton>
-          <Modal.Title>
-            {editingMeeting ? "Edit Meeting" : "Create New Meeting"}
-          </Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          
-        </Modal.Body>
-        <Modal.Footer>
-          <Button
-            variant="secondary"
-            onClick={() => setShowMeetingModal(false)}
-          >
-            Cancel
-          </Button>
-          <Button
-            variant="primary"
-            onClick={handleMeetingSubmit}
-            disabled={loading}
-          >
-            {loading
-              ? "Saving..."
-              : editingMeeting
-              ? "Update Meeting"
-              : "Create Meeting"}
-          </Button>
-        </Modal.Footer>
-      </Modal> */}
-
+     
 
 
       <FormModal
@@ -1202,33 +1245,66 @@ const handleCloseSuccessfulModal = () => {
               <Form.Label>Extensions *</Form.Label>
               {meetingForm.extensions.map((extension, index) => (
                 <div key={index} className="d-flex gap-2 mb-2">
-                  <Select
-                    value={
-                      extension
-                        ? {
-                            value: extension,
-                            label:
-                              extensions?.find(
-                                (ext: any) =>
-                                  ext.id.toString() == extension.toString()
-                              )?.display_name || "",
-                          }
-                        : null
-                    }
-                    onChange={(selectedOption: any) =>
-                      updateExtension(index, selectedOption?.value || "")
-                    }
-                    options={
-                      extensions?.map((ext: any) => ({
-                        value: ext.id,
-                        label: ext.display_name,
-                      })) || []
-                    }
-                    placeholder="Select Extension"
-                    isClearable
-                    isSearchable
-                    required
-                  />
+                  
+                  {lead.type === "lead" ? (
+                    <Select
+                      value={
+                        extension
+                          ? {
+                              value: extension,
+                              label:
+                                extensionsLeads?.find(
+                                  (ext: any) =>
+                                    ext.id.toString() == extension.toString()
+                                )?.display_name || "",
+                            }
+                          : null
+                      }
+                      onChange={(selectedOption: any) =>
+                        updateExtension(index, selectedOption?.value || "")
+                      }
+                      options={
+                        extensionsLeads?.map((ext: any) => ({
+                          value: ext.id,
+                          label: ext.display_name,
+                        })) || []
+                      }
+                      placeholder="Select Extension"
+                      isClearable
+                      isSearchable
+                      required
+                    />
+                  ) : (
+                    <Select
+                      value={
+                        extension
+                          ? {
+                              value: extension,
+                              label:
+                                extensions?.find(
+                                  (ext: any) =>
+                                    ext.id.toString() == extension.toString()
+                                )?.display_name || "",
+                            }
+                          : null
+                      }
+                      onChange={(selectedOption: any) =>
+                        updateExtension(index, selectedOption?.value || "")
+                      }
+                      options={
+                        extensions?.map((ext: any) => ({
+                          value: ext.id,
+                          label: ext.display_name,
+                        })) || []
+                      }
+                      placeholder="Select Extension"
+                      isClearable
+                      isSearchable
+                      required
+                    />
+                  )}
+
+
                   {meetingForm.extensions.length > 1 && (
                     <Button
                       variant="outline-danger"

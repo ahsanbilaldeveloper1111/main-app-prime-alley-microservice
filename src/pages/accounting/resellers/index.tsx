@@ -118,10 +118,10 @@ const ResellerList = () => {
   // Form states
   const [formData, setFormData] = useState({
     name: "",
-    email: "",
-    phone: "",
     parent_id: null as number | null,
     organization_unit: "",
+    phone: "",
+    email: "",
   });
 
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -150,18 +150,18 @@ const ResellerList = () => {
         cell: (props: any) => <div className="">{props.name}</div>,
       },
       {
-        key: "email",
-        name: "Email",
-        selector: (row: any) => row.email,
-        sortable: true,
-        cell: (props: any) => <div className="">{props.email || '-'}</div>,
-      },
-      {
         key: "phone",
         name: "Phone",
         selector: (row: any) => row.phone,
         sortable: true,
-        cell: (props: any) => <div className="">{props.phone || '-'}</div>,
+        cell: (props: any) => <div className="">{props.phone || "-"}</div>,
+      },
+      {
+        key: "email",
+        name: "Email",
+        selector: (row: any) => row.email,
+        sortable: true,
+        cell: (props: any) => <div className="">{props.email || "-"}</div>,
       },
       {
         key: "created_at",
@@ -182,24 +182,33 @@ const ResellerList = () => {
         cell: (props: any) => (
           <DatatableActionButton
             actions={[
+
+              ...(session?.user?.permissions?.includes('edit-resellers-billing') ? [
               {
                 label: 'Edit',
                 icon: <FiEdit />,
                 onClick: () => handleEditReseller(props),
                 className: 'gap-2'
               },
+              ] : []),
+
+              ...(session?.user?.permissions?.includes('view-as-resellers-billing') ? [
               {
                 label: 'View As Reseller',
                 icon: <FiEye />,
                 onClick: () => handleViewAsReseller(props),
                 className: 'gap-2'
               },
+              ] : []),
+
+              ...(session?.user?.permissions?.includes('delete-resellers-billing') ? [
               {
                 label: 'Delete',
                 icon: <FiTrash2 />,
                 onClick: () => handleDeleteReseller(props),
                 className: 'text-danger gap-2'
               }
+              ] : []),
             ]}
           />
         ),
@@ -226,10 +235,10 @@ const ResellerList = () => {
   const resetFormData = useCallback(() => {
     setFormData({
       name: "",
-      email: "",
-      phone: "",
       parent_id: null,
       organization_unit: "",
+      phone: "",
+      email: "",
     });
   }, []);
 
@@ -243,14 +252,6 @@ const ResellerList = () => {
   const handleCreateReseller = useCallback(async () => {
     if (!formData.name.trim()) {
       toast.error("Please enter a reseller name");
-      return;
-    }
-    if (!formData.email.trim()) {
-      toast.error("Please enter an email address");
-      return;
-    }
-    if (!formData.phone.trim()) {
-      toast.error("Please enter a phone number");
       return;
     }
 
@@ -278,10 +279,10 @@ const ResellerList = () => {
     setSelectedReseller(reseller);
     setFormData({
       name: reseller.name,
-      email: reseller.email || "",
-      phone: reseller.phone || "",
       parent_id: reseller.parent_id,
       organization_unit: reseller.organization_unit || "",
+      phone: reseller.phone || "",
+      email: reseller.email || "",
     });
     setShowEditModal(true);
   }, []);
@@ -300,14 +301,6 @@ const ResellerList = () => {
 
     if (!formData.name.trim()) {
       toast.error("Please enter a reseller name");
-      return;
-    }
-    if (!formData.email.trim()) {
-      toast.error("Please enter an email address");
-      return;
-    }
-    if (!formData.phone.trim()) {
-      toast.error("Please enter a phone number");
       return;
     }
 
@@ -472,16 +465,20 @@ const ResellerList = () => {
 
       <PageHeader
         title="Resellers"
-        showSearch={true}
+        showSearch={session?.user?.permissions?.includes('list-resellers-billing')}
         searchPlaceholder="Search reseller..."
         searchValue={currentFilters.search || ""}
         onSearchChange={(value) =>
           handleFiltersChange({ ...currentFilters, search: value })
         }
         buttons={
-          <Button variant="primary" size="sm" onClick={openCreateModal}>
+          <>
+          {session?.user?.permissions?.includes('add-resellers-billing') && (
+            <Button variant="primary" size="sm" onClick={openCreateModal}>
             New Reseller
           </Button>
+          )}
+          </>
         }
       />
 
@@ -519,6 +516,7 @@ const ResellerList = () => {
         </Card.Body>
       </Card>
 
+      {session?.user?.permissions?.includes('list-resellers-billing') && (
       <GenericListPage
         columns={columns}
         fetchData={fetchResellers}
@@ -530,6 +528,7 @@ const ResellerList = () => {
         filters={filters}
         tableStyle="table-style-2"
       />
+      )}
 
       {showCreateModal && (
         <FormModal
@@ -557,16 +556,38 @@ const ResellerList = () => {
                         handleInputChange("name", e.target.value)
                       }
                       placeholder="Enter reseller name"
+                      disabled={isLoading}
                     />
                   </div>
                 </div>
-                <div className="col-md-12">
+                <div className="col-md-6">
                   <div className="form-group mb-3">
-                    <label htmlFor="createEmail" className="mb-0">
-                      Email Address *
+                    <label htmlFor="createPhone" className="mb-0">
+                      Phone
                     </label>
                     <p className="text-muted mb-3">
-                      Enter the email address of the reseller
+                      Enter the phone number
+                    </p>
+                    <input
+                      type="text"
+                      className="form-control"
+                      id="createPhone"
+                      value={formData.phone}
+                      onChange={(e) =>
+                        handleInputChange("phone", e.target.value)
+                      }
+                      placeholder="Enter phone number"
+                      disabled={isLoading}
+                    />
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group mb-3">
+                    <label htmlFor="createEmail" className="mb-0">
+                      Email
+                    </label>
+                    <p className="text-muted mb-3">
+                      Enter the email address
                     </p>
                     <input
                       type="email"
@@ -577,33 +598,14 @@ const ResellerList = () => {
                         handleInputChange("email", e.target.value)
                       }
                       placeholder="Enter email address"
-                    />
-                  </div>
-                </div>
-                <div className="col-md-12">
-                  <div className="form-group mb-3">
-                    <label htmlFor="createPhone" className="mb-0">
-                      Phone Number *
-                    </label>
-                    <p className="text-muted mb-3">
-                      Enter the phone number of the reseller
-                    </p>
-                    <input
-                      type="tel"
-                      className="form-control"
-                      id="createPhone"
-                      value={formData.phone}
-                      onChange={(e) =>
-                        handleInputChange("phone", e.target.value)
-                      }
-                      placeholder="Enter phone number"
+                      disabled={isLoading}
                     />
                   </div>
                 </div>
               </div>
             </>
           }
-          submitButtonText="Submit"
+          submitButtonText={isLoading ? "Creating..." : "Submit"}
           cancelButtonText="Cancel"
           onSubmit={handleCreateReseller}
         />
@@ -635,16 +637,38 @@ const ResellerList = () => {
                         handleInputChange("name", e.target.value)
                       }
                       placeholder="Enter reseller name"
+                      disabled={isLoading}
                     />
                   </div>
                 </div>
-                <div className="col-md-12">
+                <div className="col-md-6">
                   <div className="form-group mb-3">
-                    <label htmlFor="editEmail" className="mb-0">
-                      Email Address *
+                    <label htmlFor="editPhone" className="mb-0">
+                      Phone
                     </label>
                     <p className="text-muted mb-3">
-                      Enter the email address of the reseller
+                      Enter the phone number
+                    </p>
+                    <input
+                      type="text"
+                      className="form-control"
+                      id="editPhone"
+                      value={formData.phone}
+                      onChange={(e) =>
+                        handleInputChange("phone", e.target.value)
+                      }
+                      placeholder="Enter phone number"
+                      disabled={isLoading}
+                    />
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group mb-3">
+                    <label htmlFor="editEmail" className="mb-0">
+                      Email
+                    </label>
+                    <p className="text-muted mb-3">
+                      Enter the email address
                     </p>
                     <input
                       type="email"
@@ -655,33 +679,14 @@ const ResellerList = () => {
                         handleInputChange("email", e.target.value)
                       }
                       placeholder="Enter email address"
-                    />
-                  </div>
-                </div>
-                <div className="col-md-12">
-                  <div className="form-group mb-3">
-                    <label htmlFor="editPhone" className="mb-0">
-                      Phone Number *
-                    </label>
-                    <p className="text-muted mb-3">
-                      Enter the phone number of the reseller
-                    </p>
-                    <input
-                      type="tel"
-                      className="form-control"
-                      id="editPhone"
-                      value={formData.phone}
-                      onChange={(e) =>
-                        handleInputChange("phone", e.target.value)
-                      }
-                      placeholder="Enter phone number"
+                      disabled={isLoading}
                     />
                   </div>
                 </div>
               </div>
             </>
           }
-          submitButtonText="Submit"
+          submitButtonText={isLoading ? "Updating..." : "Submit"}
           cancelButtonText="Cancel"
           onSubmit={handleUpdateReseller}
         />
@@ -698,19 +703,19 @@ const ResellerList = () => {
               <thead>
                 <tr>
                   <th>Reseller Name</th>
-                  <th>Email</th>
-                  <th>Phone</th>
                   <th>Reseller ID</th>
                   <th>Reseller Organization Unit</th>
+                  <th>Phone</th>
+                  <th>Email</th>
                 </tr>
               </thead>
               <tbody>
                 <tr>
                   <td>{selectedReseller?.name}</td>
-                  <td>{selectedReseller?.email || '-'}</td>
-                  <td>{selectedReseller?.phone || '-'}</td>
                   <td>{selectedReseller?.parent_id}</td>
                   <td>{selectedReseller?.organization_unit}</td>
+                  <td>{selectedReseller?.phone || "-"}</td>
+                  <td>{selectedReseller?.email || "-"}</td>
                 </tr>
               </tbody>
             </table>

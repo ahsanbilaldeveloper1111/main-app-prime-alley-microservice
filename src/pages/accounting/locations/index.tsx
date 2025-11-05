@@ -62,9 +62,6 @@ const LocationList = () => {
         cell: (props: InventoryLocationData) => (
           <div>
             <div>{props.name}</div>
-            {props.contact_person && (
-              <div className="text-muted small">Contact: {props.contact_person}</div>
-            )}
           </div>
         ),
       },
@@ -92,13 +89,22 @@ const LocationList = () => {
       {
         key: "contact",
         name: "Contact",
-        selector: (row: InventoryLocationData) => row.phone,
+        selector: (row: InventoryLocationData) => row.contact_person || row.email || row.phone,
         sortable: true,
         cell: (props: InventoryLocationData) => (
-          <div className="text-muted small">
-            {props.phone && <div>Phone: {props.phone}</div>}
-            {props.email && <div>Email: {props.email}</div>}
-            {!props.phone && !props.email && "No contact info"}
+          <div>
+            {props.contact_person && (
+              <div className="fw-medium">{props.contact_person}</div>
+            )}
+            {props.email && (
+              <div className="text-muted small">{props.email}</div>
+            )}
+            {props.phone && (
+              <div className="text-muted small">{props.phone}</div>
+            )}
+            {!props.contact_person && !props.email && !props.phone && (
+              <span className="text-muted">No contact info</span>
+            )}
           </div>
         ),
       },
@@ -122,18 +128,23 @@ const LocationList = () => {
           <>
           <DatatableActionButton
                     actions={[
+                      ...(session?.user?.permissions?.includes('edit-locations-billing') ? [
                         {
                             label: 'Edit',
                             icon: <FiEdit />,
                             onClick: () => handleEditLocation(props),
                             className: 'gap-2'
                         },
+                        ] : []),
+
+                        ...(session?.user?.permissions?.includes('delete-locations-billing') ? [
                         {
                             label: 'Delete',
                             icon: <FiTrash2 />,
                             onClick: () => handleDeleteLocation(props),
                             className: 'text-danger gap-2'
                         },
+                        ] : []),
                     ]}
                 />
           </>
@@ -199,6 +210,9 @@ const LocationList = () => {
         state: selectedLocation.state || "",
         zip_code: selectedLocation.zip_code || "",
         country: selectedLocation.country || "",
+        contact_person: selectedLocation.contact_person || "",
+        email: selectedLocation.email || "",
+        phone: selectedLocation.phone || "",
       };
 
       const response = await updateInventoryLocation(selectedLocation.id, locationData);
@@ -225,6 +239,9 @@ const LocationList = () => {
     state: "",
     zip_code: "",
     country: "",
+    contact_person: "",
+    email: "",
+    phone: "",
   });
 
   const handleSubmitCreateLocation = useCallback(async () => {
@@ -245,6 +262,9 @@ const LocationList = () => {
           state: "",
           zip_code: "",
           country: "",
+          contact_person: "",
+          email: "",
+          phone: "",
         });
         setShowCreateLocationModal(false);
         setRefreshKey((prev) => prev + 1);
@@ -272,6 +292,9 @@ const LocationList = () => {
       state: "",
       zip_code: "",
       country: "",
+      contact_person: "",
+      email: "",
+      phone: "",
     });
   }, []);
 
@@ -330,17 +353,21 @@ const LocationList = () => {
 
       <PageHeader
         title="Locations"
-        showSearch={true}
+        showSearch={session?.user?.permissions?.includes('list-locations-billing')}
         searchPlaceholder="Search locations..."
         searchValue={currentFilters.search || ""}
         onSearchChange={(value) => handleFiltersChange({...currentFilters, search: value})}
         buttons={
-          <Button variant="primary" size="sm" onClick={openCreateLocationModal}>New Location</Button>
+          <>
+          {session?.user?.permissions?.includes('add-locations-billing') && (
+            <Button variant="primary" size="sm" onClick={openCreateLocationModal}>New Location</Button>
+          )}
+          </>
         }
       />
 
      
-
+      {session?.user?.permissions?.includes('list-locations-billing') && (
       <GenericListPage
         columns={columns}
         fetchData={fetchLocations}
@@ -352,6 +379,7 @@ const LocationList = () => {
         search={false}
         tableStyle="table-style-2"
       />
+      )}
 
       {/* Create Location Modal */}
       {showCreateLocationModal && (
@@ -459,6 +487,57 @@ const LocationList = () => {
                         handleNewLocationChange("country", e.target.value)
                       }
                       placeholder="Enter country"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="row">
+                <div className="col-md-12">
+                  <div className="form-group mb-3">
+                    <label htmlFor="newLocationContactPerson">Contact Person</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      id="newLocationContactPerson"
+                      value={newLocation.contact_person || ""}
+                      onChange={(e) =>
+                        handleNewLocationChange("contact_person", e.target.value)
+                      }
+                      placeholder="Enter contact person name"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="row">
+                <div className="col-md-6">
+                  <div className="form-group mb-3">
+                    <label htmlFor="newLocationEmail">Email</label>
+                    <input
+                      type="email"
+                      className="form-control"
+                      id="newLocationEmail"
+                      value={newLocation.email || ""}
+                      onChange={(e) =>
+                        handleNewLocationChange("email", e.target.value)
+                      }
+                      placeholder="Enter email address"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group mb-3">
+                    <label htmlFor="newLocationPhone">Phone</label>
+                    <input
+                      type="tel"
+                      className="form-control"
+                      id="newLocationPhone"
+                      value={newLocation.phone || ""}
+                      onChange={(e) =>
+                        handleNewLocationChange("phone", e.target.value)
+                      }
+                      placeholder="Enter phone number"
                     />
                   </div>
                 </div>
@@ -580,6 +659,57 @@ const LocationList = () => {
                         handleEditLocationChange("country", e.target.value)
                       }
                       placeholder="Enter country"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="row">
+                <div className="col-md-12">
+                  <div className="form-group mb-3">
+                    <label htmlFor="editLocationContactPerson">Contact Person</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      id="editLocationContactPerson"
+                      value={selectedLocation.contact_person || ""}
+                      onChange={(e) =>
+                        handleEditLocationChange("contact_person", e.target.value)
+                      }
+                      placeholder="Enter contact person name"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="row">
+                <div className="col-md-6">
+                  <div className="form-group mb-3">
+                    <label htmlFor="editLocationEmail">Email</label>
+                    <input
+                      type="email"
+                      className="form-control"
+                      id="editLocationEmail"
+                      value={selectedLocation.email || ""}
+                      onChange={(e) =>
+                        handleEditLocationChange("email", e.target.value)
+                      }
+                      placeholder="Enter email address"
+                    />
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-group mb-3">
+                    <label htmlFor="editLocationPhone">Phone</label>
+                    <input
+                      type="tel"
+                      className="form-control"
+                      id="editLocationPhone"
+                      value={selectedLocation.phone || ""}
+                      onChange={(e) =>
+                        handleEditLocationChange("phone", e.target.value)
+                      }
+                      placeholder="Enter phone number"
                     />
                   </div>
                 </div>

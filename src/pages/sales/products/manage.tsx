@@ -406,20 +406,6 @@ const ManageProduct = () => {
                       </Form.Control.Feedback>
                     </Form.Group>
                   </Col>
-                  <Col md={6}>
-                    <Form.Group className="mb-3">
-                      <Form.Label>Status</Form.Label>
-                      <Form.Check
-                        type="switch"
-                        id="active-switch"
-                        label="Active"
-                        checked={formData.active}
-                        onChange={(e) =>
-                          handleInputChange("active", e.target.checked)
-                        }
-                      />
-                    </Form.Group>
-                  </Col>
                 </Row>
 
                 <Form.Group className="mb-3">
@@ -656,17 +642,6 @@ const ManageProduct = () => {
             </Col>
           </Row>
 
-          <Form.Group className="mb-3">
-            <Form.Check
-              type="switch"
-              id="variant-active-switch"
-              label="Active"
-              checked={variantForm.active}
-              onChange={(e) =>
-                handleVariantInputChange("active", e.target.checked)
-              }
-            />
-          </Form.Group>
         </Modal.Body>
         <Modal.Footer>
           <Button

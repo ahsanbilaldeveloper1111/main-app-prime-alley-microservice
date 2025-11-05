@@ -31,6 +31,7 @@ import {
   Alert,
   Card,
 } from "react-bootstrap";
+import { ModuleSlug } from "@utils/Helper";
 import {
   FiEdit,
   FiTrash2,
@@ -50,9 +51,12 @@ import ConfirmModal from "@pages/partial/ConfirmModal";
 import SuccessfulModal from "@pages/partial/SuccessfulModal";
 import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
 import DatatableActionButton from "@components/DatatableActionButton";
+import { useSession } from "next-auth/react";
 
 
 const CrmLeads = () => {
+  const { data: session } = useSession();
+
   const [stages, setStages] = useState<any[]>([]);
   const [lostReasons, setLostReasons] = useState<
     { id: number; name: string }[]
@@ -65,7 +69,7 @@ const CrmLeads = () => {
   useEffect(() => {
     fetchStages();
     fetchLostReasons();
-    fetchExtensions();
+    fetchExtensions(ModuleSlug.CRM_LEADS);
   }, []);
 
   // Handle filter changes
@@ -76,7 +80,7 @@ const CrmLeads = () => {
 
   const fetchStages = async () => {
     try {
-      const stagesData = await getStages();
+      const stagesData = await getStages('lead');
       setStages(stagesData || []);
     } catch (error) {
       console.error("Failed to fetch stages:", error);
@@ -92,9 +96,9 @@ const CrmLeads = () => {
     }
   };
 
-  const fetchExtensions = async () => {
+  const fetchExtensions = async (moduleSlug: string = ModuleSlug.CRM_LEADS) => {
     try {
-      const hierarchyData = await GetHierarchyData();
+      const hierarchyData = await GetHierarchyData(moduleSlug);
       if (hierarchyData?.extensions) {
         setExtensions(hierarchyData.extensions);
       }
@@ -281,7 +285,16 @@ const CrmLeads = () => {
         cell: (props: any) => (
           <div>
             <div className="fw-medium">{props.name || "Unnamed Lead"}</div>
-            <small className="text-muted">
+            <small 
+              className="text-muted" 
+              style={{
+                display: 'block',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                maxWidth: '300px'
+              }}
+            >
               {props.description || "No Description"}
             </small>
           </div>
@@ -304,36 +317,44 @@ const CrmLeads = () => {
         selector: (row: any) => row.stage?.name || "New",
         sortable: true,
         cell: (props: any) => (
+          <>
           <span className="status-badge text-capitalize primary">{props.stage?.name || "New"}</span>
+          <br />
+          <small className="text-muted">{props?.lost_reason?.name}</small>
+          </>
         ),
       },
       {
         key: "status",
         name: "Status",
-        selector: (row: any) => row.status,
+        selector: (row: any) => {
+          const stageName = (row.stage?.name || "New").toLowerCase();
+          
+          if (stageName.includes("new")) return "New";
+          if (stageName.includes("lost") || stageName.includes("won")) return "Closed";
+          return "In Progress";
+        },
         sortable: true,
         cell: (props: any) => {
-          const status = props.status || "new";
-          const isLost = props.is_lost || false;
+          const stageName = (props.stage?.name || "New").toLowerCase();
+          let status = "In Progress";
+          let statusClass = "info";
 
-          if (isLost) {
-            return (
-              <div>
-                <span className="status-badge text-capitalize danger">Lost</span>
-                {props.lost_reason && (
-                  <div className="mt-1">
-                    <small className="text-muted">
-                      Reason: {props.lost_reason.name}
-                    </small>
-                  </div>
-                )}
-              </div>
-            );
+          if (stageName.includes("new")) {
+            status = "New";
+            statusClass = "primary";
+          } else if (stageName.includes("lost") || stageName.includes("won")) {
+            status = "Closed";
+            statusClass = "danger";
+          }
+          if(props?.is_lost) {
+            status = "Lost";
+            statusClass = "danger";
           }
 
           return (
-            <span className={`status-badge text-capitalize ${status === "new" ? "primary" : "info"}`}>
-              {status.charAt(0).toUpperCase() + status.slice(1)}
+            <span className={`status-badge text-capitalize ${statusClass}`}>
+              {status}
             </span>
           );
         },
@@ -359,33 +380,38 @@ const CrmLeads = () => {
         cell: (props: any) => (
           <DatatableActionButton
             actions={[
-              {
+              ...(session?.user?.permissions?.includes('view-crm-leads') ? [{
+                label: 'View',
+                icon: <FiEye className="me-2" />,
+                onClick: () => window.location.href = `/crm/leads/${props.id}`,
+              }] : []),
+              ...(session?.user?.permissions?.includes('edit-crm-leads') ? [{
                 label: 'Edit',
                 icon: <FiEdit className="me-2" />,
                 onClick: () => window.location.href = `/crm/leads/${props.id}/edit`,
-              },
-              ...(!props.is_lost && !props.is_opportunity ? [{
+              }] : []),
+              ...(session?.user?.permissions?.includes('convert-to-opportunity-crm-leads') ? [{
                 label: 'Convert to Opportunity',
                 icon: <FiTarget className="me-2" />,
                 onClick: () => handleConvertLead(props),
               }] : []),
-              ...(!props.is_lost ? [{
-                label: 'Mark as Lost',
+              ...(session?.user?.permissions?.includes('mark-as-lost-crm-leads') ? [{
+                label: 'Mark Lost Reason',
                 icon: <FiXCircle className="me-2" />,
                 onClick: () => handleMarkLost(props),
               }] : []),
-              {
+              ...(session?.user?.permissions?.includes('delete-crm-leads') ? [{
                 label: 'Delete',
                 icon: <FiTrash2 className="me-2" />,
                 onClick: () => handleDeleteLead(props.id),
                 className: 'text-danger',
-              },
+              }] : []),
             ]}
           />
         ),
       },
     ],
-    [extensions]
+    [extensions, session?.user?.permissions]
   );
 
   return (
@@ -399,22 +425,32 @@ const CrmLeads = () => {
       <PageHeader
         title="Leads"
         filters={
-          <CrmFilters onFiltersChange={handleFiltersChange} />
-        }
-        showSearch={true}
+          session?.user?.permissions?.includes('list-crm-leads') ? (
+          <CrmFilters onFiltersChange={handleFiltersChange} type="lead" />
+        ) : (
+          <></>
+        )}
+        showSearch={session?.user?.permissions?.includes('list-crm-leads')}
         searchValue={currentFilters.search || ""}
         onSearchChange={(value) => handleFiltersChange({...currentFilters, search: value})}
         searchPlaceholder="Search leads..."
         buttons={
+          <>
+          {session?.user?.permissions?.includes('add-crm-leads') ? (
           <Link href="/crm/leads/create" className="btn btn-primary">
                   <FiPlus className="me-2" />
                   New Lead
                 </Link>
+                ) : (
+                  <></>
+                )}
+                </>
         }
         leftGrid={3}
         rightGrid={9}
       />
 
+{session?.user?.permissions?.includes('list-crm-leads') ? (
 <GenericListPage
                   columns={columns}
                   fetchData={fetchLeads}
@@ -426,6 +462,9 @@ const CrmLeads = () => {
                   search={false}
                   tableStyle="table-style-2"
                 />
+                ) : (
+                  <></>
+                )}
 
       <ConfirmModal
         show={showDeleteModal}
@@ -582,7 +621,7 @@ const CrmLeads = () => {
         }
         onSubmit={handleMarkLostSubmit}
         onCancel={() => setShowMarkLostModal(false)}
-        submitButtonText="Mark as Lost"
+        submitButtonText="Mark Lost Reason"
         cancelButtonText="Cancel"
       />
 

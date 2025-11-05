@@ -16,6 +16,15 @@ interface EndCallParams {
   callingDeviceName: string
 }
 
+interface AttendCallParams {
+  callId: string
+  callingAddress: string
+  calledAddress: string
+  controllerAddress: string
+  controllerDeviceName: string
+  controllerDeviceType: string
+}
+
 interface MergeCallsParams {
   heldCallId: string
   activeCallId: string
@@ -121,6 +130,21 @@ export const endCall = async (params: EndCallParams): Promise<DialResponse> => {
   }
 }
 
+export const attendCall = async (params: AttendCallParams): Promise<DialResponse> => {
+  try {
+    const response = await axiosInstance.post('/cti/answerCall', params);
+
+    return validateResponse(response);
+
+  } catch (error) {
+    console.error('Error calling attend-call API:', error)
+    return {
+      success: false,
+      error: 'Network error occurred while attending call'
+    }
+  }
+}
+
 export const holdCall = async (params: EndCallParams): Promise<DialResponse> => {
   try {
     const response = await axiosInstance.post('/cti/holdCall', params);
@@ -136,7 +160,7 @@ export const holdCall = async (params: EndCallParams): Promise<DialResponse> => 
   }
 }
 
-export const resumeCall = async (params: EndCallParams): Promise<DialResponse> => {
+export const resumeCall = async (params: any): Promise<DialResponse> => {
   try {
     const response = await axiosInstance.post('/cti/resumeCall', params);
 
@@ -254,6 +278,20 @@ export const stopBargeInMonitoring = async (params: StopBargeInMonitoringParams)
     return {
       success: false,
       error: 'Network error occurred while stopping barge-in monitoring'
+    }
+  }
+}
+
+
+export const GetCallLegs = async (params: any): Promise<any> => {
+  try {
+    const response = await axiosInstance.post('/cti/getCallLegs', params);
+    return validateResponse(response);
+  } catch (error) {
+    console.error('Error calling get-call-legs API:', error)
+    return {
+      success: false,
+      error: 'Network error occurred while getting call legs'
     }
   }
 }

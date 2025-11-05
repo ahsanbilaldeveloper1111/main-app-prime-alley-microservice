@@ -321,6 +321,7 @@ const Ranks = () => {
                         <div className="form-group mb-3">
                             <label htmlFor="editRankName" className="form-label">Rank Name</label>
                             <input className="form-control" type="text" value={selectedRankName} onChange={(e) => setSelectedRankName(e.target.value)} />
+                            <p className="text-muted mt-2 small">Change the name of an existing rank to better reflect its role or purpose in the system</p>
                         </div>
                     </>
                 }
@@ -330,31 +331,7 @@ const Ranks = () => {
                 onCancel={() => setShowEditRankModal(false)}
             />
 
-            {/* {showDeleteRankModal && (
-                <Modal
-                    show={showDeleteRankModal}
-                    onHide={() => setShowDeleteRankModal(false)}
-                >
-                    <Modal.Header closeButton>
-                        <Modal.Title>Delete Rank?</Modal.Title>
-                    </Modal.Header>
-                    <Modal.Body>
-                        <p>
-                            Are you sure you want to delete this <b className="text-danger">{selectedRankName}</b> rank?
-                        </p>
-                        <p>
-                            Type the word <b className="text-danger">delete</b> to confirm
-                        </p>
-                        <input type="text" className="form-control" id="confirmDelete" value={confirmDelete} onChange={(e) => setConfirmDelete(e.target.value)} placeholder="Type the word delete to confirm" />
-
-                    </Modal.Body>
-                    <Modal.Footer>
-                        <Button variant="secondary" onClick={() => setShowDeleteRankModal(false)}>Close</Button>
-                        <Button variant="danger" onClick={() => handleSubmitDeleteRank()}>Delete</Button>
-                    </Modal.Footer>
-                    
-                </Modal>
-            )} */}
+           
 
 <ConfirmModal
         show={showDeleteRankModal}
@@ -380,6 +357,7 @@ const Ranks = () => {
                         <div className="form-group mb-3">
                             <label htmlFor="newRankName" className="form-label">Rank Name</label>
                             <input type="text" className="form-control" id="newRankName"  value={newRankName} onChange={(e) => setNewRankName(e.target.value)} placeholder="Rank Name" />
+                            <p className="text-muted mt-2 small">Enter the name of the rank you want to create. This will be used to identify the rank in the system.</p>
                         </div>
                     </>
                 }
@@ -402,31 +380,7 @@ const Ranks = () => {
                 requiredConfirmationText="delete"
             />
 
-            {/* {showBulkDeleteSummaryModal && (
-                <Modal
-                    show={showBulkDeleteSummaryModal}
-                    onHide={() => setShowBulkDeleteSummaryModal(false)}
-                >
-                    <Modal.Header closeButton>
-                        <Modal.Title>Bulk Delete Summary</Modal.Title>
-                    </Modal.Header>
-                    <Modal.Body>
-                      
-                    {deleteRankResponse.length > 0 && deleteRankResponse.map((item: any) => (
-                        <div className="form-group alert alert-primary" key={item.id}>
-                           Rank: {item.name}
-                           <br />
-                           Message: {item.message}
-                        </div>
-                    ))}
-                        
-                    </Modal.Body>
-                    <Modal.Footer>
-                        <Button variant="secondary" onClick={() => setShowBulkDeleteSummaryModal(false)}>Close</Button>
-                    </Modal.Footer>
-                </Modal>
-            )} */}
-
+            
 
             <FormModal
                 show={showBulkDeleteSummaryModal}

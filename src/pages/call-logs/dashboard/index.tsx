@@ -14,7 +14,7 @@ import { useSession } from 'next-auth/react';
 import CallLogsFilters from '@components/filters/CallLogsFilters';
 import AnimatedNumber from '@components/AnimatedNumber';
 import EmptyState from '@components/EmptyState';
-import { formatDateTimeToLocal, GlobalDateTimeFormat } from '@utils/Helper';
+import { formatDateTimeToLocal, GlobalDateTimeFormat, ModuleSlug } from '@utils/Helper';
 import '@assets/scss/common.scss';
 
 import imgStatus1 from '@assets/images/widget/img-status-1.svg'
@@ -27,7 +27,7 @@ import moment from 'moment';
 import Link from 'next/link';
 import NProgress from "nprogress";
 import "nprogress/nprogress.css";
-
+import PageLoader from '@components/PageLoader';
 
 import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
 import { motion } from 'framer-motion';
@@ -83,6 +83,7 @@ const formatSecondsToTime = (seconds: number): string => {
 
 const CallDashboard = () => {
     const { data:session, status } = useSession();
+    const [showPageLoader, setShowPageLoader] = useState(false);
     const [showCountryChartModal, setShowCountryChartModal] = useState(false);
     const [showDepartmentChartModal, setShowDepartmentChartModal] = useState(false);
     const [showExtensionChartModal, setShowExtensionChartModal] = useState(false);
@@ -91,7 +92,7 @@ const CallDashboard = () => {
     
     const [refreshKey, setRefreshKey] = useState<number>(0);
     const [currentFilters, setCurrentFilters] = useState({
-      start_datetime: moment().startOf("week").format('YYYY-MM-DD hh:mm:ss A'),
+      start_datetime: moment().subtract(6, 'days').format('YYYY-MM-DD hh:mm:ss A'),
       end_datetime: moment().format('YYYY-MM-DD hh:mm:ss A'),
     });
     const [generalStats, setGeneralStats] = useState<GeneralStats>({
@@ -210,7 +211,11 @@ const CallDashboard = () => {
         fetchGeneralStats();
     }, []);
     const fetchGeneralStats = async () => {
-      const response = await ListCallLogs({ page:  page, perPage: perPage, search: "", filters: currentFilters,reportType: 'statsDashboard' }, 'call-logs/generalStats');
+      setShowPageLoader(true);
+      const response = await ListCallLogs({ page:  page, perPage: perPage, search: "", filters: currentFilters,reportType: 'statsDashboard', moduleSlug: ModuleSlug.CALL_LOGS }, 
+        'call-logs/generalStats').finally(() => {
+          setShowPageLoader(false);
+        });
 
       if(response.success){
         const responseData = response.data;
@@ -240,16 +245,12 @@ const CallDashboard = () => {
         
         // Map extension data to chart format
         const extensionLabels = chartExtension.map((item: any) => item.label || 'Unknown');
-        const shortestData = chartExtension.map((item: any) => item.shortest ? parseInt(item.shortest) : 0);
-        const longestData = chartExtension.map((item: any) => item.longest ? parseInt(item.longest) : 0);
+        const values = chartExtension.map((item: any) => item.value ? parseInt(item.value) : 0);
         
         setExtensionChart({
           series: [{
-            name: 'Shortest',
-            data: shortestData
-          }, {
-            name: 'Longest', 
-            data: longestData
+            name: 'Call Count',
+            data: values
           }],
           options: {
             ...ExtensionChart.options,
@@ -258,10 +259,7 @@ const CallDashboard = () => {
               categories: extensionLabels,
               labels: {
                 show: true,
-                formatter: function(value: string) {
-                  const numValue = parseFloat(value);
-                  return isNaN(numValue) ? value : formatSecondsToTime(numValue);
-                },
+                
                 style: {
                   fontSize: '11px',
                   colors: '#666'
@@ -270,11 +268,7 @@ const CallDashboard = () => {
             },
             tooltip: {
               ...ExtensionChart.options.tooltip,
-              y: {
-                formatter: function(value: number) {
-                  return formatSecondsToTime(value);
-                }
-              }
+              
             }
           }
         });
@@ -287,20 +281,12 @@ const CallDashboard = () => {
         
         // Map department data to chart format
         const departmentLabels = chartDepartment.map((item: any) => item.label || 'Unknown');
-        const shortestData = chartDepartment.map((item: any) => item.shortest ? parseInt(item.shortest) : 0);
-        const longestData = chartDepartment.map((item: any) => item.longest ? parseInt(item.longest) : 0);
-        const averageData = chartDepartment.map((item: any) => item.average ? parseInt(item.average) : 0);
+        const values = chartDepartment.map((item: any) => item.value ? parseInt(item.value) : 0);
         
         setDepartmentChart({
           series: [{
-            name: 'Shortest',
-            data: shortestData
-          }, {
-            name: 'Average',
-            data: averageData
-          }, {
-            name: 'Longest',
-            data: longestData
+            name: 'Call Count',
+            data: values
           }],
           options: {
             ...DepartmentChart.options,
@@ -309,10 +295,7 @@ const CallDashboard = () => {
                 categories: departmentLabels as string[],
                 labels: {
                   show: true,
-                  formatter: function(value: string) {
-                    const numValue = parseFloat(value);
-                    return isNaN(numValue) ? value : formatSecondsToTime(numValue);
-                  },
+                  
                   style: {
                     fontSize: '11px',
                     colors: '#666'
@@ -345,11 +328,7 @@ const CallDashboard = () => {
               enabled: false,
             },
             tooltip: {
-              y: {
-                formatter: function(value: number) {
-                  return formatSecondsToTime(value);
-                }
-              }
+               
             }
           }
         });
@@ -362,23 +341,13 @@ const CallDashboard = () => {
         
         // Map country data to chart format
         const countryLabels = chartCountry.map((item: any) => item.label || 'Unknown');
-        const shortestData = chartCountry.map((item: any) => item.shortest ? parseInt(item.shortest) : 0);
-        const longestData = chartCountry.map((item: any) => item.longest ? parseInt(item.longest) : 0);
-        const averageData = chartCountry.map((item: any) => item.average ? parseInt(item.average) : 0);
+        const values = chartCountry.map((item: any) => item.value ? parseInt(item.value) : 0);
         
         setCountryChart({
           series: [
             {
-              name: 'Shortest',
-              data: shortestData
-            },
-            {
-              name: 'Average',
-              data: averageData
-            },
-            {
-              name: 'Longest',
-              data: longestData
+              name: 'Call Count',
+              data: values
             }
           ],
           options: {
@@ -388,10 +357,7 @@ const CallDashboard = () => {
               categories: countryLabels,
               labels: {
                 show: true,
-                formatter: function(value: string) {
-                  const numValue = parseFloat(value);
-                  return isNaN(numValue) ? value : formatSecondsToTime(numValue);
-                },
+                
                 style: {
                   fontSize: '11px',
                   colors: '#666'
@@ -399,11 +365,7 @@ const CallDashboard = () => {
               }
             },
             tooltip: {
-              y: {
-                formatter: function(value: number) {
-                  return formatSecondsToTime(value);
-                }
-              }
+              
             }
           }
         });
@@ -442,20 +404,12 @@ const CallDashboard = () => {
         enabled: false
       },
       tooltip: {
-        y: {
-          formatter: function(value: number) {
-            return formatSecondsToTime(value);
-          }
-        }
+        
       },
       xaxis: {
         categories: [] as string[],
         labels: {
           show: true,
-          formatter: function(value: string) {
-            const numValue = parseFloat(value);
-            return isNaN(numValue) ? value : formatSecondsToTime(numValue);
-          },
           style: {
             fontSize: '11px',
             colors: '#666'
@@ -503,20 +457,12 @@ const [DepartmentChart, setDepartmentChart] = React.useState({
           enabled: false
         },
         tooltip: {
-          y: {
-            formatter: function(value: number) {
-              return formatSecondsToTime(value);
-            }
-          }
+          
         },
         xaxis: {
           categories: [] as string[],
           labels: {
             show: true,
-            formatter: function(value: string) {
-              const numValue = parseFloat(value);
-              return isNaN(numValue) ? value : formatSecondsToTime(numValue);
-            },
             style: {
               fontSize: '11px',
               colors: '#666'
@@ -526,7 +472,7 @@ const [DepartmentChart, setDepartmentChart] = React.useState({
         yaxis: {
           show: true,
           title: {
-            text: 'Duration', // <-- Your custom label here
+            text: 'Call Count', // <-- Your custom label here
             style: {
               fontSize: '12px',
               fontWeight: 'bold',
@@ -579,20 +525,12 @@ const [ExtensionChart, setExtensionChart] = React.useState({
     tooltip: {
       shared: false,
       intersect: false,
-      y: {
-        formatter: function(value: number) {
-          return formatSecondsToTime(value);
-        }
-      }
+      
     },
     xaxis: {
       categories: [] as string[],
       labels: {
         show: true,
-        formatter: function(value: string) {
-          const numValue = parseFloat(value);
-          return isNaN(numValue) ? value : formatSecondsToTime(numValue);
-        },
         style: {
           fontSize: '11px',
           colors: '#666'
@@ -622,7 +560,7 @@ const [ExtensionChart, setExtensionChart] = React.useState({
       fetchExtensionStats();
   }, []);
   const fetchExtensionStats = async () => {
-    const response = await ListCallLogs({ page:  page, perPage: perPage, search: "", filters: currentFilters,reportType: 'statsExtension' }, 'call-logs/statsByExtension');
+    const response = await ListCallLogs({ page:  page, perPage: perPage, search: "", filters: currentFilters,reportType: 'statsExtension',moduleSlug: ModuleSlug.CALL_LOGS }, 'call-logs/statsByExtension');
     if(response?.dataList?.length > 0){
       setExtensionData(response?.dataList);
     } else {
@@ -636,7 +574,7 @@ const [ExtensionChart, setExtensionChart] = React.useState({
   }, []);
 
   const fetchTrendByCountryStats = async () => {
-    const response = await ListCallLogs({ page:  page, perPage: perPage, search: "", filters: currentFilters,reportType: 'statsCountry' }, 'call-logs/statsByCountry');
+    const response = await ListCallLogs({ page:  page, perPage: perPage, search: "", filters: currentFilters,reportType: 'statsCountry', moduleSlug: ModuleSlug.CALL_LOGS }, 'call-logs/statsByCountry');
     if(response?.dataList?.length > 0){
       setTrendByCountryData(response?.dataList);
     }
@@ -686,8 +624,7 @@ const [ExtensionChart, setExtensionChart] = React.useState({
     return (
         <React.Fragment>
             {/* Removed LoadingBar component */}
-            <BreadcrumbItem mainTitle="Call Logs" mainLink="/call-logs/dashboard" subTitle="Call Dashboard" />
-
+            <BreadcrumbItem mainTitle="Call Logs" mainLink="/call-logs/dashboard" subTitle="Call Dashboard" showPageLoader={showPageLoader} />
 
 
             <Row className="mb-3">
@@ -944,7 +881,7 @@ const [ExtensionChart, setExtensionChart] = React.useState({
                                 </tbody>
                               </table>
                               <div className="d-flex justify-content-center">
-                                    <Link href="/call-reports/trend/country" className="link-primary">View All</Link>
+                                    <Link href="/call-reports/stats/country" className="link-primary">View All</Link>
                               </div>
                                       </div>
                                       </>

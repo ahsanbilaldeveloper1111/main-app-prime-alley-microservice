@@ -287,13 +287,13 @@ export const formatDateTimeToLocal = (
     let momentObj: moment.Moment;
     
     if (datetime instanceof Date) {
-      momentObj = moment.utc(datetime);
+      momentObj = moment(datetime);
     } else if (inputFormat) {
       // Parse with specific input format
-      momentObj = moment.utc(datetime, inputFormat);
+      momentObj = moment(datetime, inputFormat);
     } else {
       // Auto-detect format
-      momentObj = moment.utc(datetime);
+      momentObj = moment(datetime);
     }
     
     if (!momentObj.isValid()) {
@@ -402,8 +402,15 @@ export const ModuleSlug = {
   CALL_LOGS: 'call-logs',
   CALL_RECORDINGS: 'call-recordings',
   TICKET:'tickets',
+  BILLING:'accounts',
+  LIVE_CALLS:'cti',
+  USER_DIRECTORY:'users',
+
   CRM:'crm',
-  REPORTS:'reports'
+  CRM_CAMPAIGNS:'crm-campaigns',
+  CRM_DATA_MANAGEMENT:'crm-data-management',
+  CRM_OPPORTUNITIES:'crm-opportunities',
+  CRM_LEADS:'crm-leads',
 }
 
 export const formatCurrency = (amount: number | null): string => {

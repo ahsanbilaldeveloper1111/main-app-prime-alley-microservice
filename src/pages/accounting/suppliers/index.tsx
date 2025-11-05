@@ -110,21 +110,6 @@ const SupplierList = () => {
         ),
       },
       {
-        key: "is_active",
-        name: "Status",
-        selector: (row: InventorySupplierData) => row.is_active,
-        sortable: true,
-        cell: (props: InventorySupplierData) => (
-          <span
-            className={`status-badge text-capitalize ${
-              props.is_active ? "success" : "danger"
-            }`}
-          >
-            {props.is_active ? "Active" : "Inactive"}
-          </span>
-        ),
-      },
-      {
         key: "created_at",
         name: "Created",
         selector: (row: InventorySupplierData) => row.created_at,
@@ -144,19 +129,25 @@ const SupplierList = () => {
           <>  
           <DatatableActionButton
                     actions={[
+                      ...(session?.user?.permissions?.includes('edit-suppliers-billing') ? [
                         {
                             label: 'Edit',
                             icon: <FiEdit />,
                             onClick: () => handleEditSupplier(props),
                             className: 'gap-2'
                         },
+                        ] : []),
+
+                      ...(session?.user?.permissions?.includes('delete-suppliers-billing') ? [
                         {
                             label: 'Delete',
                             icon: <FiTrash2 />,
                             onClick: () => handleDeleteSupplier(props),
                             className: 'text-danger gap-2'
                         },
+                        ] : []),
                     ]}
+
                 />
           </>
 
@@ -218,7 +209,6 @@ const SupplierList = () => {
         email: selectedSupplier.email || "",
         phone: selectedSupplier.phone || "",
         address: selectedSupplier.address || "",
-        is_active: selectedSupplier.is_active ?? true,
       };
 
       const response = await updateInventorySupplier(selectedSupplier.id, supplierData);
@@ -243,7 +233,6 @@ const SupplierList = () => {
     email: "",
     phone: "",
     address: "",
-    is_active: true,
   });
 
   const handleSubmitCreateSupplier = useCallback(async () => {
@@ -262,7 +251,6 @@ const SupplierList = () => {
           email: "",
           phone: "",
           address: "",
-          is_active: true,
         });
         setShowCreateSupplierModal(false);
         setRefreshKey((prev) => prev + 1);
@@ -288,7 +276,6 @@ const SupplierList = () => {
       email: "",
       phone: "",
       address: "",
-      is_active: true,
     });
   }, []);
 
@@ -347,16 +334,20 @@ const SupplierList = () => {
 
       <PageHeader
         title="Suppliers"
-        showSearch={true}
+        showSearch={session?.user?.permissions?.includes('list-suppliers-billing')}
         searchPlaceholder="Search suppliers..."
         searchValue={currentFilters.search || ""}
         onSearchChange={(value) => handleFiltersChange({...currentFilters, search: value})}
         buttons={
-          <Button variant="primary" size="sm" onClick={openCreateSupplierModal}>New Supplier</Button>
+          <>
+          {session?.user?.permissions?.includes('add-suppliers-billing') && (
+            <Button variant="primary" size="sm" onClick={openCreateSupplierModal}>New Supplier</Button>
+          )}
+          </>
         }
       />
 
-
+      {session?.user?.permissions?.includes('list-suppliers-billing') && (
       <GenericListPage
         columns={columns}
         fetchData={fetchSuppliers}
@@ -368,6 +359,7 @@ const SupplierList = () => {
         search={true}
         tableStyle="table-style-2"
       />
+      )}
 
       {/* Create Supplier Modal */}
       {showCreateSupplierModal && (
@@ -425,22 +417,6 @@ const SupplierList = () => {
                       }
                       placeholder="Enter phone number"
                     />
-                  </div>
-                </div>
-                <div className="col-md-6">
-                  <div className="form-group mb-3">
-                    <label htmlFor="newSupplierStatus">Status</label>
-                    <select
-                      className="form-control"
-                      id="newSupplierStatus"
-                      value={newSupplier.is_active ? "active" : "inactive"}
-                      onChange={(e) =>
-                        handleNewSupplierChange("is_active", e.target.value === "active")
-                      }
-                    >
-                      <option value="active">Active</option>
-                      <option value="inactive">Inactive</option>
-                    </select>
                   </div>
                 </div>
               </div>
@@ -529,22 +505,6 @@ const SupplierList = () => {
                       }
                       placeholder="Enter phone number"
                     />
-                  </div>
-                </div>
-                <div className="col-md-6">
-                  <div className="form-group mb-3">
-                    <label htmlFor="editSupplierStatus">Status</label>
-                    <select
-                      className="form-control"
-                      id="editSupplierStatus"
-                      value={selectedSupplier.is_active ? "active" : "inactive"}
-                      onChange={(e) =>
-                        handleEditSupplierChange("is_active", e.target.value === "active")
-                      }
-                    >
-                      <option value="active">Active</option>
-                      <option value="inactive">Inactive</option>
-                    </select>
                   </div>
                 </div>
               </div>

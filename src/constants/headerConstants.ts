@@ -22,7 +22,11 @@ export const HEADER_CONSTANTS = {
   // Menu Labels
   MENU_LABELS: {
     DASHBOARD: 'Dashboard',
-    CONTROL_HUB: 'Resources',
+    CONTROL_HUB: 'Control Hub',
+    RESOURCES: 'Resources',
+    HELP_MATERIALS: 'Help Materials',
+    FAQ: 'FAQ',
+    CONTACT_SUPPORT: 'Contact Support',
     SIM_GATEWAY: 'Telco Gateway',
     CALL_LOGS: 'Call Logs',
     CALL_RECORDINGS: 'Call Recordings',
@@ -51,8 +55,8 @@ export const HEADER_CONSTANTS = {
     
     // Sim Gateway
     GSM_DASHBOARD: 'Dashboard',
-    GSM_LIST: 'Gsm List',
-    COMPANY_ASSIGN: 'Company Assign',
+    GSM_LIST: 'Telco Gateway List',
+    COMPANY_ASSIGN: 'Assign',
     PORTS: 'Ports',
     INBOX: 'Inbox',
     SYNC_GSM: 'Sync GSM',
@@ -66,7 +70,7 @@ export const HEADER_CONSTANTS = {
     ANALYSIS: 'Analysis',
     TRANSCRIPTION: 'Transcription',
     TRANSLATE: 'Translate',
-    ANALYSE_RECORDINGS: 'Analyse Recordings',
+    ANALYZE_RECORDINGS: 'Analyze Recordings',
     
     // Sales
     SALES_DASHBOARD: 'Dashboard',
@@ -189,7 +193,11 @@ export const HEADER_CONSTANTS = {
     MEGAPHONE: 'ph-duotone ph-megaphone',
     PHONE: 'ph-duotone ph-phone',
     CARET_RIGHT: 'ph-duotone ph-caret-right',
-    CARET_DOWN: 'ph-duotone ph-caret-down'
+    CARET_DOWN: 'ph-duotone ph-caret-down',
+    RESOURCES: 'ph-duotone ph-notebook',
+    HELP_MATERIALS: 'ph-duotone ph-book',
+    FAQ: 'ph-duotone ph-question',
+    CONTACT_SUPPORT: 'ph-duotone ph-headset'
   } as const,
   
   // Permissions
@@ -207,7 +215,38 @@ export const HEADER_CONSTANTS = {
     DNCR_SERVICES: 'dncr-services',
     ACCOUNTS_SERVICES: 'accounts-services',
     NETOPS_SERVICES: 'health-care-services',
-    CALL_HISTORY_SERVICES: 'call-history-services'
+    CALL_HISTORY_SERVICES: 'call-history-services',
+    RESOURCES_SERVICES: 'resources-services',
+
+    VIEW_COMPANIES_BILLING: 'view-companies-billing',
+    VIEW_INVOICES_BILLING: 'view-invoices-billing',
+    VIEW_EXPENSES_BILLING: 'view-expenses-billing',
+    VIEW_PRODUCTS_BILLING: 'view-products-billing',
+    VIEW_SUPPLIERS_BILLING: 'view-suppliers-billing',
+    VIEW_LOCATIONS_BILLING: 'view-locations-billing',
+    VIEW_RESSELLERS_BILLING: 'view-resellers-billing',
+    VIEW_INVENTORY_BILLING: 'view-inventory-billing',
+    VIEW_PRODUCT_PRICING_COMPANIES_BILLING: 'manage-pricing-companies-billing',
+
+    VIEW_CRM_DASHBOARD: 'dashboard-crm',
+    VIEW_CRM_CAMPAIGNS: 'view-crm-campaigns',
+    VIEW_CRM_DATA_MANAGEMENT: 'view-crm-data-management',
+    CREATE_CRM_DATA_MANAGEMENT: 'add-crm-data-management',
+    VIEW_CRM_OPPORTUNITIES: 'view-crm-opportunities',
+    CREATE_CRM_OPPORTUNITIES: 'add-crm-opportunities',
+    VIEW_CRM_LEADS: 'view-crm-leads',
+    CREATE_CRM_LEADS: 'add-crm-leads',
+    VIEW_CRM_STAGES: 'view-crm-stages',
+    VIEW_CRM_LOST_REASONS: 'view-crm-lost-reasons',
+
+    VIEW_GSM_DASHBOARD: 'dashboard-gsm-management',
+    VIEW_GSM_MANAGEMENT: 'view-gsm-management',
+    VIEW_GSM_ASSIGNMENT: 'view-gsm-assignment',
+    VIEW_GSM_PORTS: 'view-gsm-ports',
+    VIEW_GSM_INBOX: 'view-gsm-inbox',
+    VIEW_GSM_SYNC: 'view-gsm-port-sync',
+    VIEW_GSM_COMPANY_PROFILLING: 'view-gsm-company-profilling',
+    
   } as const
 } as const;
 

@@ -177,7 +177,7 @@ export default function CompaniesFilters({
                   </div>
 
                   <div className="form-group mb-3">
-                    <label className="form-label mb-1">Phone</label>
+                    <label className="form-label mb-1">Company Phone</label>
                     <input
                       className="form-control form-control-sm"
                       type="text"
@@ -188,7 +188,7 @@ export default function CompaniesFilters({
                   </div>
 
                   <div className="form-group mb-3">
-                    <label className="form-label mb-1">Email</label>
+                    <label className="form-label mb-1">Company Email</label>
                     <input
                       className="form-control form-control-sm"
                       type="text"

@@ -25,7 +25,6 @@ export const useCallTimer = ({ startTime, isActive = true }: UseCallTimerProps):
 
     // If call becomes active and we haven't started yet, start the timer
     if (isActive && !hasStartedRef.current) {
-      console.log('Starting timer for active call')
       
       // Clear any existing interval
       if (intervalRef.current) {

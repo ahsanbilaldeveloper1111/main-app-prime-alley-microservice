@@ -69,11 +69,16 @@ interface ChartData {
 
 import dynamic from 'next/dynamic';
 import { ApexOptions } from 'apexcharts';
-import { formatCurrency, formatMinutesAndSeconds, ModuleSlug } from '@utils/Helper';
+import { formatCurrency, formatMinutesAndSeconds, ModuleSlug, GlobalDateTimeFormat, formatDateTimeToLocal } from '@utils/Helper';
 const ReactApexChart = dynamic(() => import('react-apexcharts'), { ssr: false });
 
 const CallIncomingExtension = () => {
     const { data:session, status } = useSession();
+
+    const [showDateRange, setShowDateRange] = useState(false);
+    const [startDateTime, setStartDateTime] = useState<string>('');
+    const [endDateTime, setEndDateTime] = useState<string>('');
+
     const [loading, setLoading] = useState(false);
     const [activeTab, setActiveTab] = useState('calls_chart');
     
@@ -179,8 +184,10 @@ const CallIncomingExtension = () => {
         avg_duration:0,
         avg_ring_time:0
     });
-    
+
+    const [showPageLoader, setShowPageLoader] = useState(false);
     const fetchCallLogs = useCallback(async (page = 1, perPage = 15, search = "") => {
+        
         // Only fetch if filters are ready
         if (!filtersReady) {
             console.log('Filters not ready yet, skipping fetch');
@@ -189,16 +196,21 @@ const CallIncomingExtension = () => {
         
         console.log('Fetching call logs with filters:', currentFilters);
         setLoading(true);
+        setShowPageLoader(true);
         
         try {
-            console.log('About to call ListCallLogs with params:', { page, perPage, search, filters: currentFilters, reportType: 'incomingStatsExtension' });
             const response = await ListCallLogs({ page, perPage, search, filters: currentFilters, reportType: 'incomingStatsExtension', 
-                moduleSlug: ModuleSlug.CALL_REPORTS }, 'call-logs/statsIncomingByExtension');
-            console.log('API response:', response);
-            console.log('API response type:', typeof response);
-            console.log('API response keys:', response ? Object.keys(response) : 'null/undefined');
-            
+                moduleSlug: ModuleSlug.CALL_REPORTS }, 'call-logs/statsIncomingByExtension').finally(() => {
+                  setShowPageLoader(false);
+                });
+              
             if (response?.summary) {
+
+                setShowDateRange(true);
+                const dataFilters = response?.filters;
+                setStartDateTime(dataFilters?.start_datetime);
+                setEndDateTime(dataFilters?.end_datetime);
+
                 setSummary(response.summary);
                 setDataLoaded(true);
                 console.log('Summary data set:', response.summary);
@@ -563,7 +575,7 @@ const CallIncomingExtension = () => {
     
     return (
         <React.Fragment>
-            <BreadcrumbItem mainTitle="" mainLink="" subTitle="Call Incoming By Extension" />
+            <BreadcrumbItem mainTitle="" mainLink="" subTitle="Incoming Calls By Extension" showPageLoader={showPageLoader} />
 
 
             <Row className="mb-3">
@@ -571,10 +583,19 @@ const CallIncomingExtension = () => {
           <div className="page-header-title style-2">
             <Row className="d-flex justify-content-between align-items-center">
               <Col md={5}>
-                <h2 className="mb-0">Call Incoming By Extension</h2>
+                <h2 className="mb-0">Incoming Calls By Extension</h2>
               </Col>
               <Col md={7} className="d-flex justify-content-end">
                 <div className="action-buttons">
+
+                  {showDateRange && (
+                            <>
+                            <p className="mb-0">
+                            Date Range: <span className="status-badge primary">{formatDateTimeToLocal(startDateTime, GlobalDateTimeFormat)}</span> to <span className="status-badge primary">{formatDateTimeToLocal(endDateTime, GlobalDateTimeFormat)}</span>
+                            </p>
+                          
+                            </>
+                          )}
                   <CallLogsFilters
                     onFiltersChange={handleFiltersChange} 
                     onExport={handleExport} 
@@ -692,7 +713,7 @@ const CallIncomingExtension = () => {
                         activeKey={activeTab}
                         onSelect={handleTabChange}
                     >
-                        <Tab eventKey="calls_chart" title="Calls by Country">
+                        <Tab eventKey="calls_chart" title="Calls by Extension">
                            <AnimatePresence mode="wait">
                              {activeTab === 'calls_chart' && (
                                <motion.div
@@ -723,7 +744,7 @@ const CallIncomingExtension = () => {
                                                   showViewAllButton={true}
                                                   viewAllButtonText="View All"
                                                   showFullScreenButton={true}
-                                                  onFullScreenClick={() => handleOpenChartModal(chartCalls, 'Calls by Country', 'calls')}
+                                                  onFullScreenClick={() => handleOpenChartModal(chartCalls, 'Calls by Extension', 'calls')}
                                               />
                                           ) : (
                                             <div className=""></div>
@@ -738,7 +759,7 @@ const CallIncomingExtension = () => {
                         </Tab>
 
 
-                        <Tab eventKey="duration_chart" title="Duration by Country">
+                        <Tab eventKey="duration_chart" title="Duration by Extension">
                            <AnimatePresence mode="wait">
                              {activeTab === 'duration_chart' && (
                                <motion.div
@@ -769,7 +790,7 @@ const CallIncomingExtension = () => {
                                                   showViewAllButton={true}
                                                   viewAllButtonText="View All"
                                                   showFullScreenButton={true}
-                                                  onFullScreenClick={() => handleOpenChartModal(chartDuration, 'Duration by Country', 'time')}
+                                                  onFullScreenClick={() => handleOpenChartModal(chartDuration, 'Duration by Extension', 'time')}
                                               />
                                           ) : (
                                             <div className=""></div>
@@ -783,7 +804,7 @@ const CallIncomingExtension = () => {
                            </AnimatePresence>
                         </Tab>
 
-                        <Tab eventKey="ring_chart" title="Ring Time by Country">
+                        <Tab eventKey="ring_chart" title="Ring Time by Extension">
                            <AnimatePresence mode="wait">
                              {activeTab === 'ring_chart' && (
                                <motion.div
@@ -814,7 +835,7 @@ const CallIncomingExtension = () => {
                                                   showViewAllButton={true}
                                                   viewAllButtonText="View All"
                                                   showFullScreenButton={true}
-                                                  onFullScreenClick={() => handleOpenChartModal(chartRingTime, 'Ring Time by Country', 'time')}
+                                                  onFullScreenClick={() => handleOpenChartModal(chartRingTime, 'Ring Time by Extension', 'time')}
                                               />
                                           ) : (
                                               <div className=""></div>
@@ -828,7 +849,7 @@ const CallIncomingExtension = () => {
                            </AnimatePresence>
                         </Tab>
 
-                        <Tab eventKey="cost_chart" title="Cost by Country">
+                        <Tab eventKey="cost_chart" title="Cost by Extension">
                            <AnimatePresence mode="wait">
                              {activeTab === 'cost_chart' && (
                                <motion.div
@@ -859,7 +880,7 @@ const CallIncomingExtension = () => {
                                                   showViewAllButton={true}
                                                   viewAllButtonText="View All"
                                                   showFullScreenButton={true}
-                                                  onFullScreenClick={() => handleOpenChartModal(chartCost, 'Cost by Country', 'cost')}
+                                                  onFullScreenClick={() => handleOpenChartModal(chartCost, 'Cost by Extension', 'cost')}
                                               />
                                           ) : (
                                             <div className=""></div>

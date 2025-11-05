@@ -18,12 +18,14 @@ import imgStatus2 from '@assets/images/widget/img-status-2.svg'
 import imgStatus3 from '@assets/images/widget/img-status-3.svg'
 import imgStatus4 from '@assets/images/widget/img-status-4.svg'
 import moment from 'moment';
+import PageLoader from '@components/PageLoader';
 
 
 import '@assets/scss/common.scss';
 
-import { convertUTCToUserTimezone, convertUTCTimeToUserTimezone, convertUTCSeparateDateTimeToUserTime, convertUTCSeparateDateTimeToUserDate, formatDuration, GlobalDateFormat, GlobalTimeFormat } from '@utils/Helper';
+import { convertUTCToUserTimezone, convertUTCTimeToUserTimezone, convertUTCSeparateDateTimeToUserTime, convertUTCSeparateDateTimeToUserDate, formatDuration, GlobalDateFormat, GlobalTimeFormat,formatDateTimeToLocal, GlobalDateTimeFormat } from '@utils/Helper';
 import { ModuleSlug } from '@utils/Helper';
+import { useHierarchyData } from '@components/filters/useHierarchyData';
 
 
 interface Summary {
@@ -35,6 +37,11 @@ interface Summary {
 
 const CallLogs = () => {
     const { data:session, status } = useSession();
+    const [showPageLoader, setShowPageLoader] = useState(false);
+
+    const [showDateRange, setShowDateRange] = useState(false);
+    const [startDateTime, setStartDateTime] = useState<string>('');
+    const [endDateTime, setEndDateTime] = useState<string>('');
    
     const columns: Column[] = [
         { key: 'Date', name: 'Date', selector: (row: any) => row.Date, sortable: true,
@@ -81,13 +88,19 @@ const CallLogs = () => {
         outbound: 0
     });
 
+    const {hierarchyDataUsers} = useHierarchyData(ModuleSlug.CALL_LOGS);
+    const [totalUsers, setTotalUsers] = useState(0);
+    useEffect(() => {
+        setTotalUsers(hierarchyDataUsers.length);
+    }, [hierarchyDataUsers]);
+
     // Create cards data for PageSummaryGrid
     const summaryCards: SummaryCard[] = [
         {
             id: 'total-users',
             title: 'Total Users',
-            value: summary?.users || 0,
-            description: 'Total users in the system',
+            value: totalUsers || 0,
+            description: 'Show Registered users in the system',
             delay: 0.1,
             showAnimatedNumber: true,
             animationDuration: 1000,
@@ -97,7 +110,7 @@ const CallLogs = () => {
             id: 'extensions',
             title: 'Extensions',
             value: summary?.extensions || 0,
-            description: 'Extensions in the system',
+            description: 'Show Extensions currently engaged or making calls',
             delay: 0.3,
             showAnimatedNumber: true,
             animationDuration: 1000,
@@ -107,7 +120,7 @@ const CallLogs = () => {
             id: 'inbound',
             title: 'Inbound',
             value: summary?.inbound || 0,
-            description: 'Inbound calls in the system',
+            description: 'Total received call count',
             delay: 0.5,
             showAnimatedNumber: true,
             animationDuration: 1000,
@@ -117,7 +130,7 @@ const CallLogs = () => {
             id: 'outbound',
             title: 'Outbound',
             value: summary?.outbound || 0,
-            description: 'Outbound calls in the system',
+            description: 'Total placed call count',
             delay: 0.7,
             showAnimatedNumber: true,
             animationDuration: 1000,
@@ -126,9 +139,17 @@ const CallLogs = () => {
     ];
     
     const fetchCallLogs = useCallback(async (page = 1, perPage = 15, search = "") => {
+        setShowPageLoader(true);
         const response = await ListCallLogs({ page, perPage, search, filters: currentFilters, moduleSlug: ModuleSlug.CALL_LOGS }, 'call-logs/list');
+        setShowPageLoader(false);
         //console.log(response);
         if(response?.summary){
+
+            setShowDateRange(true);
+            const dataFilters = response?.filters;
+            setStartDateTime(dataFilters?.start_datetime);
+            setEndDateTime(dataFilters?.end_datetime);
+
             setSummary(response.summary);
             //console.log(summary);
         }
@@ -142,7 +163,7 @@ const CallLogs = () => {
 
     const handleExport = async (exportType: string, filters: Record<string, any>) => {
      
-
+        setShowPageLoader(true);
       try {
             if (exportType === 'excel') {
              
@@ -150,7 +171,9 @@ const CallLogs = () => {
                 { filters: currentFilters, isExport: true, exportType, moduleSlug: ModuleSlug.CALL_LOGS },
                 'call-logs/list',
                 'downlaodCallLogs'
-              );
+              ).finally(() => {
+                setShowPageLoader(false);
+              });
             }
           } catch (error) {
             console.error('Export error:', error);
@@ -161,9 +184,8 @@ const CallLogs = () => {
     
     return (
         <React.Fragment>
-            <BreadcrumbItem mainTitle="" mainLink="" subTitle="Call Logs" />
+            <BreadcrumbItem mainTitle="" mainLink="" subTitle="Call Logs" showPageLoader={showPageLoader} />
            
-
 
             <Row className="mb-3">
             <Col md={12}>
@@ -177,7 +199,19 @@ const CallLogs = () => {
 
                     <Col md={8} className="d-flex justify-content-end">
                       
+
+                    
+
                     <div className="action-buttons">
+
+                    {showDateRange && (
+                            <>
+                            <p className="mb-0">
+                            Date Range: <span className="status-badge primary">{formatDateTimeToLocal(startDateTime, GlobalDateTimeFormat)}</span> to <span className="status-badge primary">{formatDateTimeToLocal(endDateTime, GlobalDateTimeFormat)}</span>
+                            </p>
+                          
+                            </>
+                          )}
                     {/* <div className="search-container">
                             <i className="fas fa-search search-icon"></i>
                             <input type="text" className="search-bar" placeholder="Search call logs..." onChange={(e) => handleFiltersChange({...currentFilters, search: e.target.value})}/>

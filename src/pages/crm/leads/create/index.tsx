@@ -1,12 +1,28 @@
 import "@assets/scss/datatable-style.scss";
-import React, { ReactElement, useState, useEffect } from "react";
+import React, { ReactElement, useState, useEffect, useRef } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
-import { createLead, getStages, StageData, getCampaigns, getCampaignById, CampaignData, getCrmData, getCrmDataById, CrmDataItem } from "@utils/crm";
+import {
+  createLead,
+  getStages,
+  StageData,
+  getCampaigns,
+  getCampaignById,
+  CampaignData,
+  getCrmData,
+  getCrmDataById,
+  CrmDataItem,
+} from "@utils/crm";
 import { GetHierarchyData } from "@utils/users";
 import { Button, Row, Col, Form, Card, Alert, Badge } from "react-bootstrap";
 import Select from "react-select";
-import { FiSave, FiArrowLeft, FiDatabase, FiTarget, FiPlus } from "react-icons/fi";
+import {
+  FiSave,
+  FiArrowLeft,
+  FiDatabase,
+  FiTarget,
+  FiPlus,
+} from "react-icons/fi";
 import Link from "next/link";
 import { toast } from "react-toastify";
 import { useRouter } from "next/router";
@@ -17,9 +33,9 @@ import PageHeader from "@components/PageHeader";
 import FormModal from "../../../partial/FormModal";
 import ConfirmModal from "@pages/partial/ConfirmModal";
 import SuccessfulModal from "@pages/partial/SuccessfulModal";
-import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
+import PageSummaryGrid, { SummaryCard } from "@components/PageSummaryGrid";
 import DatatableActionButton from "@components/DatatableActionButton";
-
+import { ModuleSlug } from '@utils/Helper';
 
 const CreateLead = () => {
   const router = useRouter();
@@ -38,31 +54,63 @@ const CreateLead = () => {
   });
 
   const [stages, setStages] = useState<StageData[]>([]);
+
+
   const [extensions, setExtensions] = useState<any[]>([]);
+  const [extensionsOpportunities, setExtensionsOpportunities] = useState<any[]>([]);
+
+
   const [campaigns, setCampaigns] = useState<CampaignData[]>([]);
   const [crmData, setCrmData] = useState<CrmDataItem[]>([]);
-  const [selectedCrmData, setSelectedCrmData] = useState<CrmDataItem | null>(null);
-  const [selectedCampaign, setSelectedCampaign] = useState<CampaignData | null>(null);
+  const [selectedCrmData, setSelectedCrmData] = useState<CrmDataItem | null>(
+    null
+  );
+  const [selectedCampaign, setSelectedCampaign] = useState<CampaignData | null>(
+    null
+  );
   const [loading, setLoading] = useState(false);
   const [isOpportunity, setIsOpportunity] = useState(false);
+  const isInitialLoad = useRef(true);
 
   // Fetch stages and extensions on component mount
   useEffect(() => {
-    fetchStages();
     fetchExtensions();
     fetchCampaigns();
     fetchCrmData();
   }, []);
 
-  // Fetch specific CRM data record if crm_data_id is in URL
+  // Set initial type and fetch stages when router is ready
   useEffect(() => {
-    if(router.query?.type === "opportunity") {
-      setFormData(prev => ({
+    if (router.isReady) {
+      const isOpportunity = router.query?.type === "opportunity";
+      setIsOpportunity(isOpportunity);
+
+      setFormData((prev) => ({
         ...prev,
-        type: "opportunity",
+        type: isOpportunity ? "opportunity" : "lead",
+      }));
+
+      // Fetch stages with the correct type
+      fetchStages(isOpportunity ? "opportunity" : "lead");
+      isInitialLoad.current = false;
+    }
+  }, [router.isReady, router.query?.type]);
+
+  // Refetch stages when type changes (but not on initial load)
+  useEffect(() => {
+    // Only refetch if this is not the initial load
+    if (!isInitialLoad.current) {
+      fetchStages(formData.type);
+      // Clear selected stage when type changes as it might not be valid for new type
+      setFormData((prev) => ({
+        ...prev,
+        stage_id: undefined,
       }));
     }
-    setIsOpportunity(router.query?.type === "opportunity");
+  }, [formData.type]);
+
+  // Fetch specific CRM data record if crm_data_id is in URL
+  useEffect(() => {
     const fetchCrmDataRecord = async () => {
       if (router.isReady && router.query.crm_data_id) {
         try {
@@ -70,17 +118,36 @@ const CreateLead = () => {
           const crmDataRecord = await getCrmDataById(crmDataId);
           console.log("ZE CRM DATA RECORD", crmDataRecord);
           setSelectedCrmData(crmDataRecord);
-          
+
           // Pre-fill basic form fields
-          setFormData(prev => ({
+          setFormData((prev) => ({
             ...prev,
             crm_data_id: crmDataId,
             campaign_id: Number(crmDataRecord.campaign_id) || undefined,
-            name: crmDataRecord.data?.name || crmDataRecord.data?.full_name || crmDataRecord.data?.first_name || crmDataRecord.phone || '',
-            description: crmDataRecord.data?.description || crmDataRecord.data?.notes || crmDataRecord.data?.comments || '',
-            company_name: crmDataRecord.data?.company_name || crmDataRecord.data?.company || '',
-            company_contact: crmDataRecord.data?.company_contact || crmDataRecord.data?.contact || crmDataRecord.phone || '',
-            company_description: crmDataRecord.data?.company_description || crmDataRecord.data?.company_notes || '',
+            name:
+              crmDataRecord.data?.name ||
+              crmDataRecord.data?.full_name ||
+              crmDataRecord.data?.first_name ||
+              crmDataRecord.phone ||
+              "",
+            description:
+              crmDataRecord.data?.description ||
+              crmDataRecord.data?.notes ||
+              crmDataRecord.data?.comments ||
+              "",
+            company_name:
+              crmDataRecord.data?.company_name ||
+              crmDataRecord.data?.company ||
+              "",
+            company_contact:
+              crmDataRecord.data?.company_contact ||
+              crmDataRecord.data?.contact ||
+              crmDataRecord.phone ||
+              "",
+            company_description:
+              crmDataRecord.data?.company_description ||
+              crmDataRecord.data?.company_notes ||
+              "",
           }));
         } catch (error) {
           console.error("Failed to fetch CRM data record:", error);
@@ -99,36 +166,44 @@ const CreateLead = () => {
           // Fetch campaign details with fields
           const campaign = await getCampaignById(selectedCrmData.campaign_id);
           console.log("ZE AUTO-SELECTED CAMPAIGN WITH FIELDS", campaign);
-          
+
           setSelectedCampaign(campaign);
-          
+
           // Pre-fill campaign fields with CRM data (excluding dropdown fields)
           const preFilledFields: Record<string, any> = {};
-          
+
           if (campaign.fields && selectedCrmData.data) {
             campaign.fields.forEach((field) => {
               // Skip dropdown fields as requested
-              if (field.field_type === 'dropdown') {
+              if (field.field_type === "dropdown") {
                 return;
               }
-              
+
               // Try to find matching CRM data field
-              const crmDataValue = selectedCrmData.data[field.field_name] || 
-                                 selectedCrmData.data[field.field_name.toLowerCase()] ||
-                                 selectedCrmData.data[field.field_name.toUpperCase()];
-              
-              if (crmDataValue !== null && crmDataValue !== undefined && crmDataValue !== '') {
+              const crmDataValue =
+                selectedCrmData.data[field.field_name] ||
+                selectedCrmData.data[field.field_name.toLowerCase()] ||
+                selectedCrmData.data[field.field_name.toUpperCase()];
+
+              if (
+                crmDataValue !== null &&
+                crmDataValue !== undefined &&
+                crmDataValue !== ""
+              ) {
                 preFilledFields[field.field_name] = String(crmDataValue);
               }
             });
           }
-          
-          setFormData(prev => ({
+
+          setFormData((prev) => ({
             ...prev,
             campaign_field_values: preFilledFields,
           }));
         } catch (error) {
-          console.error("Failed to fetch campaign details for auto-selection:", error);
+          console.error(
+            "Failed to fetch campaign details for auto-selection:",
+            error
+          );
         }
       }
     };
@@ -136,10 +211,20 @@ const CreateLead = () => {
     fetchCampaignAndPreFill();
   }, [selectedCrmData]);
 
-  const fetchStages = async () => {
+  const opportunityRef = useRef<"lead" | "opportunity">(isOpportunity ? 'opportunity' : 'lead');
+  useEffect(() => {
+    if (opportunityRef.current !== formData.type) {
+      opportunityRef.current = formData.type;
+      fetchStages(formData.type);
+    }
+  }, [formData.type]);
+
+  const fetchStages = async (type: "lead" | "opportunity") => {
     try {
-      const stagesData = await getStages();
-      setStages(stagesData || []);
+      const stagesData = await getStages(type);
+      if (type === opportunityRef.current) {
+        setStages(stagesData || []);
+      }
     } catch (error) {
       console.error("Failed to fetch stages:", error);
     }
@@ -147,9 +232,14 @@ const CreateLead = () => {
 
   const fetchExtensions = async () => {
     try {
-      const hierarchyData = await GetHierarchyData();
+      const hierarchyData = await GetHierarchyData(ModuleSlug.CRM_LEADS);
       if (hierarchyData?.extensions) {
         setExtensions(hierarchyData.extensions);
+      }
+
+      const hierarchyDataOpportunities = await GetHierarchyData(ModuleSlug.CRM_OPPORTUNITIES);
+      if (hierarchyDataOpportunities?.extensions) {
+        setExtensionsOpportunities(hierarchyDataOpportunities.extensions);
       }
     } catch (error) {
       console.error("Failed to fetch extensions:", error);
@@ -176,6 +266,13 @@ const CreateLead = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate required fields
+    if (!formData.user_extension) {
+      toast.error("Please select a user extension");
+      return;
+    }
+    
     setLoading(true);
 
     try {
@@ -203,7 +300,7 @@ const CreateLead = () => {
 
   const handleCampaignChange = async (selectedOption: any) => {
     const campaignId = selectedOption?.value;
-    
+
     if (!campaignId) {
       setSelectedCampaign(null);
       setFormData((prev) => ({
@@ -213,44 +310,49 @@ const CreateLead = () => {
       }));
       return;
     }
-    
+
     try {
       // Fetch campaign details with fields
       const campaign = await getCampaignById(campaignId);
       console.log("ZE CAMPAIGN WITH FIELDS", campaign);
-      
+
       // Pre-fill campaign fields with CRM data (excluding dropdown fields)
       const preFilledFields: Record<string, any> = {};
-      
+
       if (campaign.fields && selectedCrmData?.data) {
         campaign.fields.forEach((field) => {
           // Skip dropdown fields as requested
-          if (field.field_type === 'dropdown') {
+          if (field.field_type === "dropdown") {
             return;
           }
-          
+
           // Try to find matching CRM data field
-          const crmDataValue = selectedCrmData.data[field.field_name] || 
-                             selectedCrmData.data[field.field_name.toLowerCase()] ||
-                             selectedCrmData.data[field.field_name.toUpperCase()];
-          
-          if (crmDataValue !== null && crmDataValue !== undefined && crmDataValue !== '') {
+          const crmDataValue =
+            selectedCrmData.data[field.field_name] ||
+            selectedCrmData.data[field.field_name.toLowerCase()] ||
+            selectedCrmData.data[field.field_name.toUpperCase()];
+
+          if (
+            crmDataValue !== null &&
+            crmDataValue !== undefined &&
+            crmDataValue !== ""
+          ) {
             preFilledFields[field.field_name] = String(crmDataValue);
           }
         });
       }
-      
+
       setFormData((prev) => ({
         ...prev,
         campaign_id: campaignId,
         campaign_field_values: preFilledFields, // Pre-fill with CRM data
       }));
-      
+
       setSelectedCampaign(campaign);
     } catch (error) {
       console.error("Failed to fetch campaign details:", error);
       // Fallback to basic campaign from list
-      const basicCampaign = campaigns.find(c => c.id === campaignId);
+      const basicCampaign = campaigns.find((c) => c.id === campaignId);
       setSelectedCampaign(basicCampaign || null);
     }
   };
@@ -275,46 +377,56 @@ const CreateLead = () => {
           <Form.Control
             type={field.field_type === "email" ? "email" : "text"}
             value={fieldValue}
-            onChange={(e) => handleCampaignFieldChange(field.field_name, e.target.value)}
+            onChange={(e) =>
+              handleCampaignFieldChange(field.field_name, e.target.value)
+            }
             placeholder={`Enter ${field.field_name}`}
           />
         );
-      
+
       case "text":
         return (
           <Form.Control
             as="textarea"
             rows={3}
             value={fieldValue}
-            onChange={(e) => handleCampaignFieldChange(field.field_name, e.target.value)}
+            onChange={(e) =>
+              handleCampaignFieldChange(field.field_name, e.target.value)
+            }
             placeholder={`Enter ${field.field_name}`}
           />
         );
-      
+
       case "integer":
         return (
           <Form.Control
             type="number"
             value={fieldValue}
-            onChange={(e) => handleCampaignFieldChange(field.field_name, e.target.value)}
+            onChange={(e) =>
+              handleCampaignFieldChange(field.field_name, e.target.value)
+            }
             placeholder={`Enter ${field.field_name}`}
           />
         );
-      
+
       case "date":
         return (
           <Form.Control
             type="date"
             value={fieldValue}
-            onChange={(e) => handleCampaignFieldChange(field.field_name, e.target.value)}
+            onChange={(e) =>
+              handleCampaignFieldChange(field.field_name, e.target.value)
+            }
           />
         );
-      
+
       case "dropdown":
         return (
           <Form.Select
             value={fieldValue}
-            onChange={(e) => handleCampaignFieldChange(field.field_name, e.target.value)}
+            onChange={(e) =>
+              handleCampaignFieldChange(field.field_name, e.target.value)
+            }
           >
             <option value="">Select {field.field_name}</option>
             {field.field_options?.map((option: string, index: number) => (
@@ -324,13 +436,15 @@ const CreateLead = () => {
             ))}
           </Form.Select>
         );
-      
+
       default:
         return (
           <Form.Control
             type="text"
             value={fieldValue}
-            onChange={(e) => handleCampaignFieldChange(field.field_name, e.target.value)}
+            onChange={(e) =>
+              handleCampaignFieldChange(field.field_name, e.target.value)
+            }
             placeholder={`Enter ${field.field_name}`}
           />
         );
@@ -345,28 +459,29 @@ const CreateLead = () => {
         subTitle={isOpportunity ? "Create Opportunity" : "Create Lead"}
       />
 
-
       <PageHeader
         title={isOpportunity ? "Create Opportunity" : "Create Lead"}
         buttons={
-          <Link href={isOpportunity ? "/crm/opportunities" : "/crm/leads"} 
-          className="btn btn-primary">
-          <FiArrowLeft className="me-2" />
-          Back to {isOpportunity ? "Opportunities" : "Leads"}
-        </Link>
+          <Link
+            href={isOpportunity ? "/crm/opportunities" : "/crm/leads"}
+            className="btn btn-primary"
+          >
+            <FiArrowLeft className="me-2" />
+            Back to {isOpportunity ? "Opportunities" : "Leads"}
+          </Link>
         }
       />
 
       <div className="container-fluid">
-       
-
         {/* Create Lead Form */}
         <div className="row">
           <div className="col-12">
             <Card className="border-0 shadow-sm">
               <Card.Header>
                 <div className="d-flex justify-content-between align-items-center">
-                  <h4 className="mb-0 app-heading">{isOpportunity ? "Opportunity" : "Lead"} Information</h4>
+                  <h4 className="mb-0 app-heading">
+                    {isOpportunity ? "Opportunity" : "Lead"} Information
+                  </h4>
                   {selectedCrmData && (
                     <Badge bg="info" className="d-flex align-items-center">
                       <FiDatabase className="me-1" size={14} />
@@ -380,22 +495,61 @@ const CreateLead = () => {
                   <Row>
                     <Col md={6}>
                       <Form.Group className="mb-3">
-                        <Form.Label>{isOpportunity ? "Opportunity" : "Lead"} Name *</Form.Label>
+                        <Form.Label>
+                          {isOpportunity ? "Opportunity" : "Lead"} Name *
+                        </Form.Label>
                         <Form.Control
                           type="text"
                           value={formData.name}
                           onChange={(e) =>
                             handleInputChange("name", e.target.value)
                           }
-                          placeholder="Enter lead name"
+                          placeholder={`Enter ${isOpportunity ? "opportunity" : "lead"} name`}
                           required
                         />
                       </Form.Group>
                     </Col>
                     <Col md={6}>
                       <Form.Group className="mb-3">
-                        <Form.Label>User Extension</Form.Label>
+                        <Form.Label>User Extension *</Form.Label>
+
+                        {formData.type === "opportunity" ? (
+                          <>
+                          
                         <Select
+                          value={
+                            formData.user_extension
+                              ? {
+                                  value: formData.user_extension,
+                                  label:
+                                    extensionsOpportunities.find(
+                                      (ext: any) =>
+                                        ext.id.toString() ===
+                                        formData.user_extension?.toString()
+                                    )?.display_name || "",
+                                }
+                              : null
+                          }
+                          onChange={(selectedOption: any) => {
+                            handleInputChange(
+                              "user_extension",
+                              selectedOption?.value || null
+                            );
+                          }}
+                          options={extensionsOpportunities.map((extension: any) => ({
+                            value: extension.id,
+                            label: extension.display_name,
+                          }))}
+                          placeholder="Select User Extension"
+                          isClearable
+                          isSearchable
+                          required
+                        />
+                        </>
+                        ) : (
+                          <>
+                          
+                          <Select
                           value={
                             formData.user_extension
                               ? {
@@ -419,10 +573,13 @@ const CreateLead = () => {
                             value: extension.id,
                             label: extension.display_name,
                           }))}
-                          placeholder="Select User Extension (Optional)"
+                          placeholder="Select User Extension"
                           isClearable
                           isSearchable
+                          required
                         />
+                        </>
+                        )}
                       </Form.Group>
                     </Col>
                   </Row>
@@ -477,7 +634,10 @@ const CreateLead = () => {
                             formData.campaign_id
                               ? {
                                   value: formData.campaign_id,
-                                  label: campaigns.find(c => c.id === formData.campaign_id)?.name || "",
+                                  label:
+                                    campaigns.find(
+                                      (c) => c.id === formData.campaign_id
+                                    )?.name || "",
                                 }
                               : null
                           }
@@ -500,16 +660,23 @@ const CreateLead = () => {
                             formData.crm_data_id
                               ? {
                                   value: formData.crm_data_id,
-                                  label: `#${formData.crm_data_id} - ${crmData.find(d => d.id === formData.crm_data_id)?.phone || 'No Phone'}`,
+                                  label: `#${formData.crm_data_id} - ${
+                                    crmData.find(
+                                      (d) => d.id === formData.crm_data_id
+                                    )?.phone || "No Phone"
+                                  }`,
                                 }
                               : null
                           }
                           onChange={(selectedOption: any) => {
-                            handleInputChange("crm_data_id", selectedOption?.value || undefined);
+                            handleInputChange(
+                              "crm_data_id",
+                              selectedOption?.value || undefined
+                            );
                           }}
                           options={crmData.map((data) => ({
                             value: data.id,
-                            label: `#${data.id} - ${data.phone || 'No Phone'}`,
+                            label: `#${data.id} - ${data.phone || "No Phone"}`,
                           }))}
                           placeholder="Select CRM data (Optional)"
                           isClearable
@@ -528,7 +695,7 @@ const CreateLead = () => {
                       onChange={(e) =>
                         handleInputChange("description", e.target.value)
                       }
-                      placeholder="Enter lead description"
+                      placeholder={`Enter ${isOpportunity ? "opportunity" : "lead"} description`}
                     />
                   </Form.Group>
 
@@ -556,7 +723,10 @@ const CreateLead = () => {
                             type="text"
                             value={formData.company_contact}
                             onChange={(e) =>
-                              handleInputChange("company_contact", e.target.value)
+                              handleInputChange(
+                                "company_contact",
+                                e.target.value
+                              )
                             }
                             placeholder="Enter phone or email"
                           />
@@ -570,7 +740,10 @@ const CreateLead = () => {
                         rows={3}
                         value={formData.company_description}
                         onChange={(e) =>
-                          handleInputChange("company_description", e.target.value)
+                          handleInputChange(
+                            "company_description",
+                            e.target.value
+                          )
                         }
                         placeholder="Enter additional company contact details"
                       />
@@ -578,43 +751,57 @@ const CreateLead = () => {
                   </div>
 
                   {/* Campaign Custom Fields */}
-                  {selectedCampaign && selectedCampaign.fields && selectedCampaign.fields.length > 0 && (
-                    <div className="border-top pt-3 mt-4">
-                      <div className="d-flex align-items-center mb-3">
-                        <FiTarget className="me-2" />
-                        <h6 className="mb-0">Campaign Fields: {selectedCampaign.name}</h6>
-                        {selectedCrmData && (
-                          <Badge bg="success" className="ms-2 small">
-                            Auto-filled from CRM Data
-                          </Badge>
-                        )}
-                      </div>
-                      <Alert variant="info" className="mb-3">
-                        <small>
-                          Fill in the custom fields for the selected campaign. These fields will be stored with the lead/opportunity.
+                  {selectedCampaign &&
+                    selectedCampaign.fields &&
+                    selectedCampaign.fields.length > 0 && (
+                      <div className="border-top pt-3 mt-4">
+                        <div className="d-flex align-items-center mb-3">
+                          <FiTarget className="me-2" />
+                          <h6 className="mb-0">
+                            Campaign Fields: {selectedCampaign.name}
+                          </h6>
                           {selectedCrmData && (
-                            <><br /><strong>Note:</strong> Fields have been automatically filled from the selected CRM data record. Dropdown fields are excluded from auto-fill.</>
+                            <Badge bg="success" className="ms-2 small">
+                              Auto-filled from CRM Data
+                            </Badge>
                           )}
-                        </small>
-                      </Alert>
-                      <Row>
-                        {selectedCampaign.fields.map((field, index) => (
-                          <Col md={6} key={index} className="mb-3">
-                            <Form.Group>
-                              <Form.Label>
-                                {field.field_name}
-                                {field.field_type === "email" && " (Email)"}
-                                {field.field_type === "integer" && " (Number)"}
-                                {field.field_type === "date" && " (Date)"}
-                                {field.field_type === "dropdown" && " (Select)"}
-                              </Form.Label>
-                              {renderCampaignField(field)}
-                            </Form.Group>
-                          </Col>
-                        ))}
-                      </Row>
-                    </div>
-                  )}
+                        </div>
+                        <Alert variant="info" className="mb-3">
+                          <small>
+                            Fill in the custom fields for the selected campaign.
+                            These fields will be stored with the
+                            {isOpportunity ? "opportunity" : "lead"}.
+                            {selectedCrmData && (
+                              <>
+                                <br />
+                                <strong>Note:</strong> Fields have been
+                                automatically filled from the selected CRM data
+                                record. Dropdown fields are excluded from
+                                auto-fill.
+                              </>
+                            )}
+                          </small>
+                        </Alert>
+                        <Row>
+                          {selectedCampaign.fields.map((field, index) => (
+                            <Col md={6} key={index} className="mb-3">
+                              <Form.Group>
+                                <Form.Label>
+                                  {field.field_name}
+                                  {field.field_type === "email" && " (Email)"}
+                                  {field.field_type === "integer" &&
+                                    " (Number)"}
+                                  {field.field_type === "date" && " (Date)"}
+                                  {field.field_type === "dropdown" &&
+                                    " (Select)"}
+                                </Form.Label>
+                                {renderCampaignField(field)}
+                              </Form.Group>
+                            </Col>
+                          ))}
+                        </Row>
+                      </div>
+                    )}
 
                   {/* CRM Data Preview */}
                   {selectedCrmData && (
@@ -625,7 +812,8 @@ const CreateLead = () => {
                       </div>
                       <Alert variant="success" className="mb-3">
                         <small>
-                          This lead/opportunity will be attributed to the selected CRM data record.
+                          This {isOpportunity ? "opportunity" : "lead"} will be attributed to the
+                          selected CRM data record.
                         </small>
                       </Alert>
                       <Card className="bg-light">
@@ -635,17 +823,25 @@ const CreateLead = () => {
                               <strong>Record ID:</strong> #{selectedCrmData.id}
                             </Col>
                             <Col md={6}>
-                              <strong>Phone:</strong> {selectedCrmData.phone || "N/A"}
+                              <strong>Phone:</strong>{" "}
+                              {selectedCrmData.phone || "N/A"}
                             </Col>
-                            {Object.entries(selectedCrmData.data || {}).slice(0, 4).map(([key, value]) => (
-                              <Col md={6} key={key} className="mt-2">
-                                <strong>{key}:</strong> {String(value) || "N/A"}
-                              </Col>
-                            ))}
-                            {Object.entries(selectedCrmData.data || {}).length > 4 && (
+                            {Object.entries(selectedCrmData.data || {})
+                              .slice(0, 4)
+                              .map(([key, value]) => (
+                                <Col md={6} key={key} className="mt-2">
+                                  <strong>{key}:</strong>{" "}
+                                  {String(value) || "N/A"}
+                                </Col>
+                              ))}
+                            {Object.entries(selectedCrmData.data || {}).length >
+                              4 && (
                               <Col md={12} className="mt-2">
                                 <small className="text-muted">
-                                  +{Object.entries(selectedCrmData.data || {}).length - 4} more fields
+                                  +
+                                  {Object.entries(selectedCrmData.data || {})
+                                    .length - 4}{" "}
+                                  more fields
                                 </small>
                               </Col>
                             )}
@@ -656,7 +852,12 @@ const CreateLead = () => {
                   )}
 
                   <div className="d-flex gap-2">
-                    <Button type="submit" variant="primary" className="app-button" disabled={loading}>
+                    <Button
+                      type="submit"
+                      variant="primary"
+                      className="app-button"
+                      disabled={loading}
+                    >
                       {loading ? (
                         "Creating..."
                       ) : (
@@ -666,10 +867,7 @@ const CreateLead = () => {
                         </>
                       )}
                     </Button>
-                    <Link
-                      href="/crm/leads"
-                      className="btn btn-info app-button"
-                    >
+                    <Link href={isOpportunity ? "/crm/opportunities" : "/crm/leads"} className="btn btn-info app-button">
                       Cancel
                     </Link>
                   </div>

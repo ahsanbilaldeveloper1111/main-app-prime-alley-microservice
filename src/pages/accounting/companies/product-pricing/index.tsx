@@ -65,7 +65,7 @@ const CompanyProductPricing = () => {
   const [formData, setFormData] = useState<ProductPricingCreateUpdatePayload>({
     product_id: "",
     selling_price: "",
-    is_active: true,
+    company_id: Number(companyId),
   });
 
   const [discountFormData, setDiscountFormData] = useState<DiscountApplicabilityCreateUpdatePayload>({
@@ -78,6 +78,7 @@ const CompanyProductPricing = () => {
     valid_from: "",
     valid_until: "",
     pricing_ids: [],
+    company_id: Number(companyId),
   });
 
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -369,9 +370,9 @@ const CompanyProductPricing = () => {
     setFormData({
       product_id: "",
       selling_price: "",
-      is_active: true,
+      company_id: Number(companyId),
     });
-  }, []);
+  }, [companyId]);
 
   const resetDiscountFormData = useCallback(() => {
     setDiscountFormData({
@@ -384,8 +385,9 @@ const CompanyProductPricing = () => {
       valid_from: "",
       valid_until: "",
       pricing_ids: [],
+      company_id: Number(companyId),
     });
-  }, []);
+  }, [companyId]);
 
   // Handle create pricing
   const handleCreatePricing = useCallback(async () => {
@@ -423,10 +425,10 @@ const CompanyProductPricing = () => {
     setFormData({
       product_id: pricing.product_id,
       selling_price: pricing.selling_price,
-      is_active: pricing.is_active,
+      company_id: Number(companyId),
     });
     setShowEditModal(true);
-  }, []);
+  }, [companyId]);
 
   // Handle update pricing
   const handleUpdatePricing = useCallback(async () => {
@@ -542,9 +544,10 @@ const CompanyProductPricing = () => {
       valid_from: moment(discount.valid_from).format("YYYY-MM-DD"),
       valid_until: moment(discount.valid_until).format("YYYY-MM-DD"),
       pricing_ids: discount.product_pricings.map(p => p.id),
+      company_id: Number(companyId),
     });
     setShowEditDiscountModal(true);
-  }, []);
+  }, [companyId]);
 
   const handleUpdateDiscount = useCallback(async () => {
     if (!selectedDiscount || !companyId) return;
@@ -853,24 +856,6 @@ const CompanyProductPricing = () => {
               </div>
             </div>
 
-            <div className="row">
-              <div className="col-md-6">
-                <div className="form-group mb-3">
-                  <div className="form-check">
-                    <input
-                      className="form-check-input"
-                      type="checkbox"
-                      id="createIsActive"
-                      checked={formData.is_active}
-                      onChange={(e) => handleInputChange("is_active", e.target.checked)}
-                    />
-                    <label className="form-check-label" htmlFor="createIsActive">
-                      Active
-                    </label>
-                  </div>
-                </div>
-              </div>
-            </div>
           </>
         }
         submitButtonText={isLoading || isLoadingProducts ? "Creating..." : "Create Pricing"}
@@ -932,24 +917,6 @@ const CompanyProductPricing = () => {
               </div>
             </div>
 
-            <div className="row">
-              <div className="col-md-6">
-                <div className="form-group mb-3">
-                  <div className="form-check">
-                    <input
-                      className="form-check-input"
-                      type="checkbox"
-                      id="editIsActive"
-                      checked={formData.is_active}
-                      onChange={(e) => handleInputChange("is_active", e.target.checked)}
-                    />
-                    <label className="form-check-label" htmlFor="editIsActive">
-                      Active
-                    </label>
-                  </div>
-                </div>
-              </div>
-            </div>
           </>
         }
         submitButtonText={isLoading || isLoadingProducts ? "Updating..." : "Update Pricing"}

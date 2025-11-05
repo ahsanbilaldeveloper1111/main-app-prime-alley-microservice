@@ -6,6 +6,7 @@ interface AudioPlayerProps {
     audioSrc: string;
     title?: string;
     showWaveform?: boolean;
+    autoPlay?: boolean;
 }
 
 export interface AudioPlayerRef {
@@ -17,7 +18,8 @@ export interface AudioPlayerRef {
 const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(({ 
     audioSrc, 
     title = "Call Recording",
-    showWaveform = false 
+    showWaveform = false ,
+    autoPlay = false
 }, ref) => {
     const [isPlaying, setIsPlaying] = useState(false);
     const [currentTime, setCurrentTime] = useState(0);
@@ -25,6 +27,7 @@ const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(({
     const [volume, setVolume] = useState(1);
     const [isMuted, setIsMuted] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
+    const [isDragging, setIsDragging] = useState(false);
     const audioRef = useRef<HTMLAudioElement>(null);
 
     // Expose methods to parent component
@@ -62,7 +65,12 @@ const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(({
         const audio = audioRef.current;
         if (!audio) return;
 
-        const updateTime = () => setCurrentTime(audio.currentTime);
+        const updateTime = () => {
+            // Only update time if not dragging to prevent seekbar jumping
+            if (!isDragging) {
+                setCurrentTime(audio.currentTime);
+            }
+        };
         const updateDuration = () => setDuration(audio.duration);
         const handleEnded = () => setIsPlaying(false);
         const handlePlay = () => setIsPlaying(true);
@@ -87,9 +95,16 @@ const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(({
             audio.removeEventListener('pause', handlePause);
             audio.removeEventListener('error', handleError);
         };
-    }, []);
+    }, [isDragging]);
+
+    useEffect(() => {
+        if (autoPlay) {
+            togglePlay();
+        }
+    }, [autoPlay]);
 
     const togglePlay = async () => {
+        console.log("REDASDA", audioRef.current);
         if (audioRef.current) {
             try {
                 setIsLoading(true);
@@ -97,7 +112,9 @@ const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(({
                     audioRef.current.pause();
                 } else {
                     // Ensure audio is loaded before playing
+                    console.log("REDASDA 2", audioRef.current.readyState);
                     if (audioRef.current.readyState < 2) {
+                        
                         await new Promise((resolve, reject) => {
                             const audio = audioRef.current!;
                             const handleCanPlay = () => {
@@ -115,6 +132,7 @@ const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(({
                             audio.load();
                         });
                     }
+                    console.log("REDASDA 3", audioRef.current.readyState);
                     await audioRef.current.play();
                 }
             } catch (error) {
@@ -128,6 +146,20 @@ const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(({
 
     const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
         const time = parseFloat(e.target.value);
+        setCurrentTime(time);
+        // Update audio time continuously while dragging for smooth scrubbing
+        if (audioRef.current) {
+            audioRef.current.currentTime = time;
+        }
+    };
+
+    const handleSeekMouseDown = () => {
+        setIsDragging(true);
+    };
+
+    const handleSeekMouseUp = (e: React.MouseEvent<HTMLInputElement> | React.TouchEvent<HTMLInputElement>) => {
+        setIsDragging(false);
+        const time = parseFloat(e.currentTarget.value);
         if (audioRef.current) {
             audioRef.current.currentTime = time;
             setCurrentTime(time);
@@ -167,14 +199,19 @@ const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(({
                 </i>
             </button>
             <div className="waveform-progress-container">
-                <div className="waveform-progress-bar">
-                    {Array.from({ length: 40 }, (_, i) => (
-                        <div
-                            key={i}
-                            className={`waveform-dot${(duration && (i / 40) * duration < currentTime) ? ' active' : ''}`}
-                        ></div>
-                    ))}
-                </div>
+                <input
+                    type="range"
+                    min="0"
+                    max={duration || 0}
+                    value={currentTime}
+                    step="0.1"
+                    className="audio-seekbar"
+                    onChange={handleSeek}
+                    onMouseDown={handleSeekMouseDown}
+                    onMouseUp={handleSeekMouseUp}
+                    onTouchStart={handleSeekMouseDown}
+                    onTouchEnd={handleSeekMouseUp}
+                />
             </div>
             <span className="audio-time">
                 {formatTime(currentTime)} / {formatTime(duration)}

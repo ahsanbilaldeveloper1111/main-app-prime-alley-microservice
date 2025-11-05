@@ -77,11 +77,16 @@ interface ChartData {
 
 import dynamic from 'next/dynamic';
 import { ApexOptions } from 'apexcharts';
-import { formatCurrency, formatMinutesAndSeconds, ModuleSlug  } from '@utils/Helper';
+import { formatCurrency, formatMinutesAndSeconds, ModuleSlug, GlobalDateTimeFormat, formatDateTimeToLocal } from '@utils/Helper';
 const ReactApexChart = dynamic(() => import('react-apexcharts'), { ssr: false });
 
 const CallStatsExtension = () => {
     const { data:session, status } = useSession();
+
+    const [showDateRange, setShowDateRange] = useState(false);
+    const [startDateTime, setStartDateTime] = useState<string>('');
+    const [endDateTime, setEndDateTime] = useState<string>('');
+
     const [loading, setLoading] = useState(false);
     const [activeTab, setActiveTab] = useState('calls_chart');
     
@@ -187,8 +192,11 @@ const CallStatsExtension = () => {
         avg_duration:0,
         avg_ring_time:0
     });
+
+    const [showPageLoader, setShowPageLoader] = useState(false);
     
     const fetchCallLogs = useCallback(async (page = 1, perPage = 15, search = "") => {
+        
         // Only fetch if filters are ready
         if (!filtersReady) {
             console.log('Filters not ready yet, skipping fetch');
@@ -197,14 +205,23 @@ const CallStatsExtension = () => {
         
         console.log('Fetching call logs with filters:', currentFilters);
         setLoading(true);
+        setShowPageLoader(true);
         
         try {
             
             const response = await ListCallLogs({ page, perPage, search, filters: currentFilters, reportType: 'statsExtension', 
-                moduleSlug: ModuleSlug.CALL_REPORTS }, 'call-logs/statsByExtension');
+                moduleSlug: ModuleSlug.CALL_REPORTS }, 'call-logs/statsByExtension').finally(() => {
+                  setShowPageLoader(false);
+                });
            
             
             if (response?.summary) {
+
+                setShowDateRange(true);
+                const dataFilters = response?.filters;
+                setStartDateTime(dataFilters?.start_datetime);
+                setEndDateTime(dataFilters?.end_datetime);
+
                 setSummary(response.summary);
                 setDataLoaded(true);
                 
@@ -604,7 +621,7 @@ const CallStatsExtension = () => {
     
     return (
         <React.Fragment>
-            <BreadcrumbItem mainTitle="" mainLink="" subTitle="Call Stats By Extension" />
+            <BreadcrumbItem mainTitle="" mainLink="" subTitle="Call Stats By Extension" showPageLoader={showPageLoader} />
 
 
             <Row className="mb-3">
@@ -617,6 +634,15 @@ const CallStatsExtension = () => {
                     <Col md={7} className="d-flex justify-content-end">
                       
                     <div className="action-buttons">
+
+                    {showDateRange && (
+                            <>
+                            <p className="mb-0">
+                            Date Range: <span className="status-badge primary">{formatDateTimeToLocal(startDateTime, GlobalDateTimeFormat)}</span> to <span className="status-badge primary">{formatDateTimeToLocal(endDateTime, GlobalDateTimeFormat)}</span>
+                            </p>
+                          
+                            </>
+                          )}
                     <CallLogsFilters
                        onFiltersChange={handleFiltersChange} onExport={handleExport} isVisibleCallDirection={false} moduleSlug={ModuleSlug.CALL_REPORTS} />
                     </div>

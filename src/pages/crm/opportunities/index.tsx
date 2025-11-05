@@ -28,8 +28,12 @@ import {
   FiXCircle,
 } from "react-icons/fi";
 import Link from "next/link";
+import { useSession } from "next-auth/react";
+import { ModuleSlug } from "@utils/Helper";
 
 const CrmOpportunities = () => {
+
+  const { data: session } = useSession();
   const [refreshKey, setRefreshKey] = useState<number>(0);
   const [currentFilters, setCurrentFilters] = useState<Record<string, any>>({});
   const [selectedOpportunity, setSelectedOpportunity] = useState<any>(null);
@@ -63,7 +67,7 @@ const CrmOpportunities = () => {
 
   const fetchExtensions = async () => {
     try {
-      const hierarchyData = await GetHierarchyData();
+      const hierarchyData = await GetHierarchyData(ModuleSlug.CRM_OPPORTUNITIES);
       if (hierarchyData?.extensions) {
         setExtensions(hierarchyData.extensions);
       }
@@ -110,7 +114,16 @@ const CrmOpportunities = () => {
         cell: (props: any) => (
           <div>
             <div className="fw-medium text-capitalize">{props.name || "Unnamed Lead"}</div>
-            <small className="text-muted">
+            <small 
+              className="text-muted" 
+              style={{
+                display: 'block',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                maxWidth: '300px'
+              }}
+            >
               {props.description || "No Description"}
             </small>
           </div>
@@ -131,36 +144,42 @@ const CrmOpportunities = () => {
         selector: (row: any) => row.stage?.name || "New",
         sortable: true,
         cell: (props: any) => (
-          <span className="status-badge primary">{props.stage?.name || "New"}</span>
+          <><span className="status-badge primary">{props.stage?.name || "New"}</span>
+          <br />
+          <small className="text-muted">{props?.lost_reason?.name}</small>
+          </>
         ),
       },
       {
         key: "status",
         name: "Status",
-        selector: (row: any) => row.status,
+        selector: (row: any) => {
+          const stageName = (row.stage?.name || "New").toLowerCase();
+          if (stageName.includes("new")) return "New";
+          if (stageName.includes("lost") || stageName.includes("won")) return "Closed";
+          return "In Progress";
+        },
         sortable: true,
         cell: (props: any) => {
-          const status = props.status || "new";
-          const isLost = props.is_lost || false;
+          const stageName = (props.stage?.name || "New").toLowerCase();
+          let status = "In Progress";
+          let statusClass = "info";
 
-          if (isLost) {
-            return (
-              <div>
-                <Badge bg="danger">Lost</Badge>
-                {props.lost_reason && (
-                  <div className="mt-1">
-                    <small className="text-muted">
-                      Reason: {props.lost_reason.name}
-                    </small>
-                  </div>
-                )}
-              </div>
-            );
+          if (stageName.includes("new")) {
+            status = "New";
+            statusClass = "primary";
+          } else if (stageName.includes("lost") || stageName.includes("won")) {
+            status = "Closed";
+            statusClass = "danger";
           }
 
+          if(props?.is_lost) {
+            status = "Lost";
+            statusClass = "danger";
+          }
           return (
-            <span className={`status-badge ${status === "new" ? "primary" : "info"}`}>
-              {status.charAt(0).toUpperCase() + status.slice(1)}
+            <span className={`status-badge text-capitalize ${statusClass}`}>
+              {status}
             </span>
           );
         },
@@ -178,36 +197,47 @@ const CrmOpportunities = () => {
           </span>
         ),
       },
+      
       {
         key: "Action",
         name: "ACTION",
         selector: (row: any) => row.id,
         sortable: false,
         cell: (props: any) => (
+
+          <>
+          {session?.user?.permissions?.includes('view-crm-opportunities') || session?.user?.permissions?.includes('edit-crm-opportunities') || session?.user?.permissions?.includes('mark-as-lost-crm-opportunities') || session?.user?.permissions?.includes('delete-crm-opportunities') ? (
           <DatatableActionButton
             actions={[
-              {
+
+              ...(session?.user?.permissions?.includes('edit-crm-opportunities') ? [{
                 label: 'Edit',
                 icon: <FiEdit className="me-2" />,
                 onClick: () => window.location.href = `/crm/leads/${props.id}/edit`,
-              },
-              ...(!props.is_lost ? [{
-                label: 'Mark as Lost',
+              }] : []),
+              
+              ...(session?.user?.permissions?.includes('mark-as-lost-crm-opportunities') ? [{
+                label: 'Mark Lost Reason',
                 icon: <FiXCircle className="me-2" />,
                 onClick: () => handleMarkLost(props),
               }] : []),
-              {
+
+              ...(session?.user?.permissions?.includes('delete-crm-opportunities') ? [{
                 label: 'Delete',
                 icon: <FiTrash2 className="me-2" />,
                 onClick: () => handleDeleteOpportunity(props),
                 className: 'text-danger',
-              },
+              }] : []),
             ]}
           />
+          ) : (
+            <></>
+            )}
+          </>
         ),
       },
     ],
-    [extensions] 
+    [extensions, session?.user?.permissions] 
   );
 
   const fetchOpportunities = useCallback(
@@ -273,22 +303,33 @@ const CrmOpportunities = () => {
        <PageHeader
          title="Opportunities"
          filters={
-           <CrmFilters onFiltersChange={setCurrentFilters} />
+          session?.user?.permissions?.includes('list-crm-opportunities') ? (
+            <CrmFilters onFiltersChange={setCurrentFilters} type="opportunity" />
+          ) : (
+            <></>
+          )
          }
-         showSearch={true}
+         showSearch={session?.user?.permissions?.includes('list-crm-opportunities')}
          searchPlaceholder="Search opportunities..."
          searchValue={currentFilters?.search || ""}
          onSearchChange={(value) => setCurrentFilters({...currentFilters, search: value})}
          buttons={
+          <>
+          {session?.user?.permissions?.includes('add-crm-opportunities') ? (
            <Link href="/crm/leads/create?type=opportunity" className="btn btn-primary">
              <FiPlus className="me-2" />
              New Opportunity
            </Link>
+           ) : (
+            <></>
+           )}
+           </>
          }
          leftGrid={3}
          rightGrid={9}
        />
 
+         {session?.user?.permissions?.includes('list-crm-opportunities') ? (
       <GenericListPage
         columns={columns}
         fetchData={fetchOpportunities}
@@ -299,6 +340,9 @@ const CrmOpportunities = () => {
         search={false}
         tableStyle="table-style-2"
       />
+      ) : (
+        <></>
+      )}
 
       {/* Delete Confirmation Modal */}
       <Modal show={showDeleteModal} onHide={() => setShowDeleteModal(false)}>
@@ -376,7 +420,7 @@ const CrmOpportunities = () => {
             Cancel
           </Button>
           <Button variant="warning" onClick={handleMarkLostSubmit}>
-            Mark as Lost
+            Mark Lost Reason
           </Button>
         </Modal.Footer>
       </Modal>

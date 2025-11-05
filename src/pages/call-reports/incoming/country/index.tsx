@@ -77,13 +77,19 @@ interface ChartData {
 
 import dynamic from 'next/dynamic';
 import { ApexOptions } from 'apexcharts';
-import { formatMinutesAndSeconds, formatCurrency, ModuleSlug } from '@utils/Helper';
+import { formatMinutesAndSeconds, formatCurrency, ModuleSlug, GlobalDateTimeFormat, formatDateTimeToLocal } from '@utils/Helper';
 const ReactApexChart = dynamic(() => import('react-apexcharts'), { ssr: false });
 
 const CallIncomingCountry = () => {
     const { data:session, status } = useSession();
+
+    const [showDateRange, setShowDateRange] = useState(false);
+    const [startDateTime, setStartDateTime] = useState<string>('');
+    const [endDateTime, setEndDateTime] = useState<string>('');
+
     const [loading, setLoading] = useState(false);
     const [activeTab, setActiveTab] = useState('calls_chart');
+    const [showPageLoader, setShowPageLoader] = useState(false);
     
     // Debug session state
     useEffect(() => {
@@ -170,7 +176,7 @@ const CallIncomingCountry = () => {
 
     const [refreshKey, setRefreshKey] = useState<number>(0);
     const [currentFilters, setCurrentFilters] = useState({
-      is_incoming_only: 'false'
+      is_incoming_only: 'true'
     });
     
     // Debug current filters state
@@ -190,6 +196,7 @@ const CallIncomingCountry = () => {
     });
     
     const fetchCallLogs = useCallback(async (page = 1, perPage = 15, search = "") => {
+        
         // Only fetch if filters are ready
         if (!filtersReady) {
             console.log('Filters not ready yet, skipping fetch');
@@ -197,12 +204,21 @@ const CallIncomingCountry = () => {
         }
         
         setLoading(true);
+        setShowPageLoader(true);
         
         try {
             const response = await ListCallLogs({ page, perPage, search, filters: currentFilters, reportType: 'incomingStatsCountry', 
-                moduleSlug: ModuleSlug.CALL_REPORTS }, 'call-logs/statsIncomingByCountry');
+                moduleSlug: ModuleSlug.CALL_REPORTS }, 'call-logs/statsIncomingByCountry').finally(() => {
+                  setShowPageLoader(false);
+                });
             
             if (response?.summary) {
+
+                setShowDateRange(true);
+                const dataFilters = response?.filters;
+                setStartDateTime(dataFilters?.start_datetime);
+                setEndDateTime(dataFilters?.end_datetime);
+
                 setSummary(response.summary);
                 setDataLoaded(true);
                 
@@ -556,7 +572,7 @@ const CallIncomingCountry = () => {
     
     return (
         <React.Fragment>
-            <BreadcrumbItem mainTitle="" mainLink="" subTitle="Call Incoming By Country" />
+            <BreadcrumbItem mainTitle="" mainLink="" subTitle="Incoming Calls By Country" showPageLoader={showPageLoader} />
 
 
             <Row className="mb-3">
@@ -564,10 +580,19 @@ const CallIncomingCountry = () => {
           <div className="page-header-title style-2">
             <Row className="d-flex justify-content-between align-items-center">
               <Col md={5}>
-                <h2 className="mb-0">Call Incoming By Country</h2>
+                <h2 className="mb-0">Incoming Calls By Country</h2>
               </Col>
               <Col md={7} className="d-flex justify-content-end">
                 <div className="action-buttons">
+
+                  {showDateRange && (
+                            <>
+                            <p className="mb-0">
+                            Date Range: <span className="status-badge primary">{formatDateTimeToLocal(startDateTime, GlobalDateTimeFormat)}</span> to <span className="status-badge primary">{formatDateTimeToLocal(endDateTime, GlobalDateTimeFormat)}</span>
+                            </p>
+                          
+                            </>
+                          )}
                   <CallLogsFilters
                     onFiltersChange={handleFiltersChange} 
                     onExport={handleExport} 

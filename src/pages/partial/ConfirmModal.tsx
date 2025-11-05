@@ -54,6 +54,24 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
       setIsValidConfirmation(confirmationText.trim().toLowerCase() === requiredConfirmationText.toLowerCase());
     }
   }, [confirmationText, requireTextConfirmation, requiredConfirmationText]);
+
+  // Handle Enter key to submit
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (show && e.key === 'Enter' && isValidConfirmation) {
+        e.preventDefault();
+        onConfirm(confirmationText);
+      }
+    };
+
+    if (show) {
+      window.addEventListener('keydown', handleKeyDown);
+    }
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [show, isValidConfirmation, onConfirm, confirmationText]);
   const handleConfirm = () => {
     if (isValidConfirmation) {
       onConfirm(confirmationText);

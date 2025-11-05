@@ -8,12 +8,14 @@ import tokenService from "../../utils/tokenService";
 import "../../assets/scss/sidebar.scss";
 
 import CompanyLogo from "@assets/images/ringedge-logo.png";
-import CompanyLogo2 from "@assets/images/ringedge-logo-black-n-blue.png";
+import CompanyLogo2 from "@assets/images/Prime3.png";
 
 import { authAPI } from "@utils/api";
 import { useAuth } from "../../hooks/useAuth";
 import { useTmsPermissions } from "../../hooks/useTmsPermissions";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
+
+import { FiChevronDown } from "react-icons/fi";
 
 // Destructure constants for easier use
 const { BASE_URL, DOM_SELECTORS, TIMING, MENU_LABELS, SUBMENU_LABELS, ICONS, PERMISSIONS } = HEADER_CONSTANTS;
@@ -269,11 +271,11 @@ const Header = ({ themeMode }: HeaderProps) => {
                             return;
                         }
                         
-                        console.log('Passed initial checks');
+                        //console.log('Passed initial checks');
                         // Check if pc-link nav-link parent has NoTab class
                         const parentLi = target.closest('li');
                         if (parentLi && parentLi.classList.contains('NoTab')) {
-                            console.log('yes');
+                            //console.log('yes');
                             // Hide submenu popup for NoTab elements
                             const submenuPopup = document.querySelector(DOM_SELECTORS.SUBMENU_POPUP) as HTMLElement;
                             if (submenuPopup) {
@@ -498,14 +500,22 @@ const Header = ({ themeMode }: HeaderProps) => {
             // Add tab pane menu events
             const addTabPaneMenuEvents = () => {
                 const menuItems = document.querySelectorAll(DOM_SELECTORS.MENU_ITEMS);
+                //console.log('Found menu items:', menuItems.length);
+                //console.log('Selector used:', DOM_SELECTORS.MENU_ITEMS);
                 
                 menuItems.forEach((menuItem) => {
+                    //console.log('Processing menu item:', menuItem);
                     const submenu = menuItem.querySelector('.pc-submenu') as HTMLElement;
-                    if (!submenu) return;
+                    if (!submenu) {
+                        //console.log('No submenu found for item:', menuItem);
+                        return;
+                    }
 
                     const parentLink = menuItem.querySelector('.pc-link') as HTMLElement;
                     if (parentLink && parentLink.parentElement === menuItem) {
+                        //console.log('Adding click handler to:', parentLink.textContent?.trim());
                         parentLink.addEventListener('click', function(e) {
+                            //console.log('Click event triggered on:', parentLink.textContent?.trim());
                             e.preventDefault();
                             e.stopPropagation();
                             
@@ -559,6 +569,7 @@ const Header = ({ themeMode }: HeaderProps) => {
                     }
                 });
             };
+
             
             // Initialize all events
             const navigationSuccess = addNavigationEvents();
@@ -574,9 +585,16 @@ const Header = ({ themeMode }: HeaderProps) => {
                     arrow.className = 'ph-duotone ph-caret-right';
                 }
             });
+
             
             if (!navigationSuccess) {
                 setTimeout(() => addNavigationEvents(), TIMING.RETRY_DELAY);
+            }
+
+            // Also retry tab pane menu events if no items found
+            if (document.querySelectorAll(DOM_SELECTORS.MENU_ITEMS).length === 0) {
+                //console.log('No menu items found, retrying...');
+                setTimeout(() => addTabPaneMenuEvents(), TIMING.RETRY_DELAY);
             }
         }, TIMING.DOM_RENDER_DELAY);
         
@@ -739,6 +757,15 @@ const Header = ({ themeMode }: HeaderProps) => {
             isMain:false,
             url: ''
         },
+        {
+            key: 'resources',
+            permission: "",
+            icon: ICONS.RESOURCES,
+            label: MENU_LABELS.RESOURCES,
+            target: '#pc-tab-resources',
+            isMain:false,
+            url: ''
+        },
        
     
         
@@ -783,49 +810,49 @@ const Header = ({ themeMode }: HeaderProps) => {
             items: [
                 {
                     key: 'dashboard-gsm-management',
-                    permission: 'dashboard-gsm-management',
+                    permission: PERMISSIONS.VIEW_GSM_DASHBOARD,
                     icon: ICONS.GAUGE,
                     label: SUBMENU_LABELS.GSM_DASHBOARD,
                     href: '/gsm/dashboard'
                 },
                 {
                     key: 'view-gsm-management',
-                    permission: 'view-gsm-management',
+                    permission: PERMISSIONS.VIEW_GSM_MANAGEMENT,
                     icon: ICONS.LIST,
                     label: SUBMENU_LABELS.GSM_LIST,
                     href: '/gsm/list'
                 },
                 {
                     key: 'view-gsm-assignment',
-                    permission: 'view-gsm-assignment',
+                    permission: PERMISSIONS.VIEW_GSM_ASSIGNMENT,
                     icon: ICONS.LIST,
                     label: SUBMENU_LABELS.COMPANY_ASSIGN,
                     href: '/gsm/assign'
                 },
                 {
                     key: 'view-gsm-ports',
-                    permission: 'view-gsm-ports',
+                    permission: PERMISSIONS.VIEW_GSM_PORTS,
                     icon: ICONS.LIST,
                     label: SUBMENU_LABELS.PORTS,
                     href: '/gsm/ports'
                 },
                 {
                     key: 'view-gsm-inbox',
-                    permission: 'view-gsm-inbox',
+                    permission: PERMISSIONS.VIEW_GSM_INBOX,
                     icon: ICONS.ENVELOPE,
                     label: SUBMENU_LABELS.INBOX,
                     href: '/gsm/inbox'
                 },
                 {
                     key: 'view-gsm-sync',
-                    permission: 'view-gsm-port-sync',
+                    permission: PERMISSIONS.VIEW_GSM_SYNC,
                     icon: ICONS.ARROWS_CLOCKWISE,
                     label: SUBMENU_LABELS.SYNC_GSM,
                     href: '/gsm/sync'
                 },
                 {
                     key: 'view-company-po',
-                    permission: 'view-gsm-company-profilling',
+                    permission: PERMISSIONS.VIEW_GSM_COMPANY_PROFILLING,
                     icon: ICONS.BUILDING,
                     label: SUBMENU_LABELS.COMPANY_PO,
                     href: '/gsm/company/po'
@@ -878,11 +905,11 @@ const Header = ({ themeMode }: HeaderProps) => {
                 //     href: '/ai-ml/transcriptions'
                 // },
                 {
-                    key: 'analyse-recordings-aiml',
+                    key: 'analyze-recordings-aiml',
                     permission: 'transcriptions-analysis-aiml',
                     icon: ICONS.FILE_ANALYTICS,
-                    label: SUBMENU_LABELS.ANALYSE_RECORDINGS,
-                    href: '/ai-ml/analyse-recordings'
+                    label: SUBMENU_LABELS.ANALYZE_RECORDINGS,
+                    href: '/ai-ml/analyze-recordings'
                 },
                 {
                     key: 'translate-aiml',
@@ -947,7 +974,7 @@ const Header = ({ themeMode }: HeaderProps) => {
                 },
                 {
                     key: 'view-cti-monitoring',
-                    permission: 'view-cti',
+                    permission: 'dashboard-cti',
                     icon: ICONS.PHONE_CALL,
                     label: SUBMENU_LABELS.CALL_MONITORING,
                     href: '/cti/monitoring'
@@ -1025,8 +1052,8 @@ const Header = ({ themeMode }: HeaderProps) => {
                     href: '/tickets/dashboard'
                 },
                 {
-                    key: 'tickets-tickets',
-                    permission: 'tickets-tickets',
+                    key: 'view-ticket-tickets',
+                    permission: 'view-ticket-tickets',
                     icon: ICONS.TICKETS,
                     label: SUBMENU_LABELS.TICKETS_LIST,
                     href: '/tickets/list'
@@ -1054,11 +1081,38 @@ const Header = ({ themeMode }: HeaderProps) => {
                 }
             ]
         },
+        {
+            id: 'pc-tab-resources',
+            title: MENU_LABELS.RESOURCES,
+            items: [
+                {
+                    key: 'faq',
+                    permission: '',
+                    icon: ICONS.FAQ,
+                    label: MENU_LABELS.FAQ,
+                    href: '/resources/faq'
+                },
+                {
+                    key: 'help-materials',
+                    permission: '',
+                    icon: ICONS.HELP_MATERIALS,
+                    label: MENU_LABELS.HELP_MATERIALS,
+                    href: '/resources/help-materials'
+                },
+                {
+                    key: 'contact-support',
+                    permission: '',
+                    icon: ICONS.CONTACT_SUPPORT,
+                    label: MENU_LABELS.CONTACT_SUPPORT,
+                    href: '/resources/contact-support'
+                }
+            ]
+        }
     ], []);
 
     // Reusable submenu item component
     const SubmenuItem = useCallback(({ item }: { item: SubmenuItem }) => {
-        if (!session?.user?.permissions?.includes(item.permission)) return null;
+        if (item.permission && !session?.user?.permissions?.includes(item.permission)) return null;
         
         const isActive = item.pathMatch ? router.asPath.includes(item.pathMatch) : false;
         
@@ -1196,48 +1250,71 @@ const Header = ({ themeMode }: HeaderProps) => {
         <div className="tab-pane" id="pc-tab-7" role="tabpanel" aria-labelledby="pc-tab-link-7" tabIndex={1}>
             <div className="pc-submenu-title">{MENU_LABELS.CRM}</div>
             <ul className="pc-navbar">
+
+                {session?.user?.permissions?.includes(PERMISSIONS.VIEW_CRM_DASHBOARD) && (
                                     <li className="pc-item">
                                         <Link className="pc-link" href={`${BASE_URL}/crm/dashboard`}>
                                             <span className="pc-micon"><i className={ICONS.GAUGE}></i></span>
                                             <span className="pc-mtext">{SUBMENU_LABELS.CRM_DASHBOARD}</span>
                                                 </Link>
                                             </li>
+                                            )}
+
+                {session?.user?.permissions?.includes(PERMISSIONS.VIEW_CRM_CAMPAIGNS) && (
                                             <li className="pc-item">
                                         <Link className="pc-link" href={`${BASE_URL}/crm/campaigns`}>
                                             <span className="pc-micon"><i className={ICONS.MEGAPHONE}></i></span>
                                             <span className="pc-mtext">{SUBMENU_LABELS.CAMPAIGNS}</span>
                                         </Link>
                                     </li>
+                                    )}
+
+
+                {session?.user?.permissions?.includes(PERMISSIONS.VIEW_CRM_DATA_MANAGEMENT) && (
                                     <li className="pc-item">
                                         <Link className="pc-link" href={`${BASE_URL}/crm/data`}>
                                             <span className="pc-micon"><i className={ICONS.DATABASE}></i></span>
                                             <span className="pc-mtext">{SUBMENU_LABELS.DATA_MANAGEMENT}</span>
                                                 </Link>
                                             </li>
+                                            )}
+
+
+                {session?.user?.permissions?.includes(PERMISSIONS.VIEW_CRM_LEADS) && (
                                     <li className="pc-item">
                                         <Link className="pc-link" href={`${BASE_URL}/crm/leads`}>
                                             <span className="pc-micon"><i className={ICONS.USERS}></i></span>
                                             <span className="pc-mtext">{SUBMENU_LABELS.LEADS}</span>
                                                 </Link>
                                             </li>
+                                            )}
+
+                {session?.user?.permissions?.includes(PERMISSIONS.VIEW_CRM_OPPORTUNITIES) && (
                                     <li className="pc-item">
                                         <Link className="pc-link" href={`${BASE_URL}/crm/opportunities`}>
                                             <span className="pc-micon"><i className={ICONS.TARGET}></i></span>
                                             <span className="pc-mtext">{SUBMENU_LABELS.OPPORTUNITIES}</span>
                                                 </Link>
                                             </li>
+                                            )}
+
+                {session?.user?.permissions?.includes(PERMISSIONS.VIEW_CRM_STAGES) && (
                                     <li className="pc-item">
                                         <Link className="pc-link" href={`${BASE_URL}/crm/stages`}>
                                             <span className="pc-micon"><i className={ICONS.TRENDING_UP}></i></span>
                                             <span className="pc-mtext">{SUBMENU_LABELS.STAGES}</span>
                                                 </Link>
                                             </li>
+                                            )}
+
+                {session?.user?.permissions?.includes(PERMISSIONS.VIEW_CRM_LOST_REASONS) && (
                                     <li className="pc-item">
                                         <Link className="pc-link" href={`${BASE_URL}/crm/lost-reasons`}>
                                             <span className="pc-micon"><i className={ICONS.X_CIRCLE}></i></span>
                                             <span className="pc-mtext">{SUBMENU_LABELS.LOST_REASONS_CRM}</span>
                                                 </Link>
                                             </li>
+                                            )}
                                 
                                    
                                         </ul>
@@ -1255,54 +1332,80 @@ const Header = ({ themeMode }: HeaderProps) => {
                         <span className="pc-mtext">Dashboard</span>
                     </Link>
                 </li> */}
+
+                {session?.user?.permissions?.includes(PERMISSIONS.VIEW_INVOICES_BILLING) && (
                 <li className="pc-item">
                     <Link className="pc-link" href={`${BASE_URL}/accounting/invoices`} >
                         <span className="pc-micon"><i className="ph-duotone ph-file-text"></i></span>
                         <span className="pc-mtext">Invoices</span>
                     </Link>
                 </li>
+                )}
+
+
+                {session?.user?.permissions?.includes(PERMISSIONS.VIEW_EXPENSES_BILLING) && (
                 <li className="pc-item">
                     <Link className="pc-link" href={`${BASE_URL}/accounting/expenses`} >
                         <span className="pc-micon"><i className="ph-duotone ph-credit-card"></i></span>
                         <span className="pc-mtext">Expenses</span>
                     </Link>
                 </li>
+                )}
+
+                {session?.user?.permissions?.includes(PERMISSIONS.VIEW_PRODUCTS_BILLING) && (
                 <li className="pc-item">
                     <Link className="pc-link" href={`${BASE_URL}/accounting/products`} >
                         <span className="pc-micon"><i className="ph-duotone ph-package"></i></span>
                         <span className="pc-mtext">Products</span>
                     </Link>
                 </li>
+                )}
+
+                {session?.user?.permissions?.includes(PERMISSIONS.VIEW_INVENTORY_BILLING) && (
                 <li className="pc-item">
                     <Link className="pc-link" href={`${BASE_URL}/accounting/inventory`} >
                         <span className="pc-micon"><i className="ph-duotone ph-warehouse"></i></span>
                         <span className="pc-mtext">Inventory</span>
                     </Link>
                 </li>
+                )}
+
+                {session?.user?.permissions?.includes(PERMISSIONS.VIEW_COMPANIES_BILLING) && (
                 <li className="pc-item">
                     <Link className="pc-link" href={`${BASE_URL}/accounting/companies`} >
                         <span className="pc-micon"><i className="ph-duotone ph-buildings"></i></span>
                         <span className="pc-mtext">Companies</span>
                     </Link>
                 </li>
+                )}
+
+                {session?.user?.permissions?.includes(PERMISSIONS.VIEW_RESSELLERS_BILLING) && (
                 <li className="pc-item">
                     <Link className="pc-link" href={`${BASE_URL}/accounting/resellers`} >
                         <span className="pc-micon"><i className="ph-duotone ph-users"></i></span>
                         <span className="pc-mtext">Resellers</span>
                     </Link>
                 </li>
+                )}
+
+                {session?.user?.permissions?.includes(PERMISSIONS.VIEW_LOCATIONS_BILLING) && (
                 <li className="pc-item">
                     <Link className="pc-link" href={`${BASE_URL}/accounting/locations`} >
                         <span className="pc-micon"><i className="ph-duotone ph-map-pin"></i></span>
                         <span className="pc-mtext">Locations</span>
                     </Link>
                 </li>
+                )}
+
+                {session?.user?.permissions?.includes(PERMISSIONS.VIEW_SUPPLIERS_BILLING) && (
                 <li className="pc-item">
                     <Link className="pc-link" href={`${BASE_URL}/accounting/suppliers`} >
                         <span className="pc-micon"><i className="ph-duotone ph-truck"></i></span>
                         <span className="pc-mtext">Suppliers</span>
                     </Link>
                 </li>
+                )}
+
             </ul>                       
         </div>
     ), []);
@@ -1588,11 +1691,29 @@ const Header = ({ themeMode }: HeaderProps) => {
                                                 <span className="pc-mtext">{MENU_LABELS.DASHBOARD}</span>
                                         </Link>
                                     </li>
+
+                                    {/* <li className="pc-item pc-caption" style={{
+                                        textAlign: "center",
+                                        backgroundColor: "#f8f9fa",
+                                        fontSize: "12px !important",
+                                        display: "flex",
+                                        alignItems: "between",
+                                        justifyContent: "center",
+                                        gap: "5px"
+                                    }}>
+                                        <span>Services</span> <i className="material-icons-two-tone" style={{display: "block",fontSize: "14px"}}>arrow_downward</i>
+                                    </li> */}
                                             
                                             {/* Dynamic Navigation Items */}
                                             {navigationItems.map((item) => {
                                                 // Special handling for Accounts and NetOps - show if user has any permissions or is admin
-                                                const shouldShow =  session?.user?.permissions?.includes(item.permission);
+                                                
+                                                let shouldShow: boolean = false;
+                                                if(item.permission !== ""){
+                                                 shouldShow =  session?.user?.permissions?.includes(item.permission) ||  false;
+                                                }else{
+                                                    shouldShow = true;
+                                                }
 
                                                 if (!shouldShow) return null;
 

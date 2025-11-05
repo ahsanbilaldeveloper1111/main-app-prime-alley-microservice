@@ -10,6 +10,7 @@ import { toast } from "react-toastify";
 import { FaSpinner } from "react-icons/fa";
 import "@assets/scss/login.scss";
 import Footer from "@components/Footer";
+import PageLoader from "@components/PageLoader";
 
 const Signin = () => {
   const [credentials, setCredentials] = useState({
@@ -80,9 +81,17 @@ const Signin = () => {
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    let nextValue = value;
+
+    if (name === "email") {
+      const atIndex = value.indexOf("@");
+      nextValue = atIndex === -1 ? value.replace(/@/g, "") : value.slice(0, atIndex);
+    }
+
     setCredentials({
       ...credentials,
-      [e.target.name]: e.target.value,
+      [name]: nextValue,
     });
   };
 
@@ -206,13 +215,7 @@ const Signin = () => {
 
          {/* Session Loading Overlay */}
          {(sessionLoading || (status === "authenticated" || status === "loading")) && (
-           <div className="session-loading-overlay">
-             <div className="session-loading-content">
-               <div className="session-loading-spinner">
-                 <FaSpinner className="fa-spin" />
-               </div>
-             </div>
-           </div>
+          <PageLoader isLoading={true} />
          )}
 
         {!sessionLoading && (
@@ -256,7 +259,7 @@ const Signin = () => {
                         value={credentials.email}
                         onChange={handleChange}
                       />
-                      <label htmlFor="email">Email Address</label>
+                      <label htmlFor="email">Username</label>
                       <small className="form-error" id="emailError"></small>
                     </div>
                     <div className="input-group">

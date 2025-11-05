@@ -24,6 +24,7 @@ import imgStatus2 from '@assets/images/widget/img-status-2.svg';
 import imgStatus3 from '@assets/images/widget/img-status-3.svg';
 import imgStatus4 from '@assets/images/widget/img-status-4.svg';
 import avatar from '@assets/images/user/avatar-3.jpg';
+import PageLoader from '@components/PageLoader';
 
 // Styles
 import '@assets/scss/datatable-style.scss';
@@ -90,7 +91,6 @@ const CallAnalysis = () => {
   const [callType, setCallType] = useState<string | null>(null);
   const [dataFound, setDataFound] = useState<boolean>(false);
   const [analysisComplete, setAnalysisComplete] = useState<boolean>(false);
-
   
   // Audio related state
   const [uuid, setUuid] = useState('');
@@ -155,7 +155,7 @@ const CallAnalysis = () => {
         // Disconnect socket when analysis is complete
         disconnectSocket();
       }
-      // Handle processing status
+      // Handle processing
       else if (data.status === 'processing') {
         setLoading(true);
       }
@@ -177,7 +177,7 @@ const CallAnalysis = () => {
     onError: (error) => {
       console.error('Analysis SSE error:', error);
       //toast.error(`WebSocket connection failed: ${error.message || error}`);
-      setError(error.message || 'Analysis connection failed');
+      //setError(error.message || 'Analysis connection failed');
       setLoading(false);
     },
     onOpen: () => {
@@ -303,7 +303,7 @@ const CallAnalysis = () => {
 
     
     try {
-      const response = await axiosInstance.get(`call-logs/recordings/download/${currentTrackId}`, {
+      const response = await axiosInstance.get(`call-logs/recordings/download/${currentTrackId}?extension_number=${ownerUsername}&node=${imagicle}`, {
         responseType: 'blob',
         headers: {
           'Accept': 'audio/*, application/octet-stream, */*'
@@ -1179,7 +1179,7 @@ const CallAnalysis = () => {
 
   } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
-      console.error('Error fetching transcription:', err);
+      //console.error('Error fetching transcription:', err);
   } finally {
       setLoading(false);
   }
@@ -1272,6 +1272,7 @@ const CallAnalysis = () => {
       <div className="analysis-container">
         {loading ? (
           <Row>
+            {/* <PageLoader isLoading={true} /> */}
             <Col md={12}>
               <div className="text-center p-5">
                 <Spinner animation="border" role="status">
