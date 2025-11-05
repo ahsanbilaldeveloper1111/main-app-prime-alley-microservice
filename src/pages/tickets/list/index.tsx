@@ -24,8 +24,7 @@ import { GetHierarchyData } from "@utils/users";
 import { GetAllStatuses } from "@utils/ticket-statuses";
 import { GetAllTypes } from "@utils/ticket-types";
 import { Column } from "@components/CustomDataTable";
-import { Button, Modal, Row } from "react-bootstrap";
-import { Col } from "react-bootstrap";
+import { Button, Modal, Row, Col, Card } from "react-bootstrap";
 import { toast } from "react-toastify";
 import { useTokenService } from "src/hooks/useTokenService";
 import { useSession } from "next-auth/react";
@@ -37,8 +36,9 @@ import {
   GetAllSubmoduleChildren,
 } from "@utils/ticket-module";
 import Select from "react-select";
+import CreatableSelect from "react-select/creatable";
 import TicketsFilters from "@components/filters/TicketFilters";
-import { ModuleSlug } from '@utils/Helper';
+import { ModuleSlug } from "@utils/Helper";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
@@ -46,11 +46,9 @@ import PageHeader from "@components/PageHeader";
 import FormModal from "../../partial/FormModal";
 import ConfirmModal from "@pages/partial/ConfirmModal";
 import SuccessfulModal from "@pages/partial/SuccessfulModal";
-import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
+import PageSummaryGrid, { SummaryCard } from "@components/PageSummaryGrid";
 import DatatableActionButton from "@components/DatatableActionButton";
-import { FiEdit, FiTrash2, FiEye,FiPlus } from "react-icons/fi";
-
-
+import { FiEdit, FiTrash2, FiEye, FiPlus } from "react-icons/fi";
 
 interface SelectOption {
   value: number;
@@ -61,7 +59,7 @@ const TicketList = () => {
   const { data: session, status } = useSession();
 
   const [refreshKey, setRefreshKey] = useState<number>(0);
-  const [currentFilters, setCurrentFilters] = useState({search: ""});
+  const [currentFilters, setCurrentFilters] = useState({ search: "" });
 
   const [statuses, setStatuses] = useState<any>([]);
   const [modules, setModules] = useState<any>([]);
@@ -73,11 +71,20 @@ const TicketList = () => {
   // Comment-related states
   const [comments, setComments] = useState<any[]>([]);
   const [assigneeComments, setAssigneeComments] = useState<any[]>([]);
+  const [commentAttachmentImages, setCommentAttachmentImages] = useState<{
+    [key: number]: string;
+  }>({});
+  const [assigneeCommentAttachmentImages, setAssigneeCommentAttachmentImages] =
+    useState<{ [key: number]: string }>({});
   const [newComment, setNewComment] = useState<string>("");
   const [newAssigneeComment, setNewAssigneeComment] = useState<string>("");
+  const [newCommentAttachment, setNewCommentAttachment] = useState<File | null>(
+    null
+  );
+  const [newAssigneeCommentAttachment, setNewAssigneeCommentAttachment] =
+    useState<File | null>(null);
   const [showComments, setShowComments] = useState<boolean>(false);
   const [isLoadingComments, setIsLoadingComments] = useState<boolean>(false);
-
 
   const columns: Column[] = useMemo(
     () => [
@@ -108,7 +115,9 @@ const TicketList = () => {
           const typeName = props?.type?.name;
 
           return (
-            <span className="status-badge info text-capitalize">{typeName}</span>
+            <span className="status-badge info text-capitalize">
+              {typeName}
+            </span>
           );
         },
       },
@@ -132,14 +141,32 @@ const TicketList = () => {
         name: "User Extension",
         selector: (row: any) => row.user_extension,
         sortable: true,
-        cell: (props: any) => (
-          <span className="status-badge primary">
-            {extensions.find(
-              (extension: any) => extension.id == props.user_extension
-            )?.display_name || props.user_extension}
-            {!props.user_extension && "Not assigned"}
-          </span>
-        ),
+        cell: (props: any) => {
+          const userExtensions = Array.isArray(props.user_extension)
+            ? props.user_extension
+            : props.user_extension
+            ? [props.user_extension]
+            : [];
+          
+          if (userExtensions.length === 0) {
+            return <span className="status-badge primary">Not assigned</span>;
+          }
+          
+          return (
+            <div className="d-flex flex-wrap gap-1">
+              {userExtensions.map((extId: any, index: number) => {
+                const ext = extensions.find(
+                  (extension: any) => extension.id.toString() === extId.toString()
+                );
+                return (
+                  <span key={index} className="status-badge primary">
+                    {ext?.display_name || extId}
+                  </span>
+                );
+              })}
+            </div>
+          );
+        },
       },
       {
         key: "created_by",
@@ -240,24 +267,49 @@ const TicketList = () => {
         cell: (props: any) => (
           <DatatableActionButton
             actions={[
-              ...(session?.user?.permissions?.includes("view-ticket-tickets") ? [{
-                label: 'View',
-                icon: <FiEye />,
-                onClick: () => handleViewTicket(props),
-                className: 'gap-2'
-              }] : []),
-              ...(session?.user?.permissions?.includes("edit-ticket-tickets") ? [{
-                label: 'Edit',
-                icon: <FiEdit />,
-                onClick: () => handleEditTicket(props),
-                className: 'gap-2'
-              }] : []),
-              ...(session?.user?.permissions?.includes("delete-ticket-tickets") ? [{
-                label: props.user_extension ? 'Delete (Assigned)' : 'Delete',
-                icon: <FiTrash2 />,
-                onClick: () => props.user_extension ? null : handleDeleteTicket(props),
-                className: props.user_extension ? 'text-muted gap-2' : 'text-danger gap-2'
-              }] : [])
+              ...(session?.user?.permissions?.includes("view-ticket-tickets")
+                ? [
+                    {
+                      label: "View",
+                      icon: <FiEye />,
+                      onClick: () => handleViewTicket(props),
+                      className: "gap-2",
+                    },
+                  ]
+                : []),
+              ...(session?.user?.permissions?.includes("edit-ticket-tickets")
+                ? [
+                    {
+                      label: "Edit",
+                      icon: <FiEdit />,
+                      onClick: () => handleEditTicket(props),
+                      className: "gap-2",
+                    },
+                  ]
+                : []),
+              ...(session?.user?.permissions?.includes("delete-ticket-tickets")
+                ? [
+                    {
+                      label: (Array.isArray(props.user_extension)
+                        ? props.user_extension.length > 0
+                        : props.user_extension)
+                        ? "Delete (Assigned)"
+                        : "Delete",
+                      icon: <FiTrash2 />,
+                      onClick: () =>
+                        (Array.isArray(props.user_extension)
+                          ? props.user_extension.length > 0
+                          : props.user_extension)
+                          ? null
+                          : handleDeleteTicket(props),
+                      className: (Array.isArray(props.user_extension)
+                        ? props.user_extension.length > 0
+                        : props.user_extension)
+                        ? "text-muted gap-2"
+                        : "text-danger gap-2",
+                    },
+                  ]
+                : []),
             ]}
           />
         ),
@@ -311,9 +363,9 @@ const TicketList = () => {
       return await ListTickets({
         page,
         perPage,
-        search:currentFilters.search || search,
+        search: currentFilters.search || search,
         filters: memoizedFilters,
-        moduleSlug: ModuleSlug.TICKET
+        moduleSlug: ModuleSlug.TICKET,
       });
     },
     [memoizedFilters, currentFilters]
@@ -327,27 +379,43 @@ const TicketList = () => {
   const [showViewTicketModal, setShowViewTicketModal] =
     useState<boolean>(false);
   const [viewTicketData, setViewTicketData] = useState<any>([]);
-  const [viewTicketImage, setViewTicketImage] = useState<string>("");
+  const [viewTicketImages, setViewTicketImages] = useState<string[]>([]);
   const [showImageModal, setShowImageModal] = useState<boolean>(false);
   const [selectedImage, setSelectedImage] = useState<string>("");
 
-  function loadImg(imgPath: string) {
-    if (viewTicketImage) {
-      // URL.revokeObjectURL(viewTicketImage);
+  function loadImgs(imgPaths: string[] | string) {
+    const paths = Array.isArray(imgPaths)
+      ? imgPaths
+      : [imgPaths].filter(Boolean);
+    if (paths.length === 0) {
+      setViewTicketImages([]);
+      return;
     }
-    loadImage(imgPath).then((res: any) => {
-      console.log("ze ran", res);
-      // const url = URL.createObjectURL(res);
-      setViewTicketImage(res);
-    });
+
+    Promise.all(paths.map((path) => loadImage(path)))
+      .then((results: any[]) => {
+        setViewTicketImages(results.filter(Boolean));
+      })
+      .catch((error) => {
+        console.error("Error loading images:", error);
+        setViewTicketImages([]);
+      });
   }
 
   useEffect(() => {
     console.log("ZE RAN");
     if (viewTicketData?.image) {
-      loadImg(viewTicketData.image);
+      // Handle both array and single image
+      const images = Array.isArray(viewTicketData.image)
+        ? viewTicketData.image
+        : [viewTicketData.image].filter(Boolean);
+      if (images.length > 0) {
+        loadImgs(images);
+      } else {
+        setViewTicketImages([]);
+      }
     } else {
-      setViewTicketImage("");
+      setViewTicketImages([]);
     }
   }, [viewTicketData, viewTicketData?.image]);
 
@@ -356,8 +424,12 @@ const TicketList = () => {
     // Reset comment states when closing
     setComments([]);
     setAssigneeComments([]);
+    setCommentAttachmentImages({});
+    setAssigneeCommentAttachmentImages({});
     setNewComment("");
     setNewAssigneeComment("");
+    setNewCommentAttachment(null);
+    setNewAssigneeCommentAttachment(null);
     setShowComments(false);
   }, []);
 
@@ -373,19 +445,22 @@ const TicketList = () => {
       console.log("Raw comments data:", commentsData);
       console.log("Raw assignee comments data:", assigneeCommentsData);
 
+      let processedComments: any[] = [];
+      let processedAssigneeComments: any[] = [];
+
       // Extract comments from the nested response structure
       if (commentsData?.data?.data) {
         console.log(
           "Setting comments from data.data.data:",
           commentsData.data.data
         );
-        setComments(commentsData.data.data);
+        processedComments = commentsData.data.data;
       } else if (commentsData?.data) {
         console.log("Setting comments from data.data:", commentsData.data);
-        setComments(commentsData.data);
+        processedComments = commentsData.data;
       } else {
         console.log("No comments data found, setting empty array");
-        setComments([]);
+        processedComments = [];
       }
 
       if (assigneeCommentsData?.data?.data) {
@@ -393,17 +468,74 @@ const TicketList = () => {
           "Setting assignee comments from data.data.data:",
           assigneeCommentsData.data.data
         );
-        setAssigneeComments(assigneeCommentsData.data.data);
+        processedAssigneeComments = assigneeCommentsData.data.data;
       } else if (assigneeCommentsData?.data) {
         console.log(
           "Setting assignee comments from data.data:",
           assigneeCommentsData.data
         );
-        setAssigneeComments(assigneeCommentsData.data);
+        processedAssigneeComments = assigneeCommentsData.data;
       } else {
         console.log("No assignee comments data found, setting empty array");
-        setAssigneeComments([]);
+        processedAssigneeComments = [];
       }
+
+      setComments(processedComments);
+      setAssigneeComments(processedAssigneeComments);
+
+      // Load comment attachment images
+      const commentImagePromises = processedComments
+        .filter((comment: any) => comment.attachment)
+        .map(async (comment: any) => {
+          try {
+            const imageUrl = await loadImage(comment.attachment);
+            return { commentId: comment.id, imageUrl };
+          } catch (error) {
+            console.error(
+              `Error loading image for comment ${comment.id}:`,
+              error
+            );
+            return { commentId: comment.id, imageUrl: null };
+          }
+        });
+
+      const assigneeImagePromises = processedAssigneeComments
+        .filter((comment: any) => comment.attachment)
+        .map(async (comment: any) => {
+          try {
+            const imageUrl = await loadImage(comment.attachment);
+            return { commentId: comment.id, imageUrl };
+          } catch (error) {
+            console.error(
+              `Error loading image for assignee comment ${comment.id}:`,
+              error
+            );
+            return { commentId: comment.id, imageUrl: null };
+          }
+        });
+
+      const [commentImageResults, assigneeImageResults] = await Promise.all([
+        Promise.all(commentImagePromises),
+        Promise.all(assigneeImagePromises),
+      ]);
+
+      // Create maps of comment ID to image URL
+      const commentImageMap: { [key: number]: string } = {};
+      commentImageResults.forEach(({ commentId, imageUrl }) => {
+        if (imageUrl) {
+          commentImageMap[commentId] = imageUrl;
+        }
+      });
+
+      const assigneeImageMap: { [key: number]: string } = {};
+      assigneeImageResults.forEach(({ commentId, imageUrl }) => {
+        if (imageUrl) {
+          assigneeImageMap[commentId] = imageUrl;
+        }
+      });
+
+      setCommentAttachmentImages(commentImageMap);
+      setAssigneeCommentAttachmentImages(assigneeImageMap);
     } catch (error) {
       console.error("Error fetching comments:", error);
       toast.error("Failed to fetch comments");
@@ -466,15 +598,41 @@ const TicketList = () => {
         return;
       }
 
+      // Validate attachment if provided
+      if (newCommentAttachment) {
+        if (!newCommentAttachment.type?.includes("image/")) {
+          toast.error("Attachment must be an image (jpeg, png, jpg, gif)");
+          return;
+        }
+        const maxSize = 5 * 1024 * 1024; // 5 MB in bytes
+        if (newCommentAttachment.size > maxSize) {
+          toast.error("Attachment size must be less than 5MB");
+          return;
+        }
+      }
+
       try {
         setCreatingTicket(true);
+        // Get first user extension for comment (backward compatibility)
+        const userExtension = Array.isArray(viewTicketData.user_extension)
+          ? viewTicketData.user_extension[0] || ""
+          : viewTicketData.user_extension || "";
         const response = await AddComment(
           ticketId,
           newComment.trim(),
-          viewTicketData.user_extension || ""
+          userExtension,
+          newCommentAttachment || undefined
         );
         if (response) {
           setNewComment("");
+          setNewCommentAttachment(null);
+          // Reset file input
+          const fileInput = document.getElementById(
+            "newCommentAttachment"
+          ) as HTMLInputElement;
+          if (fileInput) {
+            fileInput.value = "";
+          }
           // Refresh comments
           fetchComments(ticketId);
         }
@@ -484,25 +642,82 @@ const TicketList = () => {
         setCreatingTicket(false);
       }
     },
-    [newComment, viewTicketData]
+    [newComment, newCommentAttachment, viewTicketData, fetchComments]
   );
 
   const handleAddAssigneeComment = useCallback(
     async (ticketId: string) => {
+      // Check permission before allowing comment
+      if (!viewTicketData || !session?.user) {
+        toast.error("Unable to add comment");
+        return;
+      }
+      
+      const isSuperAdmin = session.user.is_admin === '1' || String(session.user.is_admin) === '1';
+      const userPhone = session.user.phone;
+      
+      if (!isSuperAdmin && userPhone) {
+        const userExtensions = Array.isArray(viewTicketData.user_extension)
+          ? viewTicketData.user_extension
+          : viewTicketData.user_extension
+          ? [viewTicketData.user_extension]
+          : [];
+        
+        const isAssigned = userExtensions.some((ext: any) => {
+          const extString = String(ext);
+          const phoneString = String(userPhone);
+          return extString === phoneString;
+        });
+        
+        if (!isAssigned) {
+          toast.error("Only assigned users can add assignee comments");
+          return;
+        }
+      } else if (!isSuperAdmin && !userPhone) {
+        toast.error("Unable to verify assignment");
+        return;
+      }
+
       if (!newAssigneeComment.trim()) {
         toast.error("Please enter an assignee comment");
         return;
       }
 
+      // Validate attachment if provided
+      if (newAssigneeCommentAttachment) {
+        if (!newAssigneeCommentAttachment.type?.includes("image/")) {
+          toast.error("Attachment must be an image (jpeg, png, jpg, gif)");
+          return;
+        }
+        const maxSize = 5 * 1024 * 1024; // 5 MB in bytes
+        if (newAssigneeCommentAttachment.size > maxSize) {
+          toast.error("Attachment size must be less than 5MB");
+          return;
+        }
+      }
+
       try {
         setCreatingTicket(true);
+        // Get first user extension for comment (backward compatibility)
+        const userExtension = Array.isArray(viewTicketData.user_extension)
+          ? viewTicketData.user_extension[0] || ""
+          : viewTicketData.user_extension || "";
         const response = await AddAssigneeComment(
           ticketId,
           newAssigneeComment.trim(),
-          viewTicketData.user_extension || ""
+          userExtension,
+          newAssigneeCommentAttachment || undefined
         );
         if (response) {
           setNewAssigneeComment("");
+          setNewAssigneeCommentAttachment(null);
+          // Reset file input
+          const fileInput = document.getElementById(
+            "newAssigneeCommentAttachment"
+          ) as HTMLInputElement;
+          if (fileInput) {
+            fileInput.value = "";
+          }
           // Refresh comments
           fetchComments(ticketId);
         }
@@ -512,8 +727,41 @@ const TicketList = () => {
         setCreatingTicket(false);
       }
     },
-    [newAssigneeComment, viewTicketData]
+    [
+      newAssigneeComment,
+      newAssigneeCommentAttachment,
+      viewTicketData,
+      fetchComments,
+      session?.user,
+    ]
   );
+
+  // Check if user can add assignee comments (must be assigned to ticket or super admin)
+  const canAddAssigneeComment = useMemo(() => {
+    if (!viewTicketData || !session?.user) return false;
+    
+    // Super admin can always add assignee comments
+    if (session.user.is_admin === '1' || String(session.user.is_admin) === '1') {
+      return true;
+    }
+    
+    // Check if user's phone/extension is in the ticket's user_extension
+    const userPhone = session.user.phone;
+    if (!userPhone) return false;
+    
+    const userExtensions = Array.isArray(viewTicketData.user_extension)
+      ? viewTicketData.user_extension
+      : viewTicketData.user_extension
+      ? [viewTicketData.user_extension]
+      : [];
+    
+    // Check if user's phone matches any assigned extension
+    return userExtensions.some((ext: any) => {
+      const extString = String(ext);
+      const phoneString = String(userPhone);
+      return extString === phoneString;
+    });
+  }, [viewTicketData, session?.user]);
 
   const toggleComments = useCallback(() => {
     setShowComments(!showComments);
@@ -523,6 +771,11 @@ const TicketList = () => {
   const [selectedTicketTitle, setSelectedTicketTitle] = useState<any>(null);
   const [selectedTicketDescription, setSelectedTicketDescription] =
     useState<any>(null);
+  const [selectedTicketNewImages, setSelectedTicketNewImages] = useState<
+    File[]
+  >([]);
+  const [selectedTicketExistingImages, setSelectedTicketExistingImages] = useState<string[]>([]);
+  const [selectedTicketTags, setSelectedTicketTags] = useState<string[]>([]);
   const [showEditTicketModal, setShowEditTicketModal] =
     useState<boolean>(false);
   const [showDeleteTicketModal, setShowDeleteTicketModal] =
@@ -558,9 +811,51 @@ const TicketList = () => {
       return;
     }
 
+    // Validate new images if provided
+    if (selectedTicketNewImages && selectedTicketNewImages.length > 0) {
+      const maxSize = 5 * 1024 * 1024; // 5 MB in bytes
+      for (let i = 0; i < selectedTicketNewImages.length; i++) {
+        const image = selectedTicketNewImages[i];
+        if (!image.type?.includes("image/")) {
+          toast.error(
+            `Attachment ${i + 1} must be an image (jpeg, png, jpg, gif)`
+          );
+          return;
+        }
+        if (image.size > maxSize) {
+          toast.error(`Attachment ${i + 1} size must be less than 5MB`);
+          return;
+        }
+      }
+    }
+
+    // Check total image count (max 3)
+    const totalImages = selectedTicketExistingImages.length + selectedTicketNewImages.length;
+    if (totalImages > 3) {
+      toast.error(`Maximum 3 images allowed. You have ${totalImages} images (${selectedTicketExistingImages.length} existing + ${selectedTicketNewImages.length} new). Please remove some images.`);
+      return;
+    }
+
+    // Combine existing images (strings) with new images (Files)
+    const allImages: (string | File)[] = [
+      ...selectedTicketExistingImages, // Existing images as strings
+      ...selectedTicketNewImages, // New images as Files
+    ];
+
     setCreatingTicket(true);
     let response = null;
     try {
+      // Only include user_extension if user has assign-user permission
+      let userExtensionArray = undefined;
+      if (session?.user?.permissions?.includes("assign-user-tickets")) {
+        userExtensionArray = Array.isArray(selectedTicket.user_extension)
+          ? selectedTicket.user_extension
+          : selectedTicket.user_extension
+          ? [selectedTicket.user_extension]
+          : [];
+        userExtensionArray = userExtensionArray.length > 0 ? userExtensionArray : undefined;
+      }
+      
       response = await UpdateTicketDetails(
         selectedTicket.id,
         selectedTicketTitle,
@@ -570,9 +865,11 @@ const TicketList = () => {
         selectedTicket.module_id,
         selectedTicket.submodule_id,
         selectedTicket.submodule_child_id,
-        selectedTicket.user_extension,
+        userExtensionArray,
         selectedTicket.priority,
-        selectedTicket.due_date
+        selectedTicket.due_date,
+        allImages.length > 0 ? allImages : undefined,
+        selectedTicketTags.length > 0 ? selectedTicketTags : undefined
       );
     } catch (error) {
       console.error("Error updating ticket details:", error);
@@ -584,11 +881,21 @@ const TicketList = () => {
       setSelectedTicket(null);
       setSelectedTicketTitle(null);
       setSelectedTicketDescription(null);
+      setSelectedTicketNewImages([]);
+      setSelectedTicketExistingImages([]);
+      setSelectedTicketTags([]);
       setShowEditTicketModal(false);
       setRefreshKey((prev) => prev + 1); // Trigger refresh
     }
-  }, [selectedTicket, selectedTicketTitle, selectedTicketDescription]);
-
+  }, [
+    selectedTicket,
+    selectedTicketTitle,
+    selectedTicketDescription,
+    selectedTicketNewImages,
+    selectedTicketExistingImages,
+    selectedTicketTags,
+    session?.user?.permissions,
+  ]);
 
   const handleDeleteTicket = useCallback((props: any) => {
     setSelectedTicket(props.id);
@@ -616,8 +923,10 @@ const TicketList = () => {
 
   const [newTicketPriority, setNewTicketPriority] = useState<string>("");
   const [newTicketDueDate, setNewTicketDueDate] = useState<string>("");
+  const [newTicketUserExtension, setNewTicketUserExtension] = useState<string[]>([]);
 
-  const [newTicketImage, setNewTicketImage] = useState<File | null>(null);
+  const [newTicketImages, setNewTicketImages] = useState<File[]>([]);
+  const [newTicketTags, setNewTicketTags] = useState<string[]>([]);
 
   // Add state for submodules and submodule children
   const [newTicketSubmodule, setNewTicketSubmodule] = useState<string>("");
@@ -626,16 +935,19 @@ const TicketList = () => {
   const [submodules, setSubmodules] = useState<any[]>([]);
   const [submoduleChildren, setSubmoduleChildren] = useState<any[]>([]);
   const [creatingTicket, setCreatingTicket] = useState<boolean>(false);
+
+  // Default tags suggestions
+  const defaultTags = [
+    "urgent",
+    "bug",
+    "feature",
+    "enhancement",
+    "documentation"
+  ];
   console.log("ZE UES IS ", session);
   const handleSubmitCreateTicket = useCallback(async () => {
     console.log("=== COMPONENT DEBUG ===");
-    console.log(
-      "newTicketImage type:",
-      typeof newTicketImage,
-      newTicketImage instanceof File
-    );
-    console.log("newTicketImage MIME type:", newTicketImage?.type);
-    console.log("newTicketImage size:", newTicketImage?.size);
+    console.log("newTicketImages count:", newTicketImages.length);
     if (!newTicketTitle?.trim() || newTicketTitle?.trim()?.length < 5) {
       toast.error("Please enter a ticket title (Min: 5 chars)");
       return;
@@ -683,32 +995,52 @@ const TicketList = () => {
     if (newTicketDueDate) {
       formData.append("due_date", newTicketDueDate);
     }
-    if (newTicketImage) {
-      // sometimes|image|mimes:jpeg,png,jpg,gif|max:5120
-      console.log("newTicketImage type:", newTicketImage);
-      if (!newTicketImage?.type?.includes("image/")) {
-        toast.error("Attachment must be an image (jpeg, png, jpg, gif)");
-        return;
-      }
+    if (session?.user?.permissions?.includes("assign-user-tickets") && newTicketUserExtension && newTicketUserExtension.length > 0) {
+      newTicketUserExtension.forEach((ext) => {
+        formData.append("user_extension[]", ext);
+      });
+    }
+    if (newTicketTags && newTicketTags.length > 0) {
+      newTicketTags.forEach((tag) => {
+        formData.append("tags[]", tag);
+      });
+    }
+    if (newTicketImages && newTicketImages.length > 0) {
       const maxSize = 5 * 1024 * 1024; // 5 MB in bytes
-      console.log(
-        "newTicketImage type IMAGE SIZE IN MB :",
-        newTicketImage?.size / (1024 * 1024)
-      );
-      if (newTicketImage?.size > maxSize) {
-        toast.error("Attachment size must be less than 5MB");
-        return;
+
+      // Validate all images
+      for (let i = 0; i < newTicketImages.length; i++) {
+        const image = newTicketImages[i];
+        if (!image.type?.includes("image/")) {
+          toast.error(
+            `Attachment ${i + 1} must be an image (jpeg, png, jpg, gif)`
+          );
+          return;
+        }
+        if (image.size > maxSize) {
+          toast.error(`Attachment ${i + 1} size must be less than 5MB`);
+          return;
+        }
       }
-      formData.append("image", newTicketImage);
+
+      // Append all images
+      newTicketImages.forEach((image) => {
+        formData.append("image[]", image);
+      });
     }
 
     // Debug FormData contents
     console.log("FormData created successfully");
-    console.log("FormData has image:", newTicketImage ? "Yes" : "No");
-    if (newTicketImage) {
-      console.log("Image name:", newTicketImage.name);
-      console.log("Image type:", newTicketImage.type);
-      console.log("Image size:", newTicketImage.size);
+    console.log(
+      "FormData has images:",
+      newTicketImages.length > 0 ? `Yes (${newTicketImages.length})` : "No"
+    );
+    if (newTicketImages.length > 0) {
+      newTicketImages.forEach((image, index) => {
+        console.log(`Image ${index + 1} name:`, image.name);
+        console.log(`Image ${index + 1} type:`, image.type);
+        console.log(`Image ${index + 1} size:`, image.size);
+      });
     }
     setCreatingTicket(true);
     console.log(
@@ -737,7 +1069,9 @@ const TicketList = () => {
       setNewTicketSubmoduleChild("");
       setNewTicketPriority("");
       setNewTicketDueDate("");
-      setNewTicketImage(null);
+      setNewTicketUserExtension([]);
+      setNewTicketTags([]);
+      setNewTicketImages([]);
       setSubmodules([]);
       setSubmoduleChildren([]);
       setShowCreateTicketModal(false);
@@ -753,7 +1087,9 @@ const TicketList = () => {
     newTicketSubmoduleChild,
     newTicketPriority,
     newTicketDueDate,
-    newTicketImage,
+    newTicketUserExtension,
+    newTicketTags,
+    newTicketImages,
     session?.user?.email,
   ]);
 
@@ -773,13 +1109,15 @@ const TicketList = () => {
     setNewTicketSubmoduleChild("");
     setNewTicketPriority("");
     setNewTicketDueDate("");
-    setNewTicketImage(null);
+    setNewTicketUserExtension([]);
+    setNewTicketTags([]);
+    setNewTicketImages([]);
     setSubmodules([]);
     setSubmoduleChildren([]);
 
     // Reset the file input element
     const fileInput = document.getElementById(
-      "newTicketImage"
+      "newTicketImages"
     ) as HTMLInputElement;
     if (fileInput) {
       fileInput.value = "";
@@ -789,10 +1127,18 @@ const TicketList = () => {
     () => setShowEditTicketModal(true),
     []
   );
-  const closeEditTicketModal = useCallback(
-    () => setShowEditTicketModal(false),
-    []
-  );
+  const closeEditTicketModal = useCallback(() => {
+    setShowEditTicketModal(false);
+    setSelectedTicketNewImages([]);
+    setSelectedTicketExistingImages([]);
+    // Reset file input
+    const fileInput = document.getElementById(
+      "editTicketImages"
+    ) as HTMLInputElement;
+    if (fileInput) {
+      fileInput.value = "";
+    }
+  }, []);
   const openDeleteTicketModal = useCallback(
     () => setShowDeleteTicketModal(true),
     []
@@ -881,6 +1227,23 @@ const TicketList = () => {
       setSelectedTicket(props);
       setSelectedTicketTitle(props.title);
       setSelectedTicketDescription(props.description);
+      // Set tags from props
+      const tagsArray = Array.isArray(props.tags)
+        ? props.tags
+        : props.tags
+        ? [props.tags]
+        : [];
+      setSelectedTicketTags(tagsArray);
+      
+      // Initialize existing images
+      const existingImages = props.image
+        ? Array.isArray(props.image)
+          ? props.image.filter(Boolean)
+          : [props.image].filter(Boolean)
+        : [];
+      setSelectedTicketExistingImages(existingImages);
+      setSelectedTicketNewImages([]);
+      
       setShowEditTicketModal(true);
 
       // Load submodules and submodule children for the selected module
@@ -895,10 +1258,67 @@ const TicketList = () => {
   );
 
   const [rerenderTrigger, setRerenderTrigger] = useState<number>(0);
+  const [allSubmodules, setAllSubmodules] = useState<any[]>([]);
+  const [allSubmoduleChildren, setAllSubmoduleChildren] = useState<any[]>([]);
+
+  // Fetch all submodules and submodule children for activity log resolution
+  useEffect(() => {
+    const fetchAllSubmodules = async () => {
+      try {
+        const submoduleData = await GetAllSubmodules();
+        setAllSubmodules(submoduleData || []);
+      } catch (error) {
+        console.error("Error fetching all submodules:", error);
+      }
+    };
+    const fetchAllSubmoduleChildren = async () => {
+      try {
+        const childrenData = await GetAllSubmoduleChildren();
+        setAllSubmoduleChildren(childrenData || []);
+      } catch (error) {
+        console.error("Error fetching all submodule children:", error);
+      }
+    };
+    fetchAllSubmodules();
+    fetchAllSubmoduleChildren();
+  }, []);
+
+  // Helper function to resolve ID fields to their names
+  const resolveFieldName = useCallback((fieldName: string, fieldId: string | number): string => {
+    if (!fieldId && fieldId !== 0) return String(fieldId);
+    
+    switch (fieldName) {
+      case 'ticket_status_id':
+        const status = statuses.find((s: any) => s.id.toString() === fieldId.toString());
+        return status?.name || fieldId.toString();
+      case 'ticket_type_id':
+        const type = types.find((t: any) => t.id.toString() === fieldId.toString());
+        return type?.name || fieldId.toString();
+      case 'module_id':
+        const module = modules.find((m: any) => m.id.toString() === fieldId.toString());
+        return module?.name || fieldId.toString();
+      case 'submodule_id':
+        const submodule = allSubmodules.find((s: any) => s.id.toString() === fieldId.toString()) ||
+          viewTicketData?.submodule || null;
+        return submodule?.name || fieldId.toString();
+      case 'submodule_child_id':
+        const child = allSubmoduleChildren.find((c: any) => c.id.toString() === fieldId.toString()) ||
+          viewTicketData?.submodule_child || null;
+        return child?.name || fieldId.toString();
+      case 'priority':
+        const priorityLabels = ["Low", "Medium", "High", "Critical"];
+        return priorityLabels[Number(fieldId)] || fieldId.toString();
+      case 'user_extension':
+        const ext = extensions.find((e: any) => e.id.toString() === fieldId.toString());
+        return ext?.display_name || fieldId.toString();
+      default:
+        return String(fieldId);
+    }
+  }, [statuses, types, modules, allSubmodules, allSubmoduleChildren, extensions, viewTicketData]);
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setRerenderTrigger(prev => prev + 1);
+      setRerenderTrigger((prev) => prev + 1);
     }, 5000);
     return () => clearInterval(interval);
   }, []);
@@ -916,19 +1336,27 @@ const TicketList = () => {
         showSearch={true}
         searchPlaceholder="Search tickets..."
         searchValue={currentFilters.search || ""}
-        onSearchChange={(value) => handleFiltersChange({...currentFilters, search: value})}
+        onSearchChange={(value) =>
+          handleFiltersChange({ ...currentFilters, search: value })
+        }
         filters={
-          <TicketsFilters onFiltersChange={handleFiltersChange} moduleSlug={ModuleSlug.TICKET} /> 
+          <TicketsFilters
+            onFiltersChange={handleFiltersChange}
+            moduleSlug={ModuleSlug.TICKET}
+          />
         }
         buttons={
-          <Button variant="primary" size="sm" onClick={openCreateTicketModal}>New Ticket</Button>
+          session?.user?.permissions?.includes("create-ticket-tickets") && (
+            <Button variant="primary" size="sm" onClick={openCreateTicketModal}>
+              New Ticket
+            </Button>
+          )
         }
         leftGrid={3}
         rightGrid={9}
-
       />
 
-      {session?.user?.permissions?.includes("tickets-tickets") && (
+      {session?.user?.permissions?.includes("view-ticket-tickets") && (
         <GenericListPage
           columns={columns}
           fetchData={fetchTickets}
@@ -1157,38 +1585,200 @@ const TicketList = () => {
               />
             </div>
 
+            {session?.user?.permissions?.includes("assign-user-tickets") && (
+              <div className="form-group mb-3">
+                <label htmlFor="editTicketUserExtension">User Extension</label>
+                <Select
+                  //   className="form-control"
+                  id="editTicketUserExtension"
+                  isMulti
+                  value={
+                    selectedTicket?.user_extension
+                      ? (Array.isArray(selectedTicket.user_extension)
+                          ? selectedTicket.user_extension
+                          : [selectedTicket.user_extension]
+                        ).map((extId: any) => {
+                          const ext = extensions.find(
+                            (ext: any) => ext.id.toString() === extId.toString()
+                          );
+                          return ext
+                            ? {
+                                value: ext.id,
+                                label: ext.display_name,
+                              }
+                            : null;
+                        }).filter(Boolean)
+                      : []
+                  }
+                  onChange={(selectedOptions: any) => {
+                    const values = selectedOptions
+                      ? selectedOptions.map((opt: any) => opt.value)
+                      : [];
+                    setSelectedTicket({
+                      ...selectedTicket,
+                      user_extension: values,
+                    });
+                  }}
+                  options={extensions.map((extension: any) => ({
+                    value: extension.id,
+                    label: extension.display_name,
+                  }))}
+                  placeholder="Select User Extension(s)"
+                  isClearable
+                  isSearchable
+                />
+              </div>
+            )}
+
             <div className="form-group mb-3">
-              <label htmlFor="editTicketUserExtension">User Extension</label>
-              <Select
-                //   className="form-control"
-                id="editTicketUserExtension"
-                value={
-                  selectedTicket?.user_extension
-                    ? {
-                        value: selectedTicket.user_extension,
-                        label:
-                          extensions.find(
-                            (ext: any) =>
-                              ext.id.toString() ===
-                              selectedTicket.user_extension.toString()
-                          )?.display_name || "",
-                      }
-                    : null
-                }
-                onChange={(selectedOption: any) => {
-                  setSelectedTicket({
-                    ...selectedTicket,
-                    user_extension: selectedOption?.value || "",
-                  });
-                }}
-                options={extensions.map((extension: any) => ({
-                  value: extension.id,
-                  label: extension.display_name,
+              <label htmlFor="editTicketTags">Tags</label>
+              <CreatableSelect
+                id="editTicketTags"
+                isMulti
+                value={selectedTicketTags.map((tag) => ({
+                  value: tag,
+                  label: tag,
                 }))}
-                placeholder="Select User Extension"
+                onChange={(selectedOptions: any) => {
+                  const values = selectedOptions
+                    ? selectedOptions.map((opt: any) => opt.value)
+                    : [];
+                  setSelectedTicketTags(values);
+                }}
+                options={defaultTags.map((tag) => ({
+                  value: tag,
+                  label: tag,
+                }))}
+                placeholder="Select or create tags"
                 isClearable
                 isSearchable
+                formatCreateLabel={(inputValue) => `Create "${inputValue}"`}
               />
+              <small className="text-muted">
+                Select from existing tags or create new ones
+              </small>
+            </div>
+
+            <div className="form-group mb-3">
+              <label htmlFor="editTicketImages">Ticket Images</label>
+              <small className="text-muted d-block mb-2">
+                Maximum 3 images total (existing + new)
+              </small>
+
+              {/* Display existing images with remove option */}
+              {selectedTicketExistingImages.length > 0 && (
+                <div className="mb-3">
+                  <small className="text-muted d-block mb-2 fw-bold">
+                    Existing images ({selectedTicketExistingImages.length}):
+                  </small>
+                  <div className="d-flex flex-column gap-2 mb-2">
+                    {selectedTicketExistingImages.map((imgPath: string, index: number) => (
+                      <div
+                        key={index}
+                        className="d-flex align-items-center justify-content-between border rounded p-2"
+                      >
+                        <small className="text-muted">
+                          {imgPath}
+                        </small>
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-danger"
+                          onClick={() => {
+                            setSelectedTicketExistingImages(
+                              selectedTicketExistingImages.filter((_, i) => i !== index)
+                            );
+                          }}
+                          title="Remove image"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Input for new images */}
+              <label htmlFor="editTicketImages" className="form-label small">
+                Add new images (Optional)
+              </label>
+              <input
+                type="file"
+                className="form-control"
+                id="editTicketImages"
+                accept="image/*"
+                multiple
+                onChange={(e) => {
+                  const files = Array.from(e.target.files || []);
+                  const remainingSlots = 3 - selectedTicketExistingImages.length;
+                  
+                  if (files.length > remainingSlots) {
+                    toast.error(`You can only add ${remainingSlots} more image(s) to reach the maximum of 3 images.`);
+                    const limitedFiles = files.slice(0, remainingSlots);
+                    setSelectedTicketNewImages(limitedFiles);
+                    // Reset file input to reflect the limited selection
+                    const fileInput = e.target;
+                    const dataTransfer = new DataTransfer();
+                    limitedFiles.forEach(file => dataTransfer.items.add(file));
+                    fileInput.files = dataTransfer.files;
+                  } else {
+                    setSelectedTicketNewImages(files);
+                  }
+                }}
+                disabled={selectedTicketExistingImages.length >= 3}
+              />
+              <small className="text-muted">
+                Supported formats: JPG, PNG, GIF. Max size: 5MB per image. You
+                can select multiple images. Maximum 3 images total.
+              </small>
+              {selectedTicketExistingImages.length >= 3 && (
+                <small className="text-danger d-block mt-1">
+                  Maximum images reached. Remove an existing image to add new ones.
+                </small>
+              )}
+              {selectedTicketNewImages.length > 0 && (
+                <div className="mt-2">
+                  <small className="text-muted d-block mb-2 fw-bold">
+                    New images ({selectedTicketNewImages.length}):
+                  </small>
+                  <div className="d-flex flex-column gap-2 mb-2">
+                    {selectedTicketNewImages.map((image, index) => (
+                      <div
+                        key={index}
+                        className="d-flex align-items-center justify-content-between border rounded p-2"
+                      >
+                        <small className="text-muted">
+                          {image.name}
+                        </small>
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-danger"
+                          onClick={() => {
+                            setSelectedTicketNewImages(
+                              selectedTicketNewImages.filter((_, i) => i !== index)
+                            );
+                            // Reset file input
+                            const fileInput = document.getElementById(
+                              "editTicketImages"
+                            ) as HTMLInputElement;
+                            if (fileInput) {
+                              fileInput.value = "";
+                            }
+                          }}
+                          title="Remove image"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <div className="mt-2">
+                <small className="text-info">
+                  Total images: {selectedTicketExistingImages.length + selectedTicketNewImages.length} / 3
+                </small>
+              </div>
             </div>
           </>
         }
@@ -1402,42 +1992,106 @@ const TicketList = () => {
               />
             </div>
 
+            {session?.user?.permissions?.includes("assign-user-tickets") && (
+              <div className="form-group mb-3">
+                <label htmlFor="newTicketUserExtension">User Extension</label>
+                <Select
+                  id="newTicketUserExtension"
+                  isMulti
+                  value={newTicketUserExtension.map((extId) => {
+                    const ext = extensions.find(
+                      (ext: any) => ext.id.toString() === extId.toString()
+                    );
+                    return ext
+                      ? {
+                          value: ext.id,
+                          label: ext.display_name,
+                        }
+                      : null;
+                  }).filter(Boolean)}
+                  onChange={(selectedOptions: any) => {
+                    const values = selectedOptions
+                      ? selectedOptions.map((opt: any) => opt.value)
+                      : [];
+                    setNewTicketUserExtension(values);
+                  }}
+                  options={extensions.map((extension: any) => ({
+                    value: extension.id,
+                    label: extension.display_name,
+                  }))}
+                  placeholder="Select User Extension(s)"
+                  isClearable
+                  isSearchable
+                />
+              </div>
+            )}
+
             <div className="form-group mb-3">
-              <label htmlFor="newTicketImage">Ticket Image</label>
+              <label htmlFor="newTicketTags">Tags</label>
+              <CreatableSelect
+                id="newTicketTags"
+                isMulti
+                value={newTicketTags.map((tag) => ({
+                  value: tag,
+                  label: tag,
+                }))}
+                onChange={(selectedOptions: any) => {
+                  const values = selectedOptions
+                    ? selectedOptions.map((opt: any) => opt.value)
+                    : [];
+                  setNewTicketTags(values);
+                }}
+                options={defaultTags.map((tag) => ({
+                  value: tag,
+                  label: tag,
+                }))}
+                placeholder="Select or create tags"
+                isClearable
+                isSearchable
+                formatCreateLabel={(inputValue) => `Create "${inputValue}"`}
+              />
+              <small className="text-muted">
+                Select from existing tags or create new ones
+              </small>
+            </div>
+
+            <div className="form-group mb-3">
+              <label htmlFor="newTicketImages">Ticket Images</label>
               <input
                 type="file"
                 className="form-control"
-                id="newTicketImage"
+                id="newTicketImages"
                 accept="image/*"
+                multiple
                 onChange={(e) => {
-                  const file = e.target.files?.[0];
+                  const files = Array.from(e.target.files || []);
                   console.log("File input onChange triggered");
-                  console.log("Selected file:", file);
-                  console.log("File type:", file?.type);
-                  console.log("File size:", file?.size);
-                  setNewTicketImage(file || null);
-                  console.log("newTicketImage state updated to:", file || null);
+                  console.log("Selected files:", files);
+                  setNewTicketImages(files);
+                  console.log(
+                    "newTicketImages state updated to:",
+                    files.length,
+                    "files"
+                  );
                 }}
               />
               <small className="text-muted">
-                Supported formats: JPG, PNG, GIF. Max size: 5MB
+                Supported formats: JPG, PNG, GIF. Max size: 5MB per image. You
+                can select multiple images.
               </small>
-              {newTicketImage && (
+              {newTicketImages.length > 0 && (
                 <div className="mt-2">
-                  <small className="text-success">
-                    Selected: {newTicketImage.name} (
-                    {(newTicketImage.size / 1024 / 1024).toFixed(2)} MB)
+                  <small className="text-success d-block mb-1">
+                    Selected {newTicketImages.length} image(s):
                   </small>
+                  {newTicketImages.map((image, index) => (
+                    <small key={index} className="text-success d-block">
+                      • {image.name} ({(image.size / 1024 / 1024).toFixed(2)}{" "}
+                      MB)
+                    </small>
+                  ))}
                 </div>
               )}
-              <div className="mt-2">
-                <small className="text-info">
-                  Current image state:{" "}
-                  {newTicketImage
-                    ? `File: ${newTicketImage.name}`
-                    : "No image selected"}
-                </small>
-              </div>
             </div>
           </>
         }
@@ -1449,110 +2103,96 @@ const TicketList = () => {
         cancelButtonVariant="secondary"
       />
 
-      <FormModal
+      <Modal
         show={showViewTicketModal}
         onHide={closeViewTicketModal}
-        title={`Ticket #${viewTicketData?.id} Information`}
-        desc="View ticket details and comments"
-        formHtml={
-          <>
-            <table
-              className="table table-bordered"
+        size="xl"
+        centered
+        className="ticket-view-modal"
+      >
+        <Modal.Header closeButton className="border-bottom">
+          <Modal.Title className="d-flex align-items-center gap-2">
+            <span className="badge bg-primary fs-6">#{viewTicketData?.id}</span>
+            <span>{viewTicketData?.title}</span>
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body style={{ maxHeight: "80vh", overflowY: "auto" }}>
+          {/* Header Section */}
+          <div className="mb-4">
+            <div className="d-flex flex-wrap gap-2 align-items-center mb-3">
+              <span
+                className="badge"
+                style={{
+                  backgroundColor: `${viewTicketData?.status?.color}30`,
+                  color: viewTicketData?.status?.color,
+                  fontWeight: "bold",
+                  fontSize: "0.875rem",
+                  padding: "0.5rem 0.75rem",
+                }}
+              >
+                {viewTicketData?.status?.name}
+              </span>
+              <span className="badge bg-primary text-uppercase">
+                {types.find(
+                  (type: any) => type.id == viewTicketData?.ticket_type_id
+                )?.name ||
+                  viewTicketData?.type?.name ||
+                  "Unknown"}
+              </span>
+              {(() => {
+                const priorityLabels = ["Low", "Medium", "High", "Critical"];
+                const priorityColors = [
+                  "bg-success",
+                  "bg-warning",
+                  "bg-danger",
+                  "bg-danger",
+                ];
+                return (
+                  <span
+                    className={`badge ${
+                      priorityColors[viewTicketData?.priority] ||
+                      "bg-secondary"
+                    } text-uppercase`}
+                  >
+                    {priorityLabels[viewTicketData?.priority] || "Unknown"}
+                  </span>
+                );
+              })()}
+              <span
+                className="badge"
+                style={{
+                  backgroundColor: `${viewTicketData?.module?.color}30`,
+                  color: viewTicketData?.module?.color,
+                  fontWeight: "bold",
+                }}
+              >
+                {viewTicketData?.module?.name}
+              </span>
+            </div>
+            <p
+              className="text-muted mb-0"
               style={{
-                tableLayout: "fixed",
+                whiteSpace: "pre-wrap",
+                wordWrap: "break-word",
+                lineHeight: "1.6",
+                fontSize: "0.95rem",
               }}
             >
-              <tbody>
-                <tr>
-                  <td>
-                    <strong>Ticket ID</strong>
-                  </td>
-                  <td>
-                    <span className="badge bg-primary">
-                      #{viewTicketData?.id}
-                    </span>
-                  </td>
-                </tr>
-                <tr>
-                  <td>
-                    <strong>Ticket Title</strong>
-                  </td>
-                  <td
-                    style={{
-                      textTransform: "capitalize",
-                      whiteSpace: "pre-wrap",
-                    }}
-                  >
-                    {viewTicketData?.title}
-                  </td>
-                </tr>
-                <tr>
-                  <td>
-                    <strong>Ticket Description</strong>
-                  </td>
-                  <td>
-                    <span
-                      style={{
-                        whiteSpace: "pre-wrap",
-                      }}
-                    >
-                      {viewTicketData?.description}
-                    </span>
-                  </td>
-                </tr>
-                <tr>
-                  <td>
-                    <strong>Ticket Type</strong>
-                  </td>
-                  <td>
-                    <span className="badge bg-primary text-uppercase">
-                      {types.find(
-                        (type: any) => type.id == viewTicketData?.ticket_type_id
-                      )?.name ||
-                        viewTicketData?.type?.name ||
-                        "Unknown"}
-                    </span>
-                  </td>
-                </tr>
-                <tr>
-                  <td>
-                    <strong>Ticket Status</strong>
-                  </td>
-                  <td>
-                    <span
-                      className="badge"
-                      style={{
-                        backgroundColor: `${viewTicketData?.status?.color}30`,
-                        color: viewTicketData?.status?.color,
-                        fontWeight: "bold",
-                      }}
-                    >
-                      {viewTicketData?.status?.name}
-                    </span>
-                  </td>
-                </tr>
-                <tr>
-                  <td>
-                    <strong>Module</strong>
-                  </td>
-                  <td>
-                    <span
-                      className="badge"
-                      style={{
-                        backgroundColor: `${viewTicketData?.module?.color}30`,
-                        color: viewTicketData?.module?.color,
-                        fontWeight: "bold",
-                      }}
-                    >
-                      {viewTicketData?.module?.name}
-                    </span>
-                  </td>
-                </tr>
-                <tr>
-                  <td>
-                    <strong>Primary Issue</strong>
-                  </td>
-                  <td>
+              {viewTicketData?.description}
+            </p>
+          </div>
+
+          {/* Main Content Grid */}
+          <Row className="g-3 mb-4">
+            {/* Left Column */}
+            <Col md={6}>
+              <div className="card border-0 shadow-sm h-100">
+                <div className="card-body">
+                  <h6 className="card-title mb-3 text-primary border-bottom pb-2">
+                    Ticket Information
+                  </h6>
+                  <div className="mb-3">
+                    <small className="text-muted d-block mb-1">Primary Issue</small>
                     {viewTicketData?.submodule ? (
                       <span
                         className="badge"
@@ -1567,13 +2207,9 @@ const TicketList = () => {
                     ) : (
                       <span className="text-muted">Not assigned</span>
                     )}
-                  </td>
-                </tr>
-                <tr>
-                  <td>
-                    <strong>Specific Problem</strong>
-                  </td>
-                  <td>
+                  </div>
+                  <div className="mb-3">
+                    <small className="text-muted d-block mb-1">Specific Problem</small>
                     {viewTicketData?.submodule_child ? (
                       <span
                         className="badge"
@@ -1588,122 +2224,169 @@ const TicketList = () => {
                     ) : (
                       <span className="text-muted">Not assigned</span>
                     )}
-                  </td>
-                </tr>
-                <tr>
-                  <td>
-                    <strong>User Extension</strong>
-                  </td>
-                  <td>
-                    <span className="badge bg-info">
-                      {/* {viewTicketData?.user_extension} */}
-                      {extensions.find(
-                        (extension: any) =>
-                          extension.id == viewTicketData?.user_extension
-                      )?.display_name || viewTicketData?.user_extension}
-                    </span>
-                  </td>
-                </tr>
-                <tr>
-                  <td>
-                    <strong>Priority</strong>
-                  </td>
-                  <td>
+                  </div>
+                  <div className="mb-3">
+                    <small className="text-muted d-block mb-1">Assigned To</small>
                     {(() => {
-                      const priorityLabels = ["Low", "Medium", "High"];
-                      const priorityColors = [
-                        "bg-success",
-                        "bg-warning",
-                        "bg-danger",
-                      ];
+                      const userExtensions = Array.isArray(viewTicketData?.user_extension)
+                        ? viewTicketData.user_extension
+                        : viewTicketData?.user_extension
+                        ? [viewTicketData.user_extension]
+                        : [];
+                      
+                      if (userExtensions.length === 0) {
+                        return <span className="badge bg-secondary">Not assigned</span>;
+                      }
+                      
                       return (
-                        <span
-                          className={`badge ${
-                            priorityColors[viewTicketData?.priority] ||
-                            "bg-secondary"
-                          } text-uppercase`}
-                        >
-                          {priorityLabels[viewTicketData?.priority] ||
-                            "Unknown"}
-                        </span>
+                        <div className="d-flex flex-wrap gap-1">
+                          {userExtensions.map((extId: any, index: number) => {
+                            const ext = extensions.find(
+                              (extension: any) =>
+                                extension.id.toString() === extId.toString()
+                            );
+                            return (
+                              <span key={index} className="badge bg-info">
+                                {ext?.display_name || extId}
+                              </span>
+                            );
+                          })}
+                        </div>
                       );
                     })()}
-                  </td>
-                </tr>
-                <tr>
-                  <td>
-                    <strong>Due Date</strong>
-                  </td>
-                  <td>
-                    {viewTicketData?.due_date
-                      ? moment(viewTicketData.due_date).format("DD/MM/YYYY")
-                      : "No due date"}
-                  </td>
-                </tr>
-                <tr>
-                  <td>
-                    <strong>Ticket Image</strong>
-                  </td>
-                  <td>
-                    {viewTicketImage ? (
-                      <img
-                        src={viewTicketImage}
-                        alt="Ticket Image"
-                        className="img-fluid"
-                        style={{
-                          maxWidth: "200px",
-                          maxHeight: "200px",
-                          cursor: "pointer",
-                        }}
-                        onClick={() =>
-                          handleImageClick(`/api/${viewTicketData.image}`)
-                        }
-                      />
-                    ) : (
-                      <span className="text-muted">No image</span>
-                    )}
-                  </td>
-                </tr>
-                <tr>
-                  <td>
-                    <strong>Created At</strong>
-                  </td>
-                  <td>
-                    {moment(viewTicketData?.created_at).format(
-                      "DD/MM/YYYY HH:mm:ss"
-                    )}
-                  </td>
-                </tr>
-                <tr>
-                  <td>
-                    <strong>Updated At</strong>
-                  </td>
-                  <td>
-                    {moment(viewTicketData?.updated_at).format(
-                      "DD/MM/YYYY HH:mm:ss"
-                    )}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+                  </div>
+                  <div className="mb-3">
+                    <small className="text-muted d-block mb-1">Due Date</small>
+                    <span className="text-dark">
+                      {viewTicketData?.due_date
+                        ? moment(viewTicketData.due_date).format("DD/MM/YYYY")
+                        : "No due date"}
+                    </span>
+                  </div>
+                  <div>
+                    <small className="text-muted d-block mb-1">Tags</small>
+                    {(() => {
+                      const tagsArray = Array.isArray(viewTicketData?.tags)
+                        ? viewTicketData.tags
+                        : viewTicketData?.tags
+                        ? [viewTicketData.tags]
+                        : [];
+                      
+                      if (tagsArray.length === 0) {
+                        return <span className="text-muted">No tags</span>;
+                      }
+                      
+                      return (
+                        <div className="d-flex flex-wrap gap-1">
+                          {tagsArray.map((tag: string, index: number) => (
+                            <span key={index} className="badge bg-secondary">
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                </div>
+              </div>
+            </Col>
 
-            {/* Comments Section */}
-            <div
-              className="mt-4"
-              style={{ borderTop: "1px solid #dee2e6", paddingTop: "20px" }}
-            >
+            {/* Right Column */}
+            <Col md={6}>
+              <div className="card border-0 shadow-sm h-100">
+                <div className="card-body">
+                  <h6 className="card-title mb-3 text-primary border-bottom pb-2">
+                    Ticket Images
+                  </h6>
+                  {viewTicketImages.length > 0 ? (
+                    <div className="d-flex flex-wrap gap-2">
+                      {viewTicketImages.map((imageUrl, index) => {
+                        return (
+                          <div
+                            key={index}
+                            className="position-relative"
+                            style={{ cursor: "pointer" }}
+                            onClick={() => handleImageClick(imageUrl)}
+                          >
+                            <img
+                              src={imageUrl}
+                              alt={`Ticket Image ${index + 1}`}
+                              className="img-fluid rounded"
+                              style={{
+                                width: "120px",
+                                height: "120px",
+                                objectFit: "cover",
+                                border: "2px solid #dee2e6",
+                                transition: "transform 0.2s",
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.transform = "scale(1.05)";
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.transform = "scale(1)";
+                              }}
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <p className="text-muted mb-0">No images attached</p>
+                  )}
+                </div>
+              </div>
+            </Col>
+          </Row>
+
+          {/* Metadata */}
+          <div className="card border-0 shadow-sm mb-4">
+            <div className="card-body">
+              <h6 className="card-title mb-3 text-primary border-bottom pb-2">
+                Metadata
+              </h6>
+              <Row className="g-3">
+                <Col md={6}>
+                  <div>
+                    <small className="text-muted d-block mb-1">Created By</small>
+                    <span className="text-dark">
+                      {extensions.find(
+                        (ext: any) => ext.id.toString() === viewTicketData?.created_by?.toString()
+                      )?.display_name || viewTicketData?.created_by || "Unknown"}
+                    </span>
+                  </div>
+                </Col>
+                <Col md={6}>
+                  <div>
+                    <small className="text-muted d-block mb-1">Created At</small>
+                    <span className="text-dark">
+                      {moment(viewTicketData?.created_at).format("DD/MM/YYYY HH:mm:ss")}
+                    </span>
+                  </div>
+                </Col>
+                <Col md={6}>
+                  <div>
+                    <small className="text-muted d-block mb-1">Last Updated</small>
+                    <span className="text-dark">
+                      {moment(viewTicketData?.updated_at).format("DD/MM/YYYY HH:mm:ss")}
+                    </span>
+                  </div>
+                </Col>
+              </Row>
+            </div>
+          </div>
+
+          {/* Comments Section */}
+          <div className="card border-0 shadow-sm mb-4">
+            <div className="card-body">
               <div className="d-flex justify-content-between align-items-center mb-3">
                 <div>
-                  <h6
-                    className="mb-0"
-                    style={{ color: "#495057", fontWeight: "600" }}
-                  >
+                  <h6 className="card-title mb-1 text-primary border-bottom pb-2 d-inline-block">
                     Comments
                     <span className="badge bg-secondary ms-2">
                       {comments.length + assigneeComments.length} total
                     </span>
                   </h6>
-                  <small className="text-muted">
+                  <small className="text-muted d-block mt-1">
                     {comments.length} user comments • {assigneeComments.length}{" "}
                     assignee comments
                   </small>
@@ -1750,29 +2433,12 @@ const TicketList = () => {
                       <p className="mt-2 text-muted">Loading comments...</p>
                     </div>
                   ) : (
-                    <div className="row">
+                    <Row className="g-3">
                       {/* User Comments Column */}
-                      <div className="col-md-6">
-                        <div
-                          className="card"
-                          style={{
-                            border: "1px solid #e9ecef",
-                            boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
-                          }}
-                        >
-                          <div
-                            className="card-header"
-                            style={{
-                              backgroundColor: "#f8f9fa",
-                              borderBottom: "1px solid #dee2e6",
-                            }}
-                          >
-                            <h6
-                              className="mb-0"
-                              style={{ color: "#495057", fontWeight: "600" }}
-                            >
-                              User Comments
-                            </h6>
+                      <Col md={6}>
+                        <div className="card border">
+                          <div className="card-header bg-light">
+                            <h6 className="mb-0 fw-semibold">User Comments</h6>
                           </div>
                           <div className="card-body">
                             {session?.user?.permissions?.includes(
@@ -1788,6 +2454,41 @@ const TicketList = () => {
                                     setNewComment(e.target.value)
                                   }
                                 />
+                                <div className="mt-2">
+                                  <label
+                                    htmlFor="newCommentAttachment"
+                                    className="form-label small"
+                                  >
+                                    Attachment (Optional)
+                                  </label>
+                                  <input
+                                    type="file"
+                                    className="form-control form-control-sm"
+                                    id="newCommentAttachment"
+                                    accept="image/*"
+                                    onChange={(e) => {
+                                      const file = e.target.files?.[0];
+                                      setNewCommentAttachment(file || null);
+                                    }}
+                                  />
+                                  <small className="text-muted">
+                                    Supported formats: JPG, PNG, GIF. Max size:
+                                    5MB
+                                  </small>
+                                  {newCommentAttachment && (
+                                    <div className="mt-1">
+                                      <small className="text-success">
+                                        Selected: {newCommentAttachment.name} (
+                                        {(
+                                          newCommentAttachment.size /
+                                          1024 /
+                                          1024
+                                        ).toFixed(2)}{" "}
+                                        MB)
+                                      </small>
+                                    </div>
+                                  )}
+                                </div>
                                 <Button
                                   variant="primary"
                                   size="sm"
@@ -1856,6 +2557,40 @@ const TicketList = () => {
                                     >
                                       {comment.content}
                                     </div>
+                                    {comment.attachment &&
+                                      commentAttachmentImages[comment.id] && (
+                                        <div className="mt-2">
+                                          <img
+                                            src={
+                                              commentAttachmentImages[
+                                                comment.id
+                                              ]
+                                            }
+                                            alt="Comment attachment"
+                                            className="img-fluid"
+                                            style={{
+                                              maxWidth: "200px",
+                                              maxHeight: "200px",
+                                              cursor: "pointer",
+                                              borderRadius: "5px",
+                                              border: "1px solid #dee2e6",
+                                            }}
+                                            onError={(e) => {
+                                              // Fallback if image fails to load
+                                              const target =
+                                                e.target as HTMLImageElement;
+                                              target.style.display = "none";
+                                            }}
+                                            onClick={() =>
+                                              handleImageClick(
+                                                commentAttachmentImages[
+                                                  comment.id
+                                                ]
+                                              )
+                                            }
+                                          />
+                                        </div>
+                                      )}
                                   </div>
                                 ))
                               ) : (
@@ -1866,56 +2601,85 @@ const TicketList = () => {
                             </div>
                           </div>
                         </div>
-                      </div>
+                      </Col>
 
                       {/* Assignee Comments Column */}
-                      <div className="col-md-6">
-                        <div
-                          className="card"
-                          style={{
-                            border: "1px solid #e9ecef",
-                            boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
-                          }}
-                        >
-                          <div
-                            className="card-header"
-                            style={{
-                              backgroundColor: "#f8f9fa",
-                              borderBottom: "1px solid #dee2e6",
-                            }}
-                          >
-                            <h6
-                              className="mb-0"
-                              style={{ color: "#495057", fontWeight: "600" }}
-                            >
-                              Assignee Comments
-                            </h6>
+                      <Col md={6}>
+                        <div className="card border">
+                          <div className="card-header bg-light">
+                            <h6 className="mb-0 fw-semibold">Assignee Comments</h6>
                           </div>
                           <div className="card-body">
-                            <div className="mb-3">
-                              <textarea
-                                className="form-control"
-                                rows={3}
-                                placeholder="Add a new assignee comment..."
-                                value={newAssigneeComment}
-                                onChange={(e) =>
-                                  setNewAssigneeComment(e.target.value)
-                                }
-                              />
-                              <Button
-                                variant="success"
-                                size="sm"
-                                className="mt-2"
-                                onClick={() =>
-                                  handleAddAssigneeComment(viewTicketData?.id)
-                                }
-                                disabled={
-                                  !newAssigneeComment.trim() || creatingTicket
-                                }
-                              >
-                                Add Assignee Comment
-                              </Button>
-                            </div>
+                            {canAddAssigneeComment ? (
+                              <div className="mb-3">
+                                <textarea
+                                  className="form-control"
+                                  rows={3}
+                                  placeholder="Add a new assignee comment..."
+                                  value={newAssigneeComment}
+                                  onChange={(e) =>
+                                    setNewAssigneeComment(e.target.value)
+                                  }
+                                />
+                                <div className="mt-2">
+                                  <label
+                                    htmlFor="newAssigneeCommentAttachment"
+                                    className="form-label small"
+                                  >
+                                    Attachment (Optional)
+                                  </label>
+                                  <input
+                                    type="file"
+                                    className="form-control form-control-sm"
+                                    id="newAssigneeCommentAttachment"
+                                    accept="image/*"
+                                    onChange={(e) => {
+                                      const file = e.target.files?.[0];
+                                      setNewAssigneeCommentAttachment(
+                                        file || null
+                                      );
+                                    }}
+                                  />
+                                  <small className="text-muted">
+                                    Supported formats: JPG, PNG, GIF. Max size:
+                                    5MB
+                                  </small>
+                                  {newAssigneeCommentAttachment && (
+                                    <div className="mt-1">
+                                      <small className="text-success">
+                                        Selected:{" "}
+                                        {newAssigneeCommentAttachment.name} (
+                                        {(
+                                          newAssigneeCommentAttachment.size /
+                                          1024 /
+                                          1024
+                                        ).toFixed(2)}{" "}
+                                        MB)
+                                      </small>
+                                    </div>
+                                  )}
+                                </div>
+                                <Button
+                                  variant="success"
+                                  size="sm"
+                                  className="mt-2"
+                                  onClick={() =>
+                                    handleAddAssigneeComment(viewTicketData?.id)
+                                  }
+                                  disabled={
+                                    !newAssigneeComment.trim() || creatingTicket
+                                  }
+                                >
+                                  Add Assignee Comment
+                                </Button>
+                              </div>
+                            ) : (
+                              <div className="mb-3">
+                                <p className="text-muted small mb-0">
+                                  Only assigned users can add assignee comments.
+                                </p>
+                              </div>
+                            )}
 
                             <div
                               className="comments-list"
@@ -1972,6 +2736,42 @@ const TicketList = () => {
                                       >
                                         {comment.content}
                                       </div>
+                                      {comment.attachment &&
+                                        assigneeCommentAttachmentImages[
+                                          comment.id
+                                        ] && (
+                                          <div className="mt-2">
+                                            <img
+                                              src={
+                                                assigneeCommentAttachmentImages[
+                                                  comment.id
+                                                ]
+                                              }
+                                              alt="Assignee comment attachment"
+                                              className="img-fluid"
+                                              style={{
+                                                maxWidth: "200px",
+                                                maxHeight: "200px",
+                                                cursor: "pointer",
+                                                borderRadius: "5px",
+                                                border: "1px solid #dee2e6",
+                                              }}
+                                              onError={(e) => {
+                                                // Fallback if image fails to load
+                                                const target =
+                                                  e.target as HTMLImageElement;
+                                                target.style.display = "none";
+                                              }}
+                                              onClick={() =>
+                                                handleImageClick(
+                                                  assigneeCommentAttachmentImages[
+                                                    comment.id
+                                                  ]
+                                                )
+                                              }
+                                            />
+                                          </div>
+                                        )}
                                     </div>
                                   )
                                 )
@@ -1983,46 +2783,151 @@ const TicketList = () => {
                             </div>
                           </div>
                         </div>
-                      </div>
-                    </div>
+                      </Col>
+                    </Row>
                   )}
                 </div>
               )}
             </div>
-          </>
-        }
-        submitButtonText="Close"
-        ShowSubmitButton={false}
-        cancelButtonText="Close"
-        onSubmit={closeViewTicketModal}
-        onCancel={() => {closeViewTicketModal()}}
-      />
+          </div>
 
-      {showImageModal && (
-        <Modal
-          show={showImageModal}
-          onHide={closeImageModal}
-          size="xl"
-          centered
-        >
-          <Modal.Header closeButton>
-            <Modal.Title>Ticket Image</Modal.Title>
-          </Modal.Header>
-          <Modal.Body className="text-center">
-            <img
-              src={viewTicketImage}
-              alt="Ticket Image Full Size"
-              className="img-fluid"
-              style={{ maxHeight: "70vh" }}
-            />
-          </Modal.Body>
-          <Modal.Footer>
-            <Button variant="secondary" onClick={closeImageModal}>
-              Close
-            </Button>
-          </Modal.Footer>
-        </Modal>
-      )}
+          {/* Activity Logs Section */}
+          <div className="card border-0 shadow-sm">
+            <div className="card-body">
+              <h6 className="card-title mb-3 text-primary border-bottom pb-2">
+                Activity Logs
+                {viewTicketData?.activity_logs && (
+                  <span className="badge bg-secondary ms-2">
+                    {viewTicketData.activity_logs.length} entries
+                  </span>
+                )}
+              </h6>
+
+              {viewTicketData?.activity_logs && viewTicketData.activity_logs.length > 0 ? (
+                <div
+                  className="activity-logs-list"
+                  style={{ maxHeight: "400px", overflowY: "auto" }}
+                >
+                  {viewTicketData.activity_logs
+                    .slice()
+                    .reverse()
+                    .map((log: any, index: number) => (
+                      <div
+                        key={log.id || index}
+                        className="activity-log-item border-bottom pb-3 mb-3"
+                        style={{
+                          padding: "15px",
+                          backgroundColor: "#f8f9fa",
+                          borderRadius: "5px",
+                          marginBottom: "10px",
+                        }}
+                      >
+                        <div className="d-flex justify-content-between align-items-start mb-2">
+                          <div>
+                            <span
+                              className="badge"
+                              style={{
+                                backgroundColor:
+                                  log.action === "created"
+                                    ? "#10B981"
+                                    : log.action === "updated"
+                                    ? "#3B82F6"
+                                    : "#6B7280",
+                                color: "white",
+                                fontWeight: "600",
+                                textTransform: "capitalize",
+                              }}
+                            >
+                              {log.action}
+                            </span>
+                            {log.user_extension && (
+                              <span className="ms-2 text-muted">
+                                by{" "}
+                                {extensions.find(
+                                  (ext: any) =>
+                                    ext.id.toString() === log.user_extension.toString()
+                                )?.display_name || log.user_extension}
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-end">
+                            <small className="text-muted d-block">
+                              {moment(log.created_at).fromNow()}
+                            </small>
+                            <small className="text-muted">
+                              {moment(log.created_at).format("DD/MM/YYYY HH:mm:ss")}
+                            </small>
+                          </div>
+                        </div>
+
+                        {log.changes && Object.keys(log.changes).length > 0 && (
+                          <div className="mt-2">
+                            <strong className="text-muted small">Changes:</strong>
+                            <ul className="list-unstyled mt-1 mb-0" style={{ fontSize: "0.9rem" }}>
+                              {Object.entries(log.changes).map(([fieldName, change]: [string, any]) => (
+                                <li key={fieldName} className="mb-1">
+                                  <span className="text-capitalize">
+                                    {fieldName.replace(/_/g, " ")}:
+                                  </span>{" "}
+                                  <span className="text-decoration-line-through text-danger">
+                                    {fieldName === "title" || fieldName === "description"
+                                      ? change.old
+                                      : resolveFieldName(fieldName, change.old)}
+                                  </span>{" "}
+                                  →{" "}
+                                  <span className="text-success fw-bold">
+                                    {fieldName === "title" || fieldName === "description"
+                                      ? change.new
+                                      : resolveFieldName(fieldName, change.new)}
+                                  </span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                </div>
+              ) : (
+                <p className="text-muted text-center py-3">No activity logs available</p>
+              )}
+            </div>
+          </div>
+        </Modal.Body>
+        <Modal.Footer className="border-top">
+          <Button variant="secondary" onClick={closeViewTicketModal}>
+            Close
+          </Button>
+        </Modal.Footer>
+      </Modal>
+      <div className="modal-parent-custom">
+        {showImageModal && (
+          <Modal
+            show={showImageModal}
+            onHide={closeImageModal}
+            size="xl"
+            centered
+            className=""
+          >
+            <Modal.Header closeButton>
+              <Modal.Title>Ticket Image</Modal.Title>
+            </Modal.Header>
+            <Modal.Body className="text-center">
+              <img
+                src={selectedImage}
+                alt="Ticket Image Full Size"
+                className="img-fluid"
+                style={{ maxHeight: "70vh" }}
+              />
+            </Modal.Body>
+            <Modal.Footer>
+              <Button variant="secondary" onClick={closeImageModal}>
+                Close
+              </Button>
+            </Modal.Footer>
+          </Modal>
+        )}
+      </div>
     </React.Fragment>
   );
 };

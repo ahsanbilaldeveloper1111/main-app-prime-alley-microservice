@@ -24,6 +24,7 @@ import SuccessfulModal from "@pages/partial/SuccessfulModal";
 import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
 import DatatableActionButton from "@components/DatatableActionButton";
 import { FiEdit, FiTrash2, FiEye,FiPlus } from "react-icons/fi";
+import { ModuleSlug } from '@utils/Helper';
 
 
 
@@ -91,12 +92,12 @@ const TicketModules = () => {
                             onClick: () => handleEditModule(props),
                             className: 'gap-2'
                         }] : []),
-                        {
+                        ...(session?.user?.permissions?.includes('edit-ticket-module-tickets') ? [{
                             label: 'Manage Submodules',
                             icon: <FiEye />,
                             onClick: () => openSubmoduleModal(props),
                             className: 'gap-2'
-                        },
+                        }] : []),
                         ...(session?.user?.permissions?.includes('delete-ticket-module-tickets') ? [{
                             label: props?.tickets_count > 0 ? 'Delete (In Use)' : 'Delete',
                             icon: <FiTrash2 />,
@@ -122,7 +123,7 @@ const TicketModules = () => {
     // Fetch extensions data
     useEffect(() => {
         const fetchHierarchyData = async () => {
-            const hierarchyData = await GetHierarchyData();
+            const hierarchyData = await GetHierarchyData(ModuleSlug.TICKET);
             setHierarchyData(hierarchyData);
             console.log('Hierarchy Data:', hierarchyData);
             setExtensions(hierarchyData?.extensions);
@@ -295,7 +296,9 @@ const TicketModules = () => {
                 onSearchChange={(value) => handleFiltersChange({...currentFilters, search: value})}
                 buttons={
                     <>
-                        <Button variant="info"  onClick={() => window.location.href = '/tickets/modules/submodules'}>Manage Submodules</Button>
+                        {session?.user?.permissions?.includes('edit-ticket-module-tickets') && (
+                            <Button variant="info" onClick={() => window.location.href = '/tickets/modules/submodules'}>Manage Submodules</Button>
+                        )}
                         {session?.user?.permissions?.includes('create-ticket-module-tickets') && (
                             <Button variant="primary" onClick={openCreateModuleModal}>New Module</Button>
                         )}

@@ -254,7 +254,11 @@ const EditLead = () => {
         campaign_field_values: lead.campaign_field_values || {},
       });
       toast.success("Lead updated successfully!");
-      router.push("/crm/leads");
+      if(lead?.type === "opportunity") {
+        router.push("/crm/opportunities");
+      } else {
+        router.push("/crm/leads");
+      }
     } catch (error) {
       toast.error("Failed to update lead");
       console.error("Update lead error:", error);

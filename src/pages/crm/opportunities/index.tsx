@@ -114,7 +114,16 @@ const CrmOpportunities = () => {
         cell: (props: any) => (
           <div>
             <div className="fw-medium text-capitalize">{props.name || "Unnamed Lead"}</div>
-            <small className="text-muted">
+            <small 
+              className="text-muted" 
+              style={{
+                display: 'block',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                maxWidth: '300px'
+              }}
+            >
               {props.description || "No Description"}
             </small>
           </div>

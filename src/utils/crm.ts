@@ -1061,6 +1061,13 @@ export interface CampaignData {
   created_at: string;
   updated_at: string;
   fields?: CampaignField[];
+  user_extensions?: {
+    id: number;
+    campaign_id: number;
+    user_extension: string;
+    created_at: string;
+    updated_at: string;
+  }[];
 }
 
 export const getCampaigns = async (

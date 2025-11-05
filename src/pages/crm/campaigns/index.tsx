@@ -119,7 +119,7 @@ const CrmCampaigns = () => {
     const maxDisplay = 2; // Show first 2 names
     const userNames = userExtensions
       .map(ue => {
-        const extension = extensions.find(ext => ext.id.toString() === ue.user_extension);
+        const extension = extensions.find(ext => ext.id == ue.user_extension);
         return extension?.display_name || extension?.name || `Extension ${ue.user_extension}`;
       })
       .filter(Boolean);
@@ -165,6 +165,13 @@ const CrmCampaigns = () => {
       options: {},
     });
     setCampaignFields([]);
+    setCampaignUsers([]);
+    setNewField({
+      field_name: "",
+      field_type: "string",
+      field_options: [],
+      sort_order: 0,
+    });
     setShowCreateModal(true);
   }, []);
 
@@ -182,6 +189,31 @@ const CrmCampaigns = () => {
         options: campaignData.options || {},
       });
       setCampaignFields(campaignData.fields || []);
+      
+      // Set campaign users from user_extensions
+      if (campaignData.user_extensions && campaignData.user_extensions.length > 0) {
+        const selectedUsers = campaignData.user_extensions
+          .map((ue: any) => {
+            const extension = extensions.find(ext => ext.id == ue.user_extension);
+              return {
+                value: ue.user_extension,
+                label: extension?.display_name || extension?.name || ue?.user_extension
+              };
+          })
+          
+        setCampaignUsers(selectedUsers);
+      } else {
+        setCampaignUsers([]);
+      }
+      
+      // Reset newField form
+      setNewField({
+        field_name: "",
+        field_type: "string",
+        field_options: [],
+        sort_order: 0,
+      });
+      
       setShowEditModal(true);
     } catch (error) {
       console.error("Failed to fetch campaign:", error);
@@ -189,7 +221,7 @@ const CrmCampaigns = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [extensions]);
 
   const handleViewCampaign = useCallback(async (campaign: any) => {
     try {
@@ -228,10 +260,88 @@ const CrmCampaigns = () => {
     }
   }, [selectedCampaign]);
 
+  // Helper function to get today's date in YYYY-MM-DD format
+  const getTodayDate = useCallback(() => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }, []);
+
+  // Get minimum date for end date (day after start_date if set, otherwise today)
+  const getMinEndDate = useCallback(() => {
+    const today = getTodayDate();
+    if (formData.start_date) {
+      // Calculate the next day after start_date
+      const startDate = new Date(formData.start_date);
+      startDate.setDate(startDate.getDate() + 1);
+      const nextDay = startDate.toISOString().split('T')[0];
+      // Return the later of: next day after start_date, or today
+      return nextDay > today ? nextDay : today;
+    }
+    return today;
+  }, [formData.start_date, getTodayDate]);
+
+  // Handle start date change with validation
+  const handleStartDateChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const newStartDate = e.target.value;
+    const today = getTodayDate();
+    
+    if (newStartDate && newStartDate < today) {
+      toast.error("Start date must be today or a future date");
+      return;
+    }
+    
+    setFormData(prev => {
+      // If new start date is after end date, clear end date
+      if (prev.end_date && newStartDate && newStartDate >= prev.end_date) {
+        return { ...prev, start_date: newStartDate, end_date: "" };
+      }
+      return { ...prev, start_date: newStartDate };
+    });
+  }, [getTodayDate]);
+
+  // Handle end date change with validation
+  const handleEndDateChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const newEndDate = e.target.value;
+    const minEndDate = getMinEndDate();
+    
+    if (newEndDate && newEndDate < minEndDate) {
+      toast.error(`End date must be after ${new Date(formData.start_date || minEndDate).toLocaleDateString()}`);
+      return;
+    }
+    
+    if (formData.start_date && newEndDate && newEndDate <= formData.start_date) {
+      toast.error("End date must be after start date");
+      return;
+    }
+    
+    setFormData(prev => ({ ...prev, end_date: newEndDate }));
+  }, [formData.start_date, getMinEndDate]);
+
   // Form submission handlers
   const handleFormSubmit = useCallback(async () => {
     if (!formData.name.trim()) {
       toast.error("Campaign name is required");
+      return;
+    }
+
+    // Validate dates
+    const today = getTodayDate();
+    
+    if (formData.start_date && formData.start_date < today) {
+      toast.error("Start date must be today or a future date");
+      return;
+    }
+    
+    if (formData.end_date && formData.end_date < today) {
+      toast.error("End date must be today or a future date");
+      return;
+    }
+    
+    if (formData.start_date && formData.end_date && formData.start_date >= formData.end_date) {
+      toast.error("End date must be after start date");
       return;
     }
 
@@ -266,7 +376,7 @@ const CrmCampaigns = () => {
     } finally {
       setLoading(false);
     }
-  }, [formData, campaignFields, campaignUsers, showEditModal, selectedCampaign]);
+  }, [formData, campaignFields, campaignUsers, showEditModal, selectedCampaign, getTodayDate]);
 
   // Field management functions
   const handleAddField = useCallback(() => {
@@ -533,9 +643,15 @@ const CrmCampaigns = () => {
           setShowEditModal(false);
           setSelectedCampaign(null);
           setCampaignUsers([]);
+          setNewField({
+            field_name: "",
+            field_type: "string",
+            field_options: [],
+            sort_order: 0,
+          });
         }}
         title= {showEditModal ? `Edit Campaign: ${selectedCampaign?.name}` : "Create New Campaign"}
-        desc="Please fill the details below to create the campaign."
+        desc={showEditModal ? "Please update the details below to modify the campaign." : "Please fill the details below to create the campaign."}
         formHtml={
           <>
            <Row>
@@ -571,8 +687,12 @@ const CrmCampaigns = () => {
                 <Form.Control
                   type="date"
                   value={formData.start_date}
-                  onChange={(e) => setFormData({...formData, start_date: e.target.value})}
+                  onChange={handleStartDateChange}
+                  min={getTodayDate()}
                 />
+                <Form.Text className="text-muted">
+                  Must be today or a future date
+                </Form.Text>
               </Form.Group>
             </Col>
             <Col md={6}>
@@ -581,8 +701,12 @@ const CrmCampaigns = () => {
                 <Form.Control
                   type="date"
                   value={formData.end_date}
-                  onChange={(e) => setFormData({...formData, end_date: e.target.value})}
+                  onChange={handleEndDateChange}
+                  min={getMinEndDate()}
                 />
+                <Form.Text className="text-muted">
+                  Must be after start date
+                </Form.Text>
               </Form.Group>
             </Col>
           </Row>
@@ -759,7 +883,7 @@ const CrmCampaigns = () => {
           </div>
           </>
         }
-        submitButtonText="Create Campaign"
+        submitButtonText={showEditModal ? "Update Campaign" : "Create Campaign"}
         cancelButtonText="Cancel"
         onSubmit={() => handleFormSubmit()}
         onCancel={() => {
@@ -767,6 +891,12 @@ const CrmCampaigns = () => {
           setShowEditModal(false);
           setSelectedCampaign(null);
           setCampaignUsers([]);
+          setNewField({
+            field_name: "",
+            field_type: "string",
+            field_options: [],
+            sort_order: 0,
+          });
         }}
       />
 
@@ -837,7 +967,7 @@ const CrmCampaigns = () => {
                   <strong>Campaign Users ({selectedCampaign.user_extensions.length}):</strong>
                   <div className="mt-2">
                     {selectedCampaign.user_extensions.map((ue: any, index: number) => {
-                      const extension = extensions.find(ext => ext.id.toString() === ue.user_extension);
+                      const extension = extensions.find(ext => ext.id == ue.user_extension);
                       const userName = extension?.display_name || extension?.name || `Extension ${ue.user_extension}`;
                       return (
                         <span key={index} className="status-badge info me-1 mb-1">

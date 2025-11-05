@@ -1052,8 +1052,8 @@ const Header = ({ themeMode }: HeaderProps) => {
                     href: '/tickets/dashboard'
                 },
                 {
-                    key: 'tickets-tickets',
-                    permission: 'tickets-tickets',
+                    key: 'view-ticket-tickets',
+                    permission: 'view-ticket-tickets',
                     icon: ICONS.TICKETS,
                     label: SUBMENU_LABELS.TICKETS_LIST,
                     href: '/tickets/list'

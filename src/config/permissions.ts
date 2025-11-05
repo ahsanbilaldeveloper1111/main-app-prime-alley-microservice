@@ -179,7 +179,7 @@ export const routePermissions: RoutePermission[] = [
             },
             {
                 path: '/modules/submodules',
-                permissions: ['ticket-modules-tickets']
+                permissions: ['edit-ticket-module-tickets']
             },
             {
                 path: '/types',

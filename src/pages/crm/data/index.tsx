@@ -1149,13 +1149,10 @@ const CrmDataManagement = () => {
         selector: (row: any) => row.campaign_id,
         sortable: true,
         cell: (props: any) => {
-          const campaign = availableCampaigns.find(
-            (c) => c.value === props.campaign_id?.toString()
-          );
           return (
             <div>
-              {campaign ? (
-                <span className="status-badge primary">{campaign.label}</span>
+              {props?.campaign ? (
+                <span className="status-badge primary">{props.campaign?.name}</span>
               ) : (
                 <span className="status-badge info">No Campaign</span>
               )}
@@ -1169,16 +1166,6 @@ const CrmDataManagement = () => {
         selector: (row: any) => row.last_called_at,
         sortable: true,
         cell: (props: any) => {
-          // Randomize: 30% chance of no call, 70% chance of call in last week
-          const hasCall = Math.random() > 0.3;
-          
-          if (!hasCall) {
-            return (
-              <div className="d-flex align-items-center">
-                <span className="text-muted">N/A</span>
-              </div>
-            );
-          }
           
           // Generate random date within last week
           const now = moment();
