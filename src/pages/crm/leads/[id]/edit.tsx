@@ -108,6 +108,8 @@ const EditLead = () => {
   });
   const [isOpportunity, setIsOpportunity] = useState(false);
   const [extensions, setExtensions] = useState<any[]>([]);
+  const [extensionsLeads, setExtensionsLeads] = useState<any[]>([]);
+
   const [campaigns, setCampaigns] = useState<CampaignData[]>([]);
   const [crmData, setCrmData] = useState<CrmDataItem[]>([]);
   const [selectedCampaign, setSelectedCampaign] = useState<CampaignData | null>(
@@ -212,6 +214,14 @@ const EditLead = () => {
       if (hierarchyData?.extensions) {
         setExtensions(hierarchyData.extensions);
       }
+
+      const hierarchyDataLeads = await GetHierarchyData(ModuleSlug.CRM_LEADS);
+      if (hierarchyDataLeads?.extensions) {
+        setExtensionsLeads(hierarchyDataLeads.extensions);
+      }
+
+
+
     } catch (error) {
       console.error("Failed to fetch extensions:", error);
     }
@@ -647,36 +657,69 @@ const handleCloseSuccessfulModal = () => {
 
                   <Form.Group className="mb-3">
                     <Form.Label>User Extension</Form.Label>
-                    <Select
-                      value={
-                        lead.user_extension
-                          ? {
-                              value: lead.user_extension,
-                              label:
-                                extensions?.find(
-                                  (ext: any) =>
-                                    ext.id.toString() ==
-                                    lead.user_extension?.toString()
-                                )?.display_name || "",
-                            }
-                          : null
-                      }
-                      onChange={(selectedOption: any) => {
-                        setLead({
-                          ...lead,
-                          user_extension: selectedOption?.value || null,
-                        });
-                      }}
-                      options={
-                        extensions?.map((extension: any) => ({
-                          value: extension.id,
-                          label: extension.display_name,
-                        })) || []
-                      }
-                      placeholder="Select User Extension (Optional)"
-                      isClearable
-                      isSearchable
-                    />
+                    {lead.type === "lead" ? (
+                      <Select
+                        value={
+                          lead.user_extension
+                            ? {
+                                value: lead.user_extension,
+                                label:
+                                  extensionsLeads?.find(
+                                    (ext: any) =>
+                                      ext.id.toString() ==
+                                      lead.user_extension?.toString()
+                                  )?.display_name || "",
+                              }
+                            : null
+                        }
+                        onChange={(selectedOption: any) => {
+                          setLead({
+                            ...lead,
+                            user_extension: selectedOption?.value || null,
+                          });
+                        }}
+                        options={
+                          extensionsLeads?.map((extension: any) => ({
+                            value: extension.id,
+                            label: extension.display_name,
+                          })) || []
+                        }
+                        placeholder="Select User Extension (Optional)"
+                        isClearable
+                        isSearchable
+                      />
+                    ) : (
+                      <Select
+                        value={
+                          lead.user_extension
+                            ? {
+                                value: lead.user_extension,
+                                label:
+                                  extensions?.find(
+                                    (ext: any) =>
+                                      ext.id.toString() ==
+                                      lead.user_extension?.toString()
+                                  )?.display_name || "",
+                              }
+                            : null
+                        }
+                        onChange={(selectedOption: any) => {
+                          setLead({
+                            ...lead,
+                            user_extension: selectedOption?.value || null,
+                          });
+                        }}
+                        options={
+                          extensions?.map((extension: any) => ({
+                            value: extension.id,
+                            label: extension.display_name,
+                          })) || []
+                        }
+                        placeholder="Select User Extension (Optional)"
+                        isClearable
+                        isSearchable
+                      />
+                    )}
                   </Form.Group>
 
                   <Form.Group className="mb-3">
@@ -686,6 +729,7 @@ const handleCloseSuccessfulModal = () => {
                       onChange={(e) =>
                         setLead({ ...lead, type: e.target.value })
                       }
+                      
                       required
                     >
                       <option value="lead">Lead</option>
@@ -1119,41 +1163,7 @@ const handleCloseSuccessfulModal = () => {
         )}
       </div>
 
-      {/* Meeting Modal */}
-      {/* <Modal
-        show={showMeetingModal}
-        onHide={() => setShowMeetingModal(false)}
-        size="lg"
-      >
-        <Modal.Header closeButton>
-          <Modal.Title>
-            {editingMeeting ? "Edit Meeting" : "Create New Meeting"}
-          </Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          
-        </Modal.Body>
-        <Modal.Footer>
-          <Button
-            variant="secondary"
-            onClick={() => setShowMeetingModal(false)}
-          >
-            Cancel
-          </Button>
-          <Button
-            variant="primary"
-            onClick={handleMeetingSubmit}
-            disabled={loading}
-          >
-            {loading
-              ? "Saving..."
-              : editingMeeting
-              ? "Update Meeting"
-              : "Create Meeting"}
-          </Button>
-        </Modal.Footer>
-      </Modal> */}
-
+     
 
 
       <FormModal
@@ -1235,33 +1245,66 @@ const handleCloseSuccessfulModal = () => {
               <Form.Label>Extensions *</Form.Label>
               {meetingForm.extensions.map((extension, index) => (
                 <div key={index} className="d-flex gap-2 mb-2">
-                  <Select
-                    value={
-                      extension
-                        ? {
-                            value: extension,
-                            label:
-                              extensions?.find(
-                                (ext: any) =>
-                                  ext.id.toString() == extension.toString()
-                              )?.display_name || "",
-                          }
-                        : null
-                    }
-                    onChange={(selectedOption: any) =>
-                      updateExtension(index, selectedOption?.value || "")
-                    }
-                    options={
-                      extensions?.map((ext: any) => ({
-                        value: ext.id,
-                        label: ext.display_name,
-                      })) || []
-                    }
-                    placeholder="Select Extension"
-                    isClearable
-                    isSearchable
-                    required
-                  />
+                  
+                  {lead.type === "lead" ? (
+                    <Select
+                      value={
+                        extension
+                          ? {
+                              value: extension,
+                              label:
+                                extensionsLeads?.find(
+                                  (ext: any) =>
+                                    ext.id.toString() == extension.toString()
+                                )?.display_name || "",
+                            }
+                          : null
+                      }
+                      onChange={(selectedOption: any) =>
+                        updateExtension(index, selectedOption?.value || "")
+                      }
+                      options={
+                        extensionsLeads?.map((ext: any) => ({
+                          value: ext.id,
+                          label: ext.display_name,
+                        })) || []
+                      }
+                      placeholder="Select Extension"
+                      isClearable
+                      isSearchable
+                      required
+                    />
+                  ) : (
+                    <Select
+                      value={
+                        extension
+                          ? {
+                              value: extension,
+                              label:
+                                extensions?.find(
+                                  (ext: any) =>
+                                    ext.id.toString() == extension.toString()
+                                )?.display_name || "",
+                            }
+                          : null
+                      }
+                      onChange={(selectedOption: any) =>
+                        updateExtension(index, selectedOption?.value || "")
+                      }
+                      options={
+                        extensions?.map((ext: any) => ({
+                          value: ext.id,
+                          label: ext.display_name,
+                        })) || []
+                      }
+                      placeholder="Select Extension"
+                      isClearable
+                      isSearchable
+                      required
+                    />
+                  )}
+
+
                   {meetingForm.extensions.length > 1 && (
                     <Button
                       variant="outline-danger"

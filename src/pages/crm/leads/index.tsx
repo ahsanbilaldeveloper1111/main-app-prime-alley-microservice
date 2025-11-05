@@ -69,7 +69,7 @@ const CrmLeads = () => {
   useEffect(() => {
     fetchStages();
     fetchLostReasons();
-    fetchExtensions();
+    fetchExtensions(ModuleSlug.CRM_LEADS);
   }, []);
 
   // Handle filter changes
@@ -96,9 +96,9 @@ const CrmLeads = () => {
     }
   };
 
-  const fetchExtensions = async () => {
+  const fetchExtensions = async (moduleSlug: string = ModuleSlug.CRM_LEADS) => {
     try {
-      const hierarchyData = await GetHierarchyData(ModuleSlug.CRM_LEADS);
+      const hierarchyData = await GetHierarchyData(moduleSlug);
       if (hierarchyData?.extensions) {
         setExtensions(hierarchyData.extensions);
       }

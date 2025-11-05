@@ -513,7 +513,9 @@ const CreateLead = () => {
                       <Form.Group className="mb-3">
                         <Form.Label>User Extension *</Form.Label>
 
-                        {isOpportunity ? (
+                        {formData.type === "opportunity" ? (
+                          <>
+                          
                         <Select
                           value={
                             formData.user_extension
@@ -534,7 +536,7 @@ const CreateLead = () => {
                               selectedOption?.value || null
                             );
                           }}
-                          options={extensions.map((extension: any) => ({
+                          options={extensionsOpportunities.map((extension: any) => ({
                             value: extension.id,
                             label: extension.display_name,
                           }))}
@@ -543,7 +545,10 @@ const CreateLead = () => {
                           isSearchable
                           required
                         />
+                        </>
                         ) : (
+                          <>
+                          
                           <Select
                           value={
                             formData.user_extension
@@ -573,6 +578,7 @@ const CreateLead = () => {
                           isSearchable
                           required
                         />
+                        </>
                         )}
                       </Form.Group>
                     </Col>

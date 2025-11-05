@@ -843,6 +843,7 @@ const CrmDashboard = () => {
                 </Form.Select>
               </Form.Group>
 
+{meetingForm.lead_id &&  (
               <Form.Group className="mb-3">
                 <Form.Label>Extensions *</Form.Label>
 
@@ -945,6 +946,8 @@ const CrmDashboard = () => {
                   Add Extension
                 </Button>
               </Form.Group>
+                )}
+
             </Form>
           </>
         }
