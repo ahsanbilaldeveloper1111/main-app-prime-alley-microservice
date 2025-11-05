@@ -1295,8 +1295,8 @@ const TicketList = () => {
         const type = types.find((t: any) => t.id.toString() === fieldId.toString());
         return type?.name || fieldId.toString();
       case 'module_id':
-        const module = modules.find((m: any) => m.id.toString() === fieldId.toString());
-        return module?.name || fieldId.toString();
+        const moduleItem = modules.find((m: any) => m.id.toString() === fieldId.toString());
+        return moduleItem?.name || fieldId.toString();
       case 'submodule_id':
         const submodule = allSubmodules.find((s: any) => s.id.toString() === fieldId.toString()) ||
           viewTicketData?.submodule || null;
