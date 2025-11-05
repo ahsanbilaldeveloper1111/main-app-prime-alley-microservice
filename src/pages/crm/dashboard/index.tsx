@@ -48,6 +48,7 @@ import FormModal from "../../partial/FormModal";
 import ConfirmModal from "@pages/partial/ConfirmModal";
 import SuccessfulModal from "@pages/partial/SuccessfulModal";
 import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
+import { ModuleSlug } from '@utils/Helper';
 
 const CrmDashboard = () => {
   const [dashboardData, setDashboardData] = useState<CrmDashboardData>(
@@ -77,6 +78,9 @@ const CrmDashboard = () => {
 
   // Extensions data
   const [extensions, setExtensions] = useState<any[]>([]);
+  const [extensionsOpportunities, setExtensionsOpportunities] = useState<any[]>([]);
+  const [extensionsLeads, setExtensionsLeads] = useState<any[]>([]);
+  
   const [leads, setLeads] = useState<any[]>([]);
   const [opportunities, setOpportunities] = useState<any[]>([]);
 
@@ -167,13 +171,17 @@ const CrmDashboard = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [hierarchyData, leadsData, opportunitiesData] = await Promise.all([
-          GetHierarchyData(),
+        const [hierarchyData,hierarchyDataOpportunities,hierarchyDataLeads, leadsData, opportunitiesData] = await Promise.all([
+          GetHierarchyData(ModuleSlug.CRM_CAMPAIGNS),
+          GetHierarchyData(ModuleSlug.CRM_OPPORTUNITIES),
+          GetHierarchyData(ModuleSlug.CRM_LEADS),
           getLeads({ per_page: 1000 }),
-          getOpportunities({ per_page: 1000 }),
-        ]);
+          getOpportunities({ per_page: 1000 }),]);
         
         setExtensions(hierarchyData?.extensions || []);
+        setExtensionsOpportunities(hierarchyDataOpportunities?.extensions || []);
+        setExtensionsLeads(hierarchyDataLeads?.extensions || []);
+
         setLeads(leadsData?.data || []);
         setOpportunities(opportunitiesData?.data || []);
       } catch (error) {
@@ -837,7 +845,10 @@ const CrmDashboard = () => {
 
               <Form.Group className="mb-3">
                 <Form.Label>Extensions *</Form.Label>
-                {meetingForm.extensions.map((extension, index) => (
+
+                {meetingForm.lead_id && leads.find(item => item.id === meetingForm.lead_id) ? (
+                  <div className="mb-2">
+                    {meetingForm.extensions.map((extension, index) => (
                   <div key={index} className="d-flex gap-2 mb-2">
                     <Select
                       value={
@@ -845,7 +856,7 @@ const CrmDashboard = () => {
                           ? {
                               value: extension,
                               label:
-                                extensions?.find(
+                                extensionsLeads?.find(
                                   (ext: any) =>
                                     ext.id.toString() == extension.toString()
                                 )?.display_name || "",
@@ -856,7 +867,7 @@ const CrmDashboard = () => {
                         updateExtension(index, selectedOption?.value || "")
                       }
                       options={
-                        extensions?.map((ext: any) => ({
+                        extensionsLeads?.map((ext: any) => ({
                           value: ext.id,
                           label: ext.display_name,
                         })) || []
@@ -877,6 +888,53 @@ const CrmDashboard = () => {
                     )}
                   </div>
                 ))}
+                  </div>
+                ) : (
+                  <div className="mb-2">
+                    {meetingForm.extensions.map((extension, index) => (
+                  <div key={index} className="d-flex gap-2 mb-2">
+                    <Select
+                      value={
+                        extension
+                          ? {
+                              value: extension,
+                              label:
+                                extensionsOpportunities?.find(
+                                  (ext: any) =>
+                                    ext.id.toString() == extension.toString()
+                                )?.display_name || "",
+                            }
+                          : null
+                      }
+                      onChange={(selectedOption: any) =>
+                        updateExtension(index, selectedOption?.value || "")
+                      }
+                      options={
+                        extensionsOpportunities?.map((ext: any) => ({
+                          value: ext.id,
+                          label: ext.display_name,
+                        })) || []
+                      }
+                      placeholder="Select Extension"
+                      isClearable
+                      isSearchable
+                      required
+                    />
+                    {meetingForm.extensions.length > 1 && (
+                      <Button
+                        variant="outline-danger"
+                        size="sm"
+                        onClick={() => removeExtensionField(index)}
+                      >
+                        <FiXCircle />
+                      </Button>
+                    )}
+                  </div>
+                ))}
+                  </div>
+                )}
+
+                
                 <Button
                   type="button"
                   variant="outline-secondary"

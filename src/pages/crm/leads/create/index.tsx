@@ -35,6 +35,7 @@ import ConfirmModal from "@pages/partial/ConfirmModal";
 import SuccessfulModal from "@pages/partial/SuccessfulModal";
 import PageSummaryGrid, { SummaryCard } from "@components/PageSummaryGrid";
 import DatatableActionButton from "@components/DatatableActionButton";
+import { ModuleSlug } from '@utils/Helper';
 
 const CreateLead = () => {
   const router = useRouter();
@@ -53,7 +54,12 @@ const CreateLead = () => {
   });
 
   const [stages, setStages] = useState<StageData[]>([]);
+
+
   const [extensions, setExtensions] = useState<any[]>([]);
+  const [extensionsOpportunities, setExtensionsOpportunities] = useState<any[]>([]);
+
+
   const [campaigns, setCampaigns] = useState<CampaignData[]>([]);
   const [crmData, setCrmData] = useState<CrmDataItem[]>([]);
   const [selectedCrmData, setSelectedCrmData] = useState<CrmDataItem | null>(
@@ -226,9 +232,14 @@ const CreateLead = () => {
 
   const fetchExtensions = async () => {
     try {
-      const hierarchyData = await GetHierarchyData();
+      const hierarchyData = await GetHierarchyData(ModuleSlug.CRM_LEADS);
       if (hierarchyData?.extensions) {
         setExtensions(hierarchyData.extensions);
+      }
+
+      const hierarchyDataOpportunities = await GetHierarchyData(ModuleSlug.CRM_OPPORTUNITIES);
+      if (hierarchyDataOpportunities?.extensions) {
+        setExtensionsOpportunities(hierarchyDataOpportunities.extensions);
       }
     } catch (error) {
       console.error("Failed to fetch extensions:", error);
@@ -501,7 +512,39 @@ const CreateLead = () => {
                     <Col md={6}>
                       <Form.Group className="mb-3">
                         <Form.Label>User Extension *</Form.Label>
+
+                        {isOpportunity ? (
                         <Select
+                          value={
+                            formData.user_extension
+                              ? {
+                                  value: formData.user_extension,
+                                  label:
+                                    extensionsOpportunities.find(
+                                      (ext: any) =>
+                                        ext.id.toString() ===
+                                        formData.user_extension?.toString()
+                                    )?.display_name || "",
+                                }
+                              : null
+                          }
+                          onChange={(selectedOption: any) => {
+                            handleInputChange(
+                              "user_extension",
+                              selectedOption?.value || null
+                            );
+                          }}
+                          options={extensions.map((extension: any) => ({
+                            value: extension.id,
+                            label: extension.display_name,
+                          }))}
+                          placeholder="Select User Extension"
+                          isClearable
+                          isSearchable
+                          required
+                        />
+                        ) : (
+                          <Select
                           value={
                             formData.user_extension
                               ? {
@@ -530,6 +573,7 @@ const CreateLead = () => {
                           isSearchable
                           required
                         />
+                        )}
                       </Form.Group>
                     </Col>
                   </Row>
