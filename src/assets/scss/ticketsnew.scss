@@ -1,0 +1,23 @@
+.pc-container {
+    margin-left: auto !important;
+}
+
+.table-responsive .table th:last-child, .table-responsive .table td:last-child {
+    min-width: auto !important;
+}
+
+.pc-container .pc-content {
+    padding-left: 0px !important;
+}
+
+.layout-collapse .pc-sidebar {
+    display: none !important
+}
+
+.pc-header {
+    display:none !important
+}
+.ticket-breadcrumbs-title .breadcrumb {
+    margin: 0px !important;
+    padding: 0px !important;
+}
