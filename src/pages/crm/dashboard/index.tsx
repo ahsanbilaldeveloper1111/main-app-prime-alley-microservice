@@ -249,9 +249,87 @@ const CrmDashboard = () => {
     }
   }, [meetingForm]);
 
+  // Helper function to get today's date in YYYY-MM-DD format
+  const getTodayDate = useCallback(() => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }, []);
+
+  // Get minimum date for end date (day after start_date if set, otherwise today)
+  const getMinEndDate = useCallback(() => {
+    const today = getTodayDate();
+    if (campaignForm.start_date) {
+      // Calculate the next day after start_date
+      const startDate = new Date(campaignForm.start_date);
+      startDate.setDate(startDate.getDate() + 1);
+      const nextDay = startDate.toISOString().split('T')[0];
+      // Return the later of: next day after start_date, or today
+      return nextDay > today ? nextDay : today;
+    }
+    return today;
+  }, [campaignForm.start_date, getTodayDate]);
+
+  // Handle start date change with validation
+  const handleStartDateChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const newStartDate = e.target.value;
+    const today = getTodayDate();
+    
+    if (newStartDate && newStartDate < today) {
+      toast.error("Start date must be today or a future date");
+      return;
+    }
+    
+    setCampaignForm(prev => {
+      // If new start date is after end date, clear end date
+      if (prev.end_date && newStartDate && newStartDate >= prev.end_date) {
+        return { ...prev, start_date: newStartDate, end_date: "" };
+      }
+      return { ...prev, start_date: newStartDate };
+    });
+  }, [getTodayDate]);
+
+  // Handle end date change with validation
+  const handleEndDateChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const newEndDate = e.target.value;
+    const minEndDate = getMinEndDate();
+    
+    if (newEndDate && newEndDate < minEndDate) {
+      toast.error(`End date must be after ${new Date(campaignForm.start_date || minEndDate).toLocaleDateString()}`);
+      return;
+    }
+    
+    if (campaignForm.start_date && newEndDate && newEndDate <= campaignForm.start_date) {
+      toast.error("End date must be after start date");
+      return;
+    }
+    
+    setCampaignForm(prev => ({ ...prev, end_date: newEndDate }));
+  }, [campaignForm.start_date, getMinEndDate]);
+
   const handleCampaignSubmit = useCallback(async () => {
     if (!campaignForm.name.trim()) {
       toast.error("Campaign name is required");
+      return;
+    }
+
+    // Validate dates
+    const today = getTodayDate();
+    
+    if (campaignForm.start_date && campaignForm.start_date < today) {
+      toast.error("Start date must be today or a future date");
+      return;
+    }
+    
+    if (campaignForm.end_date && campaignForm.end_date < today) {
+      toast.error("End date must be today or a future date");
+      return;
+    }
+    
+    if (campaignForm.start_date && campaignForm.end_date && campaignForm.start_date >= campaignForm.end_date) {
+      toast.error("End date must be after start date");
       return;
     }
 
@@ -277,7 +355,7 @@ const CrmDashboard = () => {
     } finally {
       setModalLoading(false);
     }
-  }, [campaignForm, campaignFields, campaignUsers]);
+  }, [campaignForm, campaignFields, campaignUsers, getTodayDate]);
 
   // Campaign field management functions
   const handleAddField = useCallback(() => {
@@ -1001,8 +1079,12 @@ const CrmDashboard = () => {
                   <Form.Control
                     type="date"
                     value={campaignForm.start_date}
-                    onChange={(e) => setCampaignForm({...campaignForm, start_date: e.target.value})}
+                    onChange={handleStartDateChange}
+                    min={getTodayDate()}
                   />
+                  <Form.Text className="text-muted">
+                    Must be today or a future date
+                  </Form.Text>
                 </Form.Group>
               </Col>
               <Col md={6}>
@@ -1011,8 +1093,12 @@ const CrmDashboard = () => {
                   <Form.Control
                     type="date"
                     value={campaignForm.end_date}
-                    onChange={(e) => setCampaignForm({...campaignForm, end_date: e.target.value})}
+                    onChange={handleEndDateChange}
+                    min={getMinEndDate()}
                   />
+                  <Form.Text className="text-muted">
+                    Must be after start date
+                  </Form.Text>
                 </Form.Group>
               </Col>
             </Row>
