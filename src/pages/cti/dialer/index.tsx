@@ -3357,8 +3357,35 @@ const CtiDialer = () => {
             width: '90%',
             textAlign: 'center',
             boxShadow: '0 10px 30px rgba(0, 0, 0, 0.3)',
+            position: 'relative',
             //animation: 'pulse 2s infinite'
           }}>
+            <button
+              onClick={handleRejectCall}
+              disabled={showPageLoader}
+              style={{
+                position: 'absolute',
+                top: '1rem',
+                right: '1rem',
+                background: 'none',
+                border: 'none',
+                cursor: showPageLoader ? 'not-allowed' : 'pointer',
+                padding: '0.5rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                opacity: showPageLoader ? 0.5 : 1,
+                transition: 'opacity 0.2s'
+              }}
+              title="Close"
+            >
+              <i className="material-icons-two-tone" style={{ 
+                fontSize: '1.5rem', 
+                color: '#6c757d'
+              }}>
+                close
+              </i>
+            </button>
             <div className="incoming-call-content">
               <div className="mb-4">
                 <i className="material-icons-two-tone" style={{ 

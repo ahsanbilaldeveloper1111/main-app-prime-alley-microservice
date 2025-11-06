@@ -4,6 +4,7 @@ import { createCrmFiltersConfig } from './filterConfigs';
 import { useSession } from "next-auth/react";
 import { getStages, getCampaigns } from "@utils/crm";
 import { GetHierarchyData } from "@utils/users";
+import { ModuleSlug } from "@utils/Helper";
 
 interface CrmFiltersProps {
   onFiltersChange?: (filters: Record<string, any>) => void;
@@ -41,7 +42,7 @@ export default function CrmFilters({ onFiltersChange, onExport, type }: CrmFilte
         const [stagesData, campaignsData, hierarchyData] = await Promise.all([
           getStages(type),
           getCampaigns(),
-          GetHierarchyData()
+          GetHierarchyData(type === 'lead' ? ModuleSlug.CRM_LEADS : ModuleSlug.CRM_OPPORTUNITIES)
         ]);
         
         setStages(stagesData || []);
