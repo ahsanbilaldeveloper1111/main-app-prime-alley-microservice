@@ -690,11 +690,10 @@ const CtiDashboard = () => {
         monitor: userAddress || ''
       }
 
-      console.log('🛑 Stopping silent monitoring with params:', stopParams)
       const response = await stopMonitoringAPI(stopParams)
       
       if (response.success) {
-        console.log('Silent monitoring stopped successfully for:', dn)
+       
         return true
       } else {
         console.error('Failed to stop silent monitoring:', response.error)
@@ -726,7 +725,7 @@ const CtiDashboard = () => {
       const response = await stopMonitoringAPI(stopParams)
       
       if (response.success) {
-        console.log('Whisper monitoring stopped successfully for:', dn)
+        //console.log('Whisper monitoring stopped successfully for:', dn)
         return true
       } else {
         console.error('Failed to stop whisper monitoring:', response.error)
@@ -754,11 +753,10 @@ const CtiDashboard = () => {
         monitor: userAddress || ''
       }
 
-      console.log('🛑 Stopping barge-in monitoring with params:', stopParams)
       const response = await stopBargeInMonitoringAPI(stopParams)
       
       if (response.success) {
-        console.log('Barge-in monitoring stopped successfully for:', dn)
+        //console.log('Barge-in monitoring stopped successfully for:', dn)
         return true
       } else {
         console.error('Failed to stop barge-in monitoring:', response.error)
@@ -1460,7 +1458,6 @@ const CtiDashboard = () => {
                                         title={`${deviceName} (${terminalState})`}
                                         onClick={() => { //terminalState !== 'STALE' &&
                                           if ( isDeviceActiveCall) {
-                                            console.log('Opening popup for:', dn, deviceName)
                                             setShowPopup({ dn: dn, deviceName })
                                             handleMonitorSelect(dn, 'SILENT', Object.values(dnsMap[dn]?.devices || {}))
                                           } else if (terminalState === 'STALE') {

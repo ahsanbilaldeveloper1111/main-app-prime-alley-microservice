@@ -133,15 +133,15 @@ export default function useCtiStomp(wsPath = '/ws') {
 
         if (Object.keys(activeCallStates).length > 0) {
           setCallStateMap(activeCallStates);
-          console.log('Restored active call states:', activeCallStates);
+          //console.log('Restored active call states:', activeCallStates);
         } else {
-          console.log('No active call states found in persisted data')
+          //console.log('No active call states found in persisted data')
         }
       } else {
-        console.log('No stored call states found')
+        //console.log('No stored call states found')
       }
     } catch (error) {
-      console.error('Error loading persisted call states:', error);
+      //console.error('Error loading persisted call states:', error);
       // Clear corrupted data
       localStorage.removeItem(CALL_STATES_STORAGE_KEY);
       localStorage.removeItem(CALL_STATES_TIMESTAMP_KEY);
@@ -407,25 +407,6 @@ export default function useCtiStomp(wsPath = '/ws') {
         (!hasActiveParties && processedParties.length > 0) ||
         (evt.eventType === 'DISCONNECTED' && !hasActiveParties);
 
-      // Debug logging for calls involving DN 108 (can be removed later)
-      if (processedParties.some((p: any) => p.callingAddress === '108' || p.calledAddress === '108')) {
-        console.log('🔍 DROPPED event processing for DN 108:', {
-          callId: callId,
-          eventType: evt.eventType,
-          originalParties: processedParties.map((p: any) => ({
-            calling: p.callingAddress,
-            called: p.calledAddress,
-            status: p.callStatus
-          })),
-          activePartiesAfterFilter: activePartiesOnly.map((p: any) => ({
-            calling: p.callingAddress,
-            called: p.calledAddress,
-            status: p.callStatus
-          })),
-          hasActiveParties: activePartiesOnly.length > 0,
-          shouldTerminate: shouldTerminate
-        });
-      }
 
       // Determine the current state based on active parties, not the event type
       // If event is DROPPED but there are still active parties, use the state from active parties
@@ -511,17 +492,7 @@ export default function useCtiStomp(wsPath = '/ws') {
               
               // If this call is older than the DROPPED event, mark the matching party as DROPPED
               if (otherCallTime < currentEventTime) {
-                // Debug logging for DN 108 cleanup
-                if (droppedPair.calling === '108' || droppedPair.called === '108') {
-                  console.log('🧹 Cleaning up stale call for DN 108:', {
-                    droppedCallId: callId,
-                    staleCallId: otherCallId,
-                    droppedPair: droppedPair,
-                    staleCallEventTime: otherCall.eventTime,
-                    droppedEventTime: evt.eventTime,
-                    matchingParty: matchingParty
-                  });
-                }
+                
                 const updatedParties = otherCall.parties.map((p: any) => {
                   const isMatchingParty = 
                     (p.callingAddress === droppedPair.calling && p.calledAddress === droppedPair.called) ||
@@ -924,7 +895,7 @@ export default function useCtiStomp(wsPath = '/ws') {
       if (!storedCallStates) return;
 
       const parsedCallStates = JSON.parse(storedCallStates);
-      console.log('Syncing persisted call states with server:', parsedCallStates);
+      //console.log('Syncing persisted call states with server:', parsedCallStates);
 
       // Request call state updates for persisted calls
       if (clientRef.current && clientRef.current.connected) {

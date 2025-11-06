@@ -261,6 +261,7 @@ export const HEADER_CONSTANTS = {
     VIEW_ALERTS_NETOPS: 'alerts-netops',
     RESOLVE_ALERT: 'resolve-alert-netops',
     MONITER_NETOPS: 'moniter-netops',
+    VIEW_UPTIME_SLA_NETOPS: 'monitoring-netops',
     
     
   } as const
