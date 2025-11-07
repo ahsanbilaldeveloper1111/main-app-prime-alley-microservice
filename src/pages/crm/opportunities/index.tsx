@@ -26,6 +26,7 @@ import {
   FiEdit,
   FiTrash2,
   FiXCircle,
+  FiEye,
 } from "react-icons/fi";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
@@ -189,13 +190,17 @@ const CrmOpportunities = () => {
         name: "Created",
         selector: (row: any) => row.created_at,
         sortable: true,
-        cell: (props: any) => (
-          <span>
-            {props.created_at
-              ? new Date(props.created_at).toLocaleDateString()
-              : "Unknown"}
-          </span>
-        ),
+        cell: (props: any) => {
+          const user = extensions.find((extension: any) => extension?.id == props?.created_by);
+          const name = user?.display_name || user?.name || props?.created_by;
+          return <span>
+          {props?.created_by ? name : ""}
+          {props?.created_by && <br />}
+          {props.created_at
+            ? new Date(props.created_at).toLocaleDateString()
+            : "Unknown"}
+        </span>
+        },
       },
       
       {
@@ -209,7 +214,11 @@ const CrmOpportunities = () => {
           {session?.user?.permissions?.includes('view-crm-opportunities') || session?.user?.permissions?.includes('edit-crm-opportunities') || session?.user?.permissions?.includes('mark-as-lost-crm-opportunities') || session?.user?.permissions?.includes('delete-crm-opportunities') ? (
           <DatatableActionButton
             actions={[
-
+              {
+                label: 'View',
+                icon: <FiEye className="me-2" />,
+                onClick: () => window.location.href = `/crm/leads/${props.id}`,
+              },
               ...(session?.user?.permissions?.includes('edit-crm-opportunities') ? [{
                 label: 'Edit',
                 icon: <FiEdit className="me-2" />,
