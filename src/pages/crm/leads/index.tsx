@@ -112,6 +112,7 @@ const CrmLeads = () => {
       const params: any = {
         page,
         per_page: perPage,
+        ...(currentFilters || {}),
       };
 
       // Use search from filters if available, otherwise use the search parameter
@@ -375,8 +376,19 @@ const CrmLeads = () => {
             : "Unknown"}
         </span>
         }
-          
-        ,
+      },
+      {
+        key: "user_extension",
+        name: "User Extension",
+        selector: (row: any) => row.user_extension,
+        sortable: true,
+        cell: (props: any) => {
+          const user = extensions.find((extension: any) => extension?.id == props?.user_extension);
+          const name = user?.display_name || user?.name || props?.user_extension;
+          return <span>
+          {props?.user_extension ? name : ""}
+        </span>
+        }
       },
       {
         key: "Action",

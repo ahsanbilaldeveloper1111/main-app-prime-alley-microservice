@@ -202,7 +202,19 @@ const CrmOpportunities = () => {
         </span>
         },
       },
-      
+      {
+        key: "user_extension",
+        name: "User Extension",
+        selector: (row: any) => row.user_extension,
+        sortable: true,
+        cell: (props: any) => {
+          const user = extensions.find((extension: any) => extension?.id == props?.user_extension);
+          const name = user?.display_name || user?.name || props?.user_extension;
+          return <span>
+          {props?.user_extension ? name : ""}
+        </span>
+        }
+      },
       {
         key: "Action",
         name: "ACTION",
@@ -254,20 +266,14 @@ const CrmOpportunities = () => {
       const params: any = {
         page,
         perPage,
+        ...(memoizedFilters || {}),
+        
       };
 
       // Use search from filters if available, otherwise use the search parameter
       const searchTerm = memoizedFilters.search || search;
       if (searchTerm) {
         params.search = searchTerm;
-      }
-
-      // Add filter parameters at top level
-      if (memoizedFilters.stage_id) {
-        params.stage_id = memoizedFilters.stage_id;
-      }
-      if (memoizedFilters.is_lost !== undefined) {
-        params.is_lost = memoizedFilters.is_lost;
       }
 
       return await getOpportunities(params);
