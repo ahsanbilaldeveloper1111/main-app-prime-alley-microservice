@@ -236,7 +236,8 @@ const TicketDashboard: React.FC = () => {
 //   const [activeScreen, setActiveScreen] = useState<ScreenType>('dashboard');
 //   const [sidebarOpen, setSidebarOpen] = useState<boolean>(false);
 
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+ 
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 const [activeScreen, setActiveScreen] = useState('dashboard');
 
   const [tickets, setTickets] = useState<TicketType[]>([
@@ -429,6 +430,7 @@ const [activeScreen, setActiveScreen] = useState('dashboard');
     activeScreen={activeScreen}
     setActiveScreen={setActiveScreen}
   />
+  
 </Col>
         {/* <Col lg={2} style={{ position: 'relative' }}>
   <Card 
@@ -3631,158 +3633,108 @@ const StatusManagementScreen: React.FC = () => {
   
 // Categories Management Screen
 const CategoriesManagementScreen: React.FC = () => {
-    const [categories, setCategories] = useState<CategoryType[]>([
-      { id: 1, name: 'Email Integration', description: 'Email channel integration', module: 'Omni Channel', createdAt: '15/09/2025' },
-      { id: 2, name: 'SMS Gateway', description: 'SMS communication gateway', module: 'Omni Channel', createdAt: '15/09/2025' },
-      { id: 3, name: 'Inbound Calls', description: 'Incoming call logs', module: 'Call Logs', createdAt: '15/09/2025' },
-      { id: 4, name: 'Web Dialer', description: 'Browser-based dialer', module: 'CTI', createdAt: '15/09/2025' },
-      { id: 5, name: 'WhatsApp Business', description: 'WhatsApp integration', module: 'Omni Channel', createdAt: '15/09/2025' },
-      { id: 6, name: 'Outbound Calls', description: 'Outgoing call logs', module: 'Call Logs', createdAt: '15/09/2025' },
-    ]);
-  
-    const [showModal, setShowModal] = useState<boolean>(false);
-    const [editingCategory, setEditingCategory] = useState<CategoryType | null>(null);
-    const [formData, setFormData] = useState<Omit<CategoryType, 'id' | 'createdAt'>>({
-      name: '',
-      description: '',
-      module: ''
-    });
-    const [searchTerm, setSearchTerm] = useState<string>('');
-  
-    // Parent modules with their colors
-    const modules: NewModuleType[] = [
-      { id: 1, name: 'Omni Channel', color: '#0d6efd' },
-      { id: 2, name: 'Call Logs', color: '#198754' },
-      { id: 3, name: 'TMS', color: '#dc3545' },
-      { id: 4, name: 'CTI', color: '#fd7e14' },
-      { id: 5, name: 'Ticket', color: '#6f42c1' },
-    ];
-  
-    const handleOpenModal = (category: CategoryType | null = null): void => {
-      if (category) {
-        setEditingCategory(category);
-        setFormData({
-          name: category.name,
-          description: category.description,
-          module: category.module
-        });
-      } else {
-        setEditingCategory(null);
-        setFormData({ name: '', description: '', module: '' });
-      }
-      setShowModal(true);
-    };
-  
-    const handleSaveCategory = (): void => {
-      if (!formData.name.trim() || !formData.description.trim() || !formData.module) {
-        alert('All fields are required');
-        return;
-      }
-  
-      if (editingCategory) {
-        setCategories(categories.map(c => 
-          c.id === editingCategory.id ? { ...c, ...formData } : c
-        ));
-      } else {
-        setCategories([...categories, {
-          id: Math.max(...categories.map(c => c.id), 0) + 1,
-          ...formData,
-          createdAt: new Date().toLocaleDateString('en-GB')
-        }]);
-      }
-      setShowModal(false);
-    };
-  
-    const handleDelete = (id: number): void => {
-      if (window.confirm('Are you sure you want to delete this category?')) {
-        setCategories(categories.filter(c => c.id !== id));
-      }
-    };
-  
-    const filteredCategories = categories.filter(category =>
-      category.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      category.module.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      category.description.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  
-    // Get module color by name
-    const getModuleColor = (moduleName: string): string => {
-      const module = modules.find(m => m.name === moduleName);
-      return module ? module.color : '#6c757d';
-    };
-  
-    // Group categories by module
-    const categoriesByModule = modules.map(module => ({
-      module: module.name,
-      color: module.color,
-      categories: filteredCategories.filter(cat => cat.module === module.name)
-    })).filter(group => group.categories.length > 0);
-  
-    return (
-      <div>
-        {/* Header */}
-        <div className="mb-4">
-          <div className="d-flex justify-content-between align-items-start mb-3">
-            <div>
-              <h2 className="mb-2 fw-bold d-flex align-items-center">
-                <div className="rounded-3 p-2 me-3" style={{ backgroundColor: '#6f42c115' }}>
-                  <Grid3x3 size={24} className="text-purple" style={{ color: '#6f42c1' }} />
-                </div>
-                Categories
-              </h2>
-              <p className="text-muted mb-0">Manage ticket categories by modules</p>
-            </div>
-            <Button 
-              variant="primary" 
-              onClick={() => handleOpenModal()} 
-              className="shadow-sm"
-              style={{ padding: '0.5rem 1.5rem', backgroundColor: '#6f42c1', borderColor: '#6f42c1' }}
-            >
-              <Plus size={18} className="me-2" />
-              Add Category
-            </Button>
-          </div>
-  
-          {/* Stats Cards */}
-          {/* <Row className="g-3 mb-4">
-            <Col md={3}>
-              <Card className="border-0 shadow-sm" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
-                <Card.Body className="text-white">
-                  <div className="d-flex justify-content-between align-items-center">
-                    <div>
-                      <p className="mb-1 opacity-75 small">Total Categories</p>
-                      <h3 className="mb-0 fw-bold">{categories.length}</h3>
-                    </div>
-                    <div className="bg-white bg-opacity-25 rounded-3 p-3">
-                      <Grid3x3 size={24} />
-                    </div>
-                  </div>
-                </Card.Body>
-              </Card>
-            </Col>
-            <Col md={3}>
-              <Card className="border-0 shadow-sm" style={{ background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)' }}>
-                <Card.Body className="text-white">
-                  <div className="d-flex justify-content-between align-items-center">
-                    <div>
-                      <p className="mb-1 opacity-75 small">Parent Modules</p>
-                      <h3 className="mb-0 fw-bold">{categoriesByModule.length}</h3>
-                    </div>
-                    <div className="bg-white bg-opacity-25 rounded-3 p-3">
-                      <Layers size={24} />
-                    </div>
-                  </div>
-                </Card.Body>
-              </Card>
-            </Col>
-          </Row> */}
+  const [categories, setCategories] = useState<CategoryType[]>([
+    { id: 1, name: 'Email Integration', description: 'Email channel integration', module: 'Omni Channel', createdAt: '15/09/2025' },
+    { id: 2, name: 'SMS Gateway', description: 'SMS communication gateway', module: 'Omni Channel', createdAt: '15/09/2025' },
+    { id: 3, name: 'Inbound Calls', description: 'Incoming call logs', module: 'Call Logs', createdAt: '15/09/2025' },
+    { id: 4, name: 'Web Dialer', description: 'Browser-based dialer', module: 'CTI', createdAt: '15/09/2025' },
+    { id: 5, name: 'WhatsApp Business', description: 'WhatsApp integration', module: 'Omni Channel', createdAt: '15/09/2025' },
+    { id: 6, name: 'Outbound Calls', description: 'Outgoing call logs', module: 'Call Logs', createdAt: '15/09/2025' },
+  ]);
+
+  const [showModal, setShowModal] = useState<boolean>(false);
+  const [editingCategory, setEditingCategory] = useState<CategoryType | null>(null);
+  const [formData, setFormData] = useState<Omit<CategoryType, 'id' | 'createdAt'>>({
+    name: '',
+    description: '',
+    module: ''
+  });
+  const [searchTerm, setSearchTerm] = useState<string>('');
+
+  // Parent modules with their colors
+  const modules: NewModuleType[] = [
+    { id: 1, name: 'Omni Channel', color: '#0d6efd' },
+    { id: 2, name: 'Call Logs', color: '#198754' },
+    { id: 3, name: 'TMS', color: '#dc3545' },
+    { id: 4, name: 'CTI', color: '#fd7e14' },
+    { id: 5, name: 'Ticket', color: '#6f42c1' },
+  ];
+
+  const handleOpenModal = (category: CategoryType | null = null): void => {
+    if (category) {
+      setEditingCategory(category);
+      setFormData({
+        name: category.name,
+        description: category.description,
+        module: category.module
+      });
+    } else {
+      setEditingCategory(null);
+      setFormData({ name: '', description: '', module: '' });
+    }
+    setShowModal(true);
+  };
+
+  const handleSaveCategory = (): void => {
+    if (!formData.name.trim() || !formData.description.trim() || !formData.module) {
+      alert('All fields are required');
+      return;
+    }
+
+    if (editingCategory) {
+      setCategories(categories.map(c => 
+        c.id === editingCategory.id ? { ...c, ...formData } : c
+      ));
+    } else {
+      setCategories([...categories, {
+        id: Math.max(...categories.map(c => c.id), 0) + 1,
+        ...formData,
+        createdAt: new Date().toLocaleDateString('en-GB')
+      }]);
+    }
+    setShowModal(false);
+  };
+
+  const handleDelete = (id: number): void => {
+    if (window.confirm('Are you sure you want to delete this category?')) {
+      setCategories(categories.filter(c => c.id !== id));
+    }
+  };
+
+  const filteredCategories = categories.filter(category =>
+    category.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    category.module.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    category.description.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  // Get module color by name
+  const getModuleColor = (moduleName: string): string => {
+    const module = modules.find(m => m.name === moduleName);
+    return module ? module.color : '#6c757d';
+  };
+
+  return (
+    <div>
+      {/* Header */}
+      <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4 gap-3">
+        <div>
+          <h4 className="mb-1 fw-bold">Categories Management</h4>
+          <p className="text-muted mb-0">Organize and manage ticket categories by modules</p>
         </div>
-  
-        {/* Main Content */}
-        <Card className="border-0 shadow-sm">
-          <Card.Body className="p-4">
-            {/* Search Bar */}
-            <div className="mb-4">
+        <Button 
+          variant="primary" 
+          onClick={() => handleOpenModal()}
+          className="d-flex align-items-center gap-2"
+          style={{ backgroundColor: '#6f42c1', borderColor: '#6f42c1' }}
+        >
+          <Plus size={18} />
+          Add Category
+        </Button>
+      </div>
+
+      {/* Search and Stats Bar */}
+      <Row className="mb-4 g-3">
+      <div className="mb-4">
               <InputGroup>
                 <InputGroup.Text className="bg-light border-end-0">
                   <Search size={18} className="text-muted" />
@@ -3795,311 +3747,308 @@ const CategoriesManagementScreen: React.FC = () => {
                 />
               </InputGroup>
             </div>
-  
-            {/* Categories grouped by Module */}
-            {categoriesByModule.map((group, groupIndex) => (
-              <div key={groupIndex} className="mb-4">
-                {/* Module Header */}
+        {/* <Col md={4}>
+          <Card className="border-0 shadow-sm h-100" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
+            <Card.Body className="d-flex align-items-center justify-content-between text-white py-3">
+              <div>
+                <small className="opacity-75">Total Categories</small>
+                <h4 className="mb-0 fw-bold">{categories.length}</h4>
+              </div>
+              <div className="bg-white bg-opacity-25 rounded p-2">
+                <Grid3x3 size={24} />
+              </div>
+            </Card.Body>
+          </Card>
+        </Col> */}
+      </Row>
+
+      {/* Categories Grid */}
+      {filteredCategories.length > 0 ? (
+        <Row className="g-4">
+          {filteredCategories.map((category) => (
+            <Col key={category.id} xs={12} md={6} lg={4}>
+              <Card 
+                className="border-0 shadow-sm h-100 position-relative overflow-hidden"
+                style={{ transition: 'all 0.3s ease' }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-5px)';
+                  e.currentTarget.style.boxShadow = '0 10px 25px rgba(0,0,0,0.15)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
+                }}
+              >
+                {/* Color Accent Bar */}
                 <div 
-                  className="d-flex align-items-center mb-3 p-3 rounded-3"
                   style={{ 
-                    backgroundColor: `${group.color}15`,
-                    borderLeft: `4px solid ${group.color}`
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    height: '4px',
+                    backgroundColor: getModuleColor(category.module)
                   }}
-                >
-                  <Layers size={20} style={{ color: group.color }} className="me-2" />
-                  <h5 className="mb-0 fw-bold" style={{ color: group.color }}>
-                    {group.module}
-                  </h5>
-                  <Badge 
-                    bg="light" 
-                    text="dark" 
-                    className="ms-auto"
-                  >
-                    {group.categories.length} {group.categories.length === 1 ? 'category' : 'categories'}
-                  </Badge>
-                </div>
-  
-                {/* Category Cards */}
-                <Row className="g-3">
-                  {group.categories.map((category) => (
-                    <Col key={category.id} md={6} lg={4}>
-                      <Card 
-                        className="border-0 h-100"
-                        style={{ 
-                          borderLeft: `4px solid ${group.color}`,
-                          transition: 'all 0.3s ease',
-                          backgroundColor: '#f8f9fa'
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.transform = 'translateY(-4px)';
-                          e.currentTarget.style.boxShadow = '0 8px 20px rgba(0,0,0,0.1)';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.transform = 'translateY(0)';
-                          e.currentTarget.style.boxShadow = 'none';
-                        }}
+                />
+                
+                <Card.Body className="p-4">
+                  {/* Header with Icon and Actions */}
+                  <div className="d-flex justify-content-between align-items-start mb-3">
+                    <div 
+                      className="rounded-3 p-3"
+                      style={{ 
+                        backgroundColor: `${getModuleColor(category.module)}15`,
+                        width: 'fit-content'
+                      }}
+                    >
+                      <Grid3x3 size={24} style={{ color: getModuleColor(category.module) }} />
+                    </div>
+                    <div className="d-flex gap-2">
+                      <Button
+                        variant="link"
+                        size="sm"
+                        className="p-2 text-primary"
+                        onClick={() => handleOpenModal(category)}
+                        title="Edit Category"
                       >
-                        <Card.Body className="p-3">
-                          <div className="d-flex justify-content-between align-items-start mb-2">
-                            <div className="d-flex align-items-center flex-grow-1">
-                              <div 
-                                className="rounded-3 p-2 me-2"
-                                style={{ backgroundColor: `${group.color}20` }}
-                              >
-                                <Grid3x3 size={18} style={{ color: group.color }} />
-                              </div>
-                              <div className="flex-grow-1">
-                                <h6 className="mb-0 fw-bold">{category.name}</h6>
-                              </div>
-                            </div>
-                            <div className="d-flex gap-1">
-                              <Button
-                                variant="light"
-                                size="sm"
-                                className="rounded-circle p-0"
-                                style={{ width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                                onClick={() => handleOpenModal(category)}
-                              >
-                                <Edit size={12} />
-                              </Button>
-                              <Button
-                                variant="light"
-                                size="sm"
-                                className="rounded-circle text-danger p-0"
-                                style={{ width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                                onClick={() => handleDelete(category.id)}
-                              >
-                                <Trash2 size={12} />
-                              </Button>
-                            </div>
-                          </div>
-                          <p className="text-muted small mb-2">{category.description}</p>
-                          <div className="d-flex justify-content-between align-items-center">
-                            <small className="text-muted">Created: {category.createdAt}</small>
-                            <Badge 
-                              style={{ backgroundColor: group.color }}
-                              className="px-2 py-1"
-                            >
-                              {category.module}
-                            </Badge>
-                          </div>
-                        </Card.Body>
-                      </Card>
-                    </Col>
-                  ))}
-                </Row>
-              </div>
-            ))}
-  
-            {filteredCategories.length === 0 && (
-              <div className="text-center py-5">
-                <Grid3x3 size={48} className="text-muted mb-3" />
-                <p className="text-muted">No categories found</p>
-              </div>
-            )}
+                        <Edit size={16} />
+                      </Button>
+                      <Button
+                        variant="link"
+                        size="sm"
+                        className="p-2 text-danger"
+                        onClick={() => handleDelete(category.id)}
+                        title="Delete Category"
+                      >
+                        <Trash2 size={16} />
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Category Name */}
+                  <h5 className="fw-bold mb-2">{category.name}</h5>
+                  
+                  {/* Description */}
+                  <p className="text-muted mb-3 small" style={{ minHeight: '40px' }}>
+                    {category.description}
+                  </p>
+
+                  {/* Footer Info */}
+                  <div className="d-flex justify-content-between align-items-center pt-3 border-top">
+                    <div className="d-flex align-items-center gap-2">
+                      <Layers size={14} style={{ color: getModuleColor(category.module) }} />
+                      <small className="fw-semibold" style={{ color: getModuleColor(category.module) }}>
+                        {category.module}
+                      </small>
+                    </div>
+                    <small className="text-muted">{category.createdAt}</small>
+                  </div>
+                </Card.Body>
+              </Card>
+            </Col>
+          ))}
+        </Row>
+      ) : (
+        <Card className="border-0 shadow-sm">
+          <Card.Body className="text-center py-5">
+            <div 
+              className="rounded-circle mx-auto mb-3 d-flex align-items-center justify-content-center"
+              style={{ 
+                width: '80px', 
+                height: '80px', 
+                backgroundColor: '#f8f9fa' 
+              }}
+            >
+              <Grid3x3 size={40} className="text-muted" />
+            </div>
+            <h5 className="fw-bold mb-2">No categories found</h5>
+            <p className="text-muted mb-0">
+              {searchTerm 
+                ? 'Try adjusting your search criteria' 
+                : 'Get started by creating your first category'}
+            </p>
           </Card.Body>
         </Card>
-  
-        {/* Modal */}
-       {/* Modal */}
-<Modal show={showModal} onHide={() => setShowModal(false)} centered size="lg">
-  <Modal.Header closeButton className="border-0 pb-0 bg-light">
-    <div className="d-flex align-items-center justify-content-between w-100 pe-3">
-      <Modal.Title className="fw-bold d-flex align-items-center gap-2">
-        <div className="p-2" >
-          <Grid3x3 size={20} style={{ color: '#6f42c1' }} />
-        </div>
-        <span>{editingCategory ? 'Edit Category' : 'Create New Category'}</span>
-      </Modal.Title>
-    </div>
-  </Modal.Header>
+      )}
 
-  <Modal.Body className="px-4 pb-4">
-    {/* Guidelines Alert */}
-    {/* {!editingCategory && (
-      <Alert variant="info" className="mb-4 border-0 shadow-sm">
-        <div className="d-flex align-items-start gap-3">
-          <div className="bg-info bg-opacity-10 rounded-circle p-2" style={{ minWidth: '40px', height: '40px' }}>
-            <Info size={20} className="text-info" />
+      {/* Add/Edit Modal */}
+      <Modal show={showModal} onHide={() => setShowModal(false)} centered size="lg">
+        <Modal.Header closeButton className="border-0 pb-0 bg-light">
+          <div className="d-flex align-items-center justify-content-between w-100 pe-3">
+            <Modal.Title className="fw-bold d-flex align-items-center gap-2">
+              <div className="p-2">
+                <Grid3x3 size={20} style={{ color: '#6f42c1' }} />
+              </div>
+              <span>{editingCategory ? 'Edit Category' : 'Create New Category'}</span>
+            </Modal.Title>
           </div>
-          <div>
-            <h6 className="fw-bold mb-2 text-info">Category Setup Guidelines</h6>
-            <ul className="mb-0 ps-3" style={{ fontSize: '0.875rem', lineHeight: '1.8' }}>
-              <li>Select the <strong>parent module</strong> this category belongs to</li>
-              <li>Use a <strong>specific name</strong> that describes the category clearly</li>
-              <li>Provide context in the <strong>description</strong> to help users select correctly</li>
-              <li>Categories help organize tickets within modules for better tracking</li>
-            </ul>
+        </Modal.Header>
+
+        <Modal.Body className="px-4 pb-4">
+          <Form>
+            <Row>
+              {/* Parent Module */}
+              <Col md={12} className="mb-4">
+                <Form.Group>
+                  <Form.Label className="fw-semibold d-flex align-items-center gap-2">
+                    Parent Module <span className="text-danger">*</span>
+                    <span 
+                      className="text-muted" 
+                      title="Select the module this category will belong to"
+                      style={{ cursor: 'help' }}
+                    >
+                      <Info size={14} />
+                    </span>
+                  </Form.Label>
+                  <Form.Select
+                    value={formData.module}
+                    onChange={(e: ChangeEvent<HTMLSelectElement>) => 
+                      setFormData({ ...formData, module: e.target.value })
+                    }
+                    className="py-2"
+                    style={{ fontSize: '0.938rem' }}
+                  >
+                    <option value="">Select a parent module</option>
+                    {modules.map((module) => (
+                      <option key={module.id} value={module.name}>
+                        {module.name}
+                      </option>
+                    ))}
+                  </Form.Select>
+                  <Form.Text className="text-muted d-flex align-items-center gap-1 mt-2">
+                    <Info size={12} />
+                    <span style={{ fontSize: '0.813rem' }}>
+                      Choose the module that this category will be associated with. This creates a hierarchical organization.
+                    </span>
+                  </Form.Text>
+                </Form.Group>
+              </Col>
+
+              {/* Category Name */}
+              <Col md={12} className="mb-4">
+                <Form.Group>
+                  <Form.Label className="fw-semibold d-flex align-items-center gap-2">
+                    Category Name <span className="text-danger">*</span>
+                    <span 
+                      className="text-muted" 
+                      title="Enter a descriptive name for this category"
+                      style={{ cursor: 'help' }}
+                    >
+                      <Info size={14} />
+                    </span>
+                  </Form.Label>
+                  <Form.Control
+                    type="text"
+                    placeholder="e.g., User Authentication, Email Integration"
+                    value={formData.name}
+                    onChange={(e: ChangeEvent<HTMLInputElement>) => 
+                      setFormData({ ...formData, name: e.target.value })
+                    }
+                    className="py-2"
+                    style={{ fontSize: '0.938rem' }}
+                  />
+                  <Form.Text className="text-muted d-flex align-items-center gap-1 mt-2">
+                    <Info size={12} />
+                    <span style={{ fontSize: '0.813rem' }}>
+                      Use a specific name that clearly identifies this category within the parent module.
+                    </span>
+                  </Form.Text>
+                </Form.Group>
+              </Col>
+
+              {/* Description */}
+              <Col md={12} className="mb-4">
+                <Form.Group>
+                  <Form.Label className="fw-semibold d-flex align-items-center gap-2">
+                    Description <span className="text-danger">*</span>
+                    <span 
+                      className="text-muted" 
+                      title="Explain what types of issues belong in this category"
+                      style={{ cursor: 'help' }}
+                    >
+                      <Info size={14} />
+                    </span>
+                  </Form.Label>
+                  <Form.Control
+                    as="textarea"
+                    rows={3}
+                    placeholder="Describe what issues or requests belong to this category..."
+                    value={formData.description}
+                    onChange={(e: ChangeEvent<HTMLTextAreaElement>) => 
+                      setFormData({ ...formData, description: e.target.value })
+                    }
+                    style={{ fontSize: '0.938rem', lineHeight: '1.6' }}
+                  />
+                  <Form.Text className="text-muted d-flex align-items-center gap-1 mt-2">
+                    <Info size={12} />
+                    <span style={{ fontSize: '0.813rem' }}>
+                      Provide clear guidance on what types of tickets should be categorized here. This helps users select the right category.
+                    </span>
+                  </Form.Text>
+                </Form.Group>
+              </Col>
+
+              {/* Preview Section */}
+              {formData.module && (
+                <Col md={12}>
+                  <Card className="border-0 bg-light">
+                    <Card.Body className="p-3">
+                      <Form.Label className="fw-semibold mb-3 d-flex align-items-center gap-2">
+                        <Eye size={16} />
+                        Category Hierarchy Preview
+                      </Form.Label>
+                      <div className="d-flex align-items-center gap-2 p-3 bg-white rounded-3 border">
+                        <Badge bg="primary" className="px-3 py-2">
+                          <Layers size={14} className="me-2" />
+                          {formData.module}
+                        </Badge>
+                        <ChevronRight size={16} className="text-muted" />
+                        <Badge bg="secondary" className="px-3 py-2">
+                          <Grid3x3 size={14} className="me-2" />
+                          {formData.name || 'Category Name'}
+                        </Badge>
+                      </div>
+                      <Form.Text className="text-muted d-block mt-2" style={{ fontSize: '0.813rem' }}>
+                        <Info size={12} className="me-1" />
+                        This shows how your category will be organized under the parent module
+                      </Form.Text>
+                    </Card.Body>
+                  </Card>
+                </Col>
+              )}
+            </Row>
+          </Form>
+        </Modal.Body>
+
+        <Modal.Footer className="border-0 pt-0 bg-light">
+          <div className="d-flex justify-content-between align-items-center w-100">
+            <Form.Text className="text-muted d-flex align-items-center gap-1">
+              <AlertCircle size={14} />
+              <span style={{ fontSize: '0.813rem' }}>
+                Fields marked with <span className="text-danger fw-bold">*</span> are required
+              </span>
+            </Form.Text>
+            <div className="d-flex gap-2">
+              <Button variant="light" onClick={() => setShowModal(false)}>
+                <X size={16} className="me-1" />
+                Cancel
+              </Button>
+              <Button 
+                variant="primary" 
+                onClick={handleSaveCategory}
+                disabled={!formData.name.trim() || !formData.description.trim() || !formData.module}
+                style={{ backgroundColor: '#6f42c1', borderColor: '#6f42c1' }}
+              >
+                <Check size={16} className="me-1" />
+                {editingCategory ? 'Update Category' : 'Create Category'}
+              </Button>
+            </div>
           </div>
-        </div>
-      </Alert>
-    )} */}
-
-    <Form>
-      <Row>
-        {/* Parent Module */}
-        <Col md={12} className="mb-4">
-          <Form.Group>
-            <Form.Label className="fw-semibold d-flex align-items-center gap-2">
-              Parent Module <span className="text-danger">*</span>
-              <span 
-                className="text-muted" 
-                title="Select the module this category will belong to"
-                style={{ cursor: 'help' }}
-              >
-                <Info size={14} />
-              </span>
-            </Form.Label>
-            <Form.Select
-              value={formData.module}
-              onChange={(e: ChangeEvent<HTMLSelectElement>) => 
-                setFormData({ ...formData, module: e.target.value })
-              }
-              className="py-2"
-              style={{ fontSize: '0.938rem' }}
-            >
-              <option value="">Select a parent module</option>
-              {modules.map((module) => (
-                <option key={module.id} value={module.name}>
-                  {module.name}
-                </option>
-              ))}
-            </Form.Select>
-            <Form.Text className="text-muted d-flex align-items-center gap-1 mt-2">
-              <Info size={12} />
-              <span style={{ fontSize: '0.813rem' }}>
-                Choose the module that this category will be associated with. This creates a hierarchical organization.
-              </span>
-            </Form.Text>
-          </Form.Group>
-        </Col>
-
-        {/* Category Name */}
-        <Col md={12} className="mb-4">
-          <Form.Group>
-            <Form.Label className="fw-semibold d-flex align-items-center gap-2">
-              Category Name <span className="text-danger">*</span>
-              <span 
-                className="text-muted" 
-                title="Enter a descriptive name for this category"
-                style={{ cursor: 'help' }}
-              >
-                <Info size={14} />
-              </span>
-            </Form.Label>
-            <Form.Control
-              type="text"
-              placeholder="e.g., User Authentication, Email Integration"
-              value={formData.name}
-              onChange={(e: ChangeEvent<HTMLInputElement>) => 
-                setFormData({ ...formData, name: e.target.value })
-              }
-              className="py-2"
-              style={{ fontSize: '0.938rem' }}
-            />
-            <Form.Text className="text-muted d-flex align-items-center gap-1 mt-2">
-              <Info size={12} />
-              <span style={{ fontSize: '0.813rem' }}>
-                Use a specific name that clearly identifies this category within the parent module.
-              </span>
-            </Form.Text>
-          </Form.Group>
-        </Col>
-
-        {/* Description */}
-        <Col md={12} className="mb-4">
-          <Form.Group>
-            <Form.Label className="fw-semibold d-flex align-items-center gap-2">
-              Description <span className="text-danger">*</span>
-              <span 
-                className="text-muted" 
-                title="Explain what types of issues belong in this category"
-                style={{ cursor: 'help' }}
-              >
-                <Info size={14} />
-              </span>
-            </Form.Label>
-            <Form.Control
-              as="textarea"
-              rows={3}
-              placeholder="Describe what issues or requests belong to this category..."
-              value={formData.description}
-              onChange={(e: ChangeEvent<HTMLTextAreaElement>) => 
-                setFormData({ ...formData, description: e.target.value })
-              }
-              style={{ fontSize: '0.938rem', lineHeight: '1.6' }}
-            />
-            <Form.Text className="text-muted d-flex align-items-center gap-1 mt-2">
-              <Info size={12} />
-              <span style={{ fontSize: '0.813rem' }}>
-                Provide clear guidance on what types of tickets should be categorized here. This helps users select the right category.
-              </span>
-            </Form.Text>
-          </Form.Group>
-        </Col>
-
-        {/* Preview Section */}
-        {formData.module && (
-          <Col md={12}>
-            <Card className="border-0 bg-light">
-              <Card.Body className="p-3">
-                <Form.Label className="fw-semibold mb-3 d-flex align-items-center gap-2">
-                  <Eye size={16} />
-                  Category Hierarchy Preview
-                </Form.Label>
-                <div className="d-flex align-items-center gap-2 p-3 bg-white rounded-3 border">
-                  <Badge bg="primary" className="px-3 py-2">
-                    <Layers size={14} className="me-2" />
-                    {formData.module}
-                  </Badge>
-                  <ChevronRight size={16} className="text-muted" />
-                  <Badge bg="secondary" className="px-3 py-2">
-                    <Grid3x3 size={14} className="me-2" />
-                    {formData.name || 'Category Name'}
-                  </Badge>
-                </div>
-                <Form.Text className="text-muted d-block mt-2" style={{ fontSize: '0.813rem' }}>
-                  <Info size={12} className="me-1" />
-                  This shows how your category will be organized under the parent module
-                </Form.Text>
-              </Card.Body>
-            </Card>
-          </Col>
-        )}
-      </Row>
-    </Form>
-  </Modal.Body>
-
-  <Modal.Footer className="border-0 pt-0 bg-light">
-    <div className="d-flex justify-content-between align-items-center w-100">
-      <Form.Text className="text-muted d-flex align-items-center gap-1">
-        <AlertCircle size={14} />
-        <span style={{ fontSize: '0.813rem' }}>
-          Fields marked with <span className="text-danger fw-bold">*</span> are required
-        </span>
-      </Form.Text>
-      <div className="d-flex gap-2">
-        <Button variant="light" onClick={() => setShowModal(false)}>
-          <X size={16} className="me-1" />
-          Cancel
-        </Button>
-        <Button 
-          variant="primary" 
-          onClick={handleSaveCategory}
-          disabled={!formData.name.trim() || !formData.description.trim() || !formData.module}
-          style={{ backgroundColor: '#6f42c1', borderColor: '#6f42c1' }}
-        >
-          <Check size={16} className="me-1" />
-          {editingCategory ? 'Update Category' : 'Create Category'}
-        </Button>
-      </div>
+        </Modal.Footer>
+      </Modal>
     </div>
-  </Modal.Footer>
-</Modal>
-      </div>
-    );
-  };
+  );
+};
 
   const SubCategoriesManagementScreen: React.FC = () => {
     const [subCategories, setSubCategories] = useState<SubCategoryType[]>([

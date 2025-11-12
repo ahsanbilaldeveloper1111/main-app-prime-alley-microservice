@@ -55,7 +55,7 @@ const ExpandableSidebar: React.FC<SidebarProps> = ({
   setActiveScreen 
 }) => {
   //const [expandedModules, setExpandedModules] = useState<string[]>(['ticketing']);
-  const [expandedModules, setExpandedModules] = useState<string[]>(['ticketing', 'billing']);
+  const [expandedModules, setExpandedModules] = useState<string[]>([ 'billing']);
   const [expandedSubModules, setExpandedSubModules] = useState<string[]>([]);
 
   const mainMenuItems: MainMenuItem[] = [
@@ -90,7 +90,7 @@ const ExpandableSidebar: React.FC<SidebarProps> = ({
             { id: 'product-details', title: 'Product Details', icon: <ShoppingBag size={16} /> },
             { id: 'billing-history', title: 'Billing History', icon: <FileText size={16} /> },
             { id: 'payment-method', title: 'Payment Method', icon: <CreditCard size={16} /> },
-            { id: 'expenses-reports', title: 'Expenses & Reports', icon: <BarChart3 size={16} /> },
+            // { id: 'expenses-reports', title: 'Expenses & Reports', icon: <BarChart3 size={16} /> },
           ]
         },
         {
@@ -145,29 +145,36 @@ const ExpandableSidebar: React.FC<SidebarProps> = ({
 
   const handleSubItemClick = (screenId: string) => {
     setActiveScreen(screenId);
-    setSidebarOpen(false);
+    //setSidebarOpen(false);
   };
 
   const customStyles = `
     .sidebar-card {
       min-height: 100vh;
       height: 100%;
-      position: fixed;
       width: 280px;
       border-radius: 0;
-      z-index: 1;
+      z-index: 1000;
       overflow-y: auto;
-      left: 0;
-      top: 0;
       box-shadow: 2px 0 10px rgba(0,0,0,0.05);
       border: none;
       background: white;
+      flex-shrink: 0;
+      position: fixed;
+      left: 0;
+      top: 94px;
+      transition: all 0.3s ease-in-out;
+    }
+    
+    .sidebar-card.collapsed {
+      transform: translateX(-280px);
     }
 
     .sidebar-header {
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       padding: 1.5rem;
       border-bottom: 1px solid rgba(255,255,255,0.1);
+      display: none;
     }
 
     .module-header {
@@ -355,10 +362,52 @@ const ExpandableSidebar: React.FC<SidebarProps> = ({
       max-height: 0;
     }
 
+    /* Desktop: Sidebar toggles with collapse class */
+    @media (min-width: 992px) {
+      .sidebar-card.collapsed {
+        transform: translateX(-280px);
+      }
+      
+      .sidebar-backdrop {
+        display: none !important;
+      }
+    }
+
+    /* Mobile: Sidebar slides in from left with overlay */
     @media (max-width: 991px) {
       .sidebar-card {
-        width: 100%;
+        top: 0;
+        z-index: 1050;
+        max-width: 85vw;
       }
+
+      .sidebar-card.collapsed {
+        transform: translateX(-280px);
+      }
+
+      .sidebar-card:not(.collapsed) {
+        transform: translateX(0);
+      }
+
+      .sidebar-header {
+        display: block !important;
+      }
+    }
+
+    .sidebar-backdrop {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.5);
+      z-index: 1040;
+      display: none;
+      transition: opacity 0.3s ease-in-out;
+    }
+
+    .sidebar-backdrop.show {
+      display: block;
     }
   `;
 
@@ -366,9 +415,14 @@ const ExpandableSidebar: React.FC<SidebarProps> = ({
     <>
       <style>{customStyles}</style>
       
+      {/* Backdrop for mobile */}
       <div 
-        className={`sidebar-card sidebar-scrollbar ${sidebarOpen ? '' : 'd-none d-lg-block'}`}
-        style={{ display: sidebarOpen ? 'block' : undefined }}
+        className={`sidebar-backdrop ${sidebarOpen ? 'show' : ''}`}
+        onClick={() => setSidebarOpen(false)}
+      />
+      
+      <div 
+        className={`sidebar-card sidebar-scrollbar ${!sidebarOpen ? 'collapsed' : ''}`}
       >
         <div style={{ padding: 0 }}>
           {/* Header */}
