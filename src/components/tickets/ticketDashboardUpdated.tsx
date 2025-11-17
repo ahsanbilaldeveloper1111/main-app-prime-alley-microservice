@@ -18,6 +18,7 @@ import {
   Edit,
   ArrowUp,
   ArrowDown,
+  ArrowLeft,
   Trash2,
   Check, 
   X, 
@@ -45,9 +46,11 @@ import {
 
    PieChart,
 
-   BarChart3, Grid, TrendingUp, Grid3x3, Box, FolderTree, Home 
+   BarChart3, Grid, TrendingUp, Grid3x3, Box, FolderTree, Home, Bell, Users
   
 } from 'lucide-react';
+import CompanyLogo from "@assets/images/ringedge-logo.png";
+import CompanyLogo2 from "@assets/images/ringedge-logo-black-n-blue.png";
 import {
     BarChart as ReBarChart,
     Bar,
@@ -362,14 +365,14 @@ const [activeScreen, setActiveScreen] = useState('dashboard');
       case 'tickets': 
         return <TicketingSystem  />;
   
-            case 'status': 
+      case 'status': 
         return <StatusManagementScreen />;
       case 'modules': 
         return <ModuleManagementScreen />;
       case 'categories': 
         return <CategoriesManagementScreen />;
     
-        case 'subcategories': 
+      case 'subcategories': 
         return <SubCategoriesManagementScreen />;
 
       case 'types': 
@@ -472,9 +475,39 @@ const [activeScreen, setActiveScreen] = useState('dashboard');
   </Card>
 </Col> */}
 
+<nav className="navbar navbar-expand-lg navbar-light bg-white border-bottom sticky-top shadow-sm">
+        <div className="container-fluid">
+          <div className="d-flex align-items-center gap-2">
+            <Button 
+              variant="link" 
+              className="text-dark d-none d-lg-block p-2" 
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              style={{ marginLeft: '-10px' }}
+            >
+              {sidebarOpen ? <ChevronLeft size={24} /> : <ChevronRight size={24} />}
+            </Button>
+            <a className="navbar-brand fw-bold text-primary mb-0" href="#"><img src={CompanyLogo2.src} alt="logo" className="img-fluid" /></a>
+          </div>
+          <div className="ms-auto d-flex align-items-center gap-3">
+            <Button variant="link" className="text-dark position-relative">
+              <Bell size={20} />
+              <Badge bg="danger" pill className="position-absolute translate-middle" style={{top:'10px', left:'37px'}}>3</Badge>
+            </Button>
+            <div className="d-flex align-items-center gap-2">
+              <div className="bg-primary bg-opacity-10 rounded-circle p-2">
+                <Users size={20} className="text-primary" />
+              </div>
+              <div className="d-none d-md-block">
+                <small className="d-block fw-semibold">John Doe</small>
+                <small className="text-muted">john@example.com</small>
+              </div>
+            </div>
+          </div>
+        </div>
+      </nav>
         {/* Main Content */}
         <Col lg={10} className="ms-auto">
-          <div className="p-4" style={{ marginTop: sidebarOpen ? '80px' : '0', backgroundColor: '#f8f9fa', minHeight: '100vh' }}>
+          <div className="p-4" style={{ marginTop: sidebarOpen ? '0px' : '0', backgroundColor: '#f8f9fa', minHeight: '100vh' }}>
             {renderContent()}
           </div>
         </Col>
@@ -599,7 +632,45 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ tickets, setActiveScr
       count: item.count,
       fill: rechartsModuleColors[i % rechartsModuleColors.length]
     }));
+
+    // Assignee Workload Data - Shows ticket distribution by assignee
+    const assigneeWorkloadData = [
+      { assignee: 'John Dev', count: 5, fill: '#7267EF' },      // Primary (Indigo)
+      { assignee: 'Sarah Admin', count: 3, fill: '#1E9FF2' },   // Info (Sky Blue)
+      { assignee: 'Mike Support', count: 7, fill: '#6FD943' },  // Success (Green)
+      { assignee: 'Jane Manager', count: 2, fill: '#EA5455' },  // Danger (Red)
+      { assignee: 'Test', count: 4, fill: '#6C757D' },    // Secondary / Gray
+    ];
+    
   
+    const statusBreakdownData = [
+      { 
+        status: 'Open', 
+        count: tickets.filter(t => t.status === 'Open').length,
+        fill: '#ffc107'  // Yellow
+      },
+      { 
+        status: 'In Progress', 
+        count: tickets.filter(t => t.status === 'In Progress').length,
+        fill: '#0dcaf0'  // Cyan
+      },
+      { 
+        status: 'Resolved', 
+        count: tickets.filter(t => t.status === 'Resolved').length,
+        fill: '#198754'  // Green
+      },
+      { 
+        status: 'Closed', 
+        count: tickets.filter(t => t.status === 'Closed').length,
+        fill: '#6c757d'  // Gray
+      },
+      { 
+        status: 'Pending', 
+        count: tickets.filter(t => t.status === 'Pending').length,
+        fill: '#fd7e14'  // Orange
+      },
+    ].filter(item => item.count > 0);
+    
     // CSV Download Handler
     const handleExport = () => {
       const csvContent = "data:text/csv;charset=utf-8,"
@@ -742,7 +813,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ tickets, setActiveScr
           <Col xl={6} lg={6} md={6}>
   <Card className="border-0 shadow-sm h-100">
     <Card.Body>
-      <div className="d-flex align-items-center mb-3">
+      {/* <div className="d-flex align-items-center mb-3">
         <BarChart2 size={18} className="me-2 text-primary" />
         <h6 className="mb-0 fw-semibold">Module Breakdown</h6>
       </div>
@@ -767,7 +838,47 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ tickets, setActiveScr
             <RechartsTooltip />
           </ReBarChart>
         </ResponsiveContainer>
+      </div> */}
+
+<div className="d-flex align-items-center mb-3">
+        <Users size={18} className="me-2 text-info" />
+        <h6 className="mb-0 fw-semibold">Top 5 Assignees by Workload</h6>
       </div>
+
+      <div className="p-2" style={{ height: 220 }}>
+        <ResponsiveContainer width="100%" height="100%">
+        <ReBarChart data={assigneeWorkloadData}>
+            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+            <XAxis 
+              dataKey="assignee" 
+              axisLine={false} 
+              tickLine={false}
+              tick={{ fontSize: 10 }}
+              angle={-15}
+              textAnchor="end"
+              height={60}
+            />
+            <YAxis 
+              allowDecimals={false} 
+              axisLine={false} 
+              tickLine={false}
+              tickCount={5}
+              domain={[0, 'dataMax']}
+            />
+            <Bar dataKey="count" radius={[8, 8, 0, 0]}>
+              {assigneeWorkloadData.map((entry, i) => (
+                <Cell key={`cell-${i}`} fill={entry.fill} />
+              ))}
+              <LabelList dataKey="count" position="top" fontSize={11} fontWeight="600" />
+            </Bar>
+            <RechartsTooltip 
+              contentStyle={{ borderRadius: '8px', border: '1px solid #e0e0e0' }}
+              labelStyle={{ fontWeight: '600' }}
+            />
+          </ReBarChart>
+        </ResponsiveContainer>
+      </div>
+
     </Card.Body>
   </Card>
 </Col>
@@ -943,7 +1054,6 @@ interface TicketsListScreenProps {
 
 const TicketingSystem = () => {
     const [showCreateModal, setShowCreateModal] = useState(false);
-    const [showViewModal, setShowViewModal] = useState(false);
     const [selectedTicket, setSelectedTicket] = useState<TicketType | null>(null);
     const [newComment, setNewComment] = useState('');
     const [attachments, setAttachments] = useState<File[]>([]);
@@ -1242,8 +1352,11 @@ const TicketingSystem = () => {
   
     const handleViewTicket = (ticket: TicketType) => {
       setSelectedTicket(ticket);
-      setShowViewModal(true);
       setNewComment('');
+    };
+
+    const handleBackToList = () => {
+      setSelectedTicket(null);
     };
   
     const handleAddComment = () => {
@@ -2244,68 +2357,57 @@ const ViewTicketModal = () => {
     );
   
     return (
-      <Modal show={showViewModal} onHide={() => setShowViewModal(false)} size="xl" centered fullscreen>
-        {/* <Modal.Header closeButton className="border-bottom bg-light"> */}
-        <Modal.Header className="border-bottom bg-light">
-          <div>
-            <Modal.Title className="d-flex align-items-center gap-2">
-              <span className="text-primary fw-bold">#{selectedTicket.id}</span>
-              <span>{selectedTicket.title}</span>
-            </Modal.Title>
-            <div className="ticket-breadcrumbs-title bg-light pt-2 pl-0">
-        <div className="d-flex align-items-center justify-content-between">
-          <Breadcrumb className="mb-0">
-            <Breadcrumb.Item 
-              onClick={() => {
-                setShowViewModal(false);
-                //setActiveScreen('dashboard');
-              }}
-              style={{ cursor: 'pointer' }}
-              className="d-flex align-items-center"
-            >
-              <Home size={14} className="me-1" />
-              <span style={{ fontSize: '0.875rem' }}>Dashboard</span>
-            </Breadcrumb.Item>
-            <Breadcrumb.Item 
-              onClick={() => setShowViewModal(false)}
-              style={{ cursor: 'pointer' }}
-              className="d-flex align-items-center"
-            >
-              <List size={14} className="me-1" />
-              <span style={{ fontSize: '0.875rem' }}>All Tickets</span>
-            </Breadcrumb.Item>
-            <Breadcrumb.Item active className="d-flex align-items-center">
-              <Ticket style={{ marginTop: '-3px' }} size={14} className="me-1" />
-              <span style={{ fontSize: '0.875rem', marginTop: '-3px' }}>Ticket #{selectedTicket.id}</span>
-            </Breadcrumb.Item>
-          </Breadcrumb>
-          
-          
-        </div>
-      </div>
-            {/* <div className="mt-2 d-flex gap-2 flex-wrap">
-              <Badge bg={getPriorityBadgeColor(selectedTicket.priority)} className="bg-opacity-10 text-dark">
-                <AlertCircle size={14} className="me-1" />
-                {selectedTicket.priority}
-              </Badge>
-              <Badge bg={getStatusBadgeColor(selectedTicket.status)} className="bg-opacity-10 text-dark">
-                {selectedTicket.status}
-              </Badge>
-              <Badge bg="light" text="dark">
-                <Tag size={14} className="me-1" />
-                {selectedTicket.type}
-              </Badge>
-              {selectedTicket.isInternal && (
-                <Badge bg="danger">
-                  <AlertCircle size={14} className="me-1" />
-                  Internal Ticket
-                </Badge>
-              )}
-            </div> */}
-          </div>
-        </Modal.Header>
-        
-        <Modal.Body style={{ height: 'calc(100vh - 120px)', overflowY: 'auto' }}>
+      <div>
+        {/* Header with Back Button */}
+        <Card className="border-0 shadow-sm mb-4">
+          <Card.Body className="p-4">
+            <div className="d-flex justify-content-between align-items-start mb-3">
+              <div className="d-flex align-items-center gap-3">
+                <Button 
+                  variant="outline-secondary" 
+                  size="sm"
+                  onClick={handleBackToList}
+                  className="d-flex align-items-center gap-2"
+                >
+                  <ArrowLeft size={16} />
+                  Back to Tickets
+                </Button>
+                <div className="vr" style={{ height: '32px' }} />
+                <div>
+                  <h4 className="mb-1 fw-bold d-flex align-items-center gap-2">
+                    <span className="text-primary">#{selectedTicket.id}</span>
+                    <span>{selectedTicket.title}</span>
+                  </h4>
+                  {/* <Breadcrumb className="mb-0">
+                    <Breadcrumb.Item 
+                      onClick={handleBackToList}
+                      style={{ cursor: 'pointer' }}
+                      className="d-flex align-items-center"
+                    >
+                      <Home size={12} className="me-1" />
+                      <span style={{ fontSize: '0.813rem' }}>Dashboard</span>
+                    </Breadcrumb.Item>
+                    <Breadcrumb.Item 
+                      onClick={handleBackToList}
+                      style={{ cursor: 'pointer' }}
+                      className="d-flex align-items-center"
+                    >
+                      <List size={12} className="me-1" />
+                      <span style={{ fontSize: '0.813rem' }}>All Tickets</span>
+                    </Breadcrumb.Item>
+                    <Breadcrumb.Item active className="d-flex align-items-center">
+                      <Ticket size={12} className="me-1" />
+                      <span style={{ fontSize: '0.813rem' }}>Ticket #{selectedTicket.id}</span>
+                    </Breadcrumb.Item>
+                  </Breadcrumb> */}
+                </div>
+              </div>
+            </div>
+          </Card.Body>
+        </Card>
+
+        {/* Ticket Details Content */}
+        <div style={{ maxHeight: 'calc(100vh - 250px)', overflowY: 'auto' }}>
           <Row>
             {/* Ticket Details Sidebar */}
             <Col lg={3} className="border-end">
@@ -2681,22 +2783,15 @@ const ViewTicketModal = () => {
               )}
             </Col>
           </Row>
-        </Modal.Body>
-        
-        {/* <Modal.Footer className="border-top">
-          <Button variant="secondary" onClick={() => setShowViewModal(false)}>
-            Close
-          </Button>
-        </Modal.Footer> */}
-      </Modal>
+        </div>
+      </div>
     );
   };
   
     return (
       <div className="container-fluid p-4">
-        {renderTicketListing()}
+        {selectedTicket ? <ViewTicketModal /> : renderTicketListing()}
         {CreateTicketModal()}
-        <ViewTicketModal/>
       </div>
     );
   };
@@ -2714,6 +2809,14 @@ const StatusManagementScreen: React.FC = () => {
       { id: 5, name: 'Pending', color: '#fd7e14', createdAt: '15/09/2025' },
     ]);
   
+    const statusUsage = {
+      1: 45,
+      2: 23,
+      3: 67,
+      4: 89,
+      5: 12,
+      6: 8
+    };
     const [showModal, setShowModal] = useState<boolean>(false);
     const [editingStatus, setEditingStatus] = useState<StatusType | null>(null);
     const [formData, setFormData] = useState<{ name: string; color: string }>({ 
@@ -2767,21 +2870,15 @@ const StatusManagementScreen: React.FC = () => {
       <div>
         {/* Header */}
         <div className="mb-4">
-          <div className="d-flex justify-content-between align-items-start mb-3">
+          <div className="d-flex justify-content-between align-items-start mb-4">
             <div>
-              <h2 className="mb-2 fw-bold d-flex align-items-center">
-                <div className="rounded-3 p-2 me-3" style={{ backgroundColor: '#0d6efd15' }}>
-                  <Tag size={24} className="text-primary" />
-                </div>
-                Ticket Status
-              </h2>
+              <h2 className="mb-1 fw-bold">Ticket Status</h2>
               <p className="text-muted mb-0">Manage and organize ticket statuses</p>
             </div>
             <Button 
               variant="primary" 
               onClick={() => handleOpenModal()} 
               className="shadow-sm"
-              style={{ padding: '0.5rem 1.5rem' }}
             >
               <Plus size={18} className="me-2" />
               Add Status
@@ -2789,140 +2886,270 @@ const StatusManagementScreen: React.FC = () => {
           </div>
   
           {/* Stats Cards */}
-          {/* <Row className="g-3 mb-4">
+          <Row className="g-3 mb-4">
             <Col md={4}>
-              <Card className="border-0 shadow-sm" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
-                <Card.Body className="text-white">
+              <Card className="border-0 shadow-sm">
+                <Card.Body>
                   <div className="d-flex justify-content-between align-items-center">
                     <div>
-                      <p className="mb-1 opacity-75 small">Total Statuses</p>
                       <h3 className="mb-0 fw-bold">{statuses.length}</h3>
+                      <span className="text-muted small">Total Statuses</span>
                     </div>
-                    <div className="bg-white bg-opacity-25 rounded-3 p-3">
-                      <Tag size={24} />
+                    <div className="bg-primary bg-opacity-10 rounded p-3">
+                      <Tag size={24} className="text-primary" />
                     </div>
                   </div>
                 </Card.Body>
               </Card>
             </Col>
             <Col md={4}>
-              <Card className="border-0 shadow-sm" style={{ background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)' }}>
-                <Card.Body className="text-white">
+              <Card className="border-0 shadow-sm">
+                <Card.Body>
                   <div className="d-flex justify-content-between align-items-center">
                     <div>
-                      <p className="mb-1 opacity-75 small">Active</p>
                       <h3 className="mb-0 fw-bold">{statuses.filter(s => s.name !== 'Closed').length}</h3>
+                      <span className="text-muted small">Active Statuses</span>
                     </div>
-                    <div className="bg-white bg-opacity-25 rounded-3 p-3">
-                      <Grid3x3 size={24} />
+                    <div className="bg-success bg-opacity-10 rounded p-3">
+                      <CheckCircle size={24} className="text-success" />
                     </div>
                   </div>
                 </Card.Body>
               </Card>
             </Col>
             <Col md={4}>
-              <Card className="border-0 shadow-sm" style={{ background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)' }}>
-                <Card.Body className="text-white">
+              <Card className="border-0 shadow-sm">
+                <Card.Body>
                   <div className="d-flex justify-content-between align-items-center">
                     <div>
-                      <p className="mb-1 opacity-75 small">Closed Status</p>
                       <h3 className="mb-0 fw-bold">{statuses.filter(s => s.name === 'Closed').length}</h3>
+                      <span className="text-muted small">Closed Status</span>
                     </div>
-                    <div className="bg-white bg-opacity-25 rounded-3 p-3">
-                      <Box size={24} />
+                    <div className="bg-secondary bg-opacity-10 rounded p-3">
+                      <X size={24} className="text-secondary" />
                     </div>
                   </div>
                 </Card.Body>
               </Card>
             </Col>
-          </Row> */}
+          </Row>
         </div>
   
         {/* Main Content */}
         <Card className="border-0 shadow-sm">
           <Card.Body className="p-4">
             {/* Search Bar */}
-            <div className="mb-4">
-              <InputGroup>
-                <InputGroup.Text className="bg-light border-end-0">
-                  <Search size={18} className="text-muted" />
-                </InputGroup.Text>
-                <Form.Control
-                  placeholder="Search statuses..."
-                  className="border-start-0 bg-light"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </InputGroup>
-            </div>
+           {/* Search Bar */}
+<div className="mb-4">
+  <Form.Control
+    placeholder="Search statuses..."
+    className="bg-light mb-3"
+    value={searchTerm}
+    onChange={(e) => setSearchTerm(e.target.value)}
+  />
+  <div className="d-flex gap-2 justify-content-end flex-wrap">
+    
+    {/* <Dropdown className="d-inline">
+      <Dropdown.Toggle
+        variant="outline-secondary"
+        size="sm"
+        style={{
+          backgroundColor: '#007bff',
+          border: 'none',
+          borderRadius: '6px',
+          padding: '0.7rem 1rem',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.5rem',
+          whiteSpace: 'nowrap',
+          color: 'white',
+        }}
+      >
+        <Filter size={14} />
+        Filter
+      </Dropdown.Toggle>
+      <Dropdown.Menu>
+        <Dropdown.Item>All Statuses</Dropdown.Item>
+        <Dropdown.Item>Active Only</Dropdown.Item>
+        <Dropdown.Item>Recently Created</Dropdown.Item>
+        <Dropdown.Divider />
+        <Dropdown.Item>Most Used</Dropdown.Item>
+      </Dropdown.Menu>
+    </Dropdown> */}
+    <Button
+      variant="primary"
+      size="sm"
+      style={{
+        borderRadius: '6px',
+        padding: '0.5rem 1rem',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.5rem',
+      }}
+    >
+      <Search size={14} />
+      Search
+    </Button>
+  </div>
+</div>
   
             {/* Status Grid */}
-            <Row className="g-3">
-              {filteredStatuses.map((status) => (
-                <Col key={status.id} md={6} lg={4} xl={3}>
-                  <Card 
-                    className="border-0 h-100 position-relative"
-                    style={{ 
-                        transition: 'all 0.3s ease',
-                      backgroundColor: '#f8f9fa',
-                      border: `4px solid ${status.color}30`,
+            <Row className="g-0">
+            <Card>
+          <Card.Body className="p-0">
+            
+              <Table hover responsive style={{ marginBottom: 0 }}>
+                <thead className="bg-light">
+                  <tr>
+                    <th style={{ 
+                      padding: '1rem 1.5rem',
+                      fontWeight: '600',
+                      fontSize: '0.813rem',
+                     
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px'
+                    }}>STATUS NAME</th>
+
+                   
+
+                    {/* <th style={{ 
+                      padding: '1rem 1.5rem',
+                      fontWeight: '600',
+                      fontSize: '0.813rem',
                       
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.transform = 'translateY(-4px)';
-                      e.currentTarget.style.boxShadow = `0 8px 16px ${status.color}40`;
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.transform = 'translateY(0)';
-                      e.currentTarget.style.boxShadow = 'none';
-                    }}
-                  >
-                    <Card.Body className="p-3">
-                      <div className="d-flex justify-content-between align-items-start mb-3">
-                        <div 
-                          className="rounded-circle p-2"
-                          style={{ backgroundColor: status.color }}
-                        >
-                          <Tag size={16} className="text-white" />
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px'
+                    }}>Usage</th> */}
+                    
+                    <th style={{ 
+                      padding: '1rem 1.5rem',
+                      fontWeight: '600',
+                      fontSize: '0.813rem',
+                     
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px'
+                    }}>COLOR</th>
+                    <th style={{ 
+                      padding: '1rem 1.5rem',
+                      fontWeight: '600',
+                      fontSize: '0.813rem',
+                      
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px'
+                    }}>CREATED AT</th>
+                    <th style={{ 
+                      padding: '1rem 1.5rem',
+                      fontWeight: '600',
+                      fontSize: '0.813rem',
+                      
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px',
+                      textAlign: 'center'
+                    }}>ACTIONS</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredStatuses.map((status) => (
+                    <tr key={status.id} style={{ 
+                      borderBottom: '1px solid #e9ecef',
+                      transition: 'background-color 0.2s'
+                    }}>
+                      <td style={{ padding: '1rem 1.5rem', verticalAlign: 'middle' }}>
+                        <div className="d-flex align-items-center gap-2">
+                          <div 
+                            className="rounded-circle"
+                            style={{ 
+                              width: '8px', 
+                              height: '8px', 
+                              backgroundColor: status.color,
+                              flexShrink: 0
+                            }}
+                          />
+                          <span style={{ 
+                            fontWeight: '500',
+                            fontSize: '0.938rem',
+                            color: '#212529'
+                          }}>{status.name}</span>
                         </div>
-                        <div className="d-flex gap-1">
+                      </td>
+
+
+                      {/* <td style={{ padding: '1rem 1.5rem', verticalAlign: 'middle' }}>
+                        <div className="d-flex align-items-center gap-2">
+                          <ProgressBar 
+                            now={(statusUsage[status.id as keyof typeof statusUsage] || 0)} 
+                            style={{ width: '80px', height: '6px' }}
+                            variant="primary"
+                          />
+                          <span className="small text-muted">{statusUsage[status.id as keyof typeof statusUsage] || 0} tickets</span>
+                        </div>
+                      </td> */}
+
+
+                      <td style={{ padding: '1rem 1.5rem', verticalAlign: 'middle' }}>
+                        <div className="d-flex align-items-center gap-2">
+                          <div 
+                            className="rounded"
+                            style={{ 
+                              width: '24px', 
+                              height: '24px', 
+                              backgroundColor: status.color,
+                              border: '1px solid #dee2e6',
+                              flexShrink: 0
+                            }}
+                          />
+                          <code style={{ 
+                            fontSize: '0.813rem',
+                            color: '#6c757d',
+                            backgroundColor: '#f8f9fa',
+                            padding: '0.25rem 0.5rem',
+                            borderRadius: '4px'
+                          }}>{status.color}</code>
+                        </div>
+                      </td>
+                      <td style={{ padding: '1rem 1.5rem', verticalAlign: 'middle' }}>
+                        <span style={{ 
+                          fontSize: '0.938rem',
+                          color: '#6c757d'
+                        }}>{status.createdAt}</span>
+                      </td>
+                      <td style={{ padding: '1rem 1.5rem', verticalAlign: 'middle' }}>
+                        <div className="d-flex gap-2 justify-content-center">
                           <Button
-                            variant="light"
+                            variant="link"
                             size="sm"
-                            className="p-1 rounded-circle"
-                            style={{ width: '28px', height: '28px' }}
+                            className="p-1"
+                            style={{
+                              color: '#007bff',
+                              textDecoration: 'none'
+                            }}
                             onClick={() => handleOpenModal(status)}
+                            title="Edit"
                           >
-                            <Edit size={14} />
+                            <Edit size={18} />
                           </Button>
                           <Button
-                            variant="light"
+                            variant="link"
                             size="sm"
-                            className="p-1 rounded-circle text-danger"
-                            style={{ width: '28px', height: '28px' }}
+                            className="p-1"
+                            style={{
+                              color: '#dc3545',
+                              textDecoration: 'none'
+                            }}
                             onClick={() => handleDelete(status.id)}
+                            title="Delete"
                           >
-                            <Trash2 size={14} />
+                            <Trash2 size={18} />
                           </Button>
                         </div>
-                      </div>
-                      <h6 className="mb-2 fw-bold">{status.name}</h6>
-                      <div className="d-flex align-items-center gap-2 mb-2">
-                        <div 
-                          className="rounded"
-                          style={{ 
-                            width: '20px', 
-                            height: '20px', 
-                            backgroundColor: status.color 
-                          }}
-                        />
-                        <code className="small text-muted">{status.color}</code>
-                      </div>
-                      <small className="text-muted">Created: {status.createdAt}</small>
-                    </Card.Body>
-                  </Card>
-                </Col>
-              ))}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </Table>
+            
+            </Card.Body>
+            </Card>
             </Row>
   
             {filteredStatuses.length === 0 && (
@@ -3173,6 +3400,9 @@ const StatusManagementScreen: React.FC = () => {
       userExtension: ''
     });
     const [searchTerm, setSearchTerm] = useState<string>('');
+    const [filterBy, setFilterBy] = useState<string>('all');
+
+    const colorSuggestions = ['#0d6efd', '#198754', '#dc3545', '#fd7e14', '#6f42c1', '#20c997'];
   
     const handleOpenModal = (module: ModuleType | null = null): void => {
       if (module) {
@@ -3224,409 +3454,474 @@ const StatusManagementScreen: React.FC = () => {
     return (
       <div>
         {/* Header */}
-        <div className="mb-4">
-          <div className="d-flex justify-content-between align-items-start mb-3">
-            <div>
-              <h2 className="mb-2 fw-bold d-flex align-items-center">
-                <div className="rounded-3 p-2 me-3" style={{ backgroundColor: '#198754 15' }}>
-                  <Layers size={24} className="text-success" />
-                </div>
-                Ticket Modules
-              </h2>
-              <p className="text-muted mb-0">Manage and organize ticket modules</p>
-            </div>
-            <Button 
-              variant="success" 
-              onClick={() => handleOpenModal()} 
-              className="shadow-sm btn btn-primary"
-              style={{ padding: '0.5rem 1.5rem' }}
-            >
-              <Plus size={18} className="me-2" />
-              Add Module
-            </Button>
+        <div className="d-flex justify-content-between align-items-start mb-4">
+          <div>
+            <h2 className="mb-1 fw-bold">Ticket Modules</h2>
+            <p className="text-muted mb-0">Manage and organize ticket modules</p>
           </div>
-  
-          {/* Stats Cards */}
-          {/* <Row className="g-3 mb-4">
-            <Col md={3}>
-              <Card className="border-0 shadow-sm" style={{ background: 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)' }}>
-                <Card.Body className="text-white">
-                  <div className="d-flex justify-content-between align-items-center">
-                    <div>
-                      <p className="mb-1 opacity-75 small">Total Modules</p>
-                      <h3 className="mb-0 fw-bold">{modules.length}</h3>
-                    </div>
-                    <div className="bg-white bg-opacity-25 rounded-3 p-3">
-                      <Layers size={24} />
-                    </div>
-                  </div>
-                </Card.Body>
-              </Card>
-            </Col>
-          </Row> */}
+          <Button 
+            variant="primary" 
+            onClick={() => handleOpenModal()} 
+            className="shadow-sm"
+          >
+            <Plus size={18} className="me-2" />
+            Add Module
+          </Button>
         </div>
-  
+
+        {/* Stats Cards */}
+        <Row className="g-3 mb-4">
+          <Col md={4}>
+            <Card className="border-0 shadow-sm">
+              <Card.Body>
+                <div className="d-flex justify-content-between align-items-center">
+                  <div>
+                    <h3 className="mb-0 fw-bold">{modules.length}</h3>
+                    <span className="text-muted small">Total Modules</span>
+                  </div>
+                  <div className="bg-primary bg-opacity-10 rounded p-3">
+                    <Package size={24} className="text-primary" />
+                  </div>
+                </div>
+              </Card.Body>
+            </Card>
+          </Col>
+          <Col md={4}>
+            <Card className="border-0 shadow-sm">
+              <Card.Body>
+                <div className="d-flex justify-content-between align-items-center">
+                  <div>
+                    <h3 className="mb-0 fw-bold">{modules.length}</h3>
+                    <span className="text-muted small">Active Modules</span>
+                  </div>
+                  <div className="bg-success bg-opacity-10 rounded p-3">
+                    <CheckCircle size={24} className="text-success" />
+                  </div>
+                </div>
+              </Card.Body>
+            </Card>
+          </Col>
+          <Col md={4}>
+            <Card className="border-0 shadow-sm">
+              <Card.Body>
+                <div className="d-flex justify-content-between align-items-center">
+                  <div>
+                    <h3 className="mb-0 fw-bold">150+</h3>
+                    <span className="text-muted small">User Extensions</span>
+                  </div>
+                  <div className="bg-info bg-opacity-10 rounded p-3">
+                    <Users size={24} className="text-info" />
+                  </div>
+                </div>
+              </Card.Body>
+            </Card>
+          </Col>
+        </Row>
+
         {/* Main Content */}
         <Card className="border-0 shadow-sm">
           <Card.Body className="p-4">
             {/* Search Bar */}
             <div className="mb-4">
-              <InputGroup>
-                <InputGroup.Text className="bg-light border-end-0">
-                  <Search size={18} className="text-muted" />
-                </InputGroup.Text>
-                <Form.Control
-                  placeholder="Search modules..."
-                  className="border-start-0 bg-light"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </InputGroup>
+              <Form.Control
+                placeholder="Search modules..."
+                className="bg-light mb-3"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+              <div className="d-flex gap-2 justify-content-end flex-wrap">
+                
+                <Button 
+                  variant="primary" 
+                  size="sm" 
+                  style={{
+                    borderRadius: '6px',
+                    padding: '0.5rem 1rem'
+                  }}
+                >
+                  <Search size={14} className="me-2" />
+                  Search
+                </Button>
+              </div>
             </div>
-  
-            {/* Module Cards */}
-            <Row className="g-4">
-              {filteredModules.map((module) => (
-                <Col key={module.id} md={6} lg={6}>
-                  <Card 
-                    className="border-0 h-100"
-                    style={{ 
-                      borderLeft: `4px solid ${module.color}`,
-                      transition: 'all 0.3s ease',
-                      backgroundColor: '#f8f9fa'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.transform = 'translateY(-4px)';
-                      e.currentTarget.style.boxShadow = '0 8px 20px rgba(0,0,0,0.1)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.transform = 'translateY(0)';
-                      e.currentTarget.style.boxShadow = 'none';
-                    }}
-                  >
-                    <Card.Body className="p-4">
-                      <div className="d-flex justify-content-between align-items-start mb-3">
-                        <div className="d-flex align-items-center">
-                          <div 
-                            className="rounded-3 p-2 me-3"
-                            style={{ backgroundColor: `${module.color}20` }}
-                          >
-                            <Layers size={24} style={{ color: module.color }} />
-                          </div>
-                          <div>
-                            <h5 className="mb-1 fw-bold">{module.name}</h5>
-                            <Badge 
-                              style={{ backgroundColor: module.color }}
-                              className="px-2 py-1"
-                            >
-                              {module.userExtension}
-                            </Badge>
-                          </div>
+
+            {/* Table */}
+            <Card>
+            <Card.Body className="p-0">
+            <div className="table-responsive">
+              <Table className="mb-0" style={{ minWidth: '800px' }}>
+                <thead style={{ backgroundColor: '#f8f9fa' }}>
+                  <tr>
+                    <th style={{ 
+                      padding: '1rem 1.5rem', 
+                      fontWeight: 600, 
+                      fontSize: '0.75rem', 
+                      textTransform: 'uppercase', 
+                      letterSpacing: '0.5px',
+                      color: '#6c757d',
+                      borderBottom: '2px solid #dee2e6'
+                    }}>
+                      Module Name
+                    </th>
+                    <th style={{ 
+                      padding: '1rem 1.5rem', 
+                      fontWeight: 600, 
+                      fontSize: '0.75rem', 
+                      textTransform: 'uppercase', 
+                      letterSpacing: '0.5px',
+                      color: '#6c757d',
+                      borderBottom: '2px solid #dee2e6'
+                    }}>
+                      Description
+                    </th>
+                    <th style={{ 
+                      padding: '1rem 1.5rem', 
+                      fontWeight: 600, 
+                      fontSize: '0.75rem', 
+                      textTransform: 'uppercase', 
+                      letterSpacing: '0.5px',
+                      color: '#6c757d',
+                      borderBottom: '2px solid #dee2e6'
+                    }}>
+                      Color
+                    </th>
+                    <th style={{ 
+                      padding: '1rem 1.5rem', 
+                      fontWeight: 600, 
+                      fontSize: '0.75rem', 
+                      textTransform: 'uppercase', 
+                      letterSpacing: '0.5px',
+                      color: '#6c757d',
+                      borderBottom: '2px solid #dee2e6'
+                    }}>
+                      User Extension
+                    </th>
+                    <th style={{ 
+                      padding: '1rem 1.5rem', 
+                      fontWeight: 600, 
+                      fontSize: '0.75rem', 
+                      textTransform: 'uppercase', 
+                      letterSpacing: '0.5px',
+                      color: '#6c757d',
+                      borderBottom: '2px solid #dee2e6'
+                    }}>
+                      Created At
+                    </th>
+                    <th style={{ 
+                      padding: '1rem 1.5rem', 
+                      fontWeight: 600, 
+                      fontSize: '0.75rem', 
+                      textTransform: 'uppercase', 
+                      letterSpacing: '0.5px',
+                      color: '#6c757d',
+                      borderBottom: '2px solid #dee2e6',
+                      textAlign: 'center'
+                    }}>
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredModules.map((module) => (
+                    <tr 
+                      key={module.id}
+                      style={{ 
+                        borderBottom: '1px solid #f0f0f0',
+                        transition: 'background-color 0.2s'
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8f9fa'}
+                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                    >
+                      <td style={{ padding: '1rem 1.5rem', verticalAlign: 'middle' }}>
+                        <div className="d-flex align-items-center gap-2">
+                          <div
+                            style={{
+                              width: '8px',
+                              height: '8px',
+                              borderRadius: '50%',
+                              backgroundColor: module.color,
+                              flexShrink: 0
+                            }}
+                          />
+                          <span className="fw-medium">{module.name}</span>
                         </div>
-                        <div className="d-flex gap-2">
+                      </td>
+                      <td style={{ padding: '1rem 1.5rem', verticalAlign: 'middle' }}>
+                        <span className="text-muted" style={{ fontSize: '0.875rem' }}>{module.description}</span>
+                      </td>
+                      <td style={{ padding: '1rem 1.5rem', verticalAlign: 'middle' }}>
+                        <div className="d-flex align-items-center gap-2">
+                          <div
+                            style={{
+                              width: '24px',
+                              height: '24px',
+                              borderRadius: '4px',
+                              backgroundColor: module.color,
+                              border: '1px solid #dee2e6',
+                              flexShrink: 0
+                            }}
+                          />
+                          <code style={{ fontSize: '0.813rem', color: '#6c757d' }}>{module.color}</code>
+                        </div>
+                      </td>
+                      <td style={{ padding: '1rem 1.5rem', verticalAlign: 'middle' }}>
+                        <Badge 
+                          bg="secondary" 
+                          className="px-3 py-2"
+                          style={{ 
+                            fontWeight: 500,
+                            fontSize: '0.813rem',
+                            backgroundColor: `${module.color}20`,
+                            color: module.color,
+                            border: `1px solid ${module.color}40`
+                          }}
+                        >
+                          {module.userExtension}
+                        </Badge>
+                      </td>
+                      <td style={{ padding: '1rem 1.5rem', verticalAlign: 'middle' }}>
+                        <span className="text-muted" style={{ fontSize: '0.875rem' }}>{module.createdAt}</span>
+                      </td>
+                      <td style={{ padding: '1rem 1.5rem', verticalAlign: 'middle', textAlign: 'center' }}>
+                        <div className="d-flex gap-2 justify-content-center">
                           <Button
                             variant="light"
                             size="sm"
-                            className="rounded-circle"
-                            style={{ width: '32px', height: '32px' }}
                             onClick={() => handleOpenModal(module)}
+                            style={{
+                              width: '32px',
+                              height: '32px',
+                              padding: 0,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              border: '1px solid #dee2e6'
+                            }}
+                            title="Edit"
                           >
                             <Edit size={14} />
                           </Button>
                           <Button
                             variant="light"
                             size="sm"
-                            className="rounded-circle text-danger"
-                            style={{ width: '32px', height: '32px' }}
                             onClick={() => handleDelete(module.id)}
+                            className="text-danger"
+                            style={{
+                              width: '32px',
+                              height: '32px',
+                              padding: 0,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              border: '1px solid #dee2e6'
+                            }}
+                            title="Delete"
                           >
                             <Trash2 size={14} />
                           </Button>
                         </div>
-                      </div>
-                      <p className="text-muted mb-3">{module.description}</p>
-                      <div className="d-flex justify-content-between align-items-center">
-                        <small className="text-muted">Created: {module.createdAt}</small>
-                        <div className="d-flex align-items-center gap-2">
-                          <div 
-                            className="rounded"
-                            style={{ 
-                              width: '16px', 
-                              height: '16px', 
-                              backgroundColor: module.color 
-                            }}
-                          />
-                          <code className="small">{module.color}</code>
-                        </div>
-                      </div>
-                    </Card.Body>
-                  </Card>
-                </Col>
-              ))}
-            </Row>
-  
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </Table>
+            </div>
+            </Card.Body>
+            </Card>
+            
+            
+
             {filteredModules.length === 0 && (
               <div className="text-center py-5">
-                <Layers size={48} className="text-muted mb-3" />
-                <p className="text-muted">No modules found</p>
+                <Package size={48} className="text-muted mb-3 opacity-50" />
+                <p className="text-muted mb-0">No modules found</p>
+                <p className="text-muted small">Try adjusting your search criteria</p>
               </div>
             )}
           </Card.Body>
         </Card>
-  
+
         {/* Modal */}
-<Modal show={showModal} onHide={() => setShowModal(false)} centered size="lg">
-  <Modal.Header closeButton className="border-0 pb-0 bg-light">
-    <div className="d-flex align-items-center justify-content-between w-100 pe-3">
-      <Modal.Title className="fw-bold d-flex align-items-center gap-2">
-        <div className="p-2">
-          <Layers size={20} className="text-success" />
-        </div>
-        <span>{editingModule ? 'Edit Module' : 'Create New Module'}</span>
-      </Modal.Title>
-    </div>
-  </Modal.Header>
+        <Modal show={showModal} onHide={() => setShowModal(false)} centered size="lg">
+          <Modal.Header closeButton className="border-0 pb-0">
+            <Modal.Title className="fw-bold">
+              {editingModule ? 'Edit Module' : 'Add New Module'}
+            </Modal.Title>
+          </Modal.Header>
 
-  <Modal.Body className="px-4 pb-4">
-    {/* Guidelines Alert */}
-    {/* {!editingModule && (
-      <Alert variant="info" className="mb-4 border-0 shadow-sm">
-        <div className="d-flex align-items-start gap-3">
-          <div className="bg-info bg-opacity-10 rounded-circle p-2" style={{ minWidth: '40px', height: '40px' }}>
-            <Info size={20} className="text-info" />
-          </div>
-          <div>
-            <h6 className="fw-bold mb-2 text-info">Module Setup Guidelines</h6>
-            <ul className="mb-0 ps-3" style={{ fontSize: '0.875rem', lineHeight: '1.8' }}>
-              <li>Use a <strong>clear, descriptive name</strong> that represents the system area</li>
-              <li>Provide a <strong>detailed description</strong> to help users understand the module's purpose</li>
-              <li>Choose a <strong>unique color</strong> for easy visual identification</li>
-              <li>Optionally specify <strong>user extension ranges</strong> for access control</li>
-            </ul>
-          </div>
-        </div>
-      </Alert>
-    )} */}
+          <Modal.Body className="px-4 pb-4">
+            <Form>
+              <Form.Group className="mb-3">
+                <Form.Label className="fw-semibold">
+                  Module Name <span className="text-danger">*</span>
+                  <span className="text-muted ms-2" title="Enter module name">
+                    <Info size={14} />
+                  </span>
+                </Form.Label>
+                <Form.Control
+                  type="text"
+                  placeholder="Enter module name"
+                  value={formData.name}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) => 
+                    setFormData({ ...formData, name: e.target.value })
+                  }
+                />
+              </Form.Group>
 
-    <Form>
-      <Row>
-        {/* Module Name */}
-        <Col md={12} className="mb-4">
-          <Form.Group>
-            <Form.Label className="fw-semibold d-flex align-items-center gap-2">
-              Module Name <span className="text-danger">*</span>
-              <span 
-                className="text-muted" 
-                title="Enter a unique, descriptive name for this module"
-                style={{ cursor: 'help' }}
-              >
-                <Info size={14} />
-              </span>
-            </Form.Label>
-            <Form.Control
-              type="text"
-              placeholder="e.g., Customer Relationship Management"
-              value={formData.name}
-              onChange={(e: ChangeEvent<HTMLInputElement>) => 
-                setFormData({ ...formData, name: e.target.value })
-              }
-              className="py-2"
-              style={{ fontSize: '0.938rem' }}
-            />
-            <Form.Text className="text-muted d-flex align-items-center gap-1 mt-2">
-              <Info size={12} />
-              <span style={{ fontSize: '0.813rem' }}>
-                Choose a clear name that represents the functional area or system component.
-              </span>
-            </Form.Text>
-          </Form.Group>
-        </Col>
+              <Form.Group className="mb-3">
+                <Form.Label className="fw-semibold">
+                  Description <span className="text-danger">*</span>
+                  <span className="text-muted ms-2" title="Enter module description">
+                    <Info size={14} />
+                  </span>
+                </Form.Label>
+                <Form.Control
+                  as="textarea"
+                  rows={3}
+                  placeholder="Enter module description"
+                  value={formData.description}
+                  onChange={(e: ChangeEvent<HTMLTextAreaElement>) => 
+                    setFormData({ ...formData, description: e.target.value })
+                  }
+                />
+              </Form.Group>
 
-        {/* Description */}
-        <Col md={12} className="mb-4">
-          <Form.Group>
-            <Form.Label className="fw-semibold d-flex align-items-center gap-2">
-              Description <span className="text-danger">*</span>
-              <span 
-                className="text-muted" 
-                title="Provide a comprehensive description of the module's purpose and scope"
-                style={{ cursor: 'help' }}
-              >
-                <Info size={14} />
-              </span>
-            </Form.Label>
-            <Form.Control
-              as="textarea"
-              rows={4}
-              placeholder="Describe what this module covers, its main features, and who should use it..."
-              value={formData.description}
-              onChange={(e: ChangeEvent<HTMLTextAreaElement>) => 
-                setFormData({ ...formData, description: e.target.value })
-              }
-              style={{ fontSize: '0.938rem', lineHeight: '1.6' }}
-            />
-            <Form.Text className="text-muted d-flex align-items-center gap-1 mt-2">
-              <Info size={12} />
-              <span style={{ fontSize: '0.813rem' }}>
-                Explain the module's purpose, main features, and target users. This helps with ticket routing and categorization.
-              </span>
-            </Form.Text>
-          </Form.Group>
-        </Col>
-
-        {/* Module Color */}
-        <Col md={6} className="mb-4">
-          <Form.Group>
-            <Form.Label className="fw-semibold d-flex align-items-center gap-2">
-              Module Color <span className="text-danger">*</span>
-              <span 
-                className="text-muted" 
-                title="Select a unique color to visually identify this module"
-                style={{ cursor: 'help' }}
-              >
-                <Info size={14} />
-              </span>
-            </Form.Label>
-            <div className="d-flex gap-2">
-              <Form.Control
-                type="color"
-                value={formData.color}
-                onChange={(e: ChangeEvent<HTMLInputElement>) => 
-                  setFormData({ ...formData, color: e.target.value })
-                }
-                style={{ width: '60px', height: '45px', cursor: 'pointer' }}
-                title="Click to choose a color"
-              />
-              <Form.Control
-                type="text"
-                value={formData.color}
-                onChange={(e: ChangeEvent<HTMLInputElement>) => 
-                  setFormData({ ...formData, color: e.target.value })
-                }
-                placeholder="#000000"
-                className="py-2"
-                style={{ fontSize: '0.938rem' }}
-              />
-            </div>
-            <Form.Text className="text-muted d-flex align-items-center gap-1 mt-2">
-              <Info size={12} />
-              <span style={{ fontSize: '0.813rem' }}>
-                Choose a distinct color for easy visual identification in lists, dashboards, and reports.
-              </span>
-            </Form.Text>
-          </Form.Group>
-        </Col>
-
-        {/* User Extension */}
-        <Col md={6} className="mb-4">
-          <Form.Group>
-            <Form.Label className="fw-semibold d-flex align-items-center gap-2">
-              User Extension Range
-              <span 
-                className="text-muted" 
-                title="Optional: Specify user extension numbers for access control"
-                style={{ cursor: 'help' }}
-              >
-                <Info size={14} />
-              </span>
-            </Form.Label>
-            <Form.Control
-              type="text"
-              placeholder="e.g., 101-150 or 200-299"
-              value={formData.userExtension}
-              onChange={(e: ChangeEvent<HTMLInputElement>) => 
-                setFormData({ ...formData, userExtension: e.target.value })
-              }
-              className="py-2"
-              style={{ fontSize: '0.938rem' }}
-            />
-            <Form.Text className="text-muted d-flex align-items-center gap-1 mt-2">
-              <Info size={12} />
-              <span style={{ fontSize: '0.813rem' }}>
-                Optional: Define extension number ranges (e.g., 101-150) for users who can access this module.
-              </span>
-            </Form.Text>
-          </Form.Group>
-        </Col>
-
-        {/* Preview Section */}
-        <Col md={12}>
-          <Card className="border-0 bg-light">
-            <Card.Body className="p-3">
-              <Form.Label className="fw-semibold mb-3 d-flex align-items-center gap-2">
-                <Eye size={16} />
-                Preview
-              </Form.Label>
-              <div className="d-flex align-items-center gap-3 p-3 bg-white rounded-3 border">
-                <div 
-                  className="rounded-3 p-2"
-                  style={{ backgroundColor: `${formData.color || '#0d6efd'}20` }}
-                >
-                  <Layers size={24} style={{ color: formData.color || '#0d6efd' }} />
-                </div>
-                <div className="flex-grow-1">
-                  <h6 className="mb-1 fw-bold">{formData.name || 'Module Name'}</h6>
-                  <p className="mb-2 text-muted small">{formData.description || 'Module description will appear here...'}</p>
-                  <div className="d-flex gap-2 align-items-center">
-                    {formData.userExtension && (
-                      <Badge 
-                        style={{ backgroundColor: formData.color || '#0d6efd' }}
-                        className="px-2 py-1"
-                      >
-                        {formData.userExtension}
-                      </Badge>
-                    )}
-                    <div className="d-flex align-items-center gap-2">
-                      <div 
-                        className="rounded"
-                        style={{ 
-                          width: '16px', 
-                          height: '16px', 
-                          backgroundColor: formData.color || '#0d6efd',
-                          border: '1px solid #dee2e6'
-                        }}
+              <Row>
+                <Col md={6}>
+                  <Form.Group className="mb-3">
+                    <Form.Label className="fw-semibold">
+                      Color <span className="text-danger">*</span>
+                      <span className="text-muted ms-2" title="Choose a color">
+                        <Info size={14} />
+                      </span>
+                    </Form.Label>
+                    <div className="d-flex gap-2 mb-2">
+                      {colorSuggestions.map((color) => (
+                        <div
+                          key={color}
+                          onClick={() => setFormData({ ...formData, color })}
+                          style={{
+                            width: '32px',
+                            height: '32px',
+                            borderRadius: '6px',
+                            backgroundColor: color,
+                            cursor: 'pointer',
+                            border: formData.color === color ? '3px solid #000' : '2px solid #dee2e6',
+                            transition: 'all 0.2s'
+                          }}
+                          title={color}
+                        />
+                      ))}
+                    </div>
+                    <div className="d-flex gap-2">
+                      <Form.Control
+                        type="color"
+                        value={formData.color}
+                        onChange={(e: ChangeEvent<HTMLInputElement>) => 
+                          setFormData({ ...formData, color: e.target.value })
+                        }
+                        style={{ width: '60px', cursor: 'pointer' }}
                       />
-                      <code className="small">{formData.color || '#0d6efd'}</code>
+                      <Form.Control
+                        type="text"
+                        value={formData.color}
+                        onChange={(e: ChangeEvent<HTMLInputElement>) => 
+                          setFormData({ ...formData, color: e.target.value })
+                        }
+                        placeholder="#000000"
+                      />
+                    </div>
+                  </Form.Group>
+                </Col>
+
+                <Col md={6}>
+                  <Form.Group className="mb-3">
+                    <Form.Label className="fw-semibold">
+                      User Extension
+                      <span className="text-muted ms-2" title="Optional user extension range">
+                        <Info size={14} />
+                      </span>
+                    </Form.Label>
+                    <Form.Control
+                      type="text"
+                      placeholder="e.g., 101-150"
+                      value={formData.userExtension}
+                      onChange={(e: ChangeEvent<HTMLInputElement>) => 
+                        setFormData({ ...formData, userExtension: e.target.value })
+                      }
+                    />
+                  </Form.Group>
+                </Col>
+              </Row>
+
+              {/* Preview Section */}
+              <Card className="border-0 bg-light mt-3">
+                <Card.Body className="p-3">
+                  <Form.Label className="fw-semibold mb-3 d-flex align-items-center gap-2">
+                    <Eye size={16} />
+                    Preview
+                  </Form.Label>
+                  <div className="d-flex align-items-center gap-3 p-3 bg-white rounded border">
+                    <div
+                      style={{
+                        width: '8px',
+                        height: '8px',
+                        borderRadius: '50%',
+                        backgroundColor: formData.color || '#0d6efd',
+                        flexShrink: 0
+                      }}
+                    />
+                    <div className="flex-grow-1">
+                      <div className="fw-medium mb-1">{formData.name || 'Module Name'}</div>
+                      <div className="text-muted small mb-2">{formData.description || 'Module description...'}</div>
+                      <div className="d-flex gap-2 align-items-center">
+                        {formData.userExtension && (
+                          <Badge 
+                            style={{ 
+                              backgroundColor: `${formData.color}20`,
+                              color: formData.color,
+                              border: `1px solid ${formData.color}40`
+                            }}
+                            className="px-3 py-1"
+                          >
+                            {formData.userExtension}
+                          </Badge>
+                        )}
+                        <div className="d-flex align-items-center gap-2">
+                          <div
+                            style={{
+                              width: '24px',
+                              height: '24px',
+                              borderRadius: '4px',
+                              backgroundColor: formData.color || '#0d6efd',
+                              border: '1px solid #dee2e6'
+                            }}
+                          />
+                          <code className="small">{formData.color || '#0d6efd'}</code>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                </div>
-              </div>
-              <Form.Text className="text-muted d-block mt-2" style={{ fontSize: '0.813rem' }}>
-                <Info size={12} className="me-1" />
-                This is how your module will appear in the system
-              </Form.Text>
-            </Card.Body>
-          </Card>
-        </Col>
-      </Row>
-    </Form>
-  </Modal.Body>
+                </Card.Body>
+              </Card>
+            </Form>
+          </Modal.Body>
 
-  <Modal.Footer className="border-0 pt-0 bg-light">
-    <div className="d-flex justify-content-between align-items-center w-100">
-      <Form.Text className="text-muted d-flex align-items-center gap-1">
-        <AlertCircle size={14} />
-        <span style={{ fontSize: '0.813rem' }}>
-          Fields marked with <span className="text-danger fw-bold">*</span> are required
-        </span>
-      </Form.Text>
-      <div className="d-flex gap-2">
-        <Button variant="light" onClick={() => setShowModal(false)}>
-          <X size={16} className="me-1" />
-          Cancel
-        </Button>
-        <Button 
-          variant="success" 
-          onClick={handleSaveModule}
-          disabled={!formData.name.trim() || !formData.description.trim() || !formData.color}
-        >
-          <Check size={16} className="me-1" />
-          {editingModule ? 'Update Module' : 'Create Module'}
-        </Button>
-      </div>
-    </div>
-  </Modal.Footer>
-</Modal>
+          <Modal.Footer className="border-0">
+            <Button variant="light" onClick={() => setShowModal(false)}>
+              <X size={16} className="me-1" />
+              Cancel
+            </Button>
+            <Button 
+              variant="success" 
+              onClick={handleSaveModule}
+              disabled={!formData.name.trim() || !formData.description.trim()}
+            >
+              <Check size={16} className="me-1" />
+              {editingModule ? 'Update Module' : 'Create Module'}
+            </Button>
+          </Modal.Footer>
+        </Modal>
       </div>
     );
   };
@@ -3650,6 +3945,7 @@ const CategoriesManagementScreen: React.FC = () => {
     module: ''
   });
   const [searchTerm, setSearchTerm] = useState<string>('');
+  const [filterBy, setFilterBy] = useState<string>('all');
 
   // Parent modules with their colors
   const modules: NewModuleType[] = [
@@ -3716,334 +4012,406 @@ const CategoriesManagementScreen: React.FC = () => {
   return (
     <div>
       {/* Header */}
-      <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4 gap-3">
+      <div className="d-flex justify-content-between align-items-start mb-4">
         <div>
-          <h4 className="mb-1 fw-bold">Categories Management</h4>
+          <h2 className="mb-1 fw-bold">Categories</h2>
           <p className="text-muted mb-0">Organize and manage ticket categories by modules</p>
         </div>
         <Button 
           variant="primary" 
           onClick={() => handleOpenModal()}
-          className="d-flex align-items-center gap-2"
-          style={{ backgroundColor: '#6f42c1', borderColor: '#6f42c1' }}
+          className="shadow-sm"
         >
-          <Plus size={18} />
+          <Plus size={18} className="me-2" />
           Add Category
         </Button>
       </div>
 
-      {/* Search and Stats Bar */}
-      <Row className="mb-4 g-3">
-      <div className="mb-4">
-              <InputGroup>
-                <InputGroup.Text className="bg-light border-end-0">
-                  <Search size={18} className="text-muted" />
-                </InputGroup.Text>
-                <Form.Control
-                  placeholder="Search categories..."
-                  className="border-start-0 bg-light"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </InputGroup>
-            </div>
-        {/* <Col md={4}>
-          <Card className="border-0 shadow-sm h-100" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
-            <Card.Body className="d-flex align-items-center justify-content-between text-white py-3">
-              <div>
-                <small className="opacity-75">Total Categories</small>
-                <h4 className="mb-0 fw-bold">{categories.length}</h4>
-              </div>
-              <div className="bg-white bg-opacity-25 rounded p-2">
-                <Grid3x3 size={24} />
+      {/* Stats Cards */}
+      <Row className="g-3 mb-4">
+        <Col md={4}>
+          <Card className="border-0 shadow-sm">
+            <Card.Body>
+              <div className="d-flex justify-content-between align-items-center">
+                <div>
+                  <h3 className="mb-0 fw-bold">{categories.length}</h3>
+                  <span className="text-muted small">Total Categories</span>
+                </div>
+                <div className="bg-primary bg-opacity-10 rounded p-3">
+                  <Grid3x3 size={24} className="text-primary" />
+                </div>
               </div>
             </Card.Body>
           </Card>
-        </Col> */}
+        </Col>
+        <Col md={4}>
+          <Card className="border-0 shadow-sm">
+            <Card.Body>
+              <div className="d-flex justify-content-between align-items-center">
+                <div>
+                  <h3 className="mb-0 fw-bold">{new Set(categories.map(c => c.module)).size}</h3>
+                  <span className="text-muted small">Parent Modules</span>
+                </div>
+                <div className="bg-success bg-opacity-10 rounded p-3">
+                  <Package size={24} className="text-success" />
+                </div>
+              </div>
+            </Card.Body>
+          </Card>
+        </Col>
+        <Col md={4}>
+          <Card className="border-0 shadow-sm">
+            <Card.Body>
+              <div className="d-flex justify-content-between align-items-center">
+                <div>
+                  <h3 className="mb-0 fw-bold">{categories.length}</h3>
+                  <span className="text-muted small">Active Categories</span>
+                </div>
+                <div className="bg-info bg-opacity-10 rounded p-3">
+                  <CheckCircle size={24} className="text-info" />
+                </div>
+              </div>
+            </Card.Body>
+          </Card>
+        </Col>
       </Row>
 
-      {/* Categories Grid */}
-      {filteredCategories.length > 0 ? (
-        <Row className="g-4">
-          {filteredCategories.map((category) => (
-            <Col key={category.id} xs={12} md={6} lg={4}>
-              <Card 
-                className="border-0 shadow-sm h-100 position-relative overflow-hidden"
-                style={{ transition: 'all 0.3s ease' }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-5px)';
-                  e.currentTarget.style.boxShadow = '0 10px 25px rgba(0,0,0,0.15)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
+      {/* Main Content */}
+      <Card className="border-0 shadow-sm">
+          <Card.Body className="p-4">
+            {/* Search Bar */}
+            <div className="mb-4">
+            <Form.Control
+              placeholder="Search categories..."
+              className="bg-light mb-3"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+            <div className="d-flex gap-2 justify-content-end flex-wrap">
+              {/* <Dropdown>
+                <Dropdown.Toggle 
+                  style={{
+                    backgroundColor: '#007bff',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    padding: '0.7rem 1rem'
+                  }}
+                >
+                  <Filter size={14} className="me-2" />
+                  {filterBy === 'all' ? 'All Categories' : filterBy}
+                </Dropdown.Toggle>
+                <Dropdown.Menu>
+                  <Dropdown.Item onClick={() => setFilterBy('all')}>All Categories</Dropdown.Item>
+                  <Dropdown.Item onClick={() => setFilterBy('Active')}>Active</Dropdown.Item>
+                  <Dropdown.Item onClick={() => setFilterBy('By Module')}>By Module</Dropdown.Item>
+                </Dropdown.Menu>
+              </Dropdown> */}
+              <Button 
+                variant="primary" 
+                size="sm" 
+                style={{
+                  borderRadius: '6px',
+                  padding: '0.5rem 1rem'
                 }}
               >
-                {/* Color Accent Bar */}
-                <div 
-                  style={{ 
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    height: '4px',
-                    backgroundColor: getModuleColor(category.module)
-                  }}
-                />
-                
-                <Card.Body className="p-4">
-                  {/* Header with Icon and Actions */}
-                  <div className="d-flex justify-content-between align-items-start mb-3">
-                    <div 
-                      className="rounded-3 p-3"
-                      style={{ 
-                        backgroundColor: `${getModuleColor(category.module)}15`,
-                        width: 'fit-content'
-                      }}
-                    >
-                      <Grid3x3 size={24} style={{ color: getModuleColor(category.module) }} />
-                    </div>
-                    <div className="d-flex gap-2">
-                      <Button
-                        variant="link"
-                        size="sm"
-                        className="p-2 text-primary"
-                        onClick={() => handleOpenModal(category)}
-                        title="Edit Category"
-                      >
-                        <Edit size={16} />
-                      </Button>
-                      <Button
-                        variant="link"
-                        size="sm"
-                        className="p-2 text-danger"
-                        onClick={() => handleDelete(category.id)}
-                        title="Delete Category"
-                      >
-                        <Trash2 size={16} />
-                      </Button>
-                    </div>
-                  </div>
-
-                  {/* Category Name */}
-                  <h5 className="fw-bold mb-2">{category.name}</h5>
-                  
-                  {/* Description */}
-                  <p className="text-muted mb-3 small" style={{ minHeight: '40px' }}>
-                    {category.description}
-                  </p>
-
-                  {/* Footer Info */}
-                  <div className="d-flex justify-content-between align-items-center pt-3 border-top">
-                    <div className="d-flex align-items-center gap-2">
-                      <Layers size={14} style={{ color: getModuleColor(category.module) }} />
-                      <small className="fw-semibold" style={{ color: getModuleColor(category.module) }}>
-                        {category.module}
-                      </small>
-                    </div>
-                    <small className="text-muted">{category.createdAt}</small>
-                  </div>
-                </Card.Body>
-              </Card>
-            </Col>
-          ))}
-        </Row>
-      ) : (
-        <Card className="border-0 shadow-sm">
-          <Card.Body className="text-center py-5">
-            <div 
-              className="rounded-circle mx-auto mb-3 d-flex align-items-center justify-content-center"
-              style={{ 
-                width: '80px', 
-                height: '80px', 
-                backgroundColor: '#f8f9fa' 
-              }}
-            >
-              <Grid3x3 size={40} className="text-muted" />
+                <Search size={14} className="me-2" />
+                Search
+              </Button>
             </div>
-            <h5 className="fw-bold mb-2">No categories found</h5>
-            <p className="text-muted mb-0">
-              {searchTerm 
-                ? 'Try adjusting your search criteria' 
-                : 'Get started by creating your first category'}
-            </p>
-          </Card.Body>
-        </Card>
-      )}
+          </div>
+
+          {/* Table */}
+          <Card>
+            <Card.Body className="p-0">
+            <div className="table-responsive">
+            <Table className="mb-0" style={{ minWidth: '900px' }}>
+              <thead style={{ backgroundColor: '#f8f9fa' }}>
+                <tr>
+                  <th style={{ 
+                    padding: '1rem 1.5rem', 
+                    fontWeight: 600, 
+                    fontSize: '0.75rem', 
+                    textTransform: 'uppercase', 
+                    letterSpacing: '0.5px',
+                    color: '#6c757d',
+                    borderBottom: '2px solid #dee2e6'
+                  }}>
+                    Category Name
+                  </th>
+                  <th style={{ 
+                    padding: '1rem 1.5rem', 
+                    fontWeight: 600, 
+                    fontSize: '0.75rem', 
+                    textTransform: 'uppercase', 
+                    letterSpacing: '0.5px',
+                    color: '#6c757d',
+                    borderBottom: '2px solid #dee2e6'
+                  }}>
+                    Description
+                  </th>
+                  <th style={{ 
+                    padding: '1rem 1.5rem', 
+                    fontWeight: 600, 
+                    fontSize: '0.75rem', 
+                    textTransform: 'uppercase', 
+                    letterSpacing: '0.5px',
+                    color: '#6c757d',
+                    borderBottom: '2px solid #dee2e6'
+                  }}>
+                    Module
+                  </th>
+                  <th style={{ 
+                    padding: '1rem 1.5rem', 
+                    fontWeight: 600, 
+                    fontSize: '0.75rem', 
+                    textTransform: 'uppercase', 
+                    letterSpacing: '0.5px',
+                    color: '#6c757d',
+                    borderBottom: '2px solid #dee2e6'
+                  }}>
+                    Created At
+                  </th>
+                  <th style={{ 
+                    padding: '1rem 1.5rem', 
+                    fontWeight: 600, 
+                    fontSize: '0.75rem', 
+                    textTransform: 'uppercase', 
+                    letterSpacing: '0.5px',
+                    color: '#6c757d',
+                    borderBottom: '2px solid #dee2e6',
+                    textAlign: 'center'
+                  }}>
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredCategories.map((category) => {
+                  const moduleColor = getModuleColor(category.module);
+                  return (
+                    <tr 
+                      key={category.id}
+                      style={{ 
+                        borderBottom: '1px solid #f0f0f0',
+                        transition: 'background-color 0.2s'
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8f9fa'}
+                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                    >
+                      <td style={{ padding: '1rem 1.5rem', verticalAlign: 'middle' }}>
+                        <div className="d-flex align-items-center gap-2">
+                          <div
+                            style={{
+                              width: '8px',
+                              height: '8px',
+                              borderRadius: '50%',
+                              backgroundColor: moduleColor,
+                              flexShrink: 0
+                            }}
+                          />
+                          <span className="fw-medium">{category.name}</span>
+                        </div>
+                      </td>
+                      <td style={{ padding: '1rem 1.5rem', verticalAlign: 'middle' }}>
+                        <span className="text-muted" style={{ fontSize: '0.875rem' }}>{category.description}</span>
+                      </td>
+                      <td style={{ padding: '1rem 1.5rem', verticalAlign: 'middle' }}>
+                        <Badge 
+                          bg="secondary" 
+                          className="px-3 py-2"
+                          style={{ 
+                            fontWeight: 500,
+                            fontSize: '0.813rem',
+                            backgroundColor: `${moduleColor}20`,
+                            color: moduleColor,
+                            border: `1px solid ${moduleColor}40`
+                          }}
+                        >
+                          {category.module}
+                        </Badge>
+                      </td>
+                      <td style={{ padding: '1rem 1.5rem', verticalAlign: 'middle' }}>
+                        <span className="text-muted" style={{ fontSize: '0.875rem' }}>{category.createdAt}</span>
+                      </td>
+                      <td style={{ padding: '1rem 1.5rem', verticalAlign: 'middle', textAlign: 'center' }}>
+                        <div className="d-flex gap-2 justify-content-center">
+                          <Button
+                            variant="light"
+                            size="sm"
+                            onClick={() => handleOpenModal(category)}
+                            style={{
+                              width: '32px',
+                              height: '32px',
+                              padding: 0,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              border: '1px solid #dee2e6'
+                            }}
+                            title="Edit"
+                          >
+                            <Edit size={14} />
+                          </Button>
+                          <Button
+                            variant="light"
+                            size="sm"
+                            onClick={() => handleDelete(category.id)}
+                            className="text-danger"
+                            style={{
+                              width: '32px',
+                              height: '32px',
+                              padding: 0,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              border: '1px solid #dee2e6'
+                            }}
+                            title="Delete"
+                          >
+                            <Trash2 size={14} />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </Table>
+          </div>
+            </Card.Body>
+          </Card>
+         
+
+          {filteredCategories.length === 0 && (
+            <div className="text-center py-5">
+              <Grid3x3 size={48} className="text-muted mb-3 opacity-50" />
+              <p className="text-muted mb-0">No categories found</p>
+              <p className="text-muted small">Try adjusting your search criteria</p>
+            </div>
+          )}
+        </Card.Body>
+      </Card>
 
       {/* Add/Edit Modal */}
       <Modal show={showModal} onHide={() => setShowModal(false)} centered size="lg">
-        <Modal.Header closeButton className="border-0 pb-0 bg-light">
-          <div className="d-flex align-items-center justify-content-between w-100 pe-3">
-            <Modal.Title className="fw-bold d-flex align-items-center gap-2">
-              <div className="p-2">
-                <Grid3x3 size={20} style={{ color: '#6f42c1' }} />
-              </div>
-              <span>{editingCategory ? 'Edit Category' : 'Create New Category'}</span>
-            </Modal.Title>
-          </div>
+        <Modal.Header closeButton className="border-0 pb-0">
+          <Modal.Title className="fw-bold">
+            {editingCategory ? 'Edit Category' : 'Add New Category'}
+          </Modal.Title>
         </Modal.Header>
 
         <Modal.Body className="px-4 pb-4">
           <Form>
-            <Row>
-              {/* Parent Module */}
-              <Col md={12} className="mb-4">
-                <Form.Group>
-                  <Form.Label className="fw-semibold d-flex align-items-center gap-2">
-                    Parent Module <span className="text-danger">*</span>
-                    <span 
-                      className="text-muted" 
-                      title="Select the module this category will belong to"
-                      style={{ cursor: 'help' }}
-                    >
-                      <Info size={14} />
-                    </span>
-                  </Form.Label>
-                  <Form.Select
-                    value={formData.module}
-                    onChange={(e: ChangeEvent<HTMLSelectElement>) => 
-                      setFormData({ ...formData, module: e.target.value })
-                    }
-                    className="py-2"
-                    style={{ fontSize: '0.938rem' }}
-                  >
-                    <option value="">Select a parent module</option>
-                    {modules.map((module) => (
-                      <option key={module.id} value={module.name}>
-                        {module.name}
-                      </option>
-                    ))}
-                  </Form.Select>
-                  <Form.Text className="text-muted d-flex align-items-center gap-1 mt-2">
-                    <Info size={12} />
-                    <span style={{ fontSize: '0.813rem' }}>
-                      Choose the module that this category will be associated with. This creates a hierarchical organization.
-                    </span>
-                  </Form.Text>
-                </Form.Group>
-              </Col>
+            <Form.Group className="mb-3">
+              <Form.Label className="fw-semibold">
+                Parent Module <span className="text-danger">*</span>
+                <span className="text-muted ms-2" title="Select parent module">
+                  <Info size={14} />
+                </span>
+              </Form.Label>
+              <Form.Select
+                value={formData.module}
+                onChange={(e: ChangeEvent<HTMLSelectElement>) => 
+                  setFormData({ ...formData, module: e.target.value })
+                }
+              >
+                <option value="">Select a parent module</option>
+                {modules.map((module) => (
+                  <option key={module.id} value={module.name}>
+                    {module.name}
+                  </option>
+                ))}
+              </Form.Select>
+            </Form.Group>
 
-              {/* Category Name */}
-              <Col md={12} className="mb-4">
-                <Form.Group>
-                  <Form.Label className="fw-semibold d-flex align-items-center gap-2">
-                    Category Name <span className="text-danger">*</span>
-                    <span 
-                      className="text-muted" 
-                      title="Enter a descriptive name for this category"
-                      style={{ cursor: 'help' }}
-                    >
-                      <Info size={14} />
-                    </span>
-                  </Form.Label>
-                  <Form.Control
-                    type="text"
-                    placeholder="e.g., User Authentication, Email Integration"
-                    value={formData.name}
-                    onChange={(e: ChangeEvent<HTMLInputElement>) => 
-                      setFormData({ ...formData, name: e.target.value })
-                    }
-                    className="py-2"
-                    style={{ fontSize: '0.938rem' }}
-                  />
-                  <Form.Text className="text-muted d-flex align-items-center gap-1 mt-2">
-                    <Info size={12} />
-                    <span style={{ fontSize: '0.813rem' }}>
-                      Use a specific name that clearly identifies this category within the parent module.
-                    </span>
-                  </Form.Text>
-                </Form.Group>
-              </Col>
+            <Form.Group className="mb-3">
+              <Form.Label className="fw-semibold">
+                Category Name <span className="text-danger">*</span>
+                <span className="text-muted ms-2" title="Enter category name">
+                  <Info size={14} />
+                </span>
+              </Form.Label>
+              <Form.Control
+                type="text"
+                placeholder="Enter category name"
+                value={formData.name}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => 
+                  setFormData({ ...formData, name: e.target.value })
+                }
+              />
+            </Form.Group>
 
-              {/* Description */}
-              <Col md={12} className="mb-4">
-                <Form.Group>
-                  <Form.Label className="fw-semibold d-flex align-items-center gap-2">
-                    Description <span className="text-danger">*</span>
-                    <span 
-                      className="text-muted" 
-                      title="Explain what types of issues belong in this category"
-                      style={{ cursor: 'help' }}
-                    >
-                      <Info size={14} />
-                    </span>
-                  </Form.Label>
-                  <Form.Control
-                    as="textarea"
-                    rows={3}
-                    placeholder="Describe what issues or requests belong to this category..."
-                    value={formData.description}
-                    onChange={(e: ChangeEvent<HTMLTextAreaElement>) => 
-                      setFormData({ ...formData, description: e.target.value })
-                    }
-                    style={{ fontSize: '0.938rem', lineHeight: '1.6' }}
-                  />
-                  <Form.Text className="text-muted d-flex align-items-center gap-1 mt-2">
-                    <Info size={12} />
-                    <span style={{ fontSize: '0.813rem' }}>
-                      Provide clear guidance on what types of tickets should be categorized here. This helps users select the right category.
-                    </span>
-                  </Form.Text>
-                </Form.Group>
-              </Col>
+            <Form.Group className="mb-3">
+              <Form.Label className="fw-semibold">
+                Description <span className="text-danger">*</span>
+                <span className="text-muted ms-2" title="Enter category description">
+                  <Info size={14} />
+                </span>
+              </Form.Label>
+              <Form.Control
+                as="textarea"
+                rows={3}
+                placeholder="Enter category description"
+                value={formData.description}
+                onChange={(e: ChangeEvent<HTMLTextAreaElement>) => 
+                  setFormData({ ...formData, description: e.target.value })
+                }
+              />
+            </Form.Group>
 
-              {/* Preview Section */}
-              {formData.module && (
-                <Col md={12}>
-                  <Card className="border-0 bg-light">
-                    <Card.Body className="p-3">
-                      <Form.Label className="fw-semibold mb-3 d-flex align-items-center gap-2">
-                        <Eye size={16} />
-                        Category Hierarchy Preview
-                      </Form.Label>
-                      <div className="d-flex align-items-center gap-2 p-3 bg-white rounded-3 border">
-                        <Badge bg="primary" className="px-3 py-2">
-                          <Layers size={14} className="me-2" />
-                          {formData.module}
-                        </Badge>
-                        <ChevronRight size={16} className="text-muted" />
-                        <Badge bg="secondary" className="px-3 py-2">
-                          <Grid3x3 size={14} className="me-2" />
-                          {formData.name || 'Category Name'}
-                        </Badge>
-                      </div>
-                      <Form.Text className="text-muted d-block mt-2" style={{ fontSize: '0.813rem' }}>
-                        <Info size={12} className="me-1" />
-                        This shows how your category will be organized under the parent module
-                      </Form.Text>
-                    </Card.Body>
-                  </Card>
-                </Col>
-              )}
-            </Row>
+            {/* Preview Section */}
+            {formData.module && (
+              <Card className="border-0 bg-light mt-3">
+                <Card.Body className="p-3">
+                  <Form.Label className="fw-semibold mb-3 d-flex align-items-center gap-2">
+                    <Eye size={16} />
+                    Preview
+                  </Form.Label>
+                  <div className="d-flex align-items-center gap-3 p-3 bg-white rounded border">
+                    <div
+                      style={{
+                        width: '8px',
+                        height: '8px',
+                        borderRadius: '50%',
+                        backgroundColor: getModuleColor(formData.module),
+                        flexShrink: 0
+                      }}
+                    />
+                    <div className="flex-grow-1">
+                      <div className="fw-medium mb-1">{formData.name || 'Category Name'}</div>
+                      <div className="text-muted small mb-2">{formData.description || 'Category description...'}</div>
+                      <Badge 
+                        style={{ 
+                          backgroundColor: `${getModuleColor(formData.module)}20`,
+                          color: getModuleColor(formData.module),
+                          border: `1px solid ${getModuleColor(formData.module)}40`
+                        }}
+                        className="px-3 py-1"
+                      >
+                        {formData.module}
+                      </Badge>
+                    </div>
+                  </div>
+                </Card.Body>
+              </Card>
+            )}
           </Form>
         </Modal.Body>
 
-        <Modal.Footer className="border-0 pt-0 bg-light">
-          <div className="d-flex justify-content-between align-items-center w-100">
-            <Form.Text className="text-muted d-flex align-items-center gap-1">
-              <AlertCircle size={14} />
-              <span style={{ fontSize: '0.813rem' }}>
-                Fields marked with <span className="text-danger fw-bold">*</span> are required
-              </span>
-            </Form.Text>
-            <div className="d-flex gap-2">
-              <Button variant="light" onClick={() => setShowModal(false)}>
-                <X size={16} className="me-1" />
-                Cancel
-              </Button>
-              <Button 
-                variant="primary" 
-                onClick={handleSaveCategory}
-                disabled={!formData.name.trim() || !formData.description.trim() || !formData.module}
-                style={{ backgroundColor: '#6f42c1', borderColor: '#6f42c1' }}
-              >
-                <Check size={16} className="me-1" />
-                {editingCategory ? 'Update Category' : 'Create Category'}
-              </Button>
-            </div>
-          </div>
+        <Modal.Footer className="border-0">
+          <Button variant="light" onClick={() => setShowModal(false)}>
+            <X size={16} className="me-1" />
+            Cancel
+          </Button>
+          <Button 
+            variant="success" 
+            onClick={handleSaveCategory}
+            disabled={!formData.name.trim() || !formData.description.trim() || !formData.module}
+          >
+            <Check size={16} className="me-1" />
+            {editingCategory ? 'Update Category' : 'Create Category'}
+          </Button>
         </Modal.Footer>
       </Modal>
     </div>
@@ -4071,6 +4439,7 @@ const CategoriesManagementScreen: React.FC = () => {
       category: ''
     });
     const [searchTerm, setSearchTerm] = useState<string>('');
+    const [filterBy, setFilterBy] = useState<string>('all');
   
     // Parent modules with their colors
     const modules: NewModuleType[] = [
@@ -4153,484 +4522,455 @@ const CategoriesManagementScreen: React.FC = () => {
       return categories.filter(cat => cat.module === formData.module);
     };
   
-    // Group sub-categories by module and category
-    const groupedSubCategories = modules.map(module => {
-      const moduleCategories = categories
-        .filter(cat => cat.module === module.name)
-        .map(category => ({
-          category: category.name,
-          subCategories: filteredSubCategories.filter(
-            sc => sc.module === module.name && sc.category === category.name
-          )
-        }))
-        .filter(group => group.subCategories.length > 0);
-  
-      return {
-        module: module.name,
-        color: module.color,
-        categories: moduleCategories
-      };
-    }).filter(group => group.categories.length > 0);
-  
     return (
       <div>
         {/* Header */}
-        <div className="mb-4">
-          <div className="d-flex justify-content-between align-items-start mb-3">
-            <div>
-              <h2 className="mb-2 fw-bold d-flex align-items-center">
-                <div className="rounded-3 p-2 me-3" style={{ backgroundColor: '#fd7e1415' }}>
-                  <FolderTree size={24} style={{ color: '#fd7e14' }} />
-                </div>
-                Sub-Categories
-              </h2>
-              <p className="text-muted mb-0">Manage sub-categories under categories and modules</p>
-            </div>
-            <Button 
-              variant="warning" 
-              onClick={() => handleOpenModal()} 
-              className="shadow-sm btn btn-primary"
-              style={{ padding: '0.5rem 1.5rem' }}
-            >
-              <Plus size={18} className="me-2" />
-              Add Sub-Category
-            </Button>
+        <div className="d-flex justify-content-between align-items-start mb-4">
+          <div>
+            <h2 className="mb-1 fw-bold">Sub-Categories</h2>
+            <p className="text-muted mb-0">Manage sub-categories under categories and modules</p>
           </div>
-  
-          {/* Stats Cards */}
-          {/* <Row className="g-3 mb-4">
-            <Col md={3}>
-              <Card className="border-0 shadow-sm" style={{ background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)' }}>
-                <Card.Body className="text-white">
-                  <div className="d-flex justify-content-between align-items-center">
-                    <div>
-                      <p className="mb-1 opacity-75 small">Total Sub-Categories</p>
-                      <h3 className="mb-0 fw-bold">{subCategories.length}</h3>
-                    </div>
-                    <div className="bg-white bg-opacity-25 rounded-3 p-3">
-                      <FolderTree size={24} />
-                    </div>
-                  </div>
-                </Card.Body>
-              </Card>
-            </Col>
-            <Col md={3}>
-              <Card className="border-0 shadow-sm" style={{ background: 'linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%)' }}>
-                <Card.Body className="text-white">
-                  <div className="d-flex justify-content-between align-items-center">
-                    <div>
-                      <p className="mb-1 opacity-75 small">Parent Modules</p>
-                      <h3 className="mb-0 fw-bold">{groupedSubCategories.length}</h3>
-                    </div>
-                    <div className="bg-white bg-opacity-25 rounded-3 p-3">
-                      <Layers size={24} />
-                    </div>
-                  </div>
-                </Card.Body>
-              </Card>
-            </Col>
-          </Row> */}
+          <Button 
+            variant="primary" 
+            onClick={() => handleOpenModal()} 
+            className="shadow-sm"
+          >
+            <Plus size={18} className="me-2" />
+            Add Sub-Category
+          </Button>
         </div>
+
+        {/* Stats Cards */}
+        <Row className="g-3 mb-4">
+          <Col md={4}>
+            <Card className="border-0 shadow-sm">
+              <Card.Body>
+                <div className="d-flex justify-content-between align-items-center">
+                  <div>
+                    <h3 className="mb-0 fw-bold">{subCategories.length}</h3>
+                    <span className="text-muted small">Total Sub-Categories</span>
+                  </div>
+                  <div className="bg-primary bg-opacity-10 rounded p-3">
+                    <FolderTree size={24} className="text-primary" />
+                  </div>
+                </div>
+              </Card.Body>
+            </Card>
+          </Col>
+          <Col md={4}>
+            <Card className="border-0 shadow-sm">
+              <Card.Body>
+                <div className="d-flex justify-content-between align-items-center">
+                  <div>
+                    <h3 className="mb-0 fw-bold">{new Set(subCategories.map(sc => sc.module)).size}</h3>
+                    <span className="text-muted small">Parent Modules</span>
+                  </div>
+                  <div className="bg-success bg-opacity-10 rounded p-3">
+                    <Layers size={24} className="text-success" />
+                  </div>
+                </div>
+              </Card.Body>
+            </Card>
+          </Col>
+          <Col md={4}>
+            <Card className="border-0 shadow-sm">
+              <Card.Body>
+                <div className="d-flex justify-content-between align-items-center">
+                  <div>
+                    <h3 className="mb-0 fw-bold">{subCategories.length}</h3>
+                    <span className="text-muted small">Active Sub-Categories</span>
+                  </div>
+                  <div className="bg-info bg-opacity-10 rounded p-3">
+                    <CheckCircle size={24} className="text-info" />
+                  </div>
+                </div>
+              </Card.Body>
+            </Card>
+          </Col>
+        </Row>
   
         {/* Main Content */}
         <Card className="border-0 shadow-sm">
           <Card.Body className="p-4">
             {/* Search Bar */}
             <div className="mb-4">
-              <InputGroup>
-                <InputGroup.Text className="bg-light border-end-0">
-                  <Search size={18} className="text-muted" />
-                </InputGroup.Text>
-                <Form.Control
-                  placeholder="Search sub-categories..."
-                  className="border-start-0 bg-light"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </InputGroup>
-            </div>
-  
-            {/* Sub-Categories grouped by Module and Category */}
-            {groupedSubCategories.map((moduleGroup, moduleIndex) => (
-              <div key={moduleIndex} className="mb-5">
-                {/* Module Header */}
-                <div 
-                  className="d-flex align-items-center mb-3 p-3 rounded-3"
-                  style={{ 
-                    backgroundColor: `${moduleGroup.color}15`,
-                    borderLeft: `4px solid ${moduleGroup.color}`
+              <Form.Control
+                placeholder="Search sub-categories..."
+                className="bg-light mb-3"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+              <div className="d-flex gap-2 justify-content-end flex-wrap">
+                {/* <Dropdown>
+                  <Dropdown.Toggle 
+                    style={{
+                      backgroundColor: '#007bff',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '6px',
+                      padding: '0.7rem 1rem'
+                    }}
+                  >
+                    <Filter size={14} className="me-2" />
+                    {filterBy === 'all' ? 'All Sub-Categories' : filterBy}
+                  </Dropdown.Toggle>
+                  <Dropdown.Menu>
+                    <Dropdown.Item onClick={() => setFilterBy('all')}>All Sub-Categories</Dropdown.Item>
+                    <Dropdown.Item onClick={() => setFilterBy('Active')}>Active</Dropdown.Item>
+                    <Dropdown.Item onClick={() => setFilterBy('By Module')}>By Module</Dropdown.Item>
+                  </Dropdown.Menu>
+                </Dropdown> */}
+                <Button 
+                  variant="primary" 
+                  size="sm" 
+                  style={{
+                    borderRadius: '6px',
+                    padding: '0.5rem 1rem'
                   }}
                 >
-                  <Layers size={20} style={{ color: moduleGroup.color }} className="me-2" />
-                  <h5 className="mb-0 fw-bold" style={{ color: moduleGroup.color }}>
-                    {moduleGroup.module}
-                  </h5>
-                </div>
-  
-                {/* Categories under Module */}
-                {moduleGroup.categories.map((categoryGroup, categoryIndex) => (
-                  <div key={categoryIndex} className="mb-4 ms-3">
-                    {/* Category Header */}
-                    <div 
-                      className="d-flex align-items-center mb-3 p-2 rounded-3"
-                      style={{ 
-                        backgroundColor: `${moduleGroup.color}08`,
-                        borderLeft: `3px solid ${moduleGroup.color}`
-                      }}
-                    >
-                      <ChevronRight size={16} style={{ color: moduleGroup.color }} className="me-2" />
-                      <Grid3x3 size={16} style={{ color: moduleGroup.color }} className="me-2" />
-                      <h6 className="mb-0 fw-semibold" style={{ color: moduleGroup.color }}>
-                        {categoryGroup.category}
-                      </h6>
-                      <Badge 
-                        bg="light" 
-                        text="dark" 
-                        className="ms-auto"
+                  <Search size={14} className="me-2" />
+                  Search
+                </Button>
+              </div>
+            </div>
+
+            {/* Table */}
+            <Card>
+              <Card.Body className="p-0">
+              <div className="table-responsive">
+              <Table className="mb-0" style={{ minWidth: '1000px' }}>
+                <thead style={{ backgroundColor: '#f8f9fa' }}>
+                  <tr>
+                    <th style={{ 
+                      padding: '1rem 1.5rem', 
+                      fontWeight: 600, 
+                      fontSize: '0.75rem', 
+                      textTransform: 'uppercase', 
+                      letterSpacing: '0.5px',
+                      color: '#6c757d',
+                      borderBottom: '2px solid #dee2e6'
+                    }}>
+                      Sub-Category Name
+                    </th>
+                    <th style={{ 
+                      padding: '1rem 1.5rem', 
+                      fontWeight: 600, 
+                      fontSize: '0.75rem', 
+                      textTransform: 'uppercase', 
+                      letterSpacing: '0.5px',
+                      color: '#6c757d',
+                      borderBottom: '2px solid #dee2e6'
+                    }}>
+                      Description
+                    </th>
+                    <th style={{ 
+                      padding: '1rem 1.5rem', 
+                      fontWeight: 600, 
+                      fontSize: '0.75rem', 
+                      textTransform: 'uppercase', 
+                      letterSpacing: '0.5px',
+                      color: '#6c757d',
+                      borderBottom: '2px solid #dee2e6'
+                    }}>
+                      Module
+                    </th>
+                    <th style={{ 
+                      padding: '1rem 1.5rem', 
+                      fontWeight: 600, 
+                      fontSize: '0.75rem', 
+                      textTransform: 'uppercase', 
+                      letterSpacing: '0.5px',
+                      color: '#6c757d',
+                      borderBottom: '2px solid #dee2e6'
+                    }}>
+                      Category
+                    </th>
+                    <th style={{ 
+                      padding: '1rem 1.5rem', 
+                      fontWeight: 600, 
+                      fontSize: '0.75rem', 
+                      textTransform: 'uppercase', 
+                      letterSpacing: '0.5px',
+                      color: '#6c757d',
+                      borderBottom: '2px solid #dee2e6'
+                    }}>
+                      Created At
+                    </th>
+                    <th style={{ 
+                      padding: '1rem 1.5rem', 
+                      fontWeight: 600, 
+                      fontSize: '0.75rem', 
+                      textTransform: 'uppercase', 
+                      letterSpacing: '0.5px',
+                      color: '#6c757d',
+                      borderBottom: '2px solid #dee2e6',
+                      textAlign: 'center'
+                    }}>
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredSubCategories.map((subCategory) => {
+                    const moduleColor = getModuleColor(subCategory.module);
+                    return (
+                      <tr 
+                        key={subCategory.id}
+                        style={{ 
+                          borderBottom: '1px solid #f0f0f0',
+                          transition: 'background-color 0.2s'
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8f9fa'}
+                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                       >
-                        {categoryGroup.subCategories.length} sub-{categoryGroup.subCategories.length === 1 ? 'category' : 'categories'}
-                      </Badge>
-                    </div>
-  
-                    {/* Sub-Category Cards */}
-                    <Row className="g-3 ms-4">
-                      {categoryGroup.subCategories.map((subCategory) => (
-                        <Col key={subCategory.id} md={6} lg={4}>
-                          <Card 
-                            className="border-0 h-100"
+                        <td style={{ padding: '1rem 1.5rem', verticalAlign: 'middle' }}>
+                          <div className="d-flex align-items-center gap-2">
+                            <div
+                              style={{
+                                width: '8px',
+                                height: '8px',
+                                borderRadius: '50%',
+                                backgroundColor: moduleColor,
+                                flexShrink: 0
+                              }}
+                            />
+                            <span className="fw-medium">{subCategory.name}</span>
+                          </div>
+                        </td>
+                        <td style={{ padding: '1rem 1.5rem', verticalAlign: 'middle' }}>
+                          <span className="text-muted" style={{ fontSize: '0.875rem' }}>{subCategory.description}</span>
+                        </td>
+                        <td style={{ padding: '1rem 1.5rem', verticalAlign: 'middle' }}>
+                          <Badge 
+                            bg="secondary" 
+                            className="px-3 py-2"
                             style={{ 
-                              borderLeft: `4px solid ${moduleGroup.color}`,
-                              transition: 'all 0.3s ease',
-                              backgroundColor: '#f8f9fa'
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.transform = 'translateY(-4px)';
-                              e.currentTarget.style.boxShadow = '0 8px 20px rgba(0,0,0,0.1)';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.transform = 'translateY(0)';
-                              e.currentTarget.style.boxShadow = 'none';
+                              fontWeight: 500,
+                              fontSize: '0.813rem',
+                              backgroundColor: `${moduleColor}20`,
+                              color: moduleColor,
+                              border: `1px solid ${moduleColor}40`
                             }}
                           >
-                            <Card.Body className="p-3">
-                              <div className="d-flex justify-content-between align-items-start mb-2">
-                                <div className="d-flex align-items-center flex-grow-1">
-                                  <div 
-                                    className="rounded-3 p-2 me-2"
-                                    style={{ backgroundColor: `${moduleGroup.color}20` }}
-                                  >
-                                    <FolderTree size={18} style={{ color: moduleGroup.color }} />
-                                  </div>
-                                  <div className="flex-grow-1">
-                                    <h6 className="mb-0 fw-bold">{subCategory.name}</h6>
-                                  </div>
-                                </div>
-                                <div className="d-flex gap-1">
-                                  <Button
-                                    variant="light"
-                                    size="sm"
-                                    className="rounded-circle p-0"
-                                    style={{ width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                                    onClick={() => handleOpenModal(subCategory)}
-                                  >
-                                    <Edit size={12} />
-                                  </Button>
-                                  <Button
-                                    variant="light"
-                                    size="sm"
-                                    className="rounded-circle text-danger p-0"
-                                    style={{ width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                                    onClick={() => handleDelete(subCategory.id)}
-                                  >
-                                    <Trash2 size={12} />
-                                  </Button>
-                                </div>
-                              </div>
-                              <p className="text-muted small mb-2">{subCategory.description}</p>
-                              <div className="d-flex flex-wrap gap-1 mb-2">
-                                <Badge 
-                                  style={{ backgroundColor: moduleGroup.color, fontSize: '0.65rem' }}
-                                  className="px-2 py-1"
-                                >
-                                  {subCategory.module}
-                                </Badge>
-                                <Badge 
-                                  bg="light"
-                                  text="dark"
-                                  className="px-2 py-1"
-                                  style={{ fontSize: '0.65rem' }}
-                                >
-                                  {subCategory.category}
-                                </Badge>
-                              </div>
-                              <small className="text-muted">Created: {subCategory.createdAt}</small>
-                            </Card.Body>
-                          </Card>
-                        </Col>
-                      ))}
-                    </Row>
-                  </div>
-                ))}
-              </div>
-            ))}
-  
+                            {subCategory.module}
+                          </Badge>
+                        </td>
+                        <td style={{ padding: '1rem 1.5rem', verticalAlign: 'middle' }}>
+                          <Badge bg="light" text="dark" className="px-3 py-2" style={{ fontSize: '0.813rem' }}>
+                            {subCategory.category}
+                          </Badge>
+                        </td>
+                        <td style={{ padding: '1rem 1.5rem', verticalAlign: 'middle' }}>
+                          <span className="text-muted" style={{ fontSize: '0.875rem' }}>{subCategory.createdAt}</span>
+                        </td>
+                        <td style={{ padding: '1rem 1.5rem', verticalAlign: 'middle', textAlign: 'center' }}>
+                          <div className="d-flex gap-2 justify-content-center">
+                            <Button
+                              variant="light"
+                              size="sm"
+                              onClick={() => handleOpenModal(subCategory)}
+                              style={{
+                                width: '32px',
+                                height: '32px',
+                                padding: 0,
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                border: '1px solid #dee2e6'
+                              }}
+                              title="Edit"
+                            >
+                              <Edit size={14} />
+                            </Button>
+                            <Button
+                              variant="light"
+                              size="sm"
+                              onClick={() => handleDelete(subCategory.id)}
+                              className="text-danger"
+                              style={{
+                                width: '32px',
+                                height: '32px',
+                                padding: 0,
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                border: '1px solid #dee2e6'
+                              }}
+                              title="Delete"
+                            >
+                              <Trash2 size={14} />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </Table>
+            </div>
+              </Card.Body>
+            </Card>
+           
+
             {filteredSubCategories.length === 0 && (
               <div className="text-center py-5">
-                <FolderTree size={48} className="text-muted mb-3" />
-                <p className="text-muted">No sub-categories found</p>
+                <FolderTree size={48} className="text-muted mb-3 opacity-50" />
+                <p className="text-muted mb-0">No sub-categories found</p>
+                <p className="text-muted small">Try adjusting your search criteria</p>
               </div>
             )}
           </Card.Body>
         </Card>
   
         {/* Modal */}
-        {/* Modal */}
-<Modal show={showModal} onHide={() => setShowModal(false)} centered size="lg">
-  <Modal.Header closeButton className="border-0 pb-0 bg-light">
-    <div className="d-flex align-items-center justify-content-between w-100 pe-3">
-      <Modal.Title className="fw-bold d-flex align-items-center gap-2">
-        <div className="p-2">
-          <FolderTree size={20} className="text-warning" />
-        </div>
-        <span>{editingSubCategory ? 'Edit Sub-Category' : 'Create New Sub-Category'}</span>
-      </Modal.Title>
-    </div>
-  </Modal.Header>
+        <Modal show={showModal} onHide={() => setShowModal(false)} centered size="lg">
+          <Modal.Header closeButton className="border-0 pb-0">
+            <Modal.Title className="fw-bold">
+              {editingSubCategory ? 'Edit Sub-Category' : 'Add New Sub-Category'}
+            </Modal.Title>
+          </Modal.Header>
 
-  <Modal.Body className="px-4 pb-4">
-    {/* Guidelines Alert */}
-    {/* {!editingSubCategory && (
-      <Alert variant="info" className="mb-4 border-0 shadow-sm">
-        <div className="d-flex align-items-start gap-3">
-          <div className="bg-info bg-opacity-10 rounded-circle p-2" style={{ minWidth: '40px', height: '40px' }}>
-            <Info size={20} className="text-info" />
-          </div>
-          <div>
-            <h6 className="fw-bold mb-2 text-info">Sub-Category Setup Guidelines</h6>
-            <ul className="mb-0 ps-3" style={{ fontSize: '0.875rem', lineHeight: '1.8' }}>
-              <li>First select the <strong>parent module</strong>, then choose the <strong>category</strong></li>
-              <li>Sub-categories provide the <strong>finest level of organization</strong> for tickets</li>
-              <li>Use <strong>specific, descriptive names</strong> for easy identification</li>
-              <li>This creates a three-level hierarchy: Module → Category → Sub-Category</li>
-            </ul>
-          </div>
-        </div>
-      </Alert>
-    )} */}
-
-    <Form>
-      <Row>
-        {/* Parent Module */}
-        <Col md={12} className="mb-4">
-          <Form.Group>
-            <Form.Label className="fw-semibold d-flex align-items-center gap-2">
-              Parent Module <span className="text-danger">*</span>
-              <span 
-                className="text-muted" 
-                title="Select the top-level module this sub-category belongs to"
-                style={{ cursor: 'help' }}
-              >
-                <Info size={14} />
-              </span>
-            </Form.Label>
-            <Form.Select
-              value={formData.module}
-              onChange={(e: ChangeEvent<HTMLSelectElement>) => 
-                setFormData({ ...formData, module: e.target.value, category: '' })
-              }
-              className="py-2"
-              style={{ fontSize: '0.938rem' }}
-            >
-              <option value="">Select a parent module</option>
-              {modules.map((module) => (
-                <option key={module.id} value={module.name}>
-                  {module.name}
-                </option>
-              ))}
-            </Form.Select>
-            <Form.Text className="text-muted d-flex align-items-center gap-1 mt-2">
-              <Info size={12} />
-              <span style={{ fontSize: '0.813rem' }}>
-                Start by selecting the main module. This will determine which categories are available.
-              </span>
-            </Form.Text>
-          </Form.Group>
-        </Col>
-
-        {/* Parent Category */}
-        <Col md={12} className="mb-4">
-          <Form.Group>
-            <Form.Label className="fw-semibold d-flex align-items-center gap-2">
-              Parent Category <span className="text-danger">*</span>
-              <span 
-                className="text-muted" 
-                title="Select the category this sub-category will be nested under"
-                style={{ cursor: 'help' }}
-              >
-                <Info size={14} />
-              </span>
-            </Form.Label>
-            <Form.Select
-              value={formData.category}
-              onChange={(e: ChangeEvent<HTMLSelectElement>) => 
-                setFormData({ ...formData, category: e.target.value })
-              }
-              className="py-2"
-              disabled={!formData.module}
-              style={{ fontSize: '0.938rem' }}
-            >
-              <option value="">Select a parent category</option>
-              {getFilteredCategories().map((category) => (
-                <option key={category.id} value={category.name}>
-                  {category.name}
-                </option>
-              ))}
-            </Form.Select>
-            {!formData.module ? (
-              <Form.Text className="text-muted d-flex align-items-center gap-1 mt-2">
-                <AlertCircle size={12} />
-                <span style={{ fontSize: '0.813rem' }}>
-                  Please select a module first to see available categories
-                </span>
-              </Form.Text>
-            ) : (
-              <Form.Text className="text-muted d-flex align-items-center gap-1 mt-2">
-                <Info size={12} />
-                <span style={{ fontSize: '0.813rem' }}>
-                  Choose the category under which this sub-category will be organized.
-                </span>
-              </Form.Text>
-            )}
-          </Form.Group>
-        </Col>
-
-        {/* Sub-Category Name */}
-        <Col md={12} className="mb-4">
-          <Form.Group>
-            <Form.Label className="fw-semibold d-flex align-items-center gap-2">
-              Sub-Category Name <span className="text-danger">*</span>
-              <span 
-                className="text-muted" 
-                title="Enter a specific name for this sub-category"
-                style={{ cursor: 'help' }}
-              >
-                <Info size={14} />
-              </span>
-            </Form.Label>
-            <Form.Control
-              type="text"
-              placeholder="e.g., Password Reset, Two-Factor Authentication"
-              value={formData.name}
-              onChange={(e: ChangeEvent<HTMLInputElement>) => 
-                setFormData({ ...formData, name: e.target.value })
-              }
-              className="py-2"
-              style={{ fontSize: '0.938rem' }}
-            />
-            <Form.Text className="text-muted d-flex align-items-center gap-1 mt-2">
-              <Info size={12} />
-              <span style={{ fontSize: '0.813rem' }}>
-                Use a precise, specific name that clearly identifies this sub-category within its parent category.
-              </span>
-            </Form.Text>
-          </Form.Group>
-        </Col>
-
-        {/* Description */}
-        <Col md={12} className="mb-4">
-          <Form.Group>
-            <Form.Label className="fw-semibold d-flex align-items-center gap-2">
-              Description <span className="text-danger">*</span>
-              <span 
-                className="text-muted" 
-                title="Provide details about what this sub-category covers"
-                style={{ cursor: 'help' }}
-              >
-                <Info size={14} />
-              </span>
-            </Form.Label>
-            <Form.Control
-              as="textarea"
-              rows={3}
-              placeholder="Describe the specific issues or requests that belong to this sub-category..."
-              value={formData.description}
-              onChange={(e: ChangeEvent<HTMLTextAreaElement>) => 
-                setFormData({ ...formData, description: e.target.value })
-              }
-              style={{ fontSize: '0.938rem', lineHeight: '1.6' }}
-            />
-            <Form.Text className="text-muted d-flex align-items-center gap-1 mt-2">
-              <Info size={12} />
-              <span style={{ fontSize: '0.813rem' }}>
-                Explain what specific types of issues fall under this sub-category. Be as detailed as possible for accurate ticket classification.
-              </span>
-            </Form.Text>
-          </Form.Group>
-        </Col>
-
-        {/* Hierarchy Preview */}
-        {formData.module && formData.category && (
-          <Col md={12}>
-            <Card className="border-0 bg-light">
-              <Card.Body className="p-3">
-                <Form.Label className="fw-semibold mb-3 d-flex align-items-center gap-2">
-                  <Eye size={16} />
-                  Three-Level Hierarchy Preview
+          <Modal.Body className="px-4 pb-4">
+            <Form>
+              <Form.Group className="mb-3">
+                <Form.Label className="fw-semibold">
+                  Parent Module <span className="text-danger">*</span>
+                  <span className="text-muted ms-2" title="Select parent module">
+                    <Info size={14} />
+                  </span>
                 </Form.Label>
-                <div className="d-flex align-items-center gap-2 p-3 bg-white rounded-3 border flex-wrap">
-                  <Badge bg="primary" className="px-3 py-2">
-                    <Layers size={14} className="me-2" />
-                    {formData.module}
-                  </Badge>
-                  <ChevronRight size={16} className="text-muted" />
-                  <Badge bg="secondary" className="px-3 py-2">
-                    <Grid3x3 size={14} className="me-2" />
-                    {formData.category}
-                  </Badge>
-                  <ChevronRight size={16} className="text-muted" />
-                  <Badge bg="warning" className="px-3 py-2">
-                    <FolderTree size={14} className="me-2" />
-                    {formData.name || 'Sub-Category Name'}
-                  </Badge>
-                </div>
-                <Form.Text className="text-muted d-block mt-2" style={{ fontSize: '0.813rem' }}>
-                  <Info size={12} className="me-1" />
-                  This shows the complete hierarchy: Module → Category → Sub-Category
-                </Form.Text>
-              </Card.Body>
-            </Card>
-          </Col>
-        )}
-      </Row>
-    </Form>
-  </Modal.Body>
+                <Form.Select
+                  value={formData.module}
+                  onChange={(e: ChangeEvent<HTMLSelectElement>) => 
+                    setFormData({ ...formData, module: e.target.value, category: '' })
+                  }
+                >
+                  <option value="">Select a parent module</option>
+                  {modules.map((module) => (
+                    <option key={module.id} value={module.name}>
+                      {module.name}
+                    </option>
+                  ))}
+                </Form.Select>
+              </Form.Group>
 
-  <Modal.Footer className="border-0 pt-0 bg-light">
-    <div className="d-flex justify-content-between align-items-center w-100">
-      <Form.Text className="text-muted d-flex align-items-center gap-1">
-        <AlertCircle size={14} />
-        <span style={{ fontSize: '0.813rem' }}>
-          Fields marked with <span className="text-danger fw-bold">*</span> are required
-        </span>
-      </Form.Text>
-      <div className="d-flex gap-2">
-        <Button variant="light" onClick={() => setShowModal(false)}>
-          <X size={16} className="me-1" />
-          Cancel
-        </Button>
-        <Button 
-          variant="warning" 
-          className="btn btn-primary"
-          onClick={handleSaveSubCategory}
-          disabled={!formData.name.trim() || !formData.description.trim() || !formData.module || !formData.category}
-        >
-          <Check size={16} className="me-1" />
-          {editingSubCategory ? 'Update Sub-Category' : 'Create Sub-Category'}
-        </Button>
-      </div>
-    </div>
-  </Modal.Footer>
-</Modal>
+              <Form.Group className="mb-3">
+                <Form.Label className="fw-semibold">
+                  Parent Category <span className="text-danger">*</span>
+                  <span className="text-muted ms-2" title="Select parent category">
+                    <Info size={14} />
+                  </span>
+                </Form.Label>
+                <Form.Select
+                  value={formData.category}
+                  onChange={(e: ChangeEvent<HTMLSelectElement>) => 
+                    setFormData({ ...formData, category: e.target.value })
+                  }
+                  disabled={!formData.module}
+                >
+                  <option value="">Select a parent category</option>
+                  {getFilteredCategories().map((category) => (
+                    <option key={category.id} value={category.name}>
+                      {category.name}
+                    </option>
+                  ))}
+                </Form.Select>
+              </Form.Group>
+
+              <Form.Group className="mb-3">
+                <Form.Label className="fw-semibold">
+                  Sub-Category Name <span className="text-danger">*</span>
+                  <span className="text-muted ms-2" title="Enter sub-category name">
+                    <Info size={14} />
+                  </span>
+                </Form.Label>
+                <Form.Control
+                  type="text"
+                  placeholder="Enter sub-category name"
+                  value={formData.name}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) => 
+                    setFormData({ ...formData, name: e.target.value })
+                  }
+                />
+              </Form.Group>
+
+              <Form.Group className="mb-3">
+                <Form.Label className="fw-semibold">
+                  Description <span className="text-danger">*</span>
+                  <span className="text-muted ms-2" title="Enter sub-category description">
+                    <Info size={14} />
+                  </span>
+                </Form.Label>
+                <Form.Control
+                  as="textarea"
+                  rows={3}
+                  placeholder="Enter sub-category description"
+                  value={formData.description}
+                  onChange={(e: ChangeEvent<HTMLTextAreaElement>) => 
+                    setFormData({ ...formData, description: e.target.value })
+                  }
+                />
+              </Form.Group>
+
+              {/* Preview Section */}
+              {formData.module && formData.category && (
+                <Card className="border-0 bg-light mt-3">
+                  <Card.Body className="p-3">
+                    <Form.Label className="fw-semibold mb-3 d-flex align-items-center gap-2">
+                      <Eye size={16} />
+                      Preview
+                    </Form.Label>
+                    <div className="d-flex align-items-center gap-3 p-3 bg-white rounded border">
+                      <div
+                        style={{
+                          width: '8px',
+                          height: '8px',
+                          borderRadius: '50%',
+                          backgroundColor: getModuleColor(formData.module),
+                          flexShrink: 0
+                        }}
+                      />
+                      <div className="flex-grow-1">
+                        <div className="fw-medium mb-1">{formData.name || 'Sub-Category Name'}</div>
+                        <div className="text-muted small mb-2">{formData.description || 'Sub-category description...'}</div>
+                        <div className="d-flex gap-2">
+                          <Badge 
+                            style={{ 
+                              backgroundColor: `${getModuleColor(formData.module)}20`,
+                              color: getModuleColor(formData.module),
+                              border: `1px solid ${getModuleColor(formData.module)}40`
+                            }}
+                            className="px-3 py-1"
+                          >
+                            {formData.module}
+                          </Badge>
+                          <Badge bg="light" text="dark" className="px-3 py-1">
+                            {formData.category}
+                          </Badge>
+                        </div>
+                      </div>
+                    </div>
+                  </Card.Body>
+                </Card>
+              )}
+            </Form>
+          </Modal.Body>
+
+          <Modal.Footer className="border-0">
+            <Button variant="light" onClick={() => setShowModal(false)}>
+              <X size={16} className="me-1" />
+              Cancel
+            </Button>
+            <Button 
+              variant="success" 
+              onClick={handleSaveSubCategory}
+              disabled={!formData.name.trim() || !formData.description.trim() || !formData.module || !formData.category}
+            >
+              <Check size={16} className="me-1" />
+              {editingSubCategory ? 'Update Sub-Category' : 'Create Sub-Category'}
+            </Button>
+          </Modal.Footer>
+        </Modal>
       </div>
     );
   };
@@ -4704,21 +5044,15 @@ const TypeManagementScreen: React.FC = () => {
       <div>
         {/* Header */}
         <div className="mb-4">
-          <div className="d-flex justify-content-between align-items-start mb-3">
+          <div className="d-flex justify-content-between align-items-start mb-4">
             <div>
-              <h2 className="mb-2 fw-bold d-flex align-items-center">
-                <div className="rounded-3 p-2 me-3" style={{ backgroundColor: '#0dcaf015' }}>
-                  <Tag size={24} className="text-info" style={{ color: '#0dcaf0' }} />
-                </div>
-                Ticket Types
-              </h2>
+              <h2 className="mb-1 fw-bold">Ticket Types</h2>
               <p className="text-muted mb-0">Manage ticket types and their properties</p>
             </div>
             <Button 
-              variant="info" 
+              variant="primary" 
               onClick={() => handleOpenModal()} 
               className="shadow-sm"
-              style={{ padding: '0.5rem 1.5rem' }}
             >
               <Plus size={18} className="me-2" />
               Add Type
@@ -4726,38 +5060,53 @@ const TypeManagementScreen: React.FC = () => {
           </div>
   
           {/* Stats Cards */}
-          {/* <Row className="g-3 mb-4">
-            <Col md={3}>
-              <Card className="border-0 shadow-sm" style={{ background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)' }}>
-                <Card.Body className="text-white">
+          <Row className="g-3 mb-4">
+            <Col md={4}>
+              <Card className="border-0 shadow-sm">
+                <Card.Body>
                   <div className="d-flex justify-content-between align-items-center">
                     <div>
-                      <p className="mb-1 opacity-75 small">Total Types</p>
                       <h3 className="mb-0 fw-bold">{types.length}</h3>
+                      <span className="text-muted small">Total Types</span>
                     </div>
-                    <div className="bg-white bg-opacity-25 rounded-3 p-3">
-                      <Tag size={24} />
+                    <div className="bg-primary bg-opacity-10 rounded p-3">
+                      <List size={24} className="text-primary" />
                     </div>
                   </div>
                 </Card.Body>
               </Card>
             </Col>
-            <Col md={3}>
-              <Card className="border-0 shadow-sm" style={{ background: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)' }}>
-                <Card.Body className="text-white">
+            <Col md={4}>
+              <Card className="border-0 shadow-sm">
+                <Card.Body>
                   <div className="d-flex justify-content-between align-items-center">
                     <div>
-                      <p className="mb-1 opacity-75 small">Active</p>
                       <h3 className="mb-0 fw-bold">{types.length}</h3>
+                      <span className="text-muted small">Active Types</span>
                     </div>
-                    <div className="bg-white bg-opacity-25 rounded-3 p-3">
-                      <CheckCircle size={24} />
+                    <div className="bg-success bg-opacity-10 rounded p-3">
+                      <CheckCircle size={24} className="text-success" />
                     </div>
                   </div>
                 </Card.Body>
               </Card>
             </Col>
-          </Row> */}
+            <Col md={4}>
+              <Card className="border-0 shadow-sm">
+                <Card.Body>
+                  <div className="d-flex justify-content-between align-items-center">
+                    <div>
+                      <h3 className="mb-0 fw-bold">ITIL</h3>
+                      <span className="text-muted small">Standard Types</span>
+                    </div>
+                    <div className="bg-info bg-opacity-10 rounded p-3">
+                      <Tag size={24} className="text-info" />
+                    </div>
+                  </div>
+                </Card.Body>
+              </Card>
+            </Col>
+          </Row>
         </div>
   
         {/* Main Content */}
@@ -4765,125 +5114,207 @@ const TypeManagementScreen: React.FC = () => {
           <Card.Body className="p-4">
             {/* Search Bar */}
             <div className="mb-4">
-              <InputGroup>
-                <InputGroup.Text className="bg-light border-end-0">
-                  <Search size={18} className="text-muted" />
-                </InputGroup.Text>
-                <Form.Control
-                  placeholder="Search ticket types..."
-                  className="border-start-0 bg-light"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </InputGroup>
-            </div>
-  
-            {/* Type Cards */}
-            <Row className="g-4">
-              {filteredTypes.map((type) => (
-                <Col key={type.id} md={6} lg={6}>
-                  <Card 
-                    className="border-0 h-100"
-                    style={{ 
-                      borderLeft: `4px solid ${type.color}`,
-                      transition: 'all 0.3s ease',
-                      backgroundColor: '#f8f9fa'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.transform = 'translateY(-4px)';
-                      e.currentTarget.style.boxShadow = '0 8px 20px rgba(0,0,0,0.1)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.transform = 'translateY(0)';
-                      e.currentTarget.style.boxShadow = 'none';
+              <Form.Control
+                placeholder="Search types..."
+                className="bg-light mb-3"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+              <div className="d-flex gap-2 justify-content-end flex-wrap">
+                {/* <Dropdown className="d-inline">
+                  <Dropdown.Toggle
+                    variant="outline-secondary"
+                    size="sm"
+                    style={{
+                      backgroundColor: '#007bff',
+                      border: 'none',
+                      borderRadius: '6px',
+                      padding: '0.7rem 1rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      whiteSpace: 'nowrap',
+                      color: 'white',
                     }}
                   >
-                    <Card.Body className="p-4">
-                      <div className="d-flex justify-content-between align-items-start mb-3">
-                        <div className="d-flex align-items-center flex-grow-1">
-                          <div 
-                            className="rounded-3 p-2 me-3"
-                            style={{ backgroundColor: `${type.color}20` }}
-                          >
-                            <Tag size={24} style={{ color: type.color }} />
-                          </div>
-                          <div className="flex-grow-1">
-                            <h5 className="mb-1 fw-bold">{type.name}</h5>
-                            <Badge 
-                              style={{ backgroundColor: type.color }}
-                              className="px-2 py-1"
-                            >
-                              {type.name}
-                            </Badge>
-                          </div>
-                        </div>
-                        <div className="d-flex gap-2">
-                          <Button
-                            variant="light"
-                            size="sm"
-                            className="rounded-circle"
-                            style={{ width: '32px', height: '32px' }}
-                            onClick={() => handleOpenModal(type)}
-                          >
-                            <Edit size={14} />
-                          </Button>
-                          <Button
-                            variant="light"
-                            size="sm"
-                            className="rounded-circle text-danger"
-                            style={{ width: '32px', height: '32px' }}
-                            onClick={() => handleDelete(type.id)}
-                          >
-                            <Trash2 size={14} />
-                          </Button>
-                        </div>
-                      </div>
-                      <p className="text-muted mb-3">{type.description}</p>
-                      <div className="d-flex justify-content-between align-items-center">
-                        <small className="text-muted">Created: {type.createdAt}</small>
-                        <div className="d-flex align-items-center gap-2">
-                          <div 
-                            className="rounded"
-                            style={{ 
-                              width: '16px', 
-                              height: '16px', 
-                              backgroundColor: type.color,
-                              border: '1px solid #dee2e6'
-                            }}
-                          />
-                          <code className="small">{type.color}</code>
-                        </div>
-                      </div>
-                    </Card.Body>
-                  </Card>
-                </Col>
-              ))}
+                    <Filter size={14} />
+                    Filter
+                  </Dropdown.Toggle>
+                  <Dropdown.Menu>
+                    <Dropdown.Item>All Types</Dropdown.Item>
+                    <Dropdown.Item>Active Only</Dropdown.Item>
+                    <Dropdown.Item>Recently Created</Dropdown.Item>
+                    <Dropdown.Divider />
+                    <Dropdown.Item>Most Used</Dropdown.Item>
+                  </Dropdown.Menu>
+                </Dropdown> */}
+                <Button
+                  variant="primary"
+                  size="sm"
+                  style={{
+                    borderRadius: '6px',
+                    padding: '0.5rem 1rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                  }}
+                >
+                  <Search size={14} />
+                  Search
+                </Button>
+              </div>
+            </div>
+  
+            {/* Type Table */}
+            <Row className="g-0">
+              <Card>
+                <Card.Body className="p-0">
+                  <Table hover responsive style={{ marginBottom: 0 }}>
+                    <thead className="bg-light">
+                      <tr>
+                        <th style={{ 
+                          padding: '1rem 1.5rem',
+                          fontWeight: '600',
+                          fontSize: '0.813rem',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.5px'
+                        }}>TYPE NAME</th>
+                        <th style={{ 
+                          padding: '1rem 1.5rem',
+                          fontWeight: '600',
+                          fontSize: '0.813rem',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.5px'
+                        }}>COLOR</th>
+                        <th style={{ 
+                          padding: '1rem 1.5rem',
+                          fontWeight: '600',
+                          fontSize: '0.813rem',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.5px'
+                        }}>CREATED AT</th>
+                        <th style={{ 
+                          padding: '1rem 1.5rem',
+                          fontWeight: '600',
+                          fontSize: '0.813rem',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.5px',
+                          textAlign: 'center'
+                        }}>ACTIONS</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredTypes.map((type) => (
+                        <tr key={type.id} style={{ 
+                          borderBottom: '1px solid #e9ecef',
+                          transition: 'background-color 0.2s'
+                        }}>
+                          <td style={{ padding: '1rem 1.5rem', verticalAlign: 'middle' }}>
+                            <div className="d-flex align-items-center gap-2">
+                              <div 
+                                className="rounded-circle"
+                                style={{ 
+                                  width: '8px', 
+                                  height: '8px', 
+                                  backgroundColor: type.color,
+                                  flexShrink: 0
+                                }}
+                              />
+                              <span style={{ 
+                                fontWeight: '500',
+                                fontSize: '0.938rem',
+                                color: '#212529'
+                              }}>{type.name}</span>
+                            </div>
+                          </td>
+                          <td style={{ padding: '1rem 1.5rem', verticalAlign: 'middle' }}>
+                            <div className="d-flex align-items-center gap-2">
+                              <div 
+                                className="rounded"
+                                style={{ 
+                                  width: '24px', 
+                                  height: '24px', 
+                                  backgroundColor: type.color,
+                                  border: '1px solid #dee2e6',
+                                  flexShrink: 0
+                                }}
+                              />
+                              <code style={{ 
+                                fontSize: '0.813rem',
+                                color: '#6c757d',
+                                backgroundColor: '#f8f9fa',
+                                padding: '0.25rem 0.5rem',
+                                borderRadius: '4px'
+                              }}>{type.color}</code>
+                            </div>
+                          </td>
+                          <td style={{ padding: '1rem 1.5rem', verticalAlign: 'middle' }}>
+                            <span style={{ 
+                              fontSize: '0.938rem',
+                              color: '#6c757d'
+                            }}>{type.createdAt}</span>
+                          </td>
+                          <td style={{ padding: '1rem 1.5rem', verticalAlign: 'middle' }}>
+                            <div className="d-flex gap-2 justify-content-center">
+                              <Button
+                                variant="link"
+                                size="sm"
+                                className="p-1"
+                                style={{
+                                  color: '#007bff',
+                                  textDecoration: 'none'
+                                }}
+                                onClick={() => handleOpenModal(type)}
+                                title="Edit"
+                              >
+                                <Edit size={18} />
+                              </Button>
+                              <Button
+                                variant="link"
+                                size="sm"
+                                className="p-1"
+                                style={{
+                                  color: '#dc3545',
+                                  textDecoration: 'none'
+                                }}
+                                onClick={() => handleDelete(type.id)}
+                                title="Delete"
+                              >
+                                <Trash2 size={18} />
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </Table>
+                </Card.Body>
+              </Card>
             </Row>
   
             {filteredTypes.length === 0 && (
               <div className="text-center py-5">
                 <Tag size={48} className="text-muted mb-3" />
-                <p className="text-muted">No ticket types found</p>
+                <p className="text-muted">No types found</p>
               </div>
             )}
           </Card.Body>
         </Card>
   
         {/* Modal */}
-       {/* Modal */}
-<Modal show={showModal} onHide={() => setShowModal(false)} centered size="lg">
-  <Modal.Header closeButton className="border-0 pb-0 bg-light">
-    <div className="d-flex align-items-center justify-content-between w-100 pe-3">
-      <Modal.Title className="fw-bold d-flex align-items-center gap-2">
-        <div className="p-2">
-          <Tag size={20} className="text-info" />
-        </div>
-        <span>{editingType ? 'Edit Ticket Type' : 'Create New Ticket Type'}</span>
-      </Modal.Title>
-    </div>
-  </Modal.Header>
+        <Modal show={showModal} onHide={() => setShowModal(false)} centered>
+          <Modal.Header closeButton className="border-0 pb-0 bg-light">
+            <div className="d-flex align-items-center justify-content-between w-100 pe-3">
+              <Modal.Title className="fw-bold d-flex align-items-center gap-2">
+                <div className="p-2">
+                  <Tag size={20} className="text-primary" />
+                </div>
+                <span>{editingType ? 'Edit Type' : 'Create New Type'}</span>
+              </Modal.Title>
+            </div>
+          </Modal.Header>
 
-  <Modal.Body className="px-4 pb-4">
+          <Modal.Body className="px-4 pb-4">
     {/* Guidelines Alert */}
     {/* {!editingType && (
       <Alert variant="info" className="mb-4 border-0 shadow-sm">
@@ -4904,220 +5335,187 @@ const TypeManagementScreen: React.FC = () => {
       </Alert>
     )} */}
 
-    <Form>
-      <Row>
-        {/* Type Name */}
-        <Col md={12} className="mb-4">
-          <Form.Group>
-            <Form.Label className="fw-semibold d-flex align-items-center gap-2">
-              Type Name <span className="text-danger">*</span>
-              <span 
-                className="text-muted" 
-                title="Enter a name that categorizes the type of request"
-                style={{ cursor: 'help' }}
-              >
-                <Info size={14} />
-              </span>
-            </Form.Label>
-            <Form.Control
-              type="text"
-              placeholder="e.g., Incident, Problem, Service Request, Change Request"
-              value={formData.name}
-              onChange={(e: ChangeEvent<HTMLInputElement>) => 
-                setFormData({ ...formData, name: e.target.value })
-              }
-              className="py-2"
-              style={{ fontSize: '0.938rem' }}
-            />
-            <Form.Text className="text-muted d-flex align-items-center gap-1 mt-2">
-              <Info size={12} />
-              <span style={{ fontSize: '0.813rem' }}>
-                Use standardized ITIL terminology or create custom types that match your organization's needs.
-              </span>
-            </Form.Text>
-          </Form.Group>
-        </Col>
+            <Form>
+              {/* Type Name */}
+              <Form.Group className="mb-4">
+                <Form.Label className="fw-semibold d-flex align-items-center gap-2">
+                  Type Name <span className="text-danger">*</span>
+                  <span 
+                    className="text-muted" 
+                    title="Enter a clear name that represents the ticket type"
+                    style={{ cursor: 'help' }}
+                  >
+                    <Info size={14} />
+                  </span>
+                </Form.Label>
+                <Form.Control
+                  type="text"
+                  placeholder="e.g., Incident, Problem, Service Request"
+                  value={formData.name}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) => 
+                    setFormData({ ...formData, name: e.target.value })
+                  }
+                  className="py-2"
+                  style={{ fontSize: '0.938rem' }}
+                />
+                <Form.Text className="text-muted d-flex align-items-center gap-1 mt-2">
+                  <Info size={12} />
+                  <span style={{ fontSize: '0.813rem' }}>
+                    Use descriptive names that clearly indicate the type of ticket.
+                  </span>
+                </Form.Text>
+              </Form.Group>
 
-        {/* Description */}
-        <Col md={12} className="mb-4">
-          <Form.Group>
-            <Form.Label className="fw-semibold d-flex align-items-center gap-2">
-              Description <span className="text-danger">*</span>
-              <span 
-                className="text-muted" 
-                title="Explain what this ticket type is used for"
-                style={{ cursor: 'help' }}
-              >
-                <Info size={14} />
-              </span>
-            </Form.Label>
-            <Form.Control
-              as="textarea"
-              rows={4}
-              placeholder="Describe when users should select this ticket type and what it covers..."
-              value={formData.description}
-              onChange={(e: ChangeEvent<HTMLTextAreaElement>) => 
-                setFormData({ ...formData, description: e.target.value })
-              }
-              style={{ fontSize: '0.938rem', lineHeight: '1.6' }}
-            />
-            <Form.Text className="text-muted d-block mt-2" style={{ fontSize: '0.813rem' }}>
-              <Info size={12} className="me-1" />
-              Provide a clear definition to help users understand when to use this type. Include examples if helpful.
-            </Form.Text>
-            
-            {/* Common Type Examples */}
-            {/* <Card className="border-0 bg-white mt-3">
-              <Card.Body className="p-3">
-                <small className="text-muted fw-semibold d-block mb-2">Common Type Definitions:</small>
-                <div className="d-flex flex-column gap-2" style={{ fontSize: '0.813rem' }}>
-                  <div>
-                    <strong>Incident:</strong> <span className="text-muted">Unplanned interruption or reduction in quality of an IT service</span>
-                  </div>
-                  <div>
-                    <strong>Problem:</strong> <span className="text-muted">Root cause of one or more incidents requiring investigation</span>
-                  </div>
-                  <div>
-                    <strong>Service Request:</strong> <span className="text-muted">Request from a user for information, advice, or access</span>
-                  </div>
-                  <div>
-                    <strong>Change Request:</strong> <span className="text-muted">Request to add, modify, or remove service components</span>
+              {/* Type Color */}
+              <Form.Group className="mb-4">
+                <Form.Label className="fw-semibold d-flex align-items-center gap-2">
+                  Type Color <span className="text-danger">*</span>
+                  <span 
+                    className="text-muted" 
+                    title="Select a color that visually represents this type"
+                    style={{ cursor: 'help' }}
+                  >
+                    <Info size={14} />
+                  </span>
+                </Form.Label>
+                <div className="d-flex gap-2">
+                  <Form.Control
+                    type="color"
+                    value={formData.color}
+                    onChange={(e: ChangeEvent<HTMLInputElement>) => 
+                      setFormData({ ...formData, color: e.target.value })
+                    }
+                    style={{ width: '60px', height: '45px', cursor: 'pointer' }}
+                    title="Click to choose a color"
+                  />
+                  <Form.Control
+                    type="text"
+                    value={formData.color}
+                    onChange={(e: ChangeEvent<HTMLInputElement>) => 
+                      setFormData({ ...formData, color: e.target.value })
+                    }
+                    placeholder="#000000"
+                    className="py-2"
+                    style={{ fontSize: '0.938rem' }}
+                  />
+                </div>
+                <Form.Text className="text-muted d-block mt-2" style={{ fontSize: '0.813rem' }}>
+                  <Info size={12} className="me-1" />
+                  Choose colors that align with type meaning (e.g., red for incidents, blue for requests).
+                </Form.Text>
+                
+                {/* Color Suggestions */}
+                <div className="mt-3">
+                  <small className="text-muted fw-semibold d-block mb-2">Suggested Colors:</small>
+                  <div className="d-flex gap-2 flex-wrap">
+                    {[
+                      { name: 'Red', color: '#dc3545', label: 'Incident' },
+                      { name: 'Orange', color: '#fd7e14', label: 'Problem' },
+                      { name: 'Blue', color: '#0dcaf0', label: 'Service Request' },
+                      { name: 'Purple', color: '#6f42c1', label: 'Change' },
+                      { name: 'Green', color: '#20c997', label: 'Task' },
+                      { name: 'Gray', color: '#6c757d', label: 'Other' },
+                    ].map((suggestion) => (
+                      <Button
+                        key={suggestion.color}
+                        variant="outline-secondary"
+                        size="sm"
+                        className="d-flex align-items-center gap-2"
+                        onClick={() => setFormData({ ...formData, color: suggestion.color })}
+                        style={{ padding: '0.25rem 0.75rem' }}
+                      >
+                        <div 
+                          style={{ 
+                            width: '16px', 
+                            height: '16px', 
+                            backgroundColor: suggestion.color,
+                            borderRadius: '3px',
+                            border: '1px solid #dee2e6'
+                          }}
+                        />
+                        <small>{suggestion.label}</small>
+                      </Button>
+                    ))}
                   </div>
                 </div>
-              </Card.Body>
-            </Card> */}
-          </Form.Group>
-        </Col>
+              </Form.Group>
 
-        {/* Type Color */}
-        <Col md={12} className="mb-4">
-          <Form.Group>
-            <Form.Label className="fw-semibold d-flex align-items-center gap-2">
-              Type Color <span className="text-danger">*</span>
-              <span 
-                className="text-muted" 
-                title="Select a distinctive color for this ticket type"
-                style={{ cursor: 'help' }}
-              >
-                <Info size={14} />
-              </span>
-            </Form.Label>
-            <div className="d-flex gap-2">
-              <Form.Control
-                type="color"
-                value={formData.color}
-                onChange={(e: ChangeEvent<HTMLInputElement>) => 
-                  setFormData({ ...formData, color: e.target.value })
-                }
-                style={{ width: '60px', height: '45px', cursor: 'pointer' }}
-                title="Click to choose a color"
-              />
-              <Form.Control
-                type="text"
-                value={formData.color}
-                onChange={(e: ChangeEvent<HTMLInputElement>) => 
-                  setFormData({ ...formData, color: e.target.value })
-                }
-                placeholder="#000000"
-                className="py-2"
-                style={{ fontSize: '0.938rem' }}
-              />
-            </div>
-            <Form.Text className="text-muted d-block mt-2" style={{ fontSize: '0.813rem' }}>
-              <Info size={12} className="me-1" />
-              Choose a unique color that helps users quickly identify ticket types in lists and dashboards.
-            </Form.Text>
-          </Form.Group>
-        </Col>
-
-        {/* Preview Section */}
-        <Col md={12}>
-          <Card className="border-0 bg-light">
-            <Card.Body className="p-3">
-              <Form.Label className="fw-semibold mb-3 d-flex align-items-center gap-2">
-                <Eye size={16} />
-                Ticket Type Preview
-              </Form.Label>
-              <div className="p-3 bg-white rounded-3 border">
-                <div className="d-flex flex-column gap-3">
-                  {/* Badge Style */}
-                  <div>
-                    <small className="text-muted d-block mb-2">Badge Style:</small>
-                    <Badge 
-                      style={{ backgroundColor: formData.color }}
-                      className="px-3 py-2"
-                    >
-                      <Tag size={14} className="me-2" />
-                      {formData.name || 'Type Name'}
-                    </Badge>
-                  </div>
-                  
-                  {/* Card Style */}
-                  <div>
-                    <small className="text-muted d-block mb-2">In Ticket Card:</small>
-                    <div 
-                      className="p-3 rounded-3"
-                      style={{ 
-                        borderLeft: `4px solid ${formData.color}`,
-                        backgroundColor: '#f8f9fa'
-                      }}
-                    >
-                      <div className="d-flex align-items-center gap-2 mb-2">
-                        <div 
-                          className="rounded-3 p-2"
-                          style={{ backgroundColor: `${formData.color}20` }}
+              {/* Preview */}
+              <Form.Group>
+                <Form.Label className="fw-semibold mb-3 d-flex align-items-center gap-2">
+                  <Eye size={16} />
+                  Type Preview
+                </Form.Label>
+                <Card className="border-0 bg-light">
+                  <Card.Body className="p-3">
+                    <div className="d-flex flex-column gap-3">
+                      {/* Badge Preview */}
+                      <div>
+                        <small className="text-muted d-block mb-2">As Badge:</small>
+                        <Badge 
+                          style={{ 
+                            backgroundColor: formData.color,
+                            padding: '0.5rem 1rem',
+                            fontSize: '0.9rem'
+                          }}
                         >
-                          <Tag size={20} style={{ color: formData.color }} />
-                        </div>
-                        <div>
-                          <div className="fw-bold">{formData.name || 'Type Name'}</div>
-                          <small className="text-muted">
-                            {formData.description ? 
-                              formData.description.substring(0, 60) + (formData.description.length > 60 ? '...' : '') : 
-                              'Type description will appear here'}
-                          </small>
+                          <Tag size={14} className="me-2" />
+                          {formData.name || 'Type Name'}
+                        </Badge>
+                      </div>
+                      
+                      {/* Indicator Preview */}
+                      <div>
+                        <small className="text-muted d-block mb-2">As Type Indicator:</small>
+                        <div className="d-flex align-items-center gap-2 p-2 bg-white rounded border">
+                          <div 
+                            className="rounded-circle"
+                            style={{ 
+                              width: '12px', 
+                              height: '12px', 
+                              backgroundColor: formData.color 
+                            }}
+                          />
+                          <span className="fw-semibold" style={{ fontSize: '0.875rem' }}>
+                            {formData.name || 'Type Name'}
+                          </span>
                         </div>
                       </div>
                     </div>
-                  </div>
-                </div>
-              </div>
-              <Form.Text className="text-muted d-block mt-2" style={{ fontSize: '0.813rem' }}>
-                <Info size={12} className="me-1" />
-                This shows how your ticket type will be displayed throughout the system
-              </Form.Text>
-            </Card.Body>
-          </Card>
-        </Col>
-      </Row>
-    </Form>
-  </Modal.Body>
+                  </Card.Body>
+                </Card>
+                <Form.Text className="text-muted d-block mt-2" style={{ fontSize: '0.813rem' }}>
+                  <Info size={12} className="me-1" />
+                  This is how your type will appear in tickets, dashboards, and reports
+                </Form.Text>
+              </Form.Group>
+            </Form>
+          </Modal.Body>
 
-  <Modal.Footer className="border-0 pt-0 bg-light">
-    <div className="d-flex justify-content-between align-items-center w-100">
-      <Form.Text className="text-muted d-flex align-items-center gap-1">
-        <AlertCircle size={14} />
-        <span style={{ fontSize: '0.813rem' }}>
-          Fields marked with <span className="text-danger fw-bold">*</span> are required
-        </span>
-      </Form.Text>
-      <div className="d-flex gap-2">
-        <Button variant="light" onClick={() => setShowModal(false)}>
-          <X size={16} className="me-1" />
-          Cancel
-        </Button>
-        <Button 
-          variant="info" 
-          onClick={handleSaveType}
-          disabled={!formData.name.trim() || !formData.description.trim() || !formData.color}
-        >
-          <Check size={16} className="me-1" />
-		  
-          {editingType ? 'Update Type' : 'Create Type'}
-        </Button>
-      </div>
-    </div>
-  </Modal.Footer>
+          <Modal.Footer className="border-0 pt-0 bg-light">
+            <div className="d-flex justify-content-between align-items-center w-100">
+              <Form.Text className="text-muted d-flex align-items-center gap-1">
+                <AlertCircle size={14} />
+                <span style={{ fontSize: '0.813rem' }}>
+                  Fields marked with <span className="text-danger fw-bold">*</span> are required
+                </span>
+              </Form.Text>
+              <div className="d-flex gap-2">
+                <Button variant="light" onClick={() => setShowModal(false)}>
+                  <X size={16} className="me-1" />
+                  Cancel
+                </Button>
+                <Button 
+                  variant="primary" 
+                  onClick={handleSaveType}
+                  disabled={!formData.name.trim() || !formData.color}
+                >
+                  <Check size={16} className="me-1" />
+                  {editingType ? 'Update Type' : 'Create Type'}
+                </Button>
+              </div>
+            </div>
+          </Modal.Footer>
 </Modal>
       </div>
     );
