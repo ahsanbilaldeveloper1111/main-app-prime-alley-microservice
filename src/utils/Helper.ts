@@ -1,6 +1,12 @@
 import { v4 as uuidv4 } from 'uuid';
+import { getSession } from 'next-auth/react';
+import type { Session } from 'next-auth';
 
 import moment from 'moment-timezone';
+
+// Cache for session data to avoid multiple fetches
+let sessionCache: { session: Session | null; timestamp: number } | null = null;
+const SESSION_CACHE_TTL = 5000; // 5 seconds cache TTL
 
 export const generateCustomId = (prefix = '', length = 12) => {
   
@@ -421,4 +427,75 @@ export const formatCurrency = (amount: number | null): string => {
     style: 'currency',
     currency: 'USD'
   }).format(amount);
+};
+
+/**
+ * Get cached session or fetch new one if cache is expired
+ * This prevents multiple session fetches when checking permissions multiple times
+ */
+const getCachedSession = async (): Promise<Session | null> => {
+  const now = Date.now();
+  
+  // Return cached session if it's still valid
+  if (sessionCache && (now - sessionCache.timestamp) < SESSION_CACHE_TTL) {
+    return sessionCache.session;
+  }
+
+  // Fetch new session and update cache
+  try {
+    const session = await getSession();
+    sessionCache = {
+      session,
+      timestamp: now
+    };
+    return session;
+  } catch (error) {
+    console.error('Error fetching session:', error);
+    return null;
+  }
+};
+
+/**
+ * Check if the current user has a specific permission
+ * Automatically retrieves session permissions from NextAuth with caching
+ * @param permission - The permission string to check (e.g., 'view-users', 'edit-users')
+ * @param session - Optional session object to use instead of fetching (for performance)
+ * @returns Promise<boolean> - true if user has the permission, false otherwise
+ * 
+ * @example
+ * // Simple usage - just pass the permission slug (session is cached automatically)
+ * const canViewUsers = await hasPermission('view-users');
+ * const canEditUsers = await hasPermission('edit-users');
+ * 
+ * // In async functions
+ * if (await hasPermission('view-ranks')) {
+ *   // User has permission
+ * }
+ * 
+ * // If you already have the session, pass it to avoid fetching
+ * const session = await getSession();
+ * const canView = await hasPermission('view-users', session);
+ * const canEdit = await hasPermission('edit-users', session);
+ */
+export const hasPermission = async (
+  permission: string,
+  session?: Session | null
+): Promise<boolean> => {
+  if (!permission) {
+    return false;
+  }
+
+  try {
+    // Use provided session or get cached session
+    const userSession = session ?? await getCachedSession();
+    
+    if (!userSession?.user?.permissions) {
+      return false;
+    }
+
+    return userSession.user.permissions.includes(permission);
+  } catch (error) {
+    console.error('Error checking permission:', error);
+    return false;
+  }
 };

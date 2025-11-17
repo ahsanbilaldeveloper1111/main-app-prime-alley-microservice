@@ -3,6 +3,8 @@
  * This should be called periodically to prevent memory leaks
  */
 
+import { clearSessionCookiesClient } from './cookieUtils';
+
 export const cleanupExpiredSessions = () => {
   if (!global.tmsSessions) {
     return;
@@ -23,24 +25,8 @@ export const cleanupExpiredSessions = () => {
     
     // Clear tmsSessionId from cookies when sessions are cleaned up
     if (typeof window !== 'undefined') {
-      // Clear from sessionStorage
-      sessionStorage.removeItem('tmsSessionId');
-      console.log('Cleared tmsSessionId from sessionStorage during session cleanup');
-      
-      // Clear from cookies by setting them to expire
-      const cookieOptions = [
-        'tmsSessionId=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT',
-        'tmsSessionId=; Path=/; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT',
-        'tmsSessionId=; Path=/; HttpOnly; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT',
-        'tmsSessionId=; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT',
-        'tmsSessionId=; Path=/; SameSite=Lax; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT'
-      ];
-      
-      // Set cookies to expire
-      cookieOptions.forEach(cookie => {
-        document.cookie = cookie;
-      });
-      console.log('Cleared tmsSessionId cookies during session cleanup');
+      clearSessionCookiesClient(false);
+      console.log('Cleared session cookies during session cleanup');
     }
   }
 };

@@ -62,6 +62,15 @@ const Signin = () => {
         }
       } else {
         toast.success("Login successful");
+        
+        // Set sessionStorage flag to indicate active browser session
+        // This prevents browser close detection from clearing sessions after signin
+        try {
+          sessionStorage.setItem('app_browser_session_active', 'true');
+        } catch (error) {
+          console.error('Error setting session flag:', error);
+        }
+        
         // Use NextAuth's built-in redirect mechanism for better reliability
         const redirectUrl = callbackUrl
           ? decodeURIComponent(callbackUrl as string)

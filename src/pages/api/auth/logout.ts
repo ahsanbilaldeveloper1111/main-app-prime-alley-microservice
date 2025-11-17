@@ -1,5 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { sessionStore } from '../../../utils/sessionStore';
+import { setCookieClearHeaders } from '../../../utils/cookieUtils';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -15,24 +16,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       console.log('Cleared TMS session from memory store:', sessionId);
     }
 
-    // Clear the TMS session ID cookie with multiple variations to ensure it's cleared
-    const isProduction = process.env.NODE_ENV === 'production';
-    const cookieOptions = [
-      'tmsSessionId=; Path=/; SameSite=Lax; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT',
-      'tmsSessionId=; Path=/; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT',
-      'tmsSessionId=; Path=/; SameSite=Strict; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT'
-    ];
-    
-    // Add Secure flag for production
-    if (isProduction) {
-      cookieOptions.push(
-        'tmsSessionId=; Path=/; SameSite=Lax; Secure; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT',
-        'tmsSessionId=; Path=/; SameSite=Strict; Secure; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT'
-      );
-    }
-    
-    console.log('Setting cookie clearing headers:', cookieOptions);
-    res.setHeader('Set-Cookie', cookieOptions);
+    // Clear the TMS session ID cookie using centralized utility
+    setCookieClearHeaders(res, false);
 
     return res.status(200).json({
       success: true,

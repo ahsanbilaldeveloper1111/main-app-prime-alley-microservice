@@ -722,6 +722,7 @@ const handleCloseSuccessfulModal = () => {
                     )}
                   </Form.Group>
 
+                  {session?.user?.permissions?.includes('convert-to-opportunity-crm-leads') && (
                   <Form.Group className="mb-3">
                     <Form.Label>Type *</Form.Label>
                     <Form.Select
@@ -733,9 +734,14 @@ const handleCloseSuccessfulModal = () => {
                       required
                     >
                       <option value="lead">Lead</option>
+                      
                       <option value="opportunity">Opportunity</option>
+                      
+
+
                     </Form.Select>
                   </Form.Group>
+                  )}
 
                   <Form.Group className="mb-3">
                     <Form.Label>Stage</Form.Label>
@@ -931,7 +937,7 @@ const handleCloseSuccessfulModal = () => {
               <Card.Header className="d-flex justify-content-between align-items-center p-3">
                 <h5 className="mb-0 app-title-heading">Meetings</h5>
 
-                {session?.user?.permissions?.includes('add-meeting-crm-opportunities')  ? (
+                {session?.user?.permissions?.includes('add-meeting-crm-opportunities')  || session?.user?.permissions?.includes('add-meeting-crm-leads') ? (
                 <Button
                   variant="primary"
                   size="sm"
@@ -948,7 +954,7 @@ const handleCloseSuccessfulModal = () => {
 
               </Card.Header>
               <Card.Body>
-                {meetings.length == 0  && session?.user?.permissions?.includes('meeting-crm-opportunities') ? (
+                {meetings.length == 0  && (session?.user?.permissions?.includes('meeting-crm-opportunities') || session?.user?.permissions?.includes('meeting-crm-leads')) ? (
                   <p className="text-muted text-center">
                     No meetings scheduled
                   </p>
@@ -1010,7 +1016,7 @@ const handleCloseSuccessfulModal = () => {
                                 actions={[
                                  
                                  
-                                  ...(session?.user?.permissions?.includes('edit-meeting-crm-opportunities') ? [{
+                                  ...(session?.user?.permissions?.includes('edit-meeting-crm-opportunities') || session?.user?.permissions?.includes('edit-meeting-crm-leads') ? [{
                                     label: 'Edit',
                                     icon: <FiEdit className="me-2" />,
                                     onClick: () => {
@@ -1031,7 +1037,7 @@ const handleCloseSuccessfulModal = () => {
 
 
 
-                                  ...(session?.user?.permissions?.includes('delete-meeting-crm-opportunities') ? [{
+                                  ...(session?.user?.permissions?.includes('delete-meeting-crm-opportunities') || session?.user?.permissions?.includes('delete-meeting-crm-leads') ? [{
                                     label: 'Delete',
                                     icon: <FiTrash2 className="me-2" />,
                                     onClick: () => {

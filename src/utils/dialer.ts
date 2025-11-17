@@ -77,9 +77,9 @@ interface StopBargeInMonitoringParams {
 
 export const validateResponse = (response: any) => {
   const responseData = response?.data;
-  console.log(responseData, "responseData cti");
+  //console.log(responseData, "responseData cti");
   if(responseData?.status === 'success'){
-    console.log(responseData, "yes cti");
+    
     return {
       success: true,
       data: responseData,

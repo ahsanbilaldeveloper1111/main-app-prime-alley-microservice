@@ -23,6 +23,7 @@ import {
   getCampaigns,
   DashboardData as CrmDashboardData,
 } from "@utils/crm";
+import { useSession } from "next-auth/react";
 import { GetHierarchyData } from "@utils/users";
 import {
   FiUsers,
@@ -51,6 +52,8 @@ import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
 import { ModuleSlug } from '@utils/Helper';
 
 const CrmDashboard = () => {
+  const { data: session, status } = useSession();
+
   const [dashboardData, setDashboardData] = useState<CrmDashboardData>(
     {} as CrmDashboardData
   );
@@ -512,10 +515,19 @@ const CrmDashboard = () => {
        
         buttons={
           <>
+
+          {session?.user?.permissions?.includes('add-meeting-crm-opportunities')
+          || session?.user?.permissions?.includes('add-meeting-crm-leads')
+          ? (
           <Button onClick={handleCreateMeeting} className="btn btn-primary me-2">
           <FiCalendar className="me-2" />
           Schedule a Meeting
         </Button>
+        ) : (
+          <></>
+        )}
+
+{session?.user?.permissions?.includes('add-crm-campaigns') && (
         <Button
           onClick={handleCreateCampaign}
           className="btn btn-primary me-2"
@@ -523,6 +535,8 @@ const CrmDashboard = () => {
           <FiPlus className="me-2" />
           Create a New Campaign
         </Button>
+        )}
+
           </>
         }
       />
@@ -866,14 +880,21 @@ const CrmDashboard = () => {
                         setMeetingForm({...meetingForm, lead_id: selectedOption?.value || null})
                       }
                       options={[
+
+                        ...(session?.user?.permissions?.includes('add-meeting-crm-leads') ? [
                         ...leads.map((lead: any) => ({
                           value: lead.id,
                           label: `${lead.name} (Lead)`,
                         })),
+                        ] : []),
+
+                        ...(session?.user?.permissions?.includes('add-meeting-crm-opportunities') ? [
+
                         ...opportunities.map((opp: any) => ({
                           value: opp.id,
                           label: `${opp.name} (Opportunity)`,
                         })),
+                        ] : []),
                       ]}
                       placeholder="Select a lead or opportunity"
                       isClearable

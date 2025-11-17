@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import tokenService from '../utils/tokenService';
+import { useBrowserCloseDetection } from '../hooks/useBrowserCloseDetection';
 
 interface SessionHandlerProps {
   children: React.ReactNode;
@@ -10,6 +11,9 @@ interface SessionHandlerProps {
 const SessionHandler: React.FC<SessionHandlerProps> = ({ children }) => {
   const { data: session, status } = useSession();
   const router = useRouter();
+  
+  // Detect browser close and clear all sessions
+  useBrowserCloseDetection();
 
   useEffect(() => {
     // Handle session state changes

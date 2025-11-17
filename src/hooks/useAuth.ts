@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { initializeTokensFromSession, hasTokens } from '../utils/tokenUtils';
 import { useTokenService } from './useTokenService';
 import { sessionStore } from '../utils/sessionStore';
+import { clearSessionCookiesClient } from '../utils/cookieUtils';
 
 export const useAuth = () => {
   const { data: session, status } = useSession();
@@ -84,21 +85,8 @@ export const useAuth = () => {
             
             // Client-side cookie clearing as backup
             try {
-              // Try multiple cookie clearing approaches
-              const cookieClearingAttempts = [
-                'tmsSessionId=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT',
-                'tmsSessionId=; Path=/; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT',
-                'tmsSessionId=; Path=/; HttpOnly; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT',
-                'tmsSessionId=; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT',
-                'tmsSessionId=; Path=/; SameSite=Lax; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT'
-              ];
-              
-              cookieClearingAttempts.forEach((cookieString, index) => {
-                document.cookie = cookieString;
-                console.log(`Cookie clearing attempt ${index + 1}:`, cookieString);
-              });
-              
-              console.log('Cleared tmsSessionId cookie client-side as backup');
+              clearSessionCookiesClient(false);
+              console.log('Cleared session cookies client-side as backup');
             } catch (cookieError) {
               console.error('Error clearing cookie client-side:', cookieError);
             }

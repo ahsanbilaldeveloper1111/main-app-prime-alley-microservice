@@ -1,0 +1,207 @@
+Test ID,Test Name,Test Type (Negative/Positive),Test Description,Test Steps,Test Data,Expected Result,Actual Result
+RANKS-001,Login with valid credentials and save session,Positive,Verify that login succeeds and session is saved for ranks permission testing,"1. Provide valid email and password
+2. Call authorize function
+3. Create and save session
+4. Verify session is stored","Email: test@example.com
+Password: validPassword123
+Permissions: [all ranks permissions]",Session should be created and stored successfully,Passed - Login should succeed
+RANKS-001,Login with valid credentials and save session,Positive,Verify that login succeeds and session is saved for ranks permission testing,"1. Provide valid email and password
+2. Call authorize function
+3. Create and save session
+4. Verify session is stored","Email: test@example.com
+Password: validPassword123
+Permissions: [all ranks permissions]",Session should be created and stored successfully,Passed - User should have permissions
+RANKS-001,Login with valid credentials and save session,Positive,Verify that login succeeds and session is saved for ranks permission testing,"1. Provide valid email and password
+2. Call authorize function
+3. Create and save session
+4. Verify session is stored","Email: test@example.com
+Password: validPassword123
+Permissions: [all ranks permissions]",Session should be created and stored successfully,Passed - Session should be saved
+RANKS-001,Login with valid credentials and save session,Positive,Verify that login succeeds and session is saved for ranks permission testing,"1. Provide valid email and password
+2. Call authorize function
+3. Create and save session
+4. Verify session is stored","Email: test@example.com
+Password: validPassword123
+Permissions: [all ranks permissions]",Session should be created and stored successfully,Passed - Session should have all permissions
+RANKS-005,Create limited permission user session,Setup,Create a user session with limited permissions for negative test cases,"1. Create user with minimal permissions
+2. Save session
+3. Verify session is stored","Email: limited@example.com
+Permissions: [control-hub-services only]",Session should be created with limited permissions,Passed - Limited user session should be saved
+RANKS-005,Create limited permission user session,Setup,Create a user session with limited permissions for negative test cases,"1. Create user with minimal permissions
+2. Save session
+3. Verify session is stored","Email: limited@example.com
+Permissions: [control-hub-services only]",Session should be created with limited permissions,Passed - Limited user should have minimal permissions
+RANKS-007,UI Element Visibility (Positive): list-ranks,Positive,Verify UI element is visible when user has permission: list-ranks,"1. Check if user has permission list-ranks
+2. Verify UI element should be visible
+3. Confirm access is granted","Permission: list-ranks
+User Permissions: [list-ranks, add-ranks, edit-ranks, delete-ranks, view-permissions-ranks, assign-permissions-ranks, bulk-delete-ranks, control-hub-services]",UI element for list-ranks should be visible,Passed - Permission list-ranks: UI element visible - User has required permission
+RANKS-008,UI Element Visibility (Negative): list-ranks,Negative,Verify UI element is hidden when user lacks permission: list-ranks,"1. Check if user has permission list-ranks
+2. Verify UI element should be hidden
+3. Confirm access is denied","Permission: list-ranks
+User Permissions: [control-hub-services]",UI element for list-ranks should NOT be visible,Passed - Permission list-ranks: UI element hidden (as expected) - User does not have required permission
+RANKS-009,UI Element Visibility (Positive): add-ranks,Positive,Verify UI element is visible when user has permission: add-ranks,"1. Check if user has permission add-ranks
+2. Verify UI element should be visible
+3. Confirm access is granted","Permission: add-ranks
+User Permissions: [list-ranks, add-ranks, edit-ranks, delete-ranks, view-permissions-ranks, assign-permissions-ranks, bulk-delete-ranks, control-hub-services]",UI element for add-ranks should be visible,Passed - Permission add-ranks: UI element visible - User has required permission
+RANKS-010,UI Element Visibility (Negative): add-ranks,Negative,Verify UI element is hidden when user lacks permission: add-ranks,"1. Check if user has permission add-ranks
+2. Verify UI element should be hidden
+3. Confirm access is denied","Permission: add-ranks
+User Permissions: [control-hub-services]",UI element for add-ranks should NOT be visible,Passed - Permission add-ranks: UI element hidden (as expected) - User does not have required permission
+RANKS-011,UI Element Visibility (Positive): edit-ranks,Positive,Verify UI element is visible when user has permission: edit-ranks,"1. Check if user has permission edit-ranks
+2. Verify UI element should be visible
+3. Confirm access is granted","Permission: edit-ranks
+User Permissions: [list-ranks, add-ranks, edit-ranks, delete-ranks, view-permissions-ranks, assign-permissions-ranks, bulk-delete-ranks, control-hub-services]",UI element for edit-ranks should be visible,Passed - Permission edit-ranks: UI element visible - User has required permission
+RANKS-012,UI Element Visibility (Negative): edit-ranks,Negative,Verify UI element is hidden when user lacks permission: edit-ranks,"1. Check if user has permission edit-ranks
+2. Verify UI element should be hidden
+3. Confirm access is denied","Permission: edit-ranks
+User Permissions: [control-hub-services]",UI element for edit-ranks should NOT be visible,Passed - Permission edit-ranks: UI element hidden (as expected) - User does not have required permission
+RANKS-013,UI Element Visibility (Positive): delete-ranks,Positive,Verify UI element is visible when user has permission: delete-ranks,"1. Check if user has permission delete-ranks
+2. Verify UI element should be visible
+3. Confirm access is granted","Permission: delete-ranks
+User Permissions: [list-ranks, add-ranks, edit-ranks, delete-ranks, view-permissions-ranks, assign-permissions-ranks, bulk-delete-ranks, control-hub-services]",UI element for delete-ranks should be visible,Passed - Permission delete-ranks: UI element visible - User has required permission
+RANKS-014,UI Element Visibility (Negative): delete-ranks,Negative,Verify UI element is hidden when user lacks permission: delete-ranks,"1. Check if user has permission delete-ranks
+2. Verify UI element should be hidden
+3. Confirm access is denied","Permission: delete-ranks
+User Permissions: [control-hub-services]",UI element for delete-ranks should NOT be visible,Passed - Permission delete-ranks: UI element hidden (as expected) - User does not have required permission
+RANKS-015,UI Element Visibility (Positive): view-permissions-ranks,Positive,Verify UI element is visible when user has permission: view-permissions-ranks,"1. Check if user has permission view-permissions-ranks
+2. Verify UI element should be visible
+3. Confirm access is granted","Permission: view-permissions-ranks
+User Permissions: [list-ranks, add-ranks, edit-ranks, delete-ranks, view-permissions-ranks, assign-permissions-ranks, bulk-delete-ranks, control-hub-services]",UI element for view-permissions-ranks should be visible,Passed - Permission view-permissions-ranks: UI element visible - User has required permission
+RANKS-016,UI Element Visibility (Negative): view-permissions-ranks,Negative,Verify UI element is hidden when user lacks permission: view-permissions-ranks,"1. Check if user has permission view-permissions-ranks
+2. Verify UI element should be hidden
+3. Confirm access is denied","Permission: view-permissions-ranks
+User Permissions: [control-hub-services]",UI element for view-permissions-ranks should NOT be visible,Passed - Permission view-permissions-ranks: UI element hidden (as expected) - User does not have required permission
+RANKS-017,UI Element Visibility (Positive): assign-permissions-ranks,Positive,Verify UI element is visible when user has permission: assign-permissions-ranks,"1. Check if user has permission assign-permissions-ranks
+2. Verify UI element should be visible
+3. Confirm access is granted","Permission: assign-permissions-ranks
+User Permissions: [list-ranks, add-ranks, edit-ranks, delete-ranks, view-permissions-ranks, assign-permissions-ranks, bulk-delete-ranks, control-hub-services]",UI element for assign-permissions-ranks should be visible,Passed - Permission assign-permissions-ranks: UI element visible - User has required permission
+RANKS-018,UI Element Visibility (Negative): assign-permissions-ranks,Negative,Verify UI element is hidden when user lacks permission: assign-permissions-ranks,"1. Check if user has permission assign-permissions-ranks
+2. Verify UI element should be hidden
+3. Confirm access is denied","Permission: assign-permissions-ranks
+User Permissions: [control-hub-services]",UI element for assign-permissions-ranks should NOT be visible,Passed - Permission assign-permissions-ranks: UI element hidden (as expected) - User does not have required permission
+RANKS-019,UI Element Visibility (Positive): bulk-delete-ranks,Positive,Verify UI element is visible when user has permission: bulk-delete-ranks,"1. Check if user has permission bulk-delete-ranks
+2. Verify UI element should be visible
+3. Confirm access is granted","Permission: bulk-delete-ranks
+User Permissions: [list-ranks, add-ranks, edit-ranks, delete-ranks, view-permissions-ranks, assign-permissions-ranks, bulk-delete-ranks, control-hub-services]",UI element for bulk-delete-ranks should be visible,Passed - Permission bulk-delete-ranks: UI element visible - User has required permission
+RANKS-020,UI Element Visibility (Negative): bulk-delete-ranks,Negative,Verify UI element is hidden when user lacks permission: bulk-delete-ranks,"1. Check if user has permission bulk-delete-ranks
+2. Verify UI element should be hidden
+3. Confirm access is denied","Permission: bulk-delete-ranks
+User Permissions: [control-hub-services]",UI element for bulk-delete-ranks should NOT be visible,Passed - Permission bulk-delete-ranks: UI element hidden (as expected) - User does not have required permission
+RANKS-021,API Call (Positive): list,Positive,Verify API call succeeds when user has permission: list-ranks,"1. User has permission list-ranks
+2. Make POST request to ranks/list
+3. Verify API call succeeds","Endpoint: ranks/list
+Method: POST
+Permission: list-ranks
+User Permissions: [list-ranks, add-ranks, edit-ranks, delete-ranks, view-permissions-ranks, assign-permissions-ranks, bulk-delete-ranks, control-hub-services]",API call to ranks/list should succeed with code 200,"Passed - API ranks/list: Call succeeded - User has permission list-ranks, Response code: 200"
+RANKS-022,API Call (Negative): list,Negative,Verify API call fails when user lacks permission: list-ranks,"1. User does not have permission list-ranks
+2. Make POST request to ranks/list
+3. Verify API call fails","Endpoint: ranks/list
+Method: POST
+Permission: list-ranks
+User Permissions: [control-hub-services]",API call to ranks/list should fail with code 403 (Permission denied),"Passed - API ranks/list: Call denied (as expected) - User does not have permission list-ranks, Response code: 403"
+RANKS-023,API Call (Positive): add,Positive,Verify API call succeeds when user has permission: add-ranks,"1. User has permission add-ranks
+2. Make POST request to ranks/add
+3. Verify API call succeeds","Endpoint: ranks/add
+Method: POST
+Permission: add-ranks
+User Permissions: [list-ranks, add-ranks, edit-ranks, delete-ranks, view-permissions-ranks, assign-permissions-ranks, bulk-delete-ranks, control-hub-services]",API call to ranks/add should succeed with code 200,"Passed - API ranks/add: Call succeeded - User has permission add-ranks, Response code: 200"
+RANKS-024,API Call (Negative): add,Negative,Verify API call fails when user lacks permission: add-ranks,"1. User does not have permission add-ranks
+2. Make POST request to ranks/add
+3. Verify API call fails","Endpoint: ranks/add
+Method: POST
+Permission: add-ranks
+User Permissions: [control-hub-services]",API call to ranks/add should fail with code 403 (Permission denied),"Passed - API ranks/add: Call denied (as expected) - User does not have permission add-ranks, Response code: 403"
+RANKS-025,API Call (Positive): update,Positive,Verify API call succeeds when user has permission: edit-ranks,"1. User has permission edit-ranks
+2. Make POST request to ranks/update
+3. Verify API call succeeds","Endpoint: ranks/update
+Method: POST
+Permission: edit-ranks
+User Permissions: [list-ranks, add-ranks, edit-ranks, delete-ranks, view-permissions-ranks, assign-permissions-ranks, bulk-delete-ranks, control-hub-services]",API call to ranks/update should succeed with code 200,"Passed - API ranks/update: Call succeeded - User has permission edit-ranks, Response code: 200"
+RANKS-026,API Call (Negative): update,Negative,Verify API call fails when user lacks permission: edit-ranks,"1. User does not have permission edit-ranks
+2. Make POST request to ranks/update
+3. Verify API call fails","Endpoint: ranks/update
+Method: POST
+Permission: edit-ranks
+User Permissions: [control-hub-services]",API call to ranks/update should fail with code 403 (Permission denied),"Passed - API ranks/update: Call denied (as expected) - User does not have permission edit-ranks, Response code: 403"
+RANKS-027,API Call (Positive): delete,Positive,Verify API call succeeds when user has permission: delete-ranks,"1. User has permission delete-ranks
+2. Make POST request to ranks/delete
+3. Verify API call succeeds","Endpoint: ranks/delete
+Method: POST
+Permission: delete-ranks
+User Permissions: [list-ranks, add-ranks, edit-ranks, delete-ranks, view-permissions-ranks, assign-permissions-ranks, bulk-delete-ranks, control-hub-services]",API call to ranks/delete should succeed with code 200,"Passed - API ranks/delete: Call succeeded - User has permission delete-ranks, Response code: 200"
+RANKS-028,API Call (Negative): delete,Negative,Verify API call fails when user lacks permission: delete-ranks,"1. User does not have permission delete-ranks
+2. Make POST request to ranks/delete
+3. Verify API call fails","Endpoint: ranks/delete
+Method: POST
+Permission: delete-ranks
+User Permissions: [control-hub-services]",API call to ranks/delete should fail with code 403 (Permission denied),"Passed - API ranks/delete: Call denied (as expected) - User does not have permission delete-ranks, Response code: 403"
+RANKS-029,API Call (Positive): bulk-delete,Positive,Verify API call succeeds when user has permission: bulk-delete-ranks,"1. User has permission bulk-delete-ranks
+2. Make POST request to ranks/bulk-delete
+3. Verify API call succeeds","Endpoint: ranks/bulk-delete
+Method: POST
+Permission: bulk-delete-ranks
+User Permissions: [list-ranks, add-ranks, edit-ranks, delete-ranks, view-permissions-ranks, assign-permissions-ranks, bulk-delete-ranks, control-hub-services]",API call to ranks/bulk-delete should succeed with code 200,"Passed - API ranks/bulk-delete: Call succeeded - User has permission bulk-delete-ranks, Response code: 200"
+RANKS-030,API Call (Negative): bulk-delete,Negative,Verify API call fails when user lacks permission: bulk-delete-ranks,"1. User does not have permission bulk-delete-ranks
+2. Make POST request to ranks/bulk-delete
+3. Verify API call fails","Endpoint: ranks/bulk-delete
+Method: POST
+Permission: bulk-delete-ranks
+User Permissions: [control-hub-services]",API call to ranks/bulk-delete should fail with code 403 (Permission denied),"Passed - API ranks/bulk-delete: Call denied (as expected) - User does not have permission bulk-delete-ranks, Response code: 403"
+RANKS-031,API Call (Positive): view,Positive,Verify API call succeeds when user has permission: view-permissions-ranks,"1. User has permission view-permissions-ranks
+2. Make POST request to ranks/view
+3. Verify API call succeeds","Endpoint: ranks/view
+Method: POST
+Permission: view-permissions-ranks
+User Permissions: [list-ranks, add-ranks, edit-ranks, delete-ranks, view-permissions-ranks, assign-permissions-ranks, bulk-delete-ranks, control-hub-services]",API call to ranks/view should succeed with code 200,"Passed - API ranks/view: Call succeeded - User has permission view-permissions-ranks, Response code: 200"
+RANKS-032,API Call (Negative): view,Negative,Verify API call fails when user lacks permission: view-permissions-ranks,"1. User does not have permission view-permissions-ranks
+2. Make POST request to ranks/view
+3. Verify API call fails","Endpoint: ranks/view
+Method: POST
+Permission: view-permissions-ranks
+User Permissions: [control-hub-services]",API call to ranks/view should fail with code 403 (Permission denied),"Passed - API ranks/view: Call denied (as expected) - User does not have permission view-permissions-ranks, Response code: 403"
+RANKS-033,API Call (Positive): assignPermissions,Positive,Verify API call succeeds when user has permission: assign-permissions-ranks,"1. User has permission assign-permissions-ranks
+2. Make POST request to ranks/assignPermissions
+3. Verify API call succeeds","Endpoint: ranks/assignPermissions
+Method: POST
+Permission: assign-permissions-ranks
+User Permissions: [list-ranks, add-ranks, edit-ranks, delete-ranks, view-permissions-ranks, assign-permissions-ranks, bulk-delete-ranks, control-hub-services]",API call to ranks/assignPermissions should succeed with code 200,"Passed - API ranks/assignPermissions: Call succeeded - User has permission assign-permissions-ranks, Response code: 200"
+RANKS-034,API Call (Negative): assignPermissions,Negative,Verify API call fails when user lacks permission: assign-permissions-ranks,"1. User does not have permission assign-permissions-ranks
+2. Make POST request to ranks/assignPermissions
+3. Verify API call fails","Endpoint: ranks/assignPermissions
+Method: POST
+Permission: assign-permissions-ranks
+User Permissions: [control-hub-services]",API call to ranks/assignPermissions should fail with code 403 (Permission denied),"Passed - API ranks/assignPermissions: Call denied (as expected) - User does not have permission assign-permissions-ranks, Response code: 403"
+RANKS-035,List Ranks Page Visibility (Positive),Positive,Verify that ranks list page is visible when user has list-ranks permission,"1. Check if user has list-ranks permission
+2. Verify GenericListPage component is rendered
+3. Confirm page is accessible","Permission: list-ranks
+User Permissions: [list-ranks, ...]",Ranks list page should be visible and accessible,Passed - List ranks page: Visible - User has list-ranks permission
+RANKS-036,List Ranks Page Visibility (Negative),Negative,Verify that ranks list page is hidden when user lacks list-ranks permission,"1. Check if user has list-ranks permission
+2. Verify GenericListPage component is NOT rendered
+3. Confirm page is not accessible","Permission: list-ranks
+User Permissions: [control-hub-services only]",Ranks list page should NOT be visible,Passed - List ranks page: Hidden (as expected) - User does not have list-ranks permission
+RANKS-037,Create Rank Button Visibility (Positive),Positive,"Verify that ""New Rank"" button is visible when user has add-ranks permission","1. Check if user has add-ranks permission
+2. Verify ""New Rank"" button is rendered
+3. Confirm button is clickable","Permission: add-ranks
+User Permissions: [add-ranks, ...]","""New Rank"" button should be visible",Passed - Create rank button: Visible - User has add-ranks permission
+RANKS-038,Create Rank Button Visibility (Negative),Negative,"Verify that ""New Rank"" button is hidden when user lacks add-ranks permission","1. Check if user has add-ranks permission
+2. Verify ""New Rank"" button is NOT rendered
+3. Confirm button is not accessible","Permission: add-ranks
+User Permissions: [control-hub-services only]","""New Rank"" button should NOT be visible",Passed - Create rank button: Hidden (as expected) - User does not have add-ranks permission
+RANKS-039,Action Buttons Visibility (Positive),Positive,"Verify that action buttons (Edit, Delete, View Permissions, Assign Permissions) are visible based on permissions","1. Check user permissions for edit-ranks, delete-ranks, view-permissions-ranks, assign-permissions-ranks
+2. Verify corresponding action buttons are rendered
+3. Confirm buttons are clickable","Permissions: edit-ranks, delete-ranks, view-permissions-ranks, assign-permissions-ranks
+User Permissions: [all action permissions]",Action buttons should be visible based on user permissions,Passed - Action buttons: Visible - User has at least one action permission
+RANKS-040,Action Buttons Visibility (Negative),Negative,Verify that action buttons are hidden when user lacks all action permissions,"1. Check user permissions for edit-ranks, delete-ranks, view-permissions-ranks, assign-permissions-ranks
+2. Verify action buttons are NOT rendered
+3. Confirm buttons are not accessible","Permissions: edit-ranks, delete-ranks, view-permissions-ranks, assign-permissions-ranks
+User Permissions: [control-hub-services only]",Action buttons should NOT be visible,Passed - Action buttons: Hidden (as expected) - User does not have any action permissions
+RANKS-041,Bulk Delete Feature (Positive),Positive,Verify that bulk delete feature is enabled when user has bulk-delete-ranks permission,"1. Check if user has bulk-delete-ranks permission
+2. Verify row selection is enabled
+3. Verify bulk delete button is visible when rows are selected
+4. Confirm bulk delete functionality is accessible","Permission: bulk-delete-ranks
+User Permissions: [bulk-delete-ranks, ...]",Bulk delete feature should be enabled,Passed - Bulk delete feature: Enabled - User has bulk-delete-ranks permission
+RANKS-042,Bulk Delete Feature (Negative),Negative,Verify that bulk delete feature is disabled when user lacks bulk-delete-ranks permission,"1. Check if user has bulk-delete-ranks permission
+2. Verify row selection is disabled
+3. Verify bulk delete button is NOT visible
+4. Confirm bulk delete functionality is not accessible","Permission: bulk-delete-ranks
+User Permissions: [control-hub-services only]",Bulk delete feature should be disabled,Passed - Bulk delete feature: Disabled (as expected) - User does not have bulk-delete-ranks permission

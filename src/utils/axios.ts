@@ -3,6 +3,7 @@ import { signOut } from "next-auth/react";
 import { toast } from "react-toastify";
 import tokenService from "./tokenService";
 import { clearAllLocalStorage } from "./localStorageUtils";
+import { clearSessionCookiesClient } from "./cookieUtils";
 
 const axiosInstance: import('axios').AxiosInstance = axios.create({
   //baseURL: process.env.NEXT_PUBLIC_BACKEND_URL,
@@ -54,24 +55,8 @@ const refreshToken = async () => {
         
         // Clear TMS session ID from localStorage and cookies
         if (typeof window !== 'undefined') {
-          // Clear from sessionStorage
-          sessionStorage.removeItem('tmsSessionId');
-          console.log('Cleared tmsSessionId from sessionStorage on auto logout');
-          
-          // Clear from cookies by setting them to expire
-          const cookieOptions = [
-            'tmsSessionId=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT',
-            'tmsSessionId=; Path=/; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT',
-            'tmsSessionId=; Path=/; HttpOnly; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT',
-            'tmsSessionId=; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT',
-            'tmsSessionId=; Path=/; SameSite=Lax; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT'
-          ];
-          
-          // Set cookies to expire
-          cookieOptions.forEach(cookie => {
-            document.cookie = cookie;
-          });
-          console.log('Cleared tmsSessionId cookies on auto logout');
+          clearSessionCookiesClient(false);
+          console.log('Cleared session cookies on auto logout');
         }
         
         signOut();

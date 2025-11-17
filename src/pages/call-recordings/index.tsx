@@ -40,7 +40,7 @@ import imgStatus4 from '@assets/images/widget/img-status-4.svg';
 import router from 'next/router';
 import axiosInstance from '@utils/axios';
 import { toast } from 'react-toastify';
-import { convertUTCToUserTimezone, convertUTCTimeToUserTimezone, convertUTCSeparateDateTimeToUserTime, convertUTCSeparateDateTimeToUserDate, formatDuration, convertUTCDateToUserTimezone, GlobalDateFormat, GlobalTimeFormat } from '@utils/Helper';
+import { convertUTCToUserTimezone, convertUTCTimeToUserTimezone, convertUTCSeparateDateTimeToUserTime, convertUTCSeparateDateTimeToUserDate, formatDuration, convertUTCDateToUserTimezone, GlobalDateFormat, GlobalTimeFormat, GlobalDateTimeFormat } from '@utils/Helper';
 import PageLoader from '@components/PageLoader';
 import CircularProgressLoader from '@components/CircularProgressLoader';
 import CircularProgressCircle from '@components/CircularProgressCircle';
@@ -92,6 +92,10 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
   const socketRef = useRef<Socket | null>(null);
   const audioPlayerRef = useRef<AudioPlayerRef>(null);
   const [showPageLoader, setShowPageLoader] = useState(false);
+
+  const [showDateRange, setShowDateRange] = useState(false);
+  const [startDateTime, setStartDateTime] = useState<string>('');
+  const [endDateTime, setEndDateTime] = useState<string>('');
 
   // State declarations
   const [refreshKey, setRefreshKey] = useState<number>(0);
@@ -550,7 +554,13 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
   // Wrapper function that handles modified data
   const fetchCallLogs = useCallback(async (page = 1, perPage = 15, search = "") => {
     const response = await fetchCallLogsOriginal(page, perPage, search);
-    
+
+    if (response?.summary) {
+      setShowDateRange(true);
+      const dataFilters = response?.filters;
+      setStartDateTime(dataFilters?.start_datetime);
+      setEndDateTime(dataFilters?.end_datetime);
+    }
     // Return modified data if data has been manually added, otherwise return original response
     if (isDataModified && modifiedDataRef.current.length > 0) {
       return {
@@ -844,66 +854,66 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
 
 
   // Socket connection effect
-  useEffect(() => {
-    if (status === 'authenticated' && session) {
-      // Initialize socket connection
-      socketRef.current = io(SOCKET_URL, {
-        auth: {
-          token: stableGetAccessToken()
-        }
-      });
+  // useEffect(() => {
+  //   if (status === 'authenticated' && session) {
+  //     // Initialize socket connection
+  //     socketRef.current = io(SOCKET_URL, {
+  //       auth: {
+  //         token: stableGetAccessToken()
+  //       }
+  //     });
 
-       // Socket event listeners
-       socketRef.current.on('connect', () => {
-         // Join room for all extensions
-         if (socketExtensions.length > 0) {
-           socketRef.current?.emit('join:recording', socketExtensions);
-         }
-       });
+  //      // Socket event listeners
+  //      socketRef.current.on('connect', () => {
+  //        // Join room for all extensions
+  //        if (socketExtensions.length > 0) {
+  //          socketRef.current?.emit('join:recording', socketExtensions);
+  //        }
+  //      });
 
-      socketRef.current.on('disconnect', () => {
-        console.log('Socket disconnected from call recordings');
-      });
+  //     socketRef.current.on('disconnect', () => {
+  //       console.log('Socket disconnected from call recordings');
+  //     });
 
-       socketRef.current.on('recording_update', (data: RecordingUpdate) => {
-         console.log('Recording update received:', data);
+  //      socketRef.current.on('recording_update', (data: RecordingUpdate) => {
+  //        console.log('Recording update received:', data);
          
-         // Add the new recording data to the table
-         if (data) {
+  //        // Add the new recording data to the table
+  //        if (data) {
            
-           // Add to table data directly
-           setTableData(prevData => {
-             const updatedData = [...prevData, data];
-             modifiedDataRef.current = updatedData;
-             setIsDataModified(true);
-             return updatedData;
-           });
+  //          // Add to table data directly
+  //          setTableData(prevData => {
+  //            const updatedData = [...prevData, data];
+  //            modifiedDataRef.current = updatedData;
+  //            setIsDataModified(true);
+  //            return updatedData;
+  //          });
 
 
-           // Update summary counts
-           setSummary(prevSummary => ({
-             ...prevSummary,
-             numbers: prevSummary.numbers + 1,
-             outbound: prevSummary.outbound + 1
-           }));
+  //          // Update summary counts
+  //          setSummary(prevSummary => ({
+  //            ...prevSummary,
+  //            numbers: prevSummary.numbers + 1,
+  //            outbound: prevSummary.outbound + 1
+  //          }));
 
-           toast.success('New recording received and added to table');
-         }
-       });
+  //          toast.success('New recording received and added to table');
+  //        }
+  //      });
 
-      socketRef.current.on('error', (error: any) => {
-        console.error('Socket error:', error);
-      });
+  //     socketRef.current.on('error', (error: any) => {
+  //       console.error('Socket error:', error);
+  //     });
 
-      // Cleanup function
-      return () => {
-        if (socketRef.current) {
-          socketRef.current.disconnect();
-          socketRef.current = null;
-        }
-      };
-    }
-   }, [status, session, stableGetAccessToken, socketExtensions]);
+  //     // Cleanup function
+  //     return () => {
+  //       if (socketRef.current) {
+  //         socketRef.current.disconnect();
+  //         socketRef.current = null;
+  //       }
+  //     };
+  //   }
+  //  }, [status, session, stableGetAccessToken, socketExtensions]);
 
   return (
     <React.Fragment>
@@ -953,6 +963,18 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
                     <Col md={8} className="d-flex justify-content-end">
                       
                     <div className="action-buttons">
+
+                    {showDateRange && (
+                            <>
+                            <p className="mb-0">
+                            Date Range: <span className="status-badge primary">{formatDateTimeToLocal(startDateTime, GlobalDateTimeFormat)}</span> to <span className="status-badge primary">{formatDateTimeToLocal(endDateTime, GlobalDateTimeFormat)}</span>
+                            </p>
+                          
+                            </>
+                          )}
+
+
+
                     {/* <div className="search-container">
                             <i className="fas fa-search search-icon"></i>
                             <input type="text" className="search-bar" placeholder="Search call recordings..." onChange={(e) => handleFiltersChange({...currentFilters, search: e.target.value})}/>
