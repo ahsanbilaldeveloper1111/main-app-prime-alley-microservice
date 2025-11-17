@@ -68,9 +68,7 @@ const LiveCallDashboard = () => {
     userAddress,
     syncPersistedCallStates,
     getActiveCallIdsFromLocalStorage,
-    getAllCallIds,
-    removeTerminatingCalls,
-    onAllLoaded
+    getAllCallIds
   } = useCtiStomp()
 
   const [loading, setLoading] = useState(true)
@@ -91,6 +89,15 @@ const LiveCallDashboard = () => {
   
   // Ref to track if GetCallLegs has been called to prevent multiple calls
   const hasCalledGetCallLegsRef = useRef(false)
+  // Ref to track if onAllLoaded has been called to prevent infinite loops
+  const hasCalledOnAllLoadedRef = useRef(false)
+  // Ref to store stable function reference to avoid dependency issues
+  const getActiveCallIdsFromLocalStorageRef = useRef(getActiveCallIdsFromLocalStorage)
+  
+  // Update ref when function changes
+  useEffect(() => {
+    getActiveCallIdsFromLocalStorageRef.current = getActiveCallIdsFromLocalStorage
+  }, [getActiveCallIdsFromLocalStorage])
   
   // Popover state management
   const [activePopover, setActivePopover] = useState<string | null>(null)
@@ -175,26 +182,7 @@ const LiveCallDashboard = () => {
       }
     }
     
-    // Debug logging for DN 108 (can be removed later) - moved after calculation
-    if (dn === '108') {
-      console.log('🔍 Checking DN 108:', {
-        allCallsCount: allCallsForDn.length,
-        calls: allCallsForDn.map(c => ({
-          callId: c.callId,
-          isTerminating: c.isTerminating,
-          currentState: c.currentState,
-          eventTime: c.eventTime,
-          parties: c.parties?.map((p: any) => ({
-            calling: p.callingAddress,
-            called: p.calledAddress,
-            status: p.callStatus,
-            deviceName: p.callingDeviceName || p.calledDeviceName
-          }))
-        })),
-        hasActiveCallForDn: hasActiveCallForDn,
-        willShowOnCall: hasActiveCallForDn
-      })
-    }
+    
     
     // Only show as "onCall" if there are active parties for this DN in any call
     if (hasActiveCallForDn) {
@@ -1100,15 +1088,21 @@ const LiveCallDashboard = () => {
   }, [isInitialized, dnsMap])
 
   // Function that runs when all things are loaded - only once
+  // Use a stable key based on dnsMap content to avoid re-running when object reference changes
+  const dnsMapKeys = useMemo(() => Object.keys(dnsMap || {}).sort().join(','), [dnsMap])
+  
   useEffect(() => {
-    // Only run if page is fully loaded (loading is false), initialized, we have data, haven't called GetCallLegs yet
-    if (!loading && isInitialized && dnsMap && Object.keys(dnsMap).length > 0 && !hasCalledGetCallLegsRef.current) {
-      onAllLoaded(async () => {
-        console.log('All data loaded successfully!')
+    // Only run if page is fully loaded (loading is false), initialized, we have data, haven't called onAllLoaded yet
+    if (!loading && isInitialized && dnsMapKeys.length > 0 && !hasCalledOnAllLoadedRef.current) {
+      hasCalledOnAllLoadedRef.current = true // Mark as called immediately to prevent re-entry
+      
+      // Execute the logic directly instead of using onAllLoaded to avoid infinite loops
+      const executeOnAllLoaded = async () => {
+        //console.log('All data loaded successfully!')
         
-        // Get active call IDs from localStorage (currentState != DISCONNECTED)
-        const activeCallIds = getActiveCallIdsFromLocalStorage()
-        console.log('Active call IDs from localStorage (currentState != DISCONNECTED):', activeCallIds)
+        // Get active call IDs from localStorage (currentState != DISCONNECTED) - use ref to avoid dependency issues
+        const activeCallIds = getActiveCallIdsFromLocalStorageRef.current()
+        //console.log('Active call IDs from localStorage (currentState != DISCONNECTED):', activeCallIds)
         
         // Call GetCallLegs with the call IDs if we have any - only once
         if (activeCallIds && activeCallIds.length > 0 && !hasCalledGetCallLegsRef.current) {
@@ -1117,7 +1111,7 @@ const LiveCallDashboard = () => {
             const params = {
               callIds: activeCallIds
             }
-            console.log('Calling GetCallLegs with params:', params)
+            
             const response = await GetCallLegs(params)
             console.log('GetCallLegs response:', response)
           } catch (error) {
@@ -1125,11 +1119,13 @@ const LiveCallDashboard = () => {
             hasCalledGetCallLegsRef.current = false // Reset on error so it can retry if needed
           }
         } else {
-          console.log('No active call IDs found in localStorage')
+          //console.log('No active call IDs found in localStorage')
         }
-      })
+      }
+      
+      executeOnAllLoaded()
     }
-  }, [loading, isInitialized, dnsMap, onAllLoaded, getActiveCallIdsFromLocalStorage])
+  }, [loading, isInitialized, dnsMapKeys])
 
   useEffect(() => {
     const handleClickOutside = (event: any) => {
@@ -1398,14 +1394,13 @@ const LiveCallDashboard = () => {
       }
 
       setShowPageLoader(true);
-      console.log('Stopping silent monitoring with params:', stopParams)
       const response = await stopMonitoringAPI(stopParams).finally(() => {
         setShowPageLoader(false);
       });
       
       if (response.success) {
         setShowPageLoader(false);
-        console.log('Silent monitoring stopped successfully for:', dn)
+        
         return true
       } else {
         console.error('Failed to stop silent monitoring:', response.error)
@@ -1442,7 +1437,7 @@ const LiveCallDashboard = () => {
       
       if (response.success) {
         setShowPageLoader(false);
-        console.log('Whisper monitoring stopped successfully for:', dn)
+        //console.log('Whisper monitoring stopped successfully for:', dn)
         return true
       } else {
         setShowPageLoader(false);
@@ -1473,14 +1468,13 @@ const LiveCallDashboard = () => {
       }
 
       setShowPageLoader(true);
-      console.log('Stopping barge-in monitoring with params:', stopParams)
       const response = await stopBargeInMonitoringAPI(stopParams).finally(() => {
         setShowPageLoader(false);
       });
       
       if (response.success) {
         setShowPageLoader(false);
-        console.log('Barge-in monitoring stopped successfully for:', dn)
+        //console.log('Barge-in monitoring stopped successfully for:', dn)
         return true
       } else {
         setShowPageLoader(false);
@@ -2125,7 +2119,7 @@ const LiveCallDashboard = () => {
                                                 
                                                 if (isDeviceActiveCall || isCurrentlyMonitored) {
                                                   if (hasMonitoringPermissions) {
-                                                    console.log('Opening popup for:', dn, deviceName, isCurrentlyMonitored ? '(currently monitored)' : '')
+                                                   
                                                     // If already monitoring, restore the state so stop button shows in modal
                                                     if (isCurrentlyMonitored && activeMonitoring.type) {
                                                       setSelectedMonitor((prev) => ({ ...prev, [dn]: activeMonitoring.type! }))

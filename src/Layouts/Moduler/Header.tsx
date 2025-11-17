@@ -1415,36 +1415,53 @@ const Header = ({ themeMode }: HeaderProps) => {
         <div className="tab-pane" id="pc-tab-16" role="tabpanel" aria-labelledby="pc-tab-link-16" tabIndex={1}>
             <div className="pc-submenu-title">{MENU_LABELS.NETOPS}</div>
             <ul className="pc-navbar">
+                
+                {session?.user?.permissions?.includes(PERMISSIONS.VIEW_NETOPS_DASHBOARD) && (
                 <li className="pc-item">
                     <Link className="pc-link" href={`${BASE_URL}/netops/dashboard`}>
                         <span className="pc-micon"><i className={ICONS.GAUGE}></i></span>
                         <span className="pc-mtext">Dashboard</span>
                     </Link>
                 </li>
+                )}
+
+                {session?.user?.permissions?.includes(PERMISSIONS.VIEW_NETOPS_DEVICES) && (
+
                 <li className="pc-item">
                     <Link className="pc-link" href={`${BASE_URL}/netops/devices`}>
                         <span className="pc-micon"><i className="ph-duotone ph-devices"></i></span>
                         <span className="pc-mtext">Devices</span>
                     </Link>
                 </li>
+
+                )}
+
+                {session?.user?.permissions?.includes(PERMISSIONS.VIEW_SERVICES_NETOPS) && (
                 <li className="pc-item">
                     <Link className="pc-link" href={`${BASE_URL}/netops/services`}>
                         <span className="pc-micon"><i className="ph-duotone ph-gear"></i></span>
                         <span className="pc-mtext">Services</span>
                     </Link>
                 </li>
+                )}
+
+                {session?.user?.permissions?.includes(PERMISSIONS.VIEW_ALERTS_NETOPS) && (
                 <li className="pc-item">
                     <Link className="pc-link" href={`${BASE_URL}/netops/alerts`}>
                         <span className="pc-micon"><i className="ph-duotone ph-warning-circle"></i></span>
                         <span className="pc-mtext">Alerts</span>
                     </Link>
                 </li>
+                )}
+
+                {session?.user?.permissions?.includes(PERMISSIONS.VIEW_UPTIME_SLA_NETOPS) && (
                 <li className="pc-item">
                     <Link className="pc-link" href={`${BASE_URL}/netops/uptime-sla`}>
                         <span className="pc-micon"><i className="ph-duotone ph-chart-line-up"></i></span>
                         <span className="pc-mtext">Uptime & SLA Monitoring</span>
                     </Link>
                 </li>
+                )}
             </ul>                      
         </div>
     ), []);

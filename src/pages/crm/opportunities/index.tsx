@@ -26,6 +26,7 @@ import {
   FiEdit,
   FiTrash2,
   FiXCircle,
+  FiEye,
 } from "react-icons/fi";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
@@ -189,15 +190,31 @@ const CrmOpportunities = () => {
         name: "Created",
         selector: (row: any) => row.created_at,
         sortable: true,
-        cell: (props: any) => (
-          <span>
-            {props.created_at
-              ? new Date(props.created_at).toLocaleDateString()
-              : "Unknown"}
-          </span>
-        ),
+        cell: (props: any) => {
+          const user = extensions.find((extension: any) => extension?.id == props?.created_by);
+          const name = user?.display_name || user?.name || props?.created_by;
+          return <span>
+          {props?.created_by ? name : ""}
+          {props?.created_by && <br />}
+          {props.created_at
+            ? new Date(props.created_at).toLocaleDateString()
+            : "Unknown"}
+        </span>
+        },
       },
-      
+      {
+        key: "user_extension",
+        name: "User Extension",
+        selector: (row: any) => row.user_extension,
+        sortable: true,
+        cell: (props: any) => {
+          const user = extensions.find((extension: any) => extension?.id == props?.user_extension);
+          const name = user?.display_name || user?.name || props?.user_extension;
+          return <span>
+          {props?.user_extension ? name : ""}
+        </span>
+        }
+      },
       {
         key: "Action",
         name: "ACTION",
@@ -209,7 +226,11 @@ const CrmOpportunities = () => {
           {session?.user?.permissions?.includes('view-crm-opportunities') || session?.user?.permissions?.includes('edit-crm-opportunities') || session?.user?.permissions?.includes('mark-as-lost-crm-opportunities') || session?.user?.permissions?.includes('delete-crm-opportunities') ? (
           <DatatableActionButton
             actions={[
-
+              {
+                label: 'View',
+                icon: <FiEye className="me-2" />,
+                onClick: () => window.location.href = `/crm/leads/${props.id}`,
+              },
               ...(session?.user?.permissions?.includes('edit-crm-opportunities') ? [{
                 label: 'Edit',
                 icon: <FiEdit className="me-2" />,
@@ -245,20 +266,14 @@ const CrmOpportunities = () => {
       const params: any = {
         page,
         perPage,
+        ...(memoizedFilters || {}),
+        
       };
 
       // Use search from filters if available, otherwise use the search parameter
       const searchTerm = memoizedFilters.search || search;
       if (searchTerm) {
         params.search = searchTerm;
-      }
-
-      // Add filter parameters at top level
-      if (memoizedFilters.stage_id) {
-        params.stage_id = memoizedFilters.stage_id;
-      }
-      if (memoizedFilters.is_lost !== undefined) {
-        params.is_lost = memoizedFilters.is_lost;
       }
 
       return await getOpportunities(params);

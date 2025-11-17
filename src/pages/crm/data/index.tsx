@@ -397,6 +397,11 @@ const CrmDataManagement = () => {
     fetchExtensions();
   }, []);
 
+  function getNameByExtension(extension: string) {
+    const extensionData = extensions.find((ext) => ext.id === extension);
+    return extensionData?.display_name || extensionData?.name || extension;
+  }
+  
   // Load dashboard stats
   useEffect(() => {
     const loadDashboardStats = async () => {
@@ -2807,7 +2812,7 @@ const CrmDataManagement = () => {
                           </div>
                           <div className="small text-muted">
                             <strong>To:</strong>{" "}
-                            {activity.user_extension_done_to || "Campaign team"}
+                            {getNameByExtension(activity.user_extension_done_to) || "Campaign team"}
                           </div>
                         </div>
                       );
@@ -2917,7 +2922,7 @@ const CrmDataManagement = () => {
                               <div className="flex-grow-1">
                                 <h6 className="mb-1 d-flex align-items-center">
                                   <strong className="text-primary">
-                                    {activity.user_extension_done_by ||
+                                    {getNameByExtension(activity.user_extension_done_by) ||
                                       "System"}
                                   </strong>
                                   <Badge

@@ -1493,7 +1493,7 @@ const CtiDashboard = () => {
                                         title={`${deviceName} (${terminalState})`}
                                         onClick={() => { //terminalState !== 'STALE' &&
                                           if ( isDeviceActiveCall) {
-                                            console.log('Opening popup for:', dn, deviceName)
+                                            
                                             setShowPopup({ dn: dn, deviceName })
                                           } else if (terminalState === 'STALE') {
                                             console.log('Device is STALE, popup disabled')
