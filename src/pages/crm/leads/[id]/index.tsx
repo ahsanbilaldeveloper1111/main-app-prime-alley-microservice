@@ -130,7 +130,7 @@ const ViewLead = () => {
       <BreadcrumbItem
         mainTitle="CRM"
         mainLink="/crm/dashboard"
-        subTitle="View Lead"
+        subTitle={`View ${lead?.type === 'opportunity' ? 'Opportunity' : 'Lead'}`}
       />
 
       <div className="container-fluid">
@@ -140,16 +140,16 @@ const ViewLead = () => {
             <div className="d-flex justify-content-between align-items-center">
               <div>
                 <h1 className="h3 mb-0">{lead.name}</h1>
-                <p className="text-muted">Lead Details and Meetings</p>
+                <p className="text-muted">{lead?.type === 'opportunity' ? 'Opportunity Details and Meetings' : 'Lead Details and Meetings'}</p>
               </div>
               <div>
-                <Link href="/crm/leads" className="btn btn-outline-secondary me-2">
+                <Link href={lead?.type === 'opportunity' ? '/crm/opportunities' : '/crm/leads'} className="btn btn-outline-secondary me-2">
                   <FiArrowLeft className="me-2" />
-                  Back to Leads
+                  Back to {lead?.type === 'opportunity' ? 'Opportunities' : 'Leads'}
                 </Link>
-                <Link href={`/crm/leads/${id}/edit`} className="btn btn-primary">
+                <Link href={`/crm/leads/${id}/edit?type=${lead?.type}`} className="btn btn-primary">
                   <FiEdit className="me-2" />
-                  Edit Lead
+                  Edit {lead?.type === 'opportunity' ? 'Opportunity' : 'Lead'}
                 </Link>
               </div>
             </div>
@@ -266,7 +266,7 @@ const ViewLead = () => {
             <Card className="border-0 shadow-sm">
               <Card.Header className="d-flex justify-content-between align-items-center">
                 <h5 className="mb-0">Meetings</h5>
-                <Link href={`/crm/leads/${id}/edit`} className="btn btn-primary btn-sm">
+                <Link href={`/crm/leads/${id}/edit?type=${lead?.type}`} className="btn btn-primary btn-sm">
                   <FiPlus className="me-2" />
                   Schedule Meeting
                 </Link>
@@ -332,13 +332,13 @@ const ViewLead = () => {
                       Convert to Opportunity
                     </Button>
                   )}
-                  <Link href={`/crm/leads/${id}/edit`} className="btn btn-primary">
+                  <Link href={`/crm/leads/${id}/edit?type=${lead?.type}`} className="btn btn-primary">
                     <FiEdit className="me-2" />
-                    Edit Lead
+                    Edit {lead?.type === 'opportunity' ? 'Opportunity' : 'Lead'}
                   </Link>
-                  <Link href="/crm/leads" className="btn btn-outline-secondary">
+                  <Link href={lead?.type === 'opportunity' ? '/crm/opportunities' : '/crm/leads'} className="btn btn-outline-secondary">
                     <FiArrowLeft className="me-2" />
-                    Back to Leads
+                    Back to {lead?.type === 'opportunity' ? 'Opportunities' : 'Leads'}
                   </Link>
                 </div>
               </Card.Body>

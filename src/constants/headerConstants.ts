@@ -246,6 +246,23 @@ export const HEADER_CONSTANTS = {
     VIEW_GSM_INBOX: 'view-gsm-inbox',
     VIEW_GSM_SYNC: 'view-gsm-port-sync',
     VIEW_GSM_COMPANY_PROFILLING: 'view-gsm-company-profilling',
+
+    VIEW_NETOPS_DASHBOARD: 'dashboard-netops',
+    VIEW_NETOPS_DEVICES: 'devices-netops',
+    ADD_NEW_DEVICE: 'add-device-netops',
+    EDIT_DEVICE: 'edit-device-netops',
+    DELETE_DEVICE: 'delete-device-netops',
+
+    VIEW_SERVICES_NETOPS: 'services-netops',
+    ADD_NEW_SERVICE: 'add-service-netops',
+    EDIT_SERVICE: 'edit-service-netops',
+    DELETE_SERVICE: 'delete-service-netops',
+
+    VIEW_ALERTS_NETOPS: 'alerts-netops',
+    RESOLVE_ALERT: 'resolve-alert-netops',
+    MONITER_NETOPS: 'moniter-netops',
+    VIEW_UPTIME_SLA_NETOPS: 'monitoring-netops',
+    
     
   } as const
 } as const;
