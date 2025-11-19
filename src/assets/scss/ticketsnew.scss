@@ -24,3 +24,11 @@
 .badge.bg-secondary {
     background-color: transparent !important;
   }
+
+  .table-responsive .table th:first-child, .table-responsive .table td:first-child {
+    min-width: auto !important;
+  }
+
+ .margin-minus-10 {
+    margin-top: -25px !important;
+}

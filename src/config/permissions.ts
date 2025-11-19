@@ -27,6 +27,7 @@ export const routePermissions: RoutePermission[] = [
     {path: '/billing',permissions: [PERMISSIONS.REPORTS_SERVICES]},
     {path: '/reseller',permissions: [PERMISSIONS.REPORTS_SERVICES]},
     {path: '/vendor',permissions: [PERMISSIONS.REPORTS_SERVICES]},
+    {path: '/crm-new',permissions: [PERMISSIONS.REPORTS_SERVICES]},
     {path: '/tickets/dashboardnew',permissions: [PERMISSIONS.REPORTS_SERVICES]},
 
     
