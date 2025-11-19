@@ -385,8 +385,32 @@ const [activeScreen, setActiveScreen] = useState('dashboard');
  
 
   return (
-    <Container fluid className="p-0 test">
-      <Row className="g-0">
+    <>
+      <style>{`
+        /* Responsive adjustments for sidebar and content */
+        @media (max-width: 991px) {
+          .main-content-wrapper {
+            margin-left: 0 !important;
+            width: 100% !important;
+          }
+          nav.navbar {
+            margin-left: 0 !important;
+          }
+        }
+        
+        @media (min-width: 992px) {
+          /* On desktop, sidebar should be visible by default and content should adjust */
+          .main-content-wrapper {
+            transition: margin-left 0.3s ease, width 0.3s ease;
+          }
+          nav.navbar {
+            transition: margin-left 0.3s ease;
+          }
+        }
+      `}</style>
+      
+      <Container fluid className="p-0 test">
+        <Row className="g-0">
         {/* Mobile Toggle Button */}
         <Button
           variant="primary"
@@ -408,7 +432,7 @@ const [activeScreen, setActiveScreen] = useState('dashboard');
           {sidebarOpen ? <ChevronLeft size={24} /> : <ChevronRight size={24} />}
         </Button>
 
-        {/* Overlay */}
+        {/* Overlay for Mobile */}
         {sidebarOpen && (
           <div
             className="position-fixed d-lg-none"
@@ -418,23 +442,19 @@ const [activeScreen, setActiveScreen] = useState('dashboard');
               right: 0,
               bottom: 0,
               backgroundColor: 'rgba(0,0,0,0.5)',
-              zIndex: 1
+              zIndex: 1040
             }}
             onClick={() => setSidebarOpen(false)}
           />
         )}
 
-        {/* Sidebar */}
-       
-        <Col lg={2} style={{ position: 'relative' }}>
-  <ExpandableSidebar
-    sidebarOpen={sidebarOpen}
-    setSidebarOpen={setSidebarOpen}
-    activeScreen={activeScreen}
-    setActiveScreen={setActiveScreen}
-  />
-  
-</Col>
+        {/* Sidebar - Fixed Position, No Col Wrapper */}
+        <ExpandableSidebar
+          sidebarOpen={sidebarOpen}
+          setSidebarOpen={setSidebarOpen}
+          activeScreen={activeScreen}
+          setActiveScreen={setActiveScreen}
+        />
         {/* <Col lg={2} style={{ position: 'relative' }}>
   <Card 
     className={`${sidebarOpen ? 'd-block' : 'd-none d-lg-block'}`}
@@ -475,44 +495,60 @@ const [activeScreen, setActiveScreen] = useState('dashboard');
   </Card>
 </Col> */}
 
-<nav className="navbar navbar-expand-lg navbar-light bg-white border-bottom sticky-top shadow-sm">
-        <div className="container-fluid">
-          <div className="d-flex align-items-center gap-2">
-            <Button 
-              variant="link" 
-              className="text-dark d-none d-lg-block p-2" 
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-              style={{ marginLeft: '-10px' }}
-            >
-              {sidebarOpen ? <ChevronLeft size={24} /> : <ChevronRight size={24} />}
-            </Button>
-            <a className="navbar-brand fw-bold text-primary mb-0" href="#"><img src={CompanyLogo2.src} alt="logo" className="img-fluid" /></a>
-          </div>
-          <div className="ms-auto d-flex align-items-center gap-3">
-            <Button variant="link" className="text-dark position-relative">
-              <Bell size={20} />
-              <Badge bg="danger" pill className="position-absolute translate-middle" style={{top:'10px', left:'37px'}}>3</Badge>
-            </Button>
+        {/* Top Navbar - Adjusts based on sidebar state */}
+        <nav 
+          className="navbar navbar-expand-lg navbar-light bg-white border-bottom sticky-top shadow-sm"
+          style={{
+            marginLeft: sidebarOpen ? '0' : '0',
+            transition: 'margin-left 0.3s ease',
+          }}
+        >
+          <div className="container-fluid">
             <div className="d-flex align-items-center gap-2">
-              <div className="bg-primary bg-opacity-10 rounded-circle p-2">
-                <Users size={20} className="text-primary" />
-              </div>
-              <div className="d-none d-md-block">
-                <small className="d-block fw-semibold">John Doe</small>
-                <small className="text-muted">john@example.com</small>
+              <Button 
+                variant="link" 
+                className="text-dark d-none d-lg-block p-2" 
+                onClick={() => setSidebarOpen(!sidebarOpen)}
+                style={{ marginLeft: '-10px' }}
+              >
+                {sidebarOpen ? <ChevronLeft size={24} /> : <ChevronRight size={24} />}
+              </Button>
+              <a className="navbar-brand fw-bold text-primary mb-0" href="#"><img src={CompanyLogo2.src} alt="logo" className="img-fluid" /></a>
+            </div>
+            <div className="ms-auto d-flex align-items-center gap-3">
+              <Button variant="link" className="text-dark position-relative">
+                <Bell size={20} />
+                <Badge bg="danger" pill className="position-absolute translate-middle" style={{top:'10px', left:'37px'}}>3</Badge>
+              </Button>
+              <div className="d-flex align-items-center gap-2">
+                <div className="bg-primary bg-opacity-10 rounded-circle p-2">
+                  <Users size={20} className="text-primary" />
+                </div>
+                <div className="d-none d-md-block">
+                  <small className="d-block fw-semibold">John Doe</small>
+                  <small className="text-muted">john@example.com</small>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      </nav>
-        {/* Main Content */}
-        <Col lg={10} className="ms-auto">
-          <div className="p-4" style={{ marginTop: sidebarOpen ? '0px' : '0', backgroundColor: '#f8f9fa', minHeight: '100vh' }}>
+        </nav>
+        
+        {/* Main Content - Adjusts based on sidebar state */}
+        <div 
+          className="main-content-wrapper"
+          style={{
+            marginLeft: sidebarOpen ? '280px' : '0',
+            transition: 'margin-left 0.3s ease',
+            width: sidebarOpen ? 'calc(100% - 280px)' : '100%',
+          }}
+        >
+          <div className="p-4" style={{ backgroundColor: '#f8f9fa', minHeight: '100vh' }}>
             {renderContent()}
           </div>
-        </Col>
+        </div>
       </Row>
     </Container>
+    </>
   );
 };
 
