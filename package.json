@@ -111,6 +111,7 @@
     "@types/nprogress": "^0.2.3",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
+    "@types/recharts": "^1.8.29",
     "@types/simplebar": "^5.1.2",
     "@types/stripe": "^8.0.416",
     "@types/uuid": "^10.0.0",

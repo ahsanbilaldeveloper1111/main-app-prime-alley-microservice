@@ -834,10 +834,46 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ tickets, setActiveScr
                       <RechartsTooltip />
                       <RechartsLegend />
                       <Bar dataKey="opened" fill="#3f7cf7" radius={[5, 5, 0, 0]}>
-                        <LabelList dataKey="opened" position="top" fontSize={10} />
+                        <LabelList 
+                          dataKey="opened" 
+                          position="top" 
+                          content={(props: any) => {
+                            const { x, y, value } = props;
+                            return (
+                              <text 
+                                x={x} 
+                                y={y} 
+                                fill="#666" 
+                                textAnchor="middle" 
+                                fontSize={10}
+                                dy={-6}
+                              >
+                                {value}
+                              </text>
+                            );
+                          }}
+                        />
                       </Bar>
                       <Bar dataKey="resolved" fill="#3bd99c" radius={[5, 5, 0, 0]}>
-                        <LabelList dataKey="resolved" position="top" fontSize={10} />
+                        <LabelList 
+                          dataKey="resolved" 
+                          position="top" 
+                          content={(props: any) => {
+                            const { x, y, value } = props;
+                            return (
+                              <text 
+                                x={x} 
+                                y={y} 
+                                fill="#666" 
+                                textAnchor="middle" 
+                                fontSize={10}
+                                dy={-6}
+                              >
+                                {value}
+                              </text>
+                            );
+                          }}
+                        />
                       </Bar>
                     </ReBarChart>
                   </ResponsiveContainer>
@@ -869,7 +905,25 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ tickets, setActiveScr
               {moduleBarData.map((entry, i) => (
                 <Cell key={`cell-${i}`} fill={entry.fill} />
               ))}
-              <LabelList dataKey="count" position="top" fontSize={10} />
+              <LabelList 
+                dataKey="count" 
+                position="top" 
+                content={(props: any) => {
+                  const { x, y, value } = props;
+                  return (
+                    <text 
+                      x={x} 
+                      y={y} 
+                      fill="#666" 
+                      textAnchor="middle" 
+                      fontSize={10}
+                      dy={-6}
+                    >
+                      {value}
+                    </text>
+                  );
+                }}
+              />
             </Bar>
             <RechartsTooltip />
           </ReBarChart>
@@ -905,7 +959,26 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ tickets, setActiveScr
               {assigneeWorkloadData.map((entry, i) => (
                 <Cell key={`cell-${i}`} fill={entry.fill} />
               ))}
-              <LabelList dataKey="count" position="top" fontSize={11} fontWeight="600" />
+              <LabelList 
+                dataKey="count" 
+                position="top" 
+                content={(props: any) => {
+                  const { x, y, value } = props;
+                  return (
+                    <text 
+                      x={x} 
+                      y={y} 
+                      fill="#666" 
+                      textAnchor="middle" 
+                      fontSize={11}
+                      fontWeight="600"
+                      dy={-6}
+                    >
+                      {value}
+                    </text>
+                  );
+                }}
+              />
             </Bar>
             <RechartsTooltip 
               contentStyle={{ borderRadius: '8px', border: '1px solid #e0e0e0' }}
