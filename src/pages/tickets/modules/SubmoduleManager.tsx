@@ -214,7 +214,7 @@ const SubmoduleManager: React.FC<SubmoduleManagerProps> = ({ show, onHide, modul
             <Modal.Body>
                 <Row>
                     <Col md={6}>
-                        <h5>Submodules</h5>
+                        <h5>Submodules sw</h5>
                         <div className="mb-3">
                             <Form.Group>
                                 <Form.Label>Name</Form.Label>

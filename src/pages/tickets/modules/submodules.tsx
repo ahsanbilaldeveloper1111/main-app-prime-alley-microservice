@@ -307,9 +307,9 @@ const SubmodulesPage = () => {
       />
 
       <PageHeader
-        title="Submodules"
+        title="Sub-Categories"
         showSearch={true}
-        searchPlaceholder="Search submodules..."
+        searchPlaceholder="Search sub-categories..."
         searchValue={currentFilters.search || ""}
         onSearchChange={(value) => handleFiltersChange({...currentFilters, search: value})}
         buttons={

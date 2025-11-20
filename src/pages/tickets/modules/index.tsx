@@ -5,7 +5,7 @@ import BreadcrumbItem from '@common/BreadcrumbItem';
 import GenericListPage from '@components/GenericListPage';
 import { ListModules,CreateModule,UpdateModule,DeleteModule } from '@utils/ticket-module';
 import { Column } from '@components/CustomDataTable';
-import { Button, Modal, Row } from 'react-bootstrap';
+import { Badge, Button, Card, Form, Modal, Row } from 'react-bootstrap';
 import { Col } from 'react-bootstrap';
 import { toast } from 'react-toastify';
 import { useTokenService } from 'src/hooks/useTokenService';
@@ -20,11 +20,9 @@ import "@assets/scss/tabs.scss";
 import PageHeader from "@components/PageHeader";
 import FormModal from "../../partial/FormModal";
 import ConfirmModal from "@pages/partial/ConfirmModal";
-import SuccessfulModal from "@pages/partial/SuccessfulModal";
-import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
 import DatatableActionButton from "@components/DatatableActionButton";
-import { FiEdit, FiTrash2, FiEye,FiPlus } from "react-icons/fi";
 import { ModuleSlug } from '@utils/Helper';
+import { Users, Package, CheckCircle,Eye,Edit,Trash2, Info } from 'lucide-react';
 
 
 
@@ -32,36 +30,73 @@ import { ModuleSlug } from '@utils/Helper';
 const TicketModules = () => {
     const { data:session, status } = useSession();
     const [extensions, setExtensions] = useState<any>([]);
+    const colorSuggestions = ['#0d6efd', '#198754', '#dc3545', '#fd7e14', '#6f42c1', '#20c997'];
    
     const columns: Column[] = useMemo(() => [
-        { key: 'name', name: 'Name', selector: (row: any) => row.name, sortable: true },
-        { key: 'description', name: 'Description', selector: (row: any) => row.description, sortable: true },
-        { key: 'color', name: 'Color	', selector: (row: any) => row.color, sortable: true,
-            cell: (props: any) => {
-                const bgColor = props.color;
-                return (
-                    <span className="badge" style={{ 
-                        backgroundColor: bgColor,
-                        color: props.color,
-                        width: '20px',
-                        height: '20px',
-                        borderRadius: '50%',
-                        display: 'inline-block',
-                        marginRight: '5px'
-                    }}>
-                        
-                    </span>
-                );
-            }
+        { key: 'name', name: 'Name', selector: (row: any) => row.name, sortable: true,
+            cell: (props: any) => (
+                <div className="d-flex align-items-center gap-2">
+                          <div
+                            style={{
+                              width: '8px',
+                              height: '8px',
+                              borderRadius: '50%',
+                              backgroundColor: props.color,
+                              flexShrink: 0
+                            }}
+                          />
+                          <span className="fw-medium">{props.name}</span>
+                        </div>
+            )
+         },
+        { key: 'description', name: 'Description', selector: (row: any) => row.description, sortable: true,
+            cell: (props: any) => (
+                <div className="d-flex align-items-center gap-2">
+                    <span className="text-muted" style={{ fontSize: '0.875rem' }}>{props.description}</span>
+                </div>
+            )
+         },
+        { key: 'color', name: 'Color', selector: (row: any) => row.color, sortable: true,
+            cell: (props: any) => (
+                <div className="d-flex align-items-center gap-2">
+                          <div
+                            style={{
+                              width: '24px',
+                              height: '24px',
+                              borderRadius: '4px',
+                              backgroundColor: props.color,
+                              border: '1px solid #dee2e6',
+                              flexShrink: 0
+                            }}
+                          />
+                          <code style={{ fontSize: '0.813rem', color: '#6c757d' }}>{props.color}</code>
+                        </div>
+            )
          },
         { key: 'user_extension', name: 'User Extension', selector: (row: any) => row.user_extension, sortable: true,
             cell: (props: any) => (
-                <span className="status-badge primary">
-                    {extensions.find(
-                        (extension: any) =>
-                            extension.id.toString() === props.user_extension?.toString()
-                    )?.display_name || props.user_extension || 'Not assigned'}
-                </span>
+                // <span className="status-badge primary">
+                //     {extensions.find(
+                //         (extension: any) =>
+                //             extension.id.toString() === props.user_extension?.toString()
+                //     )?.display_name || props.user_extension || 'Not assigned'}
+                // </span>
+                <Badge 
+                bg="light" 
+                className="px-3 py-2"
+                style={{ 
+                  fontWeight: 500,
+                  fontSize: '0.813rem',
+                  backgroundColor: `${props.color}20`,
+                  color: props.color,
+                  border: `1px solid ${props.color}40`
+                }}
+              >
+                {extensions.find(
+                    (extension: any) =>
+                        extension.id.toString() === props.user_extension?.toString()
+                )?.display_name || props.user_extension || 'Not assigned'}
+              </Badge>
             )
          },
         // { key: 'tickets_count', name: 'Tickets Using', selector: (row: any) => row.tickets_count, sortable: true,
@@ -80,32 +115,24 @@ const TicketModules = () => {
          },
         {
             key: 'Action',
-            name: 'ACTION',
+            name: 'Actions',
             selector: (row: any) => row.id,
             sortable: false,
             cell: (props: any) => (
-                <DatatableActionButton
-                    actions={[
-                        ...(session?.user?.permissions?.includes('edit-ticket-module-tickets') ? [{
-                            label: 'Edit',
-                            icon: <FiEdit />,
-                            onClick: () => handleEditModule(props),
-                            className: 'gap-2'
-                        }] : []),
-                        ...(session?.user?.permissions?.includes('edit-ticket-module-tickets') ? [{
-                            label: 'Manage Submodules',
-                            icon: <FiEye />,
-                            onClick: () => openSubmoduleModal(props),
-                            className: 'gap-2'
-                        }] : []),
-                        ...(session?.user?.permissions?.includes('delete-ticket-module-tickets') ? [{
-                            label: props?.tickets_count > 0 ? 'Delete (In Use)' : 'Delete',
-                            icon: <FiTrash2 />,
-                            onClick: () => props?.tickets_count > 0 ? null : handleDeleteModule(props),
-                            className: props?.tickets_count > 0 ? 'text-muted gap-2' : 'text-danger gap-2'
-                        }] : [])
-                    ]}
-                />
+               
+                <div className="d-flex gap-2">
+                    {session?.user?.permissions?.includes('edit-ticket-module-tickets') && (
+                        <Button variant="light" size="sm" className="btn-action-style-2 p-1 text-primary" title="Edit">
+                            <Edit size={16}  onClick={() => handleEditModule(props)} />
+                        </Button>
+                    )}
+                
+                    {session?.user?.permissions?.includes('delete-ticket-module-tickets') && (
+                        <Button variant="light" size="sm" className="btn-action-style-2 p-1 text-danger" title="Delete">
+                            <Trash2 size={16}  onClick={() => handleDeleteModule(props)} />
+                        </Button>
+                    )}
+                </div>
             ),
         },
     ], [session?.user?.permissions, extensions]);
@@ -194,7 +221,7 @@ const TicketModules = () => {
     const [showCreateModuleModal, setShowCreateModuleModal] = useState<boolean>(false);
     const [newModuleName, setNewModuleName] = useState<string>("");
     const [newModuleDescription, setNewModuleDescription] = useState<string>("");
-    const [newModuleColor, setNewModuleColor] = useState<string>("");
+    const [newModuleColor, setNewModuleColor] = useState<string>("#0d6efd");
     const [newModuleUserExtension, setNewModuleUserExtension] = useState<any>(null);
 
     const handleSubmitCreateModule = useCallback(async () => {
@@ -214,7 +241,7 @@ const TicketModules = () => {
         setShowCreateModuleModal(false);
         setNewModuleName("");
         setNewModuleDescription("");
-        setNewModuleColor("");
+        setNewModuleColor("#0d6efd");
         setNewModuleUserExtension(null);
     }, []);
     const openEditModuleModal = useCallback(() => setShowEditModuleModal(true), []);
@@ -290,21 +317,19 @@ const TicketModules = () => {
 
             <PageHeader
                 title="Ticket Modules"
-                showSearch={true}
-                searchPlaceholder="Search modules..."
-                searchValue={currentFilters.search || ""}
-                onSearchChange={(value) => handleFiltersChange({...currentFilters, search: value})}
                 buttons={
                     <>
-                        {session?.user?.permissions?.includes('edit-ticket-module-tickets') && (
+                        {/* {session?.user?.permissions?.includes('edit-ticket-module-tickets') && (
                             <Button variant="info" onClick={() => window.location.href = '/tickets/modules/submodules'}>Manage Submodules</Button>
-                        )}
+                        )} */}
                         {session?.user?.permissions?.includes('create-ticket-module-tickets') && (
                             <Button variant="primary" onClick={openCreateModuleModal}>New Module</Button>
                         )}
                     </>
                 }
             />
+
+          
 
             {session?.user?.permissions?.includes('ticket-modules-tickets') && (
                  <GenericListPage
@@ -315,7 +340,7 @@ const TicketModules = () => {
                  defaultPageSize={15}
                  filters={memoizedFilters}
                  refreshKey={refreshKey}
-                 search={false}
+                 search={true}
                  tableStyle="table-style-2"
              />
             )}
@@ -324,33 +349,77 @@ const TicketModules = () => {
                 show={showEditModuleModal}
                 onHide={closeEditModuleModal}
                 title="Edit Module"
+                size="lg"
+                titleIcon={<Package size={20} className="text-primary" />}
                 desc="Update the module details below"
                 formHtml={
                     <>
                         <div className="form-group mb-3">
-                            <label htmlFor="editModuleName">Module Name</label>
+                            <label htmlFor="editModuleName" className="fw-semibold d-flex align-items-center gap-2 form-label">Module Name <span className="text-danger">*</span>
+                                <span className="text-muted ms-2" title="Enter module name">
+                                    <Info size={14} />
+                                </span>
+                            </label>
                             <input type="text" className="form-control" id="editModuleName" value={selectedModuleName} onChange={handleEditModuleNameChange} placeholder="Module Name" />
+                            <Form.Text className="text-muted d-flex align-items-center gap-1 mt-2">
+                                <Info size={12} />
+                                <span style={{ fontSize: '0.813rem' }}>
+                                    Use descriptive names that clearly indicate the purpose of the module.
+                                </span>
+                            </Form.Text>
                         </div>
 
                         <div className="form-group mb-3">
-                            <label htmlFor="editModuleDescription">Module Description</label>
+                            <label htmlFor="editModuleDescription" className="fw-semibold d-flex align-items-center gap-2 form-label">Module Description <span className="text-danger">*</span>
+                                <span className="text-muted ms-2" title="Enter module description">
+                                    <Info size={14} />
+                                </span>
+                            </label>
                             <textarea className="form-control" id="editModuleDescription" value={selectedModuleDescription} onChange={handleEditModuleDescriptionChange} placeholder="Module Description"></textarea>
+                            <Form.Text className="text-muted d-flex align-items-center gap-1 mt-2">
+                                <Info size={12} />
+                                <span style={{ fontSize: '0.813rem' }}>
+                                    Provide a clear description of the module.
+                                </span>
+                            </Form.Text>
                         </div>
 
-                        <div className="form-group mb-3">
-                            <label htmlFor="editModuleColor">Module Color</label>   
-                            <div className="d-flex align-items-center gap-2">
-                                <input type="color" className="form-control form-control-color" id="editModuleColorPicker" value={selectedModuleColor} onChange={handleEditModuleColorChange} style={{ width: '50px', height: '38px' }} />
-                                <input type="text" className="form-control" id="editModuleColor" value={selectedModuleColor} onChange={handleEditModuleColorChange} placeholder="e.g., #FF5733 or rgb(255, 87, 51)" />
+                        <Row>   
+                            <Col md={6}>
+                            <div className="form-group mb-3">  
+                                <label htmlFor="editModuleColor" className="fw-semibold d-flex align-items-center gap-2 form-label">Color <span className="text-danger">*</span>
+                                    <span className="text-muted ms-2" title="Select a color that visually represents this module">
+                                        <Info size={14} />
+                                    </span>
+                                </label>
+                                <div className="d-flex align-items-center gap-2">
+                                    <input type="color" className="form-control form-control-color" id="editModuleColorPicker" value={selectedModuleColor} onChange={handleEditModuleColorChange} style={{ width: '50px', height: '38px' }} />
+                                    <input type="text" className="form-control" id="editModuleColor" value={selectedModuleColor} onChange={handleEditModuleColorChange} placeholder="e.g., #FF5733 or rgb(255, 87, 51)" />
+                                </div>
+                                <Form.Text className="text-muted d-flex align-items-center gap-1 mt-2">
+                                    <Info size={12} />
+                                    <span style={{ fontSize: '0.813rem' }}>
+                                        Choose colors that align with module meaning (e.g., green for completed, yellow for pending, red for critical).
+                                    </span>
+                                </Form.Text>
+                                <div className="d-flex gap-2 mt-2">
+                                    {colorSuggestions.map((color) => (
+                                        <div key={color} onClick={() => setSelectedModuleColor(color)} style={{ width: '32px', height: '32px', borderRadius: '6px', backgroundColor: color, cursor: 'pointer', border: selectedModuleColor === color ? '3px solid #000' : '2px solid #dee2e6', transition: 'all 0.2s' }} title={color} />
+                                    ))}
+                                </div>
                             </div>
-                        </div>
-
-                        <div className="form-group mb-3">
-                            <label htmlFor="editModuleUserExtension">User Extension (Optional)</label>
-                            <Select
-                                id="editModuleUserExtension"
-                                value={
-                                    selectedModuleUserExtension
+                            </Col>
+                            <Col md={6}>
+                            <div className="form-group mb-3">
+                                <label htmlFor="editModuleUserExtension" className="fw-semibold d-flex align-items-center gap-2 form-label">User Extension (Optional)
+                                    <span className="text-muted ms-2" title="Select a user extension that will be assigned to this module">
+                                        <Info size={14} />
+                                    </span>
+                                </label>
+                                <Select
+                                    id="editModuleUserExtension"
+                                    value={
+                                        selectedModuleUserExtension
                                         ? {
                                             value: selectedModuleUserExtension,
                                             label: extensions.find(
@@ -372,9 +441,70 @@ const TicketModules = () => {
                                 isSearchable
                             />
                         </div>
-                    </>
-                }
-                submitButtonText="Save changes"
+                        </Col>
+                        </Row>
+
+                        <Row>
+                            <Col md={12}>
+                            {/* Preview Section */}
+                                <Card className="border-0 bg-light mt-3">
+                                    <Card.Body className="p-3">
+                                    <Form.Label className="fw-semibold mb-3 d-flex align-items-center gap-2">
+                                        <Eye size={16} />
+                                        Preview
+                                    </Form.Label>
+                                    <div className="d-flex align-items-center gap-3 p-3 bg-white rounded border">
+                                        <div
+                                        style={{
+                                            width: '8px',
+                                            height: '8px',
+                                            borderRadius: '50%',
+                                            backgroundColor: selectedModuleColor,
+                                            flexShrink: 0
+                                        }}
+                                        />
+                                        <div className="flex-grow-1">
+                                        <div className="fw-medium mb-1">{selectedModuleName || 'Module Name'}</div>
+                                        <div className="text-muted small mb-2">{selectedModuleDescription || 'Module description...'}</div>
+                                        <div className="d-flex gap-2 align-items-center">
+                                            {selectedModuleUserExtension && (
+                                            <div 
+                                                style={{ 
+                                                    backgroundColor: `${selectedModuleColor}20`,
+                                                    color: selectedModuleColor,
+                                                    border: `1px solid ${selectedModuleColor}40`
+                                                }}
+                                                className="px-3 py-1"
+                                            >
+                                                {extensions.find(
+                                                    (extension: any) =>
+                                                        extension.id.toString() === selectedModuleUserExtension?.toString()
+                                                )?.display_name || selectedModuleUserExtension}
+                                            </div>
+                                            )}
+                                            <div className="d-flex align-items-center gap-2">
+                                            <div
+                                                style={{
+                                                    width: '24px',
+                                                    height: '24px',
+                                                    borderRadius: '4px',
+                                                    backgroundColor: selectedModuleColor,
+                                                    border: '1px solid #dee2e6'
+                                                }}
+                                            />
+                                            <code className="small">{selectedModuleColor || '#0d6efd'}</code>
+                                            </div>
+                                            </div>
+                                        </div>
+                                        </div>
+                                        </Card.Body>
+                                        </Card>
+                                        </Col>
+                                        </Row>
+                                        </>
+                                    }
+                submitButtonText="Update Module"
+                isSubmitDisabled={!selectedModuleName}
                 cancelButtonText="Cancel"
                 onSubmit={handleSubmitEditModule}
                 onCancel={closeEditModuleModal}
@@ -400,29 +530,57 @@ const TicketModules = () => {
                 show={showCreateModuleModal}
                 onHide={closeCreateModuleModal}
                 title="New Module"
+                size="lg"
+                titleIcon={<Package size={20} className="text-primary" />}
                 desc="Fill in the details below to create a new module"
                 formHtml={
                     <>
                         <div className="form-group mb-3">
-                            <label htmlFor="newModuleName">Module Name</label>
+                            <label htmlFor="newModuleName" className="fw-semibold d-flex align-items-center gap-2 form-label">Module Name <span className="text-danger">*</span>
+                                <span className="text-muted ms-2" title="Enter module name">
+                                    <Info size={14} />
+                                </span>
+                            </label>
                             <input type="text" className="form-control" id="newModuleName"  value={newModuleName} onChange={handleNewModuleNameChange} placeholder="Module Name" />
+                            <Form.Text className="text-muted d-flex align-items-center gap-1 mt-2">
+                                <Info size={12} />
+                                <span style={{ fontSize: '0.813rem' }}>
+                                    Use descriptive names that clearly indicate the purpose of the module.
+                                </span>
+                            </Form.Text>
                         </div>
 
                         <div className="form-group mb-3">
-                            <label htmlFor="newModuleDescription">Module Description</label>
+                            <label htmlFor="newModuleDescription" className="fw-semibold d-flex align-items-center gap-2 form-label">Module Description 
+                                <span className="text-muted ms-2" title="Enter module description">
+                                    <Info size={14} />
+                                </span>
+                            </label>
                             <textarea className="form-control" id="newModuleDescription" value={newModuleDescription} onChange={handleNewModuleDescriptionChange} placeholder="Module Description"></textarea>
+                            <Form.Text className="text-muted d-flex align-items-center gap-1 mt-2">
+                                <Info size={12} />
+                                <span style={{ fontSize: '0.813rem' }}>
+                                    Provide a clear description of the module.
+                                </span>
+                            </Form.Text>
                         </div>
 
-                        <div className="form-group mb-3">
-                            <label htmlFor="newModuleColor">Module Color</label>
+                        <Row>
+                            <Col md={6}>
+                            <div className="form-group mb-3">
+                            <label htmlFor="newModuleColor" className="fw-semibold d-flex align-items-center gap-2 form-label">Color <span className="text-danger">*</span>
+                                <span className="text-muted ms-2" title="Select a color that visually represents this module">
+                                    <Info size={14} />
+                                </span>
+                            </label>
                             <div className="d-flex align-items-center gap-2">
                                 <input 
                                     type="color" 
                                     className="form-control form-control-color" 
                                     id="colorPicker"
-                                    value={newModuleColor || "#000000"}
+                                    value={newModuleColor}
                                     onChange={handleNewModuleColorChange}
-                                    style={{ width: '50px', height: '38px' }}
+                                    style={{ width: '60px', height: '48px' }}
                                 />
                                 <input 
                                     type="text" 
@@ -433,13 +591,47 @@ const TicketModules = () => {
                                     placeholder="e.g., #FF5733 or rgb(255, 87, 51)"
                                 />
                             </div>
-                        </div>
 
-                        <div className="form-group mb-3">
-                            <label htmlFor="newModuleUserExtension">User Extension (Optional)</label>
+                            <div className="d-flex gap-2 mt-2">
+                            {colorSuggestions.map((color) => (
+                                <div
+                                key={color}
+                                onClick={() => setNewModuleColor(color)}
+                                style={{
+                                    width: '32px',
+                                    height: '32px',
+                                    borderRadius: '6px',
+                                    backgroundColor: color,
+                                    cursor: 'pointer',
+                                    border: newModuleColor === color ? '3px solid #000' : '2px solid #dee2e6',
+                                    transition: 'all 0.2s'
+                                }}
+                                title={color}
+                                />
+                            ))}
+                            </div>
+                        </div>
+                            </Col>
+                            <Col md={6}>
+                            <div className="form-group mb-3">
+                            <label htmlFor="newModuleUserExtension" className="fw-semibold d-flex align-items-center gap-2 form-label">User Extension (Optional)
+                                <span className="text-muted ms-2" title="Select a user extension that will be assigned to this module">
+                                    <Info size={14} />
+                                </span>
+                            </label>
                             <Select
                                 id="newModuleUserExtension"
-                                value={newModuleUserExtension}
+                                value={
+                                    newModuleUserExtension
+                                        ? {
+                                            value: newModuleUserExtension,
+                                            label: extensions.find(
+                                                (ext: any) =>
+                                                    ext.id.toString() === newModuleUserExtension?.toString()
+                                            )?.display_name || "",
+                                        }
+                                        : null
+                                }
                                 onChange={(selectedOption: any) => {
                                     setNewModuleUserExtension(selectedOption?.value || null);
                                 }}
@@ -452,9 +644,72 @@ const TicketModules = () => {
                                 isSearchable
                             />
                         </div>
+                            </Col>
+                        </Row>
+
+                        <Row>
+                            <Col md={12}>
+                            {/* Preview Section */}
+                                <Card className="border-0 bg-light mt-3">
+                                    <Card.Body className="p-3">
+                                    <Form.Label className="fw-semibold mb-3 d-flex align-items-center gap-2">
+                                        <Eye size={16} />
+                                        Preview
+                                    </Form.Label>
+                                    <div className="d-flex align-items-center gap-3 p-3 bg-white rounded border">
+                                        <div
+                                        style={{
+                                            width: '8px',
+                                            height: '8px',
+                                            borderRadius: '50%',
+                                            backgroundColor: newModuleColor,
+                                            flexShrink: 0
+                                        }}
+                                        />
+                                        <div className="flex-grow-1">
+                                        <div className="fw-medium mb-1">{newModuleName || 'Module Name'}</div>
+                                        <div className="text-muted small mb-2">{newModuleDescription || 'Module description...'}</div>
+                                        <div className="d-flex gap-2 align-items-center">
+                                            {newModuleUserExtension && (
+                                            <div 
+                                                style={{ 
+                                                    backgroundColor: `${newModuleColor}20`,
+                                                color: newModuleColor,
+                                                border: `1px solid ${newModuleColor}40`
+                                                }}
+                                                className="px-3 py-1"
+                                            >
+                                                {extensions.find(
+                                                    (extension: any) =>
+                                                        extension.id.toString() === newModuleUserExtension?.toString()
+                                                )?.display_name || newModuleUserExtension}
+                                            </div>
+                                            )}
+                                            <div className="d-flex align-items-center gap-2">
+                                            <div
+                                                style={{
+                                                width: '24px',
+                                                height: '24px',
+                                                borderRadius: '4px',
+                                                backgroundColor: newModuleColor,
+                                                border: '1px solid #dee2e6'
+                                                }}
+                                            />
+                                            <code className="small">{newModuleColor || '#0d6efd'}</code>
+                                            </div>
+                                        </div>
+                                        </div>
+                                    </div>
+                                    </Card.Body>
+                                </Card>
+                            </Col>
+                        </Row>
+
+                       
                     </>
                 }
-                submitButtonText="Create"
+                submitButtonText="Create Module"
+                isSubmitDisabled={!newModuleName}
                 cancelButtonText="Cancel"
                 onSubmit={handleSubmitCreateModule}
                 onCancel={closeCreateModuleModal}

@@ -133,6 +133,13 @@ interface KPICardData {
   onClick?: () => void;
 }
 
+interface PaginationState {
+  currentPage: number;
+  rowsPerPage: number;
+  sortColumn: string;
+  sortDirection: 'asc' | 'desc';
+}
+
 // Reusable KPI Card Component
 const KPICard: React.FC<KPICardData> = ({ title, value, change, isPositive, icon, color, onClick }) => {
   return (
@@ -381,7 +388,7 @@ const CRMPortal = () => {
   };
 
   // Sorting & Pagination Helper Functions
-  const handleSort = (column: string, paginationState: any, setPaginationState: Function) => {
+  const handleSort = (column: string, paginationState: PaginationState, setPaginationState: React.Dispatch<React.SetStateAction<PaginationState>>) => {
     const newDirection = paginationState.sortColumn === column && paginationState.sortDirection === 'asc' ? 'desc' : 'asc';
     setPaginationState({ ...paginationState, sortColumn: column, sortDirection: newDirection, currentPage: 1 });
   };
@@ -419,8 +426,8 @@ const CRMPortal = () => {
 
   const renderPaginationControls = (
     dataLength: number,
-    paginationState: any,
-    setPaginationState: Function,
+    paginationState: PaginationState,
+    setPaginationState: React.Dispatch<React.SetStateAction<PaginationState>>,
     label: string
   ) => {
     const totalPages = getTotalPages(dataLength, paginationState.rowsPerPage);
@@ -6875,7 +6882,7 @@ const CRMPortal = () => {
                       cx="50%"
                       cy="50%"
                       labelLine={false}
-                      label={({ name, percent }) => `${name} ${((percent || 0) * 100).toFixed(0)}%`}
+                      label={({ name, percent }) => `${name} ${((typeof percent === 'number' ? percent : 0) * 100).toFixed(0)}%`}
                       outerRadius={80}
                       fill="#8884d8"
                       dataKey="value"

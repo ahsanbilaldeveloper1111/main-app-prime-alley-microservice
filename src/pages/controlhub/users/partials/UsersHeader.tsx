@@ -28,7 +28,7 @@ const UsersHeader: React.FC<UsersHeaderProps> = ({
                         </Col>
                         <Col md={9} className="d-flex justify-content-end">
                             <div className="action-buttons">
-                                <div className="search-container">
+                                {/* <div className="search-container">
                                     <i className="fas fa-search search-icon"></i>
                                     <input 
                                         type="text" 
@@ -36,10 +36,10 @@ const UsersHeader: React.FC<UsersHeaderProps> = ({
                                         placeholder="Search users..." 
                                         onChange={(e) => handleFiltersChange({...currentFilters, search: e.target.value})}
                                     />
-                                </div>
+                                </div> */}
                                 <UsersFilters onFiltersChange={handleFiltersChange} onExport={handleExport} />
                                 {session?.user?.permissions?.includes('sync-ldap') && (
-                                    <Button variant="primary" size="sm" onClick={() => syncLdapUsers()}>
+                                    <Button variant="primary" onClick={() => syncLdapUsers()}>
                                         Sync Users
                                     </Button>
                                 )}

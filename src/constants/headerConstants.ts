@@ -127,6 +127,8 @@ MENU_COLORS: {
     STATUS: 'Status',
     MODULES: 'Modules',
     TYPES: 'Types',
+    TICKET_MODULE_CATEGORIES: 'Categories',
+    TICKET_MODULE_SUBCATEGORIES: 'Sub Categories',
     
     // CRM
     CRM_DASHBOARD: 'Dashboard',
@@ -266,6 +268,8 @@ MENU_COLORS: {
     VIEW_TICKETS_STATUS: 'ticket-statuses-tickets',
     VIEW_TICKETS_MODULES: 'ticket-modules-tickets',
     VIEW_TICKETS_TYPES: 'view-ticket-types-tickets',
+    VIEW_TICKETS_CATEGORIES: 'manage-ticket-module-category-tickets',
+    VIEW_TICKETS_SUBCATEGORIES: 'manage-ticket-module-subcategory-tickets',
 
 
 

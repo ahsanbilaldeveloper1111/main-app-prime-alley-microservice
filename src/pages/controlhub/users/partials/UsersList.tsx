@@ -32,7 +32,7 @@ const UsersList: React.FC<UsersListProps> = ({
             filters={currentFilters}
             rowClick={true}
             showCanvas={true}
-            search={false}
+            search={true}
             tableStyle="table-style-2"
         />
     );

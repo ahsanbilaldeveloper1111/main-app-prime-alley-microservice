@@ -376,7 +376,8 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
         //   url: '/accounting/suppliers'
         // }
 
-      ].filter(item => !item.permission || hasPermission(item.permission))
+      ]
+      //.filter(item => !item.permission || hasPermission(item.permission))
     }, 
     
     {
@@ -417,6 +418,21 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
           permission: PERMISSIONS.VIEW_TICKETS_MODULES,
           url: '/tickets/modules'
         },
+        {
+          id: 'tickets-module-categories',
+          title: HEADER_CONSTANTS.SUBMENU_LABELS.TICKET_MODULE_CATEGORIES,
+          icon: <Layers size={16} />,
+          permission: PERMISSIONS.VIEW_TICKETS_CATEGORIES,
+          url: '/tickets/modules/categories'
+        },
+        {
+          id: 'tickets-module-subcategories',
+          title: HEADER_CONSTANTS.SUBMENU_LABELS.TICKET_MODULE_SUBCATEGORIES,
+          icon: <Layers size={16} />,
+          permission: PERMISSIONS.VIEW_TICKETS_SUBCATEGORIES,
+          url: '/tickets/modules/submodules'
+        },
+
         {
           id: 'tickets-types',
           title: HEADER_CONSTANTS.SUBMENU_LABELS.TYPES,

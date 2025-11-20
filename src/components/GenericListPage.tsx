@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import CustomDataTable, { Column, ServerPaginationInfo } from '@components/CustomDataTable';
 import SimpleCanvas from '@components/SimpleCanvas';
+import { Card } from 'react-bootstrap';
 
 interface GenericListPageProps {
     columns: Column[];
@@ -168,37 +169,37 @@ const GenericListPage: React.FC<GenericListPageProps> = ({
     return (
         <>
             <CustomDataTable
-                columns={columns}
-                data={data}
-                title={title}
-                loading={loading}
-                defaultPageSize={defaultPageSize}
-                searchPlaceholder={searchPlaceholder}
-                onRowClick={rowClick || showCanvas ? handleRowClickWithCanvas : onRowClick}
-                // Feature flags
-                rowClick={rowClick}
-                showCanvas={showCanvas}
-                serverSide={true}
-                paginationInfo={paginationInfo}
-                onPageChange={handlePageChange}
-                onPerPageChange={handlePerPageChange}
-                onSearch={handleSearch}
-                showSearch={search}
-                pagination={pagination}
-                showPageSizeSelector={pagination}
-                rowSelection={rowSelection}
-                onSelectionChange={onSelectionChange}
-                keyField={keyField}
-                clearSelectedRows={clearSelectedRows}
-                tableStyle={tableStyle}
-                onFiltersClick={onFiltersClick}
-                onExportClick={onExportClick}
-                onNewClick={onNewClick}
-                filtersText={filtersText}
-                exportText={exportText}
-                newText={newText}
-                noTableHead={noTableHead}
-            />
+                            columns={columns}
+                            data={data}
+                            title={title}
+                            loading={loading}
+                            defaultPageSize={defaultPageSize}
+                            searchPlaceholder={searchPlaceholder}
+                            onRowClick={rowClick || showCanvas ? handleRowClickWithCanvas : onRowClick}
+                            // Feature flags
+                            rowClick={rowClick}
+                            showCanvas={showCanvas}
+                            serverSide={true}
+                            paginationInfo={paginationInfo}
+                            onPageChange={handlePageChange}
+                            onPerPageChange={handlePerPageChange}
+                            onSearch={handleSearch}
+                            showSearch={search}
+                            pagination={pagination}
+                            showPageSizeSelector={pagination}
+                            rowSelection={rowSelection}
+                            onSelectionChange={onSelectionChange}
+                            keyField={keyField}
+                            clearSelectedRows={clearSelectedRows}
+                            tableStyle={tableStyle}
+                            onFiltersClick={onFiltersClick}
+                            onExportClick={onExportClick}
+                            onNewClick={onNewClick}
+                            filtersText={filtersText}
+                            exportText={exportText}
+                            newText={newText}
+                            noTableHead={noTableHead}
+                        />
             
             {showCanvas && (
                 <SimpleCanvas

@@ -14,7 +14,7 @@ export default function handler(req, res) {
   
   // Check if analysis server URL is configured
   if (!process.env.NEXT_PUBLIC_PRIVATE_AIML_SOCKET_URL) {
-    console.error('❌ Analysis server URL not configured: NEXT_PUBLIC_PRIVATE_AIML_SOCKET_URL');
+    console.error('Analysis server URL not configured: NEXT_PUBLIC_PRIVATE_AIML_SOCKET_URL');
     res.write(`data: ${JSON.stringify({ type: 'error', status: 'error', message: 'Analysis server URL not configured. Please set NEXT_PUBLIC_PRIVATE_AIML_SOCKET_URL environment variable.' })}\n\n`);
     res.end();
     return;

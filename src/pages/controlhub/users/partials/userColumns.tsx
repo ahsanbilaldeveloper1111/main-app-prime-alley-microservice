@@ -2,6 +2,8 @@ import React, { useMemo } from 'react';
 import { Column } from '@components/CustomDataTable';
 import { FiEdit } from 'react-icons/fi';
 import DatatableActionButton from '@components/DatatableActionButton';
+import { Button } from 'react-bootstrap';
+import { Edit } from 'lucide-react';
 
 export const useUserColumns = (session: any, customFieldColumns: Column[]) => {
     // Memoize base columns to prevent recreation on every render
@@ -56,18 +58,21 @@ export const useUserColumns = (session: any, customFieldColumns: Column[]) => {
         cell: (props: any) => (
             <div className="d-flex gap-3">
                 {session?.user?.permissions?.includes('edit-users') && (
-                    <DatatableActionButton
-                        actions={[
-                            {
-                                label: 'Edit',
-                                icon: <FiEdit className="me-2" />,
-                                onClick: () => {
-                                    window.location.href = `/controlhub/users/${props.encId}`;
-                                },
-                                className: 'action-edit'
-                            }
-                        ]}
-                    />
+                    // <DatatableActionButton
+                    //     actions={[
+                    //         {
+                    //             label: 'Edit',
+                    //             icon: <FiEdit className="me-2" />,
+                    //             onClick: () => {
+                    //                 window.location.href = `/controlhub/users/${props.encId}`;
+                    //             },
+                    //             className: 'action-edit'
+                    //         }
+                    //     ]}
+                    // />
+                    <Button variant="light"  className="btn-action-style-2 p-1 text-primary" title="Edit" onClick={() => window.location.href = `/controlhub/users/${props.encId}`}>
+                        <Edit size={16} />
+                    </Button>
                 )}
             </div>
         ),

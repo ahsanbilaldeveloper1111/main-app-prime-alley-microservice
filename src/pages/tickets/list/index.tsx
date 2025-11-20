@@ -24,18 +24,16 @@ import { GetHierarchyData } from "@utils/users";
 import { GetAllStatuses } from "@utils/ticket-statuses";
 import { GetAllTypes } from "@utils/ticket-types";
 import { Column } from "@components/CustomDataTable";
-import { Button, Modal, Row, Col, Card } from "react-bootstrap";
+import { Button, Modal, Row, Col, Card, InputGroup, Form,Alert, Badge } from "react-bootstrap";
 import { toast } from "react-toastify";
-import { useTokenService } from "src/hooks/useTokenService";
 import { useSession } from "next-auth/react";
 import moment from "moment";
-import { CreateStatus } from "@utils/ticket-statuses";
 import {
   GetAllModules,
   GetAllSubmodules,
   GetAllSubmoduleChildren,
 } from "@utils/ticket-module";
-import Select from "react-select";
+
 import CreatableSelect from "react-select/creatable";
 import TicketsFilters from "@components/filters/TicketFilters";
 import { ModuleSlug } from "@utils/Helper";
@@ -45,10 +43,11 @@ import "@assets/scss/tabs.scss";
 import PageHeader from "@components/PageHeader";
 import FormModal from "../../partial/FormModal";
 import ConfirmModal from "@pages/partial/ConfirmModal";
-import SuccessfulModal from "@pages/partial/SuccessfulModal";
-import PageSummaryGrid, { SummaryCard } from "@components/PageSummaryGrid";
-import DatatableActionButton from "@components/DatatableActionButton";
-import { FiEdit, FiTrash2, FiEye, FiPlus } from "react-icons/fi";
+import { User,Edit,Trash2,Eye,Plus, Filter, Search,Info, AlertCircle, CheckCircle, X, Paperclip } from "lucide-react";
+
+import ThemeSelect from "@components/ThemeSelect";
+import Select from "react-select";
+
 
 interface SelectOption {
   value: number;
@@ -59,7 +58,7 @@ const TicketList = () => {
   const { data: session, status } = useSession();
 
   const [refreshKey, setRefreshKey] = useState<number>(0);
-  const [currentFilters, setCurrentFilters] = useState({ search: "" });
+  const [currentFilters, setCurrentFilters] = useState({ search: "", module_id: "", status_id: "", priority: "", type_id: "" });
 
   const [statuses, setStatuses] = useState<any>([]);
   const [modules, setModules] = useState<any>([]);
@@ -115,7 +114,7 @@ const TicketList = () => {
           const typeName = props?.type?.name;
 
           return (
-            <span className="status-badge info text-capitalize">
+            <span className="fw-normal badge text-dark bg-light">
               {typeName}
             </span>
           );
@@ -133,7 +132,7 @@ const TicketList = () => {
               ? description.substring(0, 50) + "..."
               : description;
 
-          return <div title={description}>{truncatedDescription}</div>;
+          return <small className="text-muted" style={{ maxWidth: '200px', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={description}>{truncatedDescription}</small>;
         },
       },
       {
@@ -149,7 +148,7 @@ const TicketList = () => {
             : [];
           
           if (userExtensions.length === 0) {
-            return <span className="status-badge primary">Not assigned</span>;
+            return <span className="fw-normal badge text-dark bg-light">Not assigned</span>;
           }
           
           return (
@@ -159,7 +158,7 @@ const TicketList = () => {
                   (extension: any) => extension.id.toString() === extId.toString()
                 );
                 return (
-                  <span key={index} className="status-badge primary">
+                  <span key={index} className="fw-normal badge text-dark bg-light">
                     {ext?.display_name || extId}
                   </span>
                 );
@@ -174,11 +173,17 @@ const TicketList = () => {
         selector: (row: any) => row.created_by,
         sortable: true,
         cell: (props: any) => (
-          <span className="status-badge warning">
+          <div className="d-flex align-items-center gap-2"> 
+            <div className="bg-primary bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center" style={{ width: '32px', height: '32px' }}>
+            <User size={16} className="text-primary" />
+            </div>
+            <small>
             {extensions.find(
-              (extension: any) => extension.id == props.created_by
-            )?.display_name || props.created_by}
-          </span>
+                (extension: any) => extension.id == props.created_by
+              )?.display_name || props.created_by}
+          </small>
+        </div>
+     
         ),
       },
       {
@@ -187,27 +192,35 @@ const TicketList = () => {
         selector: (row: any) => row.status,
         sortable: true,
         cell: (props: any) => (
-          <div className="d-flex flex-column gap-1">
-            <span
-              className="badge"
-              style={{
-                backgroundColor: `${props.status?.color}30`,
-                color: props.status?.color,
-                fontWeight: "bold",
-              }}
-            >
+          // <div className="d-flex flex-column gap-1">
+          //   <span
+          //     className="badge"
+          //     style={{
+          //       backgroundColor: `${props.status?.color}30`,
+          //       color: props.status?.color,
+          //       fontWeight: "bold",
+          //     }}
+          //   >
+          //     {props.status?.name}
+          //   </span>
+          //   <span
+          //     className="badge"
+          //     style={{
+          //       backgroundColor: `${props.module?.color}30`,
+          //       color: props.module?.color,
+          //       fontWeight: "bold",
+          //     }}
+          //   >
+          //     {props.module?.name}
+          //   </span>
+          // </div>
+          <div className="d-block">
+            <span className="bg-opacity-10 text-dark mb-1 d-inine-block badge bg-info">
               {props.status?.name}
             </span>
-            <span
-              className="badge"
-              style={{
-                backgroundColor: `${props.module?.color}30`,
-                color: props.module?.color,
-                fontWeight: "bold",
-              }}
-            >
+            <small className="text-muted d-block">
               {props.module?.name}
-            </span>
+            </small>
           </div>
         ),
       },
@@ -226,7 +239,7 @@ const TicketList = () => {
           ];
           return (
             <span
-              className={`status-badge text-white ${
+              className={`bg-opacity-10 text-dark badge bg-warning ${
                 priorityColors[props.priority] || "secondary"
               } text-capitalize`}
             >
@@ -241,11 +254,11 @@ const TicketList = () => {
         selector: (row: any) => row.due_date,
         sortable: true,
         cell: (props: any) => (
-          <span className="text-muted">
+          <small className="text-muted">
             {props.due_date
               ? moment(props.due_date).format("DD/MM/YYYY")
               : "No due date"}
-          </span>
+          </small>
         ),
       },
       {
@@ -254,64 +267,91 @@ const TicketList = () => {
         selector: (row: any) => row.created_at,
         sortable: true,
         cell: (props: any) => (
-          <span className="text-muted">
+          <small className="text-muted">
             {moment(props.created_at).format("DD/MM/YYYY")}
-          </span>
+          </small>
         ),
       },
       {
         key: "Action",
-        name: "ACTION",
+        name: "Actions",
         selector: (row: any) => row.id,
         sortable: false,
         cell: (props: any) => (
-          <DatatableActionButton
-            actions={[
-              ...(session?.user?.permissions?.includes("view-ticket-tickets")
-                ? [
-                    {
-                      label: "View",
-                      icon: <FiEye />,
-                      onClick: () => handleViewTicket(props),
-                      className: "gap-2",
-                    },
-                  ]
-                : []),
-              ...(session?.user?.permissions?.includes("edit-ticket-tickets")
-                ? [
-                    {
-                      label: "Edit",
-                      icon: <FiEdit />,
-                      onClick: () => handleEditTicket(props),
-                      className: "gap-2",
-                    },
-                  ]
-                : []),
-              ...(session?.user?.permissions?.includes("delete-ticket-tickets")
-                ? [
-                    {
-                      label: (Array.isArray(props.user_extension)
-                        ? props.user_extension.length > 0
-                        : props.user_extension)
-                        ? "Delete (Assigned)"
-                        : "Delete",
-                      icon: <FiTrash2 />,
-                      onClick: () =>
-                        (Array.isArray(props.user_extension)
-                          ? props.user_extension.length > 0
-                          : props.user_extension)
-                          ? null
-                          : handleDeleteTicket(props),
-                      className: (Array.isArray(props.user_extension)
-                        ? props.user_extension.length > 0
-                        : props.user_extension)
-                        ? "text-muted gap-2"
-                        : "text-danger gap-2",
-                    },
-                  ]
-                : []),
-            ]}
-          />
+          // <DatatableActionButton
+          //   actions={[
+          //     ...(session?.user?.permissions?.includes("view-ticket-tickets")
+          //       ? [
+          //           {
+          //             label: "View",
+          //             icon: <FiEye />,
+          //             onClick: () => handleViewTicket(props),
+          //             className: "gap-2",
+          //           },
+          //         ]
+          //       : []),
+          //     ...(session?.user?.permissions?.includes("edit-ticket-tickets")
+          //       ? [
+          //           {
+          //             label: "Edit",
+          //             icon: <FiEdit />,
+          //             onClick: () => handleEditTicket(props),
+          //             className: "gap-2",
+          //           },
+          //         ]
+          //       : []),
+              // ...(session?.user?.permissions?.includes("delete-ticket-tickets")
+              //   ? [
+              //       {
+              //         label: (Array.isArray(props.user_extension)
+              //           ? props.user_extension.length > 0
+              //           : props.user_extension)
+              //           ? "Delete (Assigned)"
+              //           : "Delete",
+              //         icon: <FiTrash2 />,
+              //         onClick: () =>
+              //           (Array.isArray(props.user_extension)
+              //             ? props.user_extension.length > 0
+              //             : props.user_extension)
+              //             ? null
+              //             : handleDeleteTicket(props),
+              //         className: (Array.isArray(props.user_extension)
+              //           ? props.user_extension.length > 0
+              //           : props.user_extension)
+              //           ? "text-muted gap-2"
+              //           : "text-danger gap-2",
+              //       },
+              //     ]
+              //   : []),
+          //   ]}
+          // />
+
+          <div className="d-flex justify-content-center gap-2">
+            {session?.user?.permissions?.includes('view-ticket-tickets') && (
+              <Button variant="light" size="sm" className="btn-action-style-2 p-1 text-secondary" title="View">
+                <Eye size={16}  onClick={() => handleViewTicket(props)} />
+              </Button>
+            )}
+            {session?.user?.permissions?.includes('edit-ticket-tickets') && (
+              <Button variant="light" size="sm" className="btn-action-style-2 p-1 text-primary" title="Edit">
+                <Edit size={16}  onClick={() => handleEditTicket(props)} />
+              </Button>
+            )}
+            
+            {session?.user?.permissions?.includes('delete-ticket-tickets') && (Array.isArray(props.user_extension) ? props.user_extension.length > 0 : props.user_extension) ? (
+            
+                <Button variant="light" size="sm" className="btn-action-style-2 p-1 text-danger gap-2"title="Delete (Assigned)">
+                  <Trash2 size={16}  onClick={() => handleDeleteTicket(props)} />
+                </Button>
+              ) : (
+                <Button variant="light" size="sm" className="btn-action-style-2 p-1 text-danger gap-2"title="Delete">
+                  <Trash2 size={16}  onClick={() => handleDeleteTicket(props)} />
+                </Button>
+              )}
+              
+        
+            
+          </div>
         ),
       },
     ],
@@ -359,11 +399,11 @@ const TicketList = () => {
   const memoizedFilters = useMemo(() => currentFilters, [currentFilters]);
 
   const fetchTickets = useCallback(
-    async (page = 1, perPage = 15, search = "") => {
+    async (page = 1, perPage = 15) => {
       return await ListTickets({
         page,
         perPage,
-        search: currentFilters.search || search,
+        search: currentFilters.search,
         filters: memoizedFilters,
         moduleSlug: ModuleSlug.TICKET,
       });
@@ -1332,23 +1372,19 @@ const TicketList = () => {
       />
 
       <PageHeader
-        title="Tickets"
-        showSearch={true}
-        searchPlaceholder="Search tickets..."
-        searchValue={currentFilters.search || ""}
-        onSearchChange={(value) =>
-          handleFiltersChange({ ...currentFilters, search: value })
-        }
-        filters={
-          <TicketsFilters
-            onFiltersChange={handleFiltersChange}
-            moduleSlug={ModuleSlug.TICKET}
-          />
-        }
+        title="All Tickets"
+        description="Manage and track all support tickets"
+        // filters={
+        //   <TicketsFilters
+        //     onFiltersChange={handleFiltersChange}
+        //     moduleSlug={ModuleSlug.TICKET}
+        //   />
+        // }
         buttons={
           session?.user?.permissions?.includes("create-ticket-tickets") && (
-            <Button variant="primary" size="sm" onClick={openCreateTicketModal}>
-              New Ticket
+            <Button variant="primary" onClick={openCreateTicketModal}>
+              <Plus size={18} className="me-2" />
+              Add Ticket
             </Button>
           )
         }
@@ -1357,17 +1393,101 @@ const TicketList = () => {
       />
 
       {session?.user?.permissions?.includes("view-ticket-tickets") && (
-        <GenericListPage
-          columns={columns}
-          fetchData={fetchTickets}
-          title="Tickets"
-          searchPlaceholder="Search tickets..."
-          defaultPageSize={15}
-          filters={memoizedFilters}
-          refreshKey={refreshKey}
-          search={false}
-          tableStyle="table-style-2"
-        />
+
+      <>
+        <Row className="mb-0">
+          <Col md={12}>
+            <Card>
+              <Card.Body>
+              <Row className="g-3">
+              <Col md={3}>
+                <InputGroup>
+                  <InputGroup.Text className="bg-light border-end-0">
+                    <Search size={16} />
+                  </InputGroup.Text>
+                  <Form.Control
+                    type="search"
+                    placeholder="Search tickets..."
+                    className="border-start-0"
+                    value={currentFilters.search}
+                    onChange={(e: any) => handleFiltersChange({...currentFilters, search: e.target.value})}
+                  />
+                </InputGroup>
+              </Col>
+              <Col md={2}>
+
+                <ThemeSelect
+                  placeholder="Select Module"
+                  value={(() => {
+                    const selectedModule = modules.find((m: any) => m.id === currentFilters.module_id);
+                    return selectedModule ? {value: selectedModule.id, label: selectedModule.name} : null;
+                  })()}
+                  onChange={(option: any) => handleFiltersChange({...currentFilters, module_id: option?.value})}
+                  options={modules.map((m: any) => ({value: m.id, label: m.name}))}
+                />
+
+              </Col>
+
+              <Col md={2}>
+                <ThemeSelect
+                  placeholder="Select Status"
+                  value={(() => {
+                    const statusIds = Array.isArray(currentFilters.status_id) ? currentFilters.status_id : (currentFilters.status_id ? [currentFilters.status_id] : []);
+                    return statuses.filter((s: any) => statusIds.includes(s.id)).map((s: any) => ({value: s.id, label: s.name}));
+                  })()}
+                  isMulti
+                  onChange={(options: any) => handleFiltersChange({...currentFilters, status_id: options?.map((opt: any) => opt.value) || []})}
+                  options={statuses.map((s: any) => ({value: s.id, label: s.name}))}
+                />
+              </Col>
+              <Col md={2}>
+                <ThemeSelect
+                  placeholder="Select Priority"
+                  value={(() => {
+                    const priorityOptions = [{value: "", label: "All"}, {value: "critical", label: "Critical"}, {value: "high", label: "High"}, {value: "medium", label: "Medium"}, {value: "low", label: "Low"}];
+                    return priorityOptions.find((opt: any) => opt.value === currentFilters.priority) || null;
+                  })()}
+                  onChange={(option: any) => handleFiltersChange({...currentFilters, priority: option?.value})}
+                  options={[{value: "", label: "All"}, {value: "critical", label: "Critical"}, {value: "high", label: "High"}, {value: "medium", label: "Medium"}, {value: "low", label: "Low"}]}
+                />
+              </Col>
+              <Col md={2}>
+                <ThemeSelect
+                placeholder="Select Type"
+                  value={(() => {
+                    const typeIds = Array.isArray(currentFilters.type_id) ? currentFilters.type_id : (currentFilters.type_id ? [currentFilters.type_id] : []);
+                    return types.filter((t: any) => typeIds.includes(t.id)).map((t: any) => ({value: t.id, label: t.name}));
+                  })()}
+                  isMulti
+                  onChange={(options: any) => handleFiltersChange({...currentFilters, type_id: options?.map((opt: any) => opt.value) || []})}
+                  options={types.map((t: any) => ({value: t.id, label: t.name}))}
+                />
+              </Col>
+            
+              <Col md={1}>
+                <Button variant="outline-primary" className="w-100" onClick={() => handleFiltersChange({...currentFilters, search: currentFilters.search})}>
+                  <Filter size={16} />
+                </Button>
+              </Col>
+            </Row>
+              </Card.Body>
+            </Card>
+          </Col>
+        </Row>
+  
+          <GenericListPage
+            columns={columns}
+            fetchData={fetchTickets}
+            title="Tickets"
+            searchPlaceholder="Search tickets..."
+            defaultPageSize={15}
+            filters={memoizedFilters}
+            refreshKey={refreshKey}
+            search={false}
+            tableStyle="table-style-2"
+          />
+      
+      </>
       )}
 
       <FormModal
@@ -1804,28 +1924,66 @@ const TicketList = () => {
 
       <FormModal
         show={showCreateTicketModal}
+        size="xl"
+        showGuidelines={true}
+        guidelines={
+          <>
+        <Alert variant="info" className="mb-4 border-0 shadow-sm">
+        <div className="d-flex align-items-start gap-3">
+                <div className="bg-info bg-opacity-10 rounded-circle p-2" style={{ minWidth: '40px', height: '40px' }}>
+                  <Info size={20} className="text-info" />
+                </div>
+                <div>
+                  <h6 className="fw-bold mb-2 text-info">Quick Guidelines for Creating Tickets</h6>
+                  <ul className="mb-0 ps-3" style={{ fontSize: '0.875rem', lineHeight: '1.8' }}>
+                    <li>Provide a <strong>clear and descriptive title</strong> that summarizes the issue</li>
+                    <li>Choose the appropriate <strong>ticket type</strong> based on the nature of your request</li>
+                    <li>Write a <strong>detailed description</strong> (minimum 50 characters) explaining the issue</li>
+                    <li>Select the correct <strong>module and category</strong> for faster routing</li>
+                    <li>Set the right <strong>priority level</strong> based on business impact</li>
+                    <li>Attach relevant <strong>screenshots or documents</strong> to help us understand better</li>
+                  </ul>
+                </div>
+              </div>
+        </Alert>
+          </>
+        }
         onHide={closeCreateTicketModal}
-        title="New Ticket"
+        title="Create New Ticket"
         desc="Fill in the details below to create a new ticket"
         formHtml={
           <>
             <div className="row">
-              <div className="col-md-6">
+              <div className="col-md-12">
                 <div className="form-group mb-3">
-                  <label htmlFor="newTicketTitle">Ticket Title</label>
+                  <label htmlFor="newTicketTitle" className="fw-semibold d-flex align-items-center gap-2 form-label">Ticket Title <span className="text-danger">*</span>
+                  <span className="text-muted" title="Enter a clear and descriptive title that summarizes the issue">
+                    <Info size={14} />
+                  </span>
+                  </label>
                   <input
                     type="text"
                     className="form-control"
                     id="newTicketTitle"
                     value={newTicketTitle}
                     onChange={handleNewTicketTitleChange}
-                    placeholder="Ticket Title"
+                    placeholder="e.g., Unable to login to dashboard after password reset"
                   />
+                  <Form.Text className="text-muted d-flex align-items-center gap-1 mt-2">
+                    <Info size={12} />
+                    <span style={{ fontSize: '0.813rem' }}>
+                      Be specific and concise. A good title helps us route your ticket to the right team quickly.
+                    </span>
+                  </Form.Text>
                 </div>
               </div>
               <div className="col-md-6">
                 <div className="form-group mb-3">
-                  <label htmlFor="newTicketType">Ticket Type</label>
+                  <label htmlFor="newTicketType" className="fw-semibold d-flex align-items-center gap-2 form-label">Ticket Type <span className="text-danger">*</span>
+                  <span className="text-muted" title="Select the appropriate ticket type based on the nature of your request">
+                    <Info size={14} />
+                  </span>
+                  </label>
                   <select
                     className="form-control"
                     id="newTicketType"
@@ -1839,12 +1997,49 @@ const TicketList = () => {
                       </option>
                     ))}
                   </select>
+                  <Form.Text className="text-muted d-flex align-items-start gap-1 mt-2">
+                    <Info size={14} />
+                    <span style={{ fontSize: '0.813rem' }}>
+                      Select the type that best matches the nature of your request. This helps us categorize and route your ticket appropriately.
+                    </span>
+                  </Form.Text>
+                </div>
+              </div>
+              <div className="col-md-6">
+                <div className="form-group mb-3">
+                  <label htmlFor="newTicketPriority" className="fw-semibold d-flex align-items-center gap-2 form-label">Priority <span className="text-danger">*</span>
+                  <span className="text-muted" title="Select the appropriate priority level based on the business impact">
+                    <Info size={14} />
+                  </span>
+                  </label>
+                  <select
+                    className="form-control"
+                    id="newTicketPriority"
+                    value={newTicketPriority || ""}
+                    onChange={(e) => setNewTicketPriority(e.target.value)}
+                  >
+                    <option value="">Select Priority</option>
+                    <option value="0">Low</option>
+                    <option value="1">Medium</option>
+                    <option value="2">High</option>
+                    <option value="3">Critical</option>
+                  </select>
+                  <Form.Text className="text-muted d-flex align-items-start gap-1 mt-2">
+                    <Info size={14} />
+                    <span style={{ fontSize: '0.813rem' }}>
+                      Choose the urgency level based on business impact. Higher priorities are addressed first by our support team.
+                    </span>
+                  </Form.Text>
                 </div>
               </div>
             </div>
 
             <div className="form-group mb-3">
-              <label htmlFor="newTicketDescription">Ticket Description</label>
+              <label htmlFor="newTicketDescription" className="fw-semibold d-flex align-items-center gap-2 form-label">Ticket Description <span className="text-danger">*</span>
+              <span className="text-muted" title="Enter a detailed description of the issue">
+                <Info size={14} />
+              </span>
+              </label>
               <textarea
                 className="form-control"
                 id="newTicketDescription"
@@ -1855,13 +2050,25 @@ const TicketList = () => {
                 maxLength={500}
               ></textarea>
               <div className="d-flex justify-content-between mt-1">
-                <small
+                <div
                   className={`text-muted ${
                     newTicketDescription.length < 50 ? "text-danger" : ""
                   }`}
                 >
-                  Min: 50 characters
-                </small>
+                  <Form.Text className={newTicketDescription.length < 50 ? 'text-warning fw-semibold' : 'text-success fw-semibold'}>
+                        {newTicketDescription.length < 50 ? (
+                          <>
+                            <AlertCircle size={14} className="me-1" />
+                            Minimum 50 characters required ({50 - newTicketDescription.length} more needed)
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle size={14} className="me-1" />
+                            Great! Detailed description provided
+                          </>
+                        )}
+                      </Form.Text>
+                </div>
                 <small
                   className={`text-muted ${
                     newTicketDescription.length > 500 ? "text-danger" : ""
@@ -1869,31 +2076,23 @@ const TicketList = () => {
                 >
                   {newTicketDescription.length}/500 characters
                 </small>
+                
               </div>
+              <Form.Text className="text-muted d-block" style={{ fontSize: '0.813rem' }}>
+                        <Info size={12} className="me-1" />
+                        More details help us resolve your issue faster
+                      </Form.Text>
             </div>
 
             <div className="row">
-              <div className="col-md-6">
+
+            <div className="col-md-6">
                 <div className="form-group mb-3">
-                  <label htmlFor="newTicketStatus">Status</label>
-                  <select
-                    className="form-control"
-                    id="newTicketStatus"
-                    value={newTicketStatus || ""}
-                    onChange={(e) => setNewTicketStatus(e.target.value)}
-                  >
-                    <option value="">Select Status</option>
-                    {statuses.map((status: any) => (
-                      <option key={status.id} value={status.id}>
-                        {status.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              <div className="col-md-6">
-                <div className="form-group mb-3">
-                  <label htmlFor="newTicketModule">Module</label>
+                  <label htmlFor="newTicketModule" className="fw-semibold d-flex align-items-center gap-2 form-label">Module <span className="text-danger">*</span>
+                  <span className="text-muted" title="Select the system module related to this issue">
+                    <Info size={14} />
+                  </span>
+                  </label>
                   <select
                     className="form-control"
                     id="newTicketModule"
@@ -1911,15 +2110,30 @@ const TicketList = () => {
                         </option>
                       ))}
                   </select>
+                  <Form.Text className="text-muted d-flex align-items-start gap-1 mt-2">
+                    <Info size={14} />
+                    <span style={{ fontSize: '0.813rem' }}>
+                      Select the system module related to this issue. This helps us route your ticket to the right team quickly.
+                    </span>
+                  </Form.Text>
                 </div>
               </div>
-            </div>
 
-            <div className="row">
+
+
+
+
+
+              
+              
+            
               <div className="col-md-6">
                 <div className="form-group mb-3">
-                  <label htmlFor="newTicketSubmodule">
-                    Primary Issue (Required)
+                  <label htmlFor="newTicketSubmodule" className="fw-semibold d-flex align-items-center gap-2 form-label">
+                    Primary Issue <span className="text-danger">*</span>
+                    <span className="text-muted" title="Select the primary issue related to this issue">
+                      <Info size={14} />
+                    </span>
                   </label>
                   <select
                     className="form-control"
@@ -1939,12 +2153,19 @@ const TicketList = () => {
                       </option>
                     ))}
                   </select>
+                  <Form.Text className="text-muted d-flex align-items-start gap-1 mt-2">
+                    <Info size={14} />
+                    <span style={{ fontSize: '0.813rem' }}>
+                      Select the primary issue related to this issue. This helps us route your ticket to the right team quickly.
+                    </span>
+                  </Form.Text>
                 </div>
               </div>
               <div className="col-md-6">
                 <div className="form-group mb-3">
-                  <label htmlFor="newTicketSubmoduleChild">
+                  <label htmlFor="newTicketSubmoduleChild" className="fw-semibold d-flex align-items-center gap-2 form-label">
                     Specific Problem (Optional)
+                    <span className="text-muted" title="Select the specific problem related to this issue"></span>
                   </label>
                   <select
                     className="form-control"
@@ -1960,28 +2181,52 @@ const TicketList = () => {
                       </option>
                     ))}
                   </select>
+                  <Form.Text className="text-muted d-flex align-items-start gap-1 mt-2">
+                    <Info size={14} />
+                    <span style={{ fontSize: '0.813rem' }}>
+                      Select the specific problem related to this issue. This helps us route your ticket to the right team quickly.
+                    </span>
+                  </Form.Text>
                 </div>
               </div>
-            </div>
 
-            <div className="form-group mb-3">
-              <label htmlFor="newTicketPriority">Priority</label>
-              <select
-                className="form-control"
-                id="newTicketPriority"
-                value={newTicketPriority || ""}
-                onChange={(e) => setNewTicketPriority(e.target.value)}
-              >
-                <option value="">Select Priority</option>
-                <option value="0">Low</option>
-                <option value="1">Medium</option>
-                <option value="2">High</option>
-                <option value="3">Critical</option>
-              </select>
-            </div>
+              <div className="col-md-6">
+                <div className="form-group mb-3">
+                  <label htmlFor="newTicketStatus" className="fw-semibold d-flex align-items-center gap-2 form-label">Initial Status <span className="text-danger">*</span>
+                  <span className="text-muted" title="Select the initial status of the ticket">
+                    <Info size={14} />
+                  </span>
+                  </label>
+                  <select
+                    className="form-control"
+                    id="newTicketStatus"
+                    value={newTicketStatus || ""}
+                    onChange={(e) => setNewTicketStatus(e.target.value)}
+                  >
+                    <option value="">Select Status</option>
+                    {statuses.map((status: any) => (
+                      <option key={status.id} value={status.id}>
+                        {status.name}
+                      </option>
+                    ))}
+                  </select>
+                  <Form.Text className="text-muted d-flex align-items-start gap-1 mt-2">
+                    <Info size={14} />
+                    <span style={{ fontSize: '0.813rem' }}>
+                      Select the initial status of the ticket. This helps us track the progress of your ticket.
+                    </span>
+                  </Form.Text>
+                </div>
+              </div>
 
-            <div className="form-group mb-3">
-              <label htmlFor="newTicketDueDate">Due Date</label>
+
+              <div className="col-md-6">
+              <div className="form-group mb-3">
+              <label htmlFor="newTicketDueDate" className="fw-semibold d-flex align-items-center gap-2 form-label">Due Date
+              <span className="text-muted" title="Select the due date of the ticket">
+                <Info size={14} />
+              </span>
+              </label>
               <input
                 type="date"
                 className="form-control"
@@ -1990,11 +2235,27 @@ const TicketList = () => {
                 onChange={(e) => setNewTicketDueDate(e.target.value)}
                 min={moment().format("YYYY-MM-DD")}
               />
+              <Form.Text className="text-muted d-flex align-items-start gap-1 mt-2">
+                <Info size={14} />
+                <span style={{ fontSize: '0.813rem' }}>
+                  Select the due date of the ticket. This helps us track the progress of your ticket.
+                </span>
+              </Form.Text>
+            </div>
+              </div>
+
             </div>
 
-            {session?.user?.permissions?.includes("assign-user-tickets") && (
+
+            <div className="row">
+              <div className="col-md-6">
+              {session?.user?.permissions?.includes("assign-user-tickets") && (
               <div className="form-group mb-3">
-                <label htmlFor="newTicketUserExtension">User Extension</label>
+                <label htmlFor="newTicketUserExtension" className="fw-semibold d-flex align-items-center gap-2 form-label">User Extension 
+                <span className="text-muted" title="Select the user extension related to this issue">
+                  <Info size={14} />
+                </span>
+                </label>
                 <Select
                   id="newTicketUserExtension"
                   isMulti
@@ -2023,11 +2284,23 @@ const TicketList = () => {
                   isClearable
                   isSearchable
                 />
+                <Form.Text className="text-muted d-flex align-items-start gap-1 mt-2">
+                  <Info size={14} />
+                  <span style={{ fontSize: '0.813rem' }}>
+                    Select the user extension related to this issue. This helps us route your ticket to the right team quickly.
+                  </span>
+                </Form.Text>
               </div>
             )}
+              </div>
+              <div className="col-md-6">
 
-            <div className="form-group mb-3">
-              <label htmlFor="newTicketTags">Tags</label>
+              <div className="form-group mb-3">
+              <label htmlFor="newTicketTags" className="fw-semibold d-flex align-items-center gap-2 form-label">Tags
+              <span className="text-muted" title="Select the tags related to this issue">
+                <Info size={14} />
+              </span>
+              </label>
               <CreatableSelect
                 id="newTicketTags"
                 isMulti
@@ -2050,9 +2323,14 @@ const TicketList = () => {
                 isSearchable
                 formatCreateLabel={(inputValue) => `Create "${inputValue}"`}
               />
-              <small className="text-muted">
-                Select from existing tags or create new ones
-              </small>
+              <Form.Text className="text-muted d-flex align-items-start gap-1 mt-2">
+                <Info size={14} />
+                <span style={{ fontSize: '0.813rem' }}>
+                  Select the tags related to this issue. This helps us categorize and route your ticket appropriately.
+                </span>
+              </Form.Text>
+            </div>
+              </div>
             </div>
 
             <div className="form-group mb-3">
@@ -2075,11 +2353,19 @@ const TicketList = () => {
                   );
                 }}
               />
-              <small className="text-muted">
-                Supported formats: JPG, PNG, GIF. Max size: 5MB per image. You
-                can select multiple images.
-              </small>
-              {newTicketImages.length > 0 && (
+              <Alert variant="info" className="py-2 px-3  mt-2 mb-0 border-0 bg-info bg-opacity-10">
+                        <div className="d-flex gap-2">
+                          <Info size={16} className="text-info mt-1" style={{ minWidth: '16px' }} />
+                          <div style={{ fontSize: '0.813rem' }}>
+                            <strong>Supported formats:</strong> Images (PNG, JPG, GIF), Documents (PDF, DOC, DOCX), Spreadsheets (XLS, XLSX), Text files (TXT, LOG)
+                            <br />
+                            <strong>Maximum:</strong> 5 files, 5MB per file
+                            <br />
+                            <strong>Tip:</strong> Screenshots of error messages greatly help our team diagnose issues faster!
+                          </div>
+                        </div>
+                      </Alert>
+              {/* {newTicketImages.length > 0 && (
                 <div className="mt-2">
                   <small className="text-success d-block mb-1">
                     Selected {newTicketImages.length} image(s):
@@ -2091,7 +2377,41 @@ const TicketList = () => {
                     </small>
                   ))}
                 </div>
-              )}
+              )} */}
+
+{newTicketImages.length > 0 && (
+                        <div className="mt-3">
+                          <small className="text-muted fw-semibold d-block mb-2">Selected Files ({newTicketImages.length}):</small>
+                          <div className="d-flex flex-wrap gap-2">
+                            {newTicketImages.map((file, index) => (
+                              <Badge key={index} bg="light" text="dark" className="p-2 d-flex align-items-center gap-2">
+                                <Paperclip size={14} className="text-primary" />
+                                <span style={{ fontSize: '0.875rem' }}>{file.name}</span>
+                                <small className="text-muted">({(file.size / 1024).toFixed(1)} KB)</small>
+                                <Button
+                                  variant="link"
+                                  size="sm"
+                                  className="p-0 ms-1 text-danger"
+                                  onClick={() => {
+                                    const newAttachments =newTicketImages.filter((_, i) => i !== index);
+                                    setNewTicketImages(newAttachments);
+                                    // Update the file input to reflect the remaining files
+                                    const fileInput = document.getElementById("newTicketImages") as HTMLInputElement;
+                                    if (fileInput) {
+                                      const dataTransfer = new DataTransfer();
+                                      newAttachments.forEach(file => dataTransfer.items.add(file));
+                                      fileInput.files = dataTransfer.files;
+                                    }
+                                  }}
+                                  title="Remove file"
+                                >
+                                  <X size={14} />
+                                </Button>
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )}
             </div>
           </>
         }

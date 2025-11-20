@@ -1,4 +1,4 @@
-import React, { useState, ChangeEvent, FormEvent } from 'react';
+import React, { useState, useEffect, ChangeEvent, FormEvent } from 'react';
 import { Container, Row, Col, Card, Button, Badge, Table, ProgressBar, Form, Alert, Modal, InputGroup, Dropdown, Breadcrumb  } from 'react-bootstrap';
 
 import { 
@@ -2248,13 +2248,23 @@ const CreateTicketModal = () => {
     // View Ticket Modal with History Thread
     // View Ticket Modal with Tab-based View
 const ViewTicketModal = () => {
+    // Hooks must be called before any early returns
+    const [ticketStatus, setTicketStatus] = useState(selectedTicket?.status || '');
+    const [assignedUser, setAssignedUser] = useState(selectedTicket?.assignedTo || '');
+    const [activeTab, setActiveTab] = useState<'public' | 'internal' | 'activity'>('public');
+    const [commentType, setCommentType] = useState<'public' | 'internal'>('public');
+  
+    // Sync state when selectedTicket changes
+    useEffect(() => {
+      if (selectedTicket) {
+        setTicketStatus(selectedTicket.status);
+        setAssignedUser(selectedTicket.assignedTo || '');
+      }
+    }, [selectedTicket]);
+  
     if (!selectedTicket) return null;
   
     const history = ticketHistory[selectedTicket.id] || [];
-    const [ticketStatus, setTicketStatus] = useState(selectedTicket.status);
-    const [assignedUser, setAssignedUser] = useState(selectedTicket.assignedTo || '');
-    const [activeTab, setActiveTab] = useState<'public' | 'internal' | 'activity'>('public');
-    const [commentType, setCommentType] = useState<'public' | 'internal'>('public');
   
     const availableUsers = [
       { id: 1, name: 'John Developer (501)' },
@@ -4041,8 +4051,8 @@ const CategoriesManagementScreen: React.FC = () => {
 
   // Get module color by name
   const getModuleColor = (moduleName: string): string => {
-    const module = modules.find(m => m.name === moduleName);
-    return module ? module.color : '#6c757d';
+    const moduleItem = modules.find(m => m.name === moduleName);
+    return moduleItem ? moduleItem.color : '#6c757d';
   };
 
   return (
@@ -4548,8 +4558,8 @@ const CategoriesManagementScreen: React.FC = () => {
   
     // Get module color by name
     const getModuleColor = (moduleName: string): string => {
-      const module = modules.find(m => m.name === moduleName);
-      return module ? module.color : '#6c757d';
+      const moduleItem = modules.find(m => m.name === moduleName);
+      return moduleItem ? moduleItem.color : '#6c757d';
     };
   
     // Get filtered categories based on selected module

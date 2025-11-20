@@ -928,7 +928,7 @@ export default function GenericFilter({
             resetFormFieldsToCurrentState();
           }
         }}>
-          <Dropdown.Toggle variant="info" size='sm'>
+          <Dropdown.Toggle variant="info" >
             <FiFilter size={10} />
           Filters
         </Dropdown.Toggle>
@@ -1008,7 +1008,7 @@ export default function GenericFilter({
       {showExport && (
         // <Button variant="outline-primary" size='sm' onClick={() => handleExport('excel')}><span className="ti ti-download"></span> Export</Button>
 
-        <button className="btn btn-export" id="export-btn" onClick={() => handleExport('excel')} >
+        <button className="btn btn-success"  onClick={() => handleExport('excel')} >
                             <i className="fas fa-download"></i> Export
                         </button>
 

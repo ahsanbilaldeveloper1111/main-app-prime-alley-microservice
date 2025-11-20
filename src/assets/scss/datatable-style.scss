@@ -14,8 +14,9 @@
 }
 
 .rdt_TableHeadRow {
-  background: #e7edf4 !important;
+  background: rgba(var(--bs-light-rgb), var(--bs-bg-opacity)) !important;
   font-weight: bold;
+  color: #29344A;
   text-transform: uppercase;
 }
 

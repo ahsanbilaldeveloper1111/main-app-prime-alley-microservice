@@ -3,6 +3,7 @@ import { Col, Row, Dropdown } from 'react-bootstrap';
 import dynamic from 'next/dynamic';
 import { Tooltip } from 'react-tooltip';
 import '@assets/scss/custom-datatable.scss';
+import { Layers } from 'lucide-react';
 
 // Dynamic import for DataTable to avoid SSR issues
 const DataTable = dynamic(() => import("react-data-table-component"), {
@@ -269,7 +270,7 @@ const CustomDataTable: React.FC<CustomDataTableProps> = ({
             {showSearch && (
               <div>
                 <label className="d-flex align-items-center justify-content-end">
-                  Search:
+                  {/* Search: */}
                   <input
                     type="search"
                     className="form-control form-control-sm ms-1"
@@ -287,7 +288,9 @@ const CustomDataTable: React.FC<CustomDataTableProps> = ({
               <div className="d-flex align-items-center justify-content-end">
                 <Dropdown>
                   <Dropdown.Toggle variant="outline-secondary" size="sm">
-                    Customize Table ({visibleColumns.length}/{columns.length})
+                  <Layers size={14} className="me-1" />
+                  Customize Columns 
+                  {/* ({visibleColumns.length}/{columns.length}) */}
                   </Dropdown.Toggle>
                   <Dropdown.Menu>
                     <Dropdown.Header>Select Columns to Show</Dropdown.Header>

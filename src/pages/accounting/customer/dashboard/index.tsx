@@ -155,7 +155,7 @@ const CustomerDashboard = () => {
                             <div className="text-muted small">Spent: <span className="fw-semibold">{product.spent}</span></div>
                           </div>
                         ))}
-                        <Button variant="outline-primary" size="sm" className="w-100" onClick={() => setActiveScreen('product-details')}>
+                        <Button variant="outline-primary" size="sm" className="w-100" onClick={() => window.location.href = '/accounting/customer/product-details'}>
                           View All Products
                         </Button>
                       </Card.Body>

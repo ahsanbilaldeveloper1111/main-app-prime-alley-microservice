@@ -1,4 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { Button, Form, Modal } from 'react-bootstrap';
+import { AlertCircle, Check, X } from 'lucide-react';
+
 
 interface ConfirmModalProps {
   show: boolean;
@@ -95,59 +98,109 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
   if (!show) return null;
 
   return (
-    <div id="action-modal" className="modal customModal" style={{display: 'flex'}}>
-      <div className="modal-content">
-        <span className="close-btn" id="action-close-btn" onClick={handleClose}>
-          <i className="fas fa-times"></i>
-        </span>
-        <h2 id="action-modal-title">{title}</h2>
+    // <div id="action-modal" className="modal customModal" style={{display: 'flex'}}>
+    //   <div className="modal-content">
+    //     <span className="close-btn" id="action-close-btn" onClick={handleClose}>
+    //       <i className="fas fa-times"></i>
+    //     </span>
+    //     <h2 id="action-modal-title">{title}</h2>
 
       
-        <p id="action-modal-text">
-          {description.replace('{targetName}', targetName)}
-        </p>
+    //     <p id="action-modal-text">
+    //       {description.replace('{targetName}', targetName)}
+    //     </p>
         
-        {requireTextConfirmation && (
-          <div className="form-group mt-3">
-            <label htmlFor="confirmationInput" className="form-label">
-              {confirmationLabel}
-            </label>
-            <p className="text-muted small">
-              Type the word <b className="text-danger">{requiredConfirmationText}</b> to confirm
-            </p>
-            <input 
-              type="text" 
-              className="form-control" 
-              id="confirmationInput"
-              value={confirmationText}
-              onChange={(e) => setConfirmationText(e.target.value)}
-              placeholder={confirmationPlaceholder}
-            />
+    //     {requireTextConfirmation && (
+    //       <div className="form-group mt-3">
+    //         <label htmlFor="confirmationInput" className="form-label">
+    //           {confirmationLabel}
+    //         </label>
+    //         <p className="text-muted small">
+    //           Type the word <b className="text-danger">{requiredConfirmationText}</b> to confirm
+    //         </p>
+    //         <input 
+    //           type="text" 
+    //           className="form-control" 
+    //           id="confirmationInput"
+    //           value={confirmationText}
+    //           onChange={(e) => setConfirmationText(e.target.value)}
+    //           placeholder={confirmationPlaceholder}
+    //         />
+    //       </div>
+    //     )}
+        
+    //     <div className="modal-footer">
+    //       {showCancelButton && (
+    //         <button 
+    //           className={`btn btn-${cancelButtonVariant}`} 
+    //           id="action-cancel-btn" 
+    //           style={{display: 'inline-block'}}
+    //           onClick={handleCancel}
+    //         >
+    //           {cancelButtonText}
+    //         </button>
+    //       )}
+    //       <button 
+    //         className={`btn btn-${confirmButtonVariant}`} 
+    //         id="action-confirm-btn" 
+    //         onClick={handleConfirm}
+    //         disabled={!isValidConfirmation}
+    //       >
+    //         {confirmButtonText}
+    //       </button>
+    //     </div>
+    //   </div>
+    // </div>
+
+    <Modal show={show} onHide={onHide} centered>
+      <Modal.Header closeButton className="bg-light">
+        <Modal.Title>
+          <div className="d-flex align-items-center gap-2">
+            <X size={20} className="text-danger" />
+            <span>{title}</span>
           </div>
-        )}
-        
-        <div className="modal-footer">
-          {showCancelButton && (
-            <button 
-              className={`btn btn-${cancelButtonVariant}`} 
-              id="action-cancel-btn" 
-              style={{display: 'inline-block'}}
-              onClick={handleCancel}
-            >
-              {cancelButtonText}
-            </button>
-          )}
-          <button 
-            className={`btn btn-${confirmButtonVariant}`} 
-            id="action-confirm-btn" 
-            onClick={handleConfirm}
-            disabled={!isValidConfirmation}
-          >
-            {confirmButtonText}
-          </button>
+        </Modal.Title>
+      </Modal.Header>
+      <Modal.Body>
+
+        <div className="form-group mb-3">
+          <Form.Text className="text-muted d-flex align-items-start gap-2 form-text">
+            <AlertCircle size={24} />
+            <span style={{ fontSize: '0.813rem' }}>
+              {description.replace('{targetName}', targetName)}
+            </span>
+          </Form.Text>
         </div>
-      </div>
-    </div>
+
+        <Form.Group>
+          <Form.Label htmlFor="confirmationInput" className="fw-semibold form-label">
+            Type the word <span className="text-danger fw-bold">{requiredConfirmationText}</span> to confirm <span className="text-danger fw-bold">*</span>
+          </Form.Label>
+          <Form.Control 
+            type="text" 
+            id="confirmationInput" 
+            value={confirmationText} 
+            onChange={(e) => setConfirmationText(e.target.value)} 
+            placeholder={confirmationPlaceholder} 
+          />
+          
+        </Form.Group>
+      </Modal.Body>
+      <Modal.Footer className="border-0 pt-0 bg-light">
+        <div className="d-flex justify-content-between align-items-center w-100">
+          <Form.Text className="text-muted d-flex align-items-center gap-1 form-text">
+            <AlertCircle size={14} />
+            <span style={{ fontSize: '0.813rem' }}>
+              Fields marked with <span className="text-danger fw-bold">*</span> are required
+            </span>
+          </Form.Text>
+          <div className="d-flex gap-2">
+            <Button variant="light" onClick={onCancel}><X size={16} className="me-1" /> {cancelButtonText}</Button>
+            <Button variant={confirmButtonVariant} onClick={handleConfirm} disabled={!isValidConfirmation}><Check size={16} className="me-1" />{confirmButtonText}</Button>
+          </div>
+        </div>
+      </Modal.Footer>
+    </Modal>
   );
 };
 

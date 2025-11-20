@@ -5,7 +5,7 @@ import BreadcrumbItem from '@common/BreadcrumbItem';
 import GenericListPage from '@components/GenericListPage';
 import { ListStatuses,CreateStatus,UpdateStatus,DeleteStatus } from '@utils/ticket-statuses';
 import { Column } from '@components/CustomDataTable';
-import { Button, Modal, Row } from 'react-bootstrap';
+import { Badge, Button, Card, Form, Modal, Row } from 'react-bootstrap';
 import { Col } from 'react-bootstrap';
 import { toast } from 'react-toastify';
 import { useTokenService } from 'src/hooks/useTokenService';
@@ -21,16 +21,26 @@ import SuccessfulModal from "@pages/partial/SuccessfulModal";
 import DatatableActionButton from "@components/DatatableActionButton";
 import { FiEdit, FiPlus, FiTrash2 } from "react-icons/fi";
 import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
+import { CheckCircle, Tag, X, Edit, Trash2, Circle, Info, Eye } from 'lucide-react';
 
 
 const TicketStatuses = () => {
     const { data:session, status } = useSession();
    
     const columns: Column[] = useMemo(() => [
-        { key: 'name', name: 'Name', selector: (row: any) => row.name, sortable: true },
+        { key: 'name', name: 'Status Name', selector: (row: any) => row.name, sortable: true, cell: (props: any) => (
+            <div className="font-weight-500">
+                <span className="rounded-circle" style={{ width: '8px', height: '8px', backgroundColor: props.color, flexShrink: 0,display: 'inline-block'}}></span>
+                <span className="ms-2">{props.name}</span>
+            </div>
+        ) },
+
       { key: 'color', name: 'Color', selector: (row: any) => row.color, sortable: true,
             cell: (props: any) => (
-                <span className="text-muted" style={{ backgroundColor: props.color, width: '20px', height: '20px', borderRadius: '50%',display: 'inline-block'}}></span>
+                <div className="d-flex align-items-center gap-2">
+                <span className="text-muted" style={{ backgroundColor: props.color, width: '24px', height: '24px', borderRadius: '8px',display: 'inline-block'}}></span>
+                    <code style={{ fontSize: '0.813rem', color: props.color, backgroundColor: '#f8f9fa', padding: '0.25rem 0.5rem', borderRadius: '4px'}}>{props.color}</code>
+                </div>
             )
          },
       //   { key: 'tickets_count', name: 'Tickets Using', selector: (row: any) => row.tickets_count, sortable: true,
@@ -49,27 +59,39 @@ const TicketStatuses = () => {
          },
         {
             key: 'Action',
-            name: 'ACTION',
+            name: 'Actions',
             selector: (row: any) => row.id,
             sortable: false,
             cell: (props: any) => (
                 
-                <DatatableActionButton
-                    actions={[
-                        ...(session?.user?.permissions?.includes('edit-ticket-status-tickets') ? [{
-                            label: 'Edit',
-                            icon: <FiEdit />,
-                            onClick: () => handleEditStatus(props),
-                            className: 'gap-2'
-                        }] : []),
-                        ...(session?.user?.permissions?.includes('delete-ticket-status-tickets') ? [{
-                            label: props?.tickets_count > 0 ? 'Delete (In Use)' : 'Delete',
-                            icon: <FiTrash2 />,
-                            onClick: () => props?.tickets_count > 0 ? null : handleDeleteStatus(props),
-                            className: props?.tickets_count > 0 ? 'text-muted gap-2' : 'text-danger gap-2'
-                        }] : [])
-                    ]}
-                />
+                // <DatatableActionButton
+                //     actions={[
+                //         ...(session?.user?.permissions?.includes('edit-ticket-status-tickets') ? [{
+                //             label: 'Edit',
+                //             icon: <FiEdit />,
+                //             onClick: () => handleEditStatus(props),
+                //             className: 'gap-2'
+                //         }] : []),
+                //         ...(session?.user?.permissions?.includes('delete-ticket-status-tickets') ? [{
+                //             label: props?.tickets_count > 0 ? 'Delete (In Use)' : 'Delete',
+                //             icon: <FiTrash2 />,
+                //             onClick: () => props?.tickets_count > 0 ? null : handleDeleteStatus(props),
+                //             className: props?.tickets_count > 0 ? 'text-muted gap-2' : 'text-danger gap-2'
+                //         }] : [])
+                //     ]}
+                // />
+                <div className="d-flex gap-2">
+                    {session?.user?.permissions?.includes('edit-ticket-status-tickets') && (
+                       <Button variant="light" size="sm" className="btn-action-style-2 p-1 text-primary" title="Edit">
+                       <Edit size={16}  onClick={() => handleEditStatus(props)} />
+                     </Button>
+                    )}
+                    {session?.user?.permissions?.includes('delete-ticket-status-tickets') && (
+                        <Button variant="light" size="sm" className="btn-action-style-2 p-1 text-danger gap-2" title="Delete">
+                            <Trash2 size={16}  onClick={() => handleDeleteStatus(props)} />
+                        </Button>
+                    )}
+                </div>
             ),
         },
     ], [session?.user?.permissions]);
@@ -136,7 +158,7 @@ const TicketStatuses = () => {
 
     const [showCreateStatusModal, setShowCreateStatusModal] = useState<boolean>(false);
     const [newStatusName, setNewStatusName] = useState<string>("");
-    const [newStatusColor, setNewStatusColor] = useState<string>("");
+    const [newStatusColor, setNewStatusColor] = useState<string>("#0d6efd");
 
     const handleSubmitCreateStatus = useCallback(async () => {
         const response = await CreateStatus(newStatusName, newStatusColor);
@@ -165,22 +187,25 @@ const TicketStatuses = () => {
             <BreadcrumbItem mainTitle="Tickets" mainLink="/tickets/statuses" subTitle="Ticket Status" />
             <PageHeader
                 title="Ticket Statuses"
-                showSearch={true}
+                description="Manage and organize ticket statuses"
+                showSearch={false}
                 searchPlaceholder="Search statuses..."
                 searchValue={currentFilters.search || ""}
                 onSearchChange={(value) => handleFiltersChange({...currentFilters, search: value})}
                 buttons={
                     <>
                     {session?.user?.permissions?.includes('create-ticket-status-tickets') && (
-                    <Button variant="primary" size="sm" onClick={openCreateStatusModal}>
+                    <Button variant="primary"  onClick={openCreateStatusModal}>
                         <FiPlus className="me-2" />
-                        New Status
+                        Add Status
                     </Button>
                     )}
                     </>
                     
                 }
             />
+
+          
            
 
             {session?.user?.permissions?.includes('ticket-statuses-tickets') && (
@@ -192,7 +217,7 @@ const TicketStatuses = () => {
                  defaultPageSize={15}
                  filters={memoizedFilters}
                  refreshKey={refreshKey}
-                 search={false}
+                 search={true}
                  tableStyle="table-style-2"
              />
             )}
@@ -201,24 +226,138 @@ const TicketStatuses = () => {
                 show={showEditStatusModal}
                 onHide={closeEditStatusModal}
                 title="Edit Status"
+                titleIcon={<Tag size={20} className="text-primary" />}
                 desc="Update the status details below"
                 formHtml={
                     <>
                         <div className="form-group mb-3">
-                            <label htmlFor="editStatusName">Status Name</label>
+                            <label htmlFor="editStatusName" className="fw-semibold d-flex align-items-center gap-2 form-label">Status Name <span className="text-danger">*</span>
+                            <span 
+                                className="text-muted" 
+                                title="Enter a clear name that represents the ticket state"
+                                style={{ cursor: 'help' }}
+                            >
+                                <Info size={14} />
+                            </span>
+                            </label>
                             <input type="text" className="form-control" id="editStatusName" value={selectedStatusName} onChange={handleEditStatusNameChange} placeholder="Status Name" />
                         </div>
 
                         <div className="form-group mb-3">
-                            <label htmlFor="editStatusColor">Status Color</label>
+                            <label htmlFor="editStatusColor" className="fw-semibold d-flex align-items-center gap-2 form-label">Status Color <span className="text-danger">*</span>
+                            <span 
+                                className="text-muted" 
+                                title="Select a color that visually represents this status"
+                                style={{ cursor: 'help' }}
+                            >
+                                <Info size={14} />
+                            </span>
+                            </label>
                             <div className="d-flex align-items-center gap-2">
                                 <input type="color" className="form-control form-control-color" id="editStatusColorPicker" value={selectedStatusColor} onChange={handleEditStatusColorChange} style={{ width: '50px', height: '38px' }} />
                                 <input type="text" className="form-control" id="editStatusColor" value={selectedStatusColor} onChange={handleEditStatusColorChange} placeholder="e.g., #FF5733 or rgb(255, 87, 51)" />
                             </div>
+                            <Form.Text className="text-muted d-flex align-items-center gap-1 mt-2">
+                            <Info size={12} />
+                            <span style={{ fontSize: '0.813rem' }}>
+                                Choose colors that align with status meaning (e.g., green for completed, yellow for pending, red for critical).
+                            </span>
+                            </Form.Text>
+
+                            {/* Color Suggestions */}
+                            <div className="mt-3">
+                            <small className="text-muted fw-semibold d-block mb-2">Suggested Colors:</small>
+                            <div className="d-flex gap-2 flex-wrap">
+                                {[
+                                { name: 'Blue', color: '#0d6efd', label: 'Open/New' },
+                                { name: 'Yellow', color: '#ffc107', label: 'Pending' },
+                                { name: 'Orange', color: '#fd7e14', label: 'In Progress' },
+                                { name: 'Green', color: '#198754', label: 'Resolved' },
+                                { name: 'Gray', color: '#6c757d', label: 'Closed' },
+                                { name: 'Red', color: '#dc3545', label: 'Blocked' },
+                                ].map((suggestion) => (
+                                <Button
+                                    key={suggestion.color}
+                                    variant="outline-secondary"
+                                    size="sm"
+                                    className="d-flex align-items-center gap-2"
+                                    onClick={() => setSelectedStatusColor(suggestion.color)}
+                                    style={{ padding: '0.25rem 0.75rem' }}
+                                >
+                                    <div 
+                                    style={{ 
+                                        width: '16px', 
+                                        height: '16px', 
+                                        backgroundColor: suggestion.color,
+                                        borderRadius: '3px',
+                                        border: '1px solid #dee2e6'
+                                    }}
+                                    />
+                                    <small>{suggestion.label}</small>
+                                </Button>
+                                ))}
+                            </div>
+                            </div>
                         </div>
-                    </>
+
+                        {/* Preview */}
+                        <Form.Group>
+                            <Form.Label className="fw-semibold mb-3 d-flex align-items-center gap-2">
+                            <Eye size={16} />
+                            Status Preview
+                            </Form.Label>
+                            <Card className="border-0 bg-light">
+                            <Card.Body className="p-3">
+                                <div className="d-flex flex-column gap-3">
+                                    {/* Badge Preview */}
+                                    <div>
+                                        <small className="text-muted d-block mb-2">As Badge:</small>
+                                        <div 
+                                        style={{ 
+                                            backgroundColor: selectedStatusColor,
+                                            padding: '0.3rem 1rem',
+                                            fontSize: '0.9rem',
+                                            borderRadius: '3px',
+                                            border: `1px solid ${selectedStatusColor}`,
+                                            color: 'white',
+                                            gap: '0.2rem',
+                                            display:'inline-block',
+                                        }}
+                                        >
+                                        <Tag size={14} className="me-2" />
+                                        {selectedStatusName || 'Status Name'}
+                                        </div>
+                                    </div>
+                                    
+                                    {/* Pill Preview */}
+                                    <div>
+                                        <small className="text-muted d-block mb-2">As Status Indicator:</small>
+                                        <div className="d-flex align-items-center gap-2 p-2 bg-white rounded border">
+                                        <div 
+                                            className="rounded-circle"
+                                            style={{ 
+                                            width: '12px', 
+                                            height: '12px', 
+                                            backgroundColor: selectedStatusColor 
+                                            }}
+                                        />
+                                        <span className="fw-semibold" style={{ fontSize: '0.875rem' }}>
+                                            {selectedStatusName || 'Status Name'}
+                                        </span>
+                                        </div>
+                                    </div>
+                                    </div>
+                                </Card.Body>
+                                </Card>
+                                <Form.Text className="text-muted d-block mt-2" style={{ fontSize: '0.813rem' }}>
+                                <Info size={12} className="me-1" />
+                                This is how your status will appear in tickets, dashboards, and reports
+                                </Form.Text>
+                            </Form.Group>
+                        </>
                 }
-                submitButtonText="Save changes"
+                submitButtonText="Update Status"
+                isSubmitDisabled={!selectedStatusName}
                 cancelButtonText="Cancel"
                 onSubmit={handleSubmitEditStatus}
                 onCancel={closeEditStatusModal}
@@ -232,7 +371,7 @@ const TicketStatuses = () => {
                 title="Delete Status?"
                 description="Are you sure you want to delete status {targetName}? This action cannot be undone."
                 targetName={selectedStatusName || ""}
-                confirmButtonText="Delete"
+                confirmButtonText="Delete Status"
                 cancelButtonText="Cancel"
                 onConfirm={handleSubmitDeleteStatus}
                 onCancel={closeDeleteStatusModal}
@@ -240,28 +379,48 @@ const TicketStatuses = () => {
                 cancelButtonVariant="secondary"
             />
 
+
             <FormModal
                 show={showCreateStatusModal}
                 onHide={closeCreateStatusModal}
-                title="New Status"
+                title="Create New Status"
+                titleIcon={<Tag size={20} className="text-primary" />}
                 desc="Fill in the details below to create a new status"
                 formHtml={
                     <>
                         <div className="form-group mb-3">
-                            <label htmlFor="newStatusName">Status Name</label>
-                            <input type="text" className="form-control" id="newStatusName"  value={newStatusName} onChange={handleNewStatusNameChange} placeholder="Status Name" />
+                            <label htmlFor="newStatusName" className="fw-semibold d-flex align-items-center gap-2 form-label">Status Name <span className="text-danger">*</span>
+                            <span 
+                                className="text-muted" 
+                                title="Enter a clear name that represents the ticket state"
+                                style={{ cursor: 'help' }}
+                            >
+                                <Info size={14} />
+                            </span>
+
+                            </label>
+                            <input type="text" className="form-control" id="newStatusName" placeholder="e.g., Open, In Progress, Resolved, Pending Review, etc." value={newStatusName} onChange={handleNewStatusNameChange} />
+
+                            <Form.Text className="text-muted d-flex align-items-center gap-1 mt-2">
+                            <Info size={12} />
+                            <span style={{ fontSize: '0.813rem' }}>
+                                Use descriptive names that clearly indicate the current state of a ticket in your workflow.
+                            </span>
+                            </Form.Text>
                         </div>
 
                         <div className="form-group mb-3">
-                            <label htmlFor="newStatusColor">Status Color</label>
+                        <label className="fw-semibold d-flex align-items-center gap-2 form-label">Status Color 
+                            <span className="text-danger">*</span>
+                            <span className="text-muted" title="Select a color that visually represents this status" style={{ cursor: 'help' }}><Info size={14} /></span></label>
                             <div className="d-flex align-items-center gap-2">
                                 <input 
                                     type="color" 
                                     className="form-control form-control-color" 
                                     id="colorPicker"
-                                    value={newStatusColor || "#000000"}
+                                    value={newStatusColor}
                                     onChange={handleNewStatusColorChange}
-                                    style={{ width: '50px', height: '38px' }}
+                                    style={{ width: '60px', height: '48px' }}
                                 />
                                 <input 
                                     type="text" 
@@ -272,10 +431,106 @@ const TicketStatuses = () => {
                                     placeholder="e.g., #FF5733 or rgb(255, 87, 51)"
                                 />
                             </div>
+                            <Form.Text className="text-muted d-block mt-2" style={{ fontSize: '0.813rem' }}>
+                            <Info size={12} className="me-1" />
+                            Choose colors that align with status meaning (e.g., green for completed, yellow for pending, red for critical).
+                            </Form.Text>
+
+                            {/* Color Suggestions */}
+                            <div className="mt-3">
+                            <small className="text-muted fw-semibold d-block mb-2">Suggested Colors:</small>
+                            <div className="d-flex gap-2 flex-wrap">
+                                {[
+                                { name: 'Blue', color: '#0d6efd', label: 'Open/New' },
+                                { name: 'Yellow', color: '#ffc107', label: 'Pending' },
+                                { name: 'Orange', color: '#fd7e14', label: 'In Progress' },
+                                { name: 'Green', color: '#198754', label: 'Resolved' },
+                                { name: 'Gray', color: '#6c757d', label: 'Closed' },
+                                { name: 'Red', color: '#dc3545', label: 'Blocked' },
+                                ].map((suggestion) => (
+                                <Button
+                                    key={suggestion.color}
+                                    variant="outline-secondary"
+                                    size="sm"
+                                    className="d-flex align-items-center gap-2"
+                                    onClick={() => setNewStatusColor(suggestion.color)}
+                                    style={{ padding: '0.25rem 0.75rem' }}
+                                >
+                                    <div 
+                                    style={{ 
+                                        width: '16px', 
+                                        height: '16px', 
+                                        backgroundColor: suggestion.color,
+                                        borderRadius: '3px',
+                                        border: '1px solid #dee2e6'
+                                    }}
+                                    />
+                                    <small>{suggestion.label}</small>
+                                </Button>
+                                ))}
+                            </div>
+                            </div>
                         </div>
+
+                        {/* Preview */}
+                        <Form.Group>
+                            <Form.Label className="fw-semibold mb-3 d-flex align-items-center gap-2">
+                            <Eye size={16} />
+                            Status Preview
+                            </Form.Label>
+                            <Card className="border-0 bg-light">
+                            <Card.Body className="p-3">
+                                <div className="d-flex flex-column gap-3">
+                                {/* Badge Preview */}
+                                <div>
+                                    <small className="text-muted d-block mb-2">As Badge:</small>
+                                    <div 
+                                    style={{ 
+                                       backgroundColor: newStatusColor,
+                                       padding: '0.3rem 1rem',
+                                       fontSize: '0.9rem',
+                                       borderRadius: '3px',
+                                       border: `1px solid ${newStatusColor}`,
+                                       color: 'white',
+                                       gap: '0.2rem',
+
+                                       display:'inline-block',
+                                    }}
+                                    >
+                                    <Tag size={14} className="me-2" />
+                                    {newStatusName || 'Status Name'}
+                                    </div>
+                                </div>
+                                
+                                {/* Pill Preview */}
+                                <div>
+                                    <small className="text-muted d-block mb-2">As Status Indicator:</small>
+                                    <div className="d-flex align-items-center gap-2 p-2 bg-white rounded border">
+                                    <div 
+                                        className="rounded-circle"
+                                        style={{ 
+                                        width: '12px', 
+                                        height: '12px', 
+                                        backgroundColor: newStatusColor 
+                                        }}
+                                    />
+                                    <span className="fw-semibold" style={{ fontSize: '0.875rem' }}>
+                                        {newStatusName || 'Status Name'}
+                                    </span>
+                                    </div>
+                                </div>
+                                </div>
+                            </Card.Body>
+                            </Card>
+                            <Form.Text className="text-muted d-block mt-2" style={{ fontSize: '0.813rem' }}>
+                            <Info size={12} className="me-1" />
+                            This is how your status will appear in tickets, dashboards, and reports
+                            </Form.Text>
+                        </Form.Group>
                     </>
                 }
-                submitButtonText="Create"
+                submitButtonText="Create Status"
+                isSubmitDisabled={!newStatusName.trim() || !newStatusColor.trim()}
                 cancelButtonText="Cancel"
                 onSubmit={handleSubmitCreateStatus}
                 onCancel={closeCreateStatusModal}
