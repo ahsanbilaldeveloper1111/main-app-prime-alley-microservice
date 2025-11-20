@@ -3,9 +3,9 @@
  * Usage: node src/__tests__/run-all-tests.js [--export=true]
  */
 
-const fs = require('fs');
-const path = require('path');
-const { spawn } = require('child_process');
+import fs from 'fs';
+import path from 'path';
+import { spawn } from 'child_process';
 
 // Get command-line arguments (pass through to test files)
 const args = process.argv.slice(2);

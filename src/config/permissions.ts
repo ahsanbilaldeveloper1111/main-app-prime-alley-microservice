@@ -27,6 +27,7 @@ export const routePermissions: RoutePermission[] = [
     {path: '/billing',permissions: [PERMISSIONS.REPORTS_SERVICES]},
     {path: '/reseller',permissions: [PERMISSIONS.REPORTS_SERVICES]},
     {path: '/vendor',permissions: [PERMISSIONS.REPORTS_SERVICES]},
+    {path: '/crm-new',permissions: [PERMISSIONS.REPORTS_SERVICES]},
     {path: '/tickets/dashboardnew',permissions: [PERMISSIONS.REPORTS_SERVICES]},
 
     
@@ -281,6 +282,17 @@ export const routePermissions: RoutePermission[] = [
         path: '/accounting',
         permissions: [PERMISSIONS.ACCOUNTS_SERVICES],
         children: [
+            {
+                path: '/customer',
+                permissions: [PERMISSIONS.ACCOUNTS_SERVICES],
+                children: [
+                    { path: '/dashboard',permissions: [PERMISSIONS.ACCOUNTS_SERVICES]},
+                    { path: '/account-overview',permissions: [PERMISSIONS.ACCOUNTS_SERVICES]},
+                    { path: '/product-details',permissions: [PERMISSIONS.ACCOUNTS_SERVICES]},
+                    { path: '/billing-history',permissions: [PERMISSIONS.ACCOUNTS_SERVICES]},
+                    { path: '/payment-methods',permissions: [PERMISSIONS.ACCOUNTS_SERVICES]}
+                ]
+            },
             {
                 path: '/companies',
                 permissions: [PERMISSIONS.VIEW_COMPANIES_BILLING],

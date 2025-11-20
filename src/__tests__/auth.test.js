@@ -12,6 +12,8 @@
  *   node src/__tests__/auth.test.js --export=true # Run tests and generate CSV file
  */
 
+import fs from 'fs';
+
 // Parse command-line arguments
 const args = process.argv.slice(2);
 const shouldExportFiles = args.some(arg => arg === '--export=true' || arg === '--export' || arg === '-e');
@@ -839,7 +841,6 @@ console.log('='.repeat(80));
 
 
 // Generate CSV report
-const fs = require('fs');
 const csvHeader = 'Test ID,Test Name,Test Type (Negative/Positive),Test Description,Test Steps,Test Data,Expected Result,Actual Result\n';
 const csvRows = testResults.map(result => {
   const escapeCSV = (str) => {

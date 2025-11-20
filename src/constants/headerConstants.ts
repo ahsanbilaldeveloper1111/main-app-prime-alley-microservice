@@ -28,8 +28,11 @@ export const HEADER_CONSTANTS = {
     FAQ: 'FAQ',
     CONTACT_SUPPORT: 'Contact Support',
     SIM_GATEWAY: 'Telco Gateway',
+
+    CALL_DASHBOARD: 'Call Dashboard',
     CALL_LOGS: 'Call Logs',
     CALL_RECORDINGS: 'Call Recordings',
+
     REPORTS: 'Reports',
     AI_INSIGHTS: 'AI Insights',
     LIVE_CALLS: 'Live Calls',
@@ -37,7 +40,18 @@ export const HEADER_CONSTANTS = {
     AUTOMATION: 'Automation',
     CRM: 'CRM',
     DNCR: 'DNCR',
+
     BILLING: 'Billing',
+    INVOICES_BILLING: 'Invoices',
+    EXPENSES_BILLING: 'Expenses',
+    PRODUCTS_BILLING: 'Products',
+    INVENTORY_BILLING: 'Inventory',
+    COMPANIES_BILLING: 'Companies',
+    RESSELLERS_BILLING: 'Resellers',
+    LOCATIONS_BILLING: 'Locations',
+    SUPPLIERS_BILLING: 'Suppliers',
+    PRODUCT_PRICING_BILLING: 'Product Pricing',
+
     NETOPS: 'NetOps',
     SALES: 'Sales',
     WEB_RTC: 'Web RTC',
@@ -45,7 +59,27 @@ export const HEADER_CONSTANTS = {
     HR_SERVICES: 'HR Services',
     CALL_HISTORY: 'Call History'
   } as const,
-  
+
+MENU_COLORS: {
+  DASHBOARD: '#007bff',
+  CRM: '#6f42c1',
+  DNCR: '#dc3545',
+  BILLING: '#007bff',
+  NETOPS: '#007bff',
+  SALES: '#dc3545',
+  WEB_RTC: '#6c757d',
+  OMNI_CHANNEL: '#6c757d',
+  HR_SERVICES: '#dc3545',
+  CALL_HISTORY: '#6c757d',
+  TICKETS: '#6c757d',
+  REPORTS: '#dc3545',
+  AUTOMATION: '#007bff',
+  AI_INSIGHTS: '#007bff',
+  LIVE_CALLS: '#dc3545',
+  SIM_GATEWAY: '#007bff',
+
+} as const,
+
   // Submenu Labels
   SUBMENU_LABELS: {
     // Control Hub
@@ -163,7 +197,7 @@ export const HEADER_CONSTANTS = {
     LIVE_CALLS: 'ph-duotone ph-phone-call',
     TICKETS: 'ph-duotone ph-ticket',
     AUTOMATION: 'ph-duotone ph-link',
-    CRM: 'ph-duotone ph-link',
+    CRM: 'LinkIcon',
     DNCR: 'ph-duotone ph-link',
     BILLING: 'ph-duotone ph-link',
     NETOPS: 'ph-duotone ph-heartbeat',
@@ -204,15 +238,43 @@ export const HEADER_CONSTANTS = {
   PERMISSIONS: {
     CONTROL_HUB_SERVICES: 'control-hub-services',
     GSM_SERVICES: 'gsm-services',
+
+
     CALL_LOGS_SERVICES: 'call-logs-services',
     CALL_RECORDINGS_SERVICES: 'call-recordings-services',
+    VIEW_CALL_DASHBOARD: 'dashboard-call-logs',
+    VIEW_CALL_LOGS: 'view-call-logs',
+    VIEW_CALL_RECORDINGS: 'view-call-recordings',
+
     REPORTS_SERVICES: 'reports-services',
+
     AI_ML_SERVICES: 'ai-ml-services',
+    TRANSCRIPTION_ANALYSIS_AIML: 'transcriptions-analysis-aiml',
+    TRANSCRIPTION_ANALYZE_RECORDINGS_AIML: 'analyze-recordings-aiml',
+    TRANSLATE_AIML: 'translate-aiml',
+
+
     CTI_SERVICES: 'cti-services',
+    VIEW_CTI:'view-cti',
+    DIAL_CALL_CTI:'dial-call-cti',
+    CTI_MONITORING:'dashboard-cti',
+
+
     TICKETS_SERVICES: 'tickets-services',
+    VIEW_TICKETS_DASHBOARD: 'dashboard-tickets',
+    VIEW_TICKETS_LIST: 'view-ticket-tickets',
+    VIEW_TICKETS_STATUS: 'ticket-statuses-tickets',
+    VIEW_TICKETS_MODULES: 'ticket-modules-tickets',
+    VIEW_TICKETS_TYPES: 'view-ticket-types-tickets',
+
+
+
     TMS_SERVICES: 'tms-services',
     CRM_SERVICES: 'crm-services',
+
     DNCR_SERVICES: 'dncr-services',
+    CHECK_NUMBERS_DNCR: 'check-numbers-dncr',
+
     ACCOUNTS_SERVICES: 'accounts-services',
     NETOPS_SERVICES: 'health-care-services',
     CALL_HISTORY_SERVICES: 'call-history-services',

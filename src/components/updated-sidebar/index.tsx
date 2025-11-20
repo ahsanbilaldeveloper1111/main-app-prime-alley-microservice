@@ -23,7 +23,13 @@ import {
   Eye,
   ShoppingBag,
   Briefcase,
-  PieChart
+  PieChart, 
+  Target,
+  Handshake,
+  Megaphone,
+  CheckCircle,
+  GitBranch,
+  Activity,
 } from 'lucide-react';
 
 interface SubMenuItem {
@@ -55,10 +61,28 @@ const ExpandableSidebar: React.FC<SidebarProps> = ({
   setActiveScreen 
 }) => {
   //const [expandedModules, setExpandedModules] = useState<string[]>(['ticketing']);
-  const [expandedModules, setExpandedModules] = useState<string[]>([ 'billing']);
+  const [expandedModules, setExpandedModules] = useState<string[]>([ 'crm']);
   const [expandedSubModules, setExpandedSubModules] = useState<string[]>([]);
 
   const mainMenuItems: MainMenuItem[] = [
+    {
+      id: 'crm',
+      title: 'CRM System',
+      icon: <Briefcase size={20} />,
+      color: '#0d6efd',
+      subItems: [
+        { id: 'dashboard', title: 'Dashboard', icon: <LayoutDashboard size={16} /> },
+        { id: 'prospects', title: 'Prospects', icon: <Users size={16} /> },
+        { id: 'leads', title: 'Leads', icon: <Target size={16} /> },
+        { id: 'deals', title: 'Deals', icon: <Handshake size={16} /> },
+        { id: 'orders', title: 'Orders', icon: <ShoppingBag size={16} /> },
+        { id: 'campaigns', title: 'Campaigns', icon: <Megaphone size={16} /> },
+        { id: 'tasks', title: 'Task Management', icon: <CheckCircle size={16} /> },
+        { id: 'stages', title: 'Stages Management', icon: <GitBranch size={16} /> },
+        { id: 'activities', title: 'Activity Tracker', icon: <Activity size={16} /> },
+        { id: 'reports', title: 'Reports', icon: <BarChart3 size={16} /> },
+      ]
+    },
     {
       id: 'ticketing',
       title: 'Ticketing System',

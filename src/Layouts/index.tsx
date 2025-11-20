@@ -1,14 +1,15 @@
 import { ReactNode } from 'react';
 import { useEffect, useState } from 'react';
-import { useSelector, useDispatch } from 'react-redux';
-import { changeThemeLayout, changeThemeMode, changeThemePreset } from '../toolkit/thunk';
-import { changeLayoutTheme, changeSidebarTheme, changeSidebarThemeCaptions } from '../toolkit/themeLayouts/thunk';
-import { createSelector } from "reselect";
 import { useRouter } from 'next/router';
 import Footer from '@components/Footer';
+import ApplicationSidebar from './Moduler/AppSidebar';
+import { useSession } from "next-auth/react";
 
-
-import Moduler from './Moduler';
+import CompanyLogo2 from "@assets/images/Prime3.png";
+import { 
+	Bell, ChevronLeft, ChevronRight, Users
+    } from 'lucide-react';
+import { Badge, Button } from 'react-bootstrap';
 
 interface LayoutProps {
 	children: ReactNode;
@@ -17,54 +18,25 @@ interface LayoutProps {
 const Layout = ({ children }: LayoutProps) => {
 
 	const router = useRouter();
+	const { data: session, status } = useSession();
+
 	const [hasTmsSession, setHasTmsSession] = useState<boolean | null>(null);
+	const [sidebarOpen, setSidebarOpen] = useState(true);
 
-	const toogleSidebarHide = () => {
-		const sidebar = document.querySelector('.pc-sidebar .pc-menu-overlay');
-		const sidebarHideId = document.getElementById("pc-sidebar-hide");
+	const [loggedInName, setLoggedInName] = useState('');
+	const [loggedInUserRole, setLoggedInUserRole] = useState('');
+	const [loggedInUserUsername, setLoggedInUserUsername] = useState('');
 
-		if (sidebarHideId) {
-			sidebarHideId.classList.toggle("pc-sidebar-hide");
+	useEffect(() => {
+		if (status !=="loading" && session) {
+		  if (typeof window !== "undefined") {
+		    setLoggedInName(session.user.name || '');
+		    setLoggedInUserUsername(session.user.username || '');
+		    setLoggedInUserRole(session.user.role || '');
+		  }
 		}
-	};
-	const toogleMobileSidebarHide = () => {
-		const sidebarHideId = document.getElementById("pc-sidebar-hide") as HTMLDivElement | null;
+	    }, [ status, session]);
 
-		if (sidebarHideId) {
-			sidebarHideId.classList.toggle("mob-sidebar-active");
-		}
-
-		// Check if overlay already exists to prevent duplicates
-		let existingOverlay = document.querySelector('.pc-menu-overlay');
-		if (existingOverlay) {
-			existingOverlay.remove();
-		}
-
-		// Create a new element
-		const newElement = document.createElement('div');
-		newElement.className = 'pc-menu-overlay'; // Set the desired class name
-
-		// Insert the new element after the .navbar-wrapper
-		const navbarWrapper = document.querySelector('.navbar-wrapper') as Element | null;
-		if (navbarWrapper) {
-			navbarWrapper.insertAdjacentElement('afterend', newElement);
-		}
-
-		// Add an event listener to remove the "mob-sidebar-active" class when the new element is clicked
-		const handleOverlayClick = () => {
-			if (sidebarHideId) {
-				sidebarHideId.classList.remove("mob-sidebar-active");
-			}
-			// Safely remove the element if it still exists
-			if (newElement && newElement.parentNode) {
-				newElement.parentNode.removeChild(newElement);
-			}
-			// Remove the event listener
-			newElement.removeEventListener('click', handleOverlayClick);
-		};
-
-		newElement.addEventListener('click', handleOverlayClick);
-	};
 
 	// Check for TMS session changes using cookies
 	useEffect(() => {
@@ -108,72 +80,6 @@ const Layout = ({ children }: LayoutProps) => {
 		}
 	}, [router.pathname, hasTmsSession]);
 
-
-	const dispatch = useDispatch<any>();
-
-	const selectLayoutProperties = createSelector(
-		(state: any) => state.Theme,
-		(layout) => ({
-			themeMode: layout.themeMode,
-			layoutTheme: layout.layoutTheme,
-			themePreset: layout.themePreset,
-			themeLayout: layout.themeLayout,
-			sidebarTheme: layout.sidebarTheme,
-			sidebarThemeCaptions: layout.sidebarThemeCaptions,
-		})
-	);
-	// Inside your component
-	const {
-		themeMode,
-		themePreset,
-		layoutTheme,
-		themeLayout,
-		sidebarTheme,
-		sidebarThemeCaptions,
-	} = useSelector(selectLayoutProperties);
-
-	/*
-		layout settings
-		*/
-	useEffect(() => {
-		if (
-			themeMode ||
-			layoutTheme ||
-			themePreset ||
-			themeLayout ||
-			sidebarTheme ||
-			sidebarThemeCaptions
-		) {
-			dispatch(changeThemeMode(themeMode));
-			dispatch(changeLayoutTheme(layoutTheme));
-			dispatch(changeThemePreset(themePreset));
-			dispatch(changeThemeLayout(themeLayout));
-			dispatch(changeSidebarTheme(sidebarTheme));
-			dispatch(changeSidebarThemeCaptions(sidebarThemeCaptions));
-		}
-	}, [
-		themeMode,
-		layoutTheme,
-		themePreset,
-		themeLayout,
-		sidebarTheme,
-		sidebarThemeCaptions,
-		dispatch
-	]);
-
-	const [isLayoutWidth, setLayoutWidth] = useState(false);
-
-	const handleChangeLayoutWidth = (value: boolean) => {
-		setLayoutWidth(value);
-	};
-	const getLayoutWidth = isLayoutWidth ? "container" : "";
-	const [showOffcanvas, setShowOffcanvas] = useState(false);
-	// console.log(isLanding);
-
-	const handleOffcanvasToggle = () => {
-		setShowOffcanvas(!showOffcanvas);
-	};
-
 	// Prevent rendering protected TMS content while redirecting
 	const isTmsRoute = router.pathname.startsWith('/tms') && router.pathname !== '/tms/verification';
 	if (isTmsRoute && typeof window !== 'undefined' && hasTmsSession === false) {
@@ -182,20 +88,122 @@ const Layout = ({ children }: LayoutProps) => {
 
 	return (
 		<>
-				<Moduler
-					children={children}
-					handleOffcanvasToggle={handleOffcanvasToggle}
-					toogleSidebarHide={toogleSidebarHide}
-					toogleMobileSidebarHide={toogleMobileSidebarHide}
-					themeMode={themeMode}
-					changeThemeMode={changeThemeMode}
-				/>
+		<style>{`
+        .main-content-wrapper {
+          transition: margin-left 0.3s ease-in-out;
+        }
+	    .header-logo{
+		width: 180px;
+		height: auto;
+	    }
 
+        @media (min-width: 992px) {
+          .main-content-wrapper.sidebar-open {
+            margin-left: 280px !important;
+          }
+          
+          .main-content-wrapper.sidebar-closed {
+            margin-left: 0 !important;
+          }
+        }
+        
+        @media (max-width: 991px) {
+          .main-content-wrapper {
+            margin-left: 0 !important;
+            width: 100% !important;
+          }
+        }
+      `}</style>
+
+<div className="min-vh-100 d-flex flex-column" style={{ backgroundColor: '#f8f9fa' }}>
+
+ {/* Sidebar Toggle Button - Fixed Position */}
+ <Button
+          variant="primary"
+          className="position-fixed d-lg-none"
+          style={{
+            top: '80px',
+            left: sidebarOpen ? '270px' : '10px',
+            zIndex: 1100,
+            width: '40px',
+            height: '40px',
+            padding: '0',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderRadius: '50%',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+            transition: 'left 0.3s ease-in-out'
+          }}
+          onClick={() => setSidebarOpen(!sidebarOpen)}
+        >
+          {sidebarOpen ? <ChevronLeft size={20} /> : <ChevronRight size={20} />}
+        </Button>
+
+        {/* Top Navigation */}
+        <nav className="navbar navbar-expand-lg navbar-light bg-white border-bottom sticky-top shadow-sm">
+        <div className="container-fluid">
+          <div className="d-flex align-items-center gap-2">
+            <Button 
+              variant="link" 
+              className="text-dark d-none d-lg-block p-2" 
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              style={{ marginLeft: '-10px' }}
+            >
+              {sidebarOpen ? <ChevronLeft size={24} /> : <ChevronRight size={24} />}
+            </Button>
+            <a className="navbar-brand fw-bold text-primary mb-0" href="#">
+			<img src={CompanyLogo2.src} alt="logo" className="img-fluid header-logo" /></a>
+          </div>
+          <div className="ms-auto d-flex align-items-center gap-3">
+            {/* <Button variant="link" className="text-dark position-relative">
+              <Bell size={20} />
+              <Badge bg="danger" pill className="position-absolute translate-middle" style={{top:'10px', left:'37px'}}>3</Badge>
+            </Button> */}
+            <div className="d-flex align-items-center gap-2">
+              <div className="bg-primary bg-opacity-10 rounded-circle p-2">
+                <Users size={20} className="text-primary" />
+              </div>
+              <div className="d-none d-md-block">
+                <small className="d-block fw-semibold">{loggedInName}</small>
+                <small className="text-muted">
+		    {loggedInUserRole !== '' ? (
+                                                                    <span>{loggedInUserRole}</span>
+                                                                ) : (
+                                                                    <span>{loggedInUserUsername}</span>
+                                                                )}
+		    </small>
+              </div>
+            </div>
+          </div>
+        </div>
+      </nav>
+		
+		<div className="d-flex flex-grow-1" style={{ position: 'relative', marginTop:'85px' }}>
+
+
+			<ApplicationSidebar
+				sidebarOpen={sidebarOpen}
+				setSidebarOpen={setSidebarOpen}
 				
-				<Footer />
+			/>
+				<div className={`flex-grow-1 p-4 main-content-wrapper ${sidebarOpen ? 'sidebar-open' : 'sidebar-closed'}`} style={{ 
+				overflowY: 'auto',
+				width: '100%'
+				}}>
+				<div className={"pc-content "}>
+					{children}
+				</div>
+			</div>
+
+			
+		</div>
+		
 				
+		<Footer />
+		</div>
 				
-			</>
+		</>
 	);
 };
 

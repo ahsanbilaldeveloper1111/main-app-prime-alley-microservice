@@ -11,6 +11,8 @@
  *   node src/__tests__/ranks-permissions.test.js --export=true # Run tests and generate CSV/Excel files
  */
 
+import fs from 'fs';
+
 // Parse command-line arguments
 const args = process.argv.slice(2);
 const shouldExportExcel = args.some(arg => arg === '--export=true' || arg === '--export' || arg === '-e');
@@ -697,7 +699,6 @@ console.log('Test Summary');
 console.log('='.repeat(80));
 
 // Generate CSV report
-const fs = require('fs');
 const csvHeader = 'Test ID,Test Name,Test Type (Negative/Positive),Test Description,Test Steps,Test Data,Expected Result,Actual Result\n';
 const csvRows = testResults.map(result => {
   const escapeCSV = (str) => {
@@ -785,8 +786,10 @@ if (shouldExportExcel) {
   console.log('\n✓ Test report CSV generated: src/__tests__/ranks-permissions-test-report.csv');
 
   // Generate Excel file
-  try {
-    const XLSX = require('xlsx');
+  (async () => {
+    try {
+      const XLSXModule = await import('xlsx');
+      const XLSX = XLSXModule.default || XLSXModule;
     
     // Format data for Excel using testResults array directly
     const formatStepsForExcel = (steps) => {
@@ -839,16 +842,17 @@ if (shouldExportExcel) {
     // Write Excel file
     const excelFileName = 'src/__tests__/ranks-permissions-test-report.xlsx';
     XLSX.writeFile(workbook, excelFileName);
-    console.log('✓ Test report Excel generated: ' + excelFileName);
-  } catch (error) {
-    if (error.code === 'MODULE_NOT_FOUND') {
-      console.log('\n⚠ Excel generation skipped: xlsx module not found');
-      console.log('  To generate Excel file, run: npm install xlsx --save-dev');
-    } else {
-      console.log('\n⚠ Excel generation failed: ' + error.message);
-      console.log('  CSV file is available at: src/__tests__/ranks-permissions-test-report.csv');
+      console.log('✓ Test report Excel generated: ' + excelFileName);
+    } catch (error) {
+      if (error.code === 'MODULE_NOT_FOUND') {
+        console.log('\n⚠ Excel generation skipped: xlsx module not found');
+        console.log('  To generate Excel file, run: npm install xlsx --save-dev');
+      } else {
+        console.log('\n⚠ Excel generation failed: ' + error.message);
+        console.log('  CSV file is available at: src/__tests__/ranks-permissions-test-report.csv');
+      }
     }
-  }
+  })();
 } else {
   console.log('\nℹ File export skipped (use --export=true to generate CSV and Excel files)');
 }
