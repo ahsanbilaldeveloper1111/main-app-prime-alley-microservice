@@ -263,11 +263,16 @@ import {
           <XAxis dataKey="name" />
           <YAxis />
           <Tooltip
-            formatter={(value: number, name: string) =>
-              name === "revenue"
-                ? [`£${value.toLocaleString()}`, "Revenue"]
-                : [`${value} products`, "Products"]
-            }
+            formatter={(value: string | number | (string | number)[], name: string) => {
+              const numValue = Array.isArray(value) ? value[0] : value;
+              const numericValue = typeof numValue === 'string' ? parseFloat(numValue) : numValue;
+              
+              if (name === "revenue") {
+                return [`£${numericValue.toLocaleString()}`, "Revenue"];
+              } else {
+                return [`${numericValue} products`, "Products"];
+              }
+            }}
           />
           <Legend />
   
