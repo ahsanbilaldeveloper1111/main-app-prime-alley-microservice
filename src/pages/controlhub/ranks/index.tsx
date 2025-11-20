@@ -255,14 +255,14 @@ const Ranks = () => {
                     <Col md={8} className="d-flex justify-content-end">
                       
                     <div className="action-buttons">
-                    <div className="search-container">
+                    {/* <div className="search-container">
                             <i className="fas fa-search search-icon"></i>
                             <input type="text" className="search-bar" placeholder="Search rank..." onChange={(e) => handleFiltersChange({...currentFilters, search: e.target.value})}/>
-                        </div>
+                        </div> */}
                     
                     {/* <RolesFilters onFiltersChange={handleFiltersChange} onExport={handleExport} /> */}
                     {session?.user?.permissions?.includes('add-ranks') && (
-                        <Button variant="primary" size="sm"  onClick={() => setShowCreateRankModal(true)}>New Rank</Button>
+                        <Button variant="primary"  onClick={() => setShowCreateRankModal(true)}>Add Rank</Button>
                     )}
                     </div>
 
@@ -304,7 +304,7 @@ const Ranks = () => {
                  onSelectionChange={handleSelectionChange}
                  clearSelectedRows={clearSelectedRows}
                  keyField="id"
-                 search={false}
+                 search={true}
                  tableStyle="table-style-2"
              />
             )}

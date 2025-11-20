@@ -61,22 +61,24 @@ export const HEADER_CONSTANTS = {
   } as const,
 
 MENU_COLORS: {
-  DASHBOARD: '#007bff',
-  CRM: '#6f42c1',
-  DNCR: '#dc3545',
-  BILLING: '#007bff',
-  NETOPS: '#007bff',
-  SALES: '#dc3545',
-  WEB_RTC: '#6c757d',
-  OMNI_CHANNEL: '#6c757d',
-  HR_SERVICES: '#dc3545',
-  CALL_HISTORY: '#6c757d',
-  TICKETS: '#6c757d',
-  REPORTS: '#dc3545',
-  AUTOMATION: '#007bff',
-  AI_INSIGHTS: '#007bff',
-  LIVE_CALLS: '#dc3545',
-  SIM_GATEWAY: '#007bff',
+  DASHBOARD: '#0d6efd',
+  CRM: '#0d6efd',
+  DNCR: '#0d6efd',
+  BILLING: '#0d6efd',
+  NETOPS: '#0d6efd',
+  SALES: '#0d6efd',
+  WEB_RTC: '#0d6efd',
+  OMNI_CHANNEL: '#0d6efd',
+  HR_SERVICES: '#0d6efd',
+  CALL_HISTORY: '#0d6efd',
+  TICKETS: '#0d6efd',
+  REPORTS: '#0d6efd',
+  AUTOMATION: '#0d6efd',
+  AI_INSIGHTS: '#0d6efd',
+  LIVE_CALLS: '#0d6efd',
+  SIM_GATEWAY: '#0d6efd',
+  CONTROL_HUB: '#0d6efd',
+  RESOURCES: '#0d6efd',
 
 } as const,
 
@@ -184,7 +186,20 @@ MENU_COLORS: {
     CREATE_PROFILE: 'Create Profile',
     USER_PROFILES: 'User Profiles',
     CREATE_USER_PROFILE: 'Create User Profile',
-    ERROR_LOGS: 'Error Logs'
+    ERROR_LOGS: 'Error Logs',
+
+    // NetOps
+    NETOPS_DASHBOARD: 'Dashboard',
+    NETOPS_DEVICES: 'Devices',
+    NETOPS_SERVICES: 'Services',
+    NETOPS_ALERTS: 'Alerts',
+    NETOPS_UPTIME_SLA: 'Uptime & SLA Monitoring',
+
+    // Resources
+    FAQ: 'FAQ',
+    HELP_MATERIALS: 'Help Materials',
+    CONTACT_SUPPORT: 'Contact Support',
+
   } as const,
   
   // Icons
@@ -239,6 +254,11 @@ MENU_COLORS: {
   // Permissions
   PERMISSIONS: {
     CONTROL_HUB_SERVICES: 'control-hub-services',
+    VIEW_USERS: 'view-users',
+    VIEW_RANKS: 'view-ranks',
+    VIEW_GROUPS: 'view-groups',
+
+
     GSM_SERVICES: 'gsm-services',
 
 
@@ -280,7 +300,28 @@ MENU_COLORS: {
     CHECK_NUMBERS_DNCR: 'check-numbers-dncr',
 
     ACCOUNTS_SERVICES: 'accounts-services',
+
     NETOPS_SERVICES: 'health-care-services',
+    VIEW_NETOPS_DASHBOARD: 'dashboard-netops',
+    VIEW_NETOPS_DEVICES: 'devices-netops',
+    VIEW_NETOPS_SERVICES: 'services-netops',
+    VIEW_NETOPS_ALERTS: 'alerts-netops',
+    VIEW_NETOPS_UPTIME_SLA: 'uptime-sla-netops',
+    ADD_NEW_DEVICE: 'add-device-netops',
+    EDIT_DEVICE: 'edit-device-netops',
+    DELETE_DEVICE: 'delete-device-netops',
+
+    VIEW_SERVICES_NETOPS: 'services-netops',
+    ADD_NEW_SERVICE: 'add-service-netops',
+    EDIT_SERVICE: 'edit-service-netops',
+    DELETE_SERVICE: 'delete-service-netops',
+
+    VIEW_ALERTS_NETOPS: 'alerts-netops',
+    RESOLVE_ALERT: 'resolve-alert-netops',
+    MONITER_NETOPS: 'moniter-netops',
+    VIEW_UPTIME_SLA_NETOPS: 'monitoring-netops',
+
+
     CALL_HISTORY_SERVICES: 'call-history-services',
     RESOURCES_SERVICES: 'resources-services',
 
@@ -313,21 +354,7 @@ MENU_COLORS: {
     VIEW_GSM_SYNC: 'view-gsm-port-sync',
     VIEW_GSM_COMPANY_PROFILLING: 'view-gsm-company-profilling',
 
-    VIEW_NETOPS_DASHBOARD: 'dashboard-netops',
-    VIEW_NETOPS_DEVICES: 'devices-netops',
-    ADD_NEW_DEVICE: 'add-device-netops',
-    EDIT_DEVICE: 'edit-device-netops',
-    DELETE_DEVICE: 'delete-device-netops',
-
-    VIEW_SERVICES_NETOPS: 'services-netops',
-    ADD_NEW_SERVICE: 'add-service-netops',
-    EDIT_SERVICE: 'edit-service-netops',
-    DELETE_SERVICE: 'delete-service-netops',
-
-    VIEW_ALERTS_NETOPS: 'alerts-netops',
-    RESOLVE_ALERT: 'resolve-alert-netops',
-    MONITER_NETOPS: 'moniter-netops',
-    VIEW_UPTIME_SLA_NETOPS: 'monitoring-netops',
+    
     
     
   } as const

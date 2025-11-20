@@ -206,7 +206,7 @@ const EditRolePermission = () => {
                             <i className="fas fa-search search-icon"></i>
                             <input type="text" className="search-bar" placeholder="Search permissions..." onChange={(e) => setSearchTerm(e.target.value)}/>
                         </div>
-                        <Button variant="primary" size='sm' onClick={handleUpdateRole}>Update Permissions</Button>
+                        <Button variant="primary" onClick={handleUpdateRole}>Update Permissions</Button>
                     
                     </div>
 

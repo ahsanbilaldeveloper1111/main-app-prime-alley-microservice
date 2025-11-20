@@ -29,7 +29,15 @@ import {
   Tags,
   CreditCard,
   Building,
-  MapPin
+  MapPin,
+  Settings,
+  History,
+  ChartNoAxesCombined,
+  FileChartPie,
+  Ban,
+  RadioTower,
+  Workflow,
+  NotebookText
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -99,7 +107,7 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
       id: 'crm',
       key: 'crm',
       permission: PERMISSIONS.CRM_SERVICES,
-      icon: <LinkIcon size={20} />,
+      icon: <Briefcase size={20} />,
       color: MENU_COLORS.CRM,
       title: MENU_LABELS.CRM,
       label: MENU_LABELS.CRM,
@@ -161,7 +169,7 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
       id: 'live-calls',
       key: 'live-calls',
       permission: PERMISSIONS.CTI_SERVICES,
-      icon: <Phone size={20} />,
+      icon: <PhoneCall size={20} />,
       color: MENU_COLORS.LIVE_CALLS,
       title: MENU_LABELS.LIVE_CALLS,
       label: MENU_LABELS.LIVE_CALLS,
@@ -195,7 +203,7 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
       id: 'call-history',
       key: 'call-history',
       permission: PERMISSIONS.CALL_HISTORY_SERVICES,
-      icon: <Phone size={20} />,
+      icon: <History size={20} />,
       color: MENU_COLORS.CALL_HISTORY,
       title: MENU_LABELS.CALL_HISTORY,
       label: MENU_LABELS.CALL_HISTORY,
@@ -229,7 +237,7 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
       id: 'call-reports',
       key: 'call-reports',
       permission: PERMISSIONS.REPORTS_SERVICES,
-      icon: <BarChart3 size={20} />,
+      icon: <ChartNoAxesCombined size={20} />,
       color: MENU_COLORS.REPORTS,
       title: MENU_LABELS.REPORTS,
       label: MENU_LABELS.REPORTS,
@@ -240,7 +248,7 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
       id: 'ai-ml',
       key: 'ai-ml',
       permission: PERMISSIONS.AI_ML_SERVICES,
-      icon: <BarChart3 size={20} />,
+      icon: <FileChartPie size={20} />,
       color: MENU_COLORS.AI_INSIGHTS,
       title: MENU_LABELS.AI_INSIGHTS,
       label: MENU_LABELS.AI_INSIGHTS,
@@ -273,8 +281,8 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
       id: 'dncr',
       key: 'dncr',
       permission: PERMISSIONS.DNCR_SERVICES,
-      icon: <Phone size={20} />,
-      color: '#dc3545',
+      icon: <Ban size={20} />,
+      color: MENU_COLORS.DNCR,
       title: MENU_LABELS.DNCR,
       label: MENU_LABELS.DNCR,
       url: '',
@@ -430,7 +438,7 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
           title: HEADER_CONSTANTS.SUBMENU_LABELS.TICKET_MODULE_SUBCATEGORIES,
           icon: <Layers size={16} />,
           permission: PERMISSIONS.VIEW_TICKETS_SUBCATEGORIES,
-          url: '/tickets/modules/submodules'
+          url: '/tickets/modules/sub-categories'
         },
 
         {
@@ -447,7 +455,7 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
       id: 'gsm',
       key: 'gsm',
       permission: PERMISSIONS.GSM_SERVICES,
-      icon: <LayoutDashboard size={20} />,
+      icon: <RadioTower size={20} />,
       color: MENU_COLORS.SIM_GATEWAY,
       title: MENU_LABELS.SIM_GATEWAY,
       label: MENU_LABELS.SIM_GATEWAY,
@@ -504,6 +512,135 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
         }
       ].filter(item => !item.permission || hasPermission(item.permission))
     },
+
+    {
+      id: 'tms',
+      key: 'tms',
+      permission: PERMISSIONS.TMS_SERVICES,
+      icon: <Workflow size={20} />,
+      color: MENU_COLORS.AUTOMATION,
+      title: MENU_LABELS.AUTOMATION,
+      label: MENU_LABELS.AUTOMATION,
+      url: '/tms/verification'
+    },
+
+    {
+      id: 'netops',
+      key: 'netops',
+      permission: PERMISSIONS.NETOPS_SERVICES,
+      icon: <LayoutDashboard size={20} />,
+      color: MENU_COLORS.NETOPS,
+      title: MENU_LABELS.NETOPS,
+      label: MENU_LABELS.NETOPS,
+      url: '',
+      subItems: [
+        {
+          id: 'netops-dashboard',
+          title: HEADER_CONSTANTS.SUBMENU_LABELS.NETOPS_DASHBOARD,
+          icon: <LayoutDashboard size={16} />,
+          permission: PERMISSIONS.VIEW_NETOPS_DASHBOARD,
+          url: '/netops/dashboard'
+        },
+        {
+          id: 'netops-devices',
+          title: HEADER_CONSTANTS.SUBMENU_LABELS.NETOPS_DEVICES,
+          icon: <List size={16} />,
+          permission: PERMISSIONS.VIEW_NETOPS_DEVICES,
+          url: '/netops/devices'
+        },
+        {
+          id: 'netops-services',
+          title: HEADER_CONSTANTS.SUBMENU_LABELS.NETOPS_SERVICES,
+          icon: <List size={16} />,
+          permission: PERMISSIONS.VIEW_NETOPS_SERVICES,
+          url: '/netops/services'
+        },
+        {
+          id: 'netops-alerts',
+          title: HEADER_CONSTANTS.SUBMENU_LABELS.NETOPS_ALERTS,
+          icon: <List size={16} />,
+          permission: PERMISSIONS.VIEW_NETOPS_ALERTS,
+          url: '/netops/alerts'
+        },
+        {
+          id: 'netops-uptime-sla',
+          title: HEADER_CONSTANTS.SUBMENU_LABELS.NETOPS_UPTIME_SLA,
+          icon: <List size={16} />,
+          permission: PERMISSIONS.VIEW_NETOPS_UPTIME_SLA,
+          url: '/netops/uptime-sla'
+        }
+      ].filter(item => !item.permission || hasPermission(item.permission))
+    },
+
+    {
+      id: 'controlhub',
+      key: 'controlhub',
+      permission: PERMISSIONS.CONTROL_HUB_SERVICES,
+      icon: <Settings size={20} />,
+      color: MENU_COLORS.CONTROL_HUB,
+      title: MENU_LABELS.CONTROL_HUB,
+      label: MENU_LABELS.CONTROL_HUB,
+      url: '',
+      subItems: [
+        {
+          id: 'controlhub-users',
+          title: HEADER_CONSTANTS.SUBMENU_LABELS.USER_DIRECTORY,
+          icon: <Users size={16} />,
+          permission: PERMISSIONS.VIEW_USERS,
+          url: '/controlhub/users'
+        },
+        {
+          id: 'controlhub-ranks',
+          title: HEADER_CONSTANTS.SUBMENU_LABELS.RANKS,
+          icon: <List size={16} />,
+          permission: PERMISSIONS.VIEW_RANKS,
+          url: '/controlhub/ranks'
+        },
+        {
+          id: 'controlhub-groups',
+          title: HEADER_CONSTANTS.SUBMENU_LABELS.GROUPS,
+          icon: <List size={16} />,
+          permission: PERMISSIONS.VIEW_GROUPS,
+          url: '/controlhub/groups'
+        }
+      ].filter(item => !item.permission || hasPermission(item.permission))
+    },
+
+    {
+      id: 'resources',
+      key: 'resources',
+      permission: '',
+      icon: <NotebookText size={20} />,
+      color: MENU_COLORS.RESOURCES,
+      title: MENU_LABELS.RESOURCES,
+      label: MENU_LABELS.RESOURCES,
+      url: '',
+      subItems: [
+        {
+          id: 'resources-faq',
+          title: HEADER_CONSTANTS.SUBMENU_LABELS.FAQ,
+          icon: <List size={16} />,
+          permission: '',
+          url: '/resources/faq'
+        },
+        {
+          id: 'resources-help-materials',
+          title: HEADER_CONSTANTS.SUBMENU_LABELS.HELP_MATERIALS,
+          icon: <List size={16} />,
+          permission: '',
+          url: '/resources/help-materials'
+        },
+        {
+          id: 'resources-contact-support',
+          title: HEADER_CONSTANTS.SUBMENU_LABELS.CONTACT_SUPPORT,
+          icon: <List size={16} />,
+          permission: '',
+          url: '/resources/contact-support'
+        }
+      ]
+    }
+
+    
 
 
   ].filter(item => !item.permission || hasPermission(item.permission));

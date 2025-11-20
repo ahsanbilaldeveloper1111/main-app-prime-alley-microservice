@@ -184,8 +184,12 @@ export const routePermissions: RoutePermission[] = [
                 permissions: ['ticket-modules-tickets']
             },
             {
+                path: '/modules/categories',
+                permissions: [HEADER_CONSTANTS.PERMISSIONS.VIEW_TICKETS_CATEGORIES]
+            },
+            {
                 path: '/modules/submodules',
-                permissions: ['edit-ticket-module-tickets']
+                permissions: [HEADER_CONSTANTS.PERMISSIONS.VIEW_TICKETS_SUBCATEGORIES]
             },
             {
                 path: '/types',

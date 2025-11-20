@@ -5,21 +5,18 @@ import BreadcrumbItem from '@common/BreadcrumbItem';
 import GenericListPage from '@components/GenericListPage';
 import { getAllGroups, ListGroups, updateGroup,deleteGroup,addGroup } from '@utils/groups';
 import { Column } from '@components/CustomDataTable';
-import { Button, Modal, Row } from 'react-bootstrap';
+import { Button, Form, Modal, Row } from 'react-bootstrap';
 import { Col } from 'react-bootstrap';
 import GroupsFilters from '@components/filters/GroupsFilters';
 import { toast } from 'react-toastify';
 import { useTokenService } from 'src/hooks/useTokenService';
 import { useSession } from 'next-auth/react';
 import '@assets/scss/common.scss';
-import { FiEdit, FiTrash2 } from 'react-icons/fi';
-import DatatableActionButton from '@components/DatatableActionButton';
-import TableAction from '@components/TableAction';
-import { Link } from 'feather-icons-react';
 import FormModal from "@pages/partial/FormModal";
 import '@assets/scss/common.scss';
 import SuccessfulModal from '@pages/partial/SuccessfulModal';
 import ConfirmModal from '@pages/partial/ConfirmModal';
+import { Edit, Info, Trash2, Users } from 'lucide-react';
 
 
 
@@ -27,32 +24,44 @@ const Groups = () => {
     const { data:session, status } = useSession();
    
     const columns: Column[] = [
-        { key: 'Name', name: 'NAME', selector: (row: any) => row.name, sortable: true },
+        { key: 'Name', name: 'Name', selector: (row: any) => row.name, sortable: true },
        
 
         ...(session?.user?.permissions?.includes('edit-groups') || session?.user?.permissions?.includes('delete-groups') ? [
             {
                 key: 'Action',
-                name: 'ACTION',
+                name: 'Actions',
                 selector: (row: any) => row.id,
                 sortable: false,
                 cell: (props: any) => (
-                    <DatatableActionButton
-                        actions={[
-                            ...(session?.user?.permissions?.includes('edit-groups') ? [{
-                                label: 'Edit',
-                                icon: <FiEdit className="me-2" />,
-                                onClick: () => handleEditGroup(props),
-                                className: 'action-edit'
-                            }] : []),
-                            ...(session?.user?.permissions?.includes('delete-groups') ? [{
-                                label: 'Delete',
-                                icon: <FiTrash2 className="me-2" />,
-                                onClick: () => handleDeleteGroup(props),
-                                className: 'text-danger'
-                            }] : [])
-                        ]}
-                    />
+                    // <DatatableActionButton
+                    //     actions={[
+                    //         ...(session?.user?.permissions?.includes('edit-groups') ? [{
+                    //             label: 'Edit',
+                    //             icon: <FiEdit className="me-2" />,
+                    //             onClick: () => handleEditGroup(props),
+                    //             className: 'action-edit'
+                    //         }] : []),
+                    //         ...(session?.user?.permissions?.includes('delete-groups') ? [{
+                    //             label: 'Delete',
+                    //             icon: <FiTrash2 className="me-2" />,
+                    //             onClick: () => handleDeleteGroup(props),
+                    //             className: 'text-danger'
+                    //         }] : [])
+                    //     ]}
+                    // />
+                    <div className="d-flex gap-2">
+                        {session?.user?.permissions?.includes('edit-groups') && (
+                            <Button variant="light" className="btn-action-style-2 p-1 text-primary" title="Edit" onClick={() => handleEditGroup(props)}>
+                                <Edit size={16} />
+                            </Button>
+                        )}
+                        {session?.user?.permissions?.includes('delete-groups') && (
+                            <Button variant="light" className="btn-action-style-2 p-1 text-danger" title="Delete" onClick={() => handleDeleteGroup(props)}>
+                                <Trash2 size={16} />
+                            </Button>
+                        )}
+                    </div>
                 )
             }
         ] : [])
@@ -176,15 +185,15 @@ const Groups = () => {
                     <Col md={8} className="d-flex justify-content-end">
                       
                     <div className="action-buttons">
-                    <div className="search-container">
+                    {/* <div className="search-container">
                             <i className="fas fa-search search-icon"></i>
                             <input type="text" className="search-bar" placeholder="Search group..." onChange={(e) => handleFiltersChange({...currentFilters, search: e.target.value})}/>
-                        </div>
+                        </div> */}
                     
                         {/* <GroupsFilters onFiltersChange={handleFiltersChange} onExport={handleExport} /> */}
 
                     {session?.user?.permissions?.includes('add-groups') && (
-                        <Button variant="primary" size="sm"  onClick={() => setShowCreateGroupModal(true)}>New Group</Button>
+                        <Button variant="primary"   onClick={() => setShowCreateGroupModal(true)}>Add Group</Button>
                     )}
                     </div>
 
@@ -210,7 +219,7 @@ const Groups = () => {
                  defaultPageSize={15}
                  filters={currentFilters}
                  refreshKey={refreshKey}
-                 search={false}
+                 search={true}
                  tableStyle="table-style-2"
              />
             )}
@@ -219,14 +228,28 @@ const Groups = () => {
                 show={showEditGroupModal}
                 onHide={() => setShowEditGroupModal(false)}
                 title="Edit Group"
+                titleIcon={<Users size={20} className="text-primary" />}
                 desc="Please fill in the details below to edit the group."
                 formHtml={
                     <>
+                    <div className="form-group mb-3">
+                        <label htmlFor="editGroupName" className="fw-semibold d-flex align-items-center gap-2 form-label">Group Name <span className="text-danger">*</span>
+                        <span className="text-muted ms-2" title="Enter the name of the group you want to edit">
+                            <Info size={14} />
+                        </span>
+                        </label>
                         <input className="form-control" type="text" value={selectedGroupName} onChange={(e) => setSelectedGroupName(e.target.value)} />
-                        <p className="text-muted mt-2 small">Change the name of an existing group to better reflect its purpose or purpose in the system</p>
+                        <Form.Text className="text-muted d-flex align-items-center gap-1 form-text">
+                            <Info size={12} />
+                            <span style={{ fontSize: '0.813rem' }}>
+                                Change the name of an existing group to better reflect its purpose or purpose in the system
+                            </span>
+                        </Form.Text>
+                    </div>
                     </>
                 }
-                submitButtonText="Save changes"
+                submitButtonText="Update Group"
+                isSubmitDisabled={!selectedGroupName}
                 cancelButtonText="Cancel"
                 onSubmit={handleSubmitEditGroup}
                 onCancel={() => setShowEditGroupModal(false)}
@@ -250,14 +273,28 @@ const Groups = () => {
                         show={showCreateGroupModal}
                         onHide={()=>setShowCreateGroupModal(false)}
                         title="New Group"
+                        titleIcon={<Users size={20} className="text-primary" />}
                         desc="Please fill in the details below to create a new group."
                         formHtml={
                             <>
-                            <input type="text" className="form-control" id="newGroupName"  value={newGroupName} onChange={(e) => setNewGroupName(e.target.value)} placeholder="Group Name" />
-                            <p className="text-muted mt-2 small">Enter the name of the group you want to create. This will be used to identify the group in the system.</p>
+                            <div className="form-group mb-3">
+                                <label htmlFor="newGroupName" className="fw-semibold d-flex align-items-center gap-2 form-label">Group Name <span className="text-danger">*</span>
+                                <span className="text-muted ms-2" title="Enter the name of the group you want to create">
+                                    <Info size={14} />
+                                </span>
+                                </label>
+                                <input type="text" className="form-control" id="newGroupName"  value={newGroupName} onChange={(e) => setNewGroupName(e.target.value)} placeholder="Group Name" />
+                                <Form.Text className="text-muted d-flex align-items-center gap-1 form-text">
+                                    <Info size={12} />
+                                    <span style={{ fontSize: '0.813rem' }}>
+                                        Enter the name of the group you want to create. This will be used to identify the group in the system.
+                                    </span>
+                                </Form.Text>
+                            </div>
                             </>
                         }
                         submitButtonText="Add Group"
+                        isSubmitDisabled={!newGroupName}
                         cancelButtonText="Cancel"
                         onSubmit={handleSubmitCreateGroup}
                         onCancel={()=>setShowCreateGroupModal(false)}

@@ -1339,12 +1339,7 @@ const AnalyzeRecordings = () => {
             </Row>
 
             {/* Data Table */}
-            <Row>
-                <Col md={12}>
-                    <div className="card">
-                        <div className="card-body">
-                            <h5 className="mb-3 app-title-heading">Call Recordings Data</h5>
-                            {session?.user?.permissions?.includes('transcriptions-analysis-aiml') && (
+            {session?.user?.permissions?.includes('transcriptions-analysis-aiml') && (
                                 <GenericListPage
                                     columns={columns}
                                     fetchData={fetchTableData}
@@ -1357,10 +1352,6 @@ const AnalyzeRecordings = () => {
                                     tableStyle='table-style-2'
                                 />
                             )}
-                        </div>
-                    </div>
-                </Col>
-            </Row>
 
             {/* Country Chart Modal */}
             <Modal 

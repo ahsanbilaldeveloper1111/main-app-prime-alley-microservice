@@ -3,14 +3,17 @@
  * Usage: node src/__tests__/run-all-tests.js [--export=true]
  */
 
-import fs from 'fs';
-import path from 'path';
-import { spawn } from 'child_process';
+import fs from 'node:fs';
+import path, { dirname } from 'node:path';
+import { spawn } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 
 // Get command-line arguments (pass through to test files)
 const args = process.argv.slice(2);
 
 // Find all test files
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 const testDir = __dirname;
 const testFiles = fs.readdirSync(testDir)
   .filter(file => file.endsWith('.test.js'))

@@ -181,7 +181,8 @@ export const GetModule = async (id: string) => {
 export const ListSubmodules = async (params: PaginationParams = {}) => {
   try {
     const { page = 1, perPage = 15, search = "", draw = 1, filters = {}, isExport = false, exportType = '' } = params;
-    
+
+    console.log(params);
     const response = await axiosInstance.post(
       `/tickets/submodules`,
       {
