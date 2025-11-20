@@ -5,7 +5,7 @@ import { toast } from 'react-toastify';
 import Select, { MultiValue } from 'react-select';
 import FormModal from '@pages/partial/FormModal';
 import ConfirmModal from '@pages/partial/ConfirmModal';
-import { Module } from './types';
+import { Module } from '@typings/controlhub/users';
 import { LinkCompany, UnlinkCompany } from '@utils/users';
 
 interface LinkedCompaniesTabProps {

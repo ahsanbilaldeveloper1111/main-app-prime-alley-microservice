@@ -20,7 +20,6 @@ import CreatableSelect from 'react-select/creatable';
 import AudioPlayer, { AudioPlayerRef } from '@components/AudioPlayer';
 import axiosInstance from '@utils/axios';
 import '@assets/scss/common.scss';
-import { GetFilteredData } from '@utils/aiml';
 
 import imgStatus1 from '@assets/images/widget/img-status-1.svg'
 import imgStatus2 from '@assets/images/widget/img-status-2.svg'
@@ -238,15 +237,6 @@ const AnalyzeRecordings = () => {
         perPage: 15,
     });
 
-
-    const [tableDataAIML, setTableDataAIML] = useState<any[]>([]);
-    const [paginationInfoAIML, setPaginationInfoAIML] = useState<any>({
-        totalRows: 0,
-        totalPages: 0,
-        currentPage: 1,
-        perPage: 15,
-    });
-
     // Table columns configuration for call recordings
     const columns = [
         {
@@ -321,175 +311,6 @@ const AnalyzeRecordings = () => {
                 };
                 
                 const duration = parseInt(props.Duration.toString())/10000000 || 0;
-                return (
-                    <div>
-                        {formatDuration(duration)}
-                    </div>
-                );
-            }
-        },
-        {
-            key: 'Action',
-            name: 'Action',
-            selector: (row: any) => row.Action,
-            sortable: true,
-            cell: (props: any) => {
-                return (
-                    <div className='d-flex gap-3 action-box'>
-                        <i
-                            data-tooltip-id="my-tooltip"
-                            data-tooltip-content="Play"
-                            className='ph-duotone ph-play text-info'
-                            style={{ fontSize: '1rem', cursor: 'pointer' }}
-                            onClick={() => handlePlayRecording(props)}
-                        />
-                        <div style={{ display: 'inline-flex', alignItems: 'center' }}>
-                            {downloadingRecordings.has(props.Id) ? (
-                                <CircularProgressCircle 
-                                    progress={downloadProgress[props.Id] || 0}
-                                    size="small" 
-                                    color="#28a745"
-                                    backgroundColor="#e9ecef"
-                                    textColor="#495057"
-                                    showPercentage={false}
-                                    className="circular-progress-inline"
-                                />
-                            ) : (
-                                <i
-                                    data-tooltip-id="my-tooltip"
-                                    data-tooltip-content="Download"
-                                    className='ph-duotone ph-arrow-line-down text-info'
-                                    style={{ fontSize: '1rem', cursor: 'pointer' }}
-                                    onClick={() => {
-                                        handleDownload(props);
-                                    }}
-                                />
-                            )}
-                        </div>
-                        <i
-                            data-tooltip-id="my-tooltip"
-                            data-tooltip-content="Call Analysis"
-                            className='ph-duotone ph-chart-bar text-info'
-                            style={{ fontSize: '1rem' }}
-                            onClick={() => {
-                                handleAnalysis(props);
-                            }}
-                        />
-                    </div>
-                )
-            }
-        }
-    ];
-
-    // Table columns configuration for call recordings
-    const columnsAIML = [
-        {
-            key: 'recording_date',
-            name: 'Date',
-            selector: (row: any) => row.DateTime,
-            sortable: true,
-            cell: (props: any) => {
-                return (
-                    <div>
-                        {formatDateTimeToLocal(props.DateTime, 'YYYY-MM-DD')}
-                    </div>
-                )
-            }
-        },
-
-        {
-            key: 'resolution_status',
-            name: 'Resolution Status',
-            selector: (row: any) => row.resolution_status,
-            sortable: true,
-            cell: (props: any) => {
-                return (
-                    <div>
-                        {props?.analysis?.resolution_status ? props?.analysis?.resolution_status : 'N/A'}
-                    </div>
-                )
-            }
-        },
-        {
-            key: 'qualified',
-            name: 'Qualified',
-            selector: (row: any) => row.qualified,
-            sortable: true,
-            cell: (props: any) => {
-                return (
-                    <div>
-                        {props?.analysis?.qualified === true ? <span className='badge bg-success'>Yes</span> : <span className='badge bg-danger'>No</span>}
-                    </div>
-                )
-            }
-        },
-
-        // {
-        //     key: 'DateTime',
-        //     name: 'Time',
-        //     selector: (row: any) => row.DateTime,
-        //     sortable: true,
-        //     cell: (props: any) => {
-        //         return (
-        //             <div>
-        //                 {formatDateTimeToLocal(props.DateTime, 'HH:mm:ss')}
-        //             </div>
-        //         )
-        //     }
-        // },
-        {
-            key: 'AgentExtension',
-            name: 'Extension',
-            selector: (row: any) => row.AgentExtension,
-            sortable: true,
-            cell: (props: any) => {
-                return (
-                    <div>
-                        {props?.analysis?.domain_specific_analysis?.localPartyNumber}
-                    </div>
-                )
-            }
-        },
-        // {
-        //     key: 'RemotePartyNumber',
-        //     name: 'Remote Number',
-        //     selector: (row: any) => row.RemotePartyNumber,
-        //     sortable: true
-        // },
-        // {
-        //     key: 'Direction',
-        //     name: 'Direction',
-        //     selector: (row: any) => row.Direction,
-        //     sortable: true,
-        //     cell: (props: any) => {
-        //         const direction = props.Direction;
-        //         const badgeClass = direction === 'INCOMING' ? 'badge bg-success' : 'badge bg-primary';
-        //         return (
-        //             <span className={badgeClass}>
-        //                 {direction === 'INCOMING' ? 'Incoming' : 'Outgoing'}
-        //             </span>
-        //         );
-        //     }
-        // },
-        {
-            key: 'Duration',
-            name: 'Duration',
-            selector: (row: any) => row.Duration,
-            sortable: true,
-            cell: (props: any) => {
-                const formatDuration = (seconds: number) => {
-                    const minutes = Math.floor(seconds / 60);
-                    let secs = seconds % 60;
-                    secs = parseFloat(secs.toFixed(2));
-                    
-                    if (minutes > 0) {
-                        return `${minutes} Min ${secs} Sec`;
-                    } else {
-                        return `${secs} Sec`;
-                    }
-                };
-                
-                const duration = parseInt(props.analysis?.domain_specific_analysis?.domain_specific_duration.toString())/10000000 || 0;
                 return (
                     <div>
                         {formatDuration(duration)}
@@ -955,7 +776,6 @@ const AnalyzeRecordings = () => {
 
     // Fetch table data function for call recordings
     const fetchTableData = useCallback(async (page = 1, perPage = 15, search = "") => {
-        return;
         try {
             setShowPageLoader(true);
             const response = await ListCallLogs(
@@ -988,9 +808,6 @@ const AnalyzeRecordings = () => {
             return { dataList: [], total: 0, last_page: 0, current_page: 1, per_page: 15 };
         }
     }, [currentFilters]);
-
-
-    
 
     const handleFiltersChange = (filters: any) => {
         setCurrentFilters(filters);
@@ -1114,8 +931,7 @@ const AnalyzeRecordings = () => {
     const handleAnalysis = async (props: any) => {
         try {
             const { Id, AudioTrack } = props;
-      window.open(`/ai-ml/analysis?id=${Id}&file=${AudioTrack}&direction=${props.Direction}&phone=${props.RemotePartyNumber}&imagicle=${props.imagicle}&datetime=${props.DateTime}&duration=${props.Duration}`, '_blank');
-            
+            window.open(`/ai-ml/analysis?id=${Id}&file=${AudioTrack}&direction=${props.Direction}&phone=${props.RemotePartyNumber}&imagicle=${props.imagicle}`, '_blank');
         } catch (error) {
             console.error('Error navigating to analysis:', error);
         }
@@ -1137,9 +953,12 @@ const AnalyzeRecordings = () => {
         
         setAudioLoading(true);
         setAudioError(null);
+        
+        console.log('=== AUDIO LOADING DEBUG ===');
+        console.log('trackId:', audioTrackId);
 
         try {
-            
+            console.log('Attempting to load audio via axiosInstance...');
             const response = await axiosInstance.get(`call-logs/recordings/download/${audioTrackId}`, {
                 responseType: 'blob',
                 params: {
@@ -1151,14 +970,15 @@ const AnalyzeRecordings = () => {
                 }
             });
             
-           
+            console.log('AxiosInstance response received:', response.status, response.headers);
+            
             if (response.status === 200) {
                 setMediaPlayerModal(true);
                 const blob = new Blob([response.data], { type: 'audio/mpeg' });
                 const audioUrl = window.URL.createObjectURL(blob);
                 setAudioUrl(audioUrl);
 
-               
+                console.log('Audio loaded successfully via axiosInstance');
             } else if (response.status === 204) {
                 toast.error('Audio file not found');
             } else {
@@ -1187,7 +1007,7 @@ const AnalyzeRecordings = () => {
             }
         } finally {
             setAudioLoading(false);
-           
+            console.log('=== AUDIO LOADING COMPLETE ===');
         }
     };
 
@@ -1207,40 +1027,9 @@ const AnalyzeRecordings = () => {
         NProgress.start();
         await fetchGeneralStats();
         await fetchTableData(1, 15, '');
-        //await fetchFilteredData();
         setLoading(false);  
         NProgress.done();
     }
-
-    
-
-    const fetchFilteredData = useCallback(async (page = 1, perPage = 15, search = "") => {
-
-        try {
-            const response = await GetFilteredData({
-                ...currentFilters,
-                page,
-                perPage,
-                search
-            });
-            console.log("Filtered Data", response);
-            // Return response for GenericListPage to handle
-            return response;
-        } catch (error) {
-            console.error('Error fetching filtered data:', error);
-            toast.error('Failed to fetch filtered data. Please try again.');
-            // Return empty response structure on error
-            return {
-                dataList: [],
-                meta: {
-                    current_page: page,
-                    total: 0,
-                    per_page: perPage,
-                    last_page: 0
-                }
-            };
-        }
-    }, [currentFilters]);
 
     return (
         <React.Fragment>
@@ -1550,20 +1339,12 @@ const AnalyzeRecordings = () => {
             </Row>
 
             {/* Data Table */}
-            {session?.user?.permissions?.includes('transcriptions-analysis-aiml') && (
-                                <>
-
-{/* <GenericListPage
-                                    columns={columnsAIML}
-                                    fetchData={fetchFilteredData}
-                                    title="AIML Data"
-                                    searchPlaceholder="Search AIML data..."
-                                    defaultPageSize={15}
-                                    filters={currentFilters}
-                                    refreshKey={refreshKey}
-                                    search={false}
-                                    tableStyle='table-style-2'
-                                /> */}
+            <Row>
+                <Col md={12}>
+                    <div className="card">
+                        <div className="card-body">
+                            <h5 className="mb-3 app-title-heading">Call Recordings Data</h5>
+                            {session?.user?.permissions?.includes('transcriptions-analysis-aiml') && (
                                 <GenericListPage
                                     columns={columns}
                                     fetchData={fetchTableData}
@@ -1575,8 +1356,11 @@ const AnalyzeRecordings = () => {
                                     search={true}
                                     tableStyle='table-style-2'
                                 />
-                                </>
                             )}
+                        </div>
+                    </div>
+                </Col>
+            </Row>
 
             {/* Country Chart Modal */}
             <Modal 

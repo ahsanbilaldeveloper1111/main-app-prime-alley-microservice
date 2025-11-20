@@ -6,7 +6,7 @@ import Select, { MultiValue } from 'react-select';
 import AsyncSelect from 'react-select/async';
 import FormModal from '@pages/partial/FormModal';
 import ConfirmModal from '@pages/partial/ConfirmModal';
-import { User, SelectOption, Module } from './types';
+import { User, SelectOption, Module } from '@typings/controlhub/users';
 import { linkUsers, unlinkUsers, getParentUsers } from '@utils/users';
 import { ModuleSlug } from '@utils/Helper';
 

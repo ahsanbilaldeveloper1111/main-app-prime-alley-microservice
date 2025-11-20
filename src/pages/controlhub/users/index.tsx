@@ -16,12 +16,12 @@ import UserDetailsModal from './partials/UserDetailsModal';
 import SyncLdapUsersModal from './partials/SyncLdapUsersModal';
 
 // Import hooks and utilities
-import { useUserColumns } from './partials/userColumns';
-import { useUserCharts } from './partials/useUserCharts';
-import { useUsersData } from './partials/useUsersData';
-import { useLdapSync } from './partials/useLdapSync';
-import { useUserModal } from './partials/useUserModal';
-import { handleUserExport } from './partials/userExport';
+import { useUserColumns } from '@hooks/controlhub/users/userColumns';
+import { useUserCharts } from '@hooks/controlhub/users/useUserCharts';
+import { useUsersData } from '@hooks/controlhub/users/useUsersData';
+import { useLdapSync } from '@hooks/controlhub/users/useLdapSync';
+import { useUserModal } from '@hooks/controlhub/users/useUserModal';
+import { handleUserExport } from '@utils/controlhub/users/userExport';
 
 
 const Users = () => {

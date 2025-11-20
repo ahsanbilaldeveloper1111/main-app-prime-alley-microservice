@@ -20,7 +20,7 @@ import PermissionsTab from './partials/PermissionsTab';
 import LinkedUsersTab from './partials/LinkedUsersTab';
 import CustomFieldsTab from './partials/CustomFieldsTab';
 import LinkedCompaniesTab from './partials/LinkedCompaniesTab';
-import { User, Permission, Role, Group, Module } from './partials/types';
+import { User, Permission, Role, Group, Module } from '@typings/controlhub/users';
 import { GetCompanies } from '@utils/users';
 
 const UserView = () => {

@@ -6,13 +6,10 @@ interface SSEConfig {
   onOpen?: () => void;
   onClose?: () => void;
   uuid?: string;
+  date?: string;
   localPartyNumber?: string;
   ownerUsername?: string;
   imagicle?: string;
-  mlCallDuration?: string;
-  callDirection?: string;
-  callRemoteNumber?: string;
-  callDateTime?: string;
   preventAutoConnect?: boolean;
 }
 
@@ -46,12 +43,12 @@ export const useAnalysisSSE = (config: SSEConfig) => {
 
   // Check if parameters are ready
   useEffect(() => {
-    const hasAllParams = !!(config.uuid  && config.localPartyNumber && config.ownerUsername && config.imagicle && config.mlCallDuration && config.callDirection && config.callRemoteNumber && config.callDateTime);
+    const hasAllParams = !!(config.uuid && config.date && config.localPartyNumber && config.ownerUsername && config.imagicle);
     setState(prev => ({
       ...prev,
       parametersReady: hasAllParams
     }));
-  }, [config.uuid, config.localPartyNumber, config.ownerUsername, config.imagicle, config.mlCallDuration, config.callDirection, config.callRemoteNumber, config.callDateTime]);
+  }, [config.uuid, config.date, config.localPartyNumber, config.ownerUsername, config.imagicle]);
 
   const connect = useCallback(() => {
     if (eventSourceRef.current?.readyState === EventSource.OPEN) {
@@ -59,23 +56,20 @@ export const useAnalysisSSE = (config: SSEConfig) => {
     }
 
     // Check if required parameters are available
-    if (!configRef.current.uuid || !configRef.current.localPartyNumber || !configRef.current.ownerUsername || !configRef.current.imagicle || !configRef.current.mlCallDuration || !configRef.current.callDirection || !configRef.current.callRemoteNumber || !configRef.current.callDateTime) {
+    if (!configRef.current.uuid || !configRef.current.date || !configRef.current.localPartyNumber || !configRef.current.ownerUsername || !configRef.current.imagicle) {
       console.warn('⚠️ Cannot connect: Missing required parameters', {
         uuid: configRef.current.uuid,
+        date: configRef.current.date,
         localPartyNumber: configRef.current.localPartyNumber,
         ownerUsername: configRef.current.ownerUsername,
-        imagicle: configRef.current.imagicle,
-        mlCallDuration: configRef.current.mlCallDuration,
-        callDirection: configRef.current.callDirection,
-        callRemoteNumber: configRef.current.callRemoteNumber,
-        callDateTime: configRef.current.callDateTime
+        imagicle: configRef.current.imagicle
       });
       setState(prev => ({
         ...prev,
         connecting: false,
-        error: 'Missing required parameters: uuid, localPartyNumber, ownerUsername, imagicle, mlCallDuration, callDirection, callRemoteNumber, callDateTime'
+        error: 'Missing required parameters: uuid, date, localPartyNumber, ownerUsername, imagicle'
       }));
-      configRef.current.onError?.('Missing required parameters: uuid, localPartyNumber, ownerUsername, imagicle, mlCallDuration, callDirection, callRemoteNumber, callDateTime');
+      configRef.current.onError?.('Missing required parameters: uuid, date, localPartyNumber, ownerUsername, imagicle');
       return;
     }
 
@@ -89,14 +83,10 @@ export const useAnalysisSSE = (config: SSEConfig) => {
       // Build query parameters
       const params = new URLSearchParams();
       if (configRef.current.uuid) params.append('uuid', configRef.current.uuid);
-      
+      if (configRef.current.date) params.append('date', configRef.current.date);
       if (configRef.current.localPartyNumber) params.append('localPartyNumber', configRef.current.localPartyNumber);
       if (configRef.current.ownerUsername) params.append('ownerUsername', configRef.current.ownerUsername);
       if (configRef.current.imagicle) params.append('imagicle', configRef.current.imagicle);
-      if (configRef.current.mlCallDuration) params.append('mlCallDuration', configRef.current.mlCallDuration);
-      if (configRef.current.callDirection) params.append('callDirection', configRef.current.callDirection);
-      if (configRef.current.callRemoteNumber) params.append('callRemoteNumber', configRef.current.callRemoteNumber);
-      if (configRef.current.callDateTime) params.append('callDateTime', configRef.current.callDateTime);
       
       const sseUrl = `/api/analysis-stream?${params.toString()}`;
       

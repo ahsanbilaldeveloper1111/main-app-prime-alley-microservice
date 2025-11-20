@@ -91,19 +91,13 @@ const CallAnalysis = () => {
   const [callType, setCallType] = useState<string | null>(null);
   const [dataFound, setDataFound] = useState<boolean>(false);
   const [analysisComplete, setAnalysisComplete] = useState<boolean>(false);
-
-  const [mlCallDuration, setMlCallDuration] = useState<string | null>('1980543371');
-  const [callDirection, setCallDirection] = useState<string | null>('CALL_OUTGOING');
-  const [callRemoteNumber, setCallRemoteNumber] = useState<string | null>('0561979110');
-  const [callDateTime, setCallDateTime] = useState<string | null>('2025-10-29 22:19:47 +04:00');
   
   // Audio related state
-  const [uuid, setUuid] = useState('9AC40A0F-03E0-4DA3-9706-219534EE5E23');
-  const [localPartyNumber, setLocalPartyNumber] = useState('6018');
-  const [ownerUsername, setOwnerUsername] = useState('bpo18');
-  const [imagicle, setImagicle] = useState('node2');
-
-
+  const [uuid, setUuid] = useState('');
+  const [date, setDate] = useState('');
+  const [localPartyNumber, setLocalPartyNumber] = useState('');
+  const [ownerUsername, setOwnerUsername] = useState('');
+  const [imagicle, setImagicle] = useState('');
   const [audioTrackId, setAudioTrackId] = useState('');
   const [audioUrl, setAudioUrl] = useState<string>('');
   const [audioLoading, setAudioLoading] = useState(false);
@@ -127,13 +121,10 @@ const CallAnalysis = () => {
     disconnect: disconnectSocket
   } = useAnalysisSSE({
     uuid: uuid,
-    localPartyNumber: localPartyNumber || '',
-    ownerUsername: ownerUsername || '',
-    imagicle: imagicle || '',
-    mlCallDuration: mlCallDuration || '',
-    callDirection: callDirection || '',
-    callRemoteNumber: callRemoteNumber || '',
-    callDateTime: callDateTime || '',
+    date: date,
+    localPartyNumber: localPartyNumber,
+    ownerUsername: ownerUsername,
+    imagicle: imagicle,
     preventAutoConnect: analysisComplete,
     onMessage: (data) => {
       if (!data) return;
@@ -205,7 +196,7 @@ const CallAnalysis = () => {
     if (!router.isReady) return;
 
     try {
-      const { id, file, direction, phone, imagicle, datetime, duration } = router.query;
+      const { id, file, direction, phone, imagicle } = router.query;
       
       // Set basic parameters
       if (id) {
@@ -233,18 +224,23 @@ const CallAnalysis = () => {
           const parts = cleanName.split('_');
           
           if (parts.length >= 4) {
-           
+            const timestamp = parts[0];
             const extension = parts[1];
             const user = parts[2];
-            const remoteNumber = parts[3];
-            setCallRemoteNumber(remoteNumber as string);
-
+            
+            // Format date from timestamp
+            const year = timestamp.substring(0, 4);
+            const month = timestamp.substring(4, 6);
+            const day = timestamp.substring(6, 8);
+            const formattedDate = `${year}-${month}-${day}`;
+            
             // Set extracted parameters
             setLocalPartyNumber(extension);
             setOwnerUsername(user);
+            setDate(formattedDate);
             
             // Trigger analysis
-            handleGetCallAnalysisWithData(extension, user, id as string, imagicle as string, mlCallDuration as string, callDirection as string, callRemoteNumber as string, callDateTime as string);
+            handleGetCallAnalysisWithData(formattedDate, extension, user, id as string, imagicle as string);
           }
         }
       }
@@ -268,8 +264,8 @@ const CallAnalysis = () => {
 
   const handleGetCallAnalysis = async () => {
     // Validate required parameters
-    if (!uuid || !localPartyNumber || !ownerUsername || !mlCallDuration || !callDirection || !callRemoteNumber || !callDateTime) {
-      toast.error('Please fill in all required fields (UUID, Extension, Username, Duration, Direction, Remote Number, DateTime)');
+    if (!uuid || !date || !localPartyNumber || !ownerUsername) {
+      toast.error('Please fill in all required fields (UUID, Date, Extension, Username)');
       return;
     }
     
@@ -283,16 +279,13 @@ const CallAnalysis = () => {
     }
   };
 
-  const handleGetCallAnalysisWithData = async (localPartyNumberParam: string, ownerUsernameParam: string, uuidParam: string, imagicleParam: string, mlCallDurationParam: string, callDirectionParam: string, callRemoteNumberParam: string, callDateTimeParam: string) => {
+  const handleGetCallAnalysisWithData = async (dateParam: string, localPartyNumberParam: string, ownerUsernameParam: string, uuidParam: string, imagicleParam: string) => {
     // Set the parameters
     setUuid(uuidParam);
+    setDate(dateParam);
     setLocalPartyNumber(localPartyNumberParam);
     setOwnerUsername(ownerUsernameParam);
     setImagicle(imagicleParam);
-    setMlCallDuration(mlCallDurationParam);
-    setCallDirection(callDirectionParam);
-    setCallRemoteNumber(callRemoteNumberParam);
-    setCallDateTime(callDateTimeParam);
     // Set loading state
     setLoading(true);
     setError(null);
@@ -454,7 +447,18 @@ const CallAnalysis = () => {
                     />
                   </Form.Group>
                 </Col>
-                
+                <Col md={2}>
+                  <Form.Group className="mb-3">
+                    <Form.Label>Date</Form.Label>
+                    <Form.Control
+                      type="date"
+                      value={date}
+                      onChange={(e) => setDate(e.target.value)}
+                      placeholder="Enter Date"
+                      required
+                    />
+                  </Form.Group>
+                </Col>
                 <Col md={2}>
                   <Form.Group className="mb-3">
                     <Form.Label>Extension</Form.Label>
@@ -492,61 +496,6 @@ const CallAnalysis = () => {
                     />
                   </Form.Group>
                 </Col>
-
-
-                <Col md={3}>
-                  <Form.Group className="mb-3">
-                    <Form.Label>Duration</Form.Label>
-                    <Form.Control
-                      type="number"
-                      min={0}
-                      value={mlCallDuration || 0}
-                      onChange={(e) => setMlCallDuration(e.target.value.toString())}
-                      placeholder="Enter Duration"
-                      required
-                    />
-                  </Form.Group>
-                </Col>
-
-                <Col md={3}>
-                  <Form.Group className="mb-3">
-                    <Form.Label>Direction</Form.Label>
-                    <Form.Control
-                      type="text"
-                      value={callDirection || ''}
-                      onChange={(e) => setCallDirection(e.target.value)}
-                      placeholder="Enter Direction"
-                      required
-                    />
-                  </Form.Group>
-                </Col>
-
-                <Col md={3}>
-                  <Form.Group className="mb-3">
-                    <Form.Label>Remote Number</Form.Label>
-                    <Form.Control
-                      type="text"
-                      value={callRemoteNumber || ''}
-                      onChange={(e) => setCallRemoteNumber(e.target.value)}
-                      placeholder="Enter Remote Number"
-                      required
-                    />
-                  </Form.Group>
-                </Col>
-
-                <Col md={3}>
-                  <Form.Group className="mb-3">
-                    <Form.Label>DateTime</Form.Label>
-                    <Form.Control
-                      type="datetime"
-                      value={callDateTime || ''}
-                      onChange={(e) => setCallDateTime(e.target.value)}
-                      placeholder="Enter DateTime"
-                      required
-                    />
-                  </Form.Group>
-                </Col>
-
                
               </Row>
               <Row>
@@ -563,7 +512,7 @@ const CallAnalysis = () => {
                           <Spinner animation="border" size="sm" className="me-2" />
                           Connecting...
                         </>
-                      ) : socketConnected ? (
+                      ) : loading ? (
                         <>
                           <Spinner animation="border" size="sm" className="me-2" />
                           Analyzing...
@@ -581,7 +530,7 @@ const CallAnalysis = () => {
                         setUuid('');
                         setLocalPartyNumber('');
                         setOwnerUsername('');
-                       
+                        setDate('');
                         
                         // Clear all analysis data
                         setAnalysis(null);
@@ -1229,8 +1178,8 @@ const CallAnalysis = () => {
       console.log(response);
 
   } catch (err) {
-      //setError(err instanceof Error ? err.message : 'An error occurred');
-      console.error('Error fetching transcription:', err);
+      setError(err instanceof Error ? err.message : 'An error occurred');
+      //console.error('Error fetching transcription:', err);
   } finally {
       setLoading(false);
   }

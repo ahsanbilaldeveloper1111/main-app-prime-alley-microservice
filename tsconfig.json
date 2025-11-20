@@ -36,6 +36,8 @@
       "@services/*": ["src/services/*"],
       "@models/*": ["src/Models/*"],
       "@hooks/*": ["src/hooks/*"],
+      "@types/*": ["src/types/*"],
+      "@typings/*": ["src/types/*"],
       "@constants/*": ["src/constants/*"]
     }
   },

@@ -3,7 +3,7 @@ import { Card, Col, Row, Button } from 'react-bootstrap';
 import { useSession } from 'next-auth/react';
 import FormModal from '@pages/partial/FormModal';
 import Select from 'react-select';
-import { User, Role, Group } from './types';
+import { User, Role, Group } from '@typings/controlhub/users';
 import { assignRoleToUser, assignGroupToUser, MarkAsCompanyAdmin } from '@utils/users';
 import { getAllRoles } from '@utils/roles';
 import { getAllGroups } from '@utils/groups';
