@@ -13,6 +13,7 @@ import {
   Plus,
   Check,
 } from 'lucide-react';
+import { useSession } from "next-auth/react";
 
 import "@assets/scss/billing.scss";
 
@@ -228,6 +229,9 @@ const AddCardForm: React.FC<{
 };
 
 const PaymentMethods = () => {
+  const { data:session, status } = useSession();
+
+
   const [showAddCardModal, setShowAddCardModal] = useState(false);
   const [stripePublishableKey, setStripePublishableKey] = useState<string>("");
   
@@ -294,10 +298,12 @@ const PaymentMethods = () => {
         showSearch={false}
         buttons={
           <>
+            {session?.user?.permissions?.includes('add-payment-method-billing') && (
             <Button variant="primary" onClick={() => setShowAddCardModal(true)}>
               <Plus size={16} className="me-2" />
               Add Card
             </Button>
+            )}
           </>
         }
       />
@@ -330,8 +336,12 @@ const PaymentMethods = () => {
                     <div className="d-flex gap-2">
                       {!method.is_default ? (
                         <>
-                          <Button variant="outline-primary" size="sm" className="flex-grow-1" onClick={() => handleSetDefault(method.id)}>Set Default</Button>
-                          <Button variant="outline-secondary" size="sm" onClick={() => handleDeleteCard(method.id)}><Trash2 size={14} /></Button>
+                          {session?.user?.permissions?.includes('mark-payment-method-default-billing') && (
+                            <Button variant="outline-primary" size="sm" className="flex-grow-1" onClick={() => handleSetDefault(method.id)}>Set Default</Button>
+                          )}
+                          {session?.user?.permissions?.includes('delete-payment-method-billing') && (
+                            <Button variant="outline-secondary" size="sm" onClick={() => handleDeleteCard(method.id)}><Trash2 size={14} /></Button>
+                          )}
                         </>
                       ) : (
                         <Button variant="outline-secondary" size="sm" className="w-100" disabled>Default Payment</Button>

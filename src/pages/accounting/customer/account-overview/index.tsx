@@ -177,12 +177,10 @@ const AccountOverview = () => {
             <Col lg={5} className="mb-4">
               <Card>
                 <Card.Body>
-                  <h6 className="text-muted mb-3">Target upgrade charges</h6>
+                  <h6 className="text-muted mb-3">Open Invoice Amount</h6>
                   <h2 className="mb-1">£17.99</h2>
-                  <small className="text-muted">(Excludes taxes and fees)</small>
-                  <div className="mt-3">
-                    <small className="text-muted">Target upgrade date: 08/05/2025</small>
-                  </div>
+                  <small className="text-muted">(Inclusive VAT)</small>
+                  
                   <hr />
                   <div className="d-flex justify-content-between mb-2">
                     <span className="text-muted">Account credit limit</span>
@@ -204,10 +202,10 @@ const AccountOverview = () => {
                 <Card.Body>
                   <h6 className="text-muted mb-2">Tax information</h6>
                   <p className="mb-1"><small className="text-muted">VAT number</small></p>
-                  <p className="fw-semibold mb-1">{companyDetails?.profile?.registration_number}</p>
+                  <p className="fw-semibold mb-1">{companyDetails?.profile?.tax_id || 'N/A'}</p>
 
                   <p className="mb-1"><small className="text-muted">VAT Rate (%)</small></p>
-                  <p className="fw-semibold mb-1">{companyDetails?.profile?.vat_rate}</p>
+                  <p className="fw-semibold mb-1">{companyDetails?.profile?.vat_rate || 'N/A'}</p>
 
                   <p className="mb-1"><small className="text-muted">VAT Exemption</small></p>
                   <p className="fw-semibold mb-1">{companyDetails?.profile?.vat_exemption ? 'Yes' : 'No'}</p>
@@ -220,9 +218,9 @@ const AccountOverview = () => {
                 <Card.Body>
                   <div className="d-flex justify-content-between align-items-center mb-2">
                     <h6 className="text-muted mb-0">Billing contact</h6>
-                    <Button variant="link" size="sm" className="p-0" onClick={() => setShowBillingEditModal(true)}>
+                    {/* <Button variant="link" size="sm" className="p-0" onClick={() => setShowBillingEditModal(true)}>
                       <Edit size={16} />
-                    </Button>
+                    </Button> */}
                   </div>
                   <p className="mb-1"><small className="text-muted">Name</small></p>
                   <p className="fw-semibold mb-1">{companyDetails?.name}</p>

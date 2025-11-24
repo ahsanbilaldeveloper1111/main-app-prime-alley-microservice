@@ -19,6 +19,7 @@ import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area
 } from 'recharts';
+import UAECurrencyLogo from "@assets/images/uae-currency-logo.jpg";
 
 import "@assets/scss/billing.scss";
 
@@ -55,6 +56,7 @@ const CustomerDashboard = () => {
     color: string;
     change: string;
     isPositive: boolean;
+    isImage: boolean;
   }>>([]);
 
   useEffect(() => {
@@ -78,10 +80,10 @@ const CustomerDashboard = () => {
     setDashboardCounters(response);
     setSummaryCards(
       [
-        { title: 'Active Products', value: response?.products?.total, icon: <Package size={24} />, color: 'primary', change: '+12.5%', isPositive: true },
-      { title: 'Total Spent', value: currency + ' ' + response?.invoices?.total_amount, icon: <DollarSign size={24} />, color: 'info', change: '+15.3%', isPositive: true },
-      { title: 'Outstanding Invoices', value: currency + ' ' + response?.invoices?.outstanding_amount, icon: <DollarSign size={24} />, color: 'warning', change: '-5.1%', isPositive: false },
-      { title: 'Monthly Cost', value: currency + ' ' + response?.invoices?.partially_paid_amount, icon: <DollarSign size={24} />, color: 'success', change: '+8.2%', isPositive: true }
+        { title: 'Active Products', value: response?.products?.total, icon: <Package size={24} />, color: 'primary', change: '+12.5%', isPositive: true,isImage: false },
+      { title: 'Open Invoice Amount', value: currency + ' ' + response?.invoices?.total_amount, icon: <DollarSign size={24} />, color: 'info', change: '+15.3%', isPositive: true,isImage: true },
+      { title: 'Open Unpaid Amount', value: currency + ' ' + response?.invoices?.outstanding_amount, icon: <DollarSign size={24} />, color: 'warning', change: '-5.1%', isPositive: false,isImage: true },
+      { title: 'Paid Amount', value: currency + ' ' + response?.invoices?.partially_paid_amount, icon: <DollarSign size={24} />, color: 'success', change: '+8.2%', isPositive: true,isImage: true }
       ]
     );
   
@@ -131,7 +133,7 @@ const CustomerDashboard = () => {
           <div className="bg-white border rounded shadow-sm p-3">
             <p className="mb-2 fw-semibold">{data.month_name}</p>
             <p className="mb-1 small">
-              <span className="text-muted">Total Amount: </span>
+              <span className="text-muted">Open Invoice Amount: </span>
               <span className="fw-semibold">{currency} {data.total_amount?.toFixed(2) || '0.00'}</span>
             </p>
             <p className="mb-1 small">
@@ -139,7 +141,7 @@ const CustomerDashboard = () => {
               <span className="fw-semibold text-success">{currency} {data.paid_amount?.toFixed(2) || '0.00'}</span>
             </p>
             <p className="mb-0 small">
-              <span className="text-muted">Outstanding Amount: </span>
+              <span className="text-muted">Open Unpaid Amount: </span>
               <span className="fw-semibold text-warning">{currency} {data.outstanding_amount?.toFixed(2) || '0.00'}</span>
             </p>
           </div>
@@ -187,9 +189,24 @@ const CustomerDashboard = () => {
                       <Card>
                         <Card.Body>
                           <div className="d-flex justify-content-between align-items-start mb-3">
+                            
+
+                            {card.isImage ===false && 
+                            <>
                             <div className={`bg-${card.color} bg-opacity-10 rounded p-3`}>
-                              <div className={`text-${card.color}`}>{card.icon}</div>
+                            <div className={`text-${card.color}`}>{card.icon}</div>
                             </div>
+                            </>
+
+                               }
+                              {card.isImage && 
+                              <>
+                              <div className={`bg-light  rounded p-3`}>
+                              <img src={UAECurrencyLogo.src} alt="Currency Logo" width={24} height={24} />
+                              </div>
+                              </>
+                              }
+
                             {/* <Badge bg={card.isPositive ? 'success' : 'danger'} className="bg-opacity-10">
                               {card.isPositive ? <ArrowUp size={12} className="me-1" /> : <ArrowDown size={12} className="me-1" />}
                               <span className={`text-${card.isPositive ? 'success' : 'danger'}`}>{card.change}</span>
@@ -218,6 +235,27 @@ const CustomerDashboard = () => {
                           </Form.Select>
                         </div> */}
                         <SpendingChart />
+
+                        <Row className="mt-4">
+                          <Col lg={4}>
+                            <div className="text-center border p-2 rounded">
+                            <h6 className="mb-2 text-muted">Open Invoice Amount</h6>
+                              <h4 className="fw-semibold text-success">{currency} {dashboardCounters?.invoices?.total_amount}</h4>
+                            </div>
+                          </Col>
+                          <Col lg={4}>
+                            <div className="text-center border p-2 rounded">
+                              <h6 className="mb-2 text-muted">Open Unpaid Amount</h6>
+                              <h4 className="fw-semibold text-warning">{currency} {dashboardCounters?.invoices?.outstanding_amount}</h4>
+                            </div>
+                          </Col>
+                          <Col lg={4}>
+                            <div className="text-center border p-2 rounded">
+                              <h6 className="mb-2 text-muted">Paid Amount</h6>
+                              <h4 className="fw-semibold text-success">{currency} {dashboardCounters?.invoices?.partially_paid_amount}</h4>
+                            </div>
+                          </Col>
+                        </Row>
                       </Card.Body>
                     </Card>
                   </Col>

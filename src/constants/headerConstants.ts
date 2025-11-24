@@ -326,7 +326,7 @@ MENU_COLORS: {
     RESOURCES_SERVICES: 'resources-services',
 
     VIEW_COMPANIES_BILLING: 'view-companies-billing',
-    VIEW_INVOICES_BILLING: 'view-invoices-billing',
+  
     VIEW_EXPENSES_BILLING: 'view-expenses-billing',
     VIEW_PRODUCTS_BILLING: 'view-products-billing',
     VIEW_SUPPLIERS_BILLING: 'view-suppliers-billing',
@@ -334,6 +334,13 @@ MENU_COLORS: {
     VIEW_RESSELLERS_BILLING: 'view-resellers-billing',
     VIEW_INVENTORY_BILLING: 'view-inventory-billing',
     VIEW_PRODUCT_PRICING_COMPANIES_BILLING: 'manage-pricing-companies-billing',
+
+    VIEW_CUSTOMER_DASHBOARD_BILLING: 'dashboard-billing',
+    VIEW_ACCOUNT_OVERVIEW_BILLING: 'account-overview-billing',
+    VIEW_PRODUCT_DETAILS_BILLING: 'products-billing',
+    VIEW_BILLING_HISTORY_BILLING: 'billing-history-billing',
+    VIEW_INVOICES_BILLING: 'invoices-billing',
+    VIEW_PAYMENT_METHODS_BILLING: 'payment-methods-billing',
 
     VIEW_CRM_DASHBOARD: 'dashboard-crm',
     VIEW_CRM_CAMPAIGNS: 'view-crm-campaigns',

@@ -322,12 +322,48 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
         //   ]
         // },
 
-            { id: 'customer-dashboard', title: 'Customer Dashboard', icon: <LayoutDashboard size={16} />, url: '/accounting/customer/dashboard' },
-            { id: 'account-overview', title: 'Account Overview', icon: <Eye size={16} />, url: '/accounting/customer/account-overview' },
-            { id: 'product-details', title: 'Product Details', icon: <ShoppingBag size={16} />, url: '/accounting/customer/product-details' },
-            { id: 'billing-history', title: 'Billing History', icon: <FileText size={16} />, url: '/accounting/customer/billing-history' },
-            { id: 'billing-invoices', title: 'Invoices', icon: <DollarSign size={16} />, url: '/accounting/customer/invoices' },
-            { id: 'payment-methods', title: 'Payment Methods', icon: <CreditCard size={16} />, url: '/accounting/customer/payment-methods' },
+            { 
+              id: 'customer-dashboard', 
+              title: 'Customer Dashboard', 
+              icon: <LayoutDashboard size={16} />, 
+              url: '/accounting/customer/dashboard', 
+              permission: PERMISSIONS.VIEW_CUSTOMER_DASHBOARD_BILLING 
+            },
+            { 
+              id: 'account-overview', 
+              title: 'Account Overview', 
+              icon: <Eye size={16} />, 
+              url: '/accounting/customer/account-overview', 
+              permission: PERMISSIONS.VIEW_ACCOUNT_OVERVIEW_BILLING 
+            },
+
+            { 
+              id: 'product-details', 
+              title: 'Product Details', 
+              icon: <ShoppingBag size={16} />, 
+              url: '/accounting/customer/product-details', 
+              permission: PERMISSIONS.VIEW_PRODUCT_DETAILS_BILLING 
+            },
+            { 
+              id: 'billing-history', 
+              title: 'Billing History', 
+              icon: <FileText size={16} />, 
+              url: '/accounting/customer/billing-history', permission: PERMISSIONS.VIEW_BILLING_HISTORY_BILLING },
+            { 
+              id: 'billing-invoices', 
+              title: 'Invoices', 
+              icon: <DollarSign size={16} />, 
+              url: '/accounting/customer/invoices', 
+              permission: PERMISSIONS.VIEW_INVOICES_BILLING 
+            },
+            { 
+              id: 'payment-methods', 
+              title: 'Payment Methods', 
+              icon: <CreditCard size={16} />, 
+              url: '/accounting/customer/payment-methods', 
+              permission: PERMISSIONS.VIEW_PAYMENT_METHODS_BILLING 
+            },
+            
 
         // {
         //   id: 'accounting',

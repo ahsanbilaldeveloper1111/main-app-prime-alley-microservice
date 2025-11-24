@@ -21,6 +21,8 @@ interface PaginationWrapper<T> {
     last_page: number;
     from: number;
     to: number;
+    page: number;
+    limit: number;
   };
 }
 
@@ -114,6 +116,7 @@ export interface InvoicePaymentData {
 export interface InvoiceData {
   id: number;
   company_id: string;
+
   invoice_number: string;
   invoice_date: string;
   due_date: string;
@@ -641,6 +644,8 @@ export const getCompanies = async (
         data: companiesData,
         pagination: {
           current_page: response.data.data.pagination?.page || 1,
+          page: response.data.data.pagination?.page || 1,
+          limit: response.data.data.pagination?.limit || companiesData.length,
           per_page:
             response.data.data.pagination?.limit || companiesData.length,
           total: response.data.data.pagination?.total || companiesData.length,
@@ -660,8 +665,10 @@ export const getCompanies = async (
         per_page: companiesData.length,
         total: companiesData.length,
         last_page: 1,
-        from: 1,
+        from: 1,  
         to: companiesData.length,
+        page: 1,
+        limit: companiesData.length,
       },
     };
   } catch (error: any) {
@@ -898,6 +905,8 @@ export const getDiscountApplicabilityList = async (
         data: response.data.data.data, // The discount applicability array
         pagination: {
           current_page: response.data.data.pagination?.page || 1,
+          page: response.data.data.pagination?.page || 1,
+          limit: response.data.data.pagination?.limit || response.data.data.data.length,
           per_page:
             response.data.data.pagination?.limit ||
             response.data.data.data.length,
@@ -941,6 +950,8 @@ export const getProductPricingList = async (
         data: response.data.data.data, // The product pricing array
         pagination: {
           current_page: response.data.data.pagination?.page || 1,
+          page: response.data.data.pagination?.page || 1,
+          limit: response.data.data.pagination?.limit || response.data.data.data.length,
           per_page:
             response.data.data.pagination?.limit ||
             response.data.data.data.length,
@@ -1037,7 +1048,9 @@ export const getInvoices = async (
       return {
         data: response.data.data.data, // The invoice array
         pagination: {
-          current_page: response.data.data.pagination.page,
+          current_page: response.data.data.pagination?.page || 1,
+          page: response.data.data.pagination?.page || 1,
+          limit: response.data.data.pagination?.limit || response.data.data.data.length,
           per_page: response.data.data.pagination.limit,
           total: response.data.data.pagination.total,
           last_page: response.data.data.pagination.last_page,
@@ -1306,7 +1319,9 @@ export const getExpenses = async (
       return {
         data: response.data.data.data.data, // The expense array (nested data)
         pagination: {
-          current_page: response.data.data.data.current_page,
+          current_page: response.data.data.data.current_page || 1,
+          page: response.data.data.data.page || 1,
+          limit: response.data.data.data.limit || response.data.data.data.data.length,
           per_page: response.data.data.data.per_page,
           total: response.data.data.data.total,
           last_page: response.data.data.data.last_page,
@@ -1472,7 +1487,9 @@ export const getExpenseCategories = async (
       return {
         data: response.data.data.data, // The category array (direct data)
         pagination: {
-          current_page: response.data.data.pagination.page,
+          current_page: response.data.data.pagination?.page || 1,
+          page: response.data.data.pagination?.page || 1,
+          limit: response.data.data.pagination?.limit || response.data.data.data.length,
           per_page: response.data.data.pagination.limit,
           total: response.data.data.pagination.total,
           last_page: response.data.data.pagination.last_page,
@@ -1580,6 +1597,8 @@ export const getProducts = async (
         data: productsData,
         pagination: {
           current_page: response.data.data.pagination?.page || 1,
+          page: response.data.data.pagination?.page || 1,
+          limit: response.data.data.pagination?.limit || productsData.length,
           per_page: response.data.data.pagination?.limit || productsData.length,
           total: response.data.data.pagination?.total || productsData.length,
           last_page: response.data.data.pagination?.last_page || 1,
@@ -1595,6 +1614,8 @@ export const getProducts = async (
       data: productsData,
       pagination: {
         current_page: 1,
+        page: 1,
+        limit: productsData.length,
         per_page: productsData.length,
         total: productsData.length,
         last_page: 1,
@@ -1807,6 +1828,8 @@ export const getProductCategories = async (
         data: categoriesData,
         pagination: {
           current_page: response.data.data.pagination?.page || 1,
+          page: response.data.data.pagination?.page || 1,
+          limit: response.data.data.pagination?.limit || categoriesData.length,
           per_page:
             response.data.data.pagination?.limit || categoriesData.length,
           total: response.data.data.pagination?.total || categoriesData.length,
@@ -1823,6 +1846,8 @@ export const getProductCategories = async (
       data: categoriesData,
       pagination: {
         current_page: 1,
+        page: 1,
+        limit: categoriesData.length,
         per_page: categoriesData.length,
         total: categoriesData.length,
         last_page: 1,
@@ -2138,7 +2163,9 @@ export const getInventories = async (
       return {
         data: response.data.data.data, // The inventory array (nested data)
         pagination: {
-          current_page: response.data.data.pagination.page,
+          current_page: response.data.data.pagination?.page || 1,
+          page: response.data.data.pagination?.page || 1,
+          limit: response.data.data.pagination?.limit || response.data.data.data.length,
           per_page: response.data.data.pagination.limit,
           total: response.data.data.pagination.total,
           last_page: response.data.data.pagination.last_page,
@@ -2505,7 +2532,9 @@ export const getInventoryLocations = async (
       return {
         data: response.data.data.data, // The location array (nested data)
         pagination: {
-          current_page: response.data.data.pagination.page,
+          current_page: response.data.data.pagination?.page || 1,
+          page: response.data.data.pagination?.page || 1,
+          limit: response.data.data.pagination?.limit || response.data.data.data.length,
           per_page: response.data.data.pagination.limit,
           total: response.data.data.pagination.total,
           last_page: response.data.data.pagination.last_page,
@@ -2606,7 +2635,9 @@ export const getInventorySuppliers = async (
       return {
         data: response.data.data.data, // The supplier array (nested data)
         pagination: {
-          current_page: response.data.data.pagination.page,
+          current_page: response.data.data.pagination?.page || 1,
+          page: response.data.data.pagination?.page || 1,
+          limit: response.data.data.pagination?.limit || response.data.data.data.length,
           per_page: response.data.data.pagination.limit,
           total: response.data.data.pagination.total,
           last_page: response.data.data.pagination.last_page,

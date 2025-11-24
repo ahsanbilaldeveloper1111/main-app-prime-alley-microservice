@@ -1,390 +1,3 @@
-// import "@assets/scss/datatable-style.scss";
-// import React, {
-//   ReactElement,
-//   useEffect,
-//   useCallback,
-// } from "react";
-// import Layout from "@layout/index";
-// import BreadcrumbItem from "@common/BreadcrumbItem";
-
-// import CompanyLogo2 from "@assets/images/Prime3.png";
-// import { useState } from 'react';
-// import { Card, Row, Col, Button, Badge, Form, Table, Modal, Dropdown, ProgressBar, Nav } from 'react-bootstrap';
-// import { 
-//   Eye, CreditCard, Clock, Wallet, ChevronRight, ChevronLeft,
-//   Edit, Trash2, Filter, Plus, Settings, Download, LayoutDashboard,
-//   Package, FileText, Bell, Check, DollarSign, TrendingUp, AlertCircle,
-//   Users, ArrowUp, ArrowDown,
-//   Info
-// } from 'lucide-react';
-// import {
-//   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
-//   ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area
-// } from 'recharts';
-
-// import "@assets/scss/billing.scss";
-
-// import "@assets/scss/common.scss";
-// import "@assets/scss/tabs.scss";
-// import PageHeader from "@components/PageHeader";
-
-// import '@assets/scss/datatable-style.scss';
-// import { GetInvoices } from "@utils/accounting";
-// import GenericListPage from '@components/GenericListPage';
-// import { useSession } from 'next-auth/react';
-// import { Column } from "@components/CustomDataTable";
-// import moment from "moment";
-// import FormModal from "@pages/partial/FormModal";
-// import { toast } from "react-toastify";
-// import {currenciesData} from "@common/JsonData/currencies";
-// import ThemeSelect from "@components/ThemeSelect";
-
-// const Invoices = () => {
-
-
-//   const { data:session, status } = useSession();
-   
-//     const columns: Column[] = [
-        
-//          { key: 'invoice', name: 'Invoice', selector: (row: any) => row.invoice_number, sortable: true,
-//           cell: (row: any) => {
-//             return <div>
-//               <p className="">{row?.invoice_number}</p>
-//             </div>
-//           }
-//          },
-         
-//          { key: 'invoice_date', name: 'Invoice Date', selector: (row: any) => row.invoice_date, sortable: true,
-//             cell: (row: any) => {
-//               return <div>
-//                 <p className="text-muted">{moment(row?.invoice_date).format('DD-MMM-YYYY')}</p>
-//               </div>
-//             }
-//            },
-//          { key: 'due_date', name: 'Due Date', selector: (row: any) => row.due_date, sortable: true,
-//           cell: (row: any) => {
-//             return <div>
-//               <p className="text-muted">{moment(row?.due_date).format('DD-MMM-YYYY')}</p>
-//             </div>
-//           }
-//          },
-//          { key: 'total_amount', name: 'Amount', selector: (row: any) => row.total_amount, sortable: true,
-//             cell: (row: any) => {
-//               return <div>
-//                 <p className="fw-semibold text-primary">{row?.currency_code} {row?.total_amount}</p>
-//               </div>
-//             }
-//            },
-           
-          
-//           { key: 'status', name: 'Status', selector: (row: any) => row.status, sortable: true,
-//             cell: (row: any) => {
-//               return <div>
-//                 <p className={`bg-opacity-10 fw-semibold text-uppercase text-dark badge 
-//                   bg-${row?.status === 'pending' ? 'warning' : row?.status === 'paid' ? 'success' : row?.status === 'refunded' ? 'danger' : row?.status === 'partially_paid' ? 'warning' : row?.status === 'cancelled' ? 'danger' : row?.status === 'failed' ? 'danger' : 'secondary'}`}>
-//                   {row?.status}
-//                   </p>
-//               </div>
-//             }
-//            },
-        
-
-        
-//             {
-//                 key: 'Action',
-//                 name: 'Actions',
-//                 selector: (row: any) => row.id,
-//                 sortable: false,
-//                 cell: (props: any) => (
-//                     <div className="d-flex gap-2">
-//                        <Button variant="light" className="btn-action-style-2 p-1 text-info" title="View" onClick={() => handleViewPayment(props)}>
-//                             <Eye size={16} />
-//                         </Button>
-                        
-//                     </div>
-//                 )
-//             }
-      
-//     ];
-
-//     const [refreshKey, setRefreshKey] = useState<number>(0);
-//     const [currentFilters, setCurrentFilters] = useState<{ status?: string }>({});
-//     const [activeStatusTab, setActiveStatusTab] = useState<string | null>(null);
-
-//     const fetchPayments = useCallback(async (page = 1, perPage = 15, search = "") => {
-//         const params: any = {
-//             page,
-//             per_page: perPage,
-//             search
-//         };
-        
-//         if (currentFilters.status) {
-//             params.status = currentFilters.status;
-//         }
-        
-//         const response = await GetInvoices(params);
-//         console.log('response', response);
-//         return response;
-//     }, [currentFilters]);
-
-//     const [selectedPaymentView, setSelectedPaymentView] = useState<any | null>(null);
-//     const [showViewPaymentModal, setShowViewPaymentModal] = useState(false);
-
-//     const handleViewPayment = (props: any) => {
-//       console.log('props', props);
-//       setSelectedPaymentView(props);
-//       setShowViewPaymentModal(true);
-//     };
-
-    
-//   return (
-//     <React.Fragment>
-//       <BreadcrumbItem mainTitle="" mainLink="" subTitle="Invoices" />
-
-//       <PageHeader
-//         title="Invoices"
-
-//         showSearch={false}
-        
-//       />
-
-//       <Row className="mb-3">
-//         <Col md={12}>
-//           <ul id="system-tabs" className="mb-3 nav nav-tabs" role="tablist">
-//             <li className="nav-item" role="presentation">
-//               <button
-//                 className={`nav-link ${activeStatusTab === null ? 'active' : ''}`}
-//                 onClick={() => {
-//                   setActiveStatusTab(null);
-//                   setCurrentFilters({});
-//                   setRefreshKey(prev => prev + 1);
-//                 }}
-//                 type="button"
-//                 role="tab"
-//               >
-//                 All
-//               </button>
-//             </li>
-//             <li className="nav-item" role="presentation">
-//               <button
-//                 className={`nav-link ${activeStatusTab === 'paid' ? 'active' : ''}`}
-//                 onClick={() => {
-//                   setActiveStatusTab('paid');
-//                   setCurrentFilters({ status: 'paid' });
-//                   setRefreshKey(prev => prev + 1);
-//                 }}
-//                 type="button"
-//                 role="tab"
-//               >
-//                 Paid
-//               </button>
-//             </li>
-//             <li className="nav-item" role="presentation">
-//               <button
-//                 className={`nav-link ${activeStatusTab === 'pending' ? 'active' : ''}`}
-//                 onClick={() => {
-//                   setActiveStatusTab('pending');
-//                   setCurrentFilters({ status: 'pending' });
-//                   setRefreshKey(prev => prev + 1);
-//                 }}
-//                 type="button"
-//                 role="tab"
-//               >
-//                 Pending
-//               </button>
-//             </li>
-//             <li className="nav-item" role="presentation">
-//               <button
-//                 className={`nav-link ${activeStatusTab === 'refunded' ? 'active' : ''}`}
-//                 onClick={() => {
-//                   setActiveStatusTab('refunded');
-//                   setCurrentFilters({ status: 'refunded' });
-//                   setRefreshKey(prev => prev + 1);
-//                 }}
-//                 type="button"
-//                 role="tab"
-//               >
-//                 Refunded
-//               </button>
-//             </li>
-//             <li className="nav-item" role="presentation">
-//               <button
-//                 className={`nav-link ${activeStatusTab === 'partially_paid' ? 'active' : ''}`}
-//                 onClick={() => {
-//                   setActiveStatusTab('partially_paid');
-//                   setCurrentFilters({ status: 'partially_paid' });
-//                   setRefreshKey(prev => prev + 1);
-//                 }}
-//                 type="button"
-//                 role="tab"
-//               >
-//                 Partially Paid
-//               </button>
-//             </li>
-//             <li className="nav-item" role="presentation">
-//               <button
-//                 className={`nav-link ${activeStatusTab === 'cancelled' ? 'active' : ''}`}
-//                 onClick={() => {
-//                   setActiveStatusTab('cancelled');
-//                   setCurrentFilters({ status: 'cancelled' });
-//                   setRefreshKey(prev => prev + 1);
-//                 }}
-//                 type="button"
-//                 role="tab"
-//               >
-//                 Cancelled
-//               </button>
-//             </li>
-//             <li className="nav-item" role="presentation">
-//               <button
-//                 className={`nav-link ${activeStatusTab === 'failed' ? 'active' : ''}`}
-//                 onClick={() => {
-//                   setActiveStatusTab('failed');
-//                   setCurrentFilters({ status: 'failed' });
-//                   setRefreshKey(prev => prev + 1);
-//                 }}
-//                 type="button"
-//                 role="tab"
-//               >
-//                 Failed
-//               </button>
-//             </li>
-//           </ul>
-//         </Col>
-//       </Row>
-
-//             <GenericListPage
-//                  columns={columns}
-//                  fetchData={fetchPayments}
-//                  title="Invoices"
-//                  searchPlaceholder="Search invoices..."
-//                  defaultPageSize={15}
-//                  filters={currentFilters}
-//                  refreshKey={refreshKey}
-//                  search={true}
-//                  tableStyle="table-style-2"
-//              />
-
-//              <FormModal
-//               show={showViewPaymentModal}
-//               size="lg"
-//               onHide={() => setShowViewPaymentModal(false)}
-//               title="Payment Details"
-//               desc="View the payment details"
-//               onSubmit={() => setShowViewPaymentModal(false)}
-//               submitButtonText="Close"
-//               cancelButtonText="Cancel"
-//               onCancel={() => setShowViewPaymentModal(false)}
-//               formHtml={
-//                 <>
-//                 <div className="mb-4 pb-4 border-bottom"><div className="mb-4 pb-4 border-bottom">
-//                 <div className="row">
-//                   <div className="col-md-6">
-//                     <h6 className="text-muted mb-2">From</h6>
-//                     <h6 className="mb-1">{selectedPaymentView?.invoice?.reseller?.name}</h6>
-//                     {/* <img alt="logo" className="img-fluid" src={CompanyLogo2.src} /> */}
-//                     <p className="text-muted mb-0 small">123 Business Street
-//                       <br/>London, UK SW1A 1AA</p>
-//                   </div>
-//                   <div className="col-md-6">
-//                     <h6 className="text-muted mb-2">Bill To</h6>
-//                     <h6 className="mb-1">{selectedPaymentView?.company?.name}</h6>
-//                     <p className="text-muted mb-0 small">{selectedPaymentView?.company?.profile?.address}</p>
-//                   </div>
-//                 </div>
-//               </div>
-//               <div className="mb-4 pb-4 border-bottom">
-//                 <div className="row">
-//                   <div className="col-md-3 col-6">
-//                     <p className="text-muted mb-1 small">Invoice Date</p>
-//                     <p className="fw-semibold mb-0">{moment(selectedPaymentView?.invoice_date).format('DD-MMM-YYYY')}</p>
-//                   </div>
-//                   <div className="col-md-3 col-6">
-//                     <p className="text-muted mb-1 small">Due Date</p>
-//                     <p className="fw-semibold mb-0">{moment(selectedPaymentView?.due_date).format('DD-MMM-YYYY')}</p>
-//                   </div>
-//                   <div className="col-md-3 col-6">
-//                     <p className="text-muted mb-1 small">Payment Mode</p>
-//                     <p className="fw-semibold mb-0">{selectedPaymentView?.payment_mode}</p>
-//                   </div>
-//                   <div className="col-md-3 col-6">
-//                     <p className="text-muted mb-1 small">Invoice ID</p>
-//                     <p className="fw-semibold mb-0">{selectedPaymentView?.invoice_number}</p>
-//                   </div>
-//                 </div>
-//               </div>
-//               <div className="mb-4">
-//                 <h6 className="text-muted mb-3">Invoice Items</h6>
-//                 <div className="table-responsive">
-//                   <table className="table">
-//                     <thead className="bg-light">
-//                       <tr>
-//                         <th>Description</th>
-//                         <th className="text-center">Quantity</th>
-//                         <th className="text-end">Unit Price</th>
-//                         <th className="text-end">Total</th>
-//                       </tr>
-//                     </thead>
-//                     <tbody>
-//                       {selectedPaymentView?.invoice?.items?.map((item: any) => (
-//                         <tr key={item.id}>
-//                           <td>{item?.product?.name}</td>
-//                           <td className="text-center">{item.quantity}</td>
-//                           <td className="text-end fw-semibold">{selectedPaymentView?.currency_code} {item.unit_price}</td>
-//                           <td className="text-end fw-semibold">{selectedPaymentView?.currency_code} {item.line_total}</td>
-//                         </tr>
-//                       ))}
-                      
-//                     </tbody>
-//                   </table>
-//                 </div>
-//               </div>
-//               <div className="bg-light rounded p-3">
-//                 <div className="mb-2 row">
-//                   <div className="col-6">
-//                     <p className="mb-0 text-muted">Subtotal:</p>
-//                   </div>
-//                   <div className="text-end col-6">
-//                     <p className="mb-0 fw-semibold">{selectedPaymentView?.currency_code} {selectedPaymentView?.invoice?.subtotal}</p>
-//                   </div>
-//                 </div>
-//                 <div className="mb-2 row">
-//                   <div className="col-6">
-//                     <p className="mb-0 text-muted">Tax:</p>
-//                   </div>
-//                   <div className="text-end col-6">
-//                     <p className="mb-0 fw-semibold">{selectedPaymentView?.currency_code} {selectedPaymentView?.invoice?.tax_amount}</p>
-//                   </div>
-//                 </div>
-//                 <hr />
-//                 <div className="row">
-//                   <div className="col-6">
-//                     <p className="mb-0 fw-bold">Total:</p>
-//                   </div>
-//                   <div className="text-end col-6">
-//                     <p className="mb-0 fw-bold text-primary fs-5">{selectedPaymentView?.currency_code} {selectedPaymentView?.invoice?.total_amount}</p>
-//                   </div>
-//                 </div>
-//               </div></div>
-//                 </>
-//               }
-//               ShowSubmitButton={false}
-//               />
-
-            
-      
-
-//     </React.Fragment>
-//   );
-// };
-
-// Invoices.getLayout = (page: ReactElement) => {
-//   return <Layout>{page}</Layout>;
-// };
-
-// export default Invoices;
-
-
 import "@assets/scss/datatable-style.scss";
 import React, {
   ReactElement,
@@ -427,8 +40,10 @@ import {
   ProductData,
   CreateDirectPaymentData,
   PaymentIntentResponse,
+  getCompanies
 } from "@utils/accountingOld";
-import { getCompanies } from "@utils/accountingOld";
+import { GetPaymentMethods } from "@utils/accounting";
+
 import { Column } from "@components/CustomDataTable";
 import { Button, Modal, Row, Form, Alert } from "react-bootstrap";
 import { Col } from "react-bootstrap";
@@ -442,19 +57,13 @@ import {
   useStripe,
   useElements,
 } from "@stripe/react-stripe-js";
-import { FaShieldAlt, FaCreditCard, FaPlus } from "react-icons/fa";
+import { FaShieldAlt, FaCreditCard } from "react-icons/fa";
 
 import "@assets/scss/common.scss";
 
 import "@assets/scss/tabs.scss";
 import PageHeader from "@components/PageHeader";
-import PageSummaryGrid from "@components/PageSummaryGrid";
-import FormModal from "@pages/partial/FormModal";
-import ConfirmModal from "@pages/partial/ConfirmModal";
-import SuccessfulModal from "@pages/partial/SuccessfulModal";
 
-import { motion } from "framer-motion";
-import { FiEdit, FiTrash2, FiPrinter, FiDownload, FiCreditCard, FiDollarSign } from "react-icons/fi";
 import TableAction, { Action } from "@components/TableAction";
 import { Spinner } from "react-bootstrap";
 import { DollarSign, Download } from "lucide-react";
@@ -846,7 +455,8 @@ const InvoiceList = () => {
   const { data: session, status } = useSession();
 
   const [refreshKey, setRefreshKey] = useState<number>(0);
-  const [currentFilters, setCurrentFilters] = useState<{search?: string}>({});
+  const [currentFilters, setCurrentFilters] = useState<{search?: string; status?: string}>({});
+  const [activeStatusTab, setActiveStatusTab] = useState<string | null>(null);
 
   const [companies, setCompanies] = useState<CompanyData[]>([]);
   const [companyProducts, setCompanyProducts] = useState<ProductData[]>([]);
@@ -858,6 +468,8 @@ const InvoiceList = () => {
   const [paymentNotes, setPaymentNotes] = useState<string>("");
   const [isProcessingPayment, setIsProcessingPayment] = useState<boolean>(false);
   const [stripePublishableKey, setStripePublishableKey] = useState<string>("");
+  const [activePaymentTab, setActivePaymentTab] = useState<string>("saved-cards");
+  const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   
   // Exchange rate states
   const [exchangeRates, setExchangeRates] = useState<ExchangeRate[]>([]);
@@ -893,7 +505,7 @@ const InvoiceList = () => {
         sortable: true,
         cell: (props: InvoiceData) => (
           <span className="fw-bold text-success">
-            {props.currency_code || "USD"} {parseFloat(props.subtotal || "0").toFixed(2)}
+            {props?.currency_code || "USD"} {parseFloat(props.subtotal || "0").toFixed(2)}
           </span>
         ),
       },
@@ -904,7 +516,7 @@ const InvoiceList = () => {
         sortable: true,
         cell: (props: InvoiceData) => (
           <span className="text-warning">
-            {props.currency_code || "USD"}{" "}
+            {props?.currency_code || "USD"}{" "}
             {parseFloat(props.tax_amount || "0").toFixed(2)}
           </span>
         ),
@@ -988,41 +600,20 @@ const InvoiceList = () => {
         selector: (row: InvoiceData) => row.id,
         sortable: false,
         cell: (props: InvoiceData) => {
-          const isUnpaid = true; // All invoices can be paid
-          const actions = [
-
-           
-            
-            ...(session?.user?.permissions?.includes('download-invoice-invoices-billing') ? [
-            {
-              label: 'Download PDF',
-              icon: FiDownload,
-              onClick: () => handleDownloadPDF(props),
-              variant: 'default'
-            }
-            ] : []),
-
-            
-          ];
-
-          // Add Pay action for unpaid invoices
-          if (isUnpaid && session?.user?.permissions?.includes('pay-invoice-invoices-billing')) {
-            actions.push({
-              label: 'Pay',
-              icon: FiDollarSign,
-              onClick: () => handlePayInvoice(props),
-              variant: 'success'
-            });
-          }
-
          
-
           return (
             <>
           
           <div className="d-flex gap-2"> 
-                        <Button variant="light" className="btn-action-style-2 p-1 text-info" title="Pay" onClick={() => handlePayInvoice(props)}><DollarSign size={16} /></Button>
+            
+              {props.status === STATUS_PENDING && session?.user?.permissions?.includes('pay-invoices-billing') && (
+                        <Button variant="light" className="btn-action-style-2 p-1 text-info" title="Pay" onClick={() => handlePayInvoice(props)}>
+                          <DollarSign size={16} />
+                        </Button>
+              )}
+             
                         <Button variant="light" className="btn-action-style-2 p-1 text-info" title="Download PDF" onClick={() => handleDownloadPDF(props)}><Download size={16} /></Button>
+                      
                         </div>
             </>
           );
@@ -1391,6 +982,46 @@ const InvoiceList = () => {
     loadExchangeRates('USD'); // Load exchange rates with USD as base initially
   }, [loadStripePublishableKey, loadExchangeRates, loadCompanyProducts]);
 
+  const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
+  useEffect(() => {
+    getPaymentMethods();
+  }, []);
+  const getPaymentMethods = async () => {
+    const response = await GetPaymentMethods() as any;
+    const methods = response?.payment_methods || [];
+    setPaymentMethods(methods);
+    console.log("Payment methods:", methods);
+  };
+
+  // Refresh payment methods when payment modal opens
+  useEffect(() => {
+    if (showPaymentModal) {
+      getPaymentMethods();
+    }
+  }, [showPaymentModal]);
+
+  // Set default card when payment methods are loaded and modal is open
+  useEffect(() => {
+    if (showPaymentModal && paymentMethods.length > 0) {
+      // Set default card if available
+      const defaultCard = paymentMethods.find((method) => method.is_default && method.type === 'card');
+      if (defaultCard) {
+        setSelectedCardId(defaultCard.id);
+      } else {
+        const firstCard = paymentMethods.find((method) => method.type === 'card');
+        if (firstCard) {
+          setSelectedCardId(firstCard.id);
+        }
+      }
+    }
+  }, [showPaymentModal, paymentMethods]);
+
+  // Payment hook for saved cards
+  const { 
+    createInvoicePayment, 
+    isCreateInvoicePaymentPending 
+  } = useCreateInvoicePayment();
+
   // Cleanup timeout on unmount
   useEffect(() => {
     return () => {
@@ -1416,11 +1047,11 @@ const InvoiceList = () => {
         // The getInvoices function returns PaginationWrapper<InvoiceData>
         // which has the structure: { data: InvoiceData[], pagination: {...} }
         return {
-          data: response.data, // The actual invoice array
-          total: response.pagination.total,
-          page: response.pagination.current_page,
-          per_page: response.pagination.per_page,
-          last_page: response.pagination.last_page,
+          data: response?.data, // The actual invoice array
+          total: response?.pagination?.total,
+          page: response?.pagination?.current_page || response?.pagination?.page,
+          per_page: response?.pagination?.per_page || response?.pagination?.limit,
+          last_page: response?.pagination?.last_page,
         };
       } catch (error) {
         console.error("Error fetching invoices:", error);
@@ -1796,6 +1427,8 @@ const InvoiceList = () => {
     setShowPaymentModal(false);
     setSelectedInvoiceForPayment(null);
     setPaymentNotes("");
+    setActivePaymentTab("saved-cards");
+    setSelectedCardId(null);
   }, []);
 
 
@@ -1815,6 +1448,37 @@ const InvoiceList = () => {
   const handleDirectPaymentError = useCallback((error: string) => {
     toast.error(error);
   }, []);
+
+  // Payment with saved card handler
+  const handlePaymentWithSavedCard = useCallback(async () => {
+    if (!selectedCardId || !selectedInvoiceForPayment) {
+      toast.error("Please select a payment method");
+      return;
+    }
+
+    setIsProcessingPayment(true);
+    createInvoicePayment({
+      amount: parseFloat(selectedInvoiceForPayment.total_amount || '0'),
+      currency: (selectedInvoiceForPayment.currency_code || 'USD').toLowerCase(),
+      payment_method_id: selectedCardId,
+      invoice_id: selectedInvoiceForPayment.id,
+      customer_id: parseInt(selectedInvoiceForPayment.company_id || '0'),
+    }, {
+      onSuccess: (paymentResult) => {
+        if ((paymentResult as any).success) {
+          toast.success('Payment successful!');
+          handleDirectPaymentSuccess();
+        } else {
+          handleDirectPaymentError('Payment was not successful. Status: ' + paymentResult.status);
+        }
+        setIsProcessingPayment(false);
+      },
+      onError: (error) => {
+        handleDirectPaymentError(error.message || 'Payment processing failed');
+        setIsProcessingPayment(false);
+      }
+    });
+  }, [selectedCardId, selectedInvoiceForPayment, createInvoicePayment, handleDirectPaymentSuccess, handleDirectPaymentError]);
 
   const handleSubmitDeleteInvoice = useCallback(async () => {
     if (!selectedInvoice) return;
@@ -2410,11 +2074,11 @@ const InvoiceList = () => {
                 <div class="totals-content">
                   <div class="totals-row">
                     <span class="totals-label">Subtotal:</span>
-                    <span class="totals-amount">${invoice.currency_code || 'USD'} ${parseFloat(invoice.subtotal || '0').toFixed(2)}</span>
+                    <span class="totals-amount">${invoice.currency_code || 'AED'} ${parseFloat(invoice.subtotal || '0').toFixed(2)}</span>
                   </div>
                   <div class="totals-row">
                     <span class="totals-label">VAT (${isVatExempt ? 'Exempt' : companyVatRate + '%'}):</span>
-                    <span class="totals-amount">${invoice.currency_code || 'USD'} ${parseFloat(invoice.tax_amount || '0').toFixed(2)}</span>
+                    <span class="totals-amount">${invoice.currency_code || 'AED'} ${parseFloat(invoice.tax_amount || '0').toFixed(2)}</span>
                   </div>
                   <div class="totals-row total-final">
                     <span class="totals-label">Total Amount:</span>
@@ -2495,15 +2159,136 @@ const InvoiceList = () => {
 
   return (
     <React.Fragment>
-      <BreadcrumbItem mainTitle="" mainLink="" subTitle="Call Logs" />
+      <BreadcrumbItem mainTitle="" mainLink="" subTitle="Invoices" />
 
       <PageHeader
         title="Invoices"
        
       />
 
+      <Row className="mb-3">
+        <Col md={12}>
+          <ul id="system-tabs" className="mb-3 nav nav-tabs" role="tablist">
+            <li className="nav-item" role="presentation">
+              <button
+                className={`nav-link ${activeStatusTab === null ? 'active' : ''}`}
+                onClick={() => {
+                  setActiveStatusTab(null);
+                  setCurrentFilters((prev) => {
+                    const { status, ...rest } = prev;
+                    return rest;
+                  });
+                  setRefreshKey(prev => prev + 1);
+                }}
+                type="button"
+                role="tab"
+              >
+                All
+              </button>
+            </li>
+            {/* <li className="nav-item" role="presentation">
+              <button
+                className={`nav-link ${activeStatusTab === 'draft' ? 'active' : ''}`}
+                onClick={() => {
+                  setActiveStatusTab('draft');
+                  setCurrentFilters((prev) => ({ ...prev, status: 'draft' }));
+                  setRefreshKey(prev => prev + 1);
+                }}
+                type="button"
+                role="tab"
+              >
+                Draft
+              </button>
+            </li>
+            <li className="nav-item" role="presentation">
+              <button
+                className={`nav-link ${activeStatusTab === 'sent' ? 'active' : ''}`}
+                onClick={() => {
+                  setActiveStatusTab('sent');
+                  setCurrentFilters((prev) => ({ ...prev, status: 'sent' }));
+                  setRefreshKey(prev => prev + 1);
+                }}
+                type="button"
+                role="tab"
+              >
+                Sent
+              </button>
+            </li> */}
+            <li className="nav-item" role="presentation">
+              <button
+                className={`nav-link ${activeStatusTab === 'paid' ? 'active' : ''}`}
+                onClick={() => {
+                  setActiveStatusTab('paid');
+                  setCurrentFilters((prev) => ({ ...prev, status: 'paid' }));
+                  setRefreshKey(prev => prev + 1);
+                }}
+                type="button"
+                role="tab"
+              >
+                Paid
+              </button>
+            </li>
+            <li className="nav-item" role="presentation">
+              <button
+                className={`nav-link ${activeStatusTab === 'pending' ? 'active' : ''}`}
+                onClick={() => {
+                  setActiveStatusTab('pending');
+                  setCurrentFilters((prev) => ({ ...prev, status: 'pending' }));
+                  setRefreshKey(prev => prev + 1);
+                }}
+                type="button"
+                role="tab"
+              >
+                Pending
+              </button>
+            </li>
+            {/* <li className="nav-item" role="presentation">
+              <button
+                className={`nav-link ${activeStatusTab === 'partially_paid' ? 'active' : ''}`}
+                onClick={() => {
+                  setActiveStatusTab('partially_paid');
+                  setCurrentFilters((prev) => ({ ...prev, status: 'partially_paid' }));
+                  setRefreshKey(prev => prev + 1);
+                }}
+                type="button"
+                role="tab"
+              >
+                Partially Paid
+              </button>
+            </li> */}
+            <li className="nav-item" role="presentation">
+              <button
+                className={`nav-link ${activeStatusTab === 'overdue' ? 'active' : ''}`}
+                onClick={() => {
+                  setActiveStatusTab('overdue');
+                  setCurrentFilters((prev) => ({ ...prev, status: 'overdue' }));
+                  setRefreshKey(prev => prev + 1);
+                }}
+                type="button"
+                role="tab"
+              >
+                Overdue
+              </button>
+            </li>
+            <li className="nav-item" role="presentation">
+              <button
+                className={`nav-link ${activeStatusTab === 'cancelled' ? 'active' : ''}`}
+                onClick={() => {
+                  setActiveStatusTab('cancelled');
+                  setCurrentFilters((prev) => ({ ...prev, status: 'cancelled' }));
+                  setRefreshKey(prev => prev + 1);
+                }}
+                type="button"
+                role="tab"
+              >
+                Cancelled
+              </button>
+            </li>
+          </ul>
+        </Col>
+      </Row>
       
-      {session?.user?.permissions?.includes('list-invoices-billing') && (
+      {/* {session?.user?.permissions?.includes('list-invoices-billing') && ( */}
       <GenericListPage
         columns={columns}
         fetchData={fetchInvoices}
@@ -2515,7 +2300,7 @@ const InvoiceList = () => {
         search={true}
         tableStyle="table-style-2"
       />
-      )}
+      {/* )} */}
 
       {/* Create Invoice Modal */}
       {showCreateInvoiceModal && (
@@ -3506,7 +3291,7 @@ const InvoiceList = () => {
         >
           <Modal.Header closeButton>
             <Modal.Title>
-              <FiDollarSign className="me-2" />
+              <DollarSign className="me-2" />
               Process Payment - Invoice #{selectedInvoiceForPayment.invoice_number}
             </Modal.Title>
           </Modal.Header>
@@ -3550,23 +3335,136 @@ const InvoiceList = () => {
             {/* Payment Method */}
             <div className="mb-4">
               <h6 className="mb-3">Payment Method</h6>
-              {stripePublishableKey ? (
-                <Elements stripe={loadStripe(stripePublishableKey)}>
-                  <DirectCardPaymentForm
-                    amount={parseFloat(selectedInvoiceForPayment.total_amount || '0')}
-                    currency={selectedInvoiceForPayment.currency_code || 'USD'}
-                    invoiceId={selectedInvoiceForPayment.id}
-                    customerId={parseInt(selectedInvoiceForPayment.company_id || '0')}
-                    onPaymentSuccess={handleDirectPaymentSuccess}
-                    onPaymentError={handleDirectPaymentError}
-                  />
-                </Elements>
-              ) : (
-                <div className="text-center py-3">
-                  <Spinner animation="border" size="sm" className="me-2" />
-                  <span>Loading Stripe...</span>
-                </div>
-              )}
+
+              {/* Tabs */}
+              <ul className="nav nav-tabs mb-3" role="tablist">
+                <li className="nav-item" role="presentation">
+                  <button
+                    className={`nav-link ${activePaymentTab === 'saved-cards' ? 'active' : ''}`}
+                    onClick={() => setActivePaymentTab('saved-cards')}
+                    type="button"
+                    role="tab"
+                  >
+                    Saved Cards
+                  </button>
+                </li>
+                <li className="nav-item" role="presentation">
+                  <button
+                    className={`nav-link ${activePaymentTab === 'direct-payment' ? 'active' : ''}`}
+                    onClick={() => setActivePaymentTab('direct-payment')}
+                    type="button"
+                    role="tab"
+                  >
+                    Direct Payment
+                  </button>
+                </li>
+              </ul>
+
+              {/* Tab Content */}
+              <div className="tab-content">
+                {/* Saved Cards Tab */}
+                {activePaymentTab === 'saved-cards' && (
+                  <div className="tab-pane active">
+                    {paymentMethods.length > 0 ? (
+                      <div>
+                        <div className="mb-3">
+                          {paymentMethods
+                            .filter((method) => method.type === 'card')
+                            .map((method) => (
+                              <label
+                                key={method.id}
+                                htmlFor={`card-${method.id}`}
+                                className={`card mb-2 ${selectedCardId === method.id ? 'border-primary' : ''}`}
+                                style={{ cursor: 'pointer', marginBottom: 0 }}
+                              >
+                                <div className="card-body">
+                                  <div className="d-flex align-items-center">
+                                    <div className="form-check me-3">
+                                      <input
+                                        className="form-check-input"
+                                        type="radio"
+                                        name="selectedCard"
+                                        id={`card-${method.id}`}
+                                        checked={selectedCardId === method.id}
+                                        onChange={() => setSelectedCardId(method.id)}
+                                      />
+                                    </div>
+                                    <div className="flex-grow-1">
+                                      <div className="d-flex align-items-center justify-content-between">
+                                        <div>
+                                          <h6 className="mb-0 text-capitalize">
+                                            {method.card?.brand || 'Card'} •••• {method.card?.last4}
+                                          </h6>
+                                          <small className="text-muted">
+                                            {method.billing_details?.name || 'Cardholder'}
+                                          </small>
+                                        </div>
+                                        <div className="text-end">
+                                          <small className="text-muted d-block">
+                                            Expires {method.card?.exp_month}/{method.card?.exp_year}
+                                          </small>
+                                          {method.is_default && (
+                                            <span className="badge bg-success">Default</span>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              </label>
+                            ))}
+                        </div>
+                        <Button
+                          variant="success"
+                          className="w-100"
+                          onClick={handlePaymentWithSavedCard}
+                          disabled={!selectedCardId || isProcessingPayment || isCreateInvoicePaymentPending}
+                        >
+                          {isProcessingPayment || isCreateInvoicePaymentPending ? (
+                            <>
+                              <Spinner animation="border" size="sm" className="me-2" />
+                              Processing Payment...
+                            </>
+                          ) : (
+                            <>
+                              <FaCreditCard className="me-2" />
+                              Make Payment
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="text-center py-4">
+                        <p className="text-muted">No saved cards available</p>
+                        <small className="text-muted">Use the Direct Payment tab to add a new card</small>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Direct Payment Tab */}
+                {activePaymentTab === 'direct-payment' && (
+                  <div className="tab-pane active">
+                    {stripePublishableKey ? (
+                      <Elements stripe={loadStripe(stripePublishableKey)}>
+                        <DirectCardPaymentForm
+                          amount={parseFloat(selectedInvoiceForPayment.total_amount || '0')}
+                          currency={selectedInvoiceForPayment.currency_code || 'USD'}
+                          invoiceId={selectedInvoiceForPayment.id}
+                          customerId={parseInt(selectedInvoiceForPayment.company_id || '0')}
+                          onPaymentSuccess={handleDirectPaymentSuccess}
+                          onPaymentError={handleDirectPaymentError}
+                        />
+                      </Elements>
+                    ) : (
+                      <div className="text-center py-3">
+                        <Spinner animation="border" size="sm" className="me-2" />
+                        <span>Loading Stripe...</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Payment Notes */}
