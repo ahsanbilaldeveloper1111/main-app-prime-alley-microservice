@@ -43,6 +43,7 @@ import {
   getCompanies
 } from "@utils/accountingOld";
 import { GetPaymentMethods } from "@utils/accounting";
+import { formatNumber } from "@utils/Helper";
 
 import { Column } from "@components/CustomDataTable";
 import { Button, Modal, Row, Form, Alert } from "react-bootstrap";
@@ -505,7 +506,7 @@ const InvoiceList = () => {
         sortable: true,
         cell: (props: InvoiceData) => (
           <span className="fw-bold text-success">
-            {props?.currency_code || "USD"} {parseFloat(props.subtotal || "0").toFixed(2)}
+            {props?.currency_code || "USD"} {formatNumber(parseFloat(props?.subtotal || "0"))}
           </span>
         ),
       },
@@ -517,7 +518,7 @@ const InvoiceList = () => {
         cell: (props: InvoiceData) => (
           <span className="text-warning">
             {props?.currency_code || "USD"}{" "}
-            {parseFloat(props.tax_amount || "0").toFixed(2)}
+            {formatNumber(parseFloat(props?.tax_amount || "0"))}
           </span>
         ),
       },
@@ -529,7 +530,7 @@ const InvoiceList = () => {
         cell: (props: InvoiceData) => (
           <span className="fw-bold text-primary">
             {props.currency_code || "USD"}{" "}
-            {parseFloat(props.total_amount || "0").toFixed(2)}
+            {formatNumber(parseFloat(props?.total_amount || "0"))}
           </span>
         ),
       },
@@ -3305,25 +3306,25 @@ const InvoiceList = () => {
                 <div className="row">
                   <div className="col-md-6">
                     <p><strong>Company:</strong> {selectedInvoiceForPayment.company?.name}</p>
-                    <p><strong>Invoice Date:</strong> {moment(selectedInvoiceForPayment.invoice_date).format('DD/MM/YYYY')}</p>
-                    <p><strong>Due Date:</strong> {selectedInvoiceForPayment.due_date ? moment(selectedInvoiceForPayment.due_date).format('DD/MM/YYYY') : 'N/A'}</p>
+                    <p><strong>Invoice Date:</strong> {moment(selectedInvoiceForPayment.invoice_date).format('DD-MMM-YYYY')}</p>
+                    <p><strong>Due Date:</strong> {selectedInvoiceForPayment.due_date ? moment(selectedInvoiceForPayment.due_date).format('DD-MMM-YYYY') : 'N/A'}</p>
                   </div>
                   <div className="col-md-6">
-                    <p><strong>Subtotal:</strong> {selectedInvoiceForPayment.currency_code || 'USD'} {parseFloat(selectedInvoiceForPayment.subtotal || '0').toFixed(2)}</p>
-                    <p><strong>VAT Amount:</strong> {selectedInvoiceForPayment.currency_code || 'USD'} {parseFloat(selectedInvoiceForPayment.tax_amount || '0').toFixed(2)}</p>
-                    <p><strong className="text-primary">Total Amount:</strong> {selectedInvoiceForPayment.currency_code || 'USD'} {parseFloat(selectedInvoiceForPayment.total_amount || '0').toFixed(2)}</p>
+                    <p><strong>Subtotal:</strong> {selectedInvoiceForPayment.currency_code || 'USD'} {formatNumber(parseFloat(selectedInvoiceForPayment.subtotal || '0'))}</p>
+                    <p><strong>VAT Amount:</strong> {selectedInvoiceForPayment.currency_code || 'USD'} {formatNumber(parseFloat(selectedInvoiceForPayment.tax_amount || '0'))}</p>
+                    <p><strong className="text-primary">Total Amount:</strong> {selectedInvoiceForPayment.currency_code || 'USD'} {formatNumber(parseFloat(selectedInvoiceForPayment.total_amount || '0'))}</p>
                     
                     {/* Currency Conversion Display */}
                     {exchangeRates.length > 0 && baseCurrency !== (selectedInvoiceForPayment.currency_code || 'USD') && (
                       <div className="mt-3 p-2 bg-light rounded">
                         <small className="text-muted">Converted to {baseCurrency}:</small>
                         <div className="mt-1">
-                          <div><strong>Subtotal:</strong> {baseCurrency} {(parseFloat(selectedInvoiceForPayment.subtotal || '0') * getExchangeRate(selectedInvoiceForPayment.currency_code || 'USD', baseCurrency)).toFixed(2)}</div>
-                          <div><strong>VAT Amount:</strong> {baseCurrency} {(parseFloat(selectedInvoiceForPayment.tax_amount || '0') * getExchangeRate(selectedInvoiceForPayment.currency_code || 'USD', baseCurrency)).toFixed(2)}</div>
-                          <div><strong className="text-primary">Total Amount:</strong> {baseCurrency} {(parseFloat(selectedInvoiceForPayment.total_amount || '0') * getExchangeRate(selectedInvoiceForPayment.currency_code || 'USD', baseCurrency)).toFixed(2)}</div>
+                          <div><strong>Subtotal:</strong> {baseCurrency} {formatNumber(parseFloat(selectedInvoiceForPayment.subtotal || '0') * getExchangeRate(selectedInvoiceForPayment.currency_code || 'USD', baseCurrency))}</div>
+                          <div><strong>VAT Amount:</strong> {baseCurrency} {formatNumber(parseFloat(selectedInvoiceForPayment.tax_amount || '0') * getExchangeRate(selectedInvoiceForPayment.currency_code || 'USD', baseCurrency))}</div>
+                          <div><strong className="text-primary">Total Amount:</strong> {baseCurrency} {formatNumber(parseFloat(selectedInvoiceForPayment.total_amount || '0') * getExchangeRate(selectedInvoiceForPayment.currency_code || 'USD', baseCurrency))}</div>
                         </div>
                         <small className="text-muted">
-                          Exchange Rate: 1 {selectedInvoiceForPayment.currency_code || 'USD'} = {getExchangeRate(selectedInvoiceForPayment.currency_code || 'USD', baseCurrency).toFixed(4)} {baseCurrency}
+                          Exchange Rate: 1 {selectedInvoiceForPayment.currency_code || 'USD'} = {formatNumber(getExchangeRate(selectedInvoiceForPayment.currency_code || 'USD', baseCurrency))} {baseCurrency}
                         </small>
                       </div>
                     )}

@@ -6,6 +6,7 @@ import React, {
 } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
+import { formatNumber } from "@utils/Helper";
 
 import CompanyLogo2 from "@assets/images/Prime3.png";
 import { useState } from 'react';
@@ -62,7 +63,7 @@ const BillingHistory = () => {
          { key: 'amount', name: 'Amount', selector: (row: any) => row.amount, sortable: true,
           cell: (row: any) => {
             return <div>
-              <p className="fw-semibold text-primary">{row?.currency_code} {row?.amount}</p>
+              <p className="fw-semibold text-primary">{row?.currency_code} {formatNumber(row?.amount)}</p>
             </div>
           }
          },
@@ -305,8 +306,8 @@ const BillingHistory = () => {
                         <tr key={item.id}>
                           <td>{item?.product?.name}</td>
                           <td className="text-center">{item.quantity}</td>
-                          <td className="text-end fw-semibold">{selectedPaymentView?.currency_code} {item.unit_price}</td>
-                          <td className="text-end fw-semibold">{selectedPaymentView?.currency_code} {item.line_total}</td>
+                          <td className="text-end fw-semibold">{selectedPaymentView?.currency_code} {formatNumber(item.unit_price)}</td>
+                          <td className="text-end fw-semibold">{selectedPaymentView?.currency_code} {formatNumber(item.line_total)}</td>
                         </tr>
                       ))}
                       
@@ -320,7 +321,7 @@ const BillingHistory = () => {
                     <p className="mb-0 text-muted">Subtotal:</p>
                   </div>
                   <div className="text-end col-6">
-                    <p className="mb-0 fw-semibold">{selectedPaymentView?.currency_code} {selectedPaymentView?.invoice?.subtotal}</p>
+                    <p className="mb-0 fw-semibold">{selectedPaymentView?.currency_code} {formatNumber(selectedPaymentView?.invoice?.subtotal)}</p>
                   </div>
                 </div>
                 <div className="mb-2 row">
@@ -328,7 +329,7 @@ const BillingHistory = () => {
                     <p className="mb-0 text-muted">Tax:</p>
                   </div>
                   <div className="text-end col-6">
-                    <p className="mb-0 fw-semibold">{selectedPaymentView?.currency_code} {selectedPaymentView?.invoice?.tax_amount}</p>
+                    <p className="mb-0 fw-semibold">{selectedPaymentView?.currency_code} {formatNumber(selectedPaymentView?.invoice?.tax_amount)}</p>
                   </div>
                 </div>
                 <hr />
@@ -337,7 +338,7 @@ const BillingHistory = () => {
                     <p className="mb-0 fw-bold">Total:</p>
                   </div>
                   <div className="text-end col-6">
-                    <p className="mb-0 fw-bold text-primary fs-5">{selectedPaymentView?.currency_code} {selectedPaymentView?.invoice?.total_amount}</p>
+                    <p className="mb-0 fw-bold text-primary fs-5">{selectedPaymentView?.currency_code} {formatNumber(selectedPaymentView?.invoice?.total_amount)}</p>
                   </div>
                 </div>
               </div></div>

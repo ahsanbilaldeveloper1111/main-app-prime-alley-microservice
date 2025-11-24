@@ -20,6 +20,7 @@ import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area
 } from 'recharts';
+import { formatNumber } from "@utils/Helper";
 
 import "@assets/scss/billing.scss";
 
@@ -187,17 +188,17 @@ const AccountOverview = () => {
               <Card>
                 <Card.Body>
                   <h6 className="text-muted mb-3">Open Invoice Amount</h6>
-                  <h2 className="mb-1">{companyDetails?.profile?.currency} {dashboardCounters?.invoices?.total_amount}</h2>
+                  <h2 className="mb-1">{companyDetails?.profile?.currency} {formatNumber(dashboardCounters?.invoices?.total_amount)}</h2>
                   <small className="text-muted">(Inclusive VAT)</small>
                   
                   <hr />
                   <div className="d-flex justify-content-between mb-2">
                     <span className="text-muted">Account credit limit</span>
-                    <span>{companyDetails?.profile?.currency} {companyDetails?.profile?.credit_limit}</span>
+                    <span>{companyDetails?.profile?.currency} {formatNumber(companyDetails?.profile?.credit_limit)}</span>
                   </div>
                   <div className="d-flex justify-content-between mb-2">
                     <span className="text-muted">Outstanding invoices</span>
-                    <span>{companyDetails?.profile?.currency} {companyDetails?.profile?.outstanding_invoices}</span>
+                    <span>{companyDetails?.profile?.currency} {formatNumber(companyDetails?.profile?.outstanding_invoices)}</span>
                   </div>
                 </Card.Body>
               </Card>
@@ -214,7 +215,7 @@ const AccountOverview = () => {
                   <p className="fw-semibold mb-1">{companyDetails?.profile?.tax_id || 'N/A'}</p>
 
                   <p className="mb-1"><small className="text-muted">VAT Rate (%)</small></p>
-                  <p className="fw-semibold mb-1">{companyDetails?.profile?.vat_rate || 'N/A'}</p>
+                  <p className="fw-semibold mb-1">{formatNumber(companyDetails?.profile?.vat_rate) || 'N/A'}</p>
 
                   <p className="mb-1"><small className="text-muted">VAT Exemption</small></p>
                   <p className="fw-semibold mb-1">{companyDetails?.profile?.vat_exemption ? 'Yes' : 'No'}</p>
@@ -253,7 +254,7 @@ const AccountOverview = () => {
                   <p className="mb-1"><small className="text-muted">Payment Mode</small></p>
                   <p className="fw-semibold mb-1 text-capitalize">{companyDetails?.profile?.payment_mode?.replace('_', ' ')}</p>
                   <p className="mb-1"><small className="text-muted">Late Fee Rule</small></p>
-                  <p className="fw-semibold mb-1">{companyDetails?.profile?.late_fee_rule}</p>
+                  <p className="fw-semibold mb-1">{formatNumber(companyDetails?.profile?.late_fee_rule)}</p>
                 </Card.Body>
               </Card>
             </Col>

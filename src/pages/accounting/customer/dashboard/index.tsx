@@ -20,6 +20,7 @@ import {
   ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area
 } from 'recharts';
 import UAECurrencyLogo from "@assets/images/uae-currency-logo.jpg";
+import { formatNumber } from "@utils/Helper";
 
 import "@assets/scss/billing.scss";
 
@@ -44,6 +45,7 @@ const CustomerDashboard = () => {
   const [analyticsByMonth, setAnalyticsByMonth] = useState<any>(null);
   const [spendingData, setSpendingData] = useState<Array<{
     month: string;
+    month_name?: string;
     spent: number;
     total_amount: number;
     paid_amount: number;
@@ -81,9 +83,9 @@ const CustomerDashboard = () => {
     setSummaryCards(
       [
         { title: 'Active Products', value: response?.products?.total, icon: <Package size={24} />, color: 'primary', change: '+12.5%', isPositive: true,isImage: false },
-      { title: 'Open Invoice Amount', value: currency + ' ' + response?.invoices?.total_amount, icon: <DollarSign size={24} />, color: 'info', change: '+15.3%', isPositive: true,isImage: true },
-      { title: 'Open Unpaid Amount', value: currency + ' ' + response?.invoices?.outstanding_amount, icon: <DollarSign size={24} />, color: 'warning', change: '-5.1%', isPositive: false,isImage: true },
-      { title: 'Paid Amount', value: currency + ' ' + response?.invoices?.paid_amount, icon: <DollarSign size={24} />, color: 'success', change: '+8.2%', isPositive: true,isImage: true }
+      { title: 'Open Invoice Amount', value: currency + ' ' + formatNumber(response?.invoices?.total_amount), icon: <DollarSign size={24} />, color: 'info', change: '+15.3%', isPositive: true,isImage: true },
+      { title: 'Open Unpaid Amount', value: currency + ' ' + formatNumber(response?.invoices?.outstanding_amount), icon: <DollarSign size={24} />, color: 'warning', change: '-5.1%', isPositive: false,isImage: true },
+      { title: 'Paid Amount', value: currency + ' ' + formatNumber(response?.invoices?.paid_amount), icon: <DollarSign size={24} />, color: 'success', change: '+8.2%', isPositive: true,isImage: true }
       ]
     );
   
@@ -115,6 +117,7 @@ const CustomerDashboard = () => {
       const monthAbbr = item.month_name;// ? item.month_name.split(' ')[0] : '';
       return {
         month: monthAbbr,
+        month_name: item.month_name,
         spent: item.total_amount || 0,
         total_amount: item.total_amount || 0,
         paid_amount: item.paid_amount || 0,
@@ -134,15 +137,15 @@ const CustomerDashboard = () => {
             <p className="mb-2 fw-semibold">{data.month_name}</p>
             <p className="mb-1 small">
               <span className="text-muted">Open Invoice Amount: </span>
-              <span className="fw-semibold text-primary">{currency} {data.total_amount?.toFixed(2) || '0.00'}</span>
+              <span className="fw-semibold text-primary">{currency} {formatNumber(data.total_amount)}</span>
             </p>
             <p className="mb-1 small">
               <span className="text-muted">Paid Amount: </span>
-              <span className="fw-semibold text-success">{currency} {data.paid_amount?.toFixed(2) || '0.00'}</span>
+              <span className="fw-semibold text-success">{currency} {formatNumber(data.paid_amount)}</span>
             </p>
             <p className="mb-0 small">
               <span className="text-muted">Open Unpaid Amount: </span>
-              <span className="fw-semibold text-warning">{currency} {data.outstanding_amount?.toFixed(2) || '0.00'}</span>
+              <span className="fw-semibold text-warning">{currency} {formatNumber(data.outstanding_amount)}</span>
             </p>
           </div>
         );
@@ -154,6 +157,7 @@ const CustomerDashboard = () => {
     for (const item of spendingData) {
       barChartData.push({
         month: item.month,
+        month_name: item.month_name,
         total_amount: item.total_amount,
         paid_amount: item.paid_amount,
         outstanding_amount: item.outstanding_amount
@@ -254,19 +258,19 @@ const CustomerDashboard = () => {
                           <Col lg={4}>
                             <div className="text-center border p-2 rounded">
                             <h6 className="mb-2 text-muted">Open Invoice Amount</h6>
-                              <h4 className="fw-semibold text-primary">{currency} {dashboardCounters?.invoices?.total_amount}</h4>
+                              <h4 className="fw-semibold text-primary">{currency} {formatNumber(dashboardCounters?.invoices?.total_amount)}</h4>
                             </div>
                           </Col>
                           <Col lg={4}>
                             <div className="text-center border p-2 rounded">
                               <h6 className="mb-2 text-muted">Open Unpaid Amount</h6>
-                              <h4 className="fw-semibold text-warning">{currency} {dashboardCounters?.invoices?.outstanding_amount}</h4>
+                              <h4 className="fw-semibold text-warning">{currency} {formatNumber(dashboardCounters?.invoices?.outstanding_amount)}</h4>
                             </div>
                           </Col>
                           <Col lg={4}>
                             <div className="text-center border p-2 rounded">
                               <h6 className="mb-2 text-muted">Paid Amount</h6>
-                              <h4 className="fw-semibold text-success">{currency} {dashboardCounters?.invoices?.paid_amount}</h4>
+                              <h4 className="fw-semibold text-success">{currency} {formatNumber(dashboardCounters?.invoices?.paid_amount)}</h4>
                             </div>
                           </Col>
                         </Row>
@@ -290,7 +294,7 @@ const CustomerDashboard = () => {
                                 {product.status}
                               </Badge> */}
                             </div>
-                            <div className="text-muted small">Total Revenue: <span className="fw-semibold">{currency} {product.total_revenue}</span></div>
+                            <div className="text-muted small">Total Revenue: <span className="fw-semibold">{currency} {formatNumber(product.total_revenue)}</span></div>
                           </div>
                         ))}
                         <Link href="/accounting/customer/product-details" className="w-100 btn btn-outline-primary btn-sm">

@@ -38,6 +38,7 @@ import FormModal from "@pages/partial/FormModal";
 import { toast } from "react-toastify";
 import {currenciesData} from "@common/JsonData/currencies";
 import ThemeSelect from "@components/ThemeSelect";
+import { formatNumber } from "@utils/Helper";
 
 interface Product {
       id: number;
@@ -87,27 +88,11 @@ const ProductDetails = () => {
          { key: 'base_price', name: 'Base Price', selector: (row: any) => row.product?.base_price, sortable: true,
           cell: (row: any) => {
             return <div>
-              <p className="text-primary fw-semibold">{row?.product?.currency} {row?.product?.base_price}</p>
+              <p className="text-primary fw-semibold">{row?.product?.currency} {formatNumber(row?.product?.base_price)}</p>
             </div>
           }
          },
        
-        //  { key: 'purchase_price', name: 'Purchase Price', selector: (row: any) => row.purchase_price, sortable: true,
-        //   cell: (row: any) => {
-        //     return <div>
-        //       <p className="text-primary fw-semibold">{row?.currency} {row?.purchase_price}</p>
-        //     </div>
-        //   }
-        //  },
-        //  { key: 'sale_price', name: 'Sale Price', selector: (row: any) => row.sale_price, sortable: true,
-        //   cell: (row: any) => {
-        //     return <div>
-        //       <p className="text-primary fw-semibold">{row?.currency} {row?.sale_price}</p>
-        //     </div>
-        //   }
-        //  },
-        
-        // { key: 'totalAmount', name: 'Total Amount', selector: (row: any) => row.totalAmount, sortable: true },
         
         { key: 'is_active', name: 'Status', selector: (row: any) => row.product?.is_active, sortable: true,
           cell: (row: any) => {

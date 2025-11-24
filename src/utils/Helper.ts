@@ -420,13 +420,38 @@ export const ModuleSlug = {
 }
 
 export const formatCurrency = (amount: number | null): string => {
-  if (amount === null || amount === 0) {
-    return '$0.00';
+  if (amount === null || amount === 0 || amount===0.00 || amount===0.0) {
+    return '0.00';
   }
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD'
   }).format(amount);
+};
+
+export const formatNumber = (amount: number | string | null | undefined): string => {
+  // Handle null, undefined, or empty string
+  if (amount === null || amount === undefined || amount === '') {
+    return '0.00';
+  }
+  
+  // Convert string to number if needed
+  const numAmount = typeof amount === 'string' ? Number.parseFloat(amount) : amount;
+  
+  // Check if the conversion resulted in a valid number
+  if (Number.isNaN(numAmount) || !Number.isFinite(numAmount)) {
+    return '0.00';
+  }
+  
+  // Handle zero case
+  if (numAmount === 0) {
+    return '0.00';
+  }
+  
+  return new Intl.NumberFormat('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(numAmount);
 };
 
 /**
