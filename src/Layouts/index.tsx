@@ -3,13 +3,15 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import Footer from '@components/Footer';
 import ApplicationSidebar from './Moduler/AppSidebar';
-import { useSession } from "next-auth/react";
+import { useSession, signOut } from "next-auth/react";
 
 import CompanyLogo2 from "@assets/images/Prime3.png";
 import { 
-	Bell, ChevronLeft, ChevronRight, Users
+	Bell, ChevronLeft, ChevronRight, Users, LogOut,
+	User
     } from 'lucide-react';
-import { Badge, Button } from 'react-bootstrap';
+import { Badge, Button, Dropdown } from 'react-bootstrap';
+import Link from 'next/link';
 
 interface LayoutProps {
 	children: ReactNode;
@@ -160,21 +162,46 @@ const Layout = ({ children }: LayoutProps) => {
               <Bell size={20} />
               <Badge bg="danger" pill className="position-absolute translate-middle" style={{top:'10px', left:'37px'}}>3</Badge>
             </Button> */}
-            <div className="d-flex align-items-center gap-2">
-              <div className="bg-primary bg-opacity-10 rounded-circle p-2">
-                <Users size={20} className="text-primary" />
-              </div>
-              <div className="d-none d-md-block">
-                <small className="d-block fw-semibold">{loggedInName}</small>
-                <small className="text-muted">
-		    {loggedInUserRole !== '' ? (
-                                                                    <span>{loggedInUserRole}</span>
-                                                                ) : (
-                                                                    <span>{loggedInUserUsername}</span>
-                                                                )}
-		    </small>
-              </div>
-            </div>
+            <Dropdown>
+              <Dropdown.Toggle 
+                variant="link" 
+                className="text-decoration-none p-0 d-flex align-items-center gap-2"
+                style={{ border: 'none', boxShadow: 'none' }}
+              >
+                <div className="bg-primary bg-opacity-10 rounded-circle p-2">
+                  <Users size={20} className="text-primary" />
+                </div>
+                <div className="d-none d-md-block">
+                  <small className="d-block fw-semibold">{loggedInName}</small>
+                  <small className="text-muted">
+                    {loggedInUserRole !== '' ? (
+                      <span>{loggedInUserRole}</span>
+                    ) : (
+                      <span>{loggedInUserUsername}</span>
+                    )}
+                  </small>
+                </div>
+              </Dropdown.Toggle>
+              <Dropdown.Menu align="end">
+				<Dropdown.Item 
+				href="/profile"
+				className="d-flex align-items-center gap-2 text-secondary"
+				>
+					<User size={16} />
+					Profile
+				</Dropdown.Item>
+                <Dropdown.Item 
+                  onClick={() => signOut({ 
+                    callbackUrl: '/auth/signin',
+                    redirect: true 
+                  })}
+                  className="d-flex align-items-center gap-2 text-secondary"
+                >
+                  <LogOut size={16} />
+                  Logout
+                </Dropdown.Item>
+              </Dropdown.Menu>
+            </Dropdown>
           </div>
         </div>
       </nav>

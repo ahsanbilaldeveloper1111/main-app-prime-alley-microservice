@@ -118,6 +118,29 @@ export const getUserById = async (id: string, encrypt: boolean = true) => {
     throw error;
   }
 };
+export const GetUserProfile = async (id: string, encrypt: boolean = true) => {
+  try {
+   
+    const response = await axiosInstance.get(
+      `users/profile`,
+      {params: {user_id: id, encFlag: encrypt}}
+    );
+   
+    if(response.data){
+      const responseData = response.data;
+      
+      if(responseData.code === 200){
+        return responseData.data;
+      }else{
+        toast.error(responseData.message);
+      }
+    }
+   
+  } catch (error) {
+    console.error('API Error:', error);
+    throw error;
+  }
+};
 
 export const assignRoleToUser = async (id: string, role_id: string) => {
   try {

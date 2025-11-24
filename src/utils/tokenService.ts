@@ -101,11 +101,11 @@ class TokenService {
 
   // Refresh token function with support for both session and refresh token
   private async refreshToken(forceRefreshToken: boolean = false): Promise<string | null> {
-    console.log('🔄 Token refresh requested:', { forceRefreshToken });
+    //console.log('🔄 Token refresh requested:', { forceRefreshToken });
     
     // Prevent multiple simultaneous refresh attempts
     if (this.isRefreshing) {
-      console.log('⚠️ Token refresh already in progress, waiting for completion');
+      //console.log('⚠️ Token refresh already in progress, waiting for completion');
       return this.refreshPromise;
     }
 
@@ -114,16 +114,16 @@ class TokenService {
     try {
       const tokens = this.getTokens();
       if (!tokens) {
-          console.log('❌ No tokens available for refresh');
+          //console.log('❌ No tokens available for refresh');
         return null;
       }
 
-        console.log('📊 Current tokens status:', {
-          hasAccessToken: !!tokens.accessToken,
-          hasRefreshToken: !!tokens.refreshToken,
-          accessTokenExpiresIn: Math.floor((tokens.accessTokenExpires - Date.now()) / 1000) + 's',
-          refreshTokenExpiresIn: Math.floor((tokens.refreshTokenExpires - Date.now()) / 1000) + 's'
-        });
+        // console.log('📊 Current tokens status:', {
+        //   hasAccessToken: !!tokens.accessToken,
+        //   hasRefreshToken: !!tokens.refreshToken,
+        //   accessTokenExpiresIn: Math.floor((tokens.accessTokenExpires - Date.now()) / 1000) + 's',
+        //   refreshTokenExpiresIn: Math.floor((tokens.refreshTokenExpires - Date.now()) / 1000) + 's'
+        // });
 
         const now = Date.now();
         const refreshTokenExpiry = tokens.refreshTokenExpires;

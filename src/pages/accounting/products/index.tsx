@@ -23,8 +23,8 @@ import {
   ProductCreateUpdatePayload,
   ProductCategoryData,
   ProductCategoryCreateUpdatePayload,
-} from "@utils/accounting";
-import { getProductCategoriesList } from "@utils/accounting";
+} from "@utils/accountingOld";
+import { getProductCategoriesList } from "@utils/accountingOld";
 import { Column } from "@components/CustomDataTable";
 import { Button, Modal, Row } from "react-bootstrap";
 import { Col } from "react-bootstrap";

@@ -1,6 +1,8 @@
 import "@assets/scss/datatable-style.scss";
 import React, {
   ReactElement,
+  useEffect,
+  useMemo,
 } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
@@ -24,7 +26,11 @@ import "@assets/scss/billing.scss";
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import PageHeader from "@components/PageHeader";
+import countries from "world-countries";
 
+import { GetCompanyDetails,GetPaymentMethods,UpdateCompanyDetails } from "@utils/accounting";
+import ThemeSelect from "@components/ThemeSelect";
+import { toast } from "react-toastify";
 interface Product {
       id: number;
       name: string;
@@ -52,65 +58,234 @@ interface Product {
 
 const AccountOverview = () => {
 
-      const [activeScreen, setActiveScreen] = useState('customer-dashboard');
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [billingFilter, setBillingFilter] = useState('All');
-  const [billingSearch, setBillingSearch] = useState('');
-  const [showProductModal, setShowProductModal] = useState(false);
+  const [billingInfo, setBillingInfo] = useState<any>({
+    name: '',
+    email: '',
+    phone: '',
+    country: '',
+    profile: {
+      address: '',
+      postal_code: ''
+    },
+  });
+
+  const [companyDetails, setCompanyDetails] = useState<any>(null);
+  const getCompanyDetails = async () => {
+    const response = await GetCompanyDetails() as any;
+    setCompanyDetails(response);
+  };
+
+  useEffect(() => {
+    getCompanyDetails();
+  }, []);
+
+  const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
+  useEffect(() => {
+    getPaymentMethods();
+  }, []);
+  const getPaymentMethods = async () => {
+    const response = await GetPaymentMethods() as any;
+    setPaymentMethods(response?.payment_methods || []);
+  };
+
   const [showBillingEditModal, setShowBillingEditModal] = useState(false);
-  const [showAddExpenseModal, setShowAddExpenseModal] = useState(false);
-  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
-  const [showAddCardModal, setShowAddCardModal] = useState(false);
-  const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [showViewModal, setShowViewModal] = useState(false);
   const [showManageAccountModal, setShowManageAccountModal] = useState(false);
 
-  const [billingInfo, setBillingInfo] = useState({
-      name: 'John Doe',
-      email: 'john.doe@example.com',
-      phone: '+44 20 1234 5678',
-      company: 'Acme Corporation',
-      address: '123 Business Street',
-      city: 'London',
-      postcode: 'SW1A 1AA',
-      country: 'United Kingdom'
-    });
-  
-    const [newCard, setNewCard] = useState({
-      cardNumber: '',
-      expiry: '',
-      cvv: '',
-      cardHolder: '',
-      billingAddress: ''
-    });
-  
-    const [paymentMethods, setPaymentMethods] = useState([
-      { id: 1, type: 'Visa', last4: '4242', expiry: '12/25', isDefault: true, cardHolder: 'John Doe' },
-      { id: 2, type: 'Mastercard', last4: '8888', expiry: '08/26', isDefault: false, cardHolder: 'John Doe' }
-    ]);
-  
-    const [products, setProducts] = useState<Product[]>([
-      { id: 1, name: 'UCASS Gateway 16 Channel', category: 'Gateway', price: '£300.00', type: 'Monthly', totalAmount: '£3,600.00', status: 'Active', created: '2024-10-15' },
-      { id: 2, name: 'UCASS Advance Policy', category: 'Policy', price: '£216.00', type: 'Annual', totalAmount: '£216.00', status: 'Trial', created: '2024-10-20' },
-      { id: 3, name: 'UCASS SLA', category: 'SLA', price: '£420.00', type: 'Monthly', totalAmount: '£5,040.00', status: 'Active', created: '2024-10-10' },
-      { id: 4, name: 'UCASS Basic', category: 'Basic', price: '£144.00', type: 'One-time', totalAmount: '£144.00', status: 'Inactive', created: '2024-10-25' }
-    ]);
-  
-    const [newProduct, setNewProduct] = useState({
-      name: '',
-      category: '',
-      price: '',
-      type: 'Monthly',
-      status: 'Active'
-    });
+  // Initialize billingInfo when modal opens or companyDetails changes
+  useEffect(() => {
+    if (companyDetails && showBillingEditModal) {
+      setBillingInfo({
+        name: companyDetails.name || '',
+        email: companyDetails.email || '',
+        phone: companyDetails.phone || '',
+        country: companyDetails.country || companyDetails.profile?.country || '',
+        profile: {
+          address: companyDetails.profile?.address || '',
+          postal_code: companyDetails.profile?.postal_code || ''
+        }
+      });
+    }
+  }, [companyDetails, showBillingEditModal]);
 
-       // Account Overview
-  const renderAccountOverview = () => {
-      const BillingEditModal = () => (
+  const countryOptions = useMemo(
+    () =>
+        countries.map((country: any) => ({
+            value: country.name.common,
+            label: country.name.common,
+        })),
+    [],
+);
 
+  const handleSaveBillingInfo = async () => {
+    setShowBillingEditModal(false);
+    //toast.error('Todo: Need api for update billing details');
+    return false;
+    const response = await UpdateCompanyDetails(billingInfo) as any;
+    if(response){
+      toast.success('Billing information updated successfully');
+      setShowBillingEditModal(false);
+    }else{
+      toast.error('Failed to update billing information');
+      setShowBillingEditModal(false);
+    }
+  };
+
+
+
+  
+
+  return (
+    <React.Fragment>
+      <BreadcrumbItem mainTitle="" mainLink="" subTitle="Account Overview" />
+
+      <PageHeader
+        title="Account Overview"
+        description="Manage your account and billing details"
+        showSearch={false}
+      />
+
+<div>
+         
+          <Row className="mb-4">
+            <Col lg={7} className="mb-4">
+              <Card style={{ minHeight: '274px' }}>
+                <Card.Body>
+                  {/* <h5 className="fw-semibold mb-2">RingEdge Account</h5> */}
+                  {/* <img src={CompanyLogo2.src} alt="logo" className="img-fluid" style={{marginTop: '21px',maxWidth: '200px'}} /> */}
+                  <h5 className="fw-semibold mb-2 text-capitalize">{companyDetails?.name}</h5>
+                  <div className="mb-5">
+                    {/* <Badge bg="secondary" pill className="px-3 py-2 me-2">Trial</Badge>
+                    <Badge bg="primary" pill className="px-3 py-2">Upgrade</Badge> */}
+                    <p className="text-muted mb-0 small">{companyDetails?.profile?.address}</p>
+                  </div>
+                  <hr className="my-3" />
+                  <div className="d-flex justify-content-end">
+                    {/* <Button variant="link" className="text-decoration-none">
+                      Manage Account <ChevronRight size={16} />
+                    </Button> */}
+                    <Button 
+                      variant="link" 
+                      className="text-decoration-none"
+                      onClick={() => setShowManageAccountModal(true)}
+                    >
+                      Manage Account <ChevronRight size={16} />
+                    </Button>
+                  </div>
+                </Card.Body>
+              </Card>
+            </Col>
+            <Col lg={5} className="mb-4">
+              <Card>
+                <Card.Body>
+                  <h6 className="text-muted mb-3">Target upgrade charges</h6>
+                  <h2 className="mb-1">£17.99</h2>
+                  <small className="text-muted">(Excludes taxes and fees)</small>
+                  <div className="mt-3">
+                    <small className="text-muted">Target upgrade date: 08/05/2025</small>
+                  </div>
+                  <hr />
+                  <div className="d-flex justify-content-between mb-2">
+                    <span className="text-muted">Account credit limit</span>
+                    <span>{companyDetails?.profile?.currency} {companyDetails?.profile?.credit_limit}</span>
+                  </div>
+                  <div className="d-flex justify-content-between mb-2">
+                    <span className="text-muted">Outstanding invoices</span>
+                    <span>{companyDetails?.profile?.currency} {companyDetails?.profile?.outstanding_invoices}</span>
+                  </div>
+                </Card.Body>
+              </Card>
+            </Col>
+          </Row>
+  
+          <Row>
+
+          <Col md={6} lg={3} className="mb-3">
+              <Card className='billing-details-cards'>
+                <Card.Body>
+                  <h6 className="text-muted mb-2">Tax information</h6>
+                  <p className="mb-1"><small className="text-muted">VAT number</small></p>
+                  <p className="fw-semibold mb-1">{companyDetails?.profile?.registration_number}</p>
+
+                  <p className="mb-1"><small className="text-muted">VAT Rate (%)</small></p>
+                  <p className="fw-semibold mb-1">{companyDetails?.profile?.vat_rate}</p>
+
+                  <p className="mb-1"><small className="text-muted">VAT Exemption</small></p>
+                  <p className="fw-semibold mb-1">{companyDetails?.profile?.vat_exemption ? 'Yes' : 'No'}</p>
+                </Card.Body>
+              </Card>
+            </Col>
+
+            <Col md={6} lg={3} className="mb-3">
+              <Card className='billing-details-cards'>
+                <Card.Body>
+                  <div className="d-flex justify-content-between align-items-center mb-2">
+                    <h6 className="text-muted mb-0">Billing contact</h6>
+                    <Button variant="link" size="sm" className="p-0" onClick={() => setShowBillingEditModal(true)}>
+                      <Edit size={16} />
+                    </Button>
+                  </div>
+                  <p className="mb-1"><small className="text-muted">Name</small></p>
+                  <p className="fw-semibold mb-1">{companyDetails?.name}</p>
+
+                  <p className="mb-1"><small className="text-muted">Email</small></p>
+                  <p className="fw-semibold mb-1">{companyDetails?.email}</p>
+
+                  <p className="mb-1"><small className="text-muted">Phone</small></p>
+                  <p className="fw-semibold mb-1">{companyDetails?.phone}</p>
+                </Card.Body>
+              </Card>
+            </Col>
+
+
+            <Col md={6} lg={3} className="mb-3">
+              <Card className='billing-details-cards'>
+                <Card.Body>
+                  <h6 className="text-muted mb-2">Terms & Rules</h6>
+                  <p className="mb-1"><small className="text-muted">Payment Terms (Days)</small></p>
+                  <p className="fw-semibold mb-1">Net {companyDetails?.profile?.payment_terms} days</p>
+                  <p className="mb-1"><small className="text-muted">Payment Mode</small></p>
+                  <p className="fw-semibold mb-1 text-capitalize">{companyDetails?.profile?.payment_mode?.replace('_', ' ')}</p>
+                  <p className="mb-1"><small className="text-muted">Late Fee Rule</small></p>
+                  <p className="fw-semibold mb-1">{companyDetails?.profile?.late_fee_rule}</p>
+                </Card.Body>
+              </Card>
+            </Col>
+            {paymentMethods?.length > 0 && (
+            <Col md={6} lg={3} className="mb-3">
+              <Card className='billing-details-cards'>
+                <Card.Body>
+                  <h6 className="text-muted mb-2">Payment method</h6>
+                  
+                   {paymentMethods?.map((method: any) => (
+                    <div key={method.id}>
+                      {method.is_default ===true && (
+                        <>
+                        <p className="mb-1"><small className="text-muted">Card number</small></p>
+                        <p className="fw-semibold mb-1">•••• {method.card?.last4}</p>
+
+                        {/* <p className="fw-semibold">{method.card?.brand}</p> */}
+                        <p className="mb-1"><small className="text-muted">Card Type</small></p>
+                        <p className="fw-semibold mb-1 text-capitalize">{method.card?.brand}</p>
+
+                        <p className="mb-1"><small className="text-muted">Exp</small></p>
+                        <p className="fw-semibold mb-1">{method.card?.exp_month}/{method.card?.exp_year}</p>
+                        </>
+                      )}
+                    </div>
+                  ))}
+                  
+                </Card.Body>
+              </Card>
+            </Col>
+            )}
 
             
+            
+          </Row>
+  
+         
+        </div>
+     
         <Modal show={showBillingEditModal} onHide={() => setShowBillingEditModal(false)} size="lg" centered>
           <Modal.Header closeButton>
             <Modal.Title>Edit Billing Information</Modal.Title>
@@ -151,11 +326,19 @@ const AccountOverview = () => {
                 <Col md={6}>
                   <Form.Group className="mb-3">
                     <Form.Label>Country *</Form.Label>
-                    <Form.Select value={billingInfo.country} onChange={(e) => setBillingInfo({ ...billingInfo, country: e.target.value })}>
-                      <option>United Kingdom</option>
-                      <option>United States</option>
-                      <option>Pakistan</option>
-                    </Form.Select>
+                    <ThemeSelect 
+                    value={(() => {
+                      const countryValue = billingInfo.country || companyDetails?.country || companyDetails?.profile?.country || '';
+                      if (!countryValue) return null;
+                      const selectedCountry = countryOptions.find((opt: any) => 
+                        opt.value === countryValue || 
+                        opt.value?.toLowerCase() === countryValue?.toLowerCase()?.trim() ||
+                        opt.label?.toLowerCase() === countryValue?.toLowerCase()?.trim()
+                      );
+                      return selectedCountry || null;
+                    })()}
+                    onChange={(e: any) => setBillingInfo({ ...billingInfo, country: e?.value || e?.label || '' })}
+                     options={countryOptions} />
                   </Form.Group>
                 </Col>
                 <Col md={12}>
@@ -163,28 +346,19 @@ const AccountOverview = () => {
                     <Form.Label>Address *</Form.Label>
                     <Form.Control
                       type="text"
-                      value={billingInfo.address}
-                      onChange={(e) => setBillingInfo({ ...billingInfo, address: e.target.value })}
+                      value={billingInfo.profile?.address}
+                      onChange={(e) => setBillingInfo({ ...billingInfo, profile: { ...billingInfo.profile, address: e.target.value } })}
                     />
                   </Form.Group>
                 </Col>
-                <Col md={6}>
-                  <Form.Group className="mb-3">
-                    <Form.Label>City *</Form.Label>
-                    <Form.Control
-                      type="text"
-                      value={billingInfo.city}
-                      onChange={(e) => setBillingInfo({ ...billingInfo, city: e.target.value })}
-                    />
-                  </Form.Group>
-                </Col>
+                
                 <Col md={6}>
                   <Form.Group className="mb-3">
                     <Form.Label>Postcode *</Form.Label>
                     <Form.Control
                       type="text"
-                      value={billingInfo.postcode}
-                      onChange={(e) => setBillingInfo({ ...billingInfo, postcode: e.target.value })}
+                      value={billingInfo.profile?.postal_code}
+                      onChange={(e) => setBillingInfo({ ...billingInfo, profile: { ...billingInfo.profile, postal_code: e.target.value } })}
                     />
                   </Form.Group>
                 </Col>
@@ -195,132 +369,11 @@ const AccountOverview = () => {
             <Button variant="outline-secondary" onClick={() => setShowBillingEditModal(false)}>
               Cancel
             </Button>
-            <Button variant="primary" onClick={() => setShowBillingEditModal(false)}>
+            <Button variant="primary" onClick={() => handleSaveBillingInfo()}>
               Save Changes
             </Button>
           </Modal.Footer>
         </Modal>
-      );
-  
-      return (
-        <div>
-          <div className="mb-4">
-            <h2 className="mb-1">Account Overview</h2>
-            <p className="text-muted mb-0">Manage your account and billing details</p>
-          </div>
-  
-          <Row className="mb-4">
-            <Col lg={7} className="mb-4">
-              <Card style={{ minHeight: '274px' }}>
-                <Card.Body>
-                  {/* <h5 className="fw-semibold mb-2">RingEdge Account</h5> */}
-                  <img src={CompanyLogo2.src} alt="logo" className="img-fluid" style={{marginTop: '21px',maxWidth: '200px'}} />
-                  <div className="mb-5">
-                    <Badge bg="secondary" pill className="px-3 py-2 me-2">Trial</Badge>
-                    <Badge bg="primary" pill className="px-3 py-2">Upgrade</Badge>
-                  </div>
-                  <hr className="my-3" />
-                  <div className="d-flex justify-content-end">
-                    {/* <Button variant="link" className="text-decoration-none">
-                      Manage Account <ChevronRight size={16} />
-                    </Button> */}
-                    <Button 
-                      variant="link" 
-                      className="text-decoration-none"
-                      onClick={() => setShowManageAccountModal(true)}
-                    >
-                      Manage Account <ChevronRight size={16} />
-                    </Button>
-                  </div>
-                </Card.Body>
-              </Card>
-            </Col>
-            <Col lg={5} className="mb-4">
-              <Card>
-                <Card.Body>
-                  <h6 className="text-muted mb-3">Target upgrade charges</h6>
-                  <h2 className="mb-1">£17.99</h2>
-                  <small className="text-muted">(Excludes taxes and fees)</small>
-                  <div className="mt-3">
-                    <small className="text-muted">Target upgrade date: 08/05/2025</small>
-                  </div>
-                  <hr />
-                  <div className="d-flex justify-content-between mb-2">
-                    <span className="text-muted">Account credit</span>
-                    <span>£0.00</span>
-                  </div>
-                  <div className="d-flex justify-content-between mb-2">
-                    <span className="text-muted">Pending credit</span>
-                    <span>£0.00</span>
-                  </div>
-                </Card.Body>
-              </Card>
-            </Col>
-          </Row>
-  
-          <Row>
-            <Col md={6} lg={3} className="mb-3">
-              <Card className='billing-details-cards'>
-                <Card.Body>
-                  <h6 className="text-muted mb-2">Billing cycle</h6>
-                  <p className="mb-1"><small className="text-muted">Billing plan</small></p>
-                  <p className="fw-semibold">Monthly</p>
-                </Card.Body>
-              </Card>
-            </Col>
-            <Col md={6} lg={3} className="mb-3">
-              <Card className='billing-details-cards'>
-                <Card.Body>
-                  <h6 className="text-muted mb-2">Payment method</h6>
-                  <p className="mb-1"><small className="text-muted">Card number</small></p>
-                  <p className="fw-semibold">•••• 4242</p>
-                  <small className="text-muted">Exp: 12/25</small>
-                </Card.Body>
-              </Card>
-            </Col>
-            <Col md={6} lg={3} className="mb-3">
-              <Card className='billing-details-cards'>
-                <Card.Body>
-                  <div className="d-flex justify-content-between align-items-center mb-2">
-                    <h6 className="text-muted mb-0">Billing contact</h6>
-                    <Button variant="link" size="sm" className="p-0" onClick={() => setShowBillingEditModal(true)}>
-                      <Edit size={16} />
-                    </Button>
-                  </div>
-                  <p className="mb-1"><small className="text-muted">Name</small></p>
-                  <p className="fw-semibold">{billingInfo.name}</p>
-                  <p className="mb-1"><small className="text-muted">Email</small></p>
-                  <p className="fw-semibold mb-0">{billingInfo.email}</p>
-                </Card.Body>
-              </Card>
-            </Col>
-            <Col md={6} lg={3} className="mb-3">
-              <Card className='billing-details-cards'>
-                <Card.Body>
-                  <h6 className="text-muted mb-2">Tax information</h6>
-                  <p className="mb-1"><small className="text-muted">VAT number</small></p>
-                  <p className="fw-semibold">Not specified</p>
-                </Card.Body>
-              </Card>
-            </Col>
-          </Row>
-  
-          {BillingEditModal()}
-        </div>
-      );
-    };
-
-
-  return (
-    <React.Fragment>
-      <BreadcrumbItem mainTitle="" mainLink="" subTitle="Customer Dashboard" />
-
-      {/* <PageHeader
-        title="Customer Dashboard"
-        showSearch={false}
-      /> */}
-
-      {renderAccountOverview()}
 
       <Modal show={showManageAccountModal} onHide={() => setShowManageAccountModal(false)} size="lg" centered>
         <Modal.Header closeButton>
@@ -363,24 +416,15 @@ const AccountOverview = () => {
                     />
                   </Form.Group>
                 </Col>
-                <Col md={6}>
-                  <Form.Group className="mb-3">
-                    <Form.Label>Company</Form.Label>
-                    <Form.Control 
-                      type="text" 
-                      value={billingInfo.company}
-                      onChange={(e) => setBillingInfo({...billingInfo, company: e.target.value})}
-                    />
-                  </Form.Group>
-                </Col>
+                
               </Row>
               <Form.Group className="mb-3">
                 <Form.Label>Billing Address</Form.Label>
                 <Form.Control 
                   as="textarea"
                   rows={2}
-                  value={billingInfo.address}
-                  onChange={(e) => setBillingInfo({...billingInfo, address: e.target.value})}
+                  value={billingInfo.profile?.address}
+                  onChange={(e) => setBillingInfo({...billingInfo, profile: { ...billingInfo.profile, address: e.target.value } })}
                 />
               </Form.Group>
             </Form>

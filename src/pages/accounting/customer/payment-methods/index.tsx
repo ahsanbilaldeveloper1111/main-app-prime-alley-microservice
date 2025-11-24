@@ -1,29 +1,35 @@
 import "@assets/scss/datatable-style.scss";
 import React, {
   ReactElement,
+  useEffect,
+  useState,
 } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
-
-import CompanyLogo2 from "@assets/images/Prime3.png";
-import { useState } from 'react';
-import { Card, Row, Col, Button, Badge, Form, Table, Modal, Dropdown, ProgressBar } from 'react-bootstrap';
+import { Card, Row, Col, Button, Badge, Modal, Spinner } from 'react-bootstrap';
 import { 
-  Eye, CreditCard, Clock, Wallet, ChevronRight, ChevronLeft,
-  Edit, Trash2, Filter, Plus, Settings, Download, LayoutDashboard,
-  Package, FileText, Bell, Check, DollarSign, TrendingUp, AlertCircle,
-  Users, ArrowUp, ArrowDown
+  CreditCard,
+  Trash2,
+  Plus,
+  Check,
 } from 'lucide-react';
-import {
-  LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
-  ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area
-} from 'recharts';
 
 import "@assets/scss/billing.scss";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import PageHeader from "@components/PageHeader";
+import { GetPaymentMethods,setDefaultPaymentMethod,deletePaymentMethod,addPaymentMethod } from "@utils/accounting";
+import { toast } from "react-toastify";
+import ConfirmModal from "@pages/partial/ConfirmModal";
+
+import { loadStripe } from "@stripe/stripe-js";
+import {
+  Elements,
+  CardElement,
+  useStripe,
+  useElements,
+} from "@stripe/react-stripe-js";
 
 interface Product {
       id: number;
@@ -50,140 +56,253 @@ interface Product {
       total: string;
     }
 
+
+// Stripe Payment Element Form Component
+const AddCardForm: React.FC<{
+  onSuccess: () => void;
+  onCancel: () => void;
+}> = ({ onSuccess, onCancel }) => {
+  const stripe = useStripe();
+  const elements = useElements();
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [cardholderName, setCardholderName] = useState('');
+  const [isDefault, setIsDefault] = useState(false);
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+
+    if (!stripe || !elements) {
+      setError('Stripe has not loaded yet');
+      return;
+    }
+
+    setIsProcessing(true);
+    setError(null);
+
+    try {
+      // Get the card element - we need CardElement for createToken()
+      const cardElement = elements.getElement(CardElement);
+      
+      if (!cardElement) {
+        setError('Card element not found. Please ensure card details are entered.');
+        setIsProcessing(false);
+        return;
+      }
+
+      // Create a token from the card element using Stripe's tokens API (https://api.stripe.com/v1/tokens)
+      const { error: tokenError, token } = await stripe.createToken(cardElement, {
+        name: cardholderName || undefined,
+        address_country: 'US',
+      });
+
+      if (tokenError) {
+        setError(tokenError.message || 'Failed to create card token');
+        setIsProcessing(false);
+        return;
+      }
+
+      if (!token) {
+        setError('Failed to create card token');
+        setIsProcessing(false);
+        return;
+      }
+
+      // Send token ID and billing details to your API
+      await addPaymentMethod({
+        stripeToken: token.id,
+        isDefault: isDefault,
+        cardholderName: cardholderName,
+      });
+
+      toast.success('Payment method added successfully');
+      setIsProcessing(false);
+      onSuccess();
+    } catch (error: any) {
+      setError(error.message || 'Failed to add payment method');
+      setIsProcessing(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <div className="mb-3">
+        <label className="form-label" htmlFor="card-element">Card Information *</label>
+        <div className="p-3 border rounded bg-light" id="card-element" style={{ position: 'relative' }}>
+          {/* Hide Stripe Link banner if it appears */}
+          <style>{`
+            #card-element [data-testid="link-authentication-element"],
+            #card-element [class*="Link"],
+            #card-element [id*="link"],
+            #card-element iframe[title*="Link"],
+            #card-element div[class*="LinkAuthenticationElement"] {
+              display: none !important;
+            }
+          `}</style>
+          <CardElement
+            options={{
+              style: {
+                base: {
+                  fontSize: '16px',
+                  color: '#424770',
+                  '::placeholder': {
+                    color: '#aab7c4',
+                  },
+                },
+                invalid: {
+                  color: '#9e2146',
+                },
+              },
+              hidePostalCode: false,
+            }}
+          />
+        </div>
+        {error && (
+          <div className="alert alert-danger mt-2 py-2">
+            <small>{error}</small>
+          </div>
+        )}
+        <small className="text-muted">
+          Your card information is securely processed by Stripe
+        </small>
+      </div>
+
+      <div className="mb-3">
+        <label className="form-label" htmlFor="cardholderName">Cardholder Name *</label>
+        <input
+          type="text"
+          id="cardholderName"
+          className="form-control"
+          placeholder="John Doe"
+          value={cardholderName}
+          onChange={(e) => setCardholderName(e.target.value)}
+          required
+        />
+      </div>
+
+      <div className="mb-3">
+        <div className="form-check">
+          <input
+            className="form-check-input"
+            type="checkbox"
+            id="isDefault"
+            checked={isDefault}
+            onChange={(e) => setIsDefault(e.target.checked)}
+          />
+          <label className="form-check-label" htmlFor="isDefault">
+            Set as default payment method
+          </label>
+        </div>
+      </div>
+
+      <div className="d-flex gap-2 mt-3">
+        <Button
+          type="submit"
+          variant="primary"
+          disabled={!stripe || !cardholderName.trim() || isProcessing}
+          className="flex-grow-1"
+        >
+          {isProcessing ? (
+            <>
+              <Spinner animation="border" size="sm" className="me-2" />
+              Adding Card...
+            </>
+          ) : (
+            <>
+              <CreditCard size={16} className="me-2" />
+              Add Card
+            </>
+          )}
+        </Button>
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={onCancel}
+          disabled={isProcessing}
+        >
+          Cancel
+        </Button>
+      </div>
+    </form>
+  );
+};
+
 const PaymentMethods = () => {
-
-
-  const [billingFilter, setBillingFilter] = useState('All');
-  const [billingSearch, setBillingSearch] = useState('');
-
-  const [showBillingEditModal, setShowBillingEditModal] = useState(false);
-  const [showAddExpenseModal, setShowAddExpenseModal] = useState(false);
-  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [showAddCardModal, setShowAddCardModal] = useState(false);
-  const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
-  const [showManageAccountModal, setShowManageAccountModal] = useState(false);
+  const [stripePublishableKey, setStripePublishableKey] = useState<string>("");
+  
+    const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
 
-  const [billingInfo, setBillingInfo] = useState({
-      name: 'John Doe',
-      email: 'john.doe@example.com',
-      phone: '+44 20 1234 5678',
-      company: 'Acme Corporation',
-      address: '123 Business Street',
-      city: 'London',
-      postcode: 'SW1A 1AA',
-      country: 'United Kingdom'
-    });
-  
-    const [newCard, setNewCard] = useState({
-      cardNumber: '',
-      expiry: '',
-      cvv: '',
-      cardHolder: '',
-      billingAddress: ''
-    });
-  
-    const [paymentMethods, setPaymentMethods] = useState([
-      { id: 1, type: 'Visa', last4: '4242', expiry: '12/25', isDefault: true, cardHolder: 'John Doe' },
-      { id: 2, type: 'Mastercard', last4: '8888', expiry: '08/26', isDefault: false, cardHolder: 'John Doe' }
-    ]);
-  
-    const [products, setProducts] = useState<Product[]>([
-      { id: 1, name: 'UCASS Gateway 16 Channel', category: 'Gateway', price: '£300.00', type: 'Monthly', totalAmount: '£3,600.00', status: 'Active', created: '2024-10-15' },
-      { id: 2, name: 'UCASS Advance Policy', category: 'Policy', price: '£216.00', type: 'Annual', totalAmount: '£216.00', status: 'Trial', created: '2024-10-20' },
-      { id: 3, name: 'UCASS SLA', category: 'SLA', price: '£420.00', type: 'Monthly', totalAmount: '£5,040.00', status: 'Active', created: '2024-10-10' },
-      { id: 4, name: 'UCASS Basic', category: 'Basic', price: '£144.00', type: 'One-time', totalAmount: '£144.00', status: 'Inactive', created: '2024-10-25' }
-    ]);
-  
-    const [newProduct, setNewProduct] = useState({
-      name: '',
-      category: '',
-      price: '',
-      type: 'Monthly',
-      status: 'Active'
-    });
+    const fetchPaymentMethods = async () => {
+      const response = await GetPaymentMethods() as any;
+      setPaymentMethods(response?.payment_methods || []);
+      console.log('response', paymentMethods);
+    };
 
- // Payment Methods
- const renderPaymentMethods = () => {
-      const handleSetDefault = (id: number) => {
-        setPaymentMethods(methods => methods.map(method => ({ ...method, isDefault: method.id === id })));
-      };
+    // Load Stripe publishable key
+    const loadStripePublishableKey = async () => {
+      try {
+        const key = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || "";
+        setStripePublishableKey(key);
+      } catch (error) {
+        console.error("Error loading Stripe publishable key:", error);
+      }
+    };
+
+    useEffect(() => {
+      fetchPaymentMethods();
+      loadStripePublishableKey();
+    }, []);
+
+    
+
+    const handleSetDefault = (id: string) => {
+      setDefaultPaymentMethod(id);
+      fetchPaymentMethods();
+    };
+
+    const [deletePaymentMethodId, setDeletePaymentMethodId] = useState<string | null>(null);
+    const [deletePaymentMethodConfirm, setDeletePaymentMethodConfirm] = useState(false);
+
+    const handleDeleteCard = (id: string) => {
+      setDeletePaymentMethodId(id);
+      setDeletePaymentMethodConfirm(true);
+    };
   
-      const handleDeleteCard = (id: number) => {
-        if (window.confirm('Delete this payment method?')) {
-          setPaymentMethods(methods => methods.filter(method => method.id !== id));
-        }
-      };
-  
-      const handleAddCard = () => {
-        const newMethod = {
-          id: paymentMethods.length + 1,
-          type: 'Visa',
-          last4: newCard.cardNumber.slice(-4),
-          expiry: newCard.expiry,
-          isDefault: paymentMethods.length === 0,
-          cardHolder: newCard.cardHolder
-        };
-        setPaymentMethods([...paymentMethods, newMethod]);
-        setShowAddCardModal(false);
-        setNewCard({ cardNumber: '', expiry: '', cvv: '', cardHolder: '', billingAddress: '' });
-      };
-  
-      const AddCardModal = () => (
-        <Modal show={showAddCardModal} onHide={() => setShowAddCardModal(false)} size="lg" centered>
-          <Modal.Header closeButton>
-            <Modal.Title>Add Payment Method</Modal.Title>
-          </Modal.Header>
-          <Modal.Body>
-            <Form>
-              <Form.Group className="mb-3">
-                <Form.Label>Card Number *</Form.Label>
-                <Form.Control type="text" placeholder="1234 5678 9012 3456" value={newCard.cardNumber} onChange={(e) => setNewCard({ ...newCard, cardNumber: e.target.value })} />
-              </Form.Group>
-              <Row>
-                <Col xs={6}>
-                  <Form.Group className="mb-3">
-                    <Form.Label>Expiry Date *</Form.Label>
-                    <Form.Control type="text" placeholder="MM/YY" value={newCard.expiry} onChange={(e) => setNewCard({ ...newCard, expiry: e.target.value })} />
-                  </Form.Group>
-                </Col>
-                <Col xs={6}>
-                  <Form.Group className="mb-3">
-                    <Form.Label>CVV *</Form.Label>
-                    <Form.Control type="text" placeholder="123" value={newCard.cvv} onChange={(e) => setNewCard({ ...newCard, cvv: e.target.value })} />
-                  </Form.Group>
-                </Col>
-              </Row>
-              <Form.Group className="mb-3">
-                <Form.Label>Cardholder Name *</Form.Label>
-                <Form.Control type="text" placeholder="John Doe" value={newCard.cardHolder} onChange={(e) => setNewCard({ ...newCard, cardHolder: e.target.value })} />
-              </Form.Group>
-              <Form.Group className="mb-3">
-                <Form.Label>Billing Address</Form.Label>
-                <Form.Control as="textarea" rows={3} value={newCard.billingAddress} onChange={(e) => setNewCard({ ...newCard, billingAddress: e.target.value })} />
-              </Form.Group>
-            </Form>
-          </Modal.Body>
-          <Modal.Footer>
-            <Button variant="outline-secondary" onClick={() => setShowAddCardModal(false)}>Cancel</Button>
-            <Button variant="primary" onClick={handleAddCard}>Add Card</Button>
-          </Modal.Footer>
-        </Modal>
-      );
-  
-      return (
-        <div>
-          <div className="d-flex justify-content-between align-items-center mb-4">
-            <div>
-              <h2 className="mb-1">Payment Methods</h2>
-              <p className="text-muted mb-0">Manage your payment methods</p>
-            </div>
+  const handleConfirmDelete = async () => {
+    if (deletePaymentMethodId) {
+      await deletePaymentMethod(deletePaymentMethodId);
+      fetchPaymentMethods();
+      setDeletePaymentMethodConfirm(false);
+      setDeletePaymentMethodId(null);
+      toast.success("Payment method deleted successfully");
+    }
+  };
+
+  const handleAddCardSuccess = () => {
+    setShowAddCardModal(false);
+    fetchPaymentMethods();
+  };
+
+  return (
+    <React.Fragment>
+      <BreadcrumbItem mainTitle="" mainLink="" subTitle="Payment Methods" />
+
+      <PageHeader
+        title="Payment Methods"
+        description="Manage your payment methods"
+        showSearch={false}
+        buttons={
+          <>
             <Button variant="primary" onClick={() => setShowAddCardModal(true)}>
               <Plus size={16} className="me-2" />
               Add Card
             </Button>
-          </div>
-  
-          <Row>
+          </>
+        }
+      />
+
+<Row>
             {paymentMethods.map((method) => (
               <Col lg={4} md={6} key={method.id} className="mb-4">
                 <Card>
@@ -194,22 +313,22 @@ const PaymentMethods = () => {
                           <CreditCard className="text-primary" size={20} />
                         </div>
                         <div>
-                          <h6 className="mb-0">{method.type}</h6>
-                          <small className="text-muted">•••• {method.last4}</small>
+                          <h6 className="mb-0">{method.card?.brand}</h6>
+                          <small className="text-muted">•••• {method.card?.last4}</small>
                         </div>
                       </div>
                       {method.isDefault && <Badge bg="success" className="bg-opacity-10 text-dark"><Check size={12} /> Default</Badge>}
                     </div>
                     <div className="mb-3">
                       <small className="text-muted d-block">Cardholder</small>
-                      <span className="fw-semibold">{method.cardHolder}</span>
+                      <span className="fw-semibold">{method.billing_details?.name}</span>
                     </div>
                     <div className="mb-3">
                       <small className="text-muted d-block">Expires</small>
-                      <span className="fw-semibold">{method.expiry}</span>
+                      <span className="fw-semibold">{method.card?.exp_month}/{method.card?.exp_year}</span>
                     </div>
                     <div className="d-flex gap-2">
-                      {!method.isDefault ? (
+                      {!method.is_default ? (
                         <>
                           <Button variant="outline-primary" size="sm" className="flex-grow-1" onClick={() => handleSetDefault(method.id)}>Set Default</Button>
                           <Button variant="outline-secondary" size="sm" onClick={() => handleDeleteCard(method.id)}><Trash2 size={14} /></Button>
@@ -223,31 +342,59 @@ const PaymentMethods = () => {
               </Col>
             ))}
           </Row>
-  
-          <div className="alert alert-info">
-            <AlertCircle size={18} className="me-2" />
-            <small><strong>Secure Payment:</strong> All payment information is encrypted and stored securely.</small>
-          </div>
-  
-          {AddCardModal()}
-        </div>
-      );
-    };
-  
-  
 
+          <ConfirmModal
+            show={deletePaymentMethodConfirm}
+            onHide={() => setDeletePaymentMethodConfirm(false)}
+            title="Delete Payment Method"
+            description="Are you sure you want to delete this payment method?"
+            targetName={deletePaymentMethodId || ""}
+            confirmButtonText="Delete"
+            cancelButtonText="Cancel"
+            onConfirm={handleConfirmDelete}
+            onCancel={() => setDeletePaymentMethodConfirm(false)}
+            confirmButtonVariant="danger"
+            cancelButtonVariant="secondary"
+            requireTextConfirmation={true}
+            confirmationPlaceholder="Type the word DELETE to confirm"
+          />
 
-
-  return (
-    <React.Fragment>
-      <BreadcrumbItem mainTitle="" mainLink="" subTitle="Customer Dashboard" />
-
-      {/* <PageHeader
-        title="Customer Dashboard"
-        showSearch={false}
-      /> */}
-
-      {renderPaymentMethods()}
+          {stripePublishableKey && (
+            <Modal
+              show={showAddCardModal}
+              onHide={() => setShowAddCardModal(false)}
+              size="lg"
+            >
+              <Modal.Header closeButton>
+                <Modal.Title>
+                  <div className="d-flex align-items-center">
+                    <CreditCard size={20} className="text-primary me-2" />
+                    Add Payment Method
+                  </div>
+                </Modal.Title>
+              </Modal.Header>
+              <Modal.Body>
+                <Elements 
+                  stripe={loadStripe(stripePublishableKey)}
+                  options={{
+                    mode: 'setup',
+                    currency: 'usd',
+                    appearance: {
+                      variables: {
+                        colorPrimary: '#0d6efd',
+                      },
+                    },
+                    paymentMethodTypes: ['card'],
+                  }}
+                >
+                  <AddCardForm
+                    onSuccess={handleAddCardSuccess}
+                    onCancel={() => setShowAddCardModal(false)}
+                  />
+                </Elements>
+              </Modal.Body>
+            </Modal>
+          )}
 
       
 

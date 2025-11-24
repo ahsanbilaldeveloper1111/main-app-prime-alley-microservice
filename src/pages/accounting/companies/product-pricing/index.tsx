@@ -23,7 +23,7 @@ import {
   ProductData,
   DiscountApplicabilityData,
   DiscountApplicabilityCreateUpdatePayload,
-} from "@utils/accounting";
+} from "@utils/accountingOld";
 import { Column } from "@components/CustomDataTable";
 import { Button, Modal, Row, Col, Form, Alert, Spinner } from "react-bootstrap";
 import { toast } from "react-toastify";

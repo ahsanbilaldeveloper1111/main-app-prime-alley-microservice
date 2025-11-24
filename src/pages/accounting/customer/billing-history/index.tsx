@@ -1,18 +1,21 @@
 import "@assets/scss/datatable-style.scss";
 import React, {
   ReactElement,
+  useEffect,
+  useCallback,
 } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 
 import CompanyLogo2 from "@assets/images/Prime3.png";
 import { useState } from 'react';
-import { Card, Row, Col, Button, Badge, Form, Table, Modal, Dropdown, ProgressBar } from 'react-bootstrap';
+import { Card, Row, Col, Button, Badge, Form, Table, Modal, Dropdown, ProgressBar, Nav } from 'react-bootstrap';
 import { 
   Eye, CreditCard, Clock, Wallet, ChevronRight, ChevronLeft,
   Edit, Trash2, Filter, Plus, Settings, Download, LayoutDashboard,
   Package, FileText, Bell, Check, DollarSign, TrendingUp, AlertCircle,
-  Users, ArrowUp, ArrowDown
+  Users, ArrowUp, ArrowDown,
+  Info
 } from 'lucide-react';
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
@@ -25,287 +28,351 @@ import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import PageHeader from "@components/PageHeader";
 
-interface Product {
-      id: number;
-      name: string;
-      category: string;
-      price: string;
-      type: string;
-      totalAmount: string;
-      status: string;
-      created: string;
-    }
-    
-    interface Invoice {
-      id: number;
-      invoice: string;
-      date: string;
-      dueDate: string;
-      amount: string;
-      status: string;
-      paymentMethod: string;
-      items: { name: string; quantity: number; price: string }[];
-      subtotal: string;
-      tax: string;
-      total: string;
-    }
+import '@assets/scss/datatable-style.scss';
+import { GetPayments } from "@utils/accounting";
+import GenericListPage from '@components/GenericListPage';
+import { useSession } from 'next-auth/react';
+import { Column } from "@components/CustomDataTable";
+import moment from "moment";
+import FormModal from "@pages/partial/FormModal";
+import { toast } from "react-toastify";
+import {currenciesData} from "@common/JsonData/currencies";
+import ThemeSelect from "@components/ThemeSelect";
 
 const BillingHistory = () => {
 
 
-  const [billingFilter, setBillingFilter] = useState('All');
-  const [billingSearch, setBillingSearch] = useState('');
+  const { data:session, status } = useSession();
+   
+    const columns: Column[] = [
+        { key: 'id', name: 'Payment ID', selector: (row: any) => row.id, sortable: true,
+          cell: (row: any) => {
+            return <div>
+              <p className="">#{row?.id}</p>
+            </div>
+          }
+         },
+         { key: 'invoice', name: 'Invoice', selector: (row: any) => row.invoice?.invoice_number, sortable: true,
+          cell: (row: any) => {
+            return <div>
+              <p className="">{row?.invoice?.invoice_number}</p>
+            </div>
+          }
+         },
+         { key: 'amount', name: 'Amount', selector: (row: any) => row.amount, sortable: true,
+          cell: (row: any) => {
+            return <div>
+              <p className="fw-semibold text-primary">{row?.currency_code} {row?.amount}</p>
+            </div>
+          }
+         },
+         { key: 'payment_method', name: 'Payment Method', selector: (row: any) => row.payment_method, sortable: true,
+          cell: (row: any) => {
+            return <div>
+              <p className="text-uppercase">{row?.payment_method}</p>
+            </div>
+          }
+         },
+        
+        { key: 'status', name: 'Status', selector: (row: any) => row.status, sortable: true,
+          cell: (row: any) => {
+            return <div>
+              <p className={`bg-opacity-10 text-dark badge bg-${row?.status   ? 'success' : 'danger'}`}>{row?.status}</p>
+            </div>
+          }
+         },
+        { key: 'payment_date', name: 'Date', selector: (row: any) => row.payment_date, sortable: true,
+          cell: (row: any) => {
+            return <div>
+              <p className="text-muted">{moment(row?.payment_date).format('DD-MMM-YYYY')}</p>
+            </div>
+          }
+         },
 
-  const [showBillingEditModal, setShowBillingEditModal] = useState(false);
-  const [showAddExpenseModal, setShowAddExpenseModal] = useState(false);
-  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
-  const [showAddCardModal, setShowAddCardModal] = useState(false);
-  const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
-  const [showManageAccountModal, setShowManageAccountModal] = useState(false);
-
-  const [billingInfo, setBillingInfo] = useState({
-      name: 'John Doe',
-      email: 'john.doe@example.com',
-      phone: '+44 20 1234 5678',
-      company: 'Acme Corporation',
-      address: '123 Business Street',
-      city: 'London',
-      postcode: 'SW1A 1AA',
-      country: 'United Kingdom'
-    });
-  
-    const [newCard, setNewCard] = useState({
-      cardNumber: '',
-      expiry: '',
-      cvv: '',
-      cardHolder: '',
-      billingAddress: ''
-    });
-  
-    const [paymentMethods, setPaymentMethods] = useState([
-      { id: 1, type: 'Visa', last4: '4242', expiry: '12/25', isDefault: true, cardHolder: 'John Doe' },
-      { id: 2, type: 'Mastercard', last4: '8888', expiry: '08/26', isDefault: false, cardHolder: 'John Doe' }
-    ]);
-  
-    const [products, setProducts] = useState<Product[]>([
-      { id: 1, name: 'UCASS Gateway 16 Channel', category: 'Gateway', price: '£300.00', type: 'Monthly', totalAmount: '£3,600.00', status: 'Active', created: '2024-10-15' },
-      { id: 2, name: 'UCASS Advance Policy', category: 'Policy', price: '£216.00', type: 'Annual', totalAmount: '£216.00', status: 'Trial', created: '2024-10-20' },
-      { id: 3, name: 'UCASS SLA', category: 'SLA', price: '£420.00', type: 'Monthly', totalAmount: '£5,040.00', status: 'Active', created: '2024-10-10' },
-      { id: 4, name: 'UCASS Basic', category: 'Basic', price: '£144.00', type: 'One-time', totalAmount: '£144.00', status: 'Inactive', created: '2024-10-25' }
-    ]);
-  
-    const [newProduct, setNewProduct] = useState({
-      name: '',
-      category: '',
-      price: '',
-      type: 'Monthly',
-      status: 'Active'
-    });
-
-
-  
-
-
-    // Billing History
-  const renderBillingHistory = () => {
-
-      const billingData = [
-        { id: 1, invoice: 'INV-001', date: '5/5/2024', dueDate: '7/11/2024', amount: '£17.99', status: 'Paid', paymentMethod: 'Card ****4242', items: [{ name: 'UCASS Gateway', quantity: 1, price: '£17.99' }], subtotal: '£17.99', tax: '£0.00', total: '£17.99' },
-        { id: 2, invoice: 'INV-002', date: '7/6/2024', dueDate: '7/8/2024', amount: '£17.99', status: 'Cancelled', paymentMethod: 'Card ****4242', items: [{ name: 'UCASS Gateway', quantity: 1, price: '£17.99' }], subtotal: '£17.99', tax: '£0.00', total: '£17.99' },
-        { id: 3, invoice: 'INV-003', date: '05/01/2024', dueDate: '06/02/2024', amount: '£17.99', status: 'Unpaid', paymentMethod: 'Card ****4242', items: [{ name: 'UCASS Gateway', quantity: 1, price: '£17.99' }], subtotal: '£17.99', tax: '£0.00', total: '£17.99' }
-      ];
-  
-      const getStatusBadge = (status: string) => {
-        const statusColors: { [key: string]: string } = { Paid: 'success', Cancelled: 'danger', Unpaid: 'warning' };
-        return <Badge bg={statusColors[status]} className="bg-opacity-10 text-dark">{status}</Badge>;
-      };
-  
-      const InvoiceModal = () => {
-        if (!selectedInvoice) return null;
-  
-        return (
-          <Modal show={showInvoiceModal} onHide={() => setShowInvoiceModal(false)} size="lg" centered>
-            <Modal.Header closeButton>
-              <Modal.Title>
-                <div className="d-flex justify-content-between align-items-start w-100">
-                  <div>
-                    <h5 className="mb-1">Invoice Details</h5>
-                    <p className="text-muted mb-0 small">Invoice #{selectedInvoice.invoice}</p>
-                  </div>
-                  {getStatusBadge(selectedInvoice.status)}
-                </div>
-              </Modal.Title>
-            </Modal.Header>
-            <Modal.Body>
-              <div className="mb-4 pb-4 border-bottom">
-                <Row>
-                  <Col md={6}>
-                    <h6 className="text-muted mb-2">From</h6>
-                    {/* <h6 className="mb-1">RingEdge</h6> */}
-                    <img src={CompanyLogo2.src} alt="logo" className="img-fluid" />
-                    <p className="text-muted mb-0 small">123 Business Street<br />London, UK SW1A 1AA</p>
-                  </Col>
-                  <Col md={6}>
-                    <h6 className="text-muted mb-2">Bill To</h6>
-                    <h6 className="mb-1">{billingInfo.name}</h6>
-                    <p className="text-muted mb-0 small">{billingInfo.address}<br />{billingInfo.city}, {billingInfo.postcode}</p>
-                  </Col>
-                </Row>
-              </div>
-  
-              <div className="mb-4 pb-4 border-bottom">
-                <Row>
-                  <Col xs={6} md={3}>
-                    <p className="text-muted mb-1 small">Invoice Date</p>
-                    <p className="fw-semibold mb-0">{selectedInvoice.date}</p>
-                  </Col>
-                  <Col xs={6} md={3}>
-                    <p className="text-muted mb-1 small">Due Date</p>
-                    <p className="fw-semibold mb-0">{selectedInvoice.dueDate}</p>
-                  </Col>
-                  <Col xs={6} md={3}>
-                    <p className="text-muted mb-1 small">Payment Method</p>
-                    <p className="fw-semibold mb-0">{selectedInvoice.paymentMethod}</p>
-                  </Col>
-                  <Col xs={6} md={3}>
-                    <p className="text-muted mb-1 small">Invoice ID</p>
-                    <p className="fw-semibold mb-0">#{selectedInvoice.invoice}</p>
-                  </Col>
-                </Row>
-              </div>
-  
-              <div className="mb-4">
-                <h6 className="text-muted mb-3">Items</h6>
-                <Table responsive>
-                  <thead className="bg-light">
-                    <tr>
-                      <th>Description</th>
-                      <th className="text-center">Quantity</th>
-                      <th className="text-end">Price</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {selectedInvoice.items.map((item, index) => (
-                      <tr key={index}>
-                        <td>{item.name}</td>
-                        <td className="text-center">{item.quantity}</td>
-                        <td className="text-end fw-semibold">{item.price}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </Table>
-              </div>
-  
-              <div className="bg-light rounded p-3">
-                <Row className="mb-2">
-                  <Col xs={6}><p className="mb-0 text-muted">Subtotal:</p></Col>
-                  <Col xs={6} className="text-end"><p className="mb-0 fw-semibold">{selectedInvoice.subtotal}</p></Col>
-                </Row>
-                <Row className="mb-2">
-                  <Col xs={6}><p className="mb-0 text-muted">Tax:</p></Col>
-                  <Col xs={6} className="text-end"><p className="mb-0 fw-semibold">{selectedInvoice.tax}</p></Col>
-                </Row>
-                <hr />
-                <Row>
-                  <Col xs={6}><p className="mb-0 fw-bold">Total:</p></Col>
-                  <Col xs={6} className="text-end"><p className="mb-0 fw-bold text-primary fs-5">{selectedInvoice.total}</p></Col>
-                </Row>
-              </div>
-            </Modal.Body>
-            <Modal.Footer>
-              <Button variant="outline-secondary" onClick={() => setShowInvoiceModal(false)}>Close</Button>
-              <Button variant="primary"><Download size={16} className="me-2" />Download PDF</Button>
-            </Modal.Footer>
-          </Modal>
-        );
-      };
-  
-      return (
-        <div>
-          <div className="mb-4">
-            <h2 className="mb-1">Billing History</h2>
-            <p className="text-muted mb-0">View and manage your invoices</p>
-          </div>
-  
-          <Card>
-            <Card.Body>
-              <div className="d-flex gap-3 mb-4 border-bottom">
-                {['All', 'Paid', 'Unpaid', 'Cancelled'].map((status) => (
-                  <button
-                    key={status}
-                    className={`btn btn-link text-decoration-none pb-2 position-relative ${
-                      billingFilter === status ? 'text-primary border-bottom border-primary border-2' : 'text-muted'
-                    }`}
-                    onClick={() => setBillingFilter(status)}
-                  >
-                    {status}
-                  </button>
-                ))}
-              </div>
-  
-              <div className="d-flex justify-content-between align-items-center mb-3">
-                <div className="d-flex align-items-center gap-2">
-                  <Form.Select size="sm" style={{ width: '80px' }}>
-                    <option>10</option>
-                    <option>25</option>
-                    <option>50</option>
-                  </Form.Select>
-                  <span className="text-muted small">entries</span>
-                </div>
-                <Form.Control type="search" placeholder="Search..." size="sm" style={{ width: '200px' }} />
-              </div>
-  
-              <Table responsive hover>
-                <thead className="bg-light">
-                  <tr>
-                    <th>Invoice ID</th>
-                    <th>Date</th>
-                    <th>Due Date</th>
-                    <th>Payment Method</th>
-                    <th>Amount</th>
-                    <th>Status</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {billingData.map((item) => (
-                    <tr key={item.id}>
-                      <td className="fw-semibold">{item.invoice}</td>
-                      <td>{item.date}</td>
-                      <td>{item.dueDate}</td>
-                      <td>{item.paymentMethod}</td>
-                      <td className="fw-semibold">{item.amount}</td>
-                      <td>{getStatusBadge(item.status)}</td>
-                      <td>
-                        <Button variant="link" size="sm" className="p-1" onClick={() => { setSelectedInvoice(item); setShowInvoiceModal(true); }}>
-                          <Eye size={18} />
+        
+            {
+                key: 'Action',
+                name: 'Actions',
+                selector: (row: any) => row.id,
+                sortable: false,
+                cell: (props: any) => (
+                    <div className="d-flex gap-2">
+                       <Button variant="light" className="btn-action-style-2 p-1 text-info" title="View" onClick={() => handleViewPayment(props)}>
+                            <Eye size={16} />
                         </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </Table>
-            </Card.Body>
-          </Card>
-  
-          {InvoiceModal()}
-        </div>
-      );
+                        
+                    </div>
+                )
+            }
+      
+    ];
+
+    const [refreshKey, setRefreshKey] = useState<number>(0);
+    const [currentFilters, setCurrentFilters] = useState<{ status?: string }>({});
+    const [activeStatusTab, setActiveStatusTab] = useState<string | null>(null);
+
+    const fetchPayments = useCallback(async (page = 1, perPage = 15, search = "") => {
+        const params: any = {
+            page,
+            per_page: perPage,
+            search
+        };
+        
+        if (currentFilters.status) {
+            params.status = currentFilters.status;
+        }
+        
+        const response = await GetPayments(params);
+        console.log('response', response);
+        return response;
+    }, [currentFilters]);
+
+    const [selectedPaymentView, setSelectedPaymentView] = useState<any | null>(null);
+    const [showViewPaymentModal, setShowViewPaymentModal] = useState(false);
+
+    const handleViewPayment = (props: any) => {
+      console.log('props', props);
+      setSelectedPaymentView(props);
+      setShowViewPaymentModal(true);
     };
 
-
+    
   return (
     <React.Fragment>
-      <BreadcrumbItem mainTitle="" mainLink="" subTitle="Customer Dashboard" />
+      <BreadcrumbItem mainTitle="" mainLink="" subTitle="Billing History" />
 
-      {/* <PageHeader
-        title="Customer Dashboard"
+      <PageHeader
+        title="Billing History"
+
         showSearch={false}
-      /> */}
+        
+      />
 
-      {renderBillingHistory()}
+      <Row className="mb-3">
+        <Col md={12}>
+          <ul id="system-tabs" className="mb-3 nav nav-tabs" role="tablist">
+            <li className="nav-item" role="presentation">
+              <button
+                className={`nav-link ${activeStatusTab === null ? 'active' : ''}`}
+                onClick={() => {
+                  setActiveStatusTab(null);
+                  setCurrentFilters({});
+                  setRefreshKey(prev => prev + 1);
+                }}
+                type="button"
+                role="tab"
+              >
+                All
+              </button>
+            </li>
+            <li className="nav-item" role="presentation">
+              <button
+                className={`nav-link ${activeStatusTab === 'completed' ? 'active' : ''}`}
+                onClick={() => {
+                  setActiveStatusTab('completed');
+                  setCurrentFilters({ status: 'completed' });
+                  setRefreshKey(prev => prev + 1);
+                }}
+                type="button"
+                role="tab"
+              >
+                Completed
+              </button>
+            </li>
+            <li className="nav-item" role="presentation">
+              <button
+                className={`nav-link ${activeStatusTab === 'pending' ? 'active' : ''}`}
+                onClick={() => {
+                  setActiveStatusTab('pending');
+                  setCurrentFilters({ status: 'pending' });
+                  setRefreshKey(prev => prev + 1);
+                }}
+                type="button"
+                role="tab"
+              >
+                Pending
+              </button>
+            </li>
+            <li className="nav-item" role="presentation">
+              <button
+                className={`nav-link ${activeStatusTab === 'refunded' ? 'active' : ''}`}
+                onClick={() => {
+                  setActiveStatusTab('refunded');
+                  setCurrentFilters({ status: 'refunded' });
+                  setRefreshKey(prev => prev + 1);
+                }}
+                type="button"
+                role="tab"
+              >
+                Refunded
+              </button>
+            </li>
+            <li className="nav-item" role="presentation">
+              <button
+                className={`nav-link ${activeStatusTab === 'partially_paid' ? 'active' : ''}`}
+                onClick={() => {
+                  setActiveStatusTab('partially_paid');
+                  setCurrentFilters({ status: 'partially_paid' });
+                  setRefreshKey(prev => prev + 1);
+                }}
+                type="button"
+                role="tab"
+              >
+                Partially Paid
+              </button>
+            </li>
+            <li className="nav-item" role="presentation">
+              <button
+                className={`nav-link ${activeStatusTab === 'cancelled' ? 'active' : ''}`}
+                onClick={() => {
+                  setActiveStatusTab('cancelled');
+                  setCurrentFilters({ status: 'cancelled' });
+                  setRefreshKey(prev => prev + 1);
+                }}
+                type="button"
+                role="tab"
+              >
+                Cancelled
+              </button>
+            </li>
+            <li className="nav-item" role="presentation">
+              <button
+                className={`nav-link ${activeStatusTab === 'failed' ? 'active' : ''}`}
+                onClick={() => {
+                  setActiveStatusTab('failed');
+                  setCurrentFilters({ status: 'failed' });
+                  setRefreshKey(prev => prev + 1);
+                }}
+                type="button"
+                role="tab"
+              >
+                Failed
+              </button>
+            </li>
+          </ul>
+        </Col>
+      </Row>
 
+            <GenericListPage
+                 columns={columns}
+                 fetchData={fetchPayments}
+                 title="Payments"
+                 searchPlaceholder="Search payments..."
+                 defaultPageSize={15}
+                 filters={currentFilters}
+                 refreshKey={refreshKey}
+                 search={true}
+                 tableStyle="table-style-2"
+             />
 
+             <FormModal
+              show={showViewPaymentModal}
+              size="lg"
+              onHide={() => setShowViewPaymentModal(false)}
+              title="Payment Details"
+              desc="View the payment details"
+              onSubmit={() => setShowViewPaymentModal(false)}
+              submitButtonText="Close"
+              cancelButtonText="Cancel"
+              onCancel={() => setShowViewPaymentModal(false)}
+              formHtml={
+                <>
+                <div className="mb-4 pb-4 border-bottom"><div className="mb-4 pb-4 border-bottom">
+                <div className="row">
+                  <div className="col-md-6">
+                    <h6 className="text-muted mb-2">From</h6>
+                    <h6 className="mb-1">{selectedPaymentView?.invoice?.reseller?.name}</h6>
+                    {/* <img alt="logo" className="img-fluid" src={CompanyLogo2.src} /> */}
+                    <p className="text-muted mb-0 small">123 Business Street
+                      <br/>London, UK SW1A 1AA</p>
+                  </div>
+                  <div className="col-md-6">
+                    <h6 className="text-muted mb-2">Bill To</h6>
+                    <h6 className="mb-1">{selectedPaymentView?.invoice?.company?.name}</h6>
+                    <p className="text-muted mb-0 small">123 Business Street
+                      <br />London, SW1A 1AA</p>
+                  </div>
+                </div>
+              </div>
+              <div className="mb-4 pb-4 border-bottom">
+                <div className="row">
+                  <div className="col-md-3 col-6">
+                    <p className="text-muted mb-1 small">Invoice Date</p>
+                    <p className="fw-semibold mb-0">{moment(selectedPaymentView?.invoice?.invoice_date).format('DD-MMM-YYYY')}</p>
+                  </div>
+                  <div className="col-md-3 col-6">
+                    <p className="text-muted mb-1 small">Due Date</p>
+                    <p className="fw-semibold mb-0">{moment(selectedPaymentView?.invoice?.due_date).format('DD-MMM-YYYY')}</p>
+                  </div>
+                  <div className="col-md-3 col-6">
+                    <p className="text-muted mb-1 small">Payment Method</p>
+                    <p className="fw-semibold mb-0">{selectedPaymentView?.payment_method}</p>
+                  </div>
+                  <div className="col-md-3 col-6">
+                    <p className="text-muted mb-1 small">Invoice ID</p>
+                    <p className="fw-semibold mb-0">{selectedPaymentView?.invoice?.invoice_number}</p>
+                  </div>
+                </div>
+              </div>
+              <div className="mb-4">
+                <h6 className="text-muted mb-3">Items</h6>
+                <div className="table-responsive">
+                  <table className="table">
+                    <thead className="bg-light">
+                      <tr>
+                        <th>Description</th>
+                        <th className="text-center">Quantity</th>
+                        <th className="text-end">Unit Price</th>
+                        <th className="text-end">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {selectedPaymentView?.invoice?.items?.map((item: any) => (
+                        <tr key={item.id}>
+                          <td>{item?.product?.name}</td>
+                          <td className="text-center">{item.quantity}</td>
+                          <td className="text-end fw-semibold">{selectedPaymentView?.currency_code} {item.unit_price}</td>
+                          <td className="text-end fw-semibold">{selectedPaymentView?.currency_code} {item.line_total}</td>
+                        </tr>
+                      ))}
+                      
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <div className="bg-light rounded p-3">
+                <div className="mb-2 row">
+                  <div className="col-6">
+                    <p className="mb-0 text-muted">Subtotal:</p>
+                  </div>
+                  <div className="text-end col-6">
+                    <p className="mb-0 fw-semibold">{selectedPaymentView?.currency_code} {selectedPaymentView?.invoice?.subtotal}</p>
+                  </div>
+                </div>
+                <div className="mb-2 row">
+                  <div className="col-6">
+                    <p className="mb-0 text-muted">Tax:</p>
+                  </div>
+                  <div className="text-end col-6">
+                    <p className="mb-0 fw-semibold">{selectedPaymentView?.currency_code} {selectedPaymentView?.invoice?.tax_amount}</p>
+                  </div>
+                </div>
+                <hr />
+                <div className="row">
+                  <div className="col-6">
+                    <p className="mb-0 fw-bold">Total:</p>
+                  </div>
+                  <div className="text-end col-6">
+                    <p className="mb-0 fw-bold text-primary fs-5">{selectedPaymentView?.currency_code} {selectedPaymentView?.invoice?.total_amount}</p>
+                  </div>
+                </div>
+              </div></div>
+                </>
+              }
+              ShowSubmitButton={false}
+              />
+
+            
       
 
     </React.Fragment>

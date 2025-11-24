@@ -73,6 +73,9 @@ const Groups = () => {
     const fetchGroups = async (page = 1, perPage = 15, search = "") => {
         return await ListGroups({ page, perPage, search, filters: currentFilters });
     };
+
+
+    
     const [showSuccessfulModal, setShowSuccessfulModal] = useState(false)
     const [successModalTitle, setSuccessModalTitle] = useState('')
     const [successModalDescription, setSuccessModalDescription] = useState('')

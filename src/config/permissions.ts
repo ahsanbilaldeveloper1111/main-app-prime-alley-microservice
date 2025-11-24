@@ -294,7 +294,8 @@ export const routePermissions: RoutePermission[] = [
                     { path: '/account-overview',permissions: [PERMISSIONS.ACCOUNTS_SERVICES]},
                     { path: '/product-details',permissions: [PERMISSIONS.ACCOUNTS_SERVICES]},
                     { path: '/billing-history',permissions: [PERMISSIONS.ACCOUNTS_SERVICES]},
-                    { path: '/payment-methods',permissions: [PERMISSIONS.ACCOUNTS_SERVICES]}
+                    { path: '/payment-methods',permissions: [PERMISSIONS.ACCOUNTS_SERVICES]},
+                    { path: '/invoices',permissions: [PERMISSIONS.ACCOUNTS_SERVICES]}
                 ]
             },
             {

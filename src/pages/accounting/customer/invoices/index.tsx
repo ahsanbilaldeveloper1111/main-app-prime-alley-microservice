@@ -1,3 +1,390 @@
+// import "@assets/scss/datatable-style.scss";
+// import React, {
+//   ReactElement,
+//   useEffect,
+//   useCallback,
+// } from "react";
+// import Layout from "@layout/index";
+// import BreadcrumbItem from "@common/BreadcrumbItem";
+
+// import CompanyLogo2 from "@assets/images/Prime3.png";
+// import { useState } from 'react';
+// import { Card, Row, Col, Button, Badge, Form, Table, Modal, Dropdown, ProgressBar, Nav } from 'react-bootstrap';
+// import { 
+//   Eye, CreditCard, Clock, Wallet, ChevronRight, ChevronLeft,
+//   Edit, Trash2, Filter, Plus, Settings, Download, LayoutDashboard,
+//   Package, FileText, Bell, Check, DollarSign, TrendingUp, AlertCircle,
+//   Users, ArrowUp, ArrowDown,
+//   Info
+// } from 'lucide-react';
+// import {
+//   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
+//   ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area
+// } from 'recharts';
+
+// import "@assets/scss/billing.scss";
+
+// import "@assets/scss/common.scss";
+// import "@assets/scss/tabs.scss";
+// import PageHeader from "@components/PageHeader";
+
+// import '@assets/scss/datatable-style.scss';
+// import { GetInvoices } from "@utils/accounting";
+// import GenericListPage from '@components/GenericListPage';
+// import { useSession } from 'next-auth/react';
+// import { Column } from "@components/CustomDataTable";
+// import moment from "moment";
+// import FormModal from "@pages/partial/FormModal";
+// import { toast } from "react-toastify";
+// import {currenciesData} from "@common/JsonData/currencies";
+// import ThemeSelect from "@components/ThemeSelect";
+
+// const Invoices = () => {
+
+
+//   const { data:session, status } = useSession();
+   
+//     const columns: Column[] = [
+        
+//          { key: 'invoice', name: 'Invoice', selector: (row: any) => row.invoice_number, sortable: true,
+//           cell: (row: any) => {
+//             return <div>
+//               <p className="">{row?.invoice_number}</p>
+//             </div>
+//           }
+//          },
+         
+//          { key: 'invoice_date', name: 'Invoice Date', selector: (row: any) => row.invoice_date, sortable: true,
+//             cell: (row: any) => {
+//               return <div>
+//                 <p className="text-muted">{moment(row?.invoice_date).format('DD-MMM-YYYY')}</p>
+//               </div>
+//             }
+//            },
+//          { key: 'due_date', name: 'Due Date', selector: (row: any) => row.due_date, sortable: true,
+//           cell: (row: any) => {
+//             return <div>
+//               <p className="text-muted">{moment(row?.due_date).format('DD-MMM-YYYY')}</p>
+//             </div>
+//           }
+//          },
+//          { key: 'total_amount', name: 'Amount', selector: (row: any) => row.total_amount, sortable: true,
+//             cell: (row: any) => {
+//               return <div>
+//                 <p className="fw-semibold text-primary">{row?.currency_code} {row?.total_amount}</p>
+//               </div>
+//             }
+//            },
+           
+          
+//           { key: 'status', name: 'Status', selector: (row: any) => row.status, sortable: true,
+//             cell: (row: any) => {
+//               return <div>
+//                 <p className={`bg-opacity-10 fw-semibold text-uppercase text-dark badge 
+//                   bg-${row?.status === 'pending' ? 'warning' : row?.status === 'paid' ? 'success' : row?.status === 'refunded' ? 'danger' : row?.status === 'partially_paid' ? 'warning' : row?.status === 'cancelled' ? 'danger' : row?.status === 'failed' ? 'danger' : 'secondary'}`}>
+//                   {row?.status}
+//                   </p>
+//               </div>
+//             }
+//            },
+        
+
+        
+//             {
+//                 key: 'Action',
+//                 name: 'Actions',
+//                 selector: (row: any) => row.id,
+//                 sortable: false,
+//                 cell: (props: any) => (
+//                     <div className="d-flex gap-2">
+//                        <Button variant="light" className="btn-action-style-2 p-1 text-info" title="View" onClick={() => handleViewPayment(props)}>
+//                             <Eye size={16} />
+//                         </Button>
+                        
+//                     </div>
+//                 )
+//             }
+      
+//     ];
+
+//     const [refreshKey, setRefreshKey] = useState<number>(0);
+//     const [currentFilters, setCurrentFilters] = useState<{ status?: string }>({});
+//     const [activeStatusTab, setActiveStatusTab] = useState<string | null>(null);
+
+//     const fetchPayments = useCallback(async (page = 1, perPage = 15, search = "") => {
+//         const params: any = {
+//             page,
+//             per_page: perPage,
+//             search
+//         };
+        
+//         if (currentFilters.status) {
+//             params.status = currentFilters.status;
+//         }
+        
+//         const response = await GetInvoices(params);
+//         console.log('response', response);
+//         return response;
+//     }, [currentFilters]);
+
+//     const [selectedPaymentView, setSelectedPaymentView] = useState<any | null>(null);
+//     const [showViewPaymentModal, setShowViewPaymentModal] = useState(false);
+
+//     const handleViewPayment = (props: any) => {
+//       console.log('props', props);
+//       setSelectedPaymentView(props);
+//       setShowViewPaymentModal(true);
+//     };
+
+    
+//   return (
+//     <React.Fragment>
+//       <BreadcrumbItem mainTitle="" mainLink="" subTitle="Invoices" />
+
+//       <PageHeader
+//         title="Invoices"
+
+//         showSearch={false}
+        
+//       />
+
+//       <Row className="mb-3">
+//         <Col md={12}>
+//           <ul id="system-tabs" className="mb-3 nav nav-tabs" role="tablist">
+//             <li className="nav-item" role="presentation">
+//               <button
+//                 className={`nav-link ${activeStatusTab === null ? 'active' : ''}`}
+//                 onClick={() => {
+//                   setActiveStatusTab(null);
+//                   setCurrentFilters({});
+//                   setRefreshKey(prev => prev + 1);
+//                 }}
+//                 type="button"
+//                 role="tab"
+//               >
+//                 All
+//               </button>
+//             </li>
+//             <li className="nav-item" role="presentation">
+//               <button
+//                 className={`nav-link ${activeStatusTab === 'paid' ? 'active' : ''}`}
+//                 onClick={() => {
+//                   setActiveStatusTab('paid');
+//                   setCurrentFilters({ status: 'paid' });
+//                   setRefreshKey(prev => prev + 1);
+//                 }}
+//                 type="button"
+//                 role="tab"
+//               >
+//                 Paid
+//               </button>
+//             </li>
+//             <li className="nav-item" role="presentation">
+//               <button
+//                 className={`nav-link ${activeStatusTab === 'pending' ? 'active' : ''}`}
+//                 onClick={() => {
+//                   setActiveStatusTab('pending');
+//                   setCurrentFilters({ status: 'pending' });
+//                   setRefreshKey(prev => prev + 1);
+//                 }}
+//                 type="button"
+//                 role="tab"
+//               >
+//                 Pending
+//               </button>
+//             </li>
+//             <li className="nav-item" role="presentation">
+//               <button
+//                 className={`nav-link ${activeStatusTab === 'refunded' ? 'active' : ''}`}
+//                 onClick={() => {
+//                   setActiveStatusTab('refunded');
+//                   setCurrentFilters({ status: 'refunded' });
+//                   setRefreshKey(prev => prev + 1);
+//                 }}
+//                 type="button"
+//                 role="tab"
+//               >
+//                 Refunded
+//               </button>
+//             </li>
+//             <li className="nav-item" role="presentation">
+//               <button
+//                 className={`nav-link ${activeStatusTab === 'partially_paid' ? 'active' : ''}`}
+//                 onClick={() => {
+//                   setActiveStatusTab('partially_paid');
+//                   setCurrentFilters({ status: 'partially_paid' });
+//                   setRefreshKey(prev => prev + 1);
+//                 }}
+//                 type="button"
+//                 role="tab"
+//               >
+//                 Partially Paid
+//               </button>
+//             </li>
+//             <li className="nav-item" role="presentation">
+//               <button
+//                 className={`nav-link ${activeStatusTab === 'cancelled' ? 'active' : ''}`}
+//                 onClick={() => {
+//                   setActiveStatusTab('cancelled');
+//                   setCurrentFilters({ status: 'cancelled' });
+//                   setRefreshKey(prev => prev + 1);
+//                 }}
+//                 type="button"
+//                 role="tab"
+//               >
+//                 Cancelled
+//               </button>
+//             </li>
+//             <li className="nav-item" role="presentation">
+//               <button
+//                 className={`nav-link ${activeStatusTab === 'failed' ? 'active' : ''}`}
+//                 onClick={() => {
+//                   setActiveStatusTab('failed');
+//                   setCurrentFilters({ status: 'failed' });
+//                   setRefreshKey(prev => prev + 1);
+//                 }}
+//                 type="button"
+//                 role="tab"
+//               >
+//                 Failed
+//               </button>
+//             </li>
+//           </ul>
+//         </Col>
+//       </Row>
+
+//             <GenericListPage
+//                  columns={columns}
+//                  fetchData={fetchPayments}
+//                  title="Invoices"
+//                  searchPlaceholder="Search invoices..."
+//                  defaultPageSize={15}
+//                  filters={currentFilters}
+//                  refreshKey={refreshKey}
+//                  search={true}
+//                  tableStyle="table-style-2"
+//              />
+
+//              <FormModal
+//               show={showViewPaymentModal}
+//               size="lg"
+//               onHide={() => setShowViewPaymentModal(false)}
+//               title="Payment Details"
+//               desc="View the payment details"
+//               onSubmit={() => setShowViewPaymentModal(false)}
+//               submitButtonText="Close"
+//               cancelButtonText="Cancel"
+//               onCancel={() => setShowViewPaymentModal(false)}
+//               formHtml={
+//                 <>
+//                 <div className="mb-4 pb-4 border-bottom"><div className="mb-4 pb-4 border-bottom">
+//                 <div className="row">
+//                   <div className="col-md-6">
+//                     <h6 className="text-muted mb-2">From</h6>
+//                     <h6 className="mb-1">{selectedPaymentView?.invoice?.reseller?.name}</h6>
+//                     {/* <img alt="logo" className="img-fluid" src={CompanyLogo2.src} /> */}
+//                     <p className="text-muted mb-0 small">123 Business Street
+//                       <br/>London, UK SW1A 1AA</p>
+//                   </div>
+//                   <div className="col-md-6">
+//                     <h6 className="text-muted mb-2">Bill To</h6>
+//                     <h6 className="mb-1">{selectedPaymentView?.company?.name}</h6>
+//                     <p className="text-muted mb-0 small">{selectedPaymentView?.company?.profile?.address}</p>
+//                   </div>
+//                 </div>
+//               </div>
+//               <div className="mb-4 pb-4 border-bottom">
+//                 <div className="row">
+//                   <div className="col-md-3 col-6">
+//                     <p className="text-muted mb-1 small">Invoice Date</p>
+//                     <p className="fw-semibold mb-0">{moment(selectedPaymentView?.invoice_date).format('DD-MMM-YYYY')}</p>
+//                   </div>
+//                   <div className="col-md-3 col-6">
+//                     <p className="text-muted mb-1 small">Due Date</p>
+//                     <p className="fw-semibold mb-0">{moment(selectedPaymentView?.due_date).format('DD-MMM-YYYY')}</p>
+//                   </div>
+//                   <div className="col-md-3 col-6">
+//                     <p className="text-muted mb-1 small">Payment Mode</p>
+//                     <p className="fw-semibold mb-0">{selectedPaymentView?.payment_mode}</p>
+//                   </div>
+//                   <div className="col-md-3 col-6">
+//                     <p className="text-muted mb-1 small">Invoice ID</p>
+//                     <p className="fw-semibold mb-0">{selectedPaymentView?.invoice_number}</p>
+//                   </div>
+//                 </div>
+//               </div>
+//               <div className="mb-4">
+//                 <h6 className="text-muted mb-3">Invoice Items</h6>
+//                 <div className="table-responsive">
+//                   <table className="table">
+//                     <thead className="bg-light">
+//                       <tr>
+//                         <th>Description</th>
+//                         <th className="text-center">Quantity</th>
+//                         <th className="text-end">Unit Price</th>
+//                         <th className="text-end">Total</th>
+//                       </tr>
+//                     </thead>
+//                     <tbody>
+//                       {selectedPaymentView?.invoice?.items?.map((item: any) => (
+//                         <tr key={item.id}>
+//                           <td>{item?.product?.name}</td>
+//                           <td className="text-center">{item.quantity}</td>
+//                           <td className="text-end fw-semibold">{selectedPaymentView?.currency_code} {item.unit_price}</td>
+//                           <td className="text-end fw-semibold">{selectedPaymentView?.currency_code} {item.line_total}</td>
+//                         </tr>
+//                       ))}
+                      
+//                     </tbody>
+//                   </table>
+//                 </div>
+//               </div>
+//               <div className="bg-light rounded p-3">
+//                 <div className="mb-2 row">
+//                   <div className="col-6">
+//                     <p className="mb-0 text-muted">Subtotal:</p>
+//                   </div>
+//                   <div className="text-end col-6">
+//                     <p className="mb-0 fw-semibold">{selectedPaymentView?.currency_code} {selectedPaymentView?.invoice?.subtotal}</p>
+//                   </div>
+//                 </div>
+//                 <div className="mb-2 row">
+//                   <div className="col-6">
+//                     <p className="mb-0 text-muted">Tax:</p>
+//                   </div>
+//                   <div className="text-end col-6">
+//                     <p className="mb-0 fw-semibold">{selectedPaymentView?.currency_code} {selectedPaymentView?.invoice?.tax_amount}</p>
+//                   </div>
+//                 </div>
+//                 <hr />
+//                 <div className="row">
+//                   <div className="col-6">
+//                     <p className="mb-0 fw-bold">Total:</p>
+//                   </div>
+//                   <div className="text-end col-6">
+//                     <p className="mb-0 fw-bold text-primary fs-5">{selectedPaymentView?.currency_code} {selectedPaymentView?.invoice?.total_amount}</p>
+//                   </div>
+//                 </div>
+//               </div></div>
+//                 </>
+//               }
+//               ShowSubmitButton={false}
+//               />
+
+            
+      
+
+//     </React.Fragment>
+//   );
+// };
+
+// Invoices.getLayout = (page: ReactElement) => {
+//   return <Layout>{page}</Layout>;
+// };
+
+// export default Invoices;
+
+
 import "@assets/scss/datatable-style.scss";
 import React, {
   ReactElement,
@@ -13,6 +400,10 @@ const STATUS_SENT = 'sent';
 const STATUS_PAID = 'paid';
 const STATUS_OVERDUE = 'overdue';
 const STATUS_CANCELLED = 'cancelled';
+const STATUS_PARTIALLY_PAID = 'partially_paid';
+const STATUS_FAILED = 'failed';
+const STATUS_REFUNDED = 'refunded';
+const STATUS_PENDING = 'pending';
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericListPage from "@components/GenericListPage";
@@ -58,7 +449,7 @@ import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import PageHeader from "@components/PageHeader";
 import PageSummaryGrid from "@components/PageSummaryGrid";
-import FormModal from "../../partial/FormModal";
+import FormModal from "@pages/partial/FormModal";
 import ConfirmModal from "@pages/partial/ConfirmModal";
 import SuccessfulModal from "@pages/partial/SuccessfulModal";
 
@@ -66,6 +457,7 @@ import { motion } from "framer-motion";
 import { FiEdit, FiTrash2, FiPrinter, FiDownload, FiCreditCard, FiDollarSign } from "react-icons/fi";
 import TableAction, { Action } from "@components/TableAction";
 import { Spinner } from "react-bootstrap";
+import { DollarSign, Download } from "lucide-react";
 
 // Rich Text Editor Component for Terms and Conditions
 const RichTextEditor: React.FC<{
@@ -493,17 +885,7 @@ const InvoiceList = () => {
           </div>
         ),
       },
-      {
-        key: "company",
-        name: "Company",
-        selector: (row: InvoiceData) => row.company?.name,
-        sortable: true,
-        cell: (props: InvoiceData) => (
-          <span className="status-badge primary">
-            {props.company?.name || "Unknown Company"}
-          </span>
-        ),
-      },
+     
       {
         key: "subtotal",
         name: "Subtotal",
@@ -581,6 +963,17 @@ const InvoiceList = () => {
                 return <span className="badge bg-danger">Overdue</span>;
               case STATUS_CANCELLED:
                 return <span className="badge bg-dark">Cancelled</span>;
+
+              case STATUS_PARTIALLY_PAID:
+                return <span className="badge bg-warning">Partially Paid</span>;
+              case STATUS_FAILED:
+                return <span className="badge bg-danger">Failed</span>;
+              case STATUS_REFUNDED:
+                return <span className="badge bg-danger">Refunded</span>;
+              case STATUS_PENDING:
+                return <span className="badge bg-warning">Pending</span>;
+              case STATUS_DRAFT:
+                return <span className="badge bg-secondary">Draft</span>;
               default:
                 return <span className="badge bg-light text-dark">{status}</span>;
             }
@@ -598,14 +991,7 @@ const InvoiceList = () => {
           const isUnpaid = true; // All invoices can be paid
           const actions = [
 
-            ...(session?.user?.permissions?.includes('edit-invoices-billing') ? [
-            {
-              label: 'Edit',
-              icon: FiEdit,
-              onClick: () => handleEditInvoice(props),
-              variant: 'edit'
-            },
-            ] : []),
+           
             
             ...(session?.user?.permissions?.includes('download-invoice-invoices-billing') ? [
             {
@@ -629,17 +1015,16 @@ const InvoiceList = () => {
             });
           }
 
-          {session?.user?.permissions?.includes('delete-invoices-billing') && (
-          actions.push({
-            label: 'Delete',
-            icon: FiTrash2,
-            onClick: () => handleDeleteInvoice(props),
-            variant: 'delete'
-          })
-          )}
+         
 
           return (
-            <TableAction actions={actions as Action[]} />
+            <>
+          
+          <div className="d-flex gap-2"> 
+                        <Button variant="light" className="btn-action-style-2 p-1 text-info" title="Pay" onClick={() => handlePayInvoice(props)}><DollarSign size={16} /></Button>
+                        <Button variant="light" className="btn-action-style-2 p-1 text-info" title="Download PDF" onClick={() => handleDownloadPDF(props)}><Download size={16} /></Button>
+                        </div>
+            </>
           );
         },
       },
@@ -2114,17 +2499,7 @@ const InvoiceList = () => {
 
       <PageHeader
         title="Invoices"
-        showSearch={session?.user?.permissions?.includes('list-invoices-billing')}
-        searchPlaceholder="Search invoices..."
-        searchValue={currentFilters.search || ""}
-        onSearchChange={(value) => handleFiltersChange({...currentFilters, search: value})}
-        buttons={
-          <>
-          {session?.user?.permissions?.includes('add-invoices-billing') && (
-            <Button variant="primary" size="sm" onClick={openCreateInvoiceModal}>New Invoice</Button>
-          )}
-          </>
-        }
+       
       />
 
       
@@ -2137,7 +2512,7 @@ const InvoiceList = () => {
         defaultPageSize={15}
         filters={memoizedFilters}
         refreshKey={refreshKey}
-        search={false}
+        search={true}
         tableStyle="table-style-2"
       />
       )}
@@ -3223,3 +3598,4 @@ InvoiceList.getLayout = (page: ReactElement) => {
 };
 
 export default InvoiceList;
+

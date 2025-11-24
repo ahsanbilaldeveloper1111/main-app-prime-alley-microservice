@@ -37,7 +37,8 @@ import {
   Ban,
   RadioTower,
   Workflow,
-  NotebookText
+  NotebookText,
+  DollarSign
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -325,6 +326,7 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
             { id: 'account-overview', title: 'Account Overview', icon: <Eye size={16} />, url: '/accounting/customer/account-overview' },
             { id: 'product-details', title: 'Product Details', icon: <ShoppingBag size={16} />, url: '/accounting/customer/product-details' },
             { id: 'billing-history', title: 'Billing History', icon: <FileText size={16} />, url: '/accounting/customer/billing-history' },
+            { id: 'billing-invoices', title: 'Invoices', icon: <DollarSign size={16} />, url: '/accounting/customer/invoices' },
             { id: 'payment-methods', title: 'Payment Methods', icon: <CreditCard size={16} />, url: '/accounting/customer/payment-methods' },
 
         // {

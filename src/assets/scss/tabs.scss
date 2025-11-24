@@ -3,7 +3,7 @@ $primary-color: #1a6bc4;
       border-bottom: 3px #e0ebf7 solid;
       margin-bottom:20px !important;
       .nav-item {
-        margin-right: 20px;
+        margin-right:15px;
 
 
       }
@@ -12,17 +12,18 @@ $primary-color: #1a6bc4;
             font-family: "Poppins", sans-serif;
             color: var(--light-text);
             position: relative;
-            border: 0px !important;
             margin: 0px !important;
-            padding:10px 0px;
-            font-weight: 600;
+            padding: 10px 15px;
+            font-weight: normal;
             letter-spacing: 0.5px;
             font-size: 1rem;
-
+            border-radius: 10px !important;
+            border: 2px transparent solid !important;
       
 
             &:hover, &:focus, &:active, &.active {
-                color:#1a6bc4 !important;
+                color:#04a9f5 !important;
+                border-color: #04a9f5 !important;
             }
         }
         .nav-link.active::after {
@@ -32,6 +33,7 @@ $primary-color: #1a6bc4;
             left: 0;
             right: 0;
             border-bottom: 5px solid #1a6bc4;
+            display: none;
         }
 
         &.tab-style-two{

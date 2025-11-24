@@ -1,6 +1,8 @@
 import "@assets/scss/datatable-style.scss";
 import React, {
   ReactElement,
+  useEffect,
+  useCallback,
 } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
@@ -12,7 +14,8 @@ import {
   Eye, CreditCard, Clock, Wallet, ChevronRight, ChevronLeft,
   Edit, Trash2, Filter, Plus, Settings, Download, LayoutDashboard,
   Package, FileText, Bell, Check, DollarSign, TrendingUp, AlertCircle,
-  Users, ArrowUp, ArrowDown
+  Users, ArrowUp, ArrowDown,
+  Info
 } from 'lucide-react';
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
@@ -24,6 +27,17 @@ import "@assets/scss/billing.scss";
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import PageHeader from "@components/PageHeader";
+
+import '@assets/scss/datatable-style.scss';
+import { GetProducts, GetProductCategories } from "@utils/accounting";
+import GenericListPage from '@components/GenericListPage';
+import { useSession } from 'next-auth/react';
+import { Column } from "@components/CustomDataTable";
+import moment from "moment";
+import FormModal from "@pages/partial/FormModal";
+import { toast } from "react-toastify";
+import {currenciesData} from "@common/JsonData/currencies";
+import ThemeSelect from "@components/ThemeSelect";
 
 interface Product {
       id: number;
@@ -52,173 +66,168 @@ interface Product {
 
 const ProductDetails = () => {
 
+
+  const { data:session, status } = useSession();
+   
+    const columns: Column[] = [
+        { key: 'name', name: 'Product Name', selector: (row: any) => row.product?.name, sortable: true,
+          cell: (row: any) => {
+            return <div>
+              <p className="fw-semibold">{row?.product?.name}</p>
+            </div>
+          }
+         },
+        { key: 'category', name: 'Category', selector: (row: any) => row.product?.category?.name, sortable: true,
+          cell: (row: any) => {
+            return <div>
+              <p>{row?.product?.category?.name}</p>
+            </div>
+          }
+         },
+         { key: 'base_price', name: 'Base Price', selector: (row: any) => row.product?.base_price, sortable: true,
+          cell: (row: any) => {
+            return <div>
+              <p className="text-primary fw-semibold">{row?.product?.currency} {row?.product?.base_price}</p>
+            </div>
+          }
+         },
+       
+        //  { key: 'purchase_price', name: 'Purchase Price', selector: (row: any) => row.purchase_price, sortable: true,
+        //   cell: (row: any) => {
+        //     return <div>
+        //       <p className="text-primary fw-semibold">{row?.currency} {row?.purchase_price}</p>
+        //     </div>
+        //   }
+        //  },
+        //  { key: 'sale_price', name: 'Sale Price', selector: (row: any) => row.sale_price, sortable: true,
+        //   cell: (row: any) => {
+        //     return <div>
+        //       <p className="text-primary fw-semibold">{row?.currency} {row?.sale_price}</p>
+        //     </div>
+        //   }
+        //  },
+        
+        // { key: 'totalAmount', name: 'Total Amount', selector: (row: any) => row.totalAmount, sortable: true },
+        
+        { key: 'is_active', name: 'Status', selector: (row: any) => row.product?.is_active, sortable: true,
+          cell: (row: any) => {
+            return <div>
+              <p className={`bg-opacity-10 text-dark badge bg-${row?.product?.is_active ? 'success' : 'danger'}`}>{row?.product?.is_active ? 'Active' : 'Inactive'}</p>
+            </div>
+          }
+         },
+        { key: 'created_at', name: 'Created', selector: (row: any) => row.product?.created_at, sortable: true,
+          cell: (row: any) => {
+            return <div>
+              <p className="text-muted">{moment(row?.product?.created_at).format('DD/MM/YYYY')}</p>
+            </div>
+          }
+         },
+
+        // ...(session?.user?.permissions?.includes('edit-groups') || session?.user?.permissions?.includes('delete-groups') ? [
+        //     {
+        //         key: 'Action',
+        //         name: 'Actions',
+        //         selector: (row: any) => row.id,
+        //         sortable: false,
+        //         cell: (props: any) => (
+        //             <div className="d-flex gap-2">
+        //                {/* <Button variant="light" className="btn-action-style-2 p-1 text-primary" title="View" onClick={() => handleViewProduct(props)}>
+        //                     <Eye size={16} />
+        //                 </Button> */}
+                        
+        //             </div>
+        //         )
+        //     }
+        // ] : [])
+    ];
+
+    const [refreshKey, setRefreshKey] = useState<number>(0);
+    const [currentFilters, setCurrentFilters] = useState({});
+
+    const fetchProducts = useCallback(async (page = 1, perPage = 15, search = "") => {
+        const response = await GetProducts({ page, perPage, search, filters: currentFilters });
+        console.log('response', response);
+        return response;
+    }, [currentFilters]);
+
+    const [selectedProductView, setSelectedProductView] = useState<any | null>(null);
+    const [showViewProductModal, setShowViewProductModal] = useState(false);
+    const handleViewProduct = (props: any) => {
+      setSelectedProductView(props);
+      setShowViewProductModal(true);
+    };
+
+    const [selectedProductDelete, setSelectedProductDelete] = useState<any | null>(null);
+    const [showDeleteProductModal, setShowDeleteProductModal] = useState(false);
+    const handleDeleteProduct = (props: any) => {
+      setSelectedProductDelete(props?.id);
+      setShowDeleteProductModal(true);
+    };
+
+    const [productCategories, setProductCategories] = useState<any[]>([]);
+    const fetchProductCategories = async () => {
+      const response = await GetProductCategories();
+      setProductCategories(response);
+    };
+    useEffect(() => {
+      fetchProductCategories();
+    }, []);
+
   const [showProductModal, setShowProductModal] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [showViewModal, setShowViewModal] = useState(false);
-  
-    const [products, setProducts] = useState<Product[]>([
-      { id: 1, name: 'UCASS Gateway 16 Channel', category: 'Gateway', price: '£300.00', type: 'Monthly', totalAmount: '£3,600.00', status: 'Active', created: '2024-10-15' },
-      { id: 2, name: 'UCASS Advance Policy', category: 'Policy', price: '£216.00', type: 'Annual', totalAmount: '£216.00', status: 'Trial', created: '2024-10-20' },
-      { id: 3, name: 'UCASS SLA', category: 'SLA', price: '£420.00', type: 'Monthly', totalAmount: '£5,040.00', status: 'Active', created: '2024-10-10' },
-      { id: 4, name: 'UCASS Basic', category: 'Basic', price: '£144.00', type: 'One-time', totalAmount: '£144.00', status: 'Inactive', created: '2024-10-25' }
-    ]);
-  
-    const [newProduct, setNewProduct] = useState({
-      name: '',
-      category: '',
-      price: '',
-      type: 'Monthly',
-      status: 'Active'
-    });
 
+  return (
+    <React.Fragment>
+      <BreadcrumbItem mainTitle="" mainLink="" subTitle="Customer Dashboard" />
 
-    // Products Management
-  const renderProducts = () => {
-      const handleAddProduct = () => {
-        const today = new Date().toISOString().split('T')[0];
-        const price = parseFloat(newProduct.price) || 0;
-        const multiplier = newProduct.type === 'Annual' ? 1 : newProduct.type === 'Monthly' ? 12 : 1;
-        const totalAmount = price * multiplier;
-        
-        const product: Product = {
-          id: products.length + 1,
-          name: newProduct.name,
-          category: newProduct.category,
-          price: `£${price.toFixed(2)}`,
-          type: newProduct.type,
-          totalAmount: `£${totalAmount.toFixed(2)}`,
-          status: newProduct.status,
-          created: today
-        };
-        
-        setProducts([...products, product]);
-        setShowProductModal(false);
-        setNewProduct({ name: '', category: '', price: '', type: 'Monthly', status: 'Active' });
-      };
-  
-      const handleEditProduct = (product: Product) => {
-        setSelectedProduct(product);
-        setShowViewModal(true);
-      };
-  
-      const handleDeleteProduct = (id: number) => {
-        if (window.confirm('Are you sure you want to delete this product?')) {
-          setProducts(products.filter(p => p.id !== id));
+      <PageHeader
+        title="My Products"
+        description="Manage your subscriptions and services"
+        showSearch={false}
+        buttons={
+          <>
+          
+          </>
         }
-      };
-  
-      const AddProductModal = () => (
-        <Modal show={showProductModal} onHide={() => setShowProductModal(false)} size="lg" centered>
-          <Modal.Header closeButton>
-            <Modal.Title>Add New Product</Modal.Title>
-          </Modal.Header>
-          <Modal.Body>
-            <Form>
-              <Row>
-                <Col md={12}>
-                  <Form.Group className="mb-3">
-                    <Form.Label>Product Name *</Form.Label>
-                    <Form.Control
-                      type="text"
-                      value={newProduct.name}
-                      onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })}
-                      placeholder="Enter product name"
-                    />
-                  </Form.Group>
-                </Col>
-                <Col md={6}>
-                  <Form.Group className="mb-3">
-                    <Form.Label>Category *</Form.Label>
-                    <Form.Select
-                      value={newProduct.category}
-                      onChange={(e) => setNewProduct({ ...newProduct, category: e.target.value })}
-                    >
-                      <option value="">Select category</option>
-                      <option>Gateway</option>
-                      <option>Policy</option>
-                      <option>SLA</option>
-                      <option>Basic</option>
-                    </Form.Select>
-                  </Form.Group>
-                </Col>
-                <Col md={6}>
-                  <Form.Group className="mb-3">
-                    <Form.Label>Price *</Form.Label>
-                    <Form.Control
-                      type="number"
-                      step="0.01"
-                      value={newProduct.price}
-                      onChange={(e) => setNewProduct({ ...newProduct, price: e.target.value })}
-                      placeholder="0.00"
-                    />
-                  </Form.Group>
-                </Col>
-                <Col md={6}>
-                  <Form.Group className="mb-3">
-                    <Form.Label>Type *</Form.Label>
-                    <Form.Select
-                      value={newProduct.type}
-                      onChange={(e) => setNewProduct({ ...newProduct, type: e.target.value })}
-                    >
-                      <option>Monthly</option>
-                      <option>Annual</option>
-                      <option>One-time</option>
-                    </Form.Select>
-                  </Form.Group>
-                </Col>
-                <Col md={6}>
-                  <Form.Group className="mb-3">
-                    <Form.Label>Status *</Form.Label>
-                    <Form.Select
-                      value={newProduct.status}
-                      onChange={(e) => setNewProduct({ ...newProduct, status: e.target.value })}
-                    >
-                      <option>Active</option>
-                      <option>Trial</option>
-                      <option>Inactive</option>
-                    </Form.Select>
-                  </Form.Group>
-                </Col>
-              </Row>
-            </Form>
-          </Modal.Body>
-          <Modal.Footer>
-            <Button variant="outline-secondary" onClick={() => setShowProductModal(false)}>
-              Cancel
-            </Button>
-            <Button variant="primary" onClick={handleAddProduct}>
-              Add Product
-            </Button>
-          </Modal.Footer>
-        </Modal>
-      );
-  
-      const ViewProductModal = () => {
-        if (!selectedProduct) return null;
-        
-        const getStatusColor = (status: string): string => {
-          switch (status) {
-            case 'Active': return 'success';
-            case 'Trial': return 'warning';
-            case 'Inactive': return 'secondary';
-            default: return 'primary';
-          }
-        };
-  
-        return (
-          <Modal show={showViewModal} onHide={() => setShowViewModal(false)} size="lg" centered>
-            <Modal.Header closeButton>
-              <Modal.Title>Product Details</Modal.Title>
-            </Modal.Header>
-            <Modal.Body>
-              <div className="mb-4 pb-4 border-bottom">
+      />
+
+      {/* {renderProducts()} */}
+
+            <GenericListPage
+                 columns={columns}
+                 fetchData={fetchProducts}
+                 title="Products"
+                 searchPlaceholder="Search products..."
+                 defaultPageSize={15}
+                 filters={currentFilters}
+                 refreshKey={refreshKey}
+                 search={true}
+                 tableStyle="table-style-2"
+             />
+
+
+             <FormModal
+              show={showViewProductModal}
+              size="lg"
+              onHide={() => setShowViewProductModal(false)}
+              title="Product Details"
+              desc="View the product details"
+              onSubmit={() => setShowViewProductModal(false)}
+              submitButtonText="Close"
+              cancelButtonText="Cancel"
+              onCancel={() => setShowViewProductModal(false)}
+              formHtml={
+                <>
+                <div className="mb-4 pb-4 border-bottom">
                 <div className="d-flex justify-content-between align-items-start">
                   <div>
-                    <h4 className="mb-2">{selectedProduct.name}</h4>
-                    <p className="text-muted mb-0">Product ID: #{selectedProduct.id}</p>
+                    <h4 className="mb-2">{selectedProductView?.name}</h4>
+                    <p className="text-muted mb-0">Product ID: #{selectedProductView?.id}</p>
                   </div>
-                  <Badge bg={getStatusColor(selectedProduct.status)} className="px-3 py-2">
-                    {selectedProduct.status}
+                  <Badge bg={selectedProductView?.is_active ? 'success' : 'danger'} className="px-3 py-2">
+                    {selectedProductView?.is_active ? 'Active' : 'Inactive'}
                   </Badge>
                 </div>
               </div>
@@ -227,194 +236,28 @@ const ProductDetails = () => {
                 <Col md={6} className="mb-3">
                   <div className="p-3 bg-light rounded">
                     <p className="text-muted mb-1 small">Category</p>
-                    <p className="mb-0 fw-semibold">{selectedProduct.category}</p>
+                    <p className="mb-0 fw-semibold">{selectedProductView?.category?.name}</p>
                   </div>
                 </Col>
+                
+                
+
                 <Col md={6} className="mb-3">
                   <div className="p-3 bg-light rounded">
-                    <p className="text-muted mb-1 small">Type</p>
-                    <p className="mb-0 fw-semibold">{selectedProduct.type}</p>
+                    <p className="text-muted mb-1 small">Base Price</p>
+                    <p className="mb-0 fw-semibold text-primary">{selectedProductView?.currency} {selectedProductView?.base_price}</p>
                   </div>
                 </Col>
-                <Col md={6} className="mb-3">
-                  <div className="p-3 bg-light rounded">
-                    <p className="text-muted mb-1 small">Price</p>
-                    <p className="mb-0 fw-semibold text-primary">{selectedProduct.price}</p>
-                  </div>
-                </Col>
-                <Col md={6} className="mb-3">
-                  <div className="p-3 bg-light rounded">
-                    <p className="text-muted mb-1 small">Total Amount</p>
-                    <p className="mb-0 fw-semibold text-success">{selectedProduct.totalAmount}</p>
-                  </div>
-                </Col>
+                
+                
               </Row>
-            </Modal.Body>
-            <Modal.Footer>
-              <Button variant="outline-secondary" onClick={() => setShowViewModal(false)}>Close</Button>
-              <Button variant="primary"><Edit size={16} className="me-2" />Edit Product</Button>
-            </Modal.Footer>
-          </Modal>
-        );
-      };
-  
-      return (
-        <div>
-          <div className="d-flex justify-content-between align-items-center mb-4">
-            <div>
-              <h2 className="mb-1">My Products</h2>
-              <p className="text-muted mb-0">Manage your subscriptions and services</p>
-            </div>
-            <Button variant="primary" onClick={() => setShowProductModal(true)}>
-              <Plus size={16} className="me-2" />
-              Add Product
-            </Button>
-          </div>
-  
-          {/* Stats Cards */}
-          <Row className="mb-4">
-            <Col md={3} className="mb-3">
-              <Card>
-                <Card.Body>
-                  <h3 className="mb-1">24</h3>
-                  <p className="text-muted mb-0 small">Total Products</p>
-                </Card.Body>
-              </Card>
-            </Col>
-            <Col md={3} className="mb-3">
-              <Card>
-                <Card.Body>
-                  <h3 className="text-success mb-1">20</h3>
-                  <p className="text-muted mb-0 small">Active</p>
-                </Card.Body>
-              </Card>
-            </Col>
-            <Col md={3} className="mb-3">
-              <Card>
-                <Card.Body>
-                  <h3 className="text-warning mb-1">4</h3>
-                  <p className="text-muted mb-0 small">Trial</p>
-                </Card.Body>
-              </Card>
-            </Col>
-            <Col md={3} className="mb-3">
-              <Card>
-                <Card.Body>
-                  <h3 className="text-info mb-1">£1,080</h3>
-                  <p className="text-muted mb-0 small">Total Value</p>
-                </Card.Body>
-              </Card>
-            </Col>
-          </Row>
-  
-          {/* Filters */}
-          <Card className="mb-4">
-            <Card.Body>
-              <Row className="align-items-center">
-                <Col md={4}>
-                  <Form.Control type="search" placeholder="Search products..." />
-                </Col>
-                <Col md={2}>
-                  <Form.Select>
-                    <option>All Categories</option>
-                    <option>Gateway</option>
-                    <option>Policy</option>
-                    <option>SLA</option>
-                  </Form.Select>
-                </Col>
-                <Col md={2}>
-                  <Form.Select>
-                    <option>All Status</option>
-                    <option>Active</option>
-                    <option>Trial</option>
-                    <option>Inactive</option>
-                  </Form.Select>
-                </Col>
-                <Col md={2}>
-                  <Form.Select>
-                    <option>All Types</option>
-                    <option>Monthly</option>
-                    <option>Annual</option>
-                    <option>One-time</option>
-                  </Form.Select>
-                </Col>
-                <Col md={2}>
-                  <Button variant="outline-primary" className="w-100">
-                    <Filter size={16} className="me-2" />
-                    Apply
-                  </Button>
-                </Col>
-              </Row>
-            </Card.Body>
-          </Card>
-  
-          {/* Products Table */}
-          <Card>
-            <Card.Body>
-              <Table responsive hover>
-                <thead className="bg-light">
-                  <tr>
-                    <th>Product</th>
-                    <th>Category</th>
-                    <th>Price</th>
-                    <th>Type</th>
-                    <th>Total Amount</th>
-                    <th>Status</th>
-                    <th>Created</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {products.map((product) => (
-                    <tr key={product.id}>
-                      <td className="fw-semibold">{product.name}</td>
-                      <td>{product.category}</td>
-                      <td className="text-primary fw-semibold">{product.price}</td>
-                      <td>{product.type}</td>
-                      <td className="text-success fw-semibold">{product.totalAmount}</td>
-                      <td>
-                        <Badge bg={product.status === 'Active' ? 'success' : product.status === 'Trial' ? 'warning' : 'secondary'} className="bg-opacity-10 text-dark">
-                          {product.status}
-                        </Badge>
-                      </td>
-                      <td>{product.created}</td>
-                      <td>
-                        <div className="d-flex gap-2">
-                          <Button variant="link" size="sm" className="p-1" onClick={() => handleEditProduct(product)}>
-                            <Eye size={16} />
-                          </Button>
-                          <Button variant="link" size="sm" className="p-1 text-danger" onClick={() => handleDeleteProduct(product.id)}>
-                            <Trash2 size={16} />
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </Table>
-            </Card.Body>
-          </Card>
-  
-          {AddProductModal()}
-          {ViewProductModal()}
-        </div>
-      );
-    };
-
-
-
-
-  return (
-    <React.Fragment>
-      <BreadcrumbItem mainTitle="" mainLink="" subTitle="Customer Dashboard" />
-
-      {/* <PageHeader
-        title="Customer Dashboard"
-        showSearch={false}
-      /> */}
-
-      {renderProducts()}
-
+                </>
+              }
+              submitButtonVariant="primary"
+              cancelButtonVariant="secondary"
+              ShowSubmitButton={false}
+            />
+            
       
 
     </React.Fragment>

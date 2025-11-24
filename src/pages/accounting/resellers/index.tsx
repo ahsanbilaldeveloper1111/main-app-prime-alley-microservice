@@ -16,7 +16,7 @@ import {
   updateReseller,
   deleteReseller,
   ResellerData,
-} from "@utils/accounting";
+} from "@utils/accountingOld";
 import { Column } from "@components/CustomDataTable";
 import {
   Button,

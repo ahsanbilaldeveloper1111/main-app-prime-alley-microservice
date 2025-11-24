@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Company, IndexCompanyParams, CallingAccess } from '../../Models/tms/Company';
 import { ListCompanies, createUpdateCompanyCallingAccess as createUpdateCompanyCallingAccessAPI, createUpdateCompanyProfile, GetCompany, GetAvailableCompanyIccids, GetAvailableExtensions } from '@utils/tms/tmsProfiling';
 import { toast } from 'react-toastify';
-import { createUpdateCompany, generateFacCode } from '@utils/accounting';
+import { createUpdateCompany, generateFacCode } from '@utils/accountingOld';
 
 export const useCompanyList = (params: IndexCompanyParams) => {
     const [data, setData] = useState<any>(null);
