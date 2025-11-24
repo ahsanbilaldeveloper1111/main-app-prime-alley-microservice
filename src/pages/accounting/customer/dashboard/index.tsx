@@ -83,7 +83,7 @@ const CustomerDashboard = () => {
         { title: 'Active Products', value: response?.products?.total, icon: <Package size={24} />, color: 'primary', change: '+12.5%', isPositive: true,isImage: false },
       { title: 'Open Invoice Amount', value: currency + ' ' + response?.invoices?.total_amount, icon: <DollarSign size={24} />, color: 'info', change: '+15.3%', isPositive: true,isImage: true },
       { title: 'Open Unpaid Amount', value: currency + ' ' + response?.invoices?.outstanding_amount, icon: <DollarSign size={24} />, color: 'warning', change: '-5.1%', isPositive: false,isImage: true },
-      { title: 'Paid Amount', value: currency + ' ' + response?.invoices?.partially_paid_amount, icon: <DollarSign size={24} />, color: 'success', change: '+8.2%', isPositive: true,isImage: true }
+      { title: 'Paid Amount', value: currency + ' ' + response?.invoices?.paid_amount, icon: <DollarSign size={24} />, color: 'success', change: '+8.2%', isPositive: true,isImage: true }
       ]
     );
   
@@ -134,7 +134,7 @@ const CustomerDashboard = () => {
             <p className="mb-2 fw-semibold">{data.month_name}</p>
             <p className="mb-1 small">
               <span className="text-muted">Open Invoice Amount: </span>
-              <span className="fw-semibold">{currency} {data.total_amount?.toFixed(2) || '0.00'}</span>
+              <span className="fw-semibold text-primary">{currency} {data.total_amount?.toFixed(2) || '0.00'}</span>
             </p>
             <p className="mb-1 small">
               <span className="text-muted">Paid Amount: </span>
@@ -150,14 +150,28 @@ const CustomerDashboard = () => {
       return null;
     };
 
+    const barChartData: any[] = [];
+    for (const item of spendingData) {
+      barChartData.push({
+        month: item.month,
+        total_amount: item.total_amount,
+        paid_amount: item.paid_amount,
+        outstanding_amount: item.outstanding_amount
+      });
+    }
+    console.log(barChartData);
+
     return (
       <ResponsiveContainer width="100%" height={354}>
-        <BarChart data={spendingData}>
+        <BarChart data={barChartData}>
+          
           <CartesianGrid strokeDasharray="3 3" />
           <XAxis dataKey="month" />
           <YAxis />
           <Tooltip content={<CustomTooltip />} />
-          <Bar dataKey="spent" fill="#0d6efd" name="Spending" />
+          <Bar dataKey="total_amount" fill="#04a9f5" name="Total Amount" />
+          <Bar dataKey="paid_amount" fill="#1de9b6" name="Paid Amount" />
+          <Bar dataKey="outstanding_amount" fill="#f4c22b" name="Outstanding Amount" />
         </BarChart>
       </ResponsiveContainer>
     );
@@ -225,7 +239,7 @@ const CustomerDashboard = () => {
                   <Col lg={8} className="mb-4">
                     <Card>
                       <Card.Body>
-                        <h5 className="mb-4">Spending Overview</h5>
+                        <h5 className="mb-4">Payments History (Last 6 Months)</h5>
                         {/* <div className="d-flex justify-content-between align-items-center mb-4">
                           <h5 className="mb-0">Spending Overview</h5>
                           <Form.Select size="sm" style={{ width: '150px' }}>
@@ -240,7 +254,7 @@ const CustomerDashboard = () => {
                           <Col lg={4}>
                             <div className="text-center border p-2 rounded">
                             <h6 className="mb-2 text-muted">Open Invoice Amount</h6>
-                              <h4 className="fw-semibold text-success">{currency} {dashboardCounters?.invoices?.total_amount}</h4>
+                              <h4 className="fw-semibold text-primary">{currency} {dashboardCounters?.invoices?.total_amount}</h4>
                             </div>
                           </Col>
                           <Col lg={4}>
@@ -252,7 +266,7 @@ const CustomerDashboard = () => {
                           <Col lg={4}>
                             <div className="text-center border p-2 rounded">
                               <h6 className="mb-2 text-muted">Paid Amount</h6>
-                              <h4 className="fw-semibold text-success">{currency} {dashboardCounters?.invoices?.partially_paid_amount}</h4>
+                              <h4 className="fw-semibold text-success">{currency} {dashboardCounters?.invoices?.paid_amount}</h4>
                             </div>
                           </Col>
                         </Row>
@@ -264,7 +278,7 @@ const CustomerDashboard = () => {
                   <Col lg={4} className="mb-4">
                     <Card>
                       <Card.Body>
-                        <h5 className="mb-4">Active Products</h5>
+                        <h5 className="mb-4">Active Subscriptions</h5>
                         {topProducts.map((product: any, index: number) => (
                           <div key={index} className="mb-4 pb-4 border-bottom">
                             <div className="d-flex justify-content-between align-items-start mb-2">
@@ -276,7 +290,7 @@ const CustomerDashboard = () => {
                                 {product.status}
                               </Badge> */}
                             </div>
-                            <div className="text-muted small">Spent: <span className="fw-semibold">{product.total_revenue}</span></div>
+                            <div className="text-muted small">Total Revenue: <span className="fw-semibold">{currency} {product.total_revenue}</span></div>
                           </div>
                         ))}
                         <Link href="/accounting/customer/product-details" className="w-100 btn btn-outline-primary btn-sm">

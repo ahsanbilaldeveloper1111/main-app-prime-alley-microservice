@@ -119,7 +119,7 @@ const ProductDetails = () => {
         { key: 'created_at', name: 'Created', selector: (row: any) => row.product?.created_at, sortable: true,
           cell: (row: any) => {
             return <div>
-              <p className="text-muted">{moment(row?.product?.created_at).format('DD/MM/YYYY')}</p>
+              <p className="text-muted">{moment(row?.product?.created_at).format('DD-MMM-YYYY')}</p>
             </div>
           }
          },
@@ -193,7 +193,7 @@ const ProductDetails = () => {
         }
       />
 
-      {/* {renderProducts()} */}
+   
 
             <GenericListPage
                  columns={columns}

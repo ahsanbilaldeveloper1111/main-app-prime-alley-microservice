@@ -179,20 +179,7 @@ const BillingHistory = () => {
                 Completed
               </button>
             </li>
-            <li className="nav-item" role="presentation">
-              <button
-                className={`nav-link ${activeStatusTab === 'pending' ? 'active' : ''}`}
-                onClick={() => {
-                  setActiveStatusTab('pending');
-                  setCurrentFilters({ status: 'pending' });
-                  setRefreshKey(prev => prev + 1);
-                }}
-                type="button"
-                role="tab"
-              >
-                Pending
-              </button>
-            </li>
+            
             <li className="nav-item" role="presentation">
               <button
                 className={`nav-link ${activeStatusTab === 'refunded' ? 'active' : ''}`}
@@ -207,20 +194,7 @@ const BillingHistory = () => {
                 Refunded
               </button>
             </li>
-            <li className="nav-item" role="presentation">
-              <button
-                className={`nav-link ${activeStatusTab === 'partially_paid' ? 'active' : ''}`}
-                onClick={() => {
-                  setActiveStatusTab('partially_paid');
-                  setCurrentFilters({ status: 'partially_paid' });
-                  setRefreshKey(prev => prev + 1);
-                }}
-                type="button"
-                role="tab"
-              >
-                Partially Paid
-              </button>
-            </li>
+            
             <li className="nav-item" role="presentation">
               <button
                 className={`nav-link ${activeStatusTab === 'cancelled' ? 'active' : ''}`}

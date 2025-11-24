@@ -345,17 +345,18 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
               permission: PERMISSIONS.VIEW_PRODUCT_DETAILS_BILLING 
             },
             { 
-              id: 'billing-history', 
-              title: 'Billing History', 
-              icon: <FileText size={16} />, 
-              url: '/accounting/customer/billing-history', permission: PERMISSIONS.VIEW_BILLING_HISTORY_BILLING },
-            { 
               id: 'billing-invoices', 
               title: 'Invoices', 
               icon: <DollarSign size={16} />, 
               url: '/accounting/customer/invoices', 
               permission: PERMISSIONS.VIEW_INVOICES_BILLING 
             },
+            { 
+              id: 'billing-history', 
+              title: 'Billing History', 
+              icon: <FileText size={16} />, 
+              url: '/accounting/customer/billing-history', permission: PERMISSIONS.VIEW_BILLING_HISTORY_BILLING },
+            
             { 
               id: 'payment-methods', 
               title: 'Payment Methods', 

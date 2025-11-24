@@ -541,7 +541,7 @@ const InvoiceList = () => {
         cell: (props: InvoiceData) => (
           <span className="text-muted">
             {props.due_date
-              ? moment(props.due_date).format("DD/MM/YYYY")
+              ? moment(props.due_date).format("DD-MMM-YYYY")
               : "No due date"}
           </span>
         ),
@@ -553,7 +553,7 @@ const InvoiceList = () => {
         sortable: true,
         cell: (props: InvoiceData) => (
           <span className="text-muted">
-            {moment(props.invoice_date).format("DD/MM/YYYY")}
+            {moment(props.invoice_date).format("DD-MMM-YYYY")}
           </span>
         ),
       },

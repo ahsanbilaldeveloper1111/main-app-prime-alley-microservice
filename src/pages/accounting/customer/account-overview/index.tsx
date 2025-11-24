@@ -28,7 +28,7 @@ import "@assets/scss/tabs.scss";
 import PageHeader from "@components/PageHeader";
 import countries from "world-countries";
 
-import { GetCompanyDetails,GetPaymentMethods,UpdateCompanyDetails } from "@utils/accounting";
+import { GetCompanyDetails,GetPaymentMethods,UpdateCompanyDetails,GetDashboardCounters } from "@utils/accounting";
 import ThemeSelect from "@components/ThemeSelect";
 import { toast } from "react-toastify";
 interface Product {
@@ -131,6 +131,15 @@ const AccountOverview = () => {
   };
 
 
+  const [dashboardCounters, setDashboardCounters] = useState<any>(null);
+  useEffect(() => {
+    getDashboardCounters();
+  }, []);
+  const getDashboardCounters = async () => {
+    const response = await GetDashboardCounters() as any;
+    setDashboardCounters(response);
+  };
+
 
   
 
@@ -178,7 +187,7 @@ const AccountOverview = () => {
               <Card>
                 <Card.Body>
                   <h6 className="text-muted mb-3">Open Invoice Amount</h6>
-                  <h2 className="mb-1">£17.99</h2>
+                  <h2 className="mb-1">{companyDetails?.profile?.currency} {dashboardCounters?.invoices?.total_amount}</h2>
                   <small className="text-muted">(Inclusive VAT)</small>
                   
                   <hr />
