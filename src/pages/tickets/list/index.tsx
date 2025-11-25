@@ -54,9 +54,9 @@ interface SelectOption {
   label: string;
 }
 
-const getPriorityBadgeColor = (priority: string) => {
-  if (!priority) return 'secondary';
-  switch (priority.toLowerCase()) {
+const getPriorityBadgeColor = (priority: string | number) => {
+  if (!priority && priority !== 0) return 'secondary';
+  switch (String(priority).toLowerCase()) {
     case 'critical': return 'danger';
     case 'high': return 'warning';
     case 'medium': return 'info';
@@ -67,7 +67,7 @@ const getPriorityBadgeColor = (priority: string) => {
 
 const getStatusBadgeColor = (status: string) => {
   if (!status) return 'secondary';
-  switch (status.toLowerCase()) {
+  switch (String(status).toLowerCase()) {
     case 'resolved': return 'success';
     case 'closed': return 'secondary';
     case 'in progress': return 'warning';
