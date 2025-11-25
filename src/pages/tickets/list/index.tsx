@@ -56,11 +56,11 @@ interface SelectOption {
 
 const getPriorityBadgeColor = (priority: string | number) => {
   if (!priority && priority !== 0) return 'secondary';
-  switch (String(priority).toLowerCase()) {
-    case 'critical': return 'danger';
-    case 'high': return 'warning';
-    case 'medium': return 'info';
-    case 'low': return 'success';
+  switch (Number(priority)) {
+    case 3: return 'danger';
+    case 2: return 'warning';
+    case 1: return 'info';
+    case 0: return 'success';
     default: return 'secondary';
   }
 };
