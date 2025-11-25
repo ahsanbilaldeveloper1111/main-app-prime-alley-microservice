@@ -43,7 +43,7 @@ import "@assets/scss/tabs.scss";
 import PageHeader from "@components/PageHeader";
 import FormModal from "../../partial/FormModal";
 import ConfirmModal from "@pages/partial/ConfirmModal";
-import { User,Edit,Trash2,Eye,Plus, Filter, Search,Info, AlertCircle, CheckCircle, X, Paperclip, FileText, Tag } from "lucide-react";
+import { User,Edit,Trash2,Eye,Plus, Filter, Search,Info, AlertCircle, CheckCircle, X, Paperclip, FileText, Tag, Calendar, Clock, Download, MessageCircle, Send } from "lucide-react";
 
 import ThemeSelect from "@components/ThemeSelect";
 import Select from "react-select";
@@ -76,8 +76,11 @@ const getStatusBadgeColor = (status: string) => {
   }
 };
 
+const priorityLabels = ["Low", "Medium", "High", "Critical"];
+
 const TicketList = () => {
   const { data: session, status } = useSession();
+  const [activeTab, setActiveTab] = useState<'public' | 'internal' | 'activity'>('public');
 
   const [refreshKey, setRefreshKey] = useState<number>(0);
   const [currentFilters, setCurrentFilters] = useState({ search: "", module_id: "", status_id: "", priority: "", type_id: "" });
@@ -104,7 +107,7 @@ const TicketList = () => {
   );
   const [newAssigneeCommentAttachment, setNewAssigneeCommentAttachment] =
     useState<File | null>(null);
-  const [showComments, setShowComments] = useState<boolean>(false);
+  const [showComments, setShowComments] = useState<boolean>(true);
   const [isLoadingComments, setIsLoadingComments] = useState<boolean>(false);
 
   const columns: Column[] = useMemo(
@@ -733,6 +736,7 @@ const TicketList = () => {
 
   // Check if user can add assignee comments (must be assigned to ticket or super admin)
   const canAddAssigneeComment = useMemo(() => {
+    // return false;
     if (!viewTicketData || !session?.user) return false;
     
     // Super admin can always add assignee comments
@@ -1317,6 +1321,171 @@ const TicketList = () => {
     }, 5000);
     return () => clearInterval(interval);
   }, []);
+
+
+
+  const renderCommentThread = (comments: any[], tabType: string) => (
+    console.log(comments, tabType),
+    <div className="position-relative" style={{ paddingLeft: '30px' }}>
+      {comments.map((item, index) => (
+        <div key={item?.id || index} className="mb-4 position-relative">
+          {/* Timeline line */}
+          {index !== comments.length - 1 && (
+            <div 
+              className="position-absolute bg-light" 
+              style={{ 
+                left: '-19px', 
+                top: '40px', 
+                width: '2px', 
+                height: 'calc(100% + 16px)' 
+              }}
+            />
+          )}
+
+          {/* Timeline dot */}
+          <div 
+            className={`position-absolute rounded-circle d-flex align-items-center justify-content-center ${
+              item?.type === 'status_change' ? 'bg-warning' :
+              item?.type === 'assignment' ? 'bg-info' :
+              item?.isInternal ? 'bg-danger' :
+              'bg-primary'
+            }`}
+            style={{ 
+              left: '-24px', 
+              top: '8px', 
+              width: '12px', 
+              height: '12px'
+            }}
+          />
+
+          <Card className="border">
+            <Card.Body className="p-3">
+              <div className="d-flex justify-content-between align-items-start mb-2">
+                <div className="d-flex align-items-center gap-2">
+                  <div className="bg-primary bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center" style={{ width: '32px', height: '32px' }}>
+                    {tabType === 'activity' ? (
+                      <CheckCircle size={16} className="text-warning" />
+                    ) : tabType === 'internal' ? (
+                      <User size={16} className="text-info" />
+                    ) : tabType === 'activity' ? (
+                      <AlertCircle size={16} className="text-danger" />
+                    ) : (
+                      <MessageCircle size={16} className="text-primary" />
+                    )}
+                  </div>
+                  <div>
+                    <div className="fw-semibold d-flex align-items-center gap-2">
+                      {extensions.find((e: any) => e.id.toString() === item?.user_extension.toString())?.display_name || item?.user_extension}
+                    
+                    </div>
+                    {/* <small className="text-muted">{item?.userRole || 'System'}</small> */}
+                    {tabType === 'activity' && (
+                      <small className="text-muted">
+                        System
+                      </small>
+                    )}
+
+{tabType === 'internal' && (
+                      <small className="text-muted">
+                        Admin
+                      </small>
+                    )}
+
+                    {tabType === 'public' && (
+                      <small className="text-muted">
+                        Reporter
+                      </small>
+                    )}
+
+
+                  </div>
+                </div>
+                <small className="text-muted">
+                  <Clock size={12} className="me-1" />
+                  {moment(item?.created_at).format("DD-MMM-YYYY HH:mm:ss")}
+                </small>
+              </div>
+
+
+              <p className="mb-2 text-muted" style={{ fontSize: '0.9rem' }}>
+                    {item?.content}
+
+                    {tabType === 'activity' && (
+                       <>
+                        <p className="">
+                          {item?.action==='created' && (
+                            
+                            <div role="alert" className="fade mb-0 py-2 px-3 alert alert-warning show d-flex align-items-center gap-2">
+                              <CheckCircle size={16} className="" />
+                              <small className="fw-semibold">Ticket created by {extensions.find((e: any) => e.id.toString() === item?.user_extension.toString())?.display_name || item?.user_extension}</small>
+                              </div>
+                          )}
+                          </p>
+
+
+                          <p className="">
+                          {item?.action==='updated' && (
+                            
+                            <div role="alert" className="fade mb-0 py-2 px-3 alert alert-warning show d-flex align-items-center gap-2">
+                              <CheckCircle size={16} className="" />
+                              <small className="fw-semibold">Ticket created by {extensions.find((e: any) => e.id.toString() === item?.user_extension.toString())?.display_name || item?.user_extension}</small>
+                              </div>
+                          )}
+                          </p>
+                       </>
+                    )}
+
+                    {tabType !== 'activity' && (
+                      <small className="text-muted">
+                        {item?.content}
+                      </small>
+                    )}
+                  </p>
+                  
+                  {/* Show attachments if any */}
+                  {/* {item.attachments && item.attachments.length > 0 && (
+                    <div className="mt-2">
+                      <small className="text-muted fw-semibold d-block mb-2">Attachments:</small>
+                      <div className="d-flex flex-wrap gap-2">
+                        {item.attachments.map((file) => (
+                          <Badge key={file.id} bg="light" text="dark" className="p-2 d-flex align-items-center gap-2">
+                            <Paperclip size={12} />
+                            <span>{file.name}</span>
+                            <small className="text-muted">({file.size})</small>
+                            <Button variant="link" size="sm" className="p-0 text-primary" title="Download">
+                              <Download size={12} />
+                            </Button>
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )} */}
+
+              {/* {item?.type === 'status_change' ? (
+                <Alert variant="warning" className="mb-0 py-2 px-3">
+                  <CheckCircle size={14} className="me-2" />
+                  <small className="fw-semibold">
+                    {item?.content} 
+                  </small>
+                </Alert>
+              ) : item.type === 'assignment' ? (
+                <Alert variant="info" className="mb-0 py-2 px-3">
+                  <User size={14} className="me-2" />
+                  <small className="fw-semibold">
+                    {item?.content}
+                  </small>
+                </Alert>
+              ) : (
+                <>
+                  
+                </>
+              )} */}
+            </Card.Body>
+          </Card>
+        </div>
+      ))}
+    </div>
+  );
 
   return (
     <React.Fragment>
@@ -2388,7 +2557,7 @@ const TicketList = () => {
         <Modal.Header closeButton className="border-bottom">
           <Modal.Title className="d-flex align-items-center gap-2">
             <span className="badge bg-primary fs-6">#{viewTicketData?.id}</span>
-            <span>{viewTicketData?.title}</span>
+            <span className="text-capitalize">{viewTicketData?.title}</span>
           </Modal.Title>
         </Modal.Header>
         <Modal.Body style={{ maxHeight: "80vh", overflowY: "auto" }}>
@@ -2419,14 +2588,599 @@ const TicketList = () => {
               <Col xs={6}>
                 <small className="text-muted d-block mb-2 fw-semibold" style={{ fontSize: '0.813rem' }}>Priority</small>
                 <Badge bg={getPriorityBadgeColor(viewTicketData.priority)} className="bg-opacity-10 text-dark px-2 py-2">
-                  <span style={{ fontSize: '0.875rem' }}>{viewTicketData.priority}</span>
+                  <span style={{ fontSize: '0.875rem' }}>{priorityLabels[viewTicketData?.priority] || "Unknown"}</span>
                 </Badge>
               </Col>
             </Row>
 
+
+            <Row className="mb-3">
+              <Col xs={6}>
+                <small className="text-muted d-block mb-2 fw-semibold" style={{ fontSize: '0.813rem' }}>Created At</small>
+                <div className="d-flex align-items-center gap-2">
+                  <Clock size={14} className="text-muted" />
+                  <span style={{ fontSize: '0.875rem' }}>{moment(viewTicketData?.created_at).format("DD-MMM-YYYY")}</span>
+                </div>
+              </Col>
+              <Col xs={6}>
+                <small className="text-muted d-block mb-2 fw-semibold" style={{ fontSize: '0.813rem' }}>Due Date</small>
+                <div className="d-flex align-items-center gap-2">
+                  <Calendar size={14} className="text-muted" />
+                  <span 
+                    className={viewTicketData.dueDate === 'No due date' ? 'text-muted' : 'fw-semibold'} 
+                    style={{ fontSize: '0.875rem' }}
+                  >
+                    {moment(viewTicketData?.due_date).format("DD-MMM-YYYY")}
+                  </span>
+                </div>
+              </Col>
+            </Row>
+
+            <div className="mb-3">
+              <small className="text-muted d-block mb-2 fw-semibold" style={{ fontSize: '0.813rem' }}>Created By</small>
+              <div className="d-flex align-items-center gap-2">
+                <div className="bg-primary bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center" style={{ width: '32px', height: '32px' }}>
+                  <User size={16} className="text-primary" />
+                </div>
+                <span className="fw-semibold" style={{ fontSize: '0.875rem' }}>{extensions.find(
+                  (extension: any) => extension.id == viewTicketData?.created_by
+                )?.display_name || viewTicketData?.created_by}</span>
+              </div>
+            </div>
+
+            <hr className="my-4" />
+
+            {/* update will be here */}
+            {/* Status Update Section */}
+            <div className="mb-3">
+              <small className="text-muted d-block mb-2 fw-semibold" style={{ fontSize: '0.813rem' }}>Status</small>
+              <InputGroup>
+                <Form.Select
+                  value={viewTicketData?.ticket_status_id}
+                  onChange={(e) => setViewTicketData({...viewTicketData, ticket_status_id: e.target.value})}
+                  className="form-control"
+                  disabled={true}
+                  style={{ fontSize: '0.875rem' }}
+                >
+                  {statuses.map((status: any) => (
+                    <option key={status.id} value={status.id}>{status.name}</option>
+                  ))}
+                </Form.Select>
+                {/* <Button 
+                  variant="primary" 
+                  onClick={handleStatusUpdate}
+                  disabled={ticketStatus === selectedTicket.status}
+                  style={{ fontSize: '0.875rem' }}
+                >
+                  Update
+                </Button> */}
+              </InputGroup>
+            </div>
+
+            {/* Assign User Section */}
+            <div className="mb-3">
+              <small className="text-muted d-block mb-2 fw-semibold" style={{ fontSize: '0.813rem' }}>Assigned To</small>
+              <InputGroup>
+                <Form.Select
+                  value={viewTicketData?.user_extension}
+                  onChange={(e) => setViewTicketData({...viewTicketData, user_extension: e.target.value})}
+                  className="form-control"
+                  disabled={true}
+                  style={{ fontSize: '0.875rem' }}
+                >
+                  {extensions.map((extension: any, index: number) => (
+                    <option key={index} value={extension.id}>{extension.display_name}</option>
+                  ))}
+                </Form.Select>
+                {/* <Button 
+                  variant="success" 
+                  onClick={handleAssignUser}
+                  disabled={assignedUser === selectedTicket.assignedTo}
+                  style={{ fontSize: '0.875rem' }}
+                >
+                  Assign
+                </Button> */}
+              </InputGroup>
+            </div>
+
+            <hr className="my-4" />
+
+          <div className="mb-4">
+            <h6 className="fw-bold mb-3">Description</h6>
+            <p className="text-muted mb-0" style={{ fontSize: '0.938rem', lineHeight: '1.6' }}>
+              {viewTicketData?.description}
+            </p>
+          </div>
+
+
+          {/* Initial Attachments */}
+          {viewTicketImages.length > 0 && (
+            <div className="mb-3">
+              <h6 className="fw-bold mb-3">Initial Attachments</h6>
+              <div className="d-flex flex-column gap-2">
+                {viewTicketImages.map((imageUrl, index) => (
+                  <div 
+                    key={index} 
+                    className="p-2 bg-light rounded d-flex align-items-center justify-content-between"
+                    style={{ border: '1px solid #e0e0e0' }}
+                  >
+                    <div className="d-flex align-items-center gap-2 flex-grow-1">
+                      <Paperclip size={14} className="text-primary" />
+                      <div className="d-flex flex-column">
+                            {/* onClick={() => handleImageClick(imageUrl)} */}
+                            {/* <span style={{ fontSize: '0.875rem', fontWeight: 500 }}>
+                              
+                              </span> */}
+                              <img
+                              onClick={() => handleImageClick(imageUrl)}
+                              src={imageUrl}
+                              alt={`Ticket Image ${index + 1}`}
+                              className="img-fluid rounded"
+                              style={{
+                                width: "40px",
+                                height: "40px",
+                                objectFit: "cover",
+                                border: "2px solid #dee2e6",
+                              }}
+                            />
+                        <small className="text-muted" style={{ fontSize: '0.75rem' }}></small>
+                      </div>
+                    </div>
+                    <Button 
+                      variant="link" 
+                      size="sm" 
+                      className="p-1 text-primary" 
+                      title="Download"
+                      style={{ minWidth: 'auto' }}
+                      onClick={() => handleImageClick(imageUrl)}
+                    >
+                      <Download size={16} />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           </Col>
 
-          <Col md={9}></Col>
+          <Col md={9}>
+
+          {/* Tab Navigation */}
+          <div className="mb-4">
+                <div className="d-flex gap-2 border-bottom pb-2">
+                  <Button
+                    variant={activeTab === 'public' ? 'primary' : 'outline-primary'}
+                    size="sm"
+                    onClick={() => setActiveTab('public')}
+                    className="d-flex align-items-center gap-2"
+                  >
+                    <MessageCircle size={16} />
+                    Public Conversation
+                    <Badge bg={activeTab === 'public' ? 'light' : 'primary'} text={activeTab === 'public' ? 'dark' : 'white'}>
+                      {/* {publicComments.length} */}
+                    </Badge>
+                  </Button>
+                  {canAddAssigneeComment && (
+                  <Button
+                    variant={activeTab === 'internal' ? 'danger' : 'outline-danger'}
+                    size="sm"
+                    onClick={() => setActiveTab('internal')}
+                    className="d-flex align-items-center gap-2"
+                  >
+                    <AlertCircle size={16} />
+                    Internal Notes
+                    <Badge bg={activeTab === 'internal' ? 'light' : 'danger'} text={activeTab === 'internal' ? 'dark' : 'white'}>
+                      {/* {internalNotes.length} */}
+                    </Badge>
+                  </Button>
+                  )}
+
+                  <Button
+                    variant={activeTab === 'activity' ? 'warning' : 'outline-warning'}
+                    size="sm"
+                    onClick={() => setActiveTab('activity')}
+                    className="d-flex align-items-center gap-2"
+                  >
+                    <Clock size={16} />
+                    Activity Logs
+                    <Badge bg={activeTab === 'activity' ? 'light' : 'warning'} text={activeTab === 'activity' ? 'dark' : 'white'}>
+                      {/* {activityLogs.length} */}
+                    </Badge>
+                  </Button>
+                </div>
+              </div>
+
+              <div>
+                {activeTab === 'public' && (
+                  <>
+                    <div className="d-flex justify-content-between align-items-center mb-3">
+                      <h6 className="fw-bold mb-0">
+                        <MessageCircle size={18} className="me-2" />
+                        Public Conversation 
+                        {/* ({publicComments.length}) */}
+                      </h6>
+                    </div>
+
+                    {showComments && (
+                <div>
+                  {isLoadingComments ? (
+                    <div className="text-center py-4">
+                      <div
+                        className="spinner-border text-primary"
+                        role="status"
+                      >
+                        <span className="visually-hidden">Loading...</span>
+                      </div>
+                      <p className="mt-2 text-muted">Loading comments...</p>
+                    </div>
+                  ) : (
+                    <Row className="g-3">
+                      {/* User Comments Column */}
+                      <Col md={12}>
+
+
+                      <div
+                              className="comments-list"
+                              // style={{ maxHeight: "300px", overflowY: "auto" }}
+                            >
+                              {comments.length > 0 ? (
+                                
+                                renderCommentThread(comments,'public')
+                              ) : (
+                                <p className="text-muted text-center">
+                                  No public comments yet
+                                </p>
+                              )}
+                            </div>
+                        
+
+
+                        <Card className="border-primary mt-4">
+                      <Card.Body className="p-3">
+                          
+                      {session?.user?.permissions?.includes(
+                              "update-ticket-comments-tickets"
+                            ) && (
+                              <div className="mb-3">
+                                <h6 className="fw-bold mb-3">Add Comment</h6>
+                                <textarea
+                                  className="form-control mb-3"
+                                  rows={3}
+                                  placeholder="Add a new comment..."
+                                  value={newComment}
+                                  onChange={(e) =>
+                                    setNewComment(e.target.value)
+                                  }
+                                />
+
+<div className="mt-1">
+                                  
+                                  <small className="text-muted">
+                                    Supported formats: JPG, PNG, GIF. Max size:
+                                    5MB
+                                  </small>
+                                  {newCommentAttachment && (
+                                    <div className="mt-0 mb-2">
+                                      <small className="text-warning">
+                                        Selected: {newCommentAttachment.name} (
+                                        {(
+                                          newCommentAttachment.size /
+                                          1024 /
+                                          1024
+                                        ).toFixed(2)}{" "}
+                                        MB)
+                                      </small>
+                                    </div>
+                                  )}
+                                </div>
+                               
+                                <div className="d-flex justify-content-between align-items-center">
+                                  <div>
+                                    <label htmlFor="newCommentAttachment" className="btn btn-outline-secondary btn-sm">
+                                      <Paperclip size={14} className="me-1" />
+                                      Attach File
+                                    </label>
+                                    <input
+                                    type="file"
+                                    className="form-control form-control-sm d-none"
+                                    id="newCommentAttachment"
+                                    accept="image/*"
+                                    onChange={(e) => {
+                                      const file = e.target.files?.[0];
+                                      setNewCommentAttachment(file || null);
+                                    }}
+                                  />
+                                  </div>
+                                  
+                                  <Button 
+                                    variant='primary'
+                                    onClick={() =>
+                                      handleAddComment(viewTicketData?.id)
+                                    }
+                                    disabled={
+                                      !newComment.trim() || creatingTicket
+                                    }
+                                  >
+                                    <Send size={14} className="me-1" /> Add Comment
+                                  </Button>
+                                </div>
+
+
+
+                              </div>
+                            )}
+                          </Card.Body>
+                        </Card>
+                      </Col>
+                    </Row>
+                  )}
+                </div>
+              )}
+                   
+                  </>
+                )}
+
+
+{activeTab === 'internal' && canAddAssigneeComment && (
+                  <>
+                    <div className="d-flex justify-content-between align-items-center mb-3">
+                      <h6 className="fw-bold mb-0 text-danger">
+                        <AlertCircle size={18} className="me-2" />
+                        Internal Notes 
+                        
+                      </h6>
+                    </div>
+                    <Alert variant="danger" className="mb-3">
+                      <AlertCircle size={16} className="me-2" />
+                      <strong>Private:</strong> These notes are only visible to internal team members and will not be shown to customers.
+                    </Alert>
+
+                    
+
+                    {showComments && (
+                <div>
+                  {isLoadingComments ? (
+                    <div className="text-center py-4">
+                      <div
+                        className="spinner-border text-primary"
+                        role="status"
+                      >
+                        <span className="visually-hidden">Loading...</span>
+                      </div>
+                      <p className="mt-2 text-muted">Loading comments...</p>
+                    </div>
+                  ) : (
+                    <Row className="g-3">
+                      
+                      <div 
+                              className="comments-list col-12"
+                              // style={{ maxHeight: "300px", overflowY: "auto" }}
+                            >
+                              {assigneeComments.length > 0 ? (
+                                renderCommentThread(assigneeComments,'internal')
+                              ) : (
+                                <p className="text-muted text-center">
+                                  No assignee comments yet
+                                </p>
+                              )}
+                            </div>
+                      {/* Assignee Comments Column */}
+                      <Col md={12}>
+                      <Card className={`border-${activeTab === 'internal' ? 'danger' : 'primary'} mt-4`}>
+                      <Card.Body className="p-3">
+                          
+                            {canAddAssigneeComment ? (
+                              <div className="mb-3">
+                                <h6 className="fw-bold mb-3">
+                        {activeTab === 'internal' ? 'Add Internal Note' : 'Add Comment'}
+                      </h6>
+                                <textarea
+                                  className="form-control mb-3"
+                                  rows={3}
+                                  placeholder="Add a new assignee comment..."
+                                  value={newAssigneeComment}
+                                  onChange={(e) =>
+                                    setNewAssigneeComment(e.target.value)
+                                  }
+                                />
+                               
+                               
+<div className="mt-1">
+                                  
+                                  <small className="text-muted">
+                                    Supported formats: JPG, PNG, GIF. Max size:
+                                    5MB
+                                  </small>
+                                  {newAssigneeCommentAttachment && (
+                                    <div className="mt-0 mb-2">
+                                      <small className="text-warning">
+                                        Selected: {newAssigneeCommentAttachment.name} (
+                                        {(
+                                          newAssigneeCommentAttachment.size /
+                                          1024 /
+                                          1024
+                                        ).toFixed(2)}{" "}
+                                        MB)
+                                      </small>
+                                    </div>
+                                  )}
+                                </div>
+
+                                <div className="d-flex justify-content-between align-items-center">
+                                  <div>
+                                    <label htmlFor="newAssigneeCommentAttachment" className="btn btn-outline-secondary btn-sm">
+                                      <Paperclip size={14} className="me-1" />
+                                      Attach File
+                                    </label>
+                                    <input
+                                    type="file"
+                                    className="form-control form-control-sm d-none"
+                                    id="newAssigneeCommentAttachment"
+                                    accept="image/*"
+                                    onChange={(e) => {
+                                      const file = e.target.files?.[0];
+                                      setNewAssigneeCommentAttachment(
+                                        file || null
+                                      );
+                                    }}
+                                  />
+                                  </div>
+                                  <Button 
+                                    variant='danger'
+                                    onClick={() =>
+                                      handleAddAssigneeComment(viewTicketData?.id)
+                                    }
+                                    disabled={
+                                      !newAssigneeComment.trim() || creatingTicket
+                                    }
+                                  >
+                                    <Send size={14} className="me-1" /> Add Internal Note
+                                  </Button>
+                                </div>
+
+
+
+                              </div>
+
+                            ) : (
+                              <div className="mb-3">
+                                <p className="text-muted small mb-0">
+                                  Only assigned users can add assignee comments.
+                                </p>
+                              </div>
+                            )}
+
+<Alert variant="danger" className="py-2 mb-3">
+                        <AlertCircle size={14} className="me-2" />
+                        <small>This note will only be visible to internal team members</small>
+                      </Alert>
+
+                          </Card.Body>
+                        </Card>
+
+
+
+                      </Col>
+                    </Row>
+                  )}
+                </div>
+              )}
+                   
+                  </>
+                )}
+
+
+{activeTab === 'activity' && (
+                  <>
+                    <div className="d-flex justify-content-between align-items-center mb-3">
+                      <h6 className="fw-bold mb-0 text-warning">
+                        <Clock size={18} className="me-2" />
+                        Activity Logs ({viewTicketData.activity_logs.length})
+                      </h6>
+                    </div>
+                    {viewTicketData.activity_logs.length > 0 ? (
+                      <div
+                      className="activity-logs-list"
+                      // style={{ maxHeight: "400px", overflowY: "auto" }}
+                    >
+                      {/* {viewTicketData.activity_logs
+                        .slice()
+                        .reverse()
+                        .map((log: any, index: number) => (
+                          <div
+                            key={log.id || index}
+                            className="activity-log-item border-bottom pb-3 mb-3"
+                            style={{
+                              padding: "15px",
+                              backgroundColor: "#f8f9fa",
+                              borderRadius: "5px",
+                              marginBottom: "10px",
+                            }}
+                          >
+                            <div className="d-flex justify-content-between align-items-start mb-2">
+                              <div>
+                                <span
+                                  className="badge"
+                                  style={{
+                                    backgroundColor:
+                                      log.action === "created"
+                                        ? "#10B981"
+                                        : log.action === "updated"
+                                        ? "#3B82F6"
+                                        : "#6B7280",
+                                    color: "white",
+                                    fontWeight: "600",
+                                    textTransform: "capitalize",
+                                  }}
+                                >
+                                  {log.action}
+                                </span>
+                                {log.user_extension && (
+                                  <span className="ms-2 text-muted">
+                                    by{" "}
+                                    {extensions.find(
+                                      (ext: any) =>
+                                        ext.id.toString() === log.user_extension.toString()
+                                    )?.display_name || log.user_extension}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-end">
+                                <small className="text-muted d-block">
+                                  {moment(log.created_at).fromNow()}
+                                </small>
+                                <small className="text-muted">
+                                  {moment(log.created_at).format("DD/MM/YYYY HH:mm:ss")}
+                                </small>
+                              </div>
+                            </div>
+    
+                            {log.changes && Object.keys(log.changes).length > 0 && (
+                              <div className="mt-2">
+                                <strong className="text-muted small">Changes:</strong>
+                                <ul className="list-unstyled mt-1 mb-0" style={{ fontSize: "0.9rem" }}>
+                                  {Object.entries(log.changes).map(([fieldName, change]: [string, any]) => (
+                                    <li key={fieldName} className="mb-1">
+                                      <span className="text-capitalize">
+                                        {fieldName.replace(/_/g, " ")}:
+                                      </span>{" "}
+                                      <span className="text-decoration-line-through text-danger">
+                                        {fieldName === "title" || fieldName === "description"
+                                          ? change.old
+                                          : resolveFieldName(fieldName, change.old)}
+                                      </span>{" "}
+                                      →{" "}
+                                      <span className="text-success fw-bold">
+                                        {fieldName === "title" || fieldName === "description"
+                                          ? change.new
+                                          : resolveFieldName(fieldName, change.new)}
+                                      </span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                          </div>
+                        ))} */}
+
+                        {renderCommentThread(viewTicketData.activity_logs,'activity')}
+                    </div>
+                    ) : (
+                      <Alert variant="secondary">
+                        <Info size={16} className="me-2" />
+                        No activity logs yet.
+                      </Alert>
+                    )}
+                  </>
+                )}
+
+
+
+                </div>
+          
+          
+          </Col>
         </Row>
 
 {/* old here */}
@@ -2434,7 +3188,7 @@ const TicketList = () => {
 
 
           {/* Header Section */}
-          <div className="mb-4">
+          {/* <div className="mb-4">
             <div className="d-flex flex-wrap gap-2 align-items-center mb-3">
               <span
                 className="badge"
@@ -2456,7 +3210,7 @@ const TicketList = () => {
                   "Unknown"}
               </span>
               {(() => {
-                const priorityLabels = ["Low", "Medium", "High", "Critical"];
+                
                 const priorityColors = [
                   "bg-success",
                   "bg-warning",
@@ -2496,12 +3250,12 @@ const TicketList = () => {
             >
               {viewTicketData?.description}
             </p>
-          </div>
+          </div> */}
 
           {/* Main Content Grid */}
-          <Row className="g-3 mb-4">
+          
             {/* Left Column */}
-            <Col md={6}>
+            {/* <Col md={6}>
               <div className="card border-0 shadow-sm h-100">
                 <div className="card-body">
                   <h6 className="card-title mb-3 text-primary border-bottom pb-2">
@@ -2605,57 +3359,12 @@ const TicketList = () => {
                   </div>
                 </div>
               </div>
-            </Col>
+            </Col> */}
 
-            {/* Right Column */}
-            <Col md={6}>
-              <div className="card border-0 shadow-sm h-100">
-                <div className="card-body">
-                  <h6 className="card-title mb-3 text-primary border-bottom pb-2">
-                    Ticket Images
-                  </h6>
-                  {viewTicketImages.length > 0 ? (
-                    <div className="d-flex flex-wrap gap-2">
-                      {viewTicketImages.map((imageUrl, index) => {
-                        return (
-                          <div
-                            key={index}
-                            className="position-relative"
-                            style={{ cursor: "pointer" }}
-                            onClick={() => handleImageClick(imageUrl)}
-                          >
-                            <img
-                              src={imageUrl}
-                              alt={`Ticket Image ${index + 1}`}
-                              className="img-fluid rounded"
-                              style={{
-                                width: "120px",
-                                height: "120px",
-                                objectFit: "cover",
-                                border: "2px solid #dee2e6",
-                                transition: "transform 0.2s",
-                              }}
-                              onMouseEnter={(e) => {
-                                e.currentTarget.style.transform = "scale(1.05)";
-                              }}
-                              onMouseLeave={(e) => {
-                                e.currentTarget.style.transform = "scale(1)";
-                              }}
-                            />
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <p className="text-muted mb-0">No images attached</p>
-                  )}
-                </div>
-              </div>
-            </Col>
-          </Row>
+         
 
           {/* Metadata */}
-          <div className="card border-0 shadow-sm mb-4">
+          {/* <div className="card border-0 shadow-sm mb-4">
             <div className="card-body">
               <h6 className="card-title mb-3 text-primary border-bottom pb-2">
                 Metadata
@@ -2689,526 +3398,11 @@ const TicketList = () => {
                 </Col>
               </Row>
             </div>
-          </div>
+          </div> */}
 
-          {/* Comments Section */}
-          <div className="card border-0 shadow-sm mb-4">
-            <div className="card-body">
-              <div className="d-flex justify-content-between align-items-center mb-3">
-                <div>
-                  <h6 className="card-title mb-1 text-primary border-bottom pb-2 d-inline-block">
-                    Comments
-                    <span className="badge bg-secondary ms-2">
-                      {comments.length + assigneeComments.length} total
-                    </span>
-                  </h6>
-                  <small className="text-muted d-block mt-1">
-                    {comments.length} user comments • {assigneeComments.length}{" "}
-                    assignee comments
-                  </small>
-                </div>
-                <div>
-                  {(session?.user?.permissions?.includes(
-                    "view-ticket-comments-tickets"
-                  ) ||
-                    session?.user?.permissions?.includes(
-                      "view-ticket-assignee-comments-tickets"
-                    )) && (
-                    <>
-                      <Button
-                        variant="outline-primary"
-                        size="sm"
-                        onClick={toggleComments}
-                        className="me-2"
-                      >
-                        {showComments ? "Hide Comments" : "Show Comments"}
-                      </Button>
-                      <Button
-                        variant="outline-secondary"
-                        size="sm"
-                        onClick={() => fetchComments(viewTicketData?.id)}
-                        disabled={isLoadingComments}
-                      >
-                        {isLoadingComments ? "Loading..." : "Refresh"}
-                      </Button>
-                    </>
-                  )}
-                </div>
-              </div>
+         
 
-              {showComments && (
-                <div>
-                  {isLoadingComments ? (
-                    <div className="text-center py-4">
-                      <div
-                        className="spinner-border text-primary"
-                        role="status"
-                      >
-                        <span className="visually-hidden">Loading...</span>
-                      </div>
-                      <p className="mt-2 text-muted">Loading comments...</p>
-                    </div>
-                  ) : (
-                    <Row className="g-3">
-                      {/* User Comments Column */}
-                      <Col md={6}>
-                        <div className="card border">
-                          <div className="card-header bg-light">
-                            <h6 className="mb-0 fw-semibold">User Comments</h6>
-                          </div>
-                          <div className="card-body">
-                            {session?.user?.permissions?.includes(
-                              "update-ticket-comments-tickets"
-                            ) && (
-                              <div className="mb-3">
-                                <textarea
-                                  className="form-control"
-                                  rows={3}
-                                  placeholder="Add a new comment..."
-                                  value={newComment}
-                                  onChange={(e) =>
-                                    setNewComment(e.target.value)
-                                  }
-                                />
-                                <div className="mt-2">
-                                  <label
-                                    htmlFor="newCommentAttachment"
-                                    className="form-label small"
-                                  >
-                                    Attachment (Optional)
-                                  </label>
-                                  <input
-                                    type="file"
-                                    className="form-control form-control-sm"
-                                    id="newCommentAttachment"
-                                    accept="image/*"
-                                    onChange={(e) => {
-                                      const file = e.target.files?.[0];
-                                      setNewCommentAttachment(file || null);
-                                    }}
-                                  />
-                                  <small className="text-muted">
-                                    Supported formats: JPG, PNG, GIF. Max size:
-                                    5MB
-                                  </small>
-                                  {newCommentAttachment && (
-                                    <div className="mt-1">
-                                      <small className="text-success">
-                                        Selected: {newCommentAttachment.name} (
-                                        {(
-                                          newCommentAttachment.size /
-                                          1024 /
-                                          1024
-                                        ).toFixed(2)}{" "}
-                                        MB)
-                                      </small>
-                                    </div>
-                                  )}
-                                </div>
-                                <Button
-                                  variant="primary"
-                                  size="sm"
-                                  className="mt-2"
-                                  onClick={() =>
-                                    handleAddComment(viewTicketData?.id)
-                                  }
-                                  disabled={
-                                    !newComment.trim() || creatingTicket
-                                  }
-                                >
-                                  Add Comment
-                                </Button>
-                              </div>
-                            )}
-
-                            <div
-                              className="comments-list"
-                              style={{ maxHeight: "300px", overflowY: "auto" }}
-                            >
-                              {comments.length > 0 ? (
-                                comments.map((comment: any, index: number) => (
-                                  <div
-                                    key={index}
-                                    className="comment-item border-bottom pb-2 mb-2"
-                                    style={{
-                                      padding: "10px",
-                                      backgroundColor: "#f8f9fa",
-                                      borderRadius: "5px",
-                                      marginBottom: "10px",
-                                    }}
-                                  >
-                                    <div className="d-flex justify-content-between">
-                                      <small
-                                        className="text-muted"
-                                        style={{
-                                          fontWeight: "600",
-                                          color: "#6c757d",
-                                        }}
-                                      >
-                                        {extensions.find(
-                                          (extension: any) =>
-                                            extension.id ==
-                                            comment.user_extension
-                                        )?.display_name ||
-                                          comment.user_extension ||
-                                          "Unknown User"}
-                                      </small>
-                                      <div className="text-end">
-                                        <small className="text-muted d-block">
-                                          {moment(comment.created_at).fromNow()}
-                                        </small>
-                                        <small className="text-muted">
-                                          {moment(comment.created_at).format(
-                                            "DD/MM/YYYY HH:mm"
-                                          )}
-                                        </small>
-                                      </div>
-                                    </div>
-                                    <div
-                                      className="mt-1"
-                                      style={{
-                                        color: "#495057",
-                                        lineHeight: "1.4",
-                                      }}
-                                    >
-                                      {comment.content}
-                                    </div>
-                                    {comment.attachment &&
-                                      commentAttachmentImages[comment.id] && (
-                                        <div className="mt-2">
-                                          <img
-                                            src={
-                                              commentAttachmentImages[
-                                                comment.id
-                                              ]
-                                            }
-                                            alt="Comment attachment"
-                                            className="img-fluid"
-                                            style={{
-                                              maxWidth: "200px",
-                                              maxHeight: "200px",
-                                              cursor: "pointer",
-                                              borderRadius: "5px",
-                                              border: "1px solid #dee2e6",
-                                            }}
-                                            onError={(e) => {
-                                              // Fallback if image fails to load
-                                              const target =
-                                                e.target as HTMLImageElement;
-                                              target.style.display = "none";
-                                            }}
-                                            onClick={() =>
-                                              handleImageClick(
-                                                commentAttachmentImages[
-                                                  comment.id
-                                                ]
-                                              )
-                                            }
-                                          />
-                                        </div>
-                                      )}
-                                  </div>
-                                ))
-                              ) : (
-                                <p className="text-muted text-center">
-                                  No user comments yet
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </Col>
-
-                      {/* Assignee Comments Column */}
-                      <Col md={6}>
-                        <div className="card border">
-                          <div className="card-header bg-light">
-                            <h6 className="mb-0 fw-semibold">Assignee Comments</h6>
-                          </div>
-                          <div className="card-body">
-                            {canAddAssigneeComment ? (
-                              <div className="mb-3">
-                                <textarea
-                                  className="form-control"
-                                  rows={3}
-                                  placeholder="Add a new assignee comment..."
-                                  value={newAssigneeComment}
-                                  onChange={(e) =>
-                                    setNewAssigneeComment(e.target.value)
-                                  }
-                                />
-                                <div className="mt-2">
-                                  <label
-                                    htmlFor="newAssigneeCommentAttachment"
-                                    className="form-label small"
-                                  >
-                                    Attachment (Optional)
-                                  </label>
-                                  <input
-                                    type="file"
-                                    className="form-control form-control-sm"
-                                    id="newAssigneeCommentAttachment"
-                                    accept="image/*"
-                                    onChange={(e) => {
-                                      const file = e.target.files?.[0];
-                                      setNewAssigneeCommentAttachment(
-                                        file || null
-                                      );
-                                    }}
-                                  />
-                                  <small className="text-muted">
-                                    Supported formats: JPG, PNG, GIF. Max size:
-                                    5MB
-                                  </small>
-                                  {newAssigneeCommentAttachment && (
-                                    <div className="mt-1">
-                                      <small className="text-success">
-                                        Selected:{" "}
-                                        {newAssigneeCommentAttachment.name} (
-                                        {(
-                                          newAssigneeCommentAttachment.size /
-                                          1024 /
-                                          1024
-                                        ).toFixed(2)}{" "}
-                                        MB)
-                                      </small>
-                                    </div>
-                                  )}
-                                </div>
-                                <Button
-                                  variant="success"
-                                  size="sm"
-                                  className="mt-2"
-                                  onClick={() =>
-                                    handleAddAssigneeComment(viewTicketData?.id)
-                                  }
-                                  disabled={
-                                    !newAssigneeComment.trim() || creatingTicket
-                                  }
-                                >
-                                  Add Assignee Comment
-                                </Button>
-                              </div>
-                            ) : (
-                              <div className="mb-3">
-                                <p className="text-muted small mb-0">
-                                  Only assigned users can add assignee comments.
-                                </p>
-                              </div>
-                            )}
-
-                            <div
-                              className="comments-list"
-                              style={{ maxHeight: "300px", overflowY: "auto" }}
-                            >
-                              {assigneeComments.length > 0 ? (
-                                assigneeComments.map(
-                                  (comment: any, index: number) => (
-                                    <div
-                                      key={index}
-                                      className="comment-item border-bottom pb-2 mb-2"
-                                      style={{
-                                        padding: "10px",
-                                        backgroundColor: "#f8f9fa",
-                                        borderRadius: "5px",
-                                        marginBottom: "10px",
-                                      }}
-                                    >
-                                      <div className="d-flex justify-content-between">
-                                        <small
-                                          className="text-muted"
-                                          style={{
-                                            fontWeight: "600",
-                                            color: "#6c757d",
-                                          }}
-                                        >
-                                          {extensions.find(
-                                            (extension: any) =>
-                                              extension.id ==
-                                              comment.user_extension
-                                          )?.display_name ||
-                                            comment.user_extension ||
-                                            "Unknown User"}
-                                        </small>
-                                        <div className="text-end">
-                                          <small className="text-muted d-block">
-                                            {moment(
-                                              comment.created_at
-                                            ).fromNow()}
-                                          </small>
-                                          <small className="text-muted">
-                                            {moment(comment.created_at).format(
-                                              "DD/MM/YYYY HH:mm"
-                                            )}
-                                          </small>
-                                        </div>
-                                      </div>
-                                      <div
-                                        className="mt-1"
-                                        style={{
-                                          color: "#495057",
-                                          lineHeight: "1.4",
-                                        }}
-                                      >
-                                        {comment.content}
-                                      </div>
-                                      {comment.attachment &&
-                                        assigneeCommentAttachmentImages[
-                                          comment.id
-                                        ] && (
-                                          <div className="mt-2">
-                                            <img
-                                              src={
-                                                assigneeCommentAttachmentImages[
-                                                  comment.id
-                                                ]
-                                              }
-                                              alt="Assignee comment attachment"
-                                              className="img-fluid"
-                                              style={{
-                                                maxWidth: "200px",
-                                                maxHeight: "200px",
-                                                cursor: "pointer",
-                                                borderRadius: "5px",
-                                                border: "1px solid #dee2e6",
-                                              }}
-                                              onError={(e) => {
-                                                // Fallback if image fails to load
-                                                const target =
-                                                  e.target as HTMLImageElement;
-                                                target.style.display = "none";
-                                              }}
-                                              onClick={() =>
-                                                handleImageClick(
-                                                  assigneeCommentAttachmentImages[
-                                                    comment.id
-                                                  ]
-                                                )
-                                              }
-                                            />
-                                          </div>
-                                        )}
-                                    </div>
-                                  )
-                                )
-                              ) : (
-                                <p className="text-muted text-center">
-                                  No assignee comments yet
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </Col>
-                    </Row>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Activity Logs Section */}
-          <div className="card border-0 shadow-sm">
-            <div className="card-body">
-              <h6 className="card-title mb-3 text-primary border-bottom pb-2">
-                Activity Logs
-                {viewTicketData?.activity_logs && (
-                  <span className="badge bg-secondary ms-2">
-                    {viewTicketData.activity_logs.length} entries
-                  </span>
-                )}
-              </h6>
-
-              {viewTicketData?.activity_logs && viewTicketData.activity_logs.length > 0 ? (
-                <div
-                  className="activity-logs-list"
-                  style={{ maxHeight: "400px", overflowY: "auto" }}
-                >
-                  {viewTicketData.activity_logs
-                    .slice()
-                    .reverse()
-                    .map((log: any, index: number) => (
-                      <div
-                        key={log.id || index}
-                        className="activity-log-item border-bottom pb-3 mb-3"
-                        style={{
-                          padding: "15px",
-                          backgroundColor: "#f8f9fa",
-                          borderRadius: "5px",
-                          marginBottom: "10px",
-                        }}
-                      >
-                        <div className="d-flex justify-content-between align-items-start mb-2">
-                          <div>
-                            <span
-                              className="badge"
-                              style={{
-                                backgroundColor:
-                                  log.action === "created"
-                                    ? "#10B981"
-                                    : log.action === "updated"
-                                    ? "#3B82F6"
-                                    : "#6B7280",
-                                color: "white",
-                                fontWeight: "600",
-                                textTransform: "capitalize",
-                              }}
-                            >
-                              {log.action}
-                            </span>
-                            {log.user_extension && (
-                              <span className="ms-2 text-muted">
-                                by{" "}
-                                {extensions.find(
-                                  (ext: any) =>
-                                    ext.id.toString() === log.user_extension.toString()
-                                )?.display_name || log.user_extension}
-                              </span>
-                            )}
-                          </div>
-                          <div className="text-end">
-                            <small className="text-muted d-block">
-                              {moment(log.created_at).fromNow()}
-                            </small>
-                            <small className="text-muted">
-                              {moment(log.created_at).format("DD/MM/YYYY HH:mm:ss")}
-                            </small>
-                          </div>
-                        </div>
-
-                        {log.changes && Object.keys(log.changes).length > 0 && (
-                          <div className="mt-2">
-                            <strong className="text-muted small">Changes:</strong>
-                            <ul className="list-unstyled mt-1 mb-0" style={{ fontSize: "0.9rem" }}>
-                              {Object.entries(log.changes).map(([fieldName, change]: [string, any]) => (
-                                <li key={fieldName} className="mb-1">
-                                  <span className="text-capitalize">
-                                    {fieldName.replace(/_/g, " ")}:
-                                  </span>{" "}
-                                  <span className="text-decoration-line-through text-danger">
-                                    {fieldName === "title" || fieldName === "description"
-                                      ? change.old
-                                      : resolveFieldName(fieldName, change.old)}
-                                  </span>{" "}
-                                  →{" "}
-                                  <span className="text-success fw-bold">
-                                    {fieldName === "title" || fieldName === "description"
-                                      ? change.new
-                                      : resolveFieldName(fieldName, change.new)}
-                                  </span>
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                </div>
-              ) : (
-                <p className="text-muted text-center py-3">No activity logs available</p>
-              )}
-            </div>
-          </div>
+          
         </Modal.Body>
         <Modal.Footer className="border-top">
           <Button variant="secondary" onClick={closeViewTicketModal}>

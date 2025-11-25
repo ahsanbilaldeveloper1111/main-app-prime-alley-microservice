@@ -8,7 +8,7 @@ import BreadcrumbItem from "@common/BreadcrumbItem";
 
 import { useState } from 'react';
 import { Card, Row, Col } from 'react-bootstrap';
-import {DollarSign} from 'lucide-react';
+import {DollarSign, Package} from 'lucide-react';
 import Link from 'next/link';
 import {BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,ResponsiveContainer} from 'recharts';
 import UAECurrencyLogo from "@assets/images/uae-currency-logo.jpg";
