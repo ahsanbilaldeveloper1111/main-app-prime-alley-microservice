@@ -106,6 +106,7 @@ MENU_COLORS: {
     ANALYSIS: 'Analysis',
     TRANSCRIPTION: 'Transcription',
     TRANSLATE: 'Translate',
+    OUTBOUND_CALLS: 'Outbound Calls',
     ANALYZE_RECORDINGS: 'Analyze Recordings',
     
     // Sales

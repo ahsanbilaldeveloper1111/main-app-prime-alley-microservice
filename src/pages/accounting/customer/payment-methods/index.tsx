@@ -32,31 +32,6 @@ import {
   useElements,
 } from "@stripe/react-stripe-js";
 
-interface Product {
-      id: number;
-      name: string;
-      category: string;
-      price: string;
-      type: string;
-      totalAmount: string;
-      status: string;
-      created: string;
-    }
-    
-    interface Invoice {
-      id: number;
-      invoice: string;
-      date: string;
-      dueDate: string;
-      amount: string;
-      status: string;
-      paymentMethod: string;
-      items: { name: string; quantity: number; price: string }[];
-      subtotal: string;
-      tax: string;
-      total: string;
-    }
-
 
 // Stripe Payment Element Form Component
 const AddCardForm: React.FC<{

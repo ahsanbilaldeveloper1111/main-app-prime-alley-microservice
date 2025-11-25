@@ -43,7 +43,7 @@ import "@assets/scss/tabs.scss";
 import PageHeader from "@components/PageHeader";
 import FormModal from "../../partial/FormModal";
 import ConfirmModal from "@pages/partial/ConfirmModal";
-import { User,Edit,Trash2,Eye,Plus, Filter, Search,Info, AlertCircle, CheckCircle, X, Paperclip } from "lucide-react";
+import { User,Edit,Trash2,Eye,Plus, Filter, Search,Info, AlertCircle, CheckCircle, X, Paperclip, FileText, Tag } from "lucide-react";
 
 import ThemeSelect from "@components/ThemeSelect";
 import Select from "react-select";
@@ -53,6 +53,28 @@ interface SelectOption {
   value: number;
   label: string;
 }
+
+const getPriorityBadgeColor = (priority: string) => {
+  if (!priority) return 'secondary';
+  switch (priority.toLowerCase()) {
+    case 'critical': return 'danger';
+    case 'high': return 'warning';
+    case 'medium': return 'info';
+    case 'low': return 'success';
+    default: return 'secondary';
+  }
+};
+
+const getStatusBadgeColor = (status: string) => {
+  if (!status) return 'secondary';
+  switch (status.toLowerCase()) {
+    case 'resolved': return 'success';
+    case 'closed': return 'secondary';
+    case 'in progress': return 'warning';
+    case 'open': return 'primary';
+    default: return 'info';
+  }
+};
 
 const TicketList = () => {
   const { data: session, status } = useSession();
@@ -192,28 +214,7 @@ const TicketList = () => {
         selector: (row: any) => row.status,
         sortable: true,
         cell: (props: any) => (
-          // <div className="d-flex flex-column gap-1">
-          //   <span
-          //     className="badge"
-          //     style={{
-          //       backgroundColor: `${props.status?.color}30`,
-          //       color: props.status?.color,
-          //       fontWeight: "bold",
-          //     }}
-          //   >
-          //     {props.status?.name}
-          //   </span>
-          //   <span
-          //     className="badge"
-          //     style={{
-          //       backgroundColor: `${props.module?.color}30`,
-          //       color: props.module?.color,
-          //       fontWeight: "bold",
-          //     }}
-          //   >
-          //     {props.module?.name}
-          //   </span>
-          // </div>
+          
           <div className="d-block">
             <span className="bg-opacity-10 text-dark mb-1 d-inine-block badge bg-info">
               {props.status?.name}
@@ -278,53 +279,7 @@ const TicketList = () => {
         selector: (row: any) => row.id,
         sortable: false,
         cell: (props: any) => (
-          // <DatatableActionButton
-          //   actions={[
-          //     ...(session?.user?.permissions?.includes("view-ticket-tickets")
-          //       ? [
-          //           {
-          //             label: "View",
-          //             icon: <FiEye />,
-          //             onClick: () => handleViewTicket(props),
-          //             className: "gap-2",
-          //           },
-          //         ]
-          //       : []),
-          //     ...(session?.user?.permissions?.includes("edit-ticket-tickets")
-          //       ? [
-          //           {
-          //             label: "Edit",
-          //             icon: <FiEdit />,
-          //             onClick: () => handleEditTicket(props),
-          //             className: "gap-2",
-          //           },
-          //         ]
-          //       : []),
-              // ...(session?.user?.permissions?.includes("delete-ticket-tickets")
-              //   ? [
-              //       {
-              //         label: (Array.isArray(props.user_extension)
-              //           ? props.user_extension.length > 0
-              //           : props.user_extension)
-              //           ? "Delete (Assigned)"
-              //           : "Delete",
-              //         icon: <FiTrash2 />,
-              //         onClick: () =>
-              //           (Array.isArray(props.user_extension)
-              //             ? props.user_extension.length > 0
-              //             : props.user_extension)
-              //             ? null
-              //             : handleDeleteTicket(props),
-              //         className: (Array.isArray(props.user_extension)
-              //           ? props.user_extension.length > 0
-              //           : props.user_extension)
-              //           ? "text-muted gap-2"
-              //           : "text-danger gap-2",
-              //       },
-              //     ]
-              //   : []),
-          //   ]}
-          // />
+         
 
           <div className="d-flex justify-content-center gap-2">
             {session?.user?.permissions?.includes('view-ticket-tickets') && (
@@ -984,7 +939,7 @@ const TicketList = () => {
     "enhancement",
     "documentation"
   ];
-  console.log("ZE UES IS ", session);
+  
   const handleSubmitCreateTicket = useCallback(async () => {
     console.log("=== COMPONENT DEBUG ===");
     console.log("newTicketImages count:", newTicketImages.length);
@@ -2423,7 +2378,7 @@ const TicketList = () => {
         cancelButtonVariant="secondary"
       />
 
-      <Modal
+<Modal
         show={showViewTicketModal}
         onHide={closeViewTicketModal}
         size="xl"
@@ -2437,6 +2392,47 @@ const TicketList = () => {
           </Modal.Title>
         </Modal.Header>
         <Modal.Body style={{ maxHeight: "80vh", overflowY: "auto" }}>
+
+
+        <Row>
+          <Col md={3} className="border-end">
+            <h5 className="fw-bold mb-4">Ticket Information</h5>
+            
+            <Row className="mb-3">
+              <Col xs={12}>
+                <small className="text-muted d-block mb-2 fw-semibold" style={{ fontSize: '0.813rem' }}>Module</small>
+                <Badge bg="primary" className="bg-opacity-10 text-dark px-2 py-2">
+                  <FileText size={14} className="me-2" />
+                  <span style={{ fontSize: '0.875rem' }}>{viewTicketData?.module?.name}</span>
+                </Badge>
+              </Col>
+            </Row>
+
+            <Row className="mb-3">
+              <Col xs={6}>
+                <small className="text-muted d-block mb-2 fw-semibold" style={{ fontSize: '0.813rem' }}>Type</small>
+                <Badge bg="secondary" className="bg-opacity-10 text-dark px-2 py-2">
+                  <Tag size={14} className="me-2" />
+                  <span style={{ fontSize: '0.875rem' }}>{viewTicketData?.type?.name}</span>
+                </Badge>
+              </Col>
+              <Col xs={6}>
+                <small className="text-muted d-block mb-2 fw-semibold" style={{ fontSize: '0.813rem' }}>Priority</small>
+                <Badge bg={getPriorityBadgeColor(viewTicketData.priority)} className="bg-opacity-10 text-dark px-2 py-2">
+                  <span style={{ fontSize: '0.875rem' }}>{viewTicketData.priority}</span>
+                </Badge>
+              </Col>
+            </Row>
+
+          </Col>
+
+          <Col md={9}></Col>
+        </Row>
+
+{/* old here */}
+
+
+
           {/* Header Section */}
           <div className="mb-4">
             <div className="d-flex flex-wrap gap-2 align-items-center mb-3">
@@ -3219,7 +3215,10 @@ const TicketList = () => {
             Close
           </Button>
         </Modal.Footer>
+        
       </Modal>
+
+
       <div className="modal-parent-custom">
         {showImageModal && (
           <Modal

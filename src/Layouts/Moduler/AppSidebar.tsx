@@ -38,7 +38,8 @@ import {
   RadioTower,
   Workflow,
   NotebookText,
-  DollarSign
+  DollarSign,
+  PhoneCallIcon
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -275,6 +276,13 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
           icon: <Languages size={16} />,
           permission: PERMISSIONS.TRANSLATE_AIML,
           url: '/ai-ml/translate'
+        },
+        {
+          id: 'ai-ml-outbound-calls',
+          title: HEADER_CONSTANTS.SUBMENU_LABELS.OUTBOUND_CALLS,
+          icon: <Phone size={16} />,
+          permission: PERMISSIONS.AI_ML_SERVICES,
+          url: '/ai-ml/outbound-calls'
         }
       ].filter(item => !item.permission || hasPermission(item.permission))
     },

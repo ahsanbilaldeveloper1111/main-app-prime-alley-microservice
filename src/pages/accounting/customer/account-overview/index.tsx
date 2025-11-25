@@ -7,19 +7,9 @@ import React, {
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 
-import CompanyLogo2 from "@assets/images/Prime3.png";
 import { useState } from 'react';
-import { Card, Row, Col, Button, Badge, Form, Table, Modal, Dropdown, ProgressBar } from 'react-bootstrap';
-import { 
-  Eye, CreditCard, Clock, Wallet, ChevronRight, ChevronLeft,
-  Edit, Trash2, Filter, Plus, Settings, Download, LayoutDashboard,
-  Package, FileText, Bell, Check, DollarSign, TrendingUp, AlertCircle,
-  Users, ArrowUp, ArrowDown
-} from 'lucide-react';
-import {
-  LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
-  ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area
-} from 'recharts';
+import { Card, Row, Col, Button, Badge, Form, Modal } from 'react-bootstrap';
+import { ChevronRight } from 'lucide-react';
 import { formatNumber } from "@utils/Helper";
 
 import "@assets/scss/billing.scss";
@@ -32,30 +22,6 @@ import countries from "world-countries";
 import { GetCompanyDetails,GetPaymentMethods,UpdateCompanyDetails,GetDashboardCounters } from "@utils/accounting";
 import ThemeSelect from "@components/ThemeSelect";
 import { toast } from "react-toastify";
-interface Product {
-      id: number;
-      name: string;
-      category: string;
-      price: string;
-      type: string;
-      totalAmount: string;
-      status: string;
-      created: string;
-    }
-    
-    interface Invoice {
-      id: number;
-      invoice: string;
-      date: string;
-      dueDate: string;
-      amount: string;
-      status: string;
-      paymentMethod: string;
-      items: { name: string; quantity: number; price: string }[];
-      subtotal: string;
-      tax: string;
-      total: string;
-    }
 
 const AccountOverview = () => {
 

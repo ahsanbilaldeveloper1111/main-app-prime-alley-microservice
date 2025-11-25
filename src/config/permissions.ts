@@ -230,6 +230,10 @@ export const routePermissions: RoutePermission[] = [
             {
                 path: '/transcriptions',
                 permissions: ['transcriptions-aiml']
+            },
+            {
+                path: '/outbound-calls',
+                permissions: [PERMISSIONS.AI_ML_SERVICES]
             }
         ]
     },
@@ -304,34 +308,6 @@ export const routePermissions: RoutePermission[] = [
                 children: [
                     { path: '/product-pricing',permissions: [PERMISSIONS.VIEW_PRODUCT_PRICING_COMPANIES_BILLING]}
                 ]
-            },
-            {
-                path: '/expenses',
-                permissions: [PERMISSIONS.VIEW_EXPENSES_BILLING]
-            },
-            {
-                path: '/invoices',
-                permissions: [PERMISSIONS.VIEW_INVOICES_BILLING]
-            },
-            {
-                path: '/inventory',
-                permissions: [PERMISSIONS.VIEW_INVENTORY_BILLING]
-            },
-            {
-                path: '/locations',
-                permissions: [PERMISSIONS.VIEW_LOCATIONS_BILLING]
-            },
-            {
-                path: '/products',
-                permissions: [PERMISSIONS.VIEW_PRODUCTS_BILLING]
-            },
-            {
-                path: '/resellers',
-                permissions: [PERMISSIONS.VIEW_RESSELLERS_BILLING]
-            },
-            {
-                path: '/suppliers',
-                permissions: [PERMISSIONS.VIEW_SUPPLIERS_BILLING]
             }
         ]
     },

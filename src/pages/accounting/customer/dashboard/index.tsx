@@ -7,18 +7,10 @@ import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 
 import { useState } from 'react';
-import { Card, Row, Col, Button, Badge, Form, Table, Modal, Dropdown, ProgressBar } from 'react-bootstrap';
-import { 
-  Eye, CreditCard, Clock, Wallet, ChevronRight, ChevronLeft,
-  Edit, Trash2, Filter, Plus, Settings, Download, LayoutDashboard,
-  Package, FileText, Bell, Check, DollarSign, TrendingUp, AlertCircle,
-  Users, ArrowUp, ArrowDown,
-} from 'lucide-react';
+import { Card, Row, Col } from 'react-bootstrap';
+import {DollarSign} from 'lucide-react';
 import Link from 'next/link';
-import {
-  LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
-  ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area
-} from 'recharts';
+import {BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,ResponsiveContainer} from 'recharts';
 import UAECurrencyLogo from "@assets/images/uae-currency-logo.jpg";
 import { formatNumber } from "@utils/Helper";
 
@@ -26,10 +18,12 @@ import "@assets/scss/billing.scss";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
-import PageHeader from "@components/PageHeader";
+
 
 import { GetDashboardCounters, GetProfitLossData, GetTopProducts, GetRecentActivity, GetAnalyticsByMonth, GetCompanyDetails } from "@utils/accounting";
 import { useSession } from "next-auth/react";
+
+
 const CustomerDashboard = () => {
 
   const { data:session, status } = useSession();
@@ -187,10 +181,6 @@ const CustomerDashboard = () => {
     <React.Fragment>
       <BreadcrumbItem mainTitle="" mainLink="" subTitle="Customer Dashboard" />
 
-      {/* <PageHeader
-        title="Customer Dashboard"
-        showSearch={false}
-      /> */}
 
 <div>
                 <div className="d-flex justify-content-between align-items-center mb-4">
