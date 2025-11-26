@@ -233,7 +233,7 @@ export const routePermissions: RoutePermission[] = [
             },
             {
                 path: '/outbound-calls',
-                permissions: [PERMISSIONS.AI_ML_SERVICES]
+                permissions: [PERMISSIONS.OUTBOUND_CALLS_AIML]
             }
         ]
     },

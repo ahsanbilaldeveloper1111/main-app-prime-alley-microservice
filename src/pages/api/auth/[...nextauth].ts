@@ -22,10 +22,10 @@ function clearExistingTmsSessions() {
     // Delete sessions with TMS data
     sessionsToDelete.forEach(sessionId => {
       sessionStore.delete(sessionId);
-      console.log('Cleared existing TMS session:', sessionId);
+      //console.log('Cleared existing TMS session:', sessionId);
     });
     
-    console.log(`Cleared ${sessionsToDelete.length} existing TMS sessions`);
+    //console.log(`Cleared ${sessionsToDelete.length} existing TMS sessions`);
   } catch (error) {
     console.error('Error clearing existing TMS sessions:', error);
   }
@@ -188,7 +188,7 @@ export const authOptions: NextAuthOptions = {
       // Store only essential data in JWT to minimize size
       if (user) {
         // Clear any existing TMS session data when creating new main app session
-        console.log('Clearing any existing TMS session data for new main app session');
+        //console.log('Clearing any existing TMS session data for new main app session');
         clearExistingTmsSessions();
         
         token.id = user.id;

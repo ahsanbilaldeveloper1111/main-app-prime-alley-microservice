@@ -275,7 +275,7 @@ MENU_COLORS: {
     TRANSCRIPTION_ANALYSIS_AIML: 'transcriptions-analysis-aiml',
     TRANSCRIPTION_ANALYZE_RECORDINGS_AIML: 'analyze-recordings-aiml',
     TRANSLATE_AIML: 'translate-aiml',
-
+    OUTBOUND_CALLS_AIML: 'outbound-call-aiml',
 
     CTI_SERVICES: 'cti-services',
     VIEW_CTI:'view-cti',

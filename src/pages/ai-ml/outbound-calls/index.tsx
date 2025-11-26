@@ -320,7 +320,7 @@ const AimlOutboundCalls = () => {
                   className="d-none"
                   onChange={handleBulkFileChange}
                   />
-            <Button
+            {/* <Button
         variant="info"
        
         disabled={bulkUploading}
@@ -334,7 +334,7 @@ const AimlOutboundCalls = () => {
         ) : (
           'Bulk Upload (.csv)'
         )}
-      </Button>
+      </Button> */}
       
           <Button variant="primary" onClick={() => setShowAddTrunkModal(true)}>Add Trunk</Button>
           <Button variant="danger" 

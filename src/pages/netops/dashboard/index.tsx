@@ -470,7 +470,9 @@ const NetOpsDashboard = () => {
                       </tbody>
                     </table>
                     <div className="d-flex justify-content-center">
+                      {session?.user?.permissions?.includes('alerts-netops') && (
                       <Link href="/netops/alerts" className="link-primary">View All Alerts</Link>
+                      )}
                     </div>
                   </div>
                 );
@@ -522,7 +524,9 @@ const NetOpsDashboard = () => {
                     </tbody>
                   </table>
                   <div className="d-flex justify-content-center">
-                    <Link href="/netops/devices" className="link-primary">View All Devices</Link>
+                    {session?.user?.permissions?.includes('devices-netops') && (
+                      <Link href="/netops/devices" className="link-primary">View All Devices</Link>
+                    )}
                   </div>
                 </div>
               )}

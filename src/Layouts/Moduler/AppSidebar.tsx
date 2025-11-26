@@ -281,7 +281,7 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
           id: 'ai-ml-outbound-calls',
           title: HEADER_CONSTANTS.SUBMENU_LABELS.OUTBOUND_CALLS,
           icon: <Phone size={16} />,
-          permission: PERMISSIONS.AI_ML_SERVICES,
+          permission: PERMISSIONS.OUTBOUND_CALLS_AIML,
           url: '/ai-ml/outbound-calls'
         }
       ].filter(item => !item.permission || hasPermission(item.permission))
