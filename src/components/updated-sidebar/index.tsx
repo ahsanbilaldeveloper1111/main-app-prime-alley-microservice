@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useRouter } from 'next/router';
 import { 
   LayoutDashboard, 
   Ticket, 
@@ -37,6 +38,7 @@ interface SubMenuItem {
   title: string;
   icon: React.ReactNode;
   subItems?: SubMenuItem[];
+  href?: string;
 }
 
 interface MainMenuItem {
@@ -60,18 +62,32 @@ const ExpandableSidebar: React.FC<SidebarProps> = ({
   activeScreen, 
   setActiveScreen 
 }) => {
+  const router = useRouter();
   //const [expandedModules, setExpandedModules] = useState<string[]>(['ticketing']);
   const [expandedModules, setExpandedModules] = useState<string[]>([ 'crm']);
   const [expandedSubModules, setExpandedSubModules] = useState<string[]>([]);
 
   const mainMenuItems: MainMenuItem[] = [
     {
+      id: 'dashboards',
+      title: 'Dashboards',
+      icon: <LayoutDashboard size={20} />,
+      color: '#20c997',
+      subItems: [
+        { id: 'dashboards-manager', title: 'Manager Dashboard', icon: <LayoutDashboard size={16} />, href: '/dashboards/manager' },
+        { id: 'dashboards-agent', title: 'Agent Dashboard', icon: <LayoutDashboard size={16} /> },
+        { id: 'dashboards-supervisor', title: 'Supervisor Dashboard', icon: <LayoutDashboard size={16} /> },
+        { id: 'dashboards-account', title: 'Account Dashboard', icon: <LayoutDashboard size={16} /> },
+        { id: 'dashboards-tech', title: 'Tech Team Dashboard', icon: <LayoutDashboard size={16} /> },
+      ]
+    },
+    {
       id: 'crm',
       title: 'CRM System',
       icon: <Briefcase size={20} />,
       color: '#0d6efd',
       subItems: [
-        { id: 'dashboard', title: 'Dashboard', icon: <LayoutDashboard size={16} /> },
+        { id: 'dashboard', title: 'Dashboard', icon: <LayoutDashboard size={16} />, href: '/crm-new' },
         { id: 'prospects', title: 'Prospects', icon: <Users size={16} /> },
         { id: 'leads', title: 'Leads', icon: <Target size={16} /> },
         { id: 'deals', title: 'Deals', icon: <Handshake size={16} /> },
@@ -89,7 +105,7 @@ const ExpandableSidebar: React.FC<SidebarProps> = ({
       icon: <Ticket size={20} />,
       color: '#6f42c1',
       subItems: [
-        { id: 'dashboard', title: 'Dashboard', icon: <LayoutDashboard size={16} /> },
+        { id: 'dashboard', title: 'Dashboard', icon: <LayoutDashboard size={16} />, href: '/tickets/dashboard' },
         { id: 'tickets', title: 'All Tickets', icon: <Ticket size={16} /> },
         { id: 'modules', title: 'Ticket Modules', icon: <Package size={16} /> },
         { id: 'categories', title: 'Categories', icon: <Layers size={16} /> },
@@ -109,7 +125,7 @@ const ExpandableSidebar: React.FC<SidebarProps> = ({
           title: 'Customer',
           icon: <Users size={16} />,
           subItems: [
-            { id: 'customer-dashboard', title: 'Customer Dashboard', icon: <LayoutDashboard size={16} /> },
+                { id: 'customer-dashboard', title: 'Customer Dashboard', icon: <LayoutDashboard size={16} />, href: '/accounting/customer/dashboard' },
             { id: 'account-overview', title: 'Account Overview', icon: <Eye size={16} /> },
             { id: 'product-details', title: 'Product Details', icon: <ShoppingBag size={16} /> },
             { id: 'billing-history', title: 'Billing History', icon: <FileText size={16} /> },
@@ -122,7 +138,7 @@ const ExpandableSidebar: React.FC<SidebarProps> = ({
           title: 'Reseller Portal',
           icon: <UserCheck size={16} />,
           subItems: [
-            { id: 'reseller-dashboard', title: 'Dashboard', icon: <LayoutDashboard size={16} /> },
+                { id: 'reseller-dashboard', title: 'Dashboard', icon: <LayoutDashboard size={16} />, href: '/reseller' },
             { id: 'customer-management', title: 'Customer Management', icon: <Users size={16} /> },
             { id: 'sales-orders', title: 'Sales & Orders', icon: <ShoppingCart size={16} /> },
             { id: 'commission-payouts', title: 'Commission & Payouts', icon: <DollarSign size={16} /> },
@@ -136,7 +152,7 @@ const ExpandableSidebar: React.FC<SidebarProps> = ({
           title: 'Vendor Portal',
           icon: <Building2 size={16} />,
           subItems: [
-            { id: 'vendor-dashboard', title: 'Dashboard', icon: <LayoutDashboard size={16} /> },
+                { id: 'vendor-dashboard', title: 'Dashboard', icon: <LayoutDashboard size={16} />, href: '/vendor' },
             { id: 'product-management', title: 'Product Management', icon: <Package size={16} /> },
             { id: 'reseller-management', title: 'Reseller Management', icon: <UserCheck size={16} /> },
             { id: 'order-management', title: 'Order Management', icon: <ShoppingCart size={16} /> },
@@ -167,8 +183,11 @@ const ExpandableSidebar: React.FC<SidebarProps> = ({
     );
   };
 
-  const handleSubItemClick = (screenId: string) => {
+  const handleSubItemClick = (screenId: string, href?: string) => {
     setActiveScreen(screenId);
+    if (href) {
+      router.push(href);
+    }
     //setSidebarOpen(false);
   };
 
@@ -534,7 +553,7 @@ const ExpandableSidebar: React.FC<SidebarProps> = ({
                                   <button
                                     key={nestedItem.id}
                                     className={`nested-sub-item ${activeScreen === nestedItem.id ? 'active' : ''}`}
-                                    onClick={() => handleSubItemClick(nestedItem.id)}
+                                    onClick={() => handleSubItemClick(nestedItem.id, nestedItem.href)}
                                   >
                                     <span className="nested-sub-item-icon">{nestedItem.icon}</span>
                                     <span>{nestedItem.title}</span>
@@ -547,7 +566,7 @@ const ExpandableSidebar: React.FC<SidebarProps> = ({
                           // Regular sub-item without children
                           <button
                             className={`sub-item ${activeScreen === subItem.id ? 'active' : ''}`}
-                            onClick={() => handleSubItemClick(subItem.id)}
+                            onClick={() => handleSubItemClick(subItem.id, subItem.href)}
                           >
                             <span className="sub-item-icon">{subItem.icon}</span>
                             <span>{subItem.title}</span>

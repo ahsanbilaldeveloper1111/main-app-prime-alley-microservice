@@ -22,6 +22,16 @@ export const routePermissions: RoutePermission[] = [
     {path: '/resources/help-materials',permissions: ['']},
     {path: '/resources/contact-support',permissions: ['']},
 
+    {
+        path: '/dashboards',
+        permissions: [''],
+        children: [
+            { path: '/manager', permissions: [''] },
+            { path: '/agent', permissions: [''] },
+            { path: '/supervisor', permissions: [''] },
+        ]
+    },
+
 
     {path: '/reports',permissions: [PERMISSIONS.REPORTS_SERVICES]},
     {path: '/billing',permissions: [PERMISSIONS.REPORTS_SERVICES]},
