@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import Head from 'next/head';
 import dynamic from 'next/dynamic';
-import { Container, Row, Col, Card, Badge, Button } from 'react-bootstrap';
+import { Container, Badge, Button } from 'react-bootstrap';
 import {
   Menu,
   ChevronLeft,
@@ -21,32 +21,25 @@ import CompanyLogo2 from '@assets/images/ringedge-logo-black-n-blue.png';
 const ReactApexChart = dynamic(() => import('react-apexcharts'), { ssr: false });
 
 const kpiCards = [
-  { id: 'agents', label: 'Active Agents', value: '126', change: '+4% vs yesterday', icon: <Users size={22} />, accent: '#5e60ce' },
-  { id: 'calls', label: 'Call Volume (In/Out)', value: '3,482', change: '+8% engagement', icon: <Activity size={22} />, accent: '#2ec4b6' },
-  { id: 'sla', label: 'Service Level', value: '94.2%', change: 'Target 92%', icon: <ShieldCheck size={22} />, accent: '#ffc107' },
-  { id: 'abandon', label: 'Queue Health', value: '3.4% / 00:43s', change: 'Abandon / Wait Time', icon: <Clock size={22} />, accent: '#ff6b6b' },
+  { id: 'agents', label: 'Total Active Agents', value: '126', change: '+4% vs yesterday', icon: <Users size={22} />, accent: '#5e60ce' },
+  { id: 'calls', label: 'Today’s Call Volume (In+Out)', value: '3,482', change: '+8% engagement', icon: <Activity size={22} />, accent: '#2ec4b6' },
+  { id: 'sla', label: 'Service Level (SLA%)', value: '94.2%', change: 'Target 92%', icon: <ShieldCheck size={22} />, accent: '#ffc107' },
+  { id: 'abandon', label: 'Abandon Rate (%) + Queue Wait Time', value: '3.4% / 00:43s', change: 'Abandon / Wait Time', icon: <Clock size={22} />, accent: '#ff6b6b' },
   { id: 'csat', label: 'CSAT', value: '4.6 / 5', change: '+0.2 sentiment', icon: <TrendingUp size={22} />, accent: '#845ef7' },
   { id: 'revenue', label: 'Revenue This Week', value: '$482K', change: '+11% growth', icon: <DollarSign size={22} />, accent: '#20c997' },
-];
-
-const statusSnapshot = [
-  { title: 'SLA Health', value: 'High confidence', sentiment: 'Positive', color: '#20c997' },
-  { title: 'Idle Risk', value: '6 agents over 20m', sentiment: 'Investigate', color: '#ff922b' },
-  { title: 'Campaign Pulse', value: 'Winter Push 12%', sentiment: 'Needs boost', color: '#845ef7' },
 ];
 
 const ordersSummary = [
   { label: 'Delivered', value: '812' },
   { label: 'Pending', value: '143' },
   { label: 'On Hold', value: '37' },
-  { label: 'Escalated', value: '9' },
 ];
 
 const alerts = [
   { type: 'SLA Risk Alert', description: 'Team Delta trending toward 88% SLA in the last 30 mins', severity: 'high' },
-  { type: 'High Idle Time', description: '6 agents idle > 20 mins in Sales - NA', severity: 'medium' },
-  { type: 'High Queue Load', description: 'Queue Retail-Support peaked at 65 waiting callers', severity: 'high' },
-  { type: 'Campaign Alert', description: 'Campaign “Winter Push” below 12% conversion today', severity: 'low' },
+  { type: 'High Idle Time Alert', description: '6 agents idle > 20 mins in Sales - NA', severity: 'medium' },
+  { type: 'High Queue Load Alert', description: 'Queue Retail-Support peaked at 65 waiting callers', severity: 'high' },
+  { type: 'Underperforming Campaign Alert', description: 'Campaign “Winter Push” below 12% conversion today', severity: 'low' },
 ];
 
 const marketingHighlights = [
@@ -160,134 +153,158 @@ const ManagerDashboard = () => {
             }
           }
 
-          .manager-hero {
-            border-radius: 36px;
-            padding: 36px;
-            color: #fff;
-            position: relative;
+          .content-wrapper {
+            padding: 0.75rem;
+          }
+
+          .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(12, minmax(0, 1fr));
+            gap: 14px;
+            height: auto;
+          }
+
+          .grid-item {
+            background: #fff;
+            border-radius: 10px;
+            padding: 14px;
+            box-shadow: 0 6px 18px rgba(15,23,42,0.05);
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
             overflow: hidden;
-            border: 1px solid rgba(255,255,255,0.15);
-            box-shadow: 0 30px 80px rgba(30, 64, 175, 0.25);
-            background: linear-gradient(135deg, #2145ff 0%, #5a67ff 42%, #8a4dff 100%);
+            border: 1px solid #edf0f5;
           }
 
-          .manager-hero::before,
-          .manager-hero::after {
-            content: '';
-            position: absolute;
-            border-radius: 50%;
-            opacity: 0.3;
-            animation: pulse 8s ease-in-out infinite;
+          .grid-col-span-12 { grid-column: span 12; }
+          .grid-col-span-8 { grid-column: span 8; }
+          .grid-col-span-6 { grid-column: span 6; }
+          .grid-col-span-5 { grid-column: span 5; }
+          .grid-col-span-4 { grid-column: span 4; }
+          .grid-col-span-3 { grid-column: span 3; }
+
+          @media (max-width: 1600px) {
+            .grid-col-span-8,
+            .grid-col-span-7,
+            .grid-col-span-6 { grid-column: span 12; }
+            .grid-col-span-5,
+            .grid-col-span-4,
+            .grid-col-span-3 { grid-column: span 6; }
           }
 
-          .manager-hero::before {
-            width: 360px;
-            height: 360px;
-            top: -120px;
-            right: -60px;
-            background: radial-gradient(circle, rgba(255,255,255,0.4) 0%, transparent 70%);
+          @media (max-width: 992px) {
+            .grid-item {
+              padding: 10px;
+            }
+            .kpi-grid {
+              grid-template-columns: repeat(2, minmax(0, 1fr));
+              gap: 8px;
+            }
+            .dashboard-grid {
+              height: auto;
+            }
           }
 
-          .manager-hero::after {
-            width: 220px;
-            height: 220px;
-            bottom: -80px;
-            left: -40px;
-            background: radial-gradient(circle, rgba(255,255,255,0.35) 0%, transparent 70%);
-          }
-
-          @keyframes pulse {
-            0% { transform: scale(0.95); opacity: 0.25; }
-            50% { transform: scale(1.05); opacity: 0.45; }
-            100% { transform: scale(0.95); opacity: 0.25; }
-          }
-
-          .glass-card {
-            background: rgba(255, 255, 255, 0.9);
-            border: 1px solid rgba(255,255,255,0.4);
-            box-shadow: 0 18px 40px rgba(15,23,42, 0.08);
-            border-radius: 24px;
-            padding: 24px;
-          }
-
-          .status-chip {
-            border-radius: 18px;
-            padding: 16px 20px;
-            background: rgba(255,255,255,0.2);
-            border: 1px solid rgba(255,255,255,0.4);
-            box-shadow: inset 0 1px 0 rgba(255,255,255,0.6);
-            backdrop-filter: blur(18px);
+          .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+            gap: 10px;
           }
 
           .kpi-card {
-            border-radius: 28px;
-            padding: 24px;
-            border: none;
-            box-shadow: 0 28px 60px rgba(15, 23, 42, 0.12);
-            height: 100%;
-            position: relative;
-            overflow: hidden;
-            background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+            border-radius: 10px;
+            padding: 12px;
+            border: 1px solid #edf0f5;
+            box-shadow: none;
+            background: #fff;
+            min-height: 0;
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
           }
 
-          .kpi-card::after {
-            content: '';
-            position: absolute;
-            inset: 16px;
-            border-radius: 22px;
-            background: linear-gradient(120deg, rgba(94,96,206,0.22), rgba(46,196,182,0.08));
-            opacity: 0;
-            transition: opacity 0.3s ease;
+          .kpi-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(15,23,42,0.08);
           }
 
-          .kpi-card:hover::after {
-            opacity: 1;
+          .kpi-card small {
+            font-size: 0.68rem;
+          }
+
+          .kpi-card .fw-bold {
+            font-size: 1rem;
           }
 
           .kpi-pill {
-            font-size: 0.75rem;
+            font-size: 0.65rem;
             border-radius: 999px;
             background: #eef2ff;
-            padding: 6px 12px;
+            padding: 3px 8px;
             display: inline-flex;
             align-items: center;
-            gap: 6px;
+            gap: 3px;
             color: #334155;
           }
 
+          .mini-section {
+            margin-bottom: 14px;
+          }
+
+          .mini-chart {
+            height: 135px;
+          }
+
+          .orders-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
+            gap: 8px;
+          }
+
+          .orders-chip {
+            background: #f3f4ff;
+            border-radius: 10px;
+            padding: 8px 10px;
+          }
+
           .campaign-card {
-            border-radius: 18px;
-            padding: 18px 20px;
-            background: #f9fbff;
+            border-radius: 12px;
+            padding: 10px 14px;
+            background: #f8f9ff;
             border: 1px solid rgba(15,23,42,0.05);
             display: flex;
             align-items: center;
             justify-content: space-between;
-            box-shadow: 0 10px 25px rgba(15,23,42,0.04);
           }
 
           .campaign-meta {
             background: white;
-            border-radius: 14px;
-            padding: 10px 14px;
-            min-width: 110px;
+            border-radius: 10px;
+            padding: 6px 10px;
+            min-width: 90px;
             text-align: center;
             font-weight: 600;
-            font-size: 0.85rem;
+            font-size: 0.75rem;
           }
 
           .campaign-progress {
-            height: 6px;
+            height: 4px;
             border-radius: 999px;
             background: #e2e8f0;
             overflow: hidden;
+            margin-top: 6px;
           }
 
           .alerts-stack > div {
-            border-radius: 18px;
+            border-radius: 12px;
             border: 1px solid rgba(15,23,42,0.08);
-            padding: 18px;
+            padding: 10px 12px;
             background: #fff;
+            font-size: 0.85rem;
+          }
+
+          .scrollable {
+            overflow-y: auto;
+            max-height: 320px;
+            padding-right: 4px;
           }
         `}</style>
 
@@ -341,210 +358,138 @@ const ManagerDashboard = () => {
 
         <div className="content-wrapper">
           <Container fluid style={{ marginTop: '85px' }}>
-            <Row className="mb-4">
-              <Col>
-                <div className="manager-hero text-white">
-                  <div className="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-4 position-relative">
-                    <div style={{ maxWidth: 520 }}>
-                      <Badge bg="light" text="dark" className="text-uppercase mb-3">Manager’s Command Center</Badge>
-                      <h1 className="fw-semibold display-6 mb-3">Your business at a glance.</h1>
-                      <p className="mb-4 fs-5 text-white-50">Live insights to steer workforce, revenue, and customer sentiment with confidence.</p>
-                      <div className="d-flex gap-3 flex-wrap">
-                        {statusSnapshot.map(item => (
-                          <div key={item.title} className="status-chip text-dark flex-grow-1" style={{ minWidth: 180 }}>
-                            <small className="text-uppercase text-white-50">{item.title}</small>
-                            <div className="d-flex justify-content-between align-items-center mt-2">
-                              <span className="fw-semibold text-white">{item.value}</span>
-                              <Badge bg="" style={{ backgroundColor: `${item.color}30`, color: '#fff' }}>
-                                {item.sentiment}
-                              </Badge>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                    <div className="glass-card" style={{ minWidth: 260, background: 'rgba(14, 19, 57, 0.35)', border: '1px solid rgba(255,255,255,0.2)', color: '#fff' }}>
-                      <div className="text-muted text-uppercase small mb-2">Efficiency boost</div>
-                      <div className="d-flex align-items-end gap-2">
-                        <div style={{ fontSize: '3.5rem', fontWeight: 700, lineHeight: 1 }}>+18%</div>
-                        <div className="pb-2">
-                          <small className="d-block text-white-50">vs last week</small>
-                          <Badge bg="success" className="mt-1">Trending up</Badge>
-                        </div>
-                      </div>
-                      <hr className="border-light opacity-25 my-3" />
-                      <div className="d-flex justify-content-between align-items-center">
-                        <div>
-                          <small className="text-white-50">Peak utilization</small>
-                          <p className="mb-0 fw-semibold">92% • Tue 11:30 AM</p>
-                        </div>
-                        <ArrowUpRight size={18} className="text-white-50" />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </Col>
-            </Row>
+            <div className="dashboard-grid">
+              <div className="grid-item grid-col-span-12">
+                <small className="text-uppercase text-muted">Manager’s Dashboard</small>
+                <h3 className="fw-semibold mt-2 mb-1">Your business at a glance.</h3>
+                <p className="mb-0 text-muted" style={{ fontSize: '0.95rem' }}>
+                  Every insight you need to steer the day with confidence.
+                </p>
+              </div>
 
-            <Row className="g-4 mb-4">
-              {kpiCards.map(card => (
-                <Col key={card.id} xxl={4} md={6}>
-                  <Card className="kpi-card">
-                    <div className="position-relative" style={{ zIndex: 1 }}>
-                      <div className="d-flex justify-content-between align-items-start">
-                        <div style={{ backgroundColor: '#f4f6ff', borderRadius: 18, padding: 14, color: card.accent, boxShadow: `0 10px 25px ${card.accent}30` }}>
-                          {card.icon}
-                        </div>
-                        <ArrowUpRight size={20} className="text-muted" />
+
+              <div className="grid-item grid-col-span-12" style={{ paddingBottom: 8 }}>
+                <div className="kpi-grid">
+                  {kpiCards.map(card => (
+                    <div key={card.id} className="kpi-card">
+                      <div className="d-flex justify-content-between align-items-center mb-2">
+                        <span style={{ color: card.accent }}>{card.icon}</span>
+                        <ArrowUpRight size={14} className="text-muted" />
                       </div>
-                      <p className="text-muted text-uppercase small mt-4 mb-2">{card.label}</p>
-                      <h2 className="fw-bold mb-2">{card.value}</h2>
-                      <span className="kpi-pill">
+                      <small className="text-uppercase text-muted">{card.label}</small>
+                      <div className="fw-bold" style={{ fontSize: '1.1rem' }}>{card.value}</div>
+                      <span className="kpi-pill mt-1">
                         <span style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: card.accent, display: 'inline-block' }}></span>
                         {card.change}
                       </span>
-                      <div className="progress mt-3" style={{ height: 6, borderRadius: 999, background: '#eef2ff' }}>
-                        <div className="progress-bar" role="progressbar" style={{ width: '72%', background: `linear-gradient(90deg, ${card.accent}, ${card.accent}90)` }}></div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="grid-item grid-col-span-6">
+                <div className="mini-section">
+                  <div className="d-flex justify-content-between align-items-center mb-1">
+                    <h6 className="text-uppercase text-muted mb-0">Performance Heatmap</h6>
+                    <small className="text-muted">Teams vs Hours</small>
+                  </div>
+                  <div className="mini-chart">
+                    <ReactApexChart options={heatmapOptions as any} series={heatmapSeries} type="heatmap" height={150} />
+                  </div>
+                </div>
+                <div className="mini-section">
+                  <h6 className="text-uppercase text-muted mb-2">Orders Snapshot</h6>
+                  <div className="orders-grid">
+                    {ordersSummary.map(item => (
+                      <div key={item.label} className="orders-chip">
+                        <small className="text-muted">{item.label}</small>
+                        <h6 className="mb-0 fw-semibold">{item.value}</h6>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid-item grid-col-span-3">
+                <div className="mini-section">
+                  <h6 className="text-uppercase text-muted mb-1">Campaign Conversion</h6>
+                  <div className="mini-chart">
+                    <ReactApexChart options={campaignTrend.options as any} series={campaignTrend.series} type="line" height={140} />
+                  </div>
+                </div>
+                <div className="mini-section">
+                  <h6 className="text-uppercase text-muted mb-1">Top Teams</h6>
+                  <div className="mini-chart">
+                    <ReactApexChart options={teamPerformance.options as any} series={teamPerformance.series} type="bar" height={140} />
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid-item grid-col-span-3">
+                <h6 className="text-uppercase text-muted mb-1">Sentiment Trend</h6>
+                <div className="mini-chart">
+                  <ReactApexChart options={sentimentTrend.options as any} series={sentimentTrend.series} type="area" height={150} />
+                </div>
+              </div>
+
+              <div className="grid-item grid-col-span-6 scrollable">
+                <div className="d-flex justify-content-between align-items-center mb-2">
+                  <h6 className="text-uppercase text-muted mb-0">Top Performing Campaigns</h6>
+                  <Button size="sm" variant="link" className="text-decoration-none">View All</Button>
+                </div>
+                <div className="d-flex flex-column gap-2">
+                  {topCampaigns.map(campaign => (
+                    <div key={campaign.name} className="campaign-card">
+                      <div>
+                        <p className="mb-1 fw-semibold">{campaign.name}</p>
+                        <small className="text-muted">Conversion {campaign.conversion}%</small>
+                        <div className="campaign-progress mt-2">
+                          <div style={{ width: `${campaign.conversion}%`, background: campaign.color, height: '100%' }}></div>
+                        </div>
+                      </div>
+                      <div className="campaign-meta" style={{ color: campaign.color, border: `1px solid ${campaign.color}40` }}>
+                        {campaign.status}
                       </div>
                     </div>
-                  </Card>
-                </Col>
-              ))}
-            </Row>
+                  ))}
+                </div>
+              </div>
 
-            <Row className="g-4 mb-4">
-              <Col xl={4} md={6}>
-                <Card className="shadow-sm border-0 h-100 glass-card">
-                  <Card.Body>
-                    <div className="d-flex justify-content-between align-items-center mb-3">
-                      <h6 className="text-uppercase text-muted mb-0">Orders Summary</h6>
-                      <ArrowUpRight size={18} className="text-muted" />
-                    </div>
-                    <Row className="g-3">
-                      {ordersSummary.map(item => (
-                        <Col xs={6} key={item.label}>
-                          <div className="p-3 rounded" style={{ backgroundColor: '#f6f8ff', borderRadius: 16 }}>
-                            <p className="text-muted small mb-1">{item.label}</p>
-                            <h5 className="mb-0 fw-semibold">{item.value}</h5>
-                          </div>
-                        </Col>
-                      ))}
-                    </Row>
-                  </Card.Body>
-                </Card>
-              </Col>
-              <Col xl={8} md={6}>
-                <Card className="shadow-sm border-0 h-100">
-                  <Card.Body>
-                    <div className="d-flex justify-content-between align-items-center mb-3">
-                      <h6 className="text-uppercase text-muted mb-0">Performance Heatmap</h6>
-                      <span className="text-muted small">Teams vs Hours</span>
-                    </div>
-                    <ReactApexChart options={heatmapOptions as any} series={heatmapSeries} type="heatmap" height={280} />
-                  </Card.Body>
-                </Card>
-              </Col>
-            </Row>
-
-            <Row className="g-4 mb-4">
-              <Col lg={6}>
-                <Card className="border-0 shadow-sm h-100">
-                  <Card.Body>
-                    <h6 className="text-uppercase text-muted mb-3">Campaign Conversion Rate</h6>
-                    <ReactApexChart options={campaignTrend.options as any} series={campaignTrend.series} type="line" height={260} />
-                  </Card.Body>
-                </Card>
-              </Col>
-              <Col lg={6}>
-                <Card className="border-0 shadow-sm h-100">
-                  <Card.Body>
-                    <h6 className="text-uppercase text-muted mb-3">Top Performing Teams</h6>
-                    <ReactApexChart options={teamPerformance.options as any} series={teamPerformance.series} type="bar" height={260} />
-                  </Card.Body>
-                </Card>
-              </Col>
-            </Row>
-
-            <Row className="g-4 mb-4">
-              <Col lg={6}>
-                <Card className="border-0 shadow-sm h-100">
-                  <Card.Body>
-                    <h6 className="text-uppercase text-muted mb-3">Negative Sentiment Trend</h6>
-                    <ReactApexChart options={sentimentTrend.options as any} series={sentimentTrend.series} type="area" height={260} />
-                  </Card.Body>
-                </Card>
-              </Col>
-              <Col lg={6}>
-                <Card className="border-0 shadow-sm h-100">
-                  <Card.Body>
-                    <div className="d-flex justify-content-between align-items-center mb-3">
-                      <h6 className="text-uppercase text-muted mb-0">Top Performing Campaigns</h6>
-                      <Button size="sm" variant="link" className="text-decoration-none">View All</Button>
-                    </div>
-                    <div className="d-flex flex-column gap-3">
-                      {topCampaigns.map(campaign => (
-                        <div key={campaign.name} className="campaign-card">
-                          <div>
-                            <p className="mb-1 fw-semibold">{campaign.name}</p>
-                            <small className="text-muted">Conversion {campaign.conversion}%</small>
-                            <div className="campaign-progress mt-2">
-                              <div style={{ width: `${campaign.conversion}%`, background: campaign.color, height: '100%' }}></div>
-                            </div>
-                          </div>
-                          <div className="campaign-meta" style={{ color: campaign.color, border: `1px solid ${campaign.color}40` }}>
-                            {campaign.status}
-                          </div>
+              <div className="grid-item grid-col-span-3 scrollable">
+                <div className="d-flex justify-content-between align-items-center mb-2">
+                  <h6 className="text-uppercase text-muted mb-0">Alerts</h6>
+                  <Button variant="outline-secondary" size="sm">View All</Button>
+                </div>
+                <div className="alerts-stack d-flex flex-column gap-2">
+                  {alerts.map(alert => (
+                    <div key={alert.type}>
+                      <div className="d-flex justify-content-between align-items-start">
+                        <div>
+                          <p className="fw-semibold mb-1">{alert.type}</p>
+                          <small className="text-muted">{alert.description}</small>
                         </div>
-                      ))}
+                        <Badge bg={alert.severity === 'high' ? 'danger' : alert.severity === 'medium' ? 'warning' : 'secondary'}>
+                          {alert.severity.toUpperCase()}
+                        </Badge>
+                      </div>
                     </div>
-                  </Card.Body>
-                </Card>
-              </Col>
-            </Row>
+                  ))}
+                </div>
+              </div>
 
-            <Row className="g-4 mb-4">
-              <Col lg={6}>
-                <Card className="border-0 shadow-sm h-100">
-                  <Card.Body>
-                    <div className="d-flex justify-content-between align-items-center mb-3">
-                      <h6 className="text-uppercase text-muted mb-0">Alerts</h6>
-                      <Button variant="outline-secondary" size="sm">View All</Button>
+              <div className="grid-item grid-col-span-3 scrollable">
+                <h6 className="text-uppercase text-muted mb-2">Marketing & Updates</h6>
+                <div className="d-flex flex-column gap-2">
+                  {marketingHighlights.map(item => (
+                    <div key={item.title} className="orders-chip">
+                      <p className="fw-semibold mb-1">{item.title}</p>
+                      <small className="text-muted d-block mb-1">{item.description}</small>
+                      <Button size="sm" variant="outline-primary">{item.cta}</Button>
                     </div>
-                    <div className="d-flex flex-column gap-3 alerts-stack">
-                      {alerts.map(alert => (
-                        <div key={alert.type}>
-                          <div className="d-flex justify-content-between align-items-start">
-                            <div>
-                              <p className="fw-semibold mb-1">{alert.type}</p>
-                              <small className="text-muted">{alert.description}</small>
-                            </div>
-                            <Badge bg={alert.severity === 'high' ? 'danger' : alert.severity === 'medium' ? 'warning' : 'secondary'}>
-                              {alert.severity.toUpperCase()}
-                            </Badge>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </Card.Body>
-                </Card>
-              </Col>
-              <Col lg={6}>
-                <Card className="border-0 shadow-sm h-100">
-                  <Card.Body>
-                    <h6 className="text-uppercase text-muted mb-3">Marketing & Updates</h6>
-                    <div className="d-flex flex-column gap-3">
-                      {marketingHighlights.map(item => (
-                        <div key={item.title} className="p-3 rounded bg-light">
-                          <p className="fw-semibold mb-1">{item.title}</p>
-                          <small className="text-muted d-block mb-2">{item.description}</small>
-                          <Button size="sm" variant="outline-primary">{item.cta}</Button>
-                        </div>
-                      ))}
-                    </div>
-                  </Card.Body>
-                </Card>
-              </Col>
-            </Row>
+                  ))}
+                </div>
+              </div>
+            </div>
           </Container>
         </div>
       </div>
