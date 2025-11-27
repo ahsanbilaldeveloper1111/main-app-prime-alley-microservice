@@ -76,28 +76,37 @@ const Devices = () => {
                 return formattedDate;
             }
         },
+        ...(session?.user?.permissions?.includes('edit-device-netops') || session?.user?.permissions?.includes('delete-device-netops') ? [
         { key: 'actions', name: 'Actions', selector: (row: any) => row.id, sortable: false,
             cell: (props: any) => {
                 return (
                     <DatatableActionButton
                         actions={[
+
+                            ...(session?.user?.permissions?.includes('edit-device-netops') ? [
                             {
                                 label: 'Edit',
-                                icon: <FiEdit />,
-                                onClick: () => handleEditDevice(props),
-                                className: 'gap-2'
-                            },
+                                    icon: <FiEdit />,
+                                    onClick: () => handleEditDevice(props),
+                                    className: 'gap-2'
+                                },
+                            ] : []),
+
+
+                            ...(session?.user?.permissions?.includes('delete-device-netops') ? [
                             {
                                 label: 'Delete',
                                 icon: <FiTrash2 />,
                                 onClick: () => handleDeleteDevice(props.id, props.hostname),
                                 className: 'text-danger gap-2'
-                            }
+                            } 
+                        ]: []),
                         ]}
                     />
                 );
             }
         }
+        ] : []),
     ];
 
     const [refreshKey, setRefreshKey] = useState<number>(0);
@@ -468,14 +477,19 @@ const Devices = () => {
                                     </div>
                                 )}
                                 <div className="action-buttons gap-2">
+                                    <>
+                                    {session?.user?.permissions?.includes('add-device-netops') && (
                                     <Button
                                         variant="primary"
                                         className="me-2"
                                         onClick={handleCreateDevice}
                                         
                                     >
-                                        <i className="fas fa-plus"></i> Add Device
+
+                                        <FiPlus size={14} /> Add Device
                                     </Button>
+                                    )}
+
                                     <Button
                                         variant="info"
                                         className="me-2"
@@ -484,6 +498,8 @@ const Devices = () => {
                                     >
                                         <FiRefreshCw size={14} /> Refresh
                                     </Button>
+
+                                    </>
                                 </div>
                             </Col>
                         </Row>

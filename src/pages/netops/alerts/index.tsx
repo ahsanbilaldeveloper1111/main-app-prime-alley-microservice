@@ -221,6 +221,9 @@ const Alerts = () => {
         return <span className="text-muted">N/A</span>;
       },
     },
+
+    ...(session?.user?.permissions?.includes('resolve-alert-netops') ? [
+      
     {
       key: "actions",
       name: "Actions",
@@ -250,6 +253,8 @@ const Alerts = () => {
         );
       },
     },
+  ] : []),
+
   ];
 
   const [refreshKey, setRefreshKey] = useState<number>(0);

@@ -85,28 +85,35 @@ const Services = () => {
                 );
             }
         },
+        ...(session?.user?.permissions?.includes('edit-service-netops') || session?.user?.permissions?.includes('delete-service-netops') ? [
         { key: 'actions', name: 'Actions', selector: (row: any) => row.service_id, sortable: false,
             cell: (props: any) => {
                 return (
                     <DatatableActionButton
                         actions={[
+                            ...(session?.user?.permissions?.includes('edit-service-netops') ? [
                             {
                                 label: 'Edit',
                                 icon: <FiEdit />,
                                 onClick: () => handleEditService(props),
                                 className: 'gap-2'
                             },
+                            ] : []),
+                            ...(session?.user?.permissions?.includes('delete-service-netops') ? [
                             {
                                 label: 'Delete',
                                 icon: <FiTrash2 />,
                                 onClick: () => handleDeleteService(props.id, props.service_name),
                                 className: 'text-danger gap-2'
                             }
+                        ]: []),
                         ]}
                     />
                 );
             }
         }
+        ] : []),
+
     ];
 
     const [refreshKey, setRefreshKey] = useState<number>(0);
@@ -351,6 +358,8 @@ const Services = () => {
                             <i className="fas fa-search search-icon"></i>
                             <input type="text" className="search-bar" placeholder="Search services..." onChange={(e) => handleFiltersChange({...currentFilters, search: e.target.value})}/>
                         </div>
+                                    
+                                    {session?.user?.permissions?.includes('add-service-netops') && (
                                     <Button
                                         variant="primary"
                                         onClick={handleCreateService}
@@ -358,6 +367,8 @@ const Services = () => {
                                     >
                                         <i className="fas fa-plus"></i> Add Service
                                     </Button>
+                                    )}
+
                                     <Button
                                         variant="info"
                                         onClick={() => setRefreshKey(prev => prev + 1)}
@@ -365,6 +376,8 @@ const Services = () => {
                                     >
                                         <i className="fas fa-sync-alt"></i> Refresh
                                     </Button>
+
+                                    
                                 </div>
                             </Col>
                         </Row>
