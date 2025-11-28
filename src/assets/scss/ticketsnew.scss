@@ -22,13 +22,30 @@
     padding: 0px !important;
 }
 .badge.bg-secondary {
-    background-color: transparent !important;
+    // background: rgb(104 124 213) !important;
+    background:  #a8dfca !important;
   }
-
+  
+ 
   .table-responsive .table th:first-child, .table-responsive .table td:first-child {
     min-width: auto !important;
   }
 
  .margin-minus-10 {
     margin-top: -25px !important;
+}
+.card-body .bg-opacity-10.badge {
+    --bs-bg-opacity: 0.5 !important;
+}
+
+.form-check-input[type=checkbox] {
+    border-radius: 0px !important;
+}
+
+input.form-control.form-control-sm {
+    height: 38px !important;
+}
+
+input#includeAssignedRecords {
+    border-radius: 2em !important;
 }
