@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import Head from 'next/head';
 import dynamic from 'next/dynamic';
 import { Container, Badge, Button } from 'react-bootstrap';
@@ -6,6 +6,7 @@ import {
   Menu,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   Bell,
   Users,
   Activity,
@@ -33,6 +34,7 @@ const ordersSummary = [
   { label: 'Delivered', value: '812' },
   { label: 'Pending', value: '143' },
   { label: 'On Hold', value: '37' },
+  { label: 'Escalations', value: '12' },
 ];
 
 const alerts = [
@@ -42,74 +44,90 @@ const alerts = [
   { type: 'Underperforming Campaign Alert', description: 'Campaign “Winter Push” below 12% conversion today', severity: 'low' },
 ];
 
-const marketingHighlights = [
-  { title: 'RingEdge Growth Pack', description: 'Unlock agent AI-coaching, analytics bundles, and CX consulting.', cta: 'View Packages' },
-  { title: 'Leadership Updates', description: 'Q1 regional goals released. Align scorecards with the latest targets.', cta: 'View Updates' },
-  { title: 'Product Announcements', description: 'New call sentiment monitor rolling out to all enterprise plans.', cta: 'See Announcement' },
-];
+const primaryMetricIds = ['agents', 'abandon', 'csat', 'sla'];
+const secondaryMetricIds = ['calls', 'revenue'];
 
-const topCampaigns = [
-  { name: 'Holiday Blitz', conversion: 18, status: 'On track', color: '#22c55e' },
-  { name: 'Retention X', conversion: 21, status: 'Surging', color: '#3b82f6' },
-  { name: 'Upsell Wave', conversion: 24, status: 'On track', color: '#a855f7' },
+const campaignSchedule = [
+  {
+    time: '10 AM',
+    entries: [
+      { name: 'Campaign 1', conversion: 80, border: '#6b7280' },
+      { name: 'Campaign 2', conversion: 60, border: '#94a3b8' },
+      { name: 'Campaign 3', conversion: 52, border: '#cbd5f5' },
+      { name: 'Campaign 4', conversion: 49, border: '#cbd5f5' },
+      { name: 'Campaign 5', conversion: 45, border: '#d1d5db' },
+      { name: 'Campaign 6', conversion: 42, border: '#d1d5db' },
+    ],
+  },
+  {
+    time: '1 PM',
+    entries: [
+      { name: 'Campaign 1', conversion: 72, border: '#6b7280' },
+      { name: 'Campaign 2', conversion: 54, border: '#94a3b8' },
+      { name: 'Campaign 3', conversion: 58, border: '#cbd5f5' },
+      { name: 'Campaign 4', conversion: 50, border: '#cbd5f5' },
+      { name: 'Campaign 5', conversion: 46, border: '#d1d5db' },
+      { name: 'Campaign 6', conversion: 44, border: '#d1d5db' },
+    ],
+  },
+  {
+    time: '4 PM',
+    entries: [
+      { name: 'Campaign 1', conversion: 66, border: '#6b7280' },
+      { name: 'Campaign 2', conversion: 58, border: '#94a3b8' },
+      { name: 'Campaign 3', conversion: 62, border: '#cbd5f5' },
+      { name: 'Campaign 4', conversion: 57, border: '#cbd5f5' },
+      { name: 'Campaign 5', conversion: 53, border: '#d1d5db' },
+      { name: 'Campaign 6', conversion: 47, border: '#d1d5db' },
+    ],
+  },
+  {
+    time: '6 PM',
+    entries: [
+      { name: 'Campaign 1', conversion: 63, border: '#6b7280' },
+      { name: 'Campaign 2', conversion: 55, border: '#94a3b8' },
+      { name: 'Campaign 3', conversion: 59, border: '#cbd5f5' },
+      { name: 'Campaign 4', conversion: 53, border: '#cbd5f5' },
+      { name: 'Campaign 5', conversion: 52, border: '#d1d5db' },
+      { name: 'Campaign 6', conversion: 45, border: '#d1d5db' },
+    ],
+  },
 ];
 
 const ManagerDashboard = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [activeScreen, setActiveScreen] = useState('dashboards-manager');
-  const [heatmapSeries] = useState([
-    {
-      name: 'Team Alpha',
-      data: [42, 39, 35, 48, 52, 60, 55, 48, 39, 33, 28, 26],
-    },
-    {
-      name: 'Team Beta',
-      data: [30, 28, 25, 40, 45, 50, 48, 45, 36, 32, 30, 24],
-    },
-    {
-      name: 'Team Delta',
-      data: [20, 20, 24, 35, 42, 46, 45, 40, 32, 30, 26, 22],
-    },
-  ]);
-
-  const heatmapOptions = {
-    chart: { type: 'heatmap', toolbar: { show: false } },
-    dataLabels: { enabled: false },
-    xaxis: { categories: ['8a', '9a', '10a', '11a', '12p', '1p', '2p', '3p', '4p', '5p', '6p', '7p'] },
-    colors: ['#0d6efd'],
-  };
-
-  const teamPerformance = {
-    series: [{ data: [92, 88, 84, 82, 79] }],
-    options: {
-      chart: { type: 'bar', toolbar: { show: false } },
-      plotOptions: { bar: { horizontal: true, borderRadius: 6 } },
-      xaxis: { categories: ['Team Alpha', 'Team Beta', 'Team Delta', 'Team Gamma', 'Team Ops'] },
-      colors: ['#20c997'],
-    },
-  };
 
   const campaignTrend = {
     series: [{ name: 'Conversion Rate', data: [14, 16, 15, 17, 19, 22, 21] }],
     options: {
-      chart: { type: 'line', toolbar: { show: false } },
-      stroke: { width: 3, curve: 'smooth' },
-      xaxis: { categories: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] },
-      colors: ['#845ef7'],
-      markers: { size: 4 },
+      chart: { type: 'line', toolbar: { show: false }, animations: { enabled: false } },
+      stroke: { width: 4, curve: 'smooth', colors: ['#111827'] },
+      xaxis: {
+        categories: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+        axisBorder: { color: '#e5e7eb' },
+        axisTicks: { color: '#e5e7eb' },
+        labels: { style: { colors: '#111827', fontSize: '11px' } },
+      },
+      yaxis: {
+        labels: { style: { colors: '#6b7280', fontSize: '11px' } },
+        axisBorder: { color: '#e5e7eb' },
+        axisTicks: { color: '#e5e7eb' },
+      },
+      grid: { strokeDashArray: 4, borderColor: '#e5e7eb' },
+      colors: ['#111827'],
+      markers: { size: 0 },
     },
   };
 
-  const sentimentTrend = {
-    series: [{ name: 'Negative Sentiment', data: [12, 11, 13, 10, 9, 11, 8] }],
-    options: {
-      chart: { type: 'area', toolbar: { show: false } },
-      stroke: { curve: 'smooth' },
-      xaxis: { categories: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] },
-      fill: { type: 'gradient', gradient: { shadeIntensity: 0.4, opacityFrom: 0.6, opacityTo: 0.1 } },
-      colors: ['#ff922b'],
-    },
-  };
+  const primaryMetrics = kpiCards.filter(card => primaryMetricIds.includes(card.id));
+  const secondaryMetrics = kpiCards.filter(card => secondaryMetricIds.includes(card.id));
+  const campaignNames = Array.from(
+    new Set(campaignSchedule.flatMap(slot => slot.entries.map(entry => entry.name)))
+  );
+
+  const severityRank: Record<string, number> = { high: 0, medium: 1, low: 2 };
+  const sortedAlerts = [...alerts].sort((a, b) => severityRank[a.severity] - severityRank[b.severity]);
 
   return (
     <>
@@ -161,7 +179,7 @@ const ManagerDashboard = () => {
           .dashboard-grid {
             display: grid;
             grid-template-columns: repeat(24, minmax(0, 1fr));
-            gap: 8px;
+            gap: 10px;
           }
 
           .grid-span-24 { grid-column: span 24; }
@@ -187,8 +205,8 @@ const ManagerDashboard = () => {
 
           .grid-item {
             background: #fff;
-            border-radius: 8px;
-            padding: 9px;
+            border-radius: 10px;
+            padding: 10px;
             box-shadow: 0 8px 18px rgba(15,23,42,0.05);
             display: flex;
             flex-direction: column;
@@ -196,107 +214,362 @@ const ManagerDashboard = () => {
             border: 1px solid #e5e9f4;
           }
 
-          @media (max-width: 992px) {
-            .grid-item {
-              padding: 8px;
-            }
-            .kpi-grid {
-              grid-template-columns: repeat(2, minmax(0, 1fr));
-              gap: 6px;
-            }
+          .overview-shell {
+            padding: 0;
+            background: transparent;
+            border: none;
+            box-shadow: none;
           }
 
-          .kpi-grid {
+          .overview-layout {
+            width: 100%;
+            display: flex;
+            gap: 20px;
+            border: 1px solid #e4e7ec;
+            border-radius: 14px;
+            padding: 18px;
+            background: #fff;
+          }
+
+          .overview-left {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+          }
+
+          .metric-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(115px, 1fr));
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 14px;
+          }
+
+          .metric-card {
+            border-radius: 10px;
+            border: 1px solid #e5e7eb;
+            background: #fff;
+            padding: 12px;
+            min-height: 100px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+          }
+
+          .metric-label {
+            font-size: 0.6rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: #667085;
+          }
+
+          .metric-value {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: #0f172a;
+          }
+
+          .metric-change {
+            font-size: 0.64rem;
+            color: #6b7280;
+            display: flex;
+            align-items: center;
             gap: 6px;
           }
 
-          .kpi-card {
-            border-radius: 7px;
-            padding: 7px;
-            border: 1px solid #edf0f5;
+          .summary-card {
+            grid-column: span 2;
+            background: #fff;
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            padding: 12px;
+            box-shadow: none;
+          }
+
+          .summary-title {
+            font-size: 0.62rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: #475467;
+            margin-bottom: 8px;
+          }
+
+          .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 6px;
+          }
+
+          .summary-tile {
+            border-radius: 9px;
+            border: 1px dashed #d5d9e2;
+            padding: 8px 4px;
+            background: #fafbff;
+            text-align: center;
+          }
+
+          .summary-tile small {
+            display: block;
+            font-size: 0.54rem;
+            text-transform: uppercase;
+            color: #6b7280;
+          }
+
+          .summary-tile strong {
+            font-size: 0.9rem;
+            display: block;
+            color: #111827;
+          }
+
+          .alerts-panel {
+            width: 28%;
+            min-width: 240px;
+            max-width: 320px;
+            border-left: 1px solid #e4e7ec;
+            padding-left: 14px;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+          }
+
+          .alerts-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+          }
+
+          .alerts-title {
+            font-size: 0.54rem;
+            text-transform: uppercase;
+            color: #475467;
+            letter-spacing: 0.08em;
+          }
+
+          .alerts-panel {
+            width: 28%;
+            min-width: 240px;
+            max-width: 320px;
+            border-left: 1px solid #e4e7ec;
+            padding-left: 14px;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+          }
+
+          .alerts-panel .alerts-scroll {
+            flex: 0 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            padding-right: 6px;
+            height: 165px;
+            max-height: 165px;
+            overflow-y: auto;
+            overflow-x: hidden;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: thin;
+            scrollbar-color: transparent transparent;
+          }
+
+          .alerts-panel .alerts-scroll::-webkit-scrollbar {
+            width: 8px;
+          }
+
+          .alerts-panel .alerts-scroll::-webkit-scrollbar-track {
+            background: transparent;
+          }
+
+          .alerts-panel .alerts-scroll::-webkit-scrollbar-thumb {
+            background: transparent;
+            border-radius: 999px;
+            border: 2px solid transparent;
+          }
+
+          .alerts-panel:hover .alerts-scroll {
+            scrollbar-color: #9ca3c7 transparent;
+          }
+
+          .alerts-panel:hover .alerts-scroll::-webkit-scrollbar-thumb {
+            background: #d5d9eb;
+            border: 2px solid #f8f9ff;
+          }
+
+          .alert-item {
+            border-radius: 8px;
+            border: 1px solid #eceff5;
+            padding: 5px 7px;
+            background: #fff;
+            font-size: 0.64rem;
+          }
+
+          .alert-item p {
+            font-size: 0.7rem;
+            margin-bottom: 1px;
+          }
+
+          .alert-item small {
+            font-size: 0.6rem;
+          }
+
+          .custom-scroll-track,
+          .scroll-arrow,
+          .scroll-bar-shell,
+          .custom-scroll-thumb {
+            display: none;
+          }
+
+          .panel-title {
+            font-size: 0.68rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: #475569;
+            margin-bottom: 12px;
+          }
+
+          .schedule-panel {
+            border: 1px solid #e4e7ec;
             background: #fff;
           }
 
-          .kpi-card small {
-            font-size: 0.58rem;
+          .campaign-table {
+            border: 1px solid #d4d8e2;
+            border-radius: 10px;
+            background: #fff;
+            overflow: hidden;
           }
 
-          .kpi-card .fw-bold {
-            font-size: 0.95rem;
+          .campaign-grid {
+            width: 100%;
+            border-collapse: collapse;
           }
 
-          .kpi-pill {
-            font-size: 0.55rem;
+          .campaign-grid th,
+          .campaign-grid td {
+            border: 1px solid #e5e7eb;
+            padding: 8px 10px;
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: #0f172a;
+          }
+
+          .campaign-grid th {
+            background: #f9fafb;
+            text-transform: uppercase;
+            font-size: 0.62rem;
+            letter-spacing: 0.06em;
+            color: #4b5563;
+            text-align: left;
+          }
+
+          .campaign-grid td:first-child {
+            text-transform: capitalize;
+          }
+
+          .conversion-chart-panel {
+            position: relative;
+            border: 1px solid #e4e7ec;
+          }
+
+          .filter-chip {
+            position: relative;
+          }
+
+          .filter-trigger {
+            border: 1px solid #f97316;
+            background: transparent;
+            color: #f97316;
             border-radius: 999px;
-            background: #eef2ff;
-            padding: 2px 6px;
+            padding: 2px 10px;
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
             display: inline-flex;
             align-items: center;
-            gap: 3px;
-            color: #334155;
-          }
-
-          .mini-section {
-            margin-bottom: 10px;
-          }
-
-          .mini-chart {
-            height: 110px;
-          }
-
-          .orders-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
-            gap: 5px;
-          }
-
-          .orders-chip {
-            background: #f3f4ff;
-            border-radius: 8px;
-            padding: 6px 8px;
-          }
-
-          .campaign-card {
-            border-radius: 9px;
-            padding: 8px 10px;
-            background: #f8f9ff;
-            border: 1px solid rgba(15,23,42,0.05);
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 8px;
-          }
-
-          .campaign-meta {
-            background: white;
-            border-radius: 8px;
-            padding: 5px 7px;
-            min-width: 70px;
-            text-align: center;
+            gap: 4px;
             font-weight: 600;
-            font-size: 0.68rem;
           }
 
-          .campaign-progress {
-            height: 3px;
-            border-radius: 999px;
-            background: #e2e8f0;
-            margin-top: 4px;
-          }
-
-          .alerts-stack > div {
-            border-radius: 8px;
-            border: 1px solid rgba(15,23,42,0.08);
-            padding: 7px 8px;
+          .filter-menu {
+            position: absolute;
+            right: 0;
+            top: calc(100% + 6px);
             background: #fff;
-            font-size: 0.75rem;
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+            padding: 4px;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            min-width: 140px;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-4px);
+            transition: all 0.15s ease;
+            z-index: 2;
           }
 
-          .scrollable {
-            overflow: visible;
-            max-height: none;
+          .filter-menu button {
+            border: none;
+            background: transparent;
+            padding: 6px 8px;
+            text-align: left;
+            font-size: 0.75rem;
+            border-radius: 4px;
+            color: #111827;
+            transition: background 0.15s ease;
+          }
+
+          .filter-menu button:hover {
+            background: #fef3c7;
+            color: #92400e;
+          }
+
+          .filter-chip:focus-within .filter-menu,
+          .filter-chip:hover .filter-menu {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+          }
+
+          .metric-span-2 {
+            grid-column: span 2;
+          }
+
+          @media (max-width: 1200px) {
+            .metric-grid {
+              grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            }
+
+            .metric-span-2 {
+              grid-column: span 1;
+            }
+          }
+
+          @media (max-width: 992px) {
+            .overview-layout {
+              flex-direction: column;
+            }
+
+            .metric-grid {
+              grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            }
+
+            .summary-grid {
+              grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .alerts-panel {
+              width: 100%;
+              max-width: 100%;
+              border-left: none;
+              border-top: 2px solid #981b1b;
+              padding-left: 0;
+              padding-top: 16px;
+            }
+
+            .custom-scroll-track {
+              display: none;
+            }
           }
         `}</style>
 
@@ -348,140 +621,118 @@ const ManagerDashboard = () => {
           </div>
         </nav>
 
-        <div className="content-wrapper mt-3">
+        <div className="content-wrapper mt-4">
           <div className="scaled-dashboard">
             <Container fluid className="p-0">
               <div className="dashboard-grid">
-              <div className="grid-item grid-span-24">
-                <small className="text-uppercase text-muted" style={{ fontSize: '0.6rem', letterSpacing: '0.08em' }}>Manager’s Dashboard</small>
-                <h5 className="fw-semibold mt-1 mb-1" style={{ fontSize: '1rem' }}>Your business at a glance.</h5>
-                <p className="mb-0 text-muted" style={{ fontSize: '0.82rem' }}>
-                  Every insight you need to steer the day with confidence.
-                </p>
-              </div>
+                <div className="grid-item grid-span-24">
+                  <small className="text-uppercase text-muted" style={{ fontSize: '0.6rem', letterSpacing: '0.08em' }}>Manager’s Dashboard</small>
+                  <h5 className="fw-semibold mt-1 mb-1" style={{ fontSize: '1rem' }}>Your business at a glance.</h5>
+                  <p className="mb-0 text-muted" style={{ fontSize: '0.82rem' }}>
+                    Every insight you need to steer the day with confidence.
+                  </p>
+                </div>
 
-
-              <div className="grid-item grid-span-24" style={{ paddingBottom: 4 }}>
-                <div className="kpi-grid">
-                  {kpiCards.map(card => (
-                    <div key={card.id} className="kpi-card">
-                      <div className="d-flex justify-content-between align-items-center mb-1">
-                        <span style={{ color: card.accent }}>{card.icon}</span>
-                        <ArrowUpRight size={12} className="text-muted" />
-                      </div>
-                      <small className="text-uppercase text-muted">{card.label}</small>
-                      <div className="fw-bold" style={{ fontSize: '1rem' }}>{card.value}</div>
-                      <span className="kpi-pill mt-1">
-                        <span style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: card.accent, display: 'inline-block' }}></span>
-                        {card.change}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="grid-item grid-span-14">
-                <div className="mini-section">
-                  <div className="d-flex justify-content-between align-items-center mb-1">
-                    <h6 className="text-uppercase text-muted mb-0" style={{ fontSize: '0.65rem', letterSpacing: '0.06em' }}>Performance Heatmap</h6>
-                    <small className="text-muted" style={{ fontSize: '0.65rem' }}>Teams vs Hours</small>
-                  </div>
-                  <div className="mini-chart">
-                    <ReactApexChart options={heatmapOptions as any} series={heatmapSeries} type="heatmap" height={110} />
-                  </div>
-                </div>
-                <div className="mini-section">
-                  <h6 className="text-uppercase text-muted mb-2" style={{ fontSize: '0.65rem', letterSpacing: '0.06em' }}>Orders Snapshot</h6>
-                  <div className="orders-grid">
-                    {ordersSummary.map(item => (
-                      <div key={item.label} className="orders-chip">
-                        <small className="text-muted">{item.label}</small>
-                        <h6 className="mb-0 fw-semibold">{item.value}</h6>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid-item grid-span-5">
-                <div className="mini-section">
-                  <h6 className="text-uppercase text-muted mb-1" style={{ fontSize: '0.65rem', letterSpacing: '0.06em' }}>Campaign Conversion</h6>
-                  <div className="mini-chart">
-                    <ReactApexChart options={campaignTrend.options as any} series={campaignTrend.series} type="line" height={110} />
-                  </div>
-                </div>
-                <div className="mini-section">
-                  <h6 className="text-uppercase text-muted mb-1" style={{ fontSize: '0.65rem', letterSpacing: '0.06em' }}>Top Teams</h6>
-                  <div className="mini-chart">
-                    <ReactApexChart options={teamPerformance.options as any} series={teamPerformance.series} type="bar" height={110} />
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid-item grid-span-5">
-                <h6 className="text-uppercase text-muted mb-1" style={{ fontSize: '0.65rem', letterSpacing: '0.06em' }}>Sentiment Trend</h6>
-                <div className="mini-chart">
-                  <ReactApexChart options={sentimentTrend.options as any} series={sentimentTrend.series} type="area" height={110} />
-                </div>
-              </div>
-
-              <div className="grid-item grid-span-12">
-                <div className="d-flex justify-content-between align-items-center mb-2">
-                  <h6 className="text-uppercase text-muted mb-0" style={{ fontSize: '0.65rem', letterSpacing: '0.06em' }}>Top Performing Campaigns</h6>
-                  <Button size="sm" variant="link" className="text-decoration-none" style={{ fontSize: '0.65rem' }}>View All</Button>
-                </div>
-                <div className="d-flex flex-column gap-2">
-                  {topCampaigns.map(campaign => (
-                    <div key={campaign.name} className="campaign-card">
-                      <div>
-                        <p className="mb-1 fw-semibold">{campaign.name}</p>
-                        <small className="text-muted">Conversion {campaign.conversion}%</small>
-                        <div className="campaign-progress mt-2">
-                          <div style={{ width: `${campaign.conversion}%`, background: campaign.color, height: '100%' }}></div>
+                <div className="grid-item grid-span-24 overview-shell">
+                  <div className="overview-layout">
+                    <div className="overview-left">
+                      <div className="metric-grid">
+                        {[...primaryMetrics, ...secondaryMetrics].map(card => (
+                          <div key={card.id} className="metric-card">
+                            <div className="d-flex justify-content-between align-items-center">
+                              <span className="metric-label">{card.label}</span>
+                              <span style={{ color: card.accent }}>{card.icon}</span>
+                            </div>
+                            <span className="metric-value">{card.value}</span>
+                            <span className="metric-change">
+                              <ArrowUpRight size={13} />
+                              {card.change}
+                            </span>
+                          </div>
+                        ))}
+                        <div className="metric-card summary-card metric-span-2">
+                          <p className="summary-title mb-0">Summary</p>
+                          <div className="summary-grid mt-2">
+                            {ordersSummary.map(item => (
+                              <div key={item.label} className="summary-tile">
+                                <strong>{item.value}</strong>
+                                <small>{item.label}</small>
+                              </div>
+                            ))}
+                          </div>
                         </div>
                       </div>
-                      <div className="campaign-meta" style={{ color: campaign.color, border: `1px solid ${campaign.color}40` }}>
-                        {campaign.status}
+                    </div>
+                    <div className="alerts-panel">
+                      <div className="alerts-head">
+                        <p className="alerts-title mb-0">Alerts & Updates</p>
+                      </div>
+                      <div className="alerts-scroll">
+                        {sortedAlerts.map(alert => (
+                          <div key={alert.type} className="alert-item">
+                            <div className="d-flex justify-content-between align-items-start">
+                              <div>
+                                <p className="fw-semibold mb-1">{alert.type}</p>
+                                <small className="text-muted d-block">{alert.description}</small>
+                              </div>
+                              <Badge bg={alert.severity === 'high' ? 'danger' : alert.severity === 'medium' ? 'warning' : 'secondary'}>
+                                {alert.severity.toUpperCase()}
+                              </Badge>
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     </div>
-                  ))}
+                  </div>
                 </div>
-              </div>
 
-              <div className="grid-item grid-span-6">
-                <div className="d-flex justify-content-between align-items-center mb-2">
-                  <h6 className="text-uppercase text-muted mb-0" style={{ fontSize: '0.65rem', letterSpacing: '0.06em' }}>Alerts</h6>
-                  <Button variant="outline-secondary" size="sm" style={{ fontSize: '0.65rem', padding: '2px 8px' }}>View All</Button>
+                <div className="grid-item grid-span-14 schedule-panel">
+                  <p className="panel-title mb-0">Campaign cadence</p>
+                  <div className="campaign-table">
+                    <table className="campaign-grid">
+                      <thead>
+                        <tr>
+                          <th>Timings</th>
+                          {campaignSchedule.map(slot => (
+                            <th key={slot.time}>{slot.time}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {campaignNames.map(name => (
+                          <tr key={name}>
+                            <td>{name}</td>
+                            {campaignSchedule.map(slot => {
+                              const entry = slot.entries.find(item => item.name === name);
+                              return <td key={`${name}-${slot.time}`}>{entry ? `${entry.conversion}%` : '—'}</td>;
+                            })}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
-                <div className="alerts-stack d-flex flex-column gap-2">
-                  {alerts.map(alert => (
-                    <div key={alert.type}>
-                      <div className="d-flex justify-content-between align-items-start">
-                        <div>
-                          <p className="fw-semibold mb-1">{alert.type}</p>
-                          <small className="text-muted">{alert.description}</small>
-                        </div>
-                        <Badge bg={alert.severity === 'high' ? 'danger' : alert.severity === 'medium' ? 'warning' : 'secondary'}>
-                          {alert.severity.toUpperCase()}
-                        </Badge>
+
+                <div className="grid-item grid-span-10 conversion-chart-panel">
+                  <div className="d-flex justify-content-between align-items-center mb-2">
+                    <div className="panel-title mb-0">Campaign Conversion Trend</div>
+                    <div className="filter-chip">
+                      <button type="button" className="filter-trigger">
+                        <span>Duration</span>
+                        <ChevronDown size={12} />
+                      </button>
+                      <div className="filter-menu">
+                        <button type="button">1st Week</button>
+                        <button type="button">Last Week</button>
+                        <button type="button">Last Month</button>
+                        <button type="button">Previous Month</button>
                       </div>
                     </div>
-                  ))}
+                  </div>
+                  <div style={{ minHeight: 240 }}>
+                    <ReactApexChart options={campaignTrend.options as any} series={campaignTrend.series} type="line" height={220} />
+                  </div>
                 </div>
-              </div>
-
-              <div className="grid-item grid-span-6">
-                <h6 className="text-uppercase text-muted mb-2" style={{ fontSize: '0.65rem', letterSpacing: '0.06em' }}>Marketing & Updates</h6>
-                <div className="d-flex flex-column gap-2">
-                  {marketingHighlights.map(item => (
-                    <div key={item.title} className="orders-chip">
-                      <p className="fw-semibold mb-1">{item.title}</p>
-                      <small className="text-muted d-block mb-1">{item.description}</small>
-                      <Button size="sm" variant="outline-primary">{item.cta}</Button>
-                    </div>
-                  ))}
-                </div>
-              </div>
               </div>
             </Container>
           </div>
@@ -492,4 +743,5 @@ const ManagerDashboard = () => {
 };
 
 export default ManagerDashboard;
+
 
