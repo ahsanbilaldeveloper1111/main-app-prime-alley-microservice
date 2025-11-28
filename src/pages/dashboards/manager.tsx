@@ -120,7 +120,7 @@ const ManagerDashboard = () => {
         <style>{`
           .content-wrapper {
             flex: 1;
-            padding: 2rem;
+            padding: 0.6rem 0.75rem;
             margin-left: 0;
             transition: margin-left 0.3s ease;
             overflow-x: hidden;
@@ -135,7 +135,7 @@ const ManagerDashboard = () => {
 
           @media (max-width: 991px) {
             .content-wrapper {
-              padding: 1rem;
+              padding: 0.75rem;
             }
           }
 
@@ -153,92 +153,85 @@ const ManagerDashboard = () => {
             }
           }
 
-          .content-wrapper {
-            padding: 0.75rem;
+          .scaled-dashboard {
+            max-width: 1360px;
+            margin: 60px auto 30px;
           }
 
           .dashboard-grid {
             display: grid;
-            grid-template-columns: repeat(12, minmax(0, 1fr));
-            gap: 14px;
-            height: auto;
+            grid-template-columns: repeat(24, minmax(0, 1fr));
+            gap: 8px;
+          }
+
+          .grid-span-24 { grid-column: span 24; }
+          .grid-span-14 { grid-column: span 14; }
+          .grid-span-12 { grid-column: span 12; }
+          .grid-span-10 { grid-column: span 10; }
+          .grid-span-6 { grid-column: span 6; }
+          .grid-span-5 { grid-column: span 5; }
+
+          @media (max-width: 1200px) {
+            .dashboard-grid {
+              grid-template-columns: repeat(12, minmax(0, 1fr));
+            }
+            .grid-span-24,
+            .grid-span-14,
+            .grid-span-12,
+            .grid-span-10,
+            .grid-span-6,
+            .grid-span-5 {
+              grid-column: span 12;
+            }
           }
 
           .grid-item {
             background: #fff;
-            border-radius: 10px;
-            padding: 14px;
-            box-shadow: 0 6px 18px rgba(15,23,42,0.05);
+            border-radius: 8px;
+            padding: 9px;
+            box-shadow: 0 8px 18px rgba(15,23,42,0.05);
             display: flex;
             flex-direction: column;
             min-height: 0;
-            overflow: hidden;
-            border: 1px solid #edf0f5;
-          }
-
-          .grid-col-span-12 { grid-column: span 12; }
-          .grid-col-span-8 { grid-column: span 8; }
-          .grid-col-span-6 { grid-column: span 6; }
-          .grid-col-span-5 { grid-column: span 5; }
-          .grid-col-span-4 { grid-column: span 4; }
-          .grid-col-span-3 { grid-column: span 3; }
-
-          @media (max-width: 1600px) {
-            .grid-col-span-8,
-            .grid-col-span-7,
-            .grid-col-span-6 { grid-column: span 12; }
-            .grid-col-span-5,
-            .grid-col-span-4,
-            .grid-col-span-3 { grid-column: span 6; }
+            border: 1px solid #e5e9f4;
           }
 
           @media (max-width: 992px) {
             .grid-item {
-              padding: 10px;
+              padding: 8px;
             }
             .kpi-grid {
               grid-template-columns: repeat(2, minmax(0, 1fr));
-              gap: 8px;
-            }
-            .dashboard-grid {
-              height: auto;
+              gap: 6px;
             }
           }
 
           .kpi-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-            gap: 10px;
+            grid-template-columns: repeat(auto-fit, minmax(115px, 1fr));
+            gap: 6px;
           }
 
           .kpi-card {
-            border-radius: 10px;
-            padding: 12px;
+            border-radius: 7px;
+            padding: 7px;
             border: 1px solid #edf0f5;
-            box-shadow: none;
             background: #fff;
-            min-height: 0;
-            transition: transform 0.15s ease, box-shadow 0.15s ease;
-          }
-
-          .kpi-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 20px rgba(15,23,42,0.08);
           }
 
           .kpi-card small {
-            font-size: 0.68rem;
+            font-size: 0.58rem;
           }
 
           .kpi-card .fw-bold {
-            font-size: 1rem;
+            font-size: 0.95rem;
           }
 
           .kpi-pill {
-            font-size: 0.65rem;
+            font-size: 0.55rem;
             border-radius: 999px;
             background: #eef2ff;
-            padding: 3px 8px;
+            padding: 2px 6px;
             display: inline-flex;
             align-items: center;
             gap: 3px;
@@ -246,65 +239,64 @@ const ManagerDashboard = () => {
           }
 
           .mini-section {
-            margin-bottom: 14px;
+            margin-bottom: 10px;
           }
 
           .mini-chart {
-            height: 135px;
+            height: 110px;
           }
 
           .orders-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
-            gap: 8px;
+            gap: 5px;
           }
 
           .orders-chip {
             background: #f3f4ff;
-            border-radius: 10px;
-            padding: 8px 10px;
+            border-radius: 8px;
+            padding: 6px 8px;
           }
 
           .campaign-card {
-            border-radius: 12px;
-            padding: 10px 14px;
+            border-radius: 9px;
+            padding: 8px 10px;
             background: #f8f9ff;
             border: 1px solid rgba(15,23,42,0.05);
             display: flex;
             align-items: center;
             justify-content: space-between;
+            gap: 8px;
           }
 
           .campaign-meta {
             background: white;
-            border-radius: 10px;
-            padding: 6px 10px;
-            min-width: 90px;
+            border-radius: 8px;
+            padding: 5px 7px;
+            min-width: 70px;
             text-align: center;
             font-weight: 600;
-            font-size: 0.75rem;
+            font-size: 0.68rem;
           }
 
           .campaign-progress {
-            height: 4px;
+            height: 3px;
             border-radius: 999px;
             background: #e2e8f0;
-            overflow: hidden;
-            margin-top: 6px;
+            margin-top: 4px;
           }
 
           .alerts-stack > div {
-            border-radius: 12px;
+            border-radius: 8px;
             border: 1px solid rgba(15,23,42,0.08);
-            padding: 10px 12px;
+            padding: 7px 8px;
             background: #fff;
-            font-size: 0.85rem;
+            font-size: 0.75rem;
           }
 
           .scrollable {
-            overflow-y: auto;
-            max-height: 320px;
-            padding-right: 4px;
+            overflow: visible;
+            max-height: none;
           }
         `}</style>
 
@@ -356,28 +348,29 @@ const ManagerDashboard = () => {
           </div>
         </nav>
 
-        <div className="content-wrapper">
-          <Container fluid style={{ marginTop: '85px' }}>
-            <div className="dashboard-grid">
-              <div className="grid-item grid-col-span-12">
-                <small className="text-uppercase text-muted">Manager’s Dashboard</small>
-                <h3 className="fw-semibold mt-2 mb-1">Your business at a glance.</h3>
-                <p className="mb-0 text-muted" style={{ fontSize: '0.95rem' }}>
+        <div className="content-wrapper mt-3">
+          <div className="scaled-dashboard">
+            <Container fluid className="p-0">
+              <div className="dashboard-grid">
+              <div className="grid-item grid-span-24">
+                <small className="text-uppercase text-muted" style={{ fontSize: '0.6rem', letterSpacing: '0.08em' }}>Manager’s Dashboard</small>
+                <h5 className="fw-semibold mt-1 mb-1" style={{ fontSize: '1rem' }}>Your business at a glance.</h5>
+                <p className="mb-0 text-muted" style={{ fontSize: '0.82rem' }}>
                   Every insight you need to steer the day with confidence.
                 </p>
               </div>
 
 
-              <div className="grid-item grid-col-span-12" style={{ paddingBottom: 8 }}>
+              <div className="grid-item grid-span-24" style={{ paddingBottom: 4 }}>
                 <div className="kpi-grid">
                   {kpiCards.map(card => (
                     <div key={card.id} className="kpi-card">
-                      <div className="d-flex justify-content-between align-items-center mb-2">
+                      <div className="d-flex justify-content-between align-items-center mb-1">
                         <span style={{ color: card.accent }}>{card.icon}</span>
-                        <ArrowUpRight size={14} className="text-muted" />
+                        <ArrowUpRight size={12} className="text-muted" />
                       </div>
                       <small className="text-uppercase text-muted">{card.label}</small>
-                      <div className="fw-bold" style={{ fontSize: '1.1rem' }}>{card.value}</div>
+                      <div className="fw-bold" style={{ fontSize: '1rem' }}>{card.value}</div>
                       <span className="kpi-pill mt-1">
                         <span style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: card.accent, display: 'inline-block' }}></span>
                         {card.change}
@@ -387,18 +380,18 @@ const ManagerDashboard = () => {
                 </div>
               </div>
 
-              <div className="grid-item grid-col-span-6">
+              <div className="grid-item grid-span-14">
                 <div className="mini-section">
                   <div className="d-flex justify-content-between align-items-center mb-1">
-                    <h6 className="text-uppercase text-muted mb-0">Performance Heatmap</h6>
-                    <small className="text-muted">Teams vs Hours</small>
+                    <h6 className="text-uppercase text-muted mb-0" style={{ fontSize: '0.65rem', letterSpacing: '0.06em' }}>Performance Heatmap</h6>
+                    <small className="text-muted" style={{ fontSize: '0.65rem' }}>Teams vs Hours</small>
                   </div>
                   <div className="mini-chart">
-                    <ReactApexChart options={heatmapOptions as any} series={heatmapSeries} type="heatmap" height={150} />
+                    <ReactApexChart options={heatmapOptions as any} series={heatmapSeries} type="heatmap" height={110} />
                   </div>
                 </div>
                 <div className="mini-section">
-                  <h6 className="text-uppercase text-muted mb-2">Orders Snapshot</h6>
+                  <h6 className="text-uppercase text-muted mb-2" style={{ fontSize: '0.65rem', letterSpacing: '0.06em' }}>Orders Snapshot</h6>
                   <div className="orders-grid">
                     {ordersSummary.map(item => (
                       <div key={item.label} className="orders-chip">
@@ -410,32 +403,32 @@ const ManagerDashboard = () => {
                 </div>
               </div>
 
-              <div className="grid-item grid-col-span-3">
+              <div className="grid-item grid-span-5">
                 <div className="mini-section">
-                  <h6 className="text-uppercase text-muted mb-1">Campaign Conversion</h6>
+                  <h6 className="text-uppercase text-muted mb-1" style={{ fontSize: '0.65rem', letterSpacing: '0.06em' }}>Campaign Conversion</h6>
                   <div className="mini-chart">
-                    <ReactApexChart options={campaignTrend.options as any} series={campaignTrend.series} type="line" height={140} />
+                    <ReactApexChart options={campaignTrend.options as any} series={campaignTrend.series} type="line" height={110} />
                   </div>
                 </div>
                 <div className="mini-section">
-                  <h6 className="text-uppercase text-muted mb-1">Top Teams</h6>
+                  <h6 className="text-uppercase text-muted mb-1" style={{ fontSize: '0.65rem', letterSpacing: '0.06em' }}>Top Teams</h6>
                   <div className="mini-chart">
-                    <ReactApexChart options={teamPerformance.options as any} series={teamPerformance.series} type="bar" height={140} />
+                    <ReactApexChart options={teamPerformance.options as any} series={teamPerformance.series} type="bar" height={110} />
                   </div>
                 </div>
               </div>
 
-              <div className="grid-item grid-col-span-3">
-                <h6 className="text-uppercase text-muted mb-1">Sentiment Trend</h6>
+              <div className="grid-item grid-span-5">
+                <h6 className="text-uppercase text-muted mb-1" style={{ fontSize: '0.65rem', letterSpacing: '0.06em' }}>Sentiment Trend</h6>
                 <div className="mini-chart">
-                  <ReactApexChart options={sentimentTrend.options as any} series={sentimentTrend.series} type="area" height={150} />
+                  <ReactApexChart options={sentimentTrend.options as any} series={sentimentTrend.series} type="area" height={110} />
                 </div>
               </div>
 
-              <div className="grid-item grid-col-span-6 scrollable">
+              <div className="grid-item grid-span-12">
                 <div className="d-flex justify-content-between align-items-center mb-2">
-                  <h6 className="text-uppercase text-muted mb-0">Top Performing Campaigns</h6>
-                  <Button size="sm" variant="link" className="text-decoration-none">View All</Button>
+                  <h6 className="text-uppercase text-muted mb-0" style={{ fontSize: '0.65rem', letterSpacing: '0.06em' }}>Top Performing Campaigns</h6>
+                  <Button size="sm" variant="link" className="text-decoration-none" style={{ fontSize: '0.65rem' }}>View All</Button>
                 </div>
                 <div className="d-flex flex-column gap-2">
                   {topCampaigns.map(campaign => (
@@ -455,10 +448,10 @@ const ManagerDashboard = () => {
                 </div>
               </div>
 
-              <div className="grid-item grid-col-span-3 scrollable">
+              <div className="grid-item grid-span-6">
                 <div className="d-flex justify-content-between align-items-center mb-2">
-                  <h6 className="text-uppercase text-muted mb-0">Alerts</h6>
-                  <Button variant="outline-secondary" size="sm">View All</Button>
+                  <h6 className="text-uppercase text-muted mb-0" style={{ fontSize: '0.65rem', letterSpacing: '0.06em' }}>Alerts</h6>
+                  <Button variant="outline-secondary" size="sm" style={{ fontSize: '0.65rem', padding: '2px 8px' }}>View All</Button>
                 </div>
                 <div className="alerts-stack d-flex flex-column gap-2">
                   {alerts.map(alert => (
@@ -477,8 +470,8 @@ const ManagerDashboard = () => {
                 </div>
               </div>
 
-              <div className="grid-item grid-col-span-3 scrollable">
-                <h6 className="text-uppercase text-muted mb-2">Marketing & Updates</h6>
+              <div className="grid-item grid-span-6">
+                <h6 className="text-uppercase text-muted mb-2" style={{ fontSize: '0.65rem', letterSpacing: '0.06em' }}>Marketing & Updates</h6>
                 <div className="d-flex flex-column gap-2">
                   {marketingHighlights.map(item => (
                     <div key={item.title} className="orders-chip">
@@ -489,8 +482,9 @@ const ManagerDashboard = () => {
                   ))}
                 </div>
               </div>
-            </div>
-          </Container>
+              </div>
+            </Container>
+          </div>
         </div>
       </div>
     </>

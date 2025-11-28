@@ -93,7 +93,7 @@ const ExpandableSidebar: React.FC<SidebarProps> = ({
       color: '#20c997',
       subItems: [
         { id: 'dashboards-manager', title: 'Manager Dashboard', icon: <LayoutDashboard size={16} />, href: '/dashboards/manager' },
-        { id: 'dashboards-agent', title: 'Agent Dashboard', icon: <LayoutDashboard size={16} /> },
+        { id: 'dashboards-agent', title: 'Agent Dashboard', icon: <LayoutDashboard size={16} />, href: '/dashboards/agent' },
         { id: 'dashboards-supervisor', title: 'Supervisor Dashboard', icon: <LayoutDashboard size={16} /> },
         { id: 'dashboards-account', title: 'Account Dashboard', icon: <LayoutDashboard size={16} /> },
         { id: 'dashboards-tech', title: 'Tech Team Dashboard', icon: <LayoutDashboard size={16} /> },
