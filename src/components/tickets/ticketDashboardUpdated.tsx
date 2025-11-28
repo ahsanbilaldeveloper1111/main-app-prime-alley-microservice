@@ -2267,6 +2267,22 @@ const CreateTicketModal = () => {
     // View Ticket Modal with History Thread
     // View Ticket Modal with Tab-based View
 const ViewTicketModal = () => {
+    // State for ticket management - hooks must be called before any early returns
+    const [ticketStatus, setTicketStatus] = useState(selectedTicket?.status || '');
+    const [assignedUser, setAssignedUser] = useState(selectedTicket?.assignedTo || 'Not assigned');
+    const [activeTab, setActiveTab] = useState<'public' | 'internal' | 'activity'>('public');
+    const [commentType, setCommentType] = useState<'public' | 'internal'>('public');
+  
+    // Sync state when selectedTicket changes
+    useEffect(() => {
+      if (selectedTicket) {
+        setTicketStatus(selectedTicket.status);
+        setAssignedUser(selectedTicket.assignedTo || 'Not assigned');
+        setActiveTab('public');
+        setCommentType('public');
+      }
+    }, [selectedTicket]);
+  
     if (!selectedTicket) return null;
   
     const history = ticketHistory[selectedTicket.id] || [];
@@ -4056,8 +4072,8 @@ const CategoriesManagementScreen: React.FC = () => {
 
   // Get module color by name
   const getModuleColor = (moduleName: string): string => {
-    const module = modules.find(m => m.name === moduleName);
-    return module ? module.color : '#6c757d';
+    const moduleItem = modules.find(m => m.name === moduleName);
+    return moduleItem ? moduleItem.color : '#6c757d';
   };
 
   return (
@@ -4563,8 +4579,8 @@ const CategoriesManagementScreen: React.FC = () => {
   
     // Get module color by name
     const getModuleColor = (moduleName: string): string => {
-      const module = modules.find(m => m.name === moduleName);
-      return module ? module.color : '#6c757d';
+      const moduleItem = modules.find(m => m.name === moduleName);
+      return moduleItem ? moduleItem.color : '#6c757d';
     };
   
     // Get filtered categories based on selected module
