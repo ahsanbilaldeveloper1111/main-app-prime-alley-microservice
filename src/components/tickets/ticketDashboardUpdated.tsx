@@ -934,60 +934,6 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ tickets, setActiveScr
         <Users size={18} className="me-2 text-info" />
         <h6 className="mb-0 fw-semibold">Top 5 Assignees by Workload</h6>
       </div>
-
-      <div className="p-2" style={{ height: 220 }}>
-        <ResponsiveContainer width="100%" height="100%">
-        <ReBarChart data={assigneeWorkloadData}>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} />
-            <XAxis 
-              dataKey="assignee" 
-              axisLine={false} 
-              tickLine={false}
-              tick={{ fontSize: 10 }}
-              angle={-15}
-              textAnchor="end"
-              height={60}
-            />
-            <YAxis 
-              allowDecimals={false} 
-              axisLine={false} 
-              tickLine={false}
-              tickCount={5}
-              domain={[0, 'dataMax']}
-            />
-            <Bar dataKey="count" radius={[8, 8, 0, 0]}>
-              {assigneeWorkloadData.map((entry, i) => (
-                <Cell key={`cell-${i}`} fill={entry.fill} />
-              ))}
-              <LabelList 
-                dataKey="count" 
-                position="top" 
-                content={(props: any) => {
-                  const { x, y, value } = props;
-                  return (
-                    <text 
-                      x={x} 
-                      y={y} 
-                      fill="#666" 
-                      textAnchor="middle" 
-                      fontSize={11}
-                      fontWeight="600"
-                      dy={-6}
-                    >
-                      {value}
-                    </text>
-                  );
-                }}
-              />
-            </Bar>
-            <RechartsTooltip 
-              contentStyle={{ borderRadius: '8px', border: '1px solid #e0e0e0' }}
-              labelStyle={{ fontWeight: '600' }}
-            />
-          </ReBarChart>
-        </ResponsiveContainer>
-      </div>
-
     </Card.Body>
   </Card>
 </Col>
@@ -2321,20 +2267,6 @@ const CreateTicketModal = () => {
     // View Ticket Modal with History Thread
     // View Ticket Modal with Tab-based View
 const ViewTicketModal = () => {
-    // Hooks must be called before any early returns
-    const [ticketStatus, setTicketStatus] = useState(selectedTicket?.status || '');
-    const [assignedUser, setAssignedUser] = useState(selectedTicket?.assignedTo || '');
-    const [activeTab, setActiveTab] = useState<'public' | 'internal' | 'activity'>('public');
-    const [commentType, setCommentType] = useState<'public' | 'internal'>('public');
-  
-    // Sync state when selectedTicket changes
-    useEffect(() => {
-      if (selectedTicket) {
-        setTicketStatus(selectedTicket.status);
-        setAssignedUser(selectedTicket.assignedTo || '');
-      }
-    }, [selectedTicket]);
-  
     if (!selectedTicket) return null;
   
     const history = ticketHistory[selectedTicket.id] || [];
@@ -4124,8 +4056,8 @@ const CategoriesManagementScreen: React.FC = () => {
 
   // Get module color by name
   const getModuleColor = (moduleName: string): string => {
-    const moduleItem = modules.find(m => m.name === moduleName);
-    return moduleItem ? moduleItem.color : '#6c757d';
+    const module = modules.find(m => m.name === moduleName);
+    return module ? module.color : '#6c757d';
   };
 
   return (
@@ -4631,8 +4563,8 @@ const CategoriesManagementScreen: React.FC = () => {
   
     // Get module color by name
     const getModuleColor = (moduleName: string): string => {
-      const moduleItem = modules.find(m => m.name === moduleName);
-      return moduleItem ? moduleItem.color : '#6c757d';
+      const module = modules.find(m => m.name === moduleName);
+      return module ? module.color : '#6c757d';
     };
   
     // Get filtered categories based on selected module

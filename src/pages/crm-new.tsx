@@ -1,5 +1,6 @@
 import React, { useState, ChangeEvent } from 'react';
-import { Container, Row, Col, Card, Button, Badge, Table, Form, Modal, Dropdown, ProgressBar } from 'react-bootstrap';
+import { Container, Row, Col, Card, Button, Badge, Table, Form, Modal, Dropdown, ProgressBar, InputGroup } from 'react-bootstrap';
+import Select from 'react-select';
 import ExpandableSidebar from '@components/updated-sidebar'
 import CompanyLogo2 from "@assets/images/ringedge-logo-black-n-blue.png";
 import { 
@@ -29,8 +30,7 @@ import {
   Building2,
   UserPlus,
   FileText,
-  CheckCircle,
-  XCircle,
+  
   AlertCircle,
   Package,
   Layers,
@@ -44,7 +44,24 @@ import {
   ExternalLink,
   X,
   Menu,
-  Bell
+  Bell,
+  Check,
+  MoreVertical,
+  XCircle,
+  CheckCircle,
+  Zap,
+  Star,
+  PlusCircle,
+  CheckSquare,
+  ChevronDown,
+  ChevronUp,
+  ShoppingCart,
+  AlertTriangle,
+  RefreshCw,
+  Briefcase,
+  User,
+  History,
+  Hash
 } from 'lucide-react';
 import { 
   PieChart, 
@@ -67,6 +84,7 @@ interface Prospect {
   lastName: string;
   phone: string;
   email: string;
+  company?: string;
   dataSource: string;
   sourceFile: string;
   assignedTo: string;
@@ -133,13 +151,6 @@ interface KPICardData {
   onClick?: () => void;
 }
 
-interface PaginationState {
-  currentPage: number;
-  rowsPerPage: number;
-  sortColumn: string;
-  sortDirection: 'asc' | 'desc';
-}
-
 // Reusable KPI Card Component
 const KPICard: React.FC<KPICardData> = ({ title, value, change, isPositive, icon, color, onClick }) => {
   return (
@@ -170,7 +181,7 @@ const KPICard: React.FC<KPICardData> = ({ title, value, change, isPositive, icon
             <div className={`text-${color}`}>{icon}</div>
           </div>
           {change && (
-            <Badge bg={isPositive ? 'success' : 'danger'} className="bg-opacity-50">
+            <Badge bg={isPositive ? 'success' : 'danger'} className="bg-opacity-10">
               {isPositive ? <ArrowUp size={12} /> : <ArrowDown size={12} />}
               {change}
             </Badge>
@@ -178,6 +189,358 @@ const KPICard: React.FC<KPICardData> = ({ title, value, change, isPositive, icon
         </div>
         <h3 className="mb-1">{value}</h3>
         <p className="text-muted mb-0 small">{title}</p>
+      </Card.Body>
+    </Card>
+  );
+};
+
+// Advanced Filter Component with React Select
+interface FilterCategory {
+  name: string;
+  icon: React.ReactNode;
+  filters: { label: string; value: string; options: string[]; type?: 'select' | 'date' | 'daterange' }[];
+}
+
+interface AdvancedFilterProps {
+  categories?: FilterCategory[];
+  filters?: { label: string; value: string; options: string[]; type?: 'select' | 'date' | 'daterange' }[];
+  selectedFilters: { [key: string]: any };
+  onFilterChange: (filterKey: string, values: any) => void;
+  onClearAll: () => void;
+  onApplyFilters: () => void;
+}
+
+// Filter Bar Component - Reusable across all pages
+interface FilterBarProps {
+  quickFilters: { id: string; label: string; count: number; variant?: string; color?: string; activeColor?: string; icon?: React.ReactNode }[];
+  activeFilter: string;
+  onFilterChange: (filterId: string) => void;
+  searchValue: string;
+  onSearchChange: (value: string) => void;
+  onSearch: () => void;
+  searchPlaceholder?: string;
+  showAdvancedFilters: boolean;
+  onToggleAdvancedFilters: () => void;
+  advancedFilterCount?: number;
+}
+
+const FilterBar: React.FC<FilterBarProps> = ({
+  quickFilters,
+  activeFilter,
+  onFilterChange,
+  searchValue,
+  onSearchChange,
+  onSearch,
+  searchPlaceholder = "Search...",
+  showAdvancedFilters,
+  onToggleAdvancedFilters,
+  advancedFilterCount = 0
+}) => {
+  return (
+    <Card className="border-0 shadow-sm mb-3">
+      <Card.Body className="p-3">
+        <div className="d-flex flex-column flex-lg-row justify-content-between align-items-stretch align-items-lg-center gap-3">
+          {/* Left Side: Quick Filter Buttons */}
+          <div className="d-flex gap-2 flex-wrap align-items-center flex-grow-1">
+  {quickFilters.map(filter => {
+    const isActive = activeFilter === filter.id;
+    const hasCustomColor = filter.color || filter.activeColor;
+
+    // Determine button styles
+    const buttonStyle: React.CSSProperties = {};
+    if (hasCustomColor) {
+      if (isActive) {
+        // Active state: use activeColor or fallback to color for background
+        const bgColor = filter.activeColor || filter.color;
+        buttonStyle.background = '#fff';
+        buttonStyle.borderColor = bgColor;
+        buttonStyle.color = bgColor;
+      } else {
+        // Inactive state: use color for background with reduced opacity
+        buttonStyle.background = '#fff';
+        buttonStyle.borderColor = filter.color;
+        buttonStyle.color = filter.color;
+        buttonStyle.opacity = '0.7';
+      }
+    }
+
+    return (
+      <Button
+        key={filter.id}
+        variant={hasCustomColor ? undefined : (isActive ? (filter.variant || 'primary') : 'outline-secondary')}
+        onClick={() => onFilterChange(filter.id)}
+        className="d-flex align-items-center gap-2"
+        style={hasCustomColor ? buttonStyle : undefined}
+      >
+        {/* Icon */}
+        {filter.icon && <span className="d-flex align-items-center">{filter.icon}</span>}
+        
+        {/* Button Text */}
+        {filter.label}
+
+        {/* Badge */}
+        <Badge
+          bg={isActive ? 'light' : 'light'}
+          text={isActive ? 'dark' : 'dark'}
+          className="ms-2"
+        >
+          {filter.count}
+        </Badge>
+      </Button>
+    );
+  })}
+</div>
+
+
+          {/* Right Side: Search and Filters */}
+          <div className="d-flex flex-column flex-sm-row gap-2 align-items-stretch align-items-sm-center flex-shrink-0">
+            <InputGroup style={{ width: '300px', minWidth: '200px' }} className="flex-shrink-0">
+              <Form.Control
+                style={{ height: '41px' }}
+                type="text"
+                placeholder={searchPlaceholder}
+                value={searchValue}
+                onChange={(e) => onSearchChange(e.target.value)}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter') {
+                    onSearch();
+                  }
+                }}
+              />
+              <Button 
+                variant="outline-secondary"
+                onClick={onSearch}
+              >
+                <Search size={16} />
+              </Button>
+            </InputGroup>
+            <Button 
+              variant={showAdvancedFilters ? 'primary' : 'outline-secondary'}
+              onClick={onToggleAdvancedFilters}
+              className="d-flex align-items-center flex-shrink-0"
+            >
+              <Filter size={16} className="me-2" />
+              Filters
+              {advancedFilterCount > 0 && (
+                <Badge bg="light" text="dark" className="ms-2">
+                  {advancedFilterCount}
+                </Badge>
+              )}
+            </Button>
+          </div>
+        </div>
+      </Card.Body>
+    </Card>
+  );
+};
+
+const AdvancedFilter: React.FC<AdvancedFilterProps> = ({ categories, filters, selectedFilters, onFilterChange, onClearAll, onApplyFilters }) => {
+  const [expandedCategory, setExpandedCategory] = React.useState<string | null>(categories ? categories[0]?.name : null);
+  
+  const activeFilterCount = Object.keys(selectedFilters).reduce((sum, key) => {
+    const val = selectedFilters[key];
+    if (Array.isArray(val)) return sum + val.length;
+    if (typeof val === 'object' && val !== null) {
+      return sum + (val.start || val.end ? 1 : 0);
+    }
+    return sum + (val ? 1 : 0);
+  }, 0);
+
+  // Custom styles for React Select to match Bootstrap theme
+  const customStyles = {
+    control: (provided: any, state: any) => ({
+      ...provided,
+      minHeight: '45px',
+      fontSize: '0.875rem',
+      borderColor: state.isFocused ? '#86b7fe' : '#dee2e6',
+      boxShadow: state.isFocused ? '0 0 0 0.2rem rgba(13, 110, 253, 0.25)' : 'none',
+      '&:hover': {
+        borderColor: '#86b7fe'
+      }
+    }),
+    multiValue: (provided: any) => ({
+      ...provided,
+      backgroundColor: '#0d6efd',
+      color: 'white',
+      fontSize: '0.813rem'
+    }),
+    multiValueLabel: (provided: any) => ({
+      ...provided,
+      color: 'white',
+      padding: '2px 6px'
+    }),
+    multiValueRemove: (provided: any) => ({
+      ...provided,
+      color: 'white',
+      '&:hover': {
+        backgroundColor: '#0b5ed7',
+        color: 'white'
+      }
+    }),
+    menu: (provided: any) => ({
+      ...provided,
+      fontSize: '0.875rem'
+    })
+  };
+
+  const renderFilterInput = (filter: any) => {
+    if (filter.type === 'daterange') {
+      return (
+        <div className="d-flex gap-2">
+          <Form.Control
+            type="date"
+            className="py-3"
+            placeholder="Start Date"
+            value={selectedFilters[filter.value]?.start || ''}
+            onChange={(e) => onFilterChange(filter.value, { ...(selectedFilters[filter.value] || {}), start: e.target.value })}
+          />
+          <Form.Control
+            type="date"
+            className="py-3"
+            placeholder="End Date"
+            value={selectedFilters[filter.value]?.end || ''}
+            onChange={(e) => onFilterChange(filter.value, { ...(selectedFilters[filter.value] || {}), end: e.target.value })}
+          />
+        </div>
+      );
+    }
+    
+    return (
+      <Select
+        isMulti
+        options={filter.options.map((opt: string) => ({ value: opt, label: opt }))}
+        value={(selectedFilters[filter.value] || []).map((val: string) => ({ value: val, label: val }))}
+        onChange={(selected) => {
+          onFilterChange(filter.value, selected ? selected.map((item: any) => item.value) : []);
+        }}
+        placeholder={`Select...`}
+        styles={customStyles}
+        closeMenuOnSelect={false}
+        hideSelectedOptions={false}
+        isClearable
+        isSearchable
+        maxMenuHeight={200}
+      />
+    );
+  };
+
+  // Use categorized view if categories provided, otherwise simple grid view
+  if (categories && categories.length > 0) {
+    return (
+      <Card className="border-0 shadow-sm mb-3">
+        <Card.Body className="p-3">
+          <div className="d-flex justify-content-between align-items-center mb-3">
+            <h6 className="mb-0 fw-semibold d-flex align-items-center gap-2">
+              <Filter size={18} />
+              Advanced Filters
+              {activeFilterCount > 0 && (
+                <Badge bg="primary" className="ms-1">{activeFilterCount}</Badge>
+              )}
+            </h6>
+            <div className="d-flex gap-2">
+              {activeFilterCount > 0 && (
+                <Button variant="link" size="sm" className="text-danger text-decoration-none p-0" onClick={onClearAll}>
+                  <X size={16} className="me-1" />
+                  Clear All
+                </Button>
+              )}
+            </div>
+          </div>
+          
+          {/* Categorized Accordion View */}
+          <div className="accordion" id="filterAccordion">
+            {categories.map((category, idx) => {
+              const categoryFilterCount = category.filters.reduce((sum, filter) => {
+                const val = selectedFilters[filter.value];
+                if (Array.isArray(val)) return sum + val.length;
+                if (typeof val === 'object' && val !== null) {
+                  return sum + (val.start || val.end ? 1 : 0);
+                }
+                return sum + (val ? 1 : 0);
+              }, 0);
+
+              return (
+                <div className="accordion-item border" key={category.name}>
+                  <h2 className="accordion-header">
+                    <button
+                      className={`accordion-button ${expandedCategory !== category.name ? 'collapsed' : ''} py-4`}
+                      type="button"
+                      onClick={() => setExpandedCategory(expandedCategory === category.name ? null : category.name)}
+                      style={{ fontSize: '0.875rem', backgroundColor: expandedCategory === category.name ? '#f8f9fa' : 'white' }}
+                    >
+                      <span className="d-flex align-items-center gap-2 w-100">
+                        {category.icon}
+                        <span className="fw-semibold">{category.name}</span>
+                        {categoryFilterCount > 0 && (
+                          <Badge bg="primary" className="ms-auto me-2" style={{ fontSize: '0.75rem' }}>
+                            {categoryFilterCount}
+                          </Badge>
+                        )}
+                      </span>
+                    </button>
+                  </h2>
+                  <div className={`accordion-collapse collapse ${expandedCategory === category.name ? 'show' : ''}`}>
+                    <div className="accordion-body p-3">
+                      <Row>
+                        {category.filters.map((filter) => (
+                          <Col md={6} key={filter.value} className="mb-3">
+                            <label className="form-label small fw-semibold mb-1" style={{ fontSize: '0.813rem' }}>
+                              {filter.label}
+                            </label>
+                            {renderFilterInput(filter)}
+                          </Col>
+                        ))}
+                      </Row>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Action Buttons */}
+          <div className="d-flex justify-content-end gap-2 mt-3 pt-3 border-top">
+            <Button variant="outline-secondary" size="sm" onClick={onClearAll}>
+              Reset
+            </Button>
+            <Button variant="primary" size="sm" onClick={onApplyFilters}>
+              <Filter size={14} className="me-1" />
+              Apply Filters
+            </Button>
+          </div>
+        </Card.Body>
+      </Card>
+    );
+  }
+
+  // Fallback to simple grid view for backward compatibility
+  return (
+    <Card className="border-0 shadow-sm mb-3">
+      <Card.Body className="p-3">
+        <div className="d-flex justify-content-between align-items-center mb-3">
+          <h6 className="mb-0 fw-semibold">Advanced Filters</h6>
+          <div className="d-flex gap-2">
+            {activeFilterCount > 0 && (
+              <Button variant="link" size="sm" className="text-danger" onClick={onClearAll}>
+                Clear All ({activeFilterCount})
+              </Button>
+            )}
+          </div>
+        </div>
+        <Row>
+          {(filters || []).map((filter) => (
+            <Col md={4} key={filter.value} className="mb-3">
+              <label className="form-label small fw-semibold">{filter.label}</label>
+              {renderFilterInput(filter)}
+            </Col>
+          ))}
+        </Row>
+        <div className="d-flex justify-content-end gap-2 mt-3">
+          <Button variant="primary" onClick={onApplyFilters}>
+            <Filter size={16} className="me-2" />
+            Apply Filters
+          </Button>
+        </div>
       </Card.Body>
     </Card>
   );
@@ -191,9 +554,12 @@ const CRMPortal = () => {
   const [showLeadFormModal, setShowLeadFormModal] = useState(false);
   const [showDealFormModal, setShowDealFormModal] = useState(false);
   const [showOrderFormModal, setShowOrderFormModal] = useState(false);
+  const [showStageModal, setShowStageModal] = useState(false);
+  const [showStageRulesModal, setShowStageRulesModal] = useState(false);
   const [editingLead, setEditingLead] = useState<any>(null);
   const [editingDeal, setEditingDeal] = useState<any>(null);
   const [editingOrder, setEditingOrder] = useState<any>(null);
+  const [editingStage, setEditingStage] = useState<any>(null);
   const [taskFormData, setTaskFormData] = useState<Task>({
     title: '',
     name: '',
@@ -210,11 +576,58 @@ const CRMPortal = () => {
   const [showImportModal, setShowImportModal] = useState(false);
   const [showFilterDrawer, setShowFilterDrawer] = useState(false);
   const [showCallHistoryModal, setShowCallHistoryModal] = useState(false);
+  const [showScheduleCallbackModal, setShowScheduleCallbackModal] = useState(false);
+  const [scheduleCallbackData, setScheduleCallbackData] = useState({
+    prospectId: null as number | null,
+    prospectName: '',
+    callbackDate: '',
+    callbackTime: '',
+    duration: '15',
+    callbackReason: '',
+    priority: 'Medium',
+    assignedTo: '',
+    reminderBefore: '15',
+    notes: '',
+    communicationChannel: 'Phone Call'
+  });
+  const [showAddFollowupModal, setShowAddFollowupModal] = useState(false);
+  const [followupData, setFollowupData] = useState({
+    leadId: null as number | null,
+    leadName: '',
+    followupDate: '',
+    status: 'Pending',
+    communicationChannel: 'Phone Call',
+    notes: ''
+  });
+  const [showAddMeetingModal, setShowAddMeetingModal] = useState(false);
+  const [meetingData, setMeetingData] = useState({
+    leadId: null as number | null,
+    leadName: '',
+    meetingName: '',
+    meetingType: 'Discovery Call',
+    meetingOutcome: '',
+    meetingDate: '',
+    meetingTime: '',
+    attendees: [] as string[]
+  });
   const [selectedProspect, setSelectedProspect] = useState<Prospect | null>(null);
   const [showLeadModal, setShowLeadModal] = useState(false);
-  const [selectedColumns, setSelectedColumns] = useState<string[]>([
-    'name', 'phone', 'dataSource', 'sourceFile', 'assignedTo', 'lastCalled', 'lastCallStatus', 'callDisposition', 'nextCallScheduled'
-  ]);
+  const [selectedColumns, setSelectedColumns] = useState<string[]>(() => {
+    const saved = localStorage.getItem('prospectsSelectedColumns');
+    return saved ? JSON.parse(saved) : ['name', 'phone', 'dataSource', 'sourceFile', 'assignedTo', 'lastCalled', 'lastCallStatus', 'callDisposition', 'nextCallScheduled', 'viewStatus', 'tags'];
+  });
+  const [selectedLeadsColumns, setSelectedLeadsColumns] = useState<string[]>(() => {
+    const saved = localStorage.getItem('leadsSelectedColumns');
+    return saved ? JSON.parse(saved) : ['name', 'company', 'email', 'phone', 'stage', 'leadPotential', 'urgency', 'followUps', 'leadScore', 'assignedUser', 'created'];
+  });
+  const [selectedDealsColumns, setSelectedDealsColumns] = useState<string[]>(() => {
+    const saved = localStorage.getItem('dealsSelectedColumns');
+    return saved ? JSON.parse(saved) : ['dealName', 'company', 'value', 'stage', 'dealType', 'owner', 'industry', 'probability', 'closeDate', 'created'];
+  });
+  const [selectedOrdersColumns, setSelectedOrdersColumns] = useState<string[]>(() => {
+    const saved = localStorage.getItem('ordersSelectedColumns');
+    return saved ? JSON.parse(saved) : ['orderId', 'linkedDeal', 'customer', 'value', 'approval', 'stage', 'fulfillment', 'progress', 'priority', 'orderDate'];
+  });
   const [leadFormData, setLeadFormData] = useState({
     leadPotential: '',
     urgency: '',
@@ -225,13 +638,35 @@ const CRMPortal = () => {
   const [showDataAssignmentModal, setShowDataAssignmentModal] = useState(false);
   const [showUploadHistoryModal, setShowUploadHistoryModal] = useState(false);
   const [selectedProspects, setSelectedProspects] = useState<number[]>([]);
+  
+  // Data Assignment Modal States
+  const [assignmentFilterCampaign, setAssignmentFilterCampaign] = useState<string>('');
+  const [assignmentFilterTags, setAssignmentFilterTags] = useState<string[]>([]);
+  const [assignmentType, setAssignmentType] = useState<string>('');
+  const [distributionMode, setDistributionMode] = useState<string>('');
+  const [assignToCampaigns, setAssignToCampaigns] = useState<string[]>([]);
+  const [customExtensions, setCustomExtensions] = useState<string>('');
+  const [recordsToAssign, setRecordsToAssign] = useState<number>(0);
+  const [includeAssignedRecords, setIncludeAssignedRecords] = useState<boolean>(false);
+  const [selectedLeads, setSelectedLeads] = useState<number[]>([]);
+  const [selectedDeals, setSelectedDeals] = useState<number[]>([]);
+  const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
   const [selectedCampaigns, setSelectedCampaigns] = useState<number[]>([]);
+  const [selectedTasks, setSelectedTasks] = useState<number[]>([]);
+  const [selectedStages, setSelectedStages] = useState<number[]>([]);
   const [activeFilter, setActiveFilter] = useState('all');
   const [expandedWidget, setExpandedWidget] = useState<string | null>(null);
   const [showExpandedModal, setShowExpandedModal] = useState(false);
   const [selectedTask, setSelectedTask] = useState<any>(null);
   const [showTaskHistory, setShowTaskHistory] = useState(false);
   const [showAllProspectStats, setShowAllProspectStats] = useState(false);
+  const [showProspectsAnalytics, setShowProspectsAnalytics] = useState(false);
+  const [showLeadsAnalytics, setShowLeadsAnalytics] = useState(false);
+  const [showDealsAnalytics, setShowDealsAnalytics] = useState(false);
+  const [showOrdersAnalytics, setShowOrdersAnalytics] = useState(false);
+  const [showCampaignsAnalytics, setShowCampaignsAnalytics] = useState(false);
+  const [showTasksAnalytics, setShowTasksAnalytics] = useState(false);
+  const [showStagesAnalytics, setShowStagesAnalytics] = useState(false);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [campaignFilters, setCampaignFilters] = useState({
     status: [] as string[],
@@ -261,28 +696,71 @@ const CRMPortal = () => {
   const [ordersPagination, setOrdersPagination] = useState({ currentPage: 1, rowsPerPage: 10, sortColumn: '', sortDirection: 'asc' as 'asc' | 'desc' });
   const [campaignsPagination, setCampaignsPagination] = useState({ currentPage: 1, rowsPerPage: 10, sortColumn: '', sortDirection: 'asc' as 'asc' | 'desc' });
   const [tasksPagination, setTasksPagination] = useState({ currentPage: 1, rowsPerPage: 10, sortColumn: '', sortDirection: 'asc' as 'asc' | 'desc' });
+  const [stagesPagination, setStagesPagination] = useState({ currentPage: 1, rowsPerPage: 10, sortColumn: '', sortDirection: 'asc' as 'asc' | 'desc' });
+
+  // Search States for all pages
+  const [prospectsSearch, setProspectsSearch] = useState('');
+  const [leadsSearch, setLeadsSearch] = useState('');
+  const [dealsSearch, setDealsSearch] = useState('');
+  const [ordersSearch, setOrdersSearch] = useState('');
+  const [campaignsSearch, setCampaignsSearch] = useState('');
+  const [tasksSearch, setTasksSearch] = useState('');
+  const [stagesSearch, setStagesSearch] = useState('');
 
   // Advanced Filters State
   const [prospectsFilters, setProspectsFilters] = useState({
-    campaigns: [] as string[],
-    tags: [] as string[],
-    assignedTo: '',
+    assignedTo: [] as string[],
     phone: '',
-    lastCallStatus: '',
-    callDisposition: '',
-    viewStatus: '',
-    lastCalledDate: '',
-    nextCallScheduled: '',
-    sourceType: '',
-    sourceFile: ''
+    campaigns: [] as string[],
+    lastCallStatus: [] as string[],
+    callDisposition: [] as string[],
+    viewStatus: [] as string[],
+    lastCalledDate: [] as string[],
+    lastCalledCustomRange: { start: '', end: '' },
+    nextCallScheduled: [] as string[],
+    nextCallCustomRange: { start: '', end: '' },
+    overdueCalls: false,
+    sourceType: [] as string[],
+    sourceFile: [] as string[],
+    tags: [] as string[]
   });
 
   const [leadsFilters, setLeadsFilters] = useState({
-    stage: [] as string[],
-    potential: [] as string[],
-    urgency: [] as string[],
     assignedTo: [] as string[],
-    dateRange: { start: '', end: '' }
+    industry: [] as string[],
+    stage: [] as string[],
+    source: [] as string[],
+    potential: [] as string[],
+    campaign: [] as string[],
+    leadScoreMin: '',
+    leadScoreMax: '',
+    dateRange: [] as string[],
+    dateRangeCustomStart: '',
+    dateRangeCustomEnd: ''
+  });
+
+  const [dealsFilters, setDealsFilters] = useState({
+    stage: [] as string[],
+    dealType: [] as string[],
+    owner: [] as string[],
+    industry: [] as string[],
+    riskLevel: [] as string[],
+    minValue: '',
+    closeDate: ''
+  });
+
+  const [ordersFilters, setOrdersFilters] = useState({
+    stage: [] as string[],
+    approvalStatus: [] as string[],
+    priority: [] as string[],
+    fulfillmentStatus: [] as string[],
+    billingStatus: [] as string[]
+  });
+
+  const [tasksFilters, setTasksFilters] = useState({
+    status: [] as string[],
+    urgency: [] as string[],
+    assignedTo: [] as string[]
   });
 
   // View/Edit/Delete Modals
@@ -294,6 +772,7 @@ const CRMPortal = () => {
   const [showTaskViewModal, setShowTaskViewModal] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [confirmAction, setConfirmAction] = useState<{ type: string; data: any } | null>(null);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [viewingLead, setViewingLead] = useState<any>(null);
   const [viewingDeal, setViewingDeal] = useState<any>(null);
   const [viewingOrder, setViewingOrder] = useState<any>(null);
@@ -320,32 +799,84 @@ const CRMPortal = () => {
     { id: 2, firstName: 'Sarah', lastName: 'Johnson', phone: '+1234567891', email: 'sarah.j@email.com', dataSource: 'Import', sourceFile: 'leads_nov_2025.csv', assignedTo: 'Jane Smith (502)', lastCalled: '2025-11-16', lastCallStatus: 'No Answer', callDisposition: 'Callback Required', nextCallScheduled: '2025-11-18 10:00', viewStatus: 'Not Viewed', tags: ['Follow-up'], importedBy: 'Jane Smith (502)', callHistory: [{ date: '2025-11-16', status: 'No Answer', comments: 'Left voicemail' }] },
     { id: 3, firstName: 'Michael', lastName: 'Brown', phone: '+1234567892', email: 'michael.b@email.com', dataSource: 'Campaign', sourceFile: 'Winter Sale 2025', assignedTo: 'Mike Johnson (503)', lastCalled: '', lastCallStatus: 'Not Called', callDisposition: '', nextCallScheduled: '2025-11-19 15:00', viewStatus: 'Not Viewed', tags: ['New'], importedBy: 'Manager One (601)', callHistory: [] },
     { id: 4, firstName: 'Emily', lastName: 'Davis', phone: '+1234567893', email: 'emily.davis@email.com', dataSource: 'Import', sourceFile: 'prospects_batch_1.csv', assignedTo: 'Sarah Williams (504)', lastCalled: '2025-11-15', lastCallStatus: 'Busy', callDisposition: 'Reschedule', nextCallScheduled: '2025-11-18 16:00', viewStatus: 'Viewed', tags: ['Warm'], importedBy: 'Sarah Williams (504)', callHistory: [{ date: '2025-11-15', status: 'Busy', comments: 'Call back later' }] },
-    { id: 5, firstName: 'David', lastName: 'Wilson', phone: '+1234567894', email: 'david.w@email.com', dataSource: 'Campaign', sourceFile: 'Q4 Campaign 2025', assignedTo: 'Tom Brown (505)', lastCalled: '2025-11-14', lastCallStatus: 'Answered', callDisposition: 'Not Interested', nextCallScheduled: '', viewStatus: 'Viewed', tags: ['Cold'], importedBy: 'Manager One (601)', callHistory: [{ date: '2025-11-14', status: 'Answered', comments: 'Not interested at this time' }] }
+    { id: 5, firstName: 'David', lastName: 'Wilson', phone: '+1234567894', email: 'david.w@email.com', dataSource: 'Campaign', sourceFile: 'Q4 Campaign 2025', assignedTo: 'Tom Brown (505)', lastCalled: '2025-11-14', lastCallStatus: 'Answered', callDisposition: 'Not Interested', nextCallScheduled: '', viewStatus: 'Viewed', tags: ['Cold'], importedBy: 'Manager One (601)', callHistory: [{ date: '2025-11-14', status: 'Answered', comments: 'Not interested at this time' }] },
+  
+    { id: 6, firstName: 'Lisa', lastName: 'Taylor', phone: '+1234567895', email: 'lisa.taylor@email.com', dataSource: 'Import', sourceFile: 'batch_2.csv', assignedTo: 'John Doe (501)', lastCalled: '2025-11-10', lastCallStatus: 'No Answer', callDisposition: 'Callback Required', nextCallScheduled: '2025-11-21 11:30', viewStatus: 'Viewed', tags: ['Warm'], importedBy: 'Manager Two (602)', callHistory: [{ date: '2025-11-10', status: 'No Answer', comments: 'Left voicemail' }] },
+    { id: 7, firstName: 'Robert', lastName: 'Lee', phone: '+1234567896', email: 'robert.lee@email.com', dataSource: 'Campaign', sourceFile: 'Winter Sale 2025', assignedTo: 'Jane Smith (502)', lastCalled: '2025-11-11', lastCallStatus: 'Busy', callDisposition: 'Reschedule', nextCallScheduled: '2025-11-22 10:00', viewStatus: 'Not Viewed', tags: ['Hot'], importedBy: 'Manager One (601)', callHistory: [{ date: '2025-11-11', status: 'Busy', comments: 'Requested callback next week' }] },
+    { id: 8, firstName: 'Karen', lastName: 'Moore', phone: '+1234567897', email: 'karen.moore@email.com', dataSource: 'Import', sourceFile: 'leads_nov_2025.csv', assignedTo: 'Mike Johnson (503)', lastCalled: '', lastCallStatus: 'Not Called', callDisposition: '', nextCallScheduled: '2025-11-25 09:00', viewStatus: 'Not Viewed', tags: ['New'], importedBy: 'Manager Two (602)', callHistory: [] },
+    { id: 9, firstName: 'James', lastName: 'Evans', phone: '+1234567898', email: 'james.evans@email.com', dataSource: 'Campaign', sourceFile: 'Q4 Campaign 2025', assignedTo: 'Tom Brown (505)', lastCalled: '2025-11-09', lastCallStatus: 'Answered', callDisposition: 'Interested', nextCallScheduled: '2025-11-23 14:20', viewStatus: 'Viewed', tags: ['Enterprise'], importedBy: 'Manager One (601)', callHistory: [{ date: '2025-11-09', status: 'Answered', comments: 'Requested pricing brochure' }] },
+    { id: 10, firstName: 'Anna', lastName: 'Hill', phone: '+1234567899', email: 'anna.hill@email.com', dataSource: 'Import', sourceFile: 'prospects_batch_3.csv', assignedTo: 'Sarah Williams (504)', lastCalled: '', lastCallStatus: 'Not Called', callDisposition: '', nextCallScheduled: '2025-11-26 13:00', viewStatus: 'Not Viewed', tags: ['Cold'], importedBy: 'Sarah Williams (504)', callHistory: [] },
+  
+    { id: 11, firstName: 'Tom', lastName: 'Anderson', phone: '+1234500000', email: 'tom.anderson@email.com', dataSource: 'Campaign', sourceFile: 'Black Friday 2025', assignedTo: 'John Doe (501)', lastCalled: '2025-11-13', lastCallStatus: 'Answered', callDisposition: 'Interested', nextCallScheduled: '2025-11-28 12:00', viewStatus: 'Viewed', tags: ['Hot'], importedBy: 'Manager Two (602)', callHistory: [{ date: '2025-11-13', status: 'Answered', comments: 'Very interested' }] },
+    { id: 12, firstName: 'Mary', lastName: 'Scott', phone: '+1234500001', email: 'mary.scott@email.com', dataSource: 'Import', sourceFile: 'batch_4.csv', assignedTo: 'Mike Johnson (503)', lastCalled: '2025-11-12', lastCallStatus: 'Busy', callDisposition: 'Callback Required', nextCallScheduled: '2025-11-27 11:30', viewStatus: 'Viewed', tags: ['Follow-up'], importedBy: 'Manager One (601)', callHistory: [{ date: '2025-11-12', status: 'Busy', comments: 'Asked to call tomorrow' }] },
+    { id: 13, firstName: 'Daniel', lastName: 'Clark', phone: '+1234500002', email: 'daniel.clark@email.com', dataSource: 'Campaign', sourceFile: 'Winter Sale 2025', assignedTo: 'Jane Smith (502)', lastCalled: '', lastCallStatus: 'Not Called', callDisposition: '', nextCallScheduled: '2025-11-30 09:00', viewStatus: 'Not Viewed', tags: ['New'], importedBy: 'Manager One (601)', callHistory: [] },
+    { id: 14, firstName: 'Sophia', lastName: 'Green', phone: '+1234500003', email: 'sophia.green@email.com', dataSource: 'Import', sourceFile: 'leads_nov_2025.csv', assignedTo: 'Tom Brown (505)', lastCalled: '2025-11-10', lastCallStatus: 'Answered', callDisposition: 'Not Interested', nextCallScheduled: '', viewStatus: 'Viewed', tags: ['Cold'], importedBy: 'Sarah Williams (504)', callHistory: [{ date: '2025-11-10', status: 'Answered', comments: 'Not interested currently' }] },
+    { id: 15, firstName: 'George', lastName: 'King', phone: '+1234500004', email: 'george.king@email.com', dataSource: 'Campaign', sourceFile: 'Q4 Campaign 2025', assignedTo: 'Mike Johnson (503)', lastCalled: '2025-11-18', lastCallStatus: 'Answered', callDisposition: 'Interested', nextCallScheduled: '2025-11-29 15:00', viewStatus: 'Viewed', tags: ['Warm'], importedBy: 'Manager Two (602)', callHistory: [{ date: '2025-11-18', status: 'Answered', comments: 'Requested follow-up call' }] }
   ];
+  
 
   const recentLeads: Lead[] = [
     { id: 1, name: 'Miss Laine', email: 'laine@email.com', phone: '+1234567890', company: 'Tech Corp', stage: 'New', created: 'Nov 17, 2025', lastActivity: 'Nov 17, 2025 17:41', assignedTo: 'John Doe', leadPotential: 'Warm', urgency: 'High', followUpCount: 2, leadScore: 73.5 },
     { id: 2, name: 'Mr. Shayir', email: 'shayir@email.com', phone: '+1234567891', company: 'Digital Inc', stage: 'New', created: 'Nov 17, 2025', lastActivity: 'Nov 17, 2025 17:31', assignedTo: 'Jane Smith', leadPotential: 'Hot', urgency: 'Medium', followUpCount: 1, leadScore: 72.5 },
     { id: 3, name: 'Mr Hassan Khokhar', email: 'hassan@email.com', phone: '+1234567892', company: 'Solutions Ltd', stage: 'Contacted', created: 'Nov 15, 2025', lastActivity: 'Nov 15, 2025 14:55', assignedTo: 'Mike Johnson', leadPotential: 'Hot', urgency: 'High', followUpCount: 3, leadScore: 90.25 },
     { id: 4, name: 'Mr Niazi', email: 'niazi@email.com', phone: '+1234567893', company: 'Global Co', stage: 'New', created: 'Nov 13, 2025', lastActivity: 'Nov 13, 2025 16:40', assignedTo: 'Sarah Williams', leadPotential: 'Cold', urgency: 'Low', followUpCount: 0, leadScore: 0 },
-    { id: 5, name: 'Mr Hilal', email: 'hilal@email.com', phone: '+1234567894', company: 'Enterprise Systems', stage: 'Contacted', created: 'Nov 12, 2025', lastActivity: 'Nov 12, 2025 17:18', assignedTo: 'Tom Brown', leadPotential: 'Warm', urgency: 'Medium', followUpCount: 1, leadScore: 50 }
+    { id: 5, name: 'Mr Hilal', email: 'hilal@email.com', phone: '+1234567894', company: 'Enterprise Systems', stage: 'Contacted', created: 'Nov 12, 2025', lastActivity: 'Nov 12, 2025 17:18', assignedTo: 'Tom Brown', leadPotential: 'Warm', urgency: 'Medium', followUpCount: 1, leadScore: 50 },
+  
+    { id: 6, name: 'Miss Ayesha', email: 'ayesha@email.com', phone: '+1234567895', company: 'Tech Hive', stage: 'New', created: 'Nov 11, 2025', lastActivity: 'Nov 11, 2025 14:22', assignedTo: 'John Doe', leadPotential: 'Warm', urgency: 'Medium', followUpCount: 1, leadScore: 61 },
+    { id: 7, name: 'Mr Danish', email: 'danish@email.com', phone: '+1234567896', company: 'CloudSoft', stage: 'Contacted', created: 'Nov 10, 2025', lastActivity: 'Nov 10, 2025 11:45', assignedTo: 'Jane Smith', leadPotential: 'Hot', urgency: 'High', followUpCount: 2, leadScore: 88.2 },
+    { id: 8, name: 'Miss Noor', email: 'noor@email.com', phone: '+1234567897', company: 'Creative Labs', stage: 'New', created: 'Nov 09, 2025', lastActivity: 'Nov 09, 2025 17:32', assignedTo: 'Mike Johnson', leadPotential: 'Cold', urgency: 'Low', followUpCount: 0, leadScore: 12 },
+    { id: 9, name: 'Mr Ali Raza', email: 'ali@email.com', phone: '+1234567898', company: 'SmartWorks', stage: 'Contacted', created: 'Nov 08, 2025', lastActivity: 'Nov 08, 2025 13:10', assignedTo: 'Sarah Williams', leadPotential: 'Warm', urgency: 'High', followUpCount: 3, leadScore: 69 },
+    { id: 10, name: 'Mr Kamran', email: 'kamran@email.com', phone: '+1234567899', company: 'Global Co', stage: 'New', created: 'Nov 07, 2025', lastActivity: 'Nov 07, 2025 15:55', assignedTo: 'Tom Brown', leadPotential: 'Cold', urgency: 'Medium', followUpCount: 1, leadScore: 22 },
+  
+    { id: 11, name: 'Mr Bilal', email: 'bilal@email.com', phone: '+1234500000', company: 'Alpha Systems', stage: 'Contacted', created: 'Nov 06, 2025', lastActivity: 'Nov 06, 2025 12:45', assignedTo: 'John Doe', leadPotential: 'Hot', urgency: 'High', followUpCount: 4, leadScore: 94 },
+    { id: 12, name: 'Miss Hira', email: 'hira@email.com', phone: '+1234500001', company: 'Tech Corp', stage: 'New', created: 'Nov 05, 2025', lastActivity: 'Nov 05, 2025 16:20', assignedTo: 'Jane Smith', leadPotential: 'Warm', urgency: 'Medium', followUpCount: 2, leadScore: 58 },
+    { id: 13, name: 'Mr Saif', email: 'saif@email.com', phone: '+1234500002', company: 'Digital Hub', stage: 'Contacted', created: 'Nov 04, 2025', lastActivity: 'Nov 04, 2025 12:05', assignedTo: 'Mike Johnson', leadPotential: 'Hot', urgency: 'High', followUpCount: 3, leadScore: 82 },
+    { id: 14, name: 'Miss Reema', email: 'reema@email.com', phone: '+1234500003', company: 'BlueStone', stage: 'New', created: 'Nov 03, 2025', lastActivity: 'Nov 03, 2025 17:20', assignedTo: 'Sarah Williams', leadPotential: 'Cold', urgency: 'Low', followUpCount: 0, leadScore: 10 },
+    { id: 15, name: 'Mr Hashim', email: 'hashim@email.com', phone: '+1234500004', company: 'Tech Hive', stage: 'Contacted', created: 'Nov 02, 2025', lastActivity: 'Nov 02, 2025 15:12', assignedTo: 'Tom Brown', leadPotential: 'Warm', urgency: 'Medium', followUpCount: 1, leadScore: 55 }
   ];
+  
 
   const recentOpportunities: Opportunity[] = [
     { id: 1, name: 'Mr Afrasiab Niazi', stage: 'Contacted', value: '£25,000', created: 'Nov 15, 2025', lastActivity: 'Nov 17, 2025 13:33' },
     { id: 2, name: 'M Jaweed Raza', stage: 'Meeting', value: '£18,500', created: 'Nov 15, 2025', lastActivity: 'Nov 15, 2025 13:00' },
     { id: 3, name: 'Waris Saleem', stage: 'Lost', value: '£12,000', created: 'Nov 13, 2025', lastActivity: 'Nov 13, 2025 16:45' },
     { id: 4, name: 'Mr Satya', stage: 'Contacted', value: '£30,000', created: 'Nov 13, 2025', lastActivity: 'Nov 14, 2025 17:40' },
-    { id: 5, name: 'Mr.Waqar', stage: 'Won', value: '£45,000', created: 'Nov 08, 2025', lastActivity: 'Nov 08, 2025 15:07' }
+    { id: 5, name: 'Mr.Waqar', stage: 'Won', value: '£45,000', created: 'Nov 08, 2025', lastActivity: 'Nov 08, 2025 15:07' },
+  
+    { id: 6, name: 'Mr Ahmed', stage: 'Lost', value: '£10,000', created: 'Nov 10, 2025', lastActivity: 'Nov 11, 2025 14:00' },
+    { id: 7, name: 'Mr Danish', stage: 'Meeting', value: '£22,000', created: 'Nov 12, 2025', lastActivity: 'Nov 12, 2025 12:30' },
+    { id: 8, name: 'Mr Haris', stage: 'Contacted', value: '£18,000', created: 'Nov 14, 2025', lastActivity: 'Nov 15, 2025 09:20' },
+    { id: 9, name: 'Mr Saad', stage: 'Won', value: '£55,000', created: 'Nov 07, 2025', lastActivity: 'Nov 07, 2025 16:40' },
+    { id: 10, name: 'Mr Adeel', stage: 'Lost', value: '£9,000', created: 'Nov 09, 2025', lastActivity: 'Nov 09, 2025 14:55' },
+  
+    { id: 11, name: 'Mr Bilal', stage: 'Meeting', value: '£28,000', created: 'Nov 05, 2025', lastActivity: 'Nov 05, 2025 13:10' },
+    { id: 12, name: 'Mr Arham', stage: 'Won', value: '£42,000', created: 'Nov 06, 2025', lastActivity: 'Nov 06, 2025 11:00' },
+    { id: 13, name: 'Mr Imran', stage: 'Contacted', value: '£15,500', created: 'Nov 04, 2025', lastActivity: 'Nov 04, 2025 10:25' },
+    { id: 14, name: 'Mr Ahsan', stage: 'Lost', value: '£8,000', created: 'Nov 03, 2025', lastActivity: 'Nov 03, 2025 17:22' },
+    { id: 15, name: 'Mr Zohaib', stage: 'Meeting', value: '£33,500', created: 'Nov 02, 2025', lastActivity: 'Nov 02, 2025 16:12' }
   ];
+  
 
   const recentOrders = [
     { id: 'ORD-001', customer: 'Mr.Waqar', product: 'Enterprise Package', amount: '£45,000', status: 'Delivered', date: 'Nov 08, 2025' },
     { id: 'ORD-002', customer: 'Tech Corp', product: 'Premium Plan', amount: '£25,000', status: 'In Progress', date: 'Nov 15, 2025' },
     { id: 'ORD-003', customer: 'Digital Inc', product: 'Basic Package', amount: '£12,000', status: 'Pending', date: 'Nov 17, 2025' },
     { id: 'ORD-004', customer: 'Solutions Ltd', product: 'Advanced Plan', amount: '£18,500', status: 'Approved', date: 'Nov 16, 2025' },
-    { id: 'ORD-005', customer: 'Global Co', product: 'Starter Pack', amount: '£8,000', status: 'Pending', date: 'Nov 18, 2025' }
+    { id: 'ORD-005', customer: 'Global Co', product: 'Starter Pack', amount: '£8,000', status: 'Pending', date: 'Nov 18, 2025' },
+  
+    { id: 'ORD-006', customer: 'BlueStone', product: 'Business Package', amount: '£15,000', status: 'Delivered', date: 'Nov 14, 2025' },
+    { id: 'ORD-007', customer: 'Tech Hive', product: 'Enterprise Package', amount: '£42,000', status: 'In Progress', date: 'Nov 13, 2025' },
+    { id: 'ORD-008', customer: 'SmartWorks', product: 'Premium Plan', amount: '£20,000', status: 'Pending', date: 'Nov 12, 2025' },
+    { id: 'ORD-009', customer: 'Creative Labs', product: 'Basic Package', amount: '£10,500', status: 'Delivered', date: 'Nov 11, 2025' },
+    { id: 'ORD-010', customer: 'CloudSoft', product: 'Advanced Plan', amount: '£22,500', status: 'Approved', date: 'Nov 10, 2025' },
+  
+    { id: 'ORD-011', customer: 'Digital Hub', product: 'Business Package', amount: '£14,000', status: 'In Progress', date: 'Nov 09, 2025' },
+    { id: 'ORD-012', customer: 'Alpha Systems', product: 'Starter Pack', amount: '£7,000', status: 'Pending', date: 'Nov 08, 2025' },
+    { id: 'ORD-013', customer: 'BlueStone', product: 'Enterprise Package', amount: '£39,000', status: 'Delivered', date: 'Nov 07, 2025' },
+    { id: 'ORD-014', customer: 'Enterprise Systems', product: 'Premium Plan', amount: '£24,500', status: 'Approved', date: 'Nov 06, 2025' },
+    { id: 'ORD-015', customer: 'Global Co', product: 'Advanced Plan', amount: '£17,500', status: 'Pending', date: 'Nov 05, 2025' }
   ];
+  
 
   // Get Widget Data for Expanded View
   const getWidgetData = (widgetType: string) => {
@@ -387,8 +918,62 @@ const CRMPortal = () => {
     }
   };
 
+  // Save column selection to localStorage whenever it changes
+  React.useEffect(() => {
+    localStorage.setItem('prospectsSelectedColumns', JSON.stringify(selectedColumns));
+  }, [selectedColumns]);
+
+  React.useEffect(() => {
+    localStorage.setItem('leadsSelectedColumns', JSON.stringify(selectedLeadsColumns));
+  }, [selectedLeadsColumns]);
+
+  React.useEffect(() => {
+    localStorage.setItem('dealsSelectedColumns', JSON.stringify(selectedDealsColumns));
+  }, [selectedDealsColumns]);
+
+  React.useEffect(() => {
+    localStorage.setItem('ordersSelectedColumns', JSON.stringify(selectedOrdersColumns));
+  }, [selectedOrdersColumns]);
+
+  // Custom styles for React Select
+  const customSelectStyles = {
+    control: (provided: any, state: any) => ({
+      ...provided,
+      minHeight: '38px',
+      fontSize: '0.875rem',
+      borderColor: state.isFocused ? '#86b7fe' : '#dee2e6',
+      boxShadow: state.isFocused ? '0 0 0 0.2rem rgba(13, 110, 253, 0.25)' : 'none',
+      '&:hover': {
+        borderColor: '#86b7fe'
+      }
+    }),
+    multiValue: (provided: any) => ({
+      ...provided,
+      backgroundColor: '#0d6efd',
+      color: 'white',
+      fontSize: '0.813rem'
+    }),
+    multiValueLabel: (provided: any) => ({
+      ...provided,
+      color: 'white',
+      padding: '2px 6px'
+    }),
+    multiValueRemove: (provided: any) => ({
+      ...provided,
+      color: 'white',
+      '&:hover': {
+        backgroundColor: '#0b5ed7',
+        color: 'white'
+      }
+    }),
+    menu: (provided: any) => ({
+      ...provided,
+      fontSize: '0.875rem'
+    })
+  };
+
   // Sorting & Pagination Helper Functions
-  const handleSort = (column: string, paginationState: PaginationState, setPaginationState: React.Dispatch<React.SetStateAction<PaginationState>>) => {
+  const handleSort = (column: string, paginationState: any, setPaginationState: (state: any) => void) => {
     const newDirection = paginationState.sortColumn === column && paginationState.sortDirection === 'asc' ? 'desc' : 'asc';
     setPaginationState({ ...paginationState, sortColumn: column, sortDirection: newDirection, currentPage: 1 });
   };
@@ -426,8 +1011,8 @@ const CRMPortal = () => {
 
   const renderPaginationControls = (
     dataLength: number,
-    paginationState: PaginationState,
-    setPaginationState: React.Dispatch<React.SetStateAction<PaginationState>>,
+    paginationState: any,
+    setPaginationState: (state: any) => void,
     label: string
   ) => {
     const totalPages = getTotalPages(dataLength, paginationState.rowsPerPage);
@@ -1308,7 +1893,7 @@ const CRMPortal = () => {
         <Button variant="secondary" onClick={() => setShowProspectModal(false)}>
           Cancel
         </Button>
-        <Button variant="primary" onClick={() => {
+        {/* <Button variant="primary" onClick={() => {
           // Handle form submission
           console.log('Prospect data:', prospectFormData);
           setShowProspectModal(false);
@@ -1326,7 +1911,7 @@ const CRMPortal = () => {
         }}>
           <Plus size={16} className="me-2" />
           Add Prospect
-        </Button>
+        </Button> */}
       </Modal.Footer>
     </Modal>
   );
@@ -1382,107 +1967,487 @@ const CRMPortal = () => {
   );
 
   // Data Assignment Modal
-  const DataAssignmentModal = () => (
-    <Modal show={showDataAssignmentModal} onHide={() => setShowDataAssignmentModal(false)} size="lg" centered>
-      <Modal.Header closeButton className="border-bottom bg-light">
-        <Modal.Title>Data Assignment - Manual Assignment</Modal.Title>
+  const DataAssignmentModal = () => {
+    // Calculate filtered records based on campaign and tags
+    const filteredRecords = sampleProspects.filter(prospect => {
+      const matchesCampaign = !assignmentFilterCampaign || 
+        (prospect.dataSource === 'Campaign' && prospect.sourceFile === assignmentFilterCampaign);
+      const matchesTags = assignmentFilterTags.length === 0 || 
+        assignmentFilterTags.some(tag => prospect.tags.includes(tag));
+      return matchesCampaign && matchesTags;
+    });
+
+    const totalFilteredRecords = filteredRecords.length;
+
+    return (
+      <Modal 
+      show={showDataAssignmentModal} 
+      onHide={() => {
+        setShowDataAssignmentModal(false);
+        setAssignmentFilterCampaign('');
+        setAssignmentFilterTags([]);
+        setAssignmentType('');
+        setDistributionMode('');
+        setAssignToCampaigns([]);
+        setCustomExtensions('');
+        setRecordsToAssign(0);
+        setIncludeAssignedRecords(false);
+      }} 
+      size="lg" 
+      centered
+      backdrop="static"
+    >
+      <Modal.Header closeButton style={{ borderBottom: '1px solid #ccc' }} className="pb-2">
+        <Modal.Title className="d-flex align-items-center gap-2 fs-5 fw-bold text-dark">
+          <div className="p-2 bg-primary bg-opacity-10 rounded-3">
+            <Target size={20} className="text-primary" />
+          </div>
+          Data Assignment
+        </Modal.Title>
       </Modal.Header>
-      <Modal.Body className="p-4">
-        <div className="alert alert-info mb-4">
-          <AlertCircle size={18} className="me-2" />
-          <strong>Assign prospects to users manually.</strong> Select prospects from the table below and assign them to a user.
+      
+      <Modal.Body className="px-4 pb-4">
+        <div className="alert alert-primary border-0 d-flex align-items-start mb-4 shadow-sm" style={{ 
+          background: 'linear-gradient(135deg, rgba(79, 70, 229, 0.05) 0%, rgba(99, 102, 241, 0.05) 100%)',
+          borderLeft: '4px solid #4f46e5'
+        }}>
+          <AlertCircle size={20} className="text-primary mt-1 me-2 flex-shrink-0" />
+          <div>
+            <strong className="d-block mb-1 text-dark">Smart Data Assignment</strong>
+            <span className="text-muted small">Configure filters and assignment criteria to distribute prospects efficiently.</span>
+          </div>
         </div>
 
         <Form>
-          <Form.Group className="mb-4">
-            <Form.Label className="fw-semibold">Assign To User <span className="text-danger">*</span></Form.Label>
-            <Form.Select>
-              <option value="">Select user...</option>
-              <option value="501">John Doe (501)</option>
-              <option value="502">Jane Smith (502)</option>
-              <option value="503">Mike Johnson (503)</option>
-              <option value="504">Sarah Williams (504)</option>
-              <option value="505">Tom Brown (505)</option>
-            </Form.Select>
-          </Form.Group>
-
-          <div className="mb-3">
-            <h6 className="fw-semibold mb-3">Select Prospects to Assign ({selectedProspects.length} selected)</h6>
-            <div style={{ maxHeight: '300px', overflowY: 'auto', border: '1px solid #e5e7eb', borderRadius: '8px' }}>
-              <Table hover size="sm" className="mb-0">
-                <thead className="bg-light sticky-top">
-                  <tr>
-                    <th style={{ width: '50px' }}>
-                      <Form.Check 
-                        type="checkbox"
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setSelectedProspects(sampleProspects.map(p => p.id));
-                          } else {
-                            setSelectedProspects([]);
-                          }
-                        }}
-                        checked={selectedProspects.length === sampleProspects.length}
-                      />
-                    </th>
-                    <th>Name</th>
-                    <th>Phone</th>
-                    <th>Current Assignment</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {sampleProspects.map((prospect) => (
-                    <tr key={prospect.id}>
-                      <td>
-                        <Form.Check 
-                          type="checkbox"
-                          checked={selectedProspects.includes(prospect.id)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setSelectedProspects([...selectedProspects, prospect.id]);
-                            } else {
-                              setSelectedProspects(selectedProspects.filter(id => id !== prospect.id));
-                            }
-                          }}
-                        />
-                      </td>
-                      <td>{prospect.firstName} {prospect.lastName}</td>
-                      <td>{prospect.phone}</td>
-                      <td>
-                        <Badge bg={prospect.assignedTo ? 'success' : 'warning'} className="bg-opacity-10 text-dark">
-                          {prospect.assignedTo || 'Unassigned'}
-                        </Badge>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </Table>
+          {/* Filter Section */}
+          <div className="mb-4 p-4 rounded-4 border" style={{ 
+            background: 'linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%)',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
+          }}>
+            <div className="d-flex align-items-center gap-2 mb-4">
+              <Filter size={18} className="text-primary" />
+              <h6 className="mb-0 fw-bold text-dark">Filter Records</h6>
+            </div>
+            
+            <Row className="g-3">
+              <Col md={6}>
+                <Form.Group>
+                  <Form.Label className="fw-semibold small text-muted mb-2">
+                    <span className="d-flex align-items-center gap-1">
+                      <TrendingUp size={14} />
+                      Campaign Filter
+                    </span>
+                  </Form.Label>
+                  <Select
+                    options={[
+                      { value: '', label: 'All Campaigns' },
+                      { value: 'Q4 2024 Outreach', label: 'Q4 2024 Outreach' },
+                      { value: 'Holiday Sale', label: 'Holiday Sale' },
+                      { value: 'Product Launch', label: 'Product Launch' },
+                      { value: 'Renewal Campaign', label: 'Renewal Campaign' }
+                    ]}
+                    value={assignmentFilterCampaign ? { value: assignmentFilterCampaign, label: assignmentFilterCampaign } : { value: '', label: 'All Campaigns' }}
+                    onChange={(selected) => setAssignmentFilterCampaign(selected?.value || '')}
+                    placeholder="Select campaign..."
+                    isClearable
+                    styles={customSelectStyles}
+                  />
+                </Form.Group>
+              </Col>
+              
+              <Col md={6}>
+                <Form.Group>
+                  <Form.Label className="fw-semibold small text-muted mb-2">
+                    <span className="d-flex align-items-center gap-1">
+                      <Hash size={14} />
+                      Tag Filter
+                    </span>
+                  </Form.Label>
+                  <Select
+                    isMulti
+                    options={[
+                      { value: 'Hot Lead', label: 'Hot Lead' },
+                      { value: 'Follow Up', label: 'Follow Up' },
+                      { value: 'Decision Maker', label: 'Decision Maker' },
+                      { value: 'Budget Approved', label: 'Budget Approved' },
+                      { value: 'Gatekeeper', label: 'Gatekeeper' }
+                    ]}
+                    value={assignmentFilterTags.map(tag => ({ value: tag, label: tag }))}
+                    onChange={(selected) => setAssignmentFilterTags(selected ? selected.map(s => s.value) : [])}
+                    placeholder="Select tags..."
+                    styles={customSelectStyles}
+                  />
+                </Form.Group>
+              </Col>
+            </Row>
+            
+            {/* Total Records Display with Breakdown */}
+            <div className="mt-4 p-4 rounded-3" style={{ 
+              background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.08) 0%, rgba(74, 222, 128, 0.08) 100%)',
+              border: '1px solid rgba(34, 197, 94, 0.2)'
+            }}>
+              <Row className="g-3 align-items-center">
+                <Col md={4}>
+                  <div className="d-flex align-items-center gap-3">
+                    <div className="p-3 bg-success bg-opacity-10 rounded-3">
+                      <Users size={28} className="text-success" />
+                    </div>
+                    <div>
+                      <small className="text-muted d-block mb-1">Total Records</small>
+                      <strong className="fs-3 text-dark">{totalFilteredRecords.toLocaleString()}</strong>
+                    </div>
+                  </div>
+                </Col>
+                <Col md={4}>
+                  <div className="d-flex align-items-center gap-3">
+                    <div className="p-3 bg-primary bg-opacity-10 rounded-3">
+                      <UserPlus size={28} className="text-primary" />
+                    </div>
+                    <div>
+                      <small className="text-muted d-block mb-1">Assigned</small>
+                      <strong className="fs-3 text-dark">
+                        {filteredRecords.filter(r => r.assignedTo && r.assignedTo !== 'Unassigned').length.toLocaleString()}
+                      </strong>
+                    </div>
+                  </div>
+                </Col>
+                <Col md={4}>
+                  <div className="d-flex align-items-center gap-3">
+                    <div className="p-3 bg-warning bg-opacity-10 rounded-3">
+                      <AlertCircle size={28} className="text-warning" />
+                    </div>
+                    <div>
+                      <small className="text-muted d-block mb-1">Unassigned</small>
+                      <strong className="fs-3 text-dark">
+                        {filteredRecords.filter(r => !r.assignedTo || r.assignedTo === 'Unassigned').length.toLocaleString()}
+                      </strong>
+                    </div>
+                  </div>
+                </Col>
+              </Row>
             </div>
           </div>
 
-          <div className="alert alert-warning mb-0">
-            <small><strong>Note:</strong> This will reassign the selected prospects to the chosen user.</small>
+          {/* Assignment Type Section */}
+          <div className="mb-4 p-4 rounded-4 border" style={{ 
+            background: 'linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%)',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
+          }}>
+            <Form.Group className="mb-3">
+              <Form.Label className="fw-semibold small text-muted mb-2">
+                Assignment Type <span className="text-danger">*</span>
+              </Form.Label>
+              <Select
+                options={[
+                  { value: 'campaigns', label: 'Assign to Campaigns' },
+                  { value: 'custom', label: 'Assign to Custom Extensions' }
+                ]}
+                value={assignmentType ? { value: assignmentType, label: assignmentType === 'campaigns' ? 'Assign to Campaigns' : 'Assign to Custom Extensions' } : null}
+                onChange={(selected) => {
+                  setAssignmentType(selected?.value || '');
+                  setDistributionMode('');
+                  setAssignToCampaigns([]);
+                  setCustomExtensions('');
+                }}
+                placeholder="Select assignment type..."
+                isClearable
+                styles={customSelectStyles}
+              />
+            </Form.Group>
+
+            {/* Conditional Fields for "Assign to Campaigns" */}
+            {assignmentType === 'campaigns' && (
+              <div className="p-4 rounded-3 border-0" style={{ 
+                background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.03) 0%, rgba(139, 92, 246, 0.03) 100%)',
+              }}>
+                <Row className="g-3">
+                  <Col md={6}>
+                    <Form.Group>
+                      <Form.Label className="fw-semibold small text-muted mb-2">
+                        Distribution Mode <span className="text-danger">*</span>
+                      </Form.Label>
+                      <Select
+                        options={[
+                          { value: 'equal', label: 'Equal Distribution' },
+                          { value: 'proportional', label: 'Proportional Distribution' }
+                        ]}
+                        value={distributionMode ? { value: distributionMode, label: distributionMode === 'equal' ? 'Equal Distribution' : 'Proportional Distribution' } : null}
+                        onChange={(selected) => setDistributionMode(selected?.value || '')}
+                        placeholder="Select distribution mode..."
+                        isClearable
+                        styles={customSelectStyles}
+                      />
+                      {distributionMode && (
+                        <div className="mt-2 p-2 rounded-2 bg-white border">
+                          <small className="text-muted d-flex align-items-start gap-2">
+                            <AlertCircle size={14} className="mt-1 flex-shrink-0 text-primary" />
+                            <span>
+                              {distributionMode === 'equal' && 'Records will be distributed equally across all selected campaigns'}
+                              {distributionMode === 'proportional' && 'Records will be distributed based on individual campaign capacity and requirements'}
+                            </span>
+                          </small>
+                        </div>
+                      )}
+                    </Form.Group>
+                  </Col>
+                  
+                  <Col md={6}>
+                    <Form.Group>
+                      <Form.Label className="fw-semibold small text-muted mb-2">
+                        Target Campaigns <span className="text-danger">*</span>
+                      </Form.Label>
+                      <Select
+                        isMulti
+                        options={[
+                          { value: 'Q4 2024 Outreach', label: 'Q4 2024 Outreach' },
+                          { value: 'Holiday Sale', label: 'Holiday Sale' },
+                          { value: 'Product Launch', label: 'Product Launch' },
+                          { value: 'Renewal Campaign', label: 'Renewal Campaign' },
+                          { value: 'Email Nurture Series', label: 'Email Nurture Series' }
+                        ]}
+                        value={assignToCampaigns.map(campaign => ({ value: campaign, label: campaign }))}
+                        onChange={(selected) => setAssignToCampaigns(selected ? selected.map(s => s.value) : [])}
+                        placeholder="Select campaigns..."
+                        styles={customSelectStyles}
+                      />
+                      {assignToCampaigns.length > 0 && (
+                        <div className="mt-2 p-2 rounded-2 bg-white border">
+                          <small className="text-muted">
+                            <strong>{assignToCampaigns.length}</strong> campaign{assignToCampaigns.length !== 1 ? 's' : ''} selected
+                          </small>
+                        </div>
+                      )}
+                    </Form.Group>
+                  </Col>
+                </Row>
+              </div>
+            )}
+
+            {/* Conditional Fields for "Assign to Custom Extensions" */}
+            {assignmentType === 'custom' && (
+              <div className="p-4 rounded-3 border-0" style={{ 
+                background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.03) 0%, rgba(139, 92, 246, 0.03) 100%)',
+              }}>
+                <Form.Group className="mb-3">
+                  <Form.Label className="fw-semibold small text-muted mb-2">
+                    Custom Extensions <span className="text-danger">*</span>
+                  </Form.Label>
+                  <Form.Control 
+                    type="text"
+                    value={customExtensions}
+                    onChange={(e) => setCustomExtensions(e.target.value)}
+                    placeholder="e.g., 501, 502, 503, 504"
+                    className="border-2"
+                  />
+                  <small className="text-muted d-block mt-2">
+                    Enter extension numbers separated by commas
+                  </small>
+                </Form.Group>
+
+                {customExtensions && (
+                  <div className="mt-3">
+                    <div className="d-flex align-items-center justify-content-between mb-3">
+                      <h6 className="fw-semibold mb-0 small">Extension Assignment Preview</h6>
+                      <Badge bg="secondary" className="bg-opacity-10 text-dark">
+                        {customExtensions.split(',').length} Extensions
+                      </Badge>
+                    </div>
+                    <div className="rounded-3 overflow-hidden border" style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                      <Table hover size="sm" className="mb-0">
+                        <thead style={{ 
+                          background: 'linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%)',
+                          position: 'sticky',
+                          top: 0
+                        }}>
+                          <tr>
+                            <th className="border-0 py-3 fw-semibold small">Extension</th>
+                            <th className="border-0 py-3 fw-semibold small">User Name</th>
+                            <th className="border-0 py-3 fw-semibold small">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {customExtensions.split(',').map((ext, idx) => {
+                            const trimmedExt = ext.trim();
+                            const userMap: { [key: string]: string } = {
+                              '501': 'John Doe',
+                              '502': 'Jane Smith',
+                              '503': 'Mike Johnson',
+                              '504': 'Sarah Williams',
+                              '505': 'Tom Brown'
+                            };
+                            const userName = userMap[trimmedExt] || 'Unknown';
+                            const isValid = userName !== 'Unknown';
+                            
+                            return (
+                              <tr key={idx} className="align-middle">
+                                <td className="py-3">
+                                  <Badge bg="secondary" className="bg-opacity-10 text-dark fw-semibold px-3 py-2">
+                                    {trimmedExt}
+                                  </Badge>
+                                </td>
+                                <td className="py-3 fw-medium">{userName}</td>
+                                <td className="py-3">
+                                  <Badge 
+                                    bg={isValid ? 'success' : 'danger'} 
+                                    className="bg-opacity-10 px-3 py-2"
+                                    style={{ color: isValid ? '#16a34a' : '#dc2626' }}
+                                  >
+                                    {isValid ? '✓ Valid' : '✗ Invalid'}
+                                  </Badge>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </Table>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Number of Records to Assign */}
+          <div className="mb-3">
+            <Form.Group>
+              <Form.Label className="fw-semibold small text-muted mb-2">
+                Number of Records to Assign <span className="text-danger">*</span>
+              </Form.Label>
+              <div className="position-relative">
+                <Form.Control 
+                  type="number"
+                  min="1"
+                  max={totalFilteredRecords}
+                  value={recordsToAssign || ''}
+                  onChange={(e) => setRecordsToAssign(parseInt(e.target.value) || 0)}
+                  placeholder={`Enter number (max: ${totalFilteredRecords.toLocaleString()})`}
+                  className="border-2 py-2"
+                  style={{ paddingRight: '100px' }}
+                />
+                <div className="position-absolute top-50 end-0 translate-middle-y me-3">
+                  <small className="text-muted">of {totalFilteredRecords.toLocaleString()}</small>
+                </div>
+              </div>
+              {recordsToAssign > 0 && recordsToAssign <= totalFilteredRecords && (
+                <div className="mt-2 d-flex align-items-center gap-2">
+                  <div className="flex-grow-1 bg-light rounded-pill overflow-hidden" style={{ height: '6px' }}>
+                    <div 
+                      className="bg-primary h-100 rounded-pill transition-all"
+                      style={{ 
+                        width: `${(recordsToAssign / totalFilteredRecords) * 100}%`,
+                        transition: 'width 0.3s ease'
+                      }}
+                    />
+                  </div>
+                  <small className="text-muted fw-medium">
+                    {((recordsToAssign / totalFilteredRecords) * 100).toFixed(1)}%
+                  </small>
+                </div>
+              )}
+            </Form.Group>
+          </div>
+
+          {/* Assignment Settings */}
+          <div className="mb-4 p-4 rounded-3" style={{
+            background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.05) 0%, rgba(139, 92, 246, 0.05) 100%)',
+            border: '1px solid rgba(99, 102, 241, 0.15)'
+          }}>
+            <h6 className="fw-bold mb-3 text-primary d-flex align-items-center">
+              <Briefcase size={18} className="me-2" />
+              Assignment Settings
+            </h6>
+            <div className="d-flex align-items-center justify-content-between p-3 bg-white rounded-3">
+              <div className="d-flex align-items-start gap-3">
+                <div className="p-2 rounded-3" style={{ background: 'rgba(99, 102, 241, 0.1)' }}>
+                  <RefreshCw size={20} className="text-primary" />
+                </div>
+                <div>
+                  <div className="fw-semibold text-dark mb-1">Include already assigned records (allow reassignment)</div>
+                  <small className="text-muted">Enable this to include records that are already assigned to other users. They will be reassigned based on the selected criteria.</small>
+                </div>
+              </div>
+              <Form.Check 
+                type="switch"
+                id="includeAssignedRecords"
+                checked={includeAssignedRecords}
+                onChange={(e) => setIncludeAssignedRecords(e.target.checked)}
+                className="ms-3"
+                style={{ transform: 'scale(1.3)' }}
+              />
+            </div>
+          </div>
+
+          <div className="alert alert-warning border-0 mb-0 d-flex align-items-start" style={{ 
+            background: 'linear-gradient(135deg, rgba(251, 191, 36, 0.08) 0%, rgba(252, 211, 77, 0.08) 100%)',
+            borderLeft: '4px solid #f59e0b'
+          }}>
+            <AlertCircle size={18} className="text-warning mt-1 me-2 flex-shrink-0" />
+            <small className="text-dark">
+              <strong>Important:</strong> Assignment will be processed immediately based on your selected criteria. This action cannot be undone.
+            </small>
           </div>
         </Form>
       </Modal.Body>
-      <Modal.Footer className="border-top">
-        <Button variant="secondary" onClick={() => setShowDataAssignmentModal(false)}>Cancel</Button>
+      
+      <Modal.Footer className="border-0 pt-0 px-4 pb-4">
+        <Button 
+          variant="light" 
+          onClick={() => {
+            setShowDataAssignmentModal(false);
+            setAssignmentFilterCampaign('');
+            setAssignmentFilterTags([]);
+            setAssignmentType('');
+            setDistributionMode('');
+            setAssignToCampaigns([]);
+            setCustomExtensions('');
+            setRecordsToAssign(0);
+            setIncludeAssignedRecords(false);
+          }}
+          className="px-4 fw-semibold"
+        >
+          Cancel
+        </Button>
         <Button 
           variant="primary" 
-          disabled={selectedProspects.length === 0}
+          disabled={
+            !assignmentType || 
+            recordsToAssign === 0 || 
+            recordsToAssign > totalFilteredRecords ||
+            (assignmentType === 'campaigns' && (!distributionMode || assignToCampaigns.length === 0)) ||
+            (assignmentType === 'custom' && !customExtensions)
+          }
           onClick={() => {
-            console.log('Assigning prospects:', selectedProspects);
-            alert(`${selectedProspects.length} prospects assigned successfully!`);
+            console.log('Assignment Data:', {
+              filterCampaign: assignmentFilterCampaign,
+              filterTags: assignmentFilterTags,
+              totalRecords: totalFilteredRecords,
+              assignmentType,
+              distributionMode,
+              assignToCampaigns,
+              customExtensions,
+              recordsToAssign,
+              includeAssignedRecords
+            });
+            alert(`Successfully assigned ${recordsToAssign} records!`);
             setShowDataAssignmentModal(false);
-            setSelectedProspects([]);
+            setAssignmentFilterCampaign('');
+            setAssignmentFilterTags([]);
+            setAssignmentType('');
+            setDistributionMode('');
+            setAssignToCampaigns([]);
+            setCustomExtensions('');
+            setRecordsToAssign(0);
+            setIncludeAssignedRecords(false);
           }}
+          className="px-4 fw-semibold d-flex align-items-center gap-2"
         >
-          <UserPlus size={16} className="me-2" />
-          Assign Selected ({selectedProspects.length})
+          <UserPlus size={18} />
+          Assign {recordsToAssign > 0 ? `${recordsToAssign.toLocaleString()} Records` : 'Records'}
         </Button>
       </Modal.Footer>
     </Modal>
-  );
+    );
+  };
 
   // Upload History Modal
   const UploadHistoryModal = () => {
@@ -1553,7 +2518,7 @@ const CRMPortal = () => {
                           activity.action === 'Prospect → Lead' ? 'primary' :
                           'secondary'
                         }
-                        className="bg-opacity-10"
+                        className="bg-opacity-50"
                       >
                         {activity.action}
                       </Badge>
@@ -1617,275 +2582,675 @@ const CRMPortal = () => {
     </Modal>
   );
 
-  // Filter Drawer Component
-  const FilterDrawer = () => {
-    const campaigns = ['Q4 Campaign 2025', 'Winter Sale 2025', 'Black Friday 2025', 'Enterprise Outreach'];
-    const tags = ['Hot', 'Warm', 'Cold', 'Enterprise', 'Follow-up', 'New'];
-    
-    const toggleArrayFilter = (array: string[], value: string) => {
-      return array.includes(value) ? array.filter(v => v !== value) : [...array, value];
-    };
+  // Schedule Callback Modal
+  const ScheduleCallbackModal = () => (
+    <Modal 
+      show={showScheduleCallbackModal} 
+      onHide={() => {
+        setShowScheduleCallbackModal(false);
+        setScheduleCallbackData({
+          prospectId: null,
+          prospectName: '',
+          callbackDate: '',
+          callbackTime: '',
+          duration: '15',
+          callbackReason: '',
+          priority: 'Medium',
+          assignedTo: '',
+          reminderBefore: '15',
+          notes: '',
+          communicationChannel: 'Phone Call'
+        });
+      }} 
+      size="lg" 
+      centered
+    >
+      <Modal.Header closeButton style={{  color: 'black', borderBottom: '1px solid #ccc' }}>
+        <Modal.Title className="d-flex align-items-center">
+          <Calendar size={24} className="me-2" />
+          Schedule Callback
+        </Modal.Title>
+      </Modal.Header>
+      <Modal.Body className="p-4">
+        {scheduleCallbackData.prospectName && (
+          <div className="alert alert-info mb-4 d-flex align-items-center">
+            <User size={20} className="me-2" />
+            <span><strong>Contact:</strong> {scheduleCallbackData.prospectName}</span>
+          </div>
+        )}
 
-    return (
-      <Modal show={showFilterDrawer} onHide={() => setShowFilterDrawer(false)} size="lg">
-        <Modal.Header closeButton className="border-bottom bg-light">
-          <Modal.Title>Advanced Filters</Modal.Title>
-        </Modal.Header>
-        <Modal.Body className="p-4" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
-          <Form>
+        <Form>
+          {/* Date and Time Section */}
+          <div className="mb-4 p-3 rounded" style={{ background: '#f8f9fa' }}>
+            <h6 className="fw-bold mb-3 text-primary d-flex align-items-center">
+              <Clock size={18} className="me-2" />
+              Schedule Details
+            </h6>
             <Row>
               <Col md={6}>
                 <Form.Group className="mb-3">
-                  <Form.Label className="fw-semibold">Assigned To</Form.Label>
-                  <Form.Select 
-                    value={prospectsFilters.assignedTo}
-                    onChange={(e) => setProspectsFilters({...prospectsFilters, assignedTo: e.target.value})}
-                  >
-                    <option value="">All Users</option>
-                    <option>John Doe (501)</option>
-                    <option>Jane Smith (502)</option>
-                    <option>Mike Johnson (503)</option>
-                  </Form.Select>
+                  <Form.Label className="fw-semibold small">Callback Date <span className="text-danger">*</span></Form.Label>
+                  <Form.Control 
+                    type="date"
+                    value={scheduleCallbackData.callbackDate}
+                    onChange={(e) => setScheduleCallbackData({ ...scheduleCallbackData, callbackDate: e.target.value })}
+                    min={new Date().toISOString().split('T')[0]}
+                    required
+                  />
                 </Form.Group>
               </Col>
               <Col md={6}>
                 <Form.Group className="mb-3">
-                  <Form.Label className="fw-semibold">Phone</Form.Label>
+                  <Form.Label className="fw-semibold small">Callback Time <span className="text-danger">*</span></Form.Label>
                   <Form.Control 
-                    type="text" 
-                    placeholder="Enter phone number"
-                    value={prospectsFilters.phone}
-                    onChange={(e) => setProspectsFilters({...prospectsFilters, phone: e.target.value})}
+                    type="time"
+                    value={scheduleCallbackData.callbackTime}
+                    onChange={(e) => setScheduleCallbackData({ ...scheduleCallbackData, callbackTime: e.target.value })}
+                    required
                   />
                 </Form.Group>
               </Col>
-            </Row>
-
-            <Form.Group className="mb-3">
-              <Form.Label className="fw-semibold">Campaigns</Form.Label>
-              {prospectsFilters.campaigns.length > 0 && (
-                <div className="mb-2 d-flex flex-wrap gap-1">
-                  {prospectsFilters.campaigns.map((campaign) => (
-                    <Badge 
-                      key={campaign} 
-                      bg="primary" 
-                      className="d-flex align-items-center gap-1"
-                      style={{ cursor: 'pointer' }}
-                      onClick={() => setProspectsFilters({
-                        ...prospectsFilters,
-                        campaigns: prospectsFilters.campaigns.filter(c => c !== campaign)
-                      })}
-                    >
-                      {campaign} <X size={14} />
-                    </Badge>
-                  ))}
-                </div>
-              )}
-              <div className="border rounded p-3" style={{ maxHeight: '200px', overflowY: 'auto', backgroundColor: '#fafafa' }}>
-                {campaigns.map((campaign) => (
-                  <Form.Check
-                    key={campaign}
-                    type="checkbox"
-                    id={`campaign-${campaign}`}
-                    label={campaign}
-                    checked={prospectsFilters.campaigns.includes(campaign)}
-                    onChange={() => setProspectsFilters({
-                      ...prospectsFilters,
-                      campaigns: toggleArrayFilter(prospectsFilters.campaigns, campaign)
-                    })}
-                    className="mb-2"
-                    style={{
-                      padding: '8px 12px',
-                      borderRadius: '4px',
-                      transition: 'background-color 0.2s',
-                      cursor: 'pointer',
-                      backgroundColor: prospectsFilters.campaigns.includes(campaign) ? '#e7f3ff' : 'transparent'
-                    }}
-                    onMouseEnter={(e) => {
-                      if (!prospectsFilters.campaigns.includes(campaign)) {
-                        e.currentTarget.style.backgroundColor = '#f0f0f0';
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (!prospectsFilters.campaigns.includes(campaign)) {
-                        e.currentTarget.style.backgroundColor = 'transparent';
-                      } else {
-                        e.currentTarget.style.backgroundColor = '#e7f3ff';
-                      }
-                    }}
+              {/* <Col md={6}>
+                <Form.Group className="mb-3">
+                  <Form.Label className="fw-semibold small">Expected Duration <span className="text-danger">*</span></Form.Label>
+                  <Select
+                    options={[
+                      { value: '15', label: '15 minutes' },
+                      { value: '30', label: '30 minutes' },
+                      { value: '45', label: '45 minutes' },
+                      { value: '60', label: '1 hour' },
+                      { value: '90', label: '1.5 hours' },
+                      { value: '120', label: '2 hours' }
+                    ]}
+                    value={{ value: scheduleCallbackData.duration, label: scheduleCallbackData.duration === '15' ? '15 minutes' : scheduleCallbackData.duration === '30' ? '30 minutes' : scheduleCallbackData.duration === '45' ? '45 minutes' : scheduleCallbackData.duration === '60' ? '1 hour' : scheduleCallbackData.duration === '90' ? '1.5 hours' : '2 hours' }}
+                    onChange={(selected) => setScheduleCallbackData({ ...scheduleCallbackData, duration: selected?.value || '15' })}
+                    styles={customSelectStyles}
                   />
-                ))}
-              </div>
-              <Form.Text className="text-muted">
-                Select one or more campaigns to filter prospects ({prospectsFilters.campaigns.length} selected)
+                </Form.Group>
+              </Col>
+              <Col md={6}>
+                <Form.Group className="mb-3">
+                  <Form.Label className="fw-semibold small">Communication Channel <span className="text-danger">*</span></Form.Label>
+                  <Select
+                    options={[
+                      { value: 'Phone Call', label: '📞 Phone Call' },
+                      { value: 'Video Meeting', label: '📹 Video Meeting' },
+                      { value: 'WhatsApp', label: '💬 WhatsApp' },
+                      { value: 'In-Person Meeting', label: '🤝 In-Person Meeting' }
+                    ]}
+                    value={{ value: scheduleCallbackData.communicationChannel, label: scheduleCallbackData.communicationChannel === 'Phone Call' ? '📞 Phone Call' : scheduleCallbackData.communicationChannel === 'Video Meeting' ? '📹 Video Meeting' : scheduleCallbackData.communicationChannel === 'WhatsApp' ? '💬 WhatsApp' : '🤝 In-Person Meeting' }}
+                    onChange={(selected) => setScheduleCallbackData({ ...scheduleCallbackData, communicationChannel: selected?.value || 'Phone Call' })}
+                    styles={customSelectStyles}
+                  />
+                </Form.Group>
+              </Col> */}
+            </Row>
+          </div>
+
+          {/* Callback Details Section */}
+          <div className="mb-4">
+            <h6 className="fw-bold mb-3 text-success d-flex align-items-center">
+              <FileText size={18} className="me-2" />
+              Callback Information
+            </h6>
+            <Row>
+              <Col md={6}>
+                <Form.Group className="mb-3">
+                  <Form.Label className="fw-semibold small">Callback Reason <span className="text-danger">*</span></Form.Label>
+                  <Select
+                    options={[
+                      { value: 'Follow-up', label: 'Follow-up' },
+                      { value: 'Product Demo', label: 'Product Demo' },
+                      { value: 'Quote Discussion', label: 'Quote Discussion' },
+                      { value: 'Pricing Inquiry', label: 'Pricing Inquiry' },
+                      { value: 'Technical Support', label: 'Technical Support' },
+                      { value: 'Contract Renewal', label: 'Contract Renewal' },
+                      { value: 'Feedback Collection', label: 'Feedback Collection' },
+                      { value: 'Other', label: 'Other' }
+                    ]}
+                    value={scheduleCallbackData.callbackReason ? { value: scheduleCallbackData.callbackReason, label: scheduleCallbackData.callbackReason } : null}
+                    onChange={(selected) => setScheduleCallbackData({ ...scheduleCallbackData, callbackReason: selected?.value || '' })}
+                    placeholder="Select reason..."
+                    isClearable
+                    styles={customSelectStyles}
+                  />
+                </Form.Group>
+              </Col>
+              {/* <Col md={6}>
+                <Form.Group className="mb-3">
+                  <Form.Label className="fw-semibold small">Priority <span className="text-danger">*</span></Form.Label>
+                  <Select
+                    options={[
+                      { value: 'Low', label: '🟢 Low' },
+                      { value: 'Medium', label: '🟡 Medium' },
+                      { value: 'High', label: '🟠 High' },
+                      { value: 'Urgent', label: '🔴 Urgent' }
+                    ]}
+                    value={{ value: scheduleCallbackData.priority, label: scheduleCallbackData.priority === 'Low' ? '🟢 Low' : scheduleCallbackData.priority === 'Medium' ? '🟡 Medium' : scheduleCallbackData.priority === 'High' ? '🟠 High' : '🔴 Urgent' }}
+                    onChange={(selected) => setScheduleCallbackData({ ...scheduleCallbackData, priority: selected?.value || 'Medium' })}
+                    styles={customSelectStyles}
+                  />
+                </Form.Group>
+              </Col> */}
+              <Col md={6}>
+                <Form.Group className="mb-3">
+                  <Form.Label className="fw-semibold small">Assign To <span className="text-danger">*</span></Form.Label>
+                  <Select
+                    options={[
+                      { value: 'John Doe (501)', label: 'John Doe (501)' },
+                      { value: 'Jane Smith (502)', label: 'Jane Smith (502)' },
+                      { value: 'Mike Johnson (503)', label: 'Mike Johnson (503)' },
+                      { value: 'Sarah Williams (504)', label: 'Sarah Williams (504)' },
+                      { value: 'Tom Brown (505)', label: 'Tom Brown (505)' }
+                    ]}
+                    value={scheduleCallbackData.assignedTo ? { value: scheduleCallbackData.assignedTo, label: scheduleCallbackData.assignedTo } : null}
+                    onChange={(selected) => setScheduleCallbackData({ ...scheduleCallbackData, assignedTo: selected?.value || '' })}
+                    placeholder="Select user..."
+                    isClearable
+                    styles={customSelectStyles}
+                  />
+                </Form.Group>
+              </Col>
+              {/* <Col md={6}>
+                <Form.Group className="mb-3">
+                  <Form.Label className="fw-semibold small">Reminder Before <span className="text-danger">*</span></Form.Label>
+                  <Select
+                    options={[
+                      { value: '0', label: 'No Reminder' },
+                      { value: '5', label: '5 minutes before' },
+                      { value: '15', label: '15 minutes before' },
+                      { value: '30', label: '30 minutes before' },
+                      { value: '60', label: '1 hour before' },
+                      { value: '120', label: '2 hours before' },
+                      { value: '1440', label: '1 day before' }
+                    ]}
+                    value={{ value: scheduleCallbackData.reminderBefore, label: scheduleCallbackData.reminderBefore === '0' ? 'No Reminder' : scheduleCallbackData.reminderBefore === '5' ? '5 minutes before' : scheduleCallbackData.reminderBefore === '15' ? '15 minutes before' : scheduleCallbackData.reminderBefore === '30' ? '30 minutes before' : scheduleCallbackData.reminderBefore === '60' ? '1 hour before' : scheduleCallbackData.reminderBefore === '120' ? '2 hours before' : '1 day before' }}
+                    onChange={(selected) => setScheduleCallbackData({ ...scheduleCallbackData, reminderBefore: selected?.value || '15' })}
+                    styles={customSelectStyles}
+                  />
+                </Form.Group>
+              </Col> */}
+            </Row>
+          </div>
+
+          {/* Notes Section */}
+          <div className="mb-3">
+            <Form.Group>
+              <Form.Label className="fw-semibold small d-flex align-items-center">
+                <FileText size={16} className="me-2" />
+                Notes / Agenda
+              </Form.Label>
+              <Form.Control 
+                as="textarea"
+                rows={4}
+                value={scheduleCallbackData.notes}
+                onChange={(e) => setScheduleCallbackData({ ...scheduleCallbackData, notes: e.target.value })}
+                placeholder="Add any notes, agenda items, or discussion points for this callback..."
+              />
+              <Form.Text className="text-muted small">
+                Optional: Add context, talking points, or preparation notes
               </Form.Text>
             </Form.Group>
+          </div>
 
-          <Row>
-            <Col md={6}>
-              <Form.Group className="mb-3">
-                <Form.Label className="fw-semibold">Last Call Status</Form.Label>
-                <Form.Select
-                  value={prospectsFilters.lastCallStatus}
-                  onChange={(e) => setProspectsFilters({...prospectsFilters, lastCallStatus: e.target.value})}
-                >
-                  <option value="">All Statuses</option>
-                  <option>Answered</option>
-                  <option>No Answer</option>
-                  <option>Busy</option>
-                  <option>Not Called</option>
-                </Form.Select>
-              </Form.Group>
-            </Col>
-            <Col md={6}>
-              <Form.Group className="mb-3">
-                <Form.Label className="fw-semibold">Call Disposition</Form.Label>
-                <Form.Select
-                  value={prospectsFilters.callDisposition}
-                  onChange={(e) => setProspectsFilters({...prospectsFilters, callDisposition: e.target.value})}
-                >
-                  <option value="">All Dispositions</option>
-                  <option>Interested</option>
-                  <option>Not Interested</option>
-                  <option>Callback Required</option>
-                  <option>Reschedule</option>
-                </Form.Select>
-              </Form.Group>
-            </Col>
-          </Row>
-
-          <Form.Group className="mb-3">
-            <Form.Label className="fw-semibold">View Status</Form.Label>
-            <Form.Select
-              value={prospectsFilters.viewStatus}
-              onChange={(e) => setProspectsFilters({...prospectsFilters, viewStatus: e.target.value})}
-            >
-              <option value="">All</option>
-              <option>Viewed</option>
-              <option>Not Viewed</option>
-            </Form.Select>
-          </Form.Group>
-
-          <Row>
-            <Col md={6}>
-              <Form.Group className="mb-3">
-                <Form.Label className="fw-semibold">Source Type</Form.Label>
-                <Form.Select
-                  value={prospectsFilters.sourceType}
-                  onChange={(e) => setProspectsFilters({...prospectsFilters, sourceType: e.target.value})}
-                >
-                  <option value="">All</option>
-                  <option>Campaign</option>
-                  <option>Import</option>
-                </Form.Select>
-              </Form.Group>
-            </Col>
-            <Col md={6}>
-              <Form.Group className="mb-3">
-                <Form.Label className="fw-semibold">Source File</Form.Label>
-                <Form.Select
-                  value={prospectsFilters.sourceFile}
-                  onChange={(e) => setProspectsFilters({...prospectsFilters, sourceFile: e.target.value})}
-                >
-                  <option value="">All</option>
-                  <option>Q4 Campaign 2025</option>
-                  <option>Winter Sale 2025</option>
-                  <option>leads_nov_2025.csv</option>
-                </Form.Select>
-              </Form.Group>
-            </Col>
-          </Row>
-
-          <Form.Group className="mb-4">
-            <Form.Label className="fw-semibold">Tags</Form.Label>
-            {prospectsFilters.tags.length > 0 && (
-              <div className="mb-2 d-flex flex-wrap gap-1">
-                {prospectsFilters.tags.map((tag) => (
-                  <Badge 
-                    key={tag} 
-                    bg="secondary" 
-                    className="d-flex align-items-center gap-1"
-                    style={{ cursor: 'pointer' }}
-                    onClick={() => setProspectsFilters({
-                      ...prospectsFilters,
-                      tags: prospectsFilters.tags.filter(t => t !== tag)
-                    })}
-                  >
-                    {tag} <X size={14} />
-                  </Badge>
-                ))}
-              </div>
-            )}
-            <div className="border rounded p-3" style={{ maxHeight: '200px', overflowY: 'auto', backgroundColor: '#fafafa' }}>
-              {tags.map((tag) => (
-                <Form.Check
-                  key={tag}
-                  type="checkbox"
-                  id={`tag-${tag}`}
-                  label={tag}
-                  checked={prospectsFilters.tags.includes(tag)}
-                  onChange={() => setProspectsFilters({
-                    ...prospectsFilters,
-                    tags: toggleArrayFilter(prospectsFilters.tags, tag)
-                  })}
-                  className="mb-2"
-                  style={{
-                    padding: '8px 12px',
-                    borderRadius: '4px',
-                    transition: 'background-color 0.2s',
-                    cursor: 'pointer',
-                    backgroundColor: prospectsFilters.tags.includes(tag) ? '#e7f3ff' : 'transparent'
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!prospectsFilters.tags.includes(tag)) {
-                      e.currentTarget.style.backgroundColor = '#f0f0f0';
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!prospectsFilters.tags.includes(tag)) {
-                      e.currentTarget.style.backgroundColor = 'transparent';
-                    } else {
-                      e.currentTarget.style.backgroundColor = '#e7f3ff';
-                    }
-                  }}
-                />
-              ))}
-            </div>
-            <Form.Text className="text-muted">
-              Select one or more tags to filter prospects ({prospectsFilters.tags.length} selected)
-            </Form.Text>
-          </Form.Group>
+          <div className="alert alert-success mb-0 d-flex align-items-center">
+            <CheckCircle size={18} className="me-2" />
+            <small><strong>Tip:</strong> A reminder notification will be sent to the assigned user before the scheduled time.</small>
+          </div>
         </Form>
       </Modal.Body>
-      <Modal.Footer className="border-top">
-        <Button variant="secondary" onClick={() => setShowFilterDrawer(false)}>Close</Button>
+      <Modal.Footer className="border-top bg-light">
         <Button 
-          variant="outline-secondary"
-          onClick={() => setProspectsFilters({
-            campaigns: [],
-            tags: [],
-            assignedTo: '',
-            phone: '',
-            lastCallStatus: '',
-            callDisposition: '',
-            viewStatus: '',
-            lastCalledDate: '',
-            nextCallScheduled: '',
-            sourceType: '',
-            sourceFile: ''
-          })}
+          variant="outline-secondary" 
+          onClick={() => {
+            setShowScheduleCallbackModal(false);
+            setScheduleCallbackData({
+              prospectId: null,
+              prospectName: '',
+              callbackDate: '',
+              callbackTime: '',
+              duration: '15',
+              callbackReason: '',
+              priority: 'Medium',
+              assignedTo: '',
+              reminderBefore: '15',
+              notes: '',
+              communicationChannel: 'Phone Call'
+            });
+          }}
         >
-          Reset Filters
+          <X size={16} className="me-1" />
+          Cancel
         </Button>
-        <Button variant="primary" onClick={() => {
-          // Apply filters logic here
-          setShowFilterDrawer(false);
-        }}>
-          Apply Filters
+        <Button 
+          variant="primary"
+          disabled={
+            !scheduleCallbackData.callbackDate || 
+            !scheduleCallbackData.callbackTime || 
+            !scheduleCallbackData.callbackReason || 
+            !scheduleCallbackData.assignedTo
+          }
+          onClick={() => {
+            console.log('Scheduling callback:', scheduleCallbackData);
+            alert(`Callback scheduled successfully for ${scheduleCallbackData.callbackDate} at ${scheduleCallbackData.callbackTime}`);
+            setShowScheduleCallbackModal(false);
+            setScheduleCallbackData({
+              prospectId: null,
+              prospectName: '',
+              callbackDate: '',
+              callbackTime: '',
+              duration: '15',
+              callbackReason: '',
+              priority: 'Medium',
+              assignedTo: '',
+              reminderBefore: '15',
+              notes: '',
+              communicationChannel: 'Phone Call'
+            });
+          }}
+        >
+          <CheckCircle size={16} className="me-2" />
+          Schedule Callback
         </Button>
       </Modal.Footer>
     </Modal>
-    );
+  );
+
+  // Add Follow-up Modal
+  const AddFollowupModal = () => (
+    <Modal 
+      show={showAddFollowupModal} 
+      onHide={() => {
+        setShowAddFollowupModal(false);
+        setFollowupData({
+          leadId: null,
+          leadName: '',
+          followupDate: '',
+          status: 'Pending',
+          communicationChannel: 'Phone Call',
+          notes: ''
+        });
+      }} 
+      size="lg" 
+      centered
+    >
+      <Modal.Header closeButton style={{  color: 'black', borderBottom: '1px solid #ccc' }}>
+        <Modal.Title className="d-flex align-items-center">
+          <Calendar size={24} className="me-2" />
+          Add Follow up Activity
+        </Modal.Title>
+      </Modal.Header>
+      <Modal.Body className="p-4">
+        {followupData.leadName && (
+          <div className="alert alert-info mb-4 d-flex align-items-center">
+            <User size={20} className="me-2" />
+            <span><strong>Lead:</strong> {followupData.leadName}</span>
+          </div>
+        )}
+
+        <Form>
+          <Row>
+            <Col md={12}>
+              <Form.Group className="mb-3">
+                <Form.Label className="fw-semibold small">Follow-up Date <span className="text-danger">*</span></Form.Label>
+                <Form.Control 
+                  type="date"
+                  value={followupData.followupDate}
+                  onChange={(e) => setFollowupData({ ...followupData, followupDate: e.target.value })}
+                  min={new Date().toISOString().split('T')[0]}
+                  required
+                />
+              </Form.Group>
+            </Col>
+          </Row>
+
+          <Row>
+            <Col md={12}>
+              <Form.Group className="mb-3">
+                <Form.Label className="fw-semibold small">Status</Form.Label>
+                <Select
+                  value={{ value: followupData.status, label: followupData.status }}
+                  onChange={(option) => setFollowupData({ ...followupData, status: option?.value || 'Pending' })}
+                  options={[
+                    { value: 'Pending', label: 'Pending' },
+                    { value: 'In Progress', label: 'In Progress' },
+                    { value: 'Completed', label: 'Completed' },
+                    { value: 'Cancelled', label: 'Cancelled' }
+                  ]}
+                  styles={customSelectStyles}
+                  placeholder="Select status..."
+                />
+              </Form.Group>
+            </Col>
+          </Row>
+
+          <Row>
+            <Col md={12}>
+              <Form.Group className="mb-3">
+                <Form.Label className="fw-semibold small">Communication Channel</Form.Label>
+                <Select
+                  value={{ value: followupData.communicationChannel, label: followupData.communicationChannel }}
+                  onChange={(option) => setFollowupData({ ...followupData, communicationChannel: option?.value || 'Phone Call' })}
+                  options={[
+                    { value: 'Phone Call', label: 'Phone Call' },
+                    { value: 'Email', label: 'Email' },
+                    { value: 'Video Call', label: 'Video Call' },
+                    { value: 'In-Person Meeting', label: 'In-Person Meeting' },
+                    { value: 'SMS', label: 'SMS' },
+                    { value: 'WhatsApp', label: 'WhatsApp' },
+                    { value: 'Other', label: 'Other' }
+                  ]}
+                  styles={customSelectStyles}
+                  placeholder="Select communication channel..."
+                />
+              </Form.Group>
+            </Col>
+          </Row>
+
+          <Row>
+            <Col md={12}>
+              <Form.Group className="mb-3">
+                <Form.Label className="fw-semibold small">Notes</Form.Label>
+                <Form.Control 
+                  as="textarea"
+                  rows={4}
+                  value={followupData.notes}
+                  onChange={(e) => setFollowupData({ ...followupData, notes: e.target.value })}
+                  placeholder="Add notes, description, or specific action items for this follow-up..."
+                />
+              </Form.Group>
+            </Col>
+          </Row>
+
+          <div className="alert alert-info mb-0 d-flex align-items-center">
+            <AlertCircle size={18} className="me-2" />
+            <small>Follow-up activities help track communication and next steps with leads.</small>
+          </div>
+        </Form>
+      </Modal.Body>
+      <Modal.Footer className="border-top bg-light">
+        <Button 
+          variant="outline-secondary" 
+          onClick={() => {
+            setShowAddFollowupModal(false);
+            setFollowupData({
+              leadId: null,
+              leadName: '',
+              followupDate: '',
+              status: 'Pending',
+              communicationChannel: 'Phone Call',
+              notes: ''
+            });
+          }}
+        >
+          <X size={16} className="me-1" />
+          Cancel
+        </Button>
+        <Button 
+          variant="primary"
+          disabled={!followupData.followupDate}
+          onClick={() => {
+            console.log('Adding follow-up:', followupData);
+            alert(`Follow-up activity added successfully for ${followupData.followupDate}`);
+            setShowAddFollowupModal(false);
+            setFollowupData({
+              leadId: null,
+              leadName: '',
+              followupDate: '',
+              status: 'Pending',
+              communicationChannel: 'Phone Call',
+              notes: ''
+            });
+          }}
+        >
+          <Plus size={16} className="me-1" />
+          Add Follow up
+        </Button>
+      </Modal.Footer>
+    </Modal>
+  );
+
+  // Add Meeting Modal
+  const AddMeetingModal = () => (
+    <Modal 
+      show={showAddMeetingModal} 
+      onHide={() => {
+        setShowAddMeetingModal(false);
+        setMeetingData({
+          leadId: null,
+          leadName: '',
+          meetingName: '',
+          meetingType: 'Discovery Call',
+          meetingOutcome: '',
+          meetingDate: '',
+          meetingTime: '',
+          attendees: []
+        });
+      }} 
+      size="lg" 
+      centered
+    >
+      <Modal.Header closeButton style={{  color: 'black', borderBottom: '1px solid #ccc' }}>
+        <Modal.Title className="d-flex align-items-center">
+          <Users size={24} className="me-2" />
+          Schedule Meeting
+        </Modal.Title>
+      </Modal.Header>
+      <Modal.Body className="p-4">
+        {meetingData.leadName && (
+          <div className="alert alert-info mb-4 d-flex align-items-center">
+            <User size={20} className="me-2" />
+            <span><strong>Lead:</strong> {meetingData.leadName}</span>
+          </div>
+        )}
+
+        <Form>
+          <Row>
+            <Col md={12}>
+              <Form.Group className="mb-3">
+                <Form.Label className="fw-semibold small">Meeting Name <span className="text-danger">*</span></Form.Label>
+                <Form.Control 
+                  type="text"
+                  value={meetingData.meetingName}
+                  onChange={(e) => setMeetingData({ ...meetingData, meetingName: e.target.value })}
+                  placeholder="Enter meeting name or title..."
+                  required
+                />
+              </Form.Group>
+            </Col>
+          </Row>
+
+          <Row>
+            <Col md={12}>
+              <Form.Group className="mb-3">
+                <Form.Label className="fw-semibold small">Meeting Type <span className="text-danger">*</span></Form.Label>
+                <Select
+                  value={{ value: meetingData.meetingType, label: meetingData.meetingType }}
+                  onChange={(option) => setMeetingData({ ...meetingData, meetingType: option?.value || 'Discovery Call' })}
+                  options={[
+                    { value: 'Discovery Call', label: 'Discovery Call' },
+                    { value: 'Product Demo', label: 'Product Demo' },
+                    { value: 'Proposal Discussion', label: 'Proposal Discussion' },
+                    { value: 'Negotiation', label: 'Negotiation' },
+                    { value: 'Follow-up', label: 'Follow-up' },
+                    { value: 'Closing', label: 'Closing' },
+                    { value: 'Other', label: 'Other' }
+                  ]}
+                  styles={customSelectStyles}
+                  placeholder="Select meeting type..."
+                />
+              </Form.Group>
+            </Col>
+          </Row>
+
+          <Row>
+            <Col md={12}>
+              <Form.Group className="mb-3">
+                <Form.Label className="fw-semibold small">Meeting Outcome</Form.Label>
+                <Select
+                  value={meetingData.meetingOutcome ? { value: meetingData.meetingOutcome, label: meetingData.meetingOutcome } : null}
+                  onChange={(option) => setMeetingData({ ...meetingData, meetingOutcome: option?.value || '' })}
+                  options={[
+                    { value: 'Scheduled', label: 'Scheduled' },
+                    { value: 'Completed - Successful', label: 'Completed - Successful' },
+                    { value: 'Completed - Needs Follow-up', label: 'Completed - Needs Follow-up' },
+                    { value: 'Cancelled', label: 'Cancelled' },
+                    { value: 'No Show', label: 'No Show' },
+                    { value: 'Rescheduled', label: 'Rescheduled' }
+                  ]}
+                  styles={customSelectStyles}
+                  placeholder="Select meeting outcome..."
+                  isClearable
+                />
+              </Form.Group>
+            </Col>
+          </Row>
+
+          <Row>
+            <Col md={6}>
+              <Form.Group className="mb-3">
+                <Form.Label className="fw-semibold small">Meeting Date <span className="text-danger">*</span></Form.Label>
+                <Form.Control 
+                  type="date"
+                  value={meetingData.meetingDate}
+                  onChange={(e) => setMeetingData({ ...meetingData, meetingDate: e.target.value })}
+                  min={new Date().toISOString().split('T')[0]}
+                  required
+                />
+              </Form.Group>
+            </Col>
+            <Col md={6}>
+              <Form.Group className="mb-3">
+                <Form.Label className="fw-semibold small">Meeting Time <span className="text-danger">*</span></Form.Label>
+                <Form.Control 
+                  type="time"
+                  value={meetingData.meetingTime}
+                  onChange={(e) => setMeetingData({ ...meetingData, meetingTime: e.target.value })}
+                  required
+                />
+              </Form.Group>
+            </Col>
+          </Row>
+
+          <Row>
+            <Col md={12}>
+              <Form.Group className="mb-3">
+                <div className="d-flex justify-content-between align-items-center mb-2">
+                  <Form.Label className="fw-semibold small mb-0">Attendees</Form.Label>
+                  <Button 
+                    variant="outline-primary" 
+                    size="sm"
+                    // onClick={() => {
+                    //   // This would typically open an attendee selection modal
+                    //   const newAttendee = prompt('Enter attendee name:');
+                    //   if (newAttendee && newAttendee.trim()) {
+                    //     setMeetingData({ 
+                    //       ...meetingData, 
+                    //       attendees: [...meetingData.attendees, newAttendee.trim()] 
+                    //     });
+                    //   }
+                    // }}
+                  >
+                    <UserPlus size={14} className="me-1" />
+                    Add Attendees
+                  </Button>
+                </div>
+                {meetingData.attendees.length > 0 ? (
+                  <div className="border rounded p-2" style={{ background: '#f8f9fa' }}>
+                    {meetingData.attendees.map((attendee, index) => (
+                      <Badge 
+                        key={index} 
+                        bg="primary" 
+                        className="me-2 mb-2 d-inline-flex align-items-center"
+                        style={{ fontSize: '0.875rem', padding: '0.5rem 0.75rem' }}
+                      >
+                        <User size={12} className="me-1" />
+                        {attendee}
+                        <X 
+                          size={14} 
+                          className="ms-2" 
+                          style={{ cursor: 'pointer' }}
+                          onClick={() => {
+                            setMeetingData({
+                              ...meetingData,
+                              attendees: meetingData.attendees.filter((_, i) => i !== index)
+                            });
+                          }}
+                        />
+                      </Badge>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-muted small border rounded p-3 text-center" style={{ background: '#f8f9fa' }}>
+                    <Users size={20} className="mb-2" />
+                    <div>No attendees added yet. Click "Add Attendees" to invite team members.</div>
+                  </div>
+                )}
+              </Form.Group>
+            </Col>
+          </Row>
+
+          <div className="alert alert-info mb-0 d-flex align-items-center">
+            <AlertCircle size={18} className="me-2" />
+            <small>Schedule meetings to track important interactions with your leads.</small>
+          </div>
+        </Form>
+      </Modal.Body>
+      <Modal.Footer className="border-top bg-light">
+        <Button 
+          variant="outline-secondary" 
+          onClick={() => {
+            setShowAddMeetingModal(false);
+            setMeetingData({
+              leadId: null,
+              leadName: '',
+              meetingName: '',
+              meetingType: 'Discovery Call',
+              meetingOutcome: '',
+              meetingDate: '',
+              meetingTime: '',
+              attendees: []
+            });
+          }}
+        >
+          <X size={16} className="me-1" />
+          Cancel
+        </Button>
+        <Button 
+          variant="primary"
+          disabled={
+            !meetingData.meetingName || 
+            !meetingData.meetingType || 
+            !meetingData.meetingDate || 
+            !meetingData.meetingTime
+          }
+          onClick={() => {
+            console.log('Scheduling meeting:', meetingData);
+            alert(`Meeting "${meetingData.meetingName}" scheduled successfully for ${meetingData.meetingDate} at ${meetingData.meetingTime}`);
+            setShowAddMeetingModal(false);
+            setMeetingData({
+              leadId: null,
+              leadName: '',
+              meetingName: '',
+              meetingType: 'Discovery Call',
+              meetingOutcome: '',
+              meetingDate: '',
+              meetingTime: '',
+              attendees: []
+            });
+          }}
+        >
+          <Calendar size={16} className="me-1" />
+          Schedule Meeting
+        </Button>
+      </Modal.Footer>
+    </Modal>
+  );
+
+  // Filter Drawer Component
+  // Column customization drawer (keeping simple version)
+  const FilterDrawer = () => {
+    return null; // Using new AdvancedFilter component instead
   };
 
   // Reminder Alert Component
@@ -1953,7 +3318,14 @@ const CRMPortal = () => {
 
   // Confirmation Dialog Component
   const ConfirmationDialog = () => (
-    <Modal show={showConfirmDialog} onHide={() => setShowConfirmDialog(false)} centered>
+    <Modal 
+      show={showConfirmDialog} 
+      onHide={() => {
+        setShowConfirmDialog(false);
+        setDeleteConfirmText('');
+      }} 
+      centered
+    >
       <Modal.Header closeButton className="border-bottom">
         <Modal.Title>
           {confirmAction?.type === 'delete' && 'Confirm Deletion'}
@@ -1966,7 +3338,17 @@ const CRMPortal = () => {
           <div className="text-center">
             <AlertCircle size={48} className="text-danger mb-3" />
             <p className="mb-0">Are you sure you want to delete this {confirmAction.data?.itemType || 'item'}?</p>
-            <p className="text-muted small mb-0">This action cannot be undone.</p>
+            <p className="text-muted small mb-3">This action cannot be undone.</p>
+            <div className="text-center mt-4">
+              <Form.Label className="fw-semibold">Type <span className="text-danger fw-bold">DELETE</span> to confirm</Form.Label>
+              <Form.Control 
+                type="text" 
+                placeholder="Type DELETE"
+                value={deleteConfirmText}
+                onChange={(e) => setDeleteConfirmText(e.target.value)}
+                autoFocus
+              />
+            </div>
           </div>
         )}
         {confirmAction?.type === 'convert-deal' && (
@@ -1985,15 +3367,23 @@ const CRMPortal = () => {
         )}
       </Modal.Body>
       <Modal.Footer className="border-top">
-        <Button variant="secondary" onClick={() => setShowConfirmDialog(false)}>
+        <Button 
+          variant="secondary" 
+          onClick={() => {
+            setShowConfirmDialog(false);
+            setDeleteConfirmText('');
+          }}
+        >
           Cancel
         </Button>
         <Button 
           variant={confirmAction?.type === 'delete' ? 'danger' : 'success'}
+          disabled={confirmAction?.type === 'delete' && deleteConfirmText !== 'DELETE'}
           onClick={() => {
             if (confirmAction?.type === 'delete') {
               console.log('Deleting:', confirmAction.data);
               alert(`${confirmAction.data?.itemType || 'Item'} deleted successfully`);
+              setDeleteConfirmText('');
             } else if (confirmAction?.type === 'convert-deal') {
               setEditingDeal({ ...confirmAction.data, dealValue: '$20,000', stage: 'Proposal' });
               setShowDealFormModal(true);
@@ -2015,126 +3405,647 @@ const CRMPortal = () => {
     if (!viewingLead) return null;
     
     return (
-      <Modal show={showLeadViewModal} onHide={() => setShowLeadViewModal(false)} size="lg" centered>
-        <Modal.Header closeButton className="border-bottom bg-light">
-          <Modal.Title>Lead Details</Modal.Title>
-        </Modal.Header>
-        <Modal.Body className="p-4">
-          <Row className="mb-4">
-            <Col md={12}>
-              <div className="d-flex align-items-center justify-content-between mb-3">
-                <h4 className="mb-0">{viewingLead.name}</h4>
-                <Badge bg={viewingLead.stage === 'Qualified' ? 'success' : viewingLead.stage === 'Contacted' ? 'info' : 'secondary'} className="px-3 py-2">
+      <Modal show={showLeadViewModal} onHide={() => setShowLeadViewModal(false)} size="xl" centered>
+        {/* Custom Header with Gradient */}
+        <div style={{
+          // background: 'linear-gradient(135deg, #4680ff 0%, #5a67d8 100%)',
+          color: 'black',
+          padding: '30px',
+          position: 'relative',
+          borderTopLeftRadius: '8px',
+          borderTopRightRadius: '8px',
+          borderBottom: '1px solid #e5e7eb'
+        }}>
+          <button 
+            onClick={() => setShowLeadViewModal(false)}
+            style={{
+              position: 'absolute',
+              top: '20px',
+              right: '20px',
+              background: 'rgba(255,255,255,0.2)',
+              border: 'none',
+              color: 'black',
+              width: '36px',
+              height: '36px',
+              borderRadius: '50%',
+              cursor: 'pointer',
+              transition: 'all 0.3s',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = 'rgba(255,255,255,0.3)';
+              e.currentTarget.style.transform = 'rotate(90deg)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = 'rgba(255,255,255,0.2)';
+              e.currentTarget.style.transform = 'rotate(0deg)';
+            }}
+          >
+            <X size={20} />
+          </button>
+          <h3 style={{ margin: 0, fontWeight: 600, fontSize: '24px' }}>
+            {viewingLead.name}
+          </h3>
+          <p style={{ margin: '8px 0 0 0', opacity: 0.9, fontSize: '14px' }}>
+            Lead Details
+          </p>
+        </div>
+
+        <Modal.Body style={{ padding: '30px' }}>
+          {/* Contact Information Section */}
+          <div style={{
+            fontSize: '16px',
+            fontWeight: 600,
+            color: '#1f2937',
+            marginBottom: '20px',
+            paddingBottom: '10px',
+            borderBottom: '2px solid #f8f9fa',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px'
+          }}>
+            <User size={18} style={{ color: '#4680ff' }} />
+            Contact Information
+          </div>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+            gap: '20px',
+            marginBottom: '30px'
+          }}>
+            <div style={{
+              background: '#f8f9fa',
+              padding: '16px',
+              borderRadius: '10px',
+              transition: 'all 0.3s'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = '#e5e7eb';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = '#f8f9fa';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}>
+              <div style={{
+                fontSize: '12px',
+                fontWeight: 600,
+                color: '#6b7280',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                marginBottom: '6px'
+              }}>Lead Name</div>
+              <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                {viewingLead.name}
+              </div>
+            </div>
+            <div style={{
+              background: '#f8f9fa',
+              padding: '16px',
+              borderRadius: '10px',
+              transition: 'all 0.3s'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = '#e5e7eb';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = '#f8f9fa';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}>
+              <div style={{
+                fontSize: '12px',
+                fontWeight: 600,
+                color: '#6b7280',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                marginBottom: '6px'
+              }}>Email Address</div>
+              <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                <Mail size={14} style={{ color: '#4680ff', marginRight: '6px' }} />
+                {viewingLead.email}
+              </div>
+            </div>
+            <div style={{
+              background: '#f8f9fa',
+              padding: '16px',
+              borderRadius: '10px',
+              transition: 'all 0.3s'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = '#e5e7eb';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = '#f8f9fa';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}>
+              <div style={{
+                fontSize: '12px',
+                fontWeight: 600,
+                color: '#6b7280',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                marginBottom: '6px'
+              }}>Phone Number</div>
+              <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                <Phone size={14} style={{ color: '#4680ff', marginRight: '6px' }} />
+                {viewingLead.phone}
+              </div>
+            </div>
+            <div style={{
+              background: '#f8f9fa',
+              padding: '16px',
+              borderRadius: '10px',
+              transition: 'all 0.3s'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = '#e5e7eb';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = '#f8f9fa';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}>
+              <div style={{
+                fontSize: '12px',
+                fontWeight: 600,
+                color: '#6b7280',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                marginBottom: '6px'
+              }}>Company</div>
+              <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                <Building2 size={14} style={{ color: '#4680ff', marginRight: '6px' }} />
+                {viewingLead.company}
+              </div>
+            </div>
+            <div style={{
+              background: '#f8f9fa',
+              padding: '16px',
+              borderRadius: '10px',
+              transition: 'all 0.3s'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = '#e5e7eb';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = '#f8f9fa';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}>
+              <div style={{
+                fontSize: '12px',
+                fontWeight: 600,
+                color: '#6b7280',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                marginBottom: '6px'
+              }}>Stage</div>
+              <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                <Badge 
+                  bg={viewingLead.stage === 'Qualified' ? 'success' : viewingLead.stage === 'Contacted' ? 'info' : 'secondary'}
+                  style={{
+                    padding: '6px 14px',
+                    borderRadius: '20px',
+                    fontSize: '12px',
+                    fontWeight: 600
+                  }}
+                >
                   {viewingLead.stage}
                 </Badge>
               </div>
-            </Col>
-          </Row>
-
-          <Row>
-            <Col md={6}>
-              <Card className="border-0 bg-light mb-3">
-                <Card.Body>
-                  <h6 className="text-muted mb-3">Contact Information</h6>
-                  <div className="mb-2">
-                    <Mail size={16} className="me-2 text-primary" />
-                    <strong>Email:</strong> {viewingLead.email}
-                  </div>
-                  <div className="mb-2">
-                    <Phone size={16} className="me-2 text-primary" />
-                    <strong>Phone:</strong> {viewingLead.phone}
-                  </div>
-                  <div className="mb-0">
-                    <Building2 size={16} className="me-2 text-primary" />
-                    <strong>Company:</strong> {viewingLead.company}
-                  </div>
-                </Card.Body>
-              </Card>
-            </Col>
-
-            <Col md={6}>
-              <Card className="border-0 bg-light mb-3">
-                <Card.Body>
-                  <h6 className="text-muted mb-3">Lead Metrics</h6>
-                  <div className="mb-2">
-                    <strong>Lead Potential:</strong>{' '}
-                    <Badge bg={viewingLead.leadPotential === 'Hot' ? 'danger' : viewingLead.leadPotential === 'Warm' ? 'warning' : 'secondary'}>
-                      {viewingLead.leadPotential}
-                    </Badge>
-                  </div>
-                  <div className="mb-2">
-                    <strong>Urgency:</strong>{' '}
-                    <Badge bg={viewingLead.urgency === 'High' ? 'danger' : viewingLead.urgency === 'Medium' ? 'warning' : 'secondary'}>
-                      {viewingLead.urgency}
-                    </Badge>
-                  </div>
-                  <div className="mb-0">
-                    <strong>Lead Score:</strong>{' '}
-                    <Badge bg={viewingLead.leadScore >= 70 ? 'success' : viewingLead.leadScore >= 40 ? 'warning' : 'danger'} className="px-3">
-                      {viewingLead.leadScore}
-                    </Badge>
-                  </div>
-                </Card.Body>
-              </Card>
-            </Col>
-          </Row>
-
-          <Row>
-            <Col md={6}>
-              <Card className="border-0 bg-light mb-3">
-                <Card.Body>
-                  <h6 className="text-muted mb-3">Additional Details</h6>
-                  <div className="mb-2">
-                    <strong>Industry:</strong> {viewingLead.industry}
-                  </div>
-                  <div className="mb-2">
-                    <strong>Assigned To:</strong> {viewingLead.assignedUser}
-                  </div>
-                  <div className="mb-0">
-                    <strong>Created:</strong> {viewingLead.created}
-                  </div>
-                </Card.Body>
-              </Card>
-            </Col>
-
-            <Col md={6}>
-              <Card className="border-0 bg-light mb-3">
-                <Card.Body>
-                  <h6 className="text-muted mb-3">Follow-ups</h6>
-                  <div className="mb-2">
-                    <strong>Total Follow-ups:</strong>{' '}
-                    <Badge bg="primary" pill>{viewingLead.followUps?.length || 0}</Badge>
-                  </div>
-                  {viewingLead.followUps && viewingLead.followUps.length > 0 && (
-                    <div className="mt-2">
-                      {viewingLead.followUps.map((followUp: any, idx: number) => (
-                        <div key={idx} className="small text-muted mb-1">
-                          • {followUp.date}: {followUp.notes}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </Card.Body>
-              </Card>
-            </Col>
-          </Row>
-        </Modal.Body>
-        <Modal.Footer className="border-top">
-          <Button variant="secondary" onClick={() => setShowLeadViewModal(false)}>
-            Close
-          </Button>
-          <Button 
-            variant="primary" 
-            onClick={() => {
-              setEditingLead(viewingLead);
-              setShowLeadViewModal(false);
-              setShowLeadFormModal(true);
+            </div>
+            <div style={{
+              background: '#f8f9fa',
+              padding: '16px',
+              borderRadius: '10px',
+              transition: 'all 0.3s'
             }}
-          >
-            <Edit size={16} className="me-1" />
-            Edit Lead
-          </Button>
-        </Modal.Footer>
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = '#e5e7eb';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = '#f8f9fa';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}>
+              <div style={{
+                fontSize: '12px',
+                fontWeight: 600,
+                color: '#6b7280',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                marginBottom: '6px'
+              }}>Assigned To</div>
+              <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                {viewingLead.assignedUser}
+              </div>
+            </div>
+          </div>
+
+          {/* Lead Metrics Section */}
+          <div style={{
+            fontSize: '16px',
+            fontWeight: 600,
+            color: '#1f2937',
+            marginBottom: '20px',
+            paddingBottom: '10px',
+            borderBottom: '2px solid #f8f9fa',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px'
+          }}>
+            <TrendingUp size={18} style={{ color: '#4680ff' }} />
+            Lead Metrics
+          </div>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+            gap: '20px',
+            marginBottom: '30px'
+          }}>
+            <div style={{
+              background: '#f8f9fa',
+              padding: '16px',
+              borderRadius: '10px',
+              transition: 'all 0.3s'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = '#e5e7eb';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = '#f8f9fa';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}>
+              <div style={{
+                fontSize: '12px',
+                fontWeight: 600,
+                color: '#6b7280',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                marginBottom: '6px'
+              }}>Lead Potential</div>
+              <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                <Badge 
+                  bg={viewingLead.leadPotential === 'Hot' ? 'danger' : viewingLead.leadPotential === 'Warm' ? 'warning' : 'secondary'}
+                  style={{
+                    padding: '6px 14px',
+                    borderRadius: '20px',
+                    fontSize: '12px',
+                    fontWeight: 600
+                  }}
+                >
+                  {viewingLead.leadPotential}
+                </Badge>
+              </div>
+            </div>
+            <div style={{
+              background: '#f8f9fa',
+              padding: '16px',
+              borderRadius: '10px',
+              transition: 'all 0.3s'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = '#e5e7eb';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = '#f8f9fa';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}>
+              <div style={{
+                fontSize: '12px',
+                fontWeight: 600,
+                color: '#6b7280',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                marginBottom: '6px'
+              }}>Urgency</div>
+              <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                <Badge 
+                  bg={viewingLead.urgency === 'High' ? 'danger' : viewingLead.urgency === 'Medium' ? 'warning' : 'info'}
+                  style={{
+                    padding: '6px 14px',
+                    borderRadius: '20px',
+                    fontSize: '12px',
+                    fontWeight: 600
+                  }}
+                >
+                  {viewingLead.urgency}
+                </Badge>
+              </div>
+            </div>
+            <div style={{
+              background: '#f8f9fa',
+              padding: '16px',
+              borderRadius: '10px',
+              transition: 'all 0.3s'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = '#e5e7eb';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = '#f8f9fa';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}>
+              <div style={{
+                fontSize: '12px',
+                fontWeight: 600,
+                color: '#6b7280',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                marginBottom: '6px'
+              }}>Lead Score</div>
+              <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                <Badge 
+                  bg={viewingLead.leadScore >= 70 ? 'success' : viewingLead.leadScore >= 40 ? 'warning' : 'danger'}
+                  style={{
+                    padding: '6px 14px',
+                    borderRadius: '20px',
+                    fontSize: '12px',
+                    fontWeight: 600
+                  }}
+                >
+                  {viewingLead.leadScore}
+                </Badge>
+              </div>
+            </div>
+            <div style={{
+              background: '#f8f9fa',
+              padding: '16px',
+              borderRadius: '10px',
+              transition: 'all 0.3s'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = '#e5e7eb';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = '#f8f9fa';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}>
+              <div style={{
+                fontSize: '12px',
+                fontWeight: 600,
+                color: '#6b7280',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                marginBottom: '6px'
+              }}>Lead Type</div>
+              <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                {viewingLead.leadType || 'N/A'}
+              </div>
+            </div>
+            <div style={{
+              background: '#f8f9fa',
+              padding: '16px',
+              borderRadius: '10px',
+              transition: 'all 0.3s'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = '#e5e7eb';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = '#f8f9fa';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}>
+              <div style={{
+                fontSize: '12px',
+                fontWeight: 600,
+                color: '#6b7280',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                marginBottom: '6px'
+              }}>Industry</div>
+              <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                {viewingLead.industry || 'N/A'}
+              </div>
+            </div>
+            <div style={{
+              background: '#f8f9fa',
+              padding: '16px',
+              borderRadius: '10px',
+              transition: 'all 0.3s'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = '#e5e7eb';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = '#f8f9fa';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}>
+              <div style={{
+                fontSize: '12px',
+                fontWeight: 600,
+                color: '#6b7280',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                marginBottom: '6px'
+              }}>Created Date</div>
+              <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                <Calendar size={14} style={{ color: '#4680ff', marginRight: '6px' }} />
+                {viewingLead.created}
+              </div>
+            </div>
+          </div>
+
+          {/* Follow-ups Timeline */}
+          {viewingLead.followUps && viewingLead.followUps.length > 0 && (
+            <>
+              <div style={{
+                fontSize: '16px',
+                fontWeight: 600,
+                color: '#1f2937',
+                marginBottom: '20px',
+                paddingBottom: '10px',
+                borderBottom: '2px solid #f8f9fa',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px'
+              }}>
+                <History size={18} style={{ color: '#4680ff' }} />
+                Follow-up Activity ({viewingLead.followUps.length})
+              </div>
+              <div style={{ position: 'relative', paddingLeft: '30px', marginBottom: '30px' }}>
+                <div style={{
+                  content: '',
+                  position: 'absolute',
+                  left: '8px',
+                  top: 0,
+                  bottom: 0,
+                  width: '2px',
+                  background: '#e5e7eb'
+                }} />
+                {viewingLead.followUps.map((followUp: any, idx: number) => (
+                  <div key={idx} style={{ position: 'relative', paddingBottom: '20px' }}>
+                    <div style={{
+                      content: '',
+                      position: 'absolute',
+                      left: '-26px',
+                      top: '4px',
+                      width: '12px',
+                      height: '12px',
+                      borderRadius: '50%',
+                      background: followUp.status === 'Completed' ? '#10b981' : '#4680ff',
+                      border: '3px solid white',
+                      boxShadow: '0 0 0 2px #e5e7eb'
+                    }} />
+                    <div style={{
+                      background: '#f8f9fa',
+                      padding: '12px 16px',
+                      borderRadius: '8px'
+                    }}>
+                      <div style={{ fontSize: '12px', color: '#6b7280', fontWeight: 600 }}>
+                        {followUp.date} - {followUp.channel}
+                      </div>
+                      <div style={{ fontSize: '14px', color: '#1f2937', marginTop: '4px' }}>
+                        <strong>{followUp.status}</strong>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+
+          {/* Action Buttons */}
+          <div style={{
+            display: 'flex',
+            gap: '12px',
+            flexWrap: 'wrap',
+            paddingTop: '20px',
+            borderTop: '1px solid #e5e7eb'
+          }}>
+            <Button
+              variant="primary"
+              style={{
+                padding: '10px 20px',
+                borderRadius: '8px',
+                fontWeight: 500,
+                fontSize: '14px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                background: '#4680ff',
+                border: 'none'
+              }}
+              onClick={() => {
+                setEditingLead(viewingLead);
+                setShowLeadViewModal(false);
+                setShowLeadFormModal(true);
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.background = '#3b6ce5';
+                e.currentTarget.style.transform = 'translateY(-2px)';
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(70, 128, 255, 0.4)';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.background = '#4680ff';
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = 'none';
+              }}
+            >
+              <Edit size={16} />
+              Edit Lead
+            </Button>
+            <Button
+              variant="success"
+              style={{
+                padding: '10px 20px',
+                borderRadius: '8px',
+                fontWeight: 500,
+                fontSize: '14px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                background: '#10b981',
+                border: 'none'
+              }}
+              onClick={() => {
+                setEditingDeal(null);
+                setDealFormStep(0);
+                setShowLeadViewModal(false);
+                setShowDealFormModal(true);
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.background = '#059669';
+                e.currentTarget.style.transform = 'translateY(-2px)';
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.4)';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.background = '#10b981';
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = 'none';
+              }}
+            >
+              <Handshake size={16} />
+              Convert to Deal
+            </Button>
+            <Button
+              variant="outline-secondary"
+              style={{
+                padding: '10px 20px',
+                borderRadius: '8px',
+                fontWeight: 500,
+                fontSize: '14px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                background: 'white',
+                color: '#6b7280',
+                border: '2px solid #e5e7eb'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.borderColor = '#4680ff';
+                e.currentTarget.style.color = '#4680ff';
+                e.currentTarget.style.background = '#f0f4ff';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.borderColor = '#e5e7eb';
+                e.currentTarget.style.color = '#6b7280';
+                e.currentTarget.style.background = 'white';
+              }}
+            >
+              <Calendar size={16} />
+              Schedule Follow-up
+            </Button>
+            <Button
+              variant="outline-secondary"
+              style={{
+                padding: '10px 20px',
+                borderRadius: '8px',
+                fontWeight: 500,
+                fontSize: '14px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                background: 'white',
+                color: '#6b7280',
+                border: '2px solid #e5e7eb'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.borderColor = '#4680ff';
+                e.currentTarget.style.color = '#4680ff';
+                e.currentTarget.style.background = '#f0f4ff';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.borderColor = '#e5e7eb';
+                e.currentTarget.style.color = '#6b7280';
+                e.currentTarget.style.background = 'white';
+              }}
+            >
+              <Phone size={16} />
+              Call Lead
+            </Button>
+          </div>
+        </Modal.Body>
       </Modal>
     );
   };
@@ -2144,75 +4055,453 @@ const CRMPortal = () => {
     if (!viewingDeal) return null;
     
     return (
-      <Modal show={showDealViewModal} onHide={() => setShowDealViewModal(false)} size="lg" centered>
-        <Modal.Header closeButton className="border-bottom bg-light">
-          <Modal.Title>Deal Details</Modal.Title>
-        </Modal.Header>
-        <Modal.Body className="p-4">
-          <Row className="mb-4">
-            <Col md={12}>
-              <div className="d-flex align-items-center justify-content-between mb-3">
-                <h4 className="mb-0">{viewingDeal.name}</h4>
-                <Badge bg={viewingDeal.stage === 'Won' ? 'success' : viewingDeal.stage === 'Lost' ? 'danger' : 'primary'} className="px-3 py-2">
+      <Modal show={showDealViewModal} onHide={() => setShowDealViewModal(false)} size="xl" centered>
+        {/* Custom Header with Gradient */}
+        <div style={{
+          color: 'black',
+          padding: '30px',
+          position: 'relative',
+          borderTopLeftRadius: '8px',
+          borderTopRightRadius: '8px',
+          borderBottom: '1px solid #e5e7eb'
+        }}>
+          <button 
+            onClick={() => setShowDealViewModal(false)}
+            style={{
+              position: 'absolute',
+              top: '20px',
+              right: '20px',
+              background: 'rgba(255,255,255,0.2)',
+              border: 'none',
+              color: 'black',
+              width: '36px',
+              height: '36px',
+              borderRadius: '50%',
+              cursor: 'pointer',
+              transition: 'all 0.3s',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = 'rgba(255,255,255,0.3)';
+              e.currentTarget.style.transform = 'rotate(90deg)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = 'rgba(255,255,255,0.2)';
+              e.currentTarget.style.transform = 'rotate(0deg)';
+            }}
+          >
+            <X size={20} />
+          </button>
+          <h3 style={{ margin: 0, fontWeight: 600, fontSize: '24px' }}>
+            {viewingDeal.name}
+          </h3>
+          <p style={{ margin: '8px 0 0 0', opacity: 0.9, fontSize: '14px' }}>
+            Deal Details
+          </p>
+        </div>
+
+        <Modal.Body style={{ padding: '30px' }}>
+          {/* Deal Information Section */}
+          <div style={{
+            fontSize: '16px',
+            fontWeight: 600,
+            color: '#1f2937',
+            marginBottom: '20px',
+            paddingBottom: '10px',
+            borderBottom: '2px solid #f8f9fa',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px'
+          }}>
+            <Handshake size={18} style={{ color: '#4680ff' }} />
+            Deal Information
+          </div>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+            gap: '20px',
+            marginBottom: '30px'
+          }}>
+            <div style={{
+              background: '#f8f9fa',
+              padding: '16px',
+              borderRadius: '10px',
+              transition: 'all 0.3s'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = '#e5e7eb';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = '#f8f9fa';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}>
+              <div style={{
+                fontSize: '12px',
+                fontWeight: 600,
+                color: '#6b7280',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                marginBottom: '6px'
+              }}>Deal Name</div>
+              <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                {viewingDeal.name}
+              </div>
+            </div>
+            <div style={{
+              background: '#f8f9fa',
+              padding: '16px',
+              borderRadius: '10px',
+              transition: 'all 0.3s'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = '#e5e7eb';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = '#f8f9fa';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}>
+              <div style={{
+                fontSize: '12px',
+                fontWeight: 600,
+                color: '#6b7280',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                marginBottom: '6px'
+              }}>Company</div>
+              <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                <Building2 size={14} style={{ color: '#4680ff', marginRight: '6px' }} />
+                {viewingDeal.company}
+              </div>
+            </div>
+            <div style={{
+              background: '#f8f9fa',
+              padding: '16px',
+              borderRadius: '10px',
+              transition: 'all 0.3s'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = '#e5e7eb';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = '#f8f9fa';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}>
+              <div style={{
+                fontSize: '12px',
+                fontWeight: 600,
+                color: '#6b7280',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                marginBottom: '6px'
+              }}>Deal Value</div>
+              <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                <DollarSign size={14} style={{ color: '#10b981', marginRight: '6px' }} />
+                {viewingDeal.value || viewingDeal.dealValue}
+              </div>
+            </div>
+            <div style={{
+              background: '#f8f9fa',
+              padding: '16px',
+              borderRadius: '10px',
+              transition: 'all 0.3s'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = '#e5e7eb';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = '#f8f9fa';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}>
+              <div style={{
+                fontSize: '12px',
+                fontWeight: 600,
+                color: '#6b7280',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                marginBottom: '6px'
+              }}>Stage</div>
+              <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                <Badge 
+                  bg={viewingDeal.stage === 'Won' ? 'success' : viewingDeal.stage === 'Lost' ? 'danger' : viewingDeal.stage === 'Negotiation' ? 'warning' : 'primary'}
+                  style={{
+                    padding: '6px 14px',
+                    borderRadius: '20px',
+                    fontSize: '12px',
+                    fontWeight: 600
+                  }}
+                >
                   {viewingDeal.stage}
                 </Badge>
               </div>
-            </Col>
-          </Row>
-
-          <Row>
-            <Col md={6}>
-              <Card className="border-0 bg-light mb-3">
-                <Card.Body>
-                  <h6 className="text-muted mb-3">Deal Information</h6>
-                  <div className="mb-2">
-                    <strong>Deal Value:</strong> {viewingDeal.value || viewingDeal.dealValue}
-                  </div>
-                  <div className="mb-2">
-                    <strong>Probability:</strong> <Badge bg="primary">{viewingDeal.probability || 50}%</Badge>
-                  </div>
-                  <div className="mb-0">
-                    <strong>Created:</strong> {viewingDeal.created}
-                  </div>
-                </Card.Body>
-              </Card>
-            </Col>
-
-            <Col md={6}>
-              <Card className="border-0 bg-light mb-3">
-                <Card.Body>
-                  <h6 className="text-muted mb-3">Company Details</h6>
-                  <div className="mb-2">
-                    <Building2 size={16} className="me-2 text-primary" />
-                    <strong>Company:</strong> {viewingDeal.company}
-                  </div>
-                  <div className="mb-2">
-                    <strong>Industry:</strong> {viewingDeal.industry}
-                  </div>
-                  <div className="mb-0">
-                    <strong>Owner:</strong> {viewingDeal.owner}
-                  </div>
-                </Card.Body>
-              </Card>
-            </Col>
-          </Row>
-        </Modal.Body>
-        <Modal.Footer className="border-top">
-          <Button variant="secondary" onClick={() => setShowDealViewModal(false)}>
-            Close
-          </Button>
-          <Button 
-            variant="primary" 
-            onClick={() => {
-              setEditingDeal(viewingDeal);
-              setShowDealViewModal(false);
-              setShowDealFormModal(true);
+            </div>
+            <div style={{
+              background: '#f8f9fa',
+              padding: '16px',
+              borderRadius: '10px',
+              transition: 'all 0.3s'
             }}
-          >
-            <Edit size={16} className="me-1" />
-            Edit Deal
-          </Button>
-        </Modal.Footer>
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = '#e5e7eb';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = '#f8f9fa';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}>
+              <div style={{
+                fontSize: '12px',
+                fontWeight: 600,
+                color: '#6b7280',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                marginBottom: '6px'
+              }}>Probability</div>
+              <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                <Badge 
+                  bg={viewingDeal.probability >= 70 ? 'success' : viewingDeal.probability >= 40 ? 'warning' : 'danger'}
+                  style={{
+                    padding: '6px 14px',
+                    borderRadius: '20px',
+                    fontSize: '12px',
+                    fontWeight: 600
+                  }}
+                >
+                  {viewingDeal.probability || 50}%
+                </Badge>
+              </div>
+            </div>
+            <div style={{
+              background: '#f8f9fa',
+              padding: '16px',
+              borderRadius: '10px',
+              transition: 'all 0.3s'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = '#e5e7eb';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = '#f8f9fa';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}>
+              <div style={{
+                fontSize: '12px',
+                fontWeight: 600,
+                color: '#6b7280',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                marginBottom: '6px'
+              }}>Owner</div>
+              <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                <User size={14} style={{ color: '#4680ff', marginRight: '6px' }} />
+                {viewingDeal.owner}
+              </div>
+            </div>
+          </div>
+
+          {/* Company Details Section */}
+          <div style={{
+            fontSize: '16px',
+            fontWeight: 600,
+            color: '#1f2937',
+            marginBottom: '20px',
+            paddingBottom: '10px',
+            borderBottom: '2px solid #f8f9fa',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px'
+          }}>
+            <Building2 size={18} style={{ color: '#4680ff' }} />
+            Company Details
+          </div>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+            gap: '20px',
+            marginBottom: '30px'
+          }}>
+            <div style={{
+              background: '#f8f9fa',
+              padding: '16px',
+              borderRadius: '10px',
+              transition: 'all 0.3s'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = '#e5e7eb';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = '#f8f9fa';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}>
+              <div style={{
+                fontSize: '12px',
+                fontWeight: 600,
+                color: '#6b7280',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                marginBottom: '6px'
+              }}>Industry</div>
+              <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                {viewingDeal.industry || 'N/A'}
+              </div>
+            </div>
+            <div style={{
+              background: '#f8f9fa',
+              padding: '16px',
+              borderRadius: '10px',
+              transition: 'all 0.3s'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = '#e5e7eb';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = '#f8f9fa';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}>
+              <div style={{
+                fontSize: '12px',
+                fontWeight: 600,
+                color: '#6b7280',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                marginBottom: '6px'
+              }}>Deal Type</div>
+              <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                {viewingDeal.dealType || 'N/A'}
+              </div>
+            </div>
+            <div style={{
+              background: '#f8f9fa',
+              padding: '16px',
+              borderRadius: '10px',
+              transition: 'all 0.3s'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = '#e5e7eb';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = '#f8f9fa';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}>
+              <div style={{
+                fontSize: '12px',
+                fontWeight: 600,
+                color: '#6b7280',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                marginBottom: '6px'
+              }}>Expected Close Date</div>
+              <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                <Calendar size={14} style={{ color: '#4680ff', marginRight: '6px' }} />
+                {viewingDeal.expectedCloseDate || viewingDeal.closeDate || 'N/A'}
+              </div>
+            </div>
+            <div style={{
+              background: '#f8f9fa',
+              padding: '16px',
+              borderRadius: '10px',
+              transition: 'all 0.3s'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = '#e5e7eb';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = '#f8f9fa';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}>
+              <div style={{
+                fontSize: '12px',
+                fontWeight: 600,
+                color: '#6b7280',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                marginBottom: '6px'
+              }}>Created Date</div>
+              <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                <Calendar size={14} style={{ color: '#4680ff', marginRight: '6px' }} />
+                {viewingDeal.created}
+              </div>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div style={{
+            display: 'flex',
+            gap: '12px',
+            flexWrap: 'wrap',
+            paddingTop: '20px',
+            borderTop: '1px solid #e5e7eb'
+          }}>
+            <Button
+              variant="primary"
+              style={{
+                padding: '10px 20px',
+                borderRadius: '8px',
+                fontWeight: 500,
+                fontSize: '14px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                background: '#4680ff',
+                border: 'none'
+              }}
+              onClick={() => {
+                setEditingDeal(viewingDeal);
+                setShowDealViewModal(false);
+                setShowDealFormModal(true);
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.background = '#3b6ce5';
+                e.currentTarget.style.transform = 'translateY(-2px)';
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(70, 128, 255, 0.4)';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.background = '#4680ff';
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = 'none';
+              }}
+            >
+              <Edit size={16} />
+              Edit Deal
+            </Button>
+            <Button
+              variant="outline-secondary"
+              style={{
+                padding: '10px 20px',
+                borderRadius: '8px',
+                fontWeight: 500,
+                fontSize: '14px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                background: 'white',
+                color: '#6b7280',
+                border: '2px solid #e5e7eb'
+              }}
+              onClick={() => setShowDealViewModal(false)}
+              onMouseOver={(e) => {
+                e.currentTarget.style.borderColor = '#4680ff';
+                e.currentTarget.style.color = '#4680ff';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.borderColor = '#e5e7eb';
+                e.currentTarget.style.color = '#6b7280';
+              }}
+            >
+              Close
+            </Button>
+          </div>
+        </Modal.Body>
       </Modal>
     );
   };
@@ -2222,75 +4511,700 @@ const CRMPortal = () => {
     if (!viewingOrder) return null;
     
     return (
-      <Modal show={showOrderViewModal} onHide={() => setShowOrderViewModal(false)} size="lg" centered>
-        <Modal.Header closeButton className="border-bottom bg-light">
-          <Modal.Title>Order Details</Modal.Title>
-        </Modal.Header>
-        <Modal.Body className="p-4">
-          <Row className="mb-4">
-            <Col md={12}>
-              <div className="d-flex align-items-center justify-content-between mb-3">
-                <h4 className="mb-0">{viewingOrder.id}</h4>
-                <Badge bg={
-                  viewingOrder.status === 'Delivered' ? 'success' : 
-                  viewingOrder.status === 'In Progress' ? 'info' : 
-                  viewingOrder.status === 'Pending' ? 'warning' : 
-                  'secondary'
-                } className="px-3 py-2">
-                  {viewingOrder.status}
-                </Badge>
-              </div>
-            </Col>
-          </Row>
-
-          <Row>
-            <Col md={6}>
-              <Card className="border-0 bg-light mb-3">
-                <Card.Body>
-                  <h6 className="text-muted mb-3">Order Information</h6>
-                  <div className="mb-2">
-                    <strong>Customer:</strong> {viewingOrder.customer}
-                  </div>
-                  <div className="mb-2">
-                    <strong>Product:</strong> {viewingOrder.product}
-                  </div>
-                  <div className="mb-0">
-                    <strong>Amount:</strong> {viewingOrder.amount}
-                  </div>
-                </Card.Body>
-              </Card>
-            </Col>
-
-            <Col md={6}>
-              <Card className="border-0 bg-light mb-3">
-                <Card.Body>
-                  <h6 className="text-muted mb-3">Additional Details</h6>
-                  <div className="mb-2">
-                    <strong>Date:</strong> {viewingOrder.date}
-                  </div>
-                  <div className="mb-2">
-                    <strong>Status:</strong> {viewingOrder.status}
-                  </div>
-                </Card.Body>
-              </Card>
-            </Col>
-          </Row>
-        </Modal.Body>
-        <Modal.Footer className="border-top">
-          <Button variant="secondary" onClick={() => setShowOrderViewModal(false)}>
-            Close
-          </Button>
-          <Button 
-            variant="primary" 
-            onClick={() => {
-              setShowOrderViewModal(false);
-              // Add edit functionality
+      <Modal show={showOrderViewModal} onHide={() => setShowOrderViewModal(false)} size="xl" centered>
+        {/* Custom Header with Gradient */}
+        <div style={{
+          color: 'black',
+          padding: '30px',
+          position: 'relative',
+          borderTopLeftRadius: '8px',
+          borderTopRightRadius: '8px',
+          borderBottom: '1px solid #e5e7eb'
+        }}>
+          <button 
+            onClick={() => setShowOrderViewModal(false)}
+            style={{
+              position: 'absolute',
+              top: '20px',
+              right: '20px',
+              background: 'rgba(255,255,255,0.2)',
+              border: 'none',
+              color: 'black',
+              width: '36px',
+              height: '36px',
+              borderRadius: '50%',
+              cursor: 'pointer',
+              transition: 'all 0.3s',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = 'rgba(255,255,255,0.3)';
+              e.currentTarget.style.transform = 'rotate(90deg)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = 'rgba(255,255,255,0.2)';
+              e.currentTarget.style.transform = 'rotate(0deg)';
             }}
           >
-            <Edit size={16} className="me-1" />
-            Edit Order
-          </Button>
-        </Modal.Footer>
+            <X size={20} />
+          </button>
+          <h3 style={{ margin: 0, fontWeight: 600, fontSize: '24px' }}>
+            {viewingOrder.id}
+          </h3>
+          <p style={{ margin: '8px 0 0 0', opacity: 0.9, fontSize: '14px' }}>
+            Order Details
+          </p>
+        </div>
+
+        <Modal.Body style={{ padding: '30px' }}>
+          {/* Order Information Section */}
+          <div style={{
+            fontSize: '16px',
+            fontWeight: 600,
+            color: '#1f2937',
+            marginBottom: '20px',
+            paddingBottom: '10px',
+            borderBottom: '2px solid #f8f9fa',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px'
+          }}>
+            <ShoppingCart size={18} style={{ color: '#4680ff' }} />
+            Order Information
+          </div>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+            gap: '20px',
+            marginBottom: '30px'
+          }}>
+            <div style={{
+              background: '#f8f9fa',
+              padding: '16px',
+              borderRadius: '10px',
+              transition: 'all 0.3s'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = '#e5e7eb';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = '#f8f9fa';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}>
+              <div style={{
+                fontSize: '12px',
+                fontWeight: 600,
+                color: '#6b7280',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                marginBottom: '6px'
+              }}>Order ID</div>
+              <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                <Hash size={14} style={{ color: '#4680ff', marginRight: '6px' }} />
+                {viewingOrder.id}
+              </div>
+            </div>
+            <div style={{
+              background: '#f8f9fa',
+              padding: '16px',
+              borderRadius: '10px',
+              transition: 'all 0.3s'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = '#e5e7eb';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = '#f8f9fa';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}>
+              <div style={{
+                fontSize: '12px',
+                fontWeight: 600,
+                color: '#6b7280',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                marginBottom: '6px'
+              }}>Linked Deal</div>
+              <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                <Handshake size={14} style={{ color: '#4680ff', marginRight: '6px' }} />
+                {viewingOrder.linkedDeal || 'N/A'}
+              </div>
+            </div>
+            <div style={{
+              background: '#f8f9fa',
+              padding: '16px',
+              borderRadius: '10px',
+              transition: 'all 0.3s'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = '#e5e7eb';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = '#f8f9fa';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}>
+              <div style={{
+                fontSize: '12px',
+                fontWeight: 600,
+                color: '#6b7280',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                marginBottom: '6px'
+              }}>Order Value</div>
+              <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                <DollarSign size={14} style={{ color: '#10b981', marginRight: '6px' }} />
+                {viewingOrder.value}
+              </div>
+            </div>
+            <div style={{
+              background: '#f8f9fa',
+              padding: '16px',
+              borderRadius: '10px',
+              transition: 'all 0.3s'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = '#e5e7eb';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = '#f8f9fa';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}>
+              <div style={{
+                fontSize: '12px',
+                fontWeight: 600,
+                color: '#6b7280',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                marginBottom: '6px'
+              }}>Stage</div>
+              <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                <Badge 
+                  bg={viewingOrder.stage === 'Completed' || viewingOrder.stage === 'Delivered' ? 'success' : viewingOrder.stage === 'In Progress' ? 'info' : viewingOrder.stage === 'Order Created' ? 'warning' : 'secondary'}
+                  style={{
+                    padding: '6px 14px',
+                    borderRadius: '20px',
+                    fontSize: '12px',
+                    fontWeight: 600
+                  }}
+                >
+                  {viewingOrder.stage}
+                </Badge>
+              </div>
+            </div>
+            <div style={{
+              background: '#f8f9fa',
+              padding: '16px',
+              borderRadius: '10px',
+              transition: 'all 0.3s'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = '#e5e7eb';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = '#f8f9fa';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}>
+              <div style={{
+                fontSize: '12px',
+                fontWeight: 600,
+                color: '#6b7280',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                marginBottom: '6px'
+              }}>Approval Status</div>
+              <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                <Badge 
+                  bg={viewingOrder.approvalStatus === 'Approved' ? 'success' : viewingOrder.approvalStatus === 'Pending' ? 'warning' : 'danger'}
+                  style={{
+                    padding: '6px 14px',
+                    borderRadius: '20px',
+                    fontSize: '12px',
+                    fontWeight: 600
+                  }}
+                >
+                  {viewingOrder.approvalStatus}
+                </Badge>
+              </div>
+            </div>
+            <div style={{
+              background: '#f8f9fa',
+              padding: '16px',
+              borderRadius: '10px',
+              transition: 'all 0.3s'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = '#e5e7eb';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = '#f8f9fa';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}>
+              <div style={{
+                fontSize: '12px',
+                fontWeight: 600,
+                color: '#6b7280',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                marginBottom: '6px'
+              }}>Priority</div>
+              <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                <Badge 
+                  bg={viewingOrder.priority === 'High' ? 'danger' : viewingOrder.priority === 'Medium' ? 'warning' : 'info'}
+                  style={{
+                    padding: '6px 14px',
+                    borderRadius: '20px',
+                    fontSize: '12px',
+                    fontWeight: 600
+                  }}
+                >
+                  {viewingOrder.priority}
+                </Badge>
+              </div>
+            </div>
+          </div>
+
+          {/* Contract & Billing Section */}
+          <div style={{
+            fontSize: '16px',
+            fontWeight: 600,
+            color: '#1f2937',
+            marginBottom: '20px',
+            paddingBottom: '10px',
+            borderBottom: '2px solid #f8f9fa',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px'
+          }}>
+            <FileText size={18} style={{ color: '#4680ff' }} />
+            Contract & Billing Details
+          </div>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+            gap: '20px',
+            marginBottom: '30px'
+          }}>
+            <div style={{
+              background: '#f8f9fa',
+              padding: '16px',
+              borderRadius: '10px',
+              transition: 'all 0.3s'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = '#e5e7eb';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = '#f8f9fa';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}>
+              <div style={{
+                fontSize: '12px',
+                fontWeight: 600,
+                color: '#6b7280',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                marginBottom: '6px'
+              }}>Contract Type</div>
+              <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                {viewingOrder.contractType || 'N/A'}
+              </div>
+            </div>
+            <div style={{
+              background: '#f8f9fa',
+              padding: '16px',
+              borderRadius: '10px',
+              transition: 'all 0.3s'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = '#e5e7eb';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = '#f8f9fa';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}>
+              <div style={{
+                fontSize: '12px',
+                fontWeight: 600,
+                color: '#6b7280',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                marginBottom: '6px'
+              }}>Contract Length</div>
+              <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                <Calendar size={14} style={{ color: '#4680ff', marginRight: '6px' }} />
+                {viewingOrder.contractLength || 'N/A'}
+              </div>
+            </div>
+            <div style={{
+              background: '#f8f9fa',
+              padding: '16px',
+              borderRadius: '10px',
+              transition: 'all 0.3s'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = '#e5e7eb';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = '#f8f9fa';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}>
+              <div style={{
+                fontSize: '12px',
+                fontWeight: 600,
+                color: '#6b7280',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                marginBottom: '6px'
+              }}>Billing Model</div>
+              <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                {viewingOrder.billingModel || 'N/A'}
+              </div>
+            </div>
+            <div style={{
+              background: '#f8f9fa',
+              padding: '16px',
+              borderRadius: '10px',
+              transition: 'all 0.3s'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = '#e5e7eb';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = '#f8f9fa';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}>
+              <div style={{
+                fontSize: '12px',
+                fontWeight: 600,
+                color: '#6b7280',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                marginBottom: '6px'
+              }}>Billing Status</div>
+              <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                <Badge 
+                  bg={viewingOrder.billingStatus === 'Paid' ? 'success' : viewingOrder.billingStatus === 'Not Billed' ? 'warning' : 'danger'}
+                  style={{
+                    padding: '6px 14px',
+                    borderRadius: '20px',
+                    fontSize: '12px',
+                    fontWeight: 600
+                  }}
+                >
+                  {viewingOrder.billingStatus}
+                </Badge>
+              </div>
+            </div>
+            <div style={{
+              background: '#f8f9fa',
+              padding: '16px',
+              borderRadius: '10px',
+              transition: 'all 0.3s'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = '#e5e7eb';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = '#f8f9fa';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}>
+              <div style={{
+                fontSize: '12px',
+                fontWeight: 600,
+                color: '#6b7280',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                marginBottom: '6px'
+              }}>Payment Status</div>
+              <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                <Badge 
+                  bg={viewingOrder.paymentStatus === 'Received' ? 'success' : viewingOrder.paymentStatus === 'Pending' ? 'warning' : 'danger'}
+                  style={{
+                    padding: '6px 14px',
+                    borderRadius: '20px',
+                    fontSize: '12px',
+                    fontWeight: 600
+                  }}
+                >
+                  {viewingOrder.paymentStatus}
+                </Badge>
+              </div>
+            </div>
+            <div style={{
+              background: '#f8f9fa',
+              padding: '16px',
+              borderRadius: '10px',
+              transition: 'all 0.3s'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = '#e5e7eb';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = '#f8f9fa';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}>
+              <div style={{
+                fontSize: '12px',
+                fontWeight: 600,
+                color: '#6b7280',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                marginBottom: '6px'
+              }}>Fulfillment Status</div>
+              <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                <Badge 
+                  bg={viewingOrder.fulfillmentStatus === 'Completed' ? 'success' : viewingOrder.fulfillmentStatus === 'In Progress' ? 'info' : viewingOrder.fulfillmentStatus === 'Pending' ? 'warning' : 'secondary'}
+                  style={{
+                    padding: '6px 14px',
+                    borderRadius: '20px',
+                    fontSize: '12px',
+                    fontWeight: 600
+                  }}
+                >
+                  {viewingOrder.fulfillmentStatus}
+                </Badge>
+              </div>
+            </div>
+          </div>
+
+          {/* POC Information Section */}
+          <div style={{
+            fontSize: '16px',
+            fontWeight: 600,
+            color: '#1f2937',
+            marginBottom: '20px',
+            paddingBottom: '10px',
+            borderBottom: '2px solid #f8f9fa',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px'
+          }}>
+            <User size={18} style={{ color: '#4680ff' }} />
+            Point of Contact
+          </div>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+            gap: '20px',
+            marginBottom: '30px'
+          }}>
+            <div style={{
+              background: '#f8f9fa',
+              padding: '16px',
+              borderRadius: '10px',
+              transition: 'all 0.3s'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = '#e5e7eb';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = '#f8f9fa';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}>
+              <div style={{
+                fontSize: '12px',
+                fontWeight: 600,
+                color: '#6b7280',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                marginBottom: '6px'
+              }}>POC Name</div>
+              <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                <User size={14} style={{ color: '#4680ff', marginRight: '6px' }} />
+                {viewingOrder.pocName || 'N/A'}
+              </div>
+            </div>
+            <div style={{
+              background: '#f8f9fa',
+              padding: '16px',
+              borderRadius: '10px',
+              transition: 'all 0.3s'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = '#e5e7eb';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = '#f8f9fa';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}>
+              <div style={{
+                fontSize: '12px',
+                fontWeight: 600,
+                color: '#6b7280',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                marginBottom: '6px'
+              }}>POC Title</div>
+              <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                {viewingOrder.pocTitle || 'N/A'}
+              </div>
+            </div>
+            <div style={{
+              background: '#f8f9fa',
+              padding: '16px',
+              borderRadius: '10px',
+              transition: 'all 0.3s'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = '#e5e7eb';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = '#f8f9fa';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}>
+              <div style={{
+                fontSize: '12px',
+                fontWeight: 600,
+                color: '#6b7280',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                marginBottom: '6px'
+              }}>POC Phone</div>
+              <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                <Phone size={14} style={{ color: '#4680ff', marginRight: '6px' }} />
+                {viewingOrder.pocPhone || 'N/A'}
+              </div>
+            </div>
+            <div style={{
+              background: '#f8f9fa',
+              padding: '16px',
+              borderRadius: '10px',
+              transition: 'all 0.3s'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = '#e5e7eb';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = '#f8f9fa';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}>
+              <div style={{
+                fontSize: '12px',
+                fontWeight: 600,
+                color: '#6b7280',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                marginBottom: '6px'
+              }}>Owner</div>
+              <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                {viewingOrder.owner || 'N/A'}
+              </div>
+            </div>
+            <div style={{
+              background: '#f8f9fa',
+              padding: '16px',
+              borderRadius: '10px',
+              transition: 'all 0.3s'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = '#e5e7eb';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = '#f8f9fa';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}>
+              <div style={{
+                fontSize: '12px',
+                fontWeight: 600,
+                color: '#6b7280',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                marginBottom: '6px'
+              }}>Order Date</div>
+              <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                <Calendar size={14} style={{ color: '#4680ff', marginRight: '6px' }} />
+                {viewingOrder.orderDate || viewingOrder.created}
+              </div>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div style={{
+            display: 'flex',
+            gap: '12px',
+            flexWrap: 'wrap',
+            paddingTop: '20px',
+            borderTop: '1px solid #e5e7eb'
+          }}>
+            <Button
+              variant="primary"
+              style={{
+                padding: '10px 20px',
+                borderRadius: '8px',
+                fontWeight: 500,
+                fontSize: '14px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                background: '#4680ff',
+                border: 'none'
+              }}
+              onClick={() => {
+                setEditingOrder(viewingOrder);
+                setShowOrderViewModal(false);
+                setShowOrderFormModal(true);
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.background = '#3b6ce5';
+                e.currentTarget.style.transform = 'translateY(-2px)';
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(70, 128, 255, 0.4)';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.background = '#4680ff';
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = 'none';
+              }}
+            >
+              <Edit size={16} />
+              Edit Order
+            </Button>
+            <Button
+              variant="outline-secondary"
+              style={{
+                padding: '10px 20px',
+                borderRadius: '8px',
+                fontWeight: 500,
+                fontSize: '14px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                background: 'white',
+                color: '#6b7280',
+                border: '2px solid #e5e7eb'
+              }}
+              onClick={() => setShowOrderViewModal(false)}
+              onMouseOver={(e) => {
+                e.currentTarget.style.borderColor = '#4680ff';
+                e.currentTarget.style.color = '#4680ff';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.borderColor = '#e5e7eb';
+                e.currentTarget.style.color = '#6b7280';
+              }}
+            >
+              Close
+            </Button>
+          </div>
+        </Modal.Body>
       </Modal>
     );
   };
@@ -2300,102 +5214,554 @@ const CRMPortal = () => {
     if (!viewingProspect) return null;
     
     return (
-      <Modal show={showProspectViewModal} onHide={() => setShowProspectViewModal(false)} size="lg" centered>
-        <Modal.Header closeButton className="border-bottom bg-light">
-          <Modal.Title>Prospect Details</Modal.Title>
-        </Modal.Header>
-        <Modal.Body className="p-4">
-          <Row className="mb-4">
-            <Col md={12}>
-              <h4 className="mb-0">{viewingProspect.firstName} {viewingProspect.lastName}</h4>
-            </Col>
-          </Row>
+      <Modal show={showProspectViewModal} onHide={() => setShowProspectViewModal(false)} size="xl" centered>
+        {/* Custom Header with Gradient */}
+        <div style={{
+          // background: 'linear-gradient(135deg, #4680ff 0%, #5a67d8 100%)',
+          color: 'black',
+          padding: '30px',
+          position: 'relative',
+          borderTopLeftRadius: '8px',
+          borderTopRightRadius: '8px',
+          borderBottom: '1px solid #e5e7eb'
 
-          <Row>
-            <Col md={6}>
-              <Card className="border-0 bg-light mb-3">
-                <Card.Body>
-                  <h6 className="text-muted mb-3">Contact Information</h6>
-                  <div className="mb-2">
-                    <Phone size={16} className="me-2 text-primary" />
-                    <strong>Phone:</strong> {viewingProspect.phone}
-                  </div>
-                  <div className="mb-2">
-                    <Mail size={16} className="me-2 text-primary" />
-                    <strong>Email:</strong> {viewingProspect.email}
-                  </div>
-                </Card.Body>
-              </Card>
-            </Col>
-
-            <Col md={6}>
-              <Card className="border-0 bg-light mb-3">
-                <Card.Body>
-                  <h6 className="text-muted mb-3">Assignment Details</h6>
-                  <div className="mb-2">
-                    <strong>Assigned To:</strong> {viewingProspect.assignedTo}
-                  </div>
-                  <div className="mb-2">
-                    <strong>Data Source:</strong> {viewingProspect.dataSource}
-                  </div>
-                  <div className="mb-0">
-                    <strong>Source File:</strong> {viewingProspect.sourceFile}
-                  </div>
-                </Card.Body>
-              </Card>
-            </Col>
-          </Row>
-
-          <Row>
-            <Col md={12}>
-              <Card className="border-0 bg-light mb-3">
-                <Card.Body>
-                  <h6 className="text-muted mb-3">Call Information</h6>
-                  <div className="mb-2">
-                    <strong>Last Called:</strong> {viewingProspect.lastCalled || 'Never'}
-                  </div>
-                  <div className="mb-2">
-                    <strong>Last Call Status:</strong>{' '}
-                    {viewingProspect.lastCallStatus && (
-                      <Badge bg={
-                        viewingProspect.lastCallStatus === 'Answered' ? 'success' :
-                        viewingProspect.lastCallStatus === 'No Answer' ? 'warning' :
-                        'secondary'
-                      }>
-                        {viewingProspect.lastCallStatus}
-                      </Badge>
-                    )}
-                  </div>
-                  <div className="mb-2">
-                    <strong>Call Disposition:</strong> {viewingProspect.callDisposition || '-'}
-                  </div>
-                  <div className="mb-0">
-                    <strong>Tags:</strong>{' '}
-                    {viewingProspect.tags?.map((tag: string, idx: number) => (
-                      <Badge key={idx} bg="secondary" className="me-1">{tag}</Badge>
-                    ))}
-                  </div>
-                </Card.Body>
-              </Card>
-            </Col>
-          </Row>
-        </Modal.Body>
-        <Modal.Footer className="border-top">
-          <Button variant="secondary" onClick={() => setShowProspectViewModal(false)}>
-            Close
-          </Button>
-          <Button 
-            variant="success" 
-            onClick={() => {
-              setSelectedProspect(viewingProspect);
-              setShowProspectViewModal(false);
-              setShowLeadModal(true);
+        }}>
+          <button 
+            onClick={() => setShowProspectViewModal(false)}
+            style={{
+              position: 'absolute',
+              top: '20px',
+              right: '20px',
+              background: 'rgba(255,255,255,0.2)',
+              border: 'none',
+              color: 'black',
+              width: '36px',
+              height: '36px',
+              borderRadius: '50%',
+              cursor: 'pointer',
+              transition: 'all 0.3s',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = 'rgba(255,255,255,0.3)';
+              e.currentTarget.style.transform = 'rotate(90deg)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = 'rgba(255,255,255,0.2)';
+              e.currentTarget.style.transform = 'rotate(0deg)';
             }}
           >
-            <UserPlus size={16} className="me-1" />
-            Generate Lead
-          </Button>
-        </Modal.Footer>
+            <X size={20} />
+          </button>
+          <h3 style={{ margin: 0, fontWeight: 600, fontSize: '24px' }}>
+            {viewingProspect.firstName} {viewingProspect.lastName}
+          </h3>
+          <p style={{ margin: '8px 0 0 0', opacity: 0.9, fontSize: '14px' }}>
+            Prospect Details
+          </p>
+        </div>
+
+        <Modal.Body style={{ padding: '30px' }}>
+          {/* Contact Information Section */}
+          <div style={{
+            fontSize: '16px',
+            fontWeight: 600,
+            color: '#1f2937',
+            marginBottom: '20px',
+            paddingBottom: '10px',
+            borderBottom: '2px solid #f8f9fa',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px'
+          }}>
+            <User size={18} style={{ color: '#4680ff' }} />
+            Contact Information
+          </div>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+            gap: '20px',
+            marginBottom: '30px'
+          }}>
+            <div style={{
+              background: '#f8f9fa',
+              padding: '16px',
+              borderRadius: '10px',
+              transition: 'all 0.3s'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = '#e5e7eb';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = '#f8f9fa';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}>
+              <div style={{
+                fontSize: '12px',
+                fontWeight: 600,
+                color: '#6b7280',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                marginBottom: '6px'
+              }}>Full Name</div>
+              <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                {viewingProspect.firstName} {viewingProspect.lastName}
+              </div>
+            </div>
+            <div style={{
+              background: '#f8f9fa',
+              padding: '16px',
+              borderRadius: '10px',
+              transition: 'all 0.3s'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = '#e5e7eb';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = '#f8f9fa';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}>
+              <div style={{
+                fontSize: '12px',
+                fontWeight: 600,
+                color: '#6b7280',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                marginBottom: '6px'
+              }}>Phone Number</div>
+              <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                <Phone size={14} style={{ color: '#4680ff', marginRight: '6px' }} />
+                {viewingProspect.phone}
+              </div>
+            </div>
+            <div style={{
+              background: '#f8f9fa',
+              padding: '16px',
+              borderRadius: '10px',
+              transition: 'all 0.3s'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = '#e5e7eb';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = '#f8f9fa';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}>
+              <div style={{
+                fontSize: '12px',
+                fontWeight: 600,
+                color: '#6b7280',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                marginBottom: '6px'
+              }}>Email Address</div>
+              <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                <Mail size={14} style={{ color: '#4680ff', marginRight: '6px' }} />
+                {viewingProspect.email}
+              </div>
+            </div>
+            <div style={{
+              background: '#f8f9fa',
+              padding: '16px',
+              borderRadius: '10px',
+              transition: 'all 0.3s'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = '#e5e7eb';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = '#f8f9fa';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}>
+              <div style={{
+                fontSize: '12px',
+                fontWeight: 600,
+                color: '#6b7280',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                marginBottom: '6px'
+              }}>Assigned To</div>
+              <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                {viewingProspect.assignedTo}
+              </div>
+            </div>
+            <div style={{
+              background: '#f8f9fa',
+              padding: '16px',
+              borderRadius: '10px',
+              transition: 'all 0.3s'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = '#e5e7eb';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = '#f8f9fa';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}>
+              <div style={{
+                fontSize: '12px',
+                fontWeight: 600,
+                color: '#6b7280',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                marginBottom: '6px'
+              }}>Last Call Status</div>
+              <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                <Badge 
+                  bg={viewingProspect.lastCallStatus === 'Answered' ? 'success' : 'warning'}
+                  style={{
+                    padding: '6px 14px',
+                    borderRadius: '20px',
+                    fontSize: '12px',
+                    fontWeight: 600
+                  }}
+                >
+                  {viewingProspect.lastCallStatus || 'Not Called'}
+                </Badge>
+              </div>
+            </div>
+          </div>
+
+          {/* Campaign Information Section */}
+          <div style={{
+            fontSize: '16px',
+            fontWeight: 600,
+            color: '#1f2937',
+            marginBottom: '20px',
+            paddingBottom: '10px',
+            borderBottom: '2px solid #f8f9fa',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px'
+          }}>
+            <Megaphone size={18} style={{ color: '#4680ff' }} />
+            Campaign Information
+          </div>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+            gap: '20px',
+            marginBottom: '30px'
+          }}>
+            <div style={{
+              background: '#f8f9fa',
+              padding: '16px',
+              borderRadius: '10px',
+              transition: 'all 0.3s'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = '#e5e7eb';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = '#f8f9fa';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}>
+              <div style={{
+                fontSize: '12px',
+                fontWeight: 600,
+                color: '#6b7280',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                marginBottom: '6px'
+              }}>Data Source</div>
+              <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                <Badge 
+                  bg="primary"
+                  style={{
+                    padding: '6px 14px',
+                    borderRadius: '20px',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    background: '#dbeafe',
+                    color: '#1e40af'
+                  }}
+                >
+                  {viewingProspect.dataSource}
+                </Badge>
+              </div>
+            </div>
+            <div style={{
+              background: '#f8f9fa',
+              padding: '16px',
+              borderRadius: '10px',
+              transition: 'all 0.3s'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = '#e5e7eb';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = '#f8f9fa';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}>
+              <div style={{
+                fontSize: '12px',
+                fontWeight: 600,
+                color: '#6b7280',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                marginBottom: '6px'
+              }}>Source File/Campaign</div>
+              <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                {viewingProspect.sourceFile}
+              </div>
+            </div>
+            <div style={{
+              background: '#f8f9fa',
+              padding: '16px',
+              borderRadius: '10px',
+              transition: 'all 0.3s'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = '#e5e7eb';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = '#f8f9fa';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}>
+              <div style={{
+                fontSize: '12px',
+                fontWeight: 600,
+                color: '#6b7280',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                marginBottom: '6px'
+              }}>Last Called</div>
+              <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                {viewingProspect.lastCalled || 'Never'}
+              </div>
+            </div>
+            <div style={{
+              background: '#f8f9fa',
+              padding: '16px',
+              borderRadius: '10px',
+              transition: 'all 0.3s'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = '#e5e7eb';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = '#f8f9fa';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}>
+              <div style={{
+                fontSize: '12px',
+                fontWeight: 600,
+                color: '#6b7280',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                marginBottom: '6px'
+              }}>Imported By</div>
+              <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                {viewingProspect.importedBy}
+              </div>
+            </div>
+          </div>
+
+          {/* Recent Activity Timeline */}
+          {viewingProspect.callHistory && viewingProspect.callHistory.length > 0 && (
+            <>
+              <div style={{
+                fontSize: '16px',
+                fontWeight: 600,
+                color: '#1f2937',
+                marginBottom: '20px',
+                paddingBottom: '10px',
+                borderBottom: '2px solid #f8f9fa',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px'
+              }}>
+                <History size={18} style={{ color: '#4680ff' }} />
+                Recent Activity
+              </div>
+              <div style={{ position: 'relative', paddingLeft: '30px', marginBottom: '30px' }}>
+                <div style={{
+                  content: '',
+                  position: 'absolute',
+                  left: '8px',
+                  top: 0,
+                  bottom: 0,
+                  width: '2px',
+                  background: '#e5e7eb'
+                }} />
+                {viewingProspect.callHistory.map((call: any, idx: number) => (
+                  <div key={idx} style={{ position: 'relative', paddingBottom: '20px' }}>
+                    <div style={{
+                      content: '',
+                      position: 'absolute',
+                      left: '-26px',
+                      top: '4px',
+                      width: '12px',
+                      height: '12px',
+                      borderRadius: '50%',
+                      background: '#4680ff',
+                      border: '3px solid white',
+                      boxShadow: '0 0 0 2px #e5e7eb'
+                    }} />
+                    <div style={{
+                      background: '#f8f9fa',
+                      padding: '12px 16px',
+                      borderRadius: '8px'
+                    }}>
+                      <div style={{ fontSize: '12px', color: '#6b7280', fontWeight: 600 }}>
+                        {call.date}
+                      </div>
+                      <div style={{ fontSize: '14px', color: '#1f2937', marginTop: '4px' }}>
+                        <strong>{call.status}</strong> - {call.comments}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+
+          {/* Action Buttons */}
+          <div style={{
+            display: 'flex',
+            gap: '12px',
+            flexWrap: 'wrap',
+            paddingTop: '20px',
+            borderTop: '1px solid #e5e7eb'
+          }}>
+            <Button
+              variant="primary"
+              style={{
+                padding: '10px 20px',
+                borderRadius: '8px',
+                fontWeight: 500,
+                fontSize: '14px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                background: '#4680ff',
+                border: 'none'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.background = '#3b6ce5';
+                e.currentTarget.style.transform = 'translateY(-2px)';
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(70, 128, 255, 0.4)';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.background = '#4680ff';
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = 'none';
+              }}
+            >
+              <Phone size={16} />
+              Call Now
+            </Button>
+            <Button
+              variant="success"
+              style={{
+                padding: '10px 20px',
+                borderRadius: '8px',
+                fontWeight: 500,
+                fontSize: '14px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                background: '#10b981',
+                border: 'none'
+              }}
+              onClick={() => {
+                setSelectedProspect(viewingProspect);
+                setShowProspectViewModal(false);
+                setShowLeadModal(true);
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.background = '#059669';
+                e.currentTarget.style.transform = 'translateY(-2px)';
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.4)';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.background = '#10b981';
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = 'none';
+              }}
+            >
+              <UserPlus size={16} />
+              Convert to Lead
+            </Button>
+            <Button
+              variant="outline-secondary"
+              style={{
+                padding: '10px 20px',
+                borderRadius: '8px',
+                fontWeight: 500,
+                fontSize: '14px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                background: 'white',
+                color: '#6b7280',
+                border: '2px solid #e5e7eb'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.borderColor = '#4680ff';
+                e.currentTarget.style.color = '#4680ff';
+                e.currentTarget.style.background = '#f0f4ff';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.borderColor = '#e5e7eb';
+                e.currentTarget.style.color = '#6b7280';
+                e.currentTarget.style.background = 'white';
+              }}
+              onClick={() => {
+                if (viewingProspect) {
+                  setScheduleCallbackData({
+                    ...scheduleCallbackData,
+                    prospectId: viewingProspect.id,
+                    prospectName: `${viewingProspect.firstName} ${viewingProspect.lastName}`
+                  });
+                  setShowScheduleCallbackModal(true);
+                }
+              }}
+            >
+              <Calendar size={16} />
+              Schedule Callback
+            </Button>
+            <Button
+              variant="outline-secondary"
+              style={{
+                padding: '10px 20px',
+                borderRadius: '8px',
+                fontWeight: 500,
+                fontSize: '14px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                background: 'white',
+                color: '#6b7280',
+                border: '2px solid #e5e7eb'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.borderColor = '#4680ff';
+                e.currentTarget.style.color = '#4680ff';
+                e.currentTarget.style.background = '#f0f4ff';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.borderColor = '#e5e7eb';
+                e.currentTarget.style.color = '#6b7280';
+                e.currentTarget.style.background = 'white';
+              }}
+            >
+              <FileText size={16} />
+              Add Note
+            </Button>
+          </div>
+        </Modal.Body>
       </Modal>
     );
   };
@@ -2623,6 +5989,7 @@ const CRMPortal = () => {
                     <option value="Warm">Warm (50%)</option>
                     <option value="Hot">Hot (95%)</option>
                   </Form.Select>
+                  <Form.Text className="text-muted">Assessed likelihood of converting based on fit and interest (50% weight in score)</Form.Text>
                 </Form.Group>
               </Col>
               <Col md={6}>
@@ -2637,6 +6004,7 @@ const CRMPortal = () => {
                     <option value="Medium">Medium (50%)</option>
                     <option value="High">High (95%)</option>
                   </Form.Select>
+                  <Form.Text className="text-muted">How quickly they need to make a decision (30% weight in score)</Form.Text>
                 </Form.Group>
               </Col>
             </Row>
@@ -2651,6 +6019,7 @@ const CRMPortal = () => {
                 <option value="1">1 follow-up (50%)</option>
                 <option value="2">2 or more follow-ups (95%)</option>
               </Form.Select>
+              <Form.Text className="text-muted">Number of meaningful interactions in recent weeks (20% weight in score)</Form.Text>
             </Form.Group>
 
             <div className="alert alert-success">
@@ -2680,12 +6049,459 @@ const CRMPortal = () => {
     );
   };
 
+  // Add Lead Form Modal (Full Form with 4 Steps)
+  const AddLeadFormModal = () => {
+    return (
+      <Modal show={showLeadFormModal} onHide={() => { setShowLeadFormModal(false); setEditingLead(null); setLeadFormStep(0); }} size="xl" >
+        <Modal.Header closeButton>
+          <Modal.Title>{editingLead ? 'Edit Lead' : 'Add New Lead'}</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {/* Timeline Navigation */}
+          <div className="mb-4">
+            <div className="d-flex align-items-center justify-content-between position-relative">
+              {/* Progress Line */}
+              <div 
+                className="position-absolute bg-light" 
+                style={{ 
+                  left: '0', 
+                  right: '0', 
+                  top: '20px', 
+                  height: '2px', 
+                  zIndex: 0 
+                }}
+              />
+              <div 
+                className="position-absolute bg-primary" 
+                style={{ 
+                  left: '0', 
+                  top: '20px', 
+                  height: '2px', 
+                  width: `${(leadFormStep / 3) * 100}%`,
+                  zIndex: 0,
+                  transition: 'width 0.3s ease'
+                }}
+              />
+              
+              {/* Step 1 */}
+              <div 
+                className="text-center position-relative" 
+                style={{ cursor: 'pointer', flex: 1 }}
+                onClick={() => setLeadFormStep(0)}
+              >
+                <div 
+                  className={`rounded-circle d-flex align-items-center justify-content-center mx-auto ${leadFormStep >= 0 ? 'bg-primary text-white' : 'bg-light text-muted'}`}
+                  style={{ width: '40px', height: '40px', zIndex: 1, position: 'relative' }}
+                >
+                  {leadFormStep > 0 ? <CheckCircle size={20} /> : '1'}
+                </div>
+                <small className={`d-block mt-2 ${leadFormStep === 0 ? 'fw-bold text-primary' : 'text-muted'}`}>Lead Info</small>
+              </div>
+
+              {/* Step 2 */}
+              <div 
+                className="text-center position-relative" 
+                style={{ cursor: 'pointer', flex: 1 }}
+                onClick={() => setLeadFormStep(1)}
+              >
+                <div 
+                  className={`rounded-circle d-flex align-items-center justify-content-center mx-auto ${leadFormStep >= 1 ? 'bg-primary text-white' : 'bg-light text-muted'}`}
+                  style={{ width: '40px', height: '40px', zIndex: 1, position: 'relative' }}
+                >
+                  {leadFormStep > 1 ? <CheckCircle size={20} /> : '2'}
+                </div>
+                <small className={`d-block mt-2 ${leadFormStep === 1 ? 'fw-bold text-primary' : 'text-muted'}`}>Company Info</small>
+              </div>
+
+              {/* Step 3 */}
+              <div 
+                className="text-center position-relative" 
+                style={{ cursor: 'pointer', flex: 1 }}
+                onClick={() => setLeadFormStep(2)}
+              >
+                <div 
+                  className={`rounded-circle d-flex align-items-center justify-content-center mx-auto ${leadFormStep >= 2 ? 'bg-primary text-white' : 'bg-light text-muted'}`}
+                  style={{ width: '40px', height: '40px', zIndex: 1, position: 'relative' }}
+                >
+                  {leadFormStep > 2 ? <CheckCircle size={20} /> : '3'}
+                </div>
+                <small className={`d-block mt-2 ${leadFormStep === 2 ? 'fw-bold text-primary' : 'text-muted'}`}>Other Info</small>
+              </div>
+
+              {/* Step 4 */}
+              <div 
+                className="text-center position-relative" 
+                style={{ cursor: 'pointer', flex: 1 }}
+                onClick={() => setLeadFormStep(3)}
+              >
+                <div 
+                  className={`rounded-circle d-flex align-items-center justify-content-center mx-auto ${leadFormStep >= 3 ? 'bg-primary text-white' : 'bg-light text-muted'}`}
+                  style={{ width: '40px', height: '40px', zIndex: 1, position: 'relative' }}
+                >
+                  {leadFormStep > 3 ? <CheckCircle size={20} /> : '4'}
+                </div>
+                <small className={`d-block mt-2 ${leadFormStep === 3 ? 'fw-bold text-primary' : 'text-muted'}`}>Follow-ups</small>
+              </div>
+            </div>
+          </div>
+
+          {/* Form Content Based on Step */}
+          <div style={{ minHeight: '400px' }}>
+            {leadFormStep === 0 && (
+              <Card className="border-0 bg-light">
+                <Card.Body>
+                  <h5 className="fw-bold mb-4 text-primary">LEAD INFORMATION</h5>
+                  <Row>
+                    <Col md={6}>
+                      <Form.Group className="mb-3">
+                        <Form.Label>Lead Name <span className="text-danger">*</span></Form.Label>
+                        <Form.Control type="text" defaultValue={editingLead?.name || ''} placeholder="Enter lead name" required />
+                      </Form.Group>
+                    </Col>
+                    <Col md={6}>
+                      <Form.Group className="mb-3">
+                        <Form.Label>Type <span className="text-danger">*</span></Form.Label>
+                        <Form.Select defaultValue={editingLead?.leadType || ''} required>
+                          <option value="">Select Type</option>
+                          <option value="Inbound">Inbound</option>
+                          <option value="Outbound">Outbound</option>
+                          <option value="Referral">Referral</option>
+                          <option value="Partner">Partner</option>
+                        </Form.Select>
+                      </Form.Group>
+                    </Col>
+                    <Col md={6}>
+                      <Form.Group className="mb-3">
+                        <Form.Label>Lead Source <span className="text-danger">*</span></Form.Label>
+                        <Form.Select defaultValue={editingLead?.leadSource || ''} required>
+                          <option value="">Select Source</option>
+                          <option value="Website">Website</option>
+                          <option value="Email Campaign">Email Campaign</option>
+                          <option value="Social Media">Social Media</option>
+                          <option value="Referral">Referral</option>
+                          <option value="Cold Call">Cold Call</option>
+                          <option value="Event">Event</option>
+                          <option value="Advertisement">Advertisement</option>
+                        </Form.Select>
+                      </Form.Group>
+                    </Col>
+                    <Col md={6}>
+                      <Form.Group className="mb-3">
+                        <Form.Label>CRM Data Attribution</Form.Label>
+                        <Form.Select defaultValue={editingLead?.crmAttribution || ''}>
+                          <option value="">Select Attribution</option>
+                          <option value="Website Form">Website Form</option>
+                          <option value="Landing Page">Landing Page</option>
+                          <option value="Cold Email">Cold Email</option>
+                          <option value="Referral">Referral</option>
+                          <option value="Event">Event</option>
+                          <option value="Webinar">Webinar</option>
+                        </Form.Select>
+                      </Form.Group>
+                    </Col>
+                    <Col md={12}>
+                      <Form.Group className="mb-3">
+                        <Form.Label>Description</Form.Label>
+                        <Form.Control 
+                          as="textarea" 
+                          rows={3} 
+                          defaultValue={editingLead?.description || ''} 
+                          placeholder="Enter lead description or notes"
+                        />
+                      </Form.Group>
+                    </Col>
+                    <Col md={6}>
+                      <Form.Group className="mb-3">
+                        <Form.Label>Assigned to <span className="text-danger">*</span></Form.Label>
+                        <Form.Select defaultValue={editingLead?.assignedUser || ''} required>
+                          <option value="">Select User</option>
+                          <option value="John Doe">John Doe</option>
+                          <option value="Jane Doe">Jane Doe</option>
+                          <option value="Sarah Smith">Sarah Smith</option>
+                          <option value="Mike Johnson">Mike Johnson</option>
+                        </Form.Select>
+                      </Form.Group>
+                    </Col>
+                    <Col md={6}>
+                      <Form.Group className="mb-3">
+                        <Form.Label>Stage <span className="text-danger">*</span></Form.Label>
+                        <Form.Select defaultValue={editingLead?.stage || ''} required>
+                          <option value="">Select Stage</option>
+                          <option value="New">New</option>
+                          <option value="Contacted">Contacted</option>
+                          <option value="Qualified">Qualified</option>
+                          <option value="Unqualified">Unqualified</option>
+                          <option value="Nurturing">Nurturing</option>
+                        </Form.Select>
+                      </Form.Group>
+                    </Col>
+                    <Col md={12}>
+                      <Form.Group className="mb-3">
+                        <Form.Label>Campaign <span className="text-danger">*</span></Form.Label>
+                        <Form.Select defaultValue={editingLead?.campaign || ''} required>
+                          <option value="">Select Campaign</option>
+                          <option value="Q4 2025 Digital Campaign">Q4 2025 Digital Campaign</option>
+                          <option value="Product Launch 2025">Product Launch 2025</option>
+                          <option value="Email Nurture Series">Email Nurture Series</option>
+                          <option value="Trade Show Q4">Trade Show Q4</option>
+                          <option value="Social Media Ads">Social Media Ads</option>
+                        </Form.Select>
+                      </Form.Group>
+                    </Col>
+                  </Row>
+                </Card.Body>
+              </Card>
+            )}
+
+            {leadFormStep === 1 && (
+              <Card className="border-0 bg-light">
+                <Card.Body>
+                  <h5 className="fw-bold mb-4 text-success">COMPANY INFORMATION</h5>
+                  <Row>
+                    <Col md={6}>
+                      <Form.Group className="mb-3">
+                        <Form.Label>Company Name <span className="text-danger">*</span></Form.Label>
+                        <Form.Control type="text" defaultValue={editingLead?.company || ''} placeholder="Enter company name" required />
+                      </Form.Group>
+                    </Col>
+                    <Col md={6}>
+                      <Form.Group className="mb-3">
+                        <Form.Label>Business Type <span className="text-danger">*</span></Form.Label>
+                        <Form.Select defaultValue={editingLead?.businessType || ''} required>
+                          <option value="">Select Type</option>
+                          <option value="B2B">B2B (Business to Business)</option>
+                          <option value="B2C">B2C (Business to Consumer)</option>
+                          <option value="B2G">B2G (Business to Government)</option>
+                          <option value="B2B2C">B2B2C</option>
+                        </Form.Select>
+                      </Form.Group>
+                    </Col>
+                    <Col md={6}>
+                      <Form.Group className="mb-3">
+                        <Form.Label>Company Location <span className="text-danger">*</span></Form.Label>
+                        <Form.Control type="text" defaultValue={editingLead?.location || ''} placeholder="City, Country" required />
+                      </Form.Group>
+                    </Col>
+                    <Col md={6}>
+                      <Form.Group className="mb-3">
+                        <Form.Label>Contact Person <span className="text-danger">*</span></Form.Label>
+                        <Form.Control type="text" defaultValue={editingLead?.contactPerson || ''} placeholder="Primary contact name" required />
+                      </Form.Group>
+                    </Col>
+                    <Col md={6}>
+                      <Form.Group className="mb-3">
+                        <Form.Label>Phone <span className="text-danger">*</span></Form.Label>
+                        <Form.Control type="tel" defaultValue={editingLead?.phone || ''} placeholder="+44 20 1234 5678" required />
+                      </Form.Group>
+                    </Col>
+                    <Col md={6}>
+                      <Form.Group className="mb-3">
+                        <Form.Label>Email <span className="text-danger">*</span></Form.Label>
+                        <Form.Control type="email" defaultValue={editingLead?.email || ''} placeholder="email@example.com" required />
+                      </Form.Group>
+                    </Col>
+                    <Col md={6}>
+                      <Form.Group className="mb-3">
+                        <Form.Label>Website</Form.Label>
+                        <Form.Control type="url" defaultValue={editingLead?.website || ''} placeholder="https://example.com" />
+                      </Form.Group>
+                    </Col>
+                    <Col md={6}>
+                      <Form.Group className="mb-3">
+                        <Form.Label>Industry <span className="text-danger">*</span></Form.Label>
+                        <Form.Select defaultValue={editingLead?.industry || ''} required>
+                          <option value="">Select Industry</option>
+                          <option value="Technology">Technology</option>
+                          <option value="Finance">Finance</option>
+                          <option value="Healthcare">Healthcare</option>
+                          <option value="Retail">Retail</option>
+                          <option value="Manufacturing">Manufacturing</option>
+                          <option value="Education">Education</option>
+                          <option value="Real Estate">Real Estate</option>
+                          <option value="Telecommunications">Telecommunications</option>
+                        </Form.Select>
+                      </Form.Group>
+                    </Col>
+                    <Col md={6}>
+                      <Form.Group className="mb-3">
+                        <Form.Label>Company Size <span className="text-danger">*</span></Form.Label>
+                        <Form.Select defaultValue={editingLead?.companySize || ''} required>
+                          <option value="">Select Size</option>
+                          <option value="1-10">1-10 employees</option>
+                          <option value="11-50">11-50 employees</option>
+                          <option value="51-200">51-200 employees</option>
+                          <option value="201-500">201-500 employees</option>
+                          <option value="501-1000">501-1000 employees</option>
+                          <option value="1000+">1000+ employees</option>
+                        </Form.Select>
+                      </Form.Group>
+                    </Col>
+                    <Col md={6}>
+                      <Form.Group className="mb-3">
+                        <Form.Label>Designation <span className="text-danger">*</span></Form.Label>
+                        <Form.Control type="text" defaultValue={editingLead?.designation || ''} placeholder="e.g., CEO, CTO, Marketing Manager" required />
+                      </Form.Group>
+                    </Col>
+                  </Row>
+                </Card.Body>
+              </Card>
+            )}
+
+            {leadFormStep === 2 && (
+              <Card className="border-0 bg-light">
+                <Card.Body>
+                  <h5 className="fw-bold mb-4 text-info">OTHER INFORMATION</h5>
+                  <Row>
+                    <Col md={6}>
+                      <Form.Group className="mb-3">
+                        <Form.Label>Lead Potential</Form.Label>
+                        <Form.Select defaultValue={editingLead?.leadPotential || ''}>
+                          <option value="">Select Potential</option>
+                          <option value="Hot">Hot</option>
+                          <option value="Warm">Warm</option>
+                          <option value="Cold">Cold</option>
+                        </Form.Select>
+                        <Form.Text className="text-muted">Likelihood of converting based on engagement</Form.Text>
+                      </Form.Group>
+                    </Col>
+                    <Col md={6}>
+                      <Form.Group className="mb-3">
+                        <Form.Label>Requirement Confirmed</Form.Label>
+                        <Form.Select defaultValue={editingLead?.requirementConfirmed || ''}>
+                          <option value="">Select Status</option>
+                          <option value="Yes">Yes</option>
+                          <option value="No">No</option>
+                        </Form.Select>
+                        <Form.Text className="text-muted">Has the customer confirmed their requirement?</Form.Text>
+                      </Form.Group>
+                    </Col>
+                    <Col md={6}>
+                      <Form.Group className="mb-3">
+                        <Form.Label>Urgency</Form.Label>
+                        <Form.Select defaultValue={editingLead?.urgency || ''}>
+                          <option value="">Select Urgency</option>
+                          <option value="Low">Low</option>
+                          <option value="Medium">Medium</option>
+                          <option value="High">High</option>
+                        </Form.Select>
+                        <Form.Text className="text-muted">Timeline for purchasing decision</Form.Text>
+                      </Form.Group>
+                    </Col>
+                    <Col md={6}>
+                      <Form.Group className="mb-3">
+                        <Form.Label>Lead Score</Form.Label>
+                        <Form.Control 
+                          type="number" 
+                          min="0" 
+                          max="100" 
+                          defaultValue={editingLead?.leadScore || ''} 
+                          placeholder="0-100"
+                          disabled
+                        />
+                        <Form.Text className="text-muted">Auto-calculated based on engagement</Form.Text>
+                      </Form.Group>
+                    </Col>
+                    <Col md={12}>
+                      <div className="alert alert-info small mb-0">
+                        <AlertCircle size={14} className="me-1" />
+                        Lead score is automatically calculated based on potential, urgency, requirement status, and follow-up activities
+                      </div>
+                    </Col>
+                  </Row>
+                </Card.Body>
+              </Card>
+            )}
+
+            {leadFormStep === 3 && (
+              <Card className="border-0 bg-light">
+                <Card.Body>
+                  <h5 className="fw-bold mb-4 text-warning">FOLLOW-UPS</h5>
+                  <Row>
+                    <Col md={6}>
+                      <Form.Group className="mb-3">
+                        <Form.Label>Follow-up Date</Form.Label>
+                        <Form.Control 
+                          type="date" 
+                          defaultValue={editingLead?.followUpDate || ''} 
+                        />
+                        <Form.Text className="text-muted">Schedule next follow-up activity</Form.Text>
+                      </Form.Group>
+                    </Col>
+                    <Col md={6}>
+                      <Form.Group className="mb-3">
+                        <Form.Label>Follow-up Status</Form.Label>
+                        <Form.Select defaultValue={editingLead?.followUpStatus || ''}>
+                          <option value="">Select Status</option>
+                          <option value="Pending">Pending</option>
+                          <option value="Scheduled">Scheduled</option>
+                          <option value="Done">Done</option>
+                        </Form.Select>
+                        <Form.Text className="text-muted">Current follow-up status</Form.Text>
+                      </Form.Group>
+                    </Col>
+                    <Col md={12}>
+                      <Form.Group className="mb-3">
+                        <Form.Label>Communication Channel</Form.Label>
+                        <Form.Select defaultValue={editingLead?.communicationChannel || ''}>
+                          <option value="">Select Channel</option>
+                          <option value="Email">Email</option>
+                          <option value="Phone Call">Phone Call</option>
+                          <option value="Video Meeting">Video Meeting</option>
+                          <option value="In-Person Meeting">In-Person Meeting</option>
+                          <option value="LinkedIn Message">LinkedIn Message</option>
+                          <option value="WhatsApp">WhatsApp</option>
+                        </Form.Select>
+                        <Form.Text className="text-muted">Preferred communication method</Form.Text>
+                      </Form.Group>
+                    </Col>
+                    <Col md={12}>
+                      <div className="alert alert-success small">
+                        <CheckCircle size={14} className="me-1" />
+                        All required fields are marked with <span className="text-danger">*</span>. Complete all sections to create the lead.
+                      </div>
+                    </Col>
+                  </Row>
+                </Card.Body>
+              </Card>
+            )}
+          </div>
+        </Modal.Body>
+        <Modal.Footer className="d-flex justify-content-between">
+          <Button 
+            variant="outline-secondary" 
+            onClick={() => setLeadFormStep(Math.max(0, leadFormStep - 1))}
+            disabled={leadFormStep === 0}
+          >
+            <ChevronLeft size={16} className="me-1" />
+            Back
+          </Button>
+          <Button variant="secondary" onClick={() => { setShowLeadFormModal(false); setEditingLead(null); setLeadFormStep(0); }}>
+            Cancel
+          </Button>
+          {leadFormStep < 3 ? (
+            <Button 
+              variant="primary" 
+              onClick={() => setLeadFormStep(Math.min(3, leadFormStep + 1))}
+            >
+              Next
+              <ChevronRight size={16} className="ms-1" />
+            </Button>
+          ) : (
+            <Button variant="success">
+              <CheckCircle size={16} className="me-2" />
+              {editingLead ? 'Update Lead' : 'Create Lead'}
+            </Button>
+          )}
+        </Modal.Footer>
+      </Modal>
+    );
+  };
+
   // Prospects Screen
   const renderProspects = () => {
     const availableColumns = [
       { key: 'name', label: 'Name' },
       { key: 'phone', label: 'Phone' },
-      { key: 'email', label: 'Email' },
       { key: 'dataSource', label: 'Data Source' },
       { key: 'sourceFile', label: 'Source File/Campaign' },
       { key: 'assignedTo', label: 'Assigned To' },
@@ -2693,6 +6509,7 @@ const CRMPortal = () => {
       { key: 'lastCallStatus', label: 'Last Call Status' },
       { key: 'callDisposition', label: 'Call Disposition' },
       { key: 'nextCallScheduled', label: 'Next Call Scheduled' },
+      { key: 'viewStatus', label: 'View Status' },
       { key: 'tags', label: 'Tags' }
     ];
 
@@ -2710,12 +6527,14 @@ const CRMPortal = () => {
         {AddProspectModal()}
         {ImportProspectsModal()}
         {CallHistoryModal()}
+        {ScheduleCallbackModal()}
         {FilterDrawer()}
         {GenerateLeadModal()}
         {DataAssignmentModal()}
         {UploadHistoryModal()}
         {ProspectViewModal()}
         {ConfirmationDialog()}
+        {AddLeadFormModal()}
 
         <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4">
           <div>
@@ -2723,6 +6542,13 @@ const CRMPortal = () => {
             <p className="text-muted mb-0">Manage your prospects and schedule calls</p>
           </div>
           <div className="d-flex flex-wrap gap-2">
+            <Button 
+              variant={showProspectsAnalytics ? "primary" : "outline-secondary"}
+              onClick={() => setShowProspectsAnalytics(!showProspectsAnalytics)}
+            >
+              <BarChart3 size={16} className="me-2" />
+              {showProspectsAnalytics ? 'Hide Analytics' : 'Show Analytics'}
+            </Button>
             <Button 
               variant="outline-info" 
               onClick={() => setShowUploadHistoryModal(true)}
@@ -2741,15 +6567,18 @@ const CRMPortal = () => {
               <Download size={16} className="me-2" />
               Upload CSV
             </Button>
-            <Button variant="primary" onClick={() => setShowProspectModal(true)}>
+            {/* <Button variant="primary" onClick={() => setShowProspectModal(true)}>
               <Plus size={16} className="me-2" />
               Add Prospect
-            </Button>
+            </Button> */}
           </div>
         </div>
 
-        {/* Summary Stats Grid - Collapsible */}
-        <Row className="mb-2">
+        {/* Analytics Section - Collapsible */}
+        {showProspectsAnalytics && (
+          <>
+            {/* Summary Stats Grid - Collapsible */}
+            <Row className="mb-2">
           <Col xl={3} lg={4} md={6} className="mb-3">
             <KPICard 
               title="Total Records"
@@ -2953,89 +6782,396 @@ const CRMPortal = () => {
             </Card>
           </Col>
         </Row>
+          </>
+        )}
 
-        {/* Search and Filter Toolbar */}
-        <Card className="border-0 shadow-sm mb-4">
-          <Card.Body className="bg-light">
-            <Row className="align-items-center g-3">
-              <Col md={4}>
-                <Form.Control type="search" placeholder="Search prospects..." />
-              </Col>
-              <Col md={2}>
-                <Form.Select>
-                  <option>All Assigned</option>
-                  <option>John Doe (501)</option>
-                  <option>Jane Smith (502)</option>
-                  <option>Mike Johnson (503)</option>
-                </Form.Select>
-              </Col>
-              <Col md={2}>
-                <Form.Select>
-                  <option>All Status</option>
-                  <option>Answered</option>
-                  <option>No Answer</option>
-                  <option>Busy</option>
-                  <option>Not Called</option>
-                </Form.Select>
-              </Col>
-              <Col md={2}>
-                <Form.Select>
-                  <option>All Disposition</option>
-                  <option>Interested</option>
-                  <option>Not Interested</option>
-                  <option>Callback Required</option>
-                  <option>Reschedule</option>
-                </Form.Select>
-              </Col>
-              <Col md={2}>
-                <Button variant="primary" className="w-100" onClick={() => setShowFilterDrawer(true)}>
-                  <Filter size={16} className="me-2" />
-                  Filters
-                </Button>
-              </Col>
-            </Row>
-          </Card.Body>
-        </Card>
+        {/* Filter Bar prospects*/}
+        <FilterBar
+          quickFilters={[
+            { id: 'all', label: 'All Prospects', count: 241, color: '#6c757d', activeColor: '#0d6efd', icon: <Users size={16} /> },
+            { id: 'assigned', label: 'Assigned to Me', count: 58, color: '#0dcaf0', activeColor: '#0dcaf0', icon: <UserPlus size={16} /> },
+            { id: 'not-called', label: 'Not Called', count: 45, color: '#fd7e14', activeColor: '#fd7e14', icon: <Phone size={16} /> },
+            { id: 'answered', label: 'Answered', count: 125, color: '#198754', activeColor: '#198754', icon: <CheckCircle size={16} /> },
+            { id: 'callback', label: 'Callback Required', count: 23, color: '#ffc107', activeColor: '#ffc107', icon: <AlertCircle size={16} /> },
+            { id: 'scheduled', label: 'Scheduled Today', count: 8, color: '#20c997', activeColor: '#20c997', icon: <Calendar size={16} /> }
+          ]}
+          activeFilter={activeFilter}
+          onFilterChange={(filterId) => setActiveFilter(filterId)}
+          searchValue={prospectsSearch}
+          onSearchChange={(value) => setProspectsSearch(value)}
+          onSearch={() => console.log('Searching prospects:', prospectsSearch)}
+          searchPlaceholder="Search prospects by name, phone, email..."
+          showAdvancedFilters={showAdvancedFilters}
+          onToggleAdvancedFilters={() => setShowAdvancedFilters(!showAdvancedFilters)}
+          advancedFilterCount={Object.keys(prospectsFilters).filter(key => {
+            const val = prospectsFilters[key as keyof typeof prospectsFilters];
+            if (Array.isArray(val)) return val.length > 0;
+            if (typeof val === 'object' && val !== null) return (val as any).start || (val as any).end;
+            return val;
+          }).length}
+        />
 
-        {/* Customize Table Columns */}
-        <Card className="border-0 shadow-sm mb-3">
-          <Card.Body>
-            <div className="d-flex justify-content-between align-items-center">
-              <h6 className="mb-0 fw-semibold">Customize Table Columns</h6>
-              <Dropdown>
-                <Dropdown.Toggle variant="outline-secondary" size="sm">
-                  <Layers size={14} className="me-1" />
-                  Select Columns
-                </Dropdown.Toggle>
-                <Dropdown.Menu style={{ maxHeight: '300px', overflowY: 'auto' }}>
-                  {availableColumns.map((col) => (
-                    <Dropdown.Item key={col.key} as="div">
-                      <Form.Check
-                        type="checkbox"
-                        label={col.label}
-                        checked={selectedColumns.includes(col.key)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setSelectedColumns([...selectedColumns, col.key]);
-                          } else {
-                            setSelectedColumns(selectedColumns.filter(c => c !== col.key));
-                          }
-                        }}
-                      />
-                    </Dropdown.Item>
-                  ))}
-                  <Dropdown.Divider />
-                  <Dropdown.Item onClick={() => setSelectedColumns(availableColumns.map(c => c.key))}>
-                    Select All
-                  </Dropdown.Item>
-                  <Dropdown.Item onClick={() => setSelectedColumns(['name', 'phone', 'assignedTo'])}>
-                    Reset to Default
-                  </Dropdown.Item>
-                </Dropdown.Menu>
-              </Dropdown>
-            </div>
-          </Card.Body>
-        </Card>
+        {/* Advanced Filters */}
+        {showAdvancedFilters && (
+          <Card className="border-0 shadow-sm mb-4">
+            <Card.Body>
+              <Row className="g-3 align-items-end">
+                {/* Row 1 */}
+                <Col md={2}>
+                  <Form.Label className="small fw-bold mb-2">Assigned To</Form.Label>
+                  <Select
+                    options={[
+                      { value: 'John Doe (501)', label: 'John Doe (501)' },
+                      { value: 'Jane Smith (502)', label: 'Jane Smith (502)' },
+                      { value: 'Mike Johnson (503)', label: 'Mike Johnson (503)' },
+                      { value: 'Sarah Williams (504)', label: 'Sarah Williams (504)' },
+                      { value: 'Tom Brown (505)', label: 'Tom Brown (505)' }
+                    ]}
+                    value={prospectsFilters.assignedTo.length > 0 ? { value: prospectsFilters.assignedTo[0], label: prospectsFilters.assignedTo[0] } : null}
+                    onChange={(selected) => {
+                      setProspectsFilters(prev => ({
+                        ...prev,
+                        assignedTo: selected ? [selected.value] : []
+                      }));
+                    }}
+                    placeholder="Select..."
+                    isClearable
+                    styles={customSelectStyles}
+                  />
+                </Col>
+                <Col md={2}>
+                  <Form.Label className="small fw-bold mb-2">Campaigns</Form.Label>
+                  <Select
+                    isMulti
+                    options={[
+                      { value: 'Q4 2024 Outreach', label: 'Q4 2024 Outreach' },
+                      { value: 'Holiday Sale', label: 'Holiday Sale' },
+                      { value: 'Product Launch', label: 'Product Launch' },
+                      { value: 'Renewal Campaign', label: 'Renewal Campaign' }
+                    ]}
+                    value={prospectsFilters.campaigns.map(c => ({ value: c, label: c }))}
+                    onChange={(selected) => {
+                      setProspectsFilters(prev => ({
+                        ...prev,
+                        campaigns: selected ? selected.map(s => s.value) : []
+                      }));
+                    }}
+                    placeholder="Select campaigns..."
+                    styles={customSelectStyles}
+                  />
+                </Col>
+                <Col md={2}>
+                  <Form.Label className="small fw-bold mb-2">Last Call Status</Form.Label>
+                  <Select
+                    options={[
+                      { value: 'Answered', label: 'Answered' },
+                      { value: 'No Answer', label: 'No Answer' },
+                      { value: 'Busy', label: 'Busy' },
+                      { value: 'Voicemail', label: 'Voicemail' },
+                      { value: 'Not Called', label: 'Not Called' }
+                    ]}
+                    value={prospectsFilters.lastCallStatus.length > 0 ? { value: prospectsFilters.lastCallStatus[0], label: prospectsFilters.lastCallStatus[0] } : null}
+                    onChange={(selected) => {
+                      setProspectsFilters(prev => ({
+                        ...prev,
+                        lastCallStatus: selected ? [selected.value] : []
+                      }));
+                    }}
+                    placeholder="Select..."
+                    isClearable
+                    styles={customSelectStyles}
+                  />
+                </Col>
+                <Col md={2}>
+                  <Form.Label className="small fw-bold mb-2">Call Disposition</Form.Label>
+                  <Select
+                    options={[
+                      { value: 'Interested', label: 'Interested' },
+                      { value: 'Not Interested', label: 'Not Interested' },
+                      { value: 'Callback Required', label: 'Callback Required' },
+                      { value: 'Reschedule', label: 'Reschedule' },
+                      { value: 'Wrong Number', label: 'Wrong Number' }
+                    ]}
+                    value={prospectsFilters.callDisposition.length > 0 ? { value: prospectsFilters.callDisposition[0], label: prospectsFilters.callDisposition[0] } : null}
+                    onChange={(selected) => {
+                      setProspectsFilters(prev => ({
+                        ...prev,
+                        callDisposition: selected ? [selected.value] : []
+                      }));
+                    }}
+                    placeholder="Select..."
+                    isClearable
+                    styles={customSelectStyles}
+                  />
+                </Col>
+                <Col md={2}>
+                  <Form.Label className="small fw-bold mb-2">View Status</Form.Label>
+                  <Select
+                    options={[
+                      { value: 'Viewed', label: 'Viewed' },
+                      { value: 'Not Viewed', label: 'Not Viewed' }
+                    ]}
+                    value={prospectsFilters.viewStatus.length > 0 ? { value: prospectsFilters.viewStatus[0], label: prospectsFilters.viewStatus[0] } : null}
+                    onChange={(selected) => {
+                      setProspectsFilters(prev => ({
+                        ...prev,
+                        viewStatus: selected ? [selected.value] : []
+                      }));
+                    }}
+                    placeholder="Select..."
+                    isClearable
+                    styles={customSelectStyles}
+                  />
+                </Col>
+                
+                {/* Row 2 */}
+                <Col md={2}>
+                  <Form.Label className="small fw-bold mb-2">Last Called Date</Form.Label>
+                  <Select
+                    options={[
+                      { value: 'Today', label: 'Today' },
+                      { value: 'Yesterday', label: 'Yesterday' },
+                      { value: 'Last 7 days', label: 'Last 7 days' },
+                      { value: 'Last 30 days', label: 'Last 30 days' },
+                      { value: 'Custom range', label: 'Custom range' }
+                    ]}
+                    value={prospectsFilters.lastCalledDate.length > 0 ? { value: prospectsFilters.lastCalledDate[0], label: prospectsFilters.lastCalledDate[0] } : null}
+                    onChange={(selected) => {
+                      setProspectsFilters(prev => ({
+                        ...prev,
+                        lastCalledDate: selected ? [selected.value] : []
+                      }));
+                    }}
+                    placeholder="Select..."
+                    isClearable
+                    styles={customSelectStyles}
+                  />
+                </Col>
+                <Col md={2}>
+                  <Form.Label className="small fw-bold mb-2">Next Call Scheduled</Form.Label>
+                  <Select
+                    options={[
+                      { value: 'Today', label: 'Today' },
+                      { value: 'Tomorrow', label: 'Tomorrow' },
+                      { value: 'This week', label: 'This week' },
+                      { value: 'Next week', label: 'Next week' },
+                      { value: 'Custom range', label: 'Custom range' },
+                      { value: 'Overdue', label: 'Overdue' }
+                    ]}
+                    value={prospectsFilters.nextCallScheduled.length > 0 ? { value: prospectsFilters.nextCallScheduled[0], label: prospectsFilters.nextCallScheduled[0] } : null}
+                    onChange={(selected) => {
+                      setProspectsFilters(prev => ({
+                        ...prev,
+                        nextCallScheduled: selected ? [selected.value] : []
+                      }));
+                    }}
+                    placeholder="Select..."
+                    isClearable
+                    styles={customSelectStyles}
+                  />
+                </Col>
+                <Col md={2}>
+                  <Form.Label className="small fw-bold mb-2">Source Type</Form.Label>
+                  <Select
+                    options={[
+                      { value: 'Campaign', label: 'Campaign' },
+                      { value: 'CSV Upload', label: 'CSV Upload' },
+                      { value: 'Manual Entry', label: 'Manual Entry' },
+                      { value: 'API Import', label: 'API Import' }
+                    ]}
+                    value={prospectsFilters.sourceType.length > 0 ? { value: prospectsFilters.sourceType[0], label: prospectsFilters.sourceType[0] } : null}
+                    onChange={(selected) => {
+                      setProspectsFilters(prev => ({
+                        ...prev,
+                        sourceType: selected ? [selected.value] : []
+                      }));
+                    }}
+                    placeholder="Select..."
+                    isClearable
+                    styles={customSelectStyles}
+                  />
+                </Col>
+                <Col md={2}>
+                  <Form.Label className="small fw-bold mb-2">Source File</Form.Label>
+                  <Select
+                    options={[
+                      { value: 'All', label: 'All' },
+                      { value: 'Campaign list', label: 'Campaign list' }
+                    ]}
+                    value={prospectsFilters.sourceFile.length > 0 ? { value: prospectsFilters.sourceFile[0], label: prospectsFilters.sourceFile[0] } : null}
+                    onChange={(selected) => {
+                      setProspectsFilters(prev => ({
+                        ...prev,
+                        sourceFile: selected ? [selected.value] : []
+                      }));
+                    }}
+                    placeholder="Select..."
+                    isClearable
+                    styles={customSelectStyles}
+                  />
+                </Col>
+                <Col md={2}>
+                  <Form.Label className="small fw-bold mb-2">Tags</Form.Label>
+                  <Select
+                    isMulti
+                    options={[
+                      { value: 'Hot Lead', label: 'Hot Lead' },
+                      { value: 'Follow Up', label: 'Follow Up' },
+                      { value: 'Decision Maker', label: 'Decision Maker' },
+                      { value: 'Budget Approved', label: 'Budget Approved' },
+                      { value: 'Gatekeeper', label: 'Gatekeeper' }
+                    ]}
+                    value={prospectsFilters.tags.map(t => ({ value: t, label: t }))}
+                    onChange={(selected) => {
+                      setProspectsFilters(prev => ({
+                        ...prev,
+                        tags: selected ? selected.map(s => s.value) : []
+                      }));
+                    }}
+                    placeholder="Select tags..."
+                    styles={customSelectStyles}
+                  />
+                </Col>
+                
+                <Col md={2}>
+                  <div className="d-flex gap-2">
+                    <Button 
+                      variant="primary" 
+                      
+                      className="flex-grow-1"
+                      onClick={() => {
+                        setProspectsPagination({ ...prospectsPagination, currentPage: 1 });
+                      }}
+                    >
+                      Apply
+                    </Button>
+                    <Button 
+                      variant="outline-secondary" 
+                      
+                      onClick={() => {
+                        setProspectsFilters({
+                          assignedTo: [],
+                          phone: '',
+                          campaigns: [],
+                          lastCallStatus: [],
+                          callDisposition: [],
+                          viewStatus: [],
+                          lastCalledDate: [],
+                          lastCalledCustomRange: { start: '', end: '' },
+                          nextCallScheduled: [],
+                          nextCallCustomRange: { start: '', end: '' },
+                          overdueCalls: false,
+                          sourceType: [],
+                          sourceFile: [],
+                          tags: []
+                        });
+                        setProspectsPagination({ ...prospectsPagination, currentPage: 1 });
+                      }}
+                    >
+                      Reset
+                    </Button>
+                  </div>
+                </Col>
+              </Row>
+            </Card.Body>
+          </Card>
+        )}
+
+        {/* Bulk Actions and Column Customization */}
+        <div className="d-flex justify-content-end gap-2 mb-3">
+          {/* Bulk Actions Dropdown - Only show when items are selected */}
+          {selectedProspects.length > 0 && (
+            <Dropdown>
+              <Dropdown.Toggle variant="outline-primary" size="sm">
+                <CheckSquare size={16} className="me-2" />
+                Bulk Actions ({selectedProspects.length})
+              </Dropdown.Toggle>
+              <Dropdown.Menu align="end">
+                <Dropdown.Item 
+                  onClick={() => {
+                    // Get all selected prospects
+                    const prospectsToSchedule = sampleProspects.filter(p => selectedProspects.includes(p.id));
+                    if (prospectsToSchedule.length === 1) {
+                      // If only one selected, open modal with pre-filled data
+                      const prospect = prospectsToSchedule[0];
+                      setScheduleCallbackData({
+                        ...scheduleCallbackData,
+                        prospectId: prospect.id,
+                        prospectName: `${prospect.firstName} ${prospect.lastName}`
+                      });
+                      setShowScheduleCallbackModal(true);
+                    } else {
+                      // For multiple selections, just open the modal
+                      setScheduleCallbackData({
+                        ...scheduleCallbackData,
+                        prospectId: null,
+                        prospectName: `${prospectsToSchedule.length} prospects selected`
+                      });
+                      setShowScheduleCallbackModal(true);
+                    }
+                  }}
+                  className="d-flex align-items-center"
+                >
+                  <Calendar size={14} className="me-2" />
+                  Schedule Callback
+                </Dropdown.Item>
+                <Dropdown.Divider />
+                <Dropdown.Item 
+                  onClick={() => {
+                    setConfirmAction({
+                      type: 'delete',
+                      data: { 
+                        itemType: 'Prospects', 
+                        name: `${selectedProspects.length} selected prospects`,
+                        count: selectedProspects.length
+                      }
+                    });
+                    setShowConfirmDialog(true);
+                  }}
+                  className="d-flex align-items-center text-danger"
+                >
+                  <Trash2 size={14} className="me-2" />
+                  Delete Selected ({selectedProspects.length})
+                </Dropdown.Item>
+              </Dropdown.Menu>
+            </Dropdown>
+          )}
+
+          {/* Column Customization */}
+          <Dropdown>
+            <Dropdown.Toggle variant="outline-secondary" size="sm">
+              <Layers size={16} className="me-2" />
+              Customize Table
+            </Dropdown.Toggle>
+            <Dropdown.Menu align="end" style={{ maxHeight: '300px', overflowY: 'auto' }}>
+              {availableColumns.map((col) => (
+                <Dropdown.Item key={col.key} as="div">
+                  <Form.Check
+                    type="checkbox"
+                    label={col.label}
+                    checked={selectedColumns.includes(col.key)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedColumns([...selectedColumns, col.key]);
+                      } else {
+                        setSelectedColumns(selectedColumns.filter(c => c !== col.key));
+                      }
+                    }}
+                  />
+                </Dropdown.Item>
+              ))}
+              <Dropdown.Divider />
+              <Dropdown.Item onClick={() => setSelectedColumns(availableColumns.map(c => c.key))}>
+                Select All
+              </Dropdown.Item>
+              <Dropdown.Item onClick={() => {
+                setSelectedColumns(['name', 'phone', 'dataSource', 'sourceFile', 'assignedTo', 'lastCalled', 'lastCallStatus', 'callDisposition', 'nextCallScheduled', 'viewStatus', 'tags']);
+              }}>
+                Reset to Default
+              </Dropdown.Item>
+            </Dropdown.Menu>
+          </Dropdown>
+        </div>
 
         {/* Prospects Table */}
         <Card className="border-0 shadow-sm">
@@ -3044,6 +7180,94 @@ const CRMPortal = () => {
               <Table hover className="mb-0">
                 <thead className="bg-light">
                   <tr>
+                    <th style={{ width: '50px' }}>
+                      <Form.Check
+                        type="checkbox"
+                        checked={(() => {
+                          const filtered = sampleProspects.filter(prospect => {
+                            if (activeFilter === 'assigned') {
+                              if (prospect.assignedTo !== 'John Doe (501)') return false;
+                            } else if (activeFilter === 'not-called') {
+                              if (prospect.lastCallStatus) return false;
+                            } else if (activeFilter === 'answered') {
+                              if (prospect.lastCallStatus !== 'Answered') return false;
+                            } else if (activeFilter === 'callback') {
+                              if (prospect.callDisposition !== 'Callback Required') return false;
+                            } else if (activeFilter === 'scheduled') {
+                              const today = new Date().toISOString().split('T')[0];
+                              if (prospect.nextCallScheduled !== today) return false;
+                            }
+                            
+                            const searchLower = prospectsSearch.toLowerCase();
+                            const matchesSearch = !prospectsSearch ||
+                              prospect.firstName.toLowerCase().includes(searchLower) ||
+                              prospect.lastName.toLowerCase().includes(searchLower) ||
+                              prospect.phone.includes(searchLower) ||
+                              prospect.email.toLowerCase().includes(searchLower) ||
+                              (prospect.company?.toLowerCase().includes(searchLower) || false);
+                            
+                            const matchesAssignedTo = prospectsFilters.assignedTo.length === 0 || prospectsFilters.assignedTo.includes(prospect.assignedTo);
+                            const matchesPhone = !prospectsFilters.phone || prospect.phone.includes(prospectsFilters.phone);
+                            const matchesCampaigns = prospectsFilters.campaigns.length === 0 || (prospect.dataSource === 'Campaign' && prospectsFilters.campaigns.includes(prospect.sourceFile));
+                            const matchesCallStatus = prospectsFilters.lastCallStatus.length === 0 || prospectsFilters.lastCallStatus.includes(prospect.lastCallStatus || '');
+                            const matchesDisposition = prospectsFilters.callDisposition.length === 0 || prospectsFilters.callDisposition.includes(prospect.callDisposition || '');
+                            const matchesViewStatus = prospectsFilters.viewStatus.length === 0 || prospectsFilters.viewStatus.includes(prospect.viewStatus);
+                            const matchesSourceType = prospectsFilters.sourceType.length === 0 || prospectsFilters.sourceType.includes(prospect.dataSource);
+                            const matchesSourceFile = prospectsFilters.sourceFile.length === 0 || prospectsFilters.sourceFile.includes(prospect.sourceFile);
+                            const matchesTags = prospectsFilters.tags.length === 0 || prospectsFilters.tags.some(tag => prospect.tags.includes(tag));
+                            
+                            return matchesSearch && matchesAssignedTo && matchesPhone && matchesCampaigns && matchesCallStatus && matchesDisposition && matchesViewStatus && matchesSourceType && matchesSourceFile && matchesTags;
+                          });
+                          const sorted = sortData(filtered, prospectsPagination.sortColumn, prospectsPagination.sortDirection);
+                          const paginated = paginateData(sorted, prospectsPagination.currentPage, prospectsPagination.rowsPerPage);
+                          return paginated.length > 0 && paginated.every(p => selectedProspects.includes(p.id));
+                        })()}
+                        onChange={(e) => {
+                          const filtered = sampleProspects.filter(prospect => {
+                            if (activeFilter === 'assigned') {
+                              if (prospect.assignedTo !== 'John Doe (501)') return false;
+                            } else if (activeFilter === 'not-called') {
+                              if (prospect.lastCallStatus) return false;
+                            } else if (activeFilter === 'answered') {
+                              if (prospect.lastCallStatus !== 'Answered') return false;
+                            } else if (activeFilter === 'callback') {
+                              if (prospect.callDisposition !== 'Callback Required') return false;
+                            } else if (activeFilter === 'scheduled') {
+                              const today = new Date().toISOString().split('T')[0];
+                              if (prospect.nextCallScheduled !== today) return false;
+                            }
+                            
+                            const searchLower = prospectsSearch.toLowerCase();
+                            const matchesSearch = !prospectsSearch ||
+                              prospect.firstName.toLowerCase().includes(searchLower) ||
+                              prospect.lastName.toLowerCase().includes(searchLower) ||
+                              prospect.phone.includes(searchLower) ||
+                              prospect.email.toLowerCase().includes(searchLower) ||
+                              (prospect.company?.toLowerCase().includes(searchLower) || false);
+                            
+                            const matchesAssignedTo = prospectsFilters.assignedTo.length === 0 || prospectsFilters.assignedTo.includes(prospect.assignedTo);
+                            const matchesPhone = !prospectsFilters.phone || prospect.phone.includes(prospectsFilters.phone);
+                            const matchesCampaigns = prospectsFilters.campaigns.length === 0 || (prospect.dataSource === 'Campaign' && prospectsFilters.campaigns.includes(prospect.sourceFile));
+                            const matchesCallStatus = prospectsFilters.lastCallStatus.length === 0 || prospectsFilters.lastCallStatus.includes(prospect.lastCallStatus || '');
+                            const matchesDisposition = prospectsFilters.callDisposition.length === 0 || prospectsFilters.callDisposition.includes(prospect.callDisposition || '');
+                            const matchesViewStatus = prospectsFilters.viewStatus.length === 0 || prospectsFilters.viewStatus.includes(prospect.viewStatus);
+                            const matchesSourceType = prospectsFilters.sourceType.length === 0 || prospectsFilters.sourceType.includes(prospect.dataSource);
+                            const matchesSourceFile = prospectsFilters.sourceFile.length === 0 || prospectsFilters.sourceFile.includes(prospect.sourceFile);
+                            const matchesTags = prospectsFilters.tags.length === 0 || prospectsFilters.tags.some(tag => prospect.tags.includes(tag));
+                            
+                            return matchesSearch && matchesAssignedTo && matchesPhone && matchesCampaigns && matchesCallStatus && matchesDisposition && matchesViewStatus && matchesSourceType && matchesSourceFile && matchesTags;
+                          });
+                          const sorted = sortData(filtered, prospectsPagination.sortColumn, prospectsPagination.sortDirection);
+                          const paginated = paginateData(sorted, prospectsPagination.currentPage, prospectsPagination.rowsPerPage);
+                          
+                          if (e.target.checked) {
+                            setSelectedProspects(paginated.map(p => p.id));
+                          } else {
+                            setSelectedProspects([]);
+                          }
+                        }}
+                      />
+                    </th>
                     {selectedColumns.includes('name') && (
                       <th 
                         style={{ cursor: 'pointer', userSelect: 'none' }}
@@ -3058,14 +7282,6 @@ const CRMPortal = () => {
                         onClick={() => handleSort('phone', prospectsPagination, setProspectsPagination)}
                       >
                         Phone {renderSortIcon('phone', prospectsPagination)}
-                      </th>
-                    )}
-                    {selectedColumns.includes('email') && (
-                      <th 
-                        style={{ cursor: 'pointer', userSelect: 'none' }}
-                        onClick={() => handleSort('email', prospectsPagination, setProspectsPagination)}
-                      >
-                        Email {renderSortIcon('email', prospectsPagination)}
                       </th>
                     )}
                     {selectedColumns.includes('dataSource') && (
@@ -3124,21 +7340,93 @@ const CRMPortal = () => {
                         Next Call Scheduled {renderSortIcon('nextCallScheduled', prospectsPagination)}
                       </th>
                     )}
+                    {selectedColumns.includes('viewStatus') && (
+                      <th 
+                        style={{ cursor: 'pointer', userSelect: 'none' }}
+                        onClick={() => handleSort('viewStatus', prospectsPagination, setProspectsPagination)}
+                      >
+                        View Status {renderSortIcon('viewStatus', prospectsPagination)}
+                      </th>
+                    )}
                     {selectedColumns.includes('tags') && <th>Tags</th>}
                     <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {(() => {
-                    const sorted = sortData(sampleProspects, prospectsPagination.sortColumn, prospectsPagination.sortDirection);
+                    // Apply search filter
+                    let filtered = sampleProspects.filter(prospect => {
+                      // Apply quick filters first
+                      if (activeFilter === 'assigned') {
+                        // Filter for prospects assigned to current user (example: John Doe)
+                        if (prospect.assignedTo !== 'John Doe (501)') return false;
+                      } else if (activeFilter === 'not-called') {
+                        if (prospect.lastCallStatus !== 'Not Called') return false;
+                      } else if (activeFilter === 'answered') {
+                        if (prospect.lastCallStatus !== 'Answered') return false;
+                      } else if (activeFilter === 'callback') {
+                        if (prospect.callDisposition !== 'Callback Required') return false;
+                      } else if (activeFilter === 'scheduled') {
+                        // Filter for prospects with calls scheduled today
+                        const today = new Date().toISOString().split('T')[0];
+                        if (!prospect.nextCallScheduled || !prospect.nextCallScheduled.includes(today)) return false;
+                      }
+                      // 'all' filter shows everything
+
+                      const searchLower = prospectsSearch.toLowerCase();
+                      const matchesSearch = !prospectsSearch || 
+                        prospect.firstName.toLowerCase().includes(searchLower) ||
+                        prospect.lastName.toLowerCase().includes(searchLower) ||
+                        prospect.phone.toLowerCase().includes(searchLower) ||
+                        prospect.email.toLowerCase().includes(searchLower) ||
+                        prospect.company?.toLowerCase().includes(searchLower);
+
+                      // Apply advanced filters
+                      const matchesAssignedTo = prospectsFilters.assignedTo.length === 0 || prospectsFilters.assignedTo.includes(prospect.assignedTo);
+                      const matchesPhone = !prospectsFilters.phone || prospect.phone.includes(prospectsFilters.phone);
+                      const matchesCampaigns = prospectsFilters.campaigns.length === 0 || (prospect.dataSource === 'Campaign' && prospectsFilters.campaigns.includes(prospect.sourceFile));
+                      const matchesCallStatus = prospectsFilters.lastCallStatus.length === 0 || prospectsFilters.lastCallStatus.includes(prospect.lastCallStatus || '');
+                      const matchesDisposition = prospectsFilters.callDisposition.length === 0 || prospectsFilters.callDisposition.includes(prospect.callDisposition || '');
+                      const matchesViewStatus = prospectsFilters.viewStatus.length === 0 || prospectsFilters.viewStatus.includes(prospect.viewStatus);
+                      const matchesSourceType = prospectsFilters.sourceType.length === 0 || prospectsFilters.sourceType.includes(prospect.dataSource);
+                      const matchesSourceFile = prospectsFilters.sourceFile.length === 0 || prospectsFilters.sourceFile.includes(prospect.sourceFile);
+                      const matchesTags = prospectsFilters.tags.length === 0 || prospectsFilters.tags.some(tag => prospect.tags.includes(tag));
+
+                      return matchesSearch && matchesAssignedTo && matchesPhone && matchesCampaigns && matchesCallStatus && matchesDisposition && matchesViewStatus && matchesSourceType && matchesSourceFile && matchesTags;
+                    });
+
+                    const sorted = sortData(filtered, prospectsPagination.sortColumn, prospectsPagination.sortDirection);
                     const paginated = paginateData(sorted, prospectsPagination.currentPage, prospectsPagination.rowsPerPage);
+                    
+                    if (filtered.length === 0) {
+                      return (
+                        <tr>
+                          <td colSpan={selectedColumns.length + 2} className="text-center py-4 text-muted">
+                            No prospects found matching your criteria
+                          </td>
+                        </tr>
+                      );
+                    }
+
                     return paginated.map((prospect) => (
                     <tr key={prospect.id}>
+                      <td>
+                        <Form.Check
+                          type="checkbox"
+                          checked={selectedProspects.includes(prospect.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedProspects([...selectedProspects, prospect.id]);
+                            } else {
+                              setSelectedProspects(selectedProspects.filter(id => id !== prospect.id));
+                            }
+                          }}
+                        />
+                      </td>
                       {selectedColumns.includes('name') && (
                         <td className="fw-semibold">{prospect.firstName} {prospect.lastName}</td>
                       )}
                       {selectedColumns.includes('phone') && <td>{prospect.phone}</td>}
-                      {selectedColumns.includes('email') && <td>{prospect.email}</td>}
                       {selectedColumns.includes('dataSource') && (
                         <td>
                           <Badge bg={prospect.dataSource === 'Campaign' ? 'primary' : 'info'} className="bg-opacity-10 text-dark">
@@ -3168,6 +7456,16 @@ const CRMPortal = () => {
                       )}
                       {selectedColumns.includes('callDisposition') && <td>{prospect.callDisposition || '-'}</td>}
                       {selectedColumns.includes('nextCallScheduled') && <td>{prospect.nextCallScheduled || '-'}</td>}
+                      {selectedColumns.includes('viewStatus') && (
+                        <td>
+                          <Badge 
+                            bg={prospect.viewStatus === 'Viewed' ? 'success' : 'secondary'} 
+                            className="bg-opacity-10 text-dark"
+                          >
+                            {prospect.viewStatus}
+                          </Badge>
+                        </td>
+                      )}
                       {selectedColumns.includes('tags') && (
                         <td>
                           <div className="d-flex gap-1 flex-wrap">
@@ -3180,32 +7478,49 @@ const CRMPortal = () => {
                         </td>
                       )}
                       <td>
-                        <div className="d-flex gap-2">
-                          <Button
-                            variant="outline-primary"
-                            size="sm"
+                        <div className="d-flex gap-1">
+                          <Button 
+                            variant="link" 
+                            size="sm" 
+                            className="p-1" 
+                            title="View Details"
                             onClick={() => {
                               setViewingProspect(prospect);
                               setShowProspectViewModal(true);
                             }}
-                            title="View Details"
                           >
                             <Eye size={16} />
                           </Button>
-                          <Button
-                            variant="outline-success"
-                            size="sm"
+                          {/* <Button 
+                            variant="link" 
+                            size="sm" 
+                            className="p-1" 
+                            title="Edit Prospect"
                             onClick={() => {
                               setSelectedProspect(prospect);
-                              setShowLeadModal(true);
+                              // Add edit modal trigger here when available
+                              alert('Edit prospect functionality');
                             }}
-                            title="Generate Lead"
+                          >
+                            <Edit size={16} />
+                          </Button> */}
+                          <Button 
+                            variant="link" 
+                            size="sm" 
+                            className="p-1 text-success" 
+                            title="Convert to Lead"
+                            onClick={() => {
+                              setSelectedProspect(prospect);
+                              setShowLeadFormModal(true);
+                            }}
                           >
                             <UserPlus size={16} />
                           </Button>
-                          <Button
-                            variant="outline-danger"
-                            size="sm"
+                          <Button 
+                            variant="link" 
+                            size="sm" 
+                            className="p-1 text-danger" 
+                            title="Delete"
                             onClick={() => {
                               setConfirmAction({
                                 type: 'delete',
@@ -3213,10 +7528,53 @@ const CRMPortal = () => {
                               });
                               setShowConfirmDialog(true);
                             }}
-                            title="Delete Prospect"
                           >
                             <Trash2 size={16} />
                           </Button>
+                          <Dropdown className="d-inline">
+                            <Dropdown.Toggle 
+                              as={Button}
+                              variant="link" 
+                              size="sm" 
+                              className="p-1"
+                              title="More Actions"
+                            >
+                              <MoreVertical size={16} />
+                            </Dropdown.Toggle>
+                            <Dropdown.Menu align="end">
+                              <Dropdown.Item onClick={() => {
+                                window.location.href = `tel:${prospect.phone}`;
+                              }}>
+                                <Phone size={14} className="me-2" />
+                                Call Prospect
+                              </Dropdown.Item>
+                              <Dropdown.Item onClick={() => {
+                                window.location.href = `mailto:${prospect.email}`;
+                              }}>
+                                <Mail size={14} className="me-2" />
+                                Send Email
+                              </Dropdown.Item>
+                              <Dropdown.Item onClick={() => {
+                                setScheduleCallbackData({
+                                  ...scheduleCallbackData,
+                                  prospectId: prospect.id,
+                                  prospectName: `${prospect.firstName} ${prospect.lastName}`
+                                });
+                                setShowScheduleCallbackModal(true);
+                              }}>
+                                <Calendar size={14} className="me-2" />
+                                Schedule Callback
+                              </Dropdown.Item>
+                              <Dropdown.Divider />
+                              <Dropdown.Item onClick={() => {
+                                setSelectedProspect(prospect);
+                                setShowCallHistoryModal(true);
+                              }}>
+                                <Activity size={14} className="me-2" />
+                                View Call History
+                              </Dropdown.Item>
+                            </Dropdown.Menu>
+                          </Dropdown>
                         </div>
                       </td>
                     </tr>
@@ -3314,6 +7672,245 @@ const CRMPortal = () => {
         leadScore: 75.5,
         created: '2025-11-12',
         lastActivity: '2025-11-12'
+      },
+
+
+      {
+        id: 4,
+        name: 'John Smith',
+        email: 'john@company.com',
+        phone: '+44 20 1234 5678',
+        company: 'Tech Corp Ltd',
+        industry: 'Technology',
+        businessType: 'B2B',
+        location: 'London, UK',
+        companySize: '50-200',
+        contactPerson: 'Sarah Johnson',
+        stage: 'Qualified',
+        leadType: 'Inbound',
+        assignedUser: 'Jane Doe',
+        campaignSource: 'Google Ads Q4',
+        crmAttribution: 'Website Form',
+        leadPotential: 'Hot',
+        urgency: 'High',
+        followUps: [
+          { date: '2025-11-15', status: 'Completed', channel: 'Call' },
+          { date: '2025-11-18', status: 'Scheduled', channel: 'Email' }
+        ],
+        leadScore: 82.5,
+        created: '2025-11-10',
+        lastActivity: '2025-11-15'
+      },
+      {
+        id: 5,
+        name: 'Emily Brown',
+        email: 'emily@startup.io',
+        phone: '+44 20 9876 5432',
+        company: 'Startup Innovations',
+        industry: 'Software',
+        businessType: 'B2C',
+        location: 'Manchester, UK',
+        companySize: '10-50',
+        contactPerson: 'Mike Wilson',
+        stage: 'Contacted',
+        leadType: 'Outbound',
+        assignedUser: 'John Doe',
+        campaignSource: 'LinkedIn Campaign',
+        crmAttribution: 'Cold Email',
+        leadPotential: 'Warm',
+        urgency: 'Medium',
+        followUps: [
+          { date: '2025-11-14', status: 'Completed', channel: 'WhatsApp' }
+        ],
+        leadScore: 55.0,
+        created: '2025-11-08',
+        lastActivity: '2025-11-14'
+      },
+      {
+        id: 6,
+        name: 'Robert Taylor',
+        email: 'robert@enterprise.co.uk',
+        phone: '+44 161 234 5678',
+        company: 'Enterprise Solutions',
+        industry: 'Finance',
+        businessType: 'B2B',
+        location: 'Birmingham, UK',
+        companySize: '200+',
+        contactPerson: 'David Lee',
+        stage: 'New',
+        leadType: 'Referral',
+        assignedUser: 'Sarah Smith',
+        campaignSource: 'Partner Referral',
+        crmAttribution: 'Referral',
+        leadPotential: 'Hot',
+        urgency: 'High',
+        followUps: [
+          { date: '2025-11-19', status: 'Scheduled', channel: 'LinkedIn' },
+          { date: '2025-11-20', status: 'Scheduled', channel: 'Call' }
+        ],
+        leadScore: 75.5,
+        created: '2025-11-12',
+        lastActivity: '2025-11-12'
+      },
+
+
+
+
+      {
+        id:7,
+        name: 'John Smith',
+        email: 'john@company.com',
+        phone: '+44 20 1234 5678',
+        company: 'Tech Corp Ltd',
+        industry: 'Technology',
+        businessType: 'B2B',
+        location: 'London, UK',
+        companySize: '50-200',
+        contactPerson: 'Sarah Johnson',
+        stage: 'Qualified',
+        leadType: 'Inbound',
+        assignedUser: 'Jane Doe',
+        campaignSource: 'Google Ads Q4',
+        crmAttribution: 'Website Form',
+        leadPotential: 'Hot',
+        urgency: 'High',
+        followUps: [
+          { date: '2025-11-15', status: 'Completed', channel: 'Call' },
+          { date: '2025-11-18', status: 'Scheduled', channel: 'Email' }
+        ],
+        leadScore: 82.5,
+        created: '2025-11-10',
+        lastActivity: '2025-11-15'
+      },
+      {
+        id: 8,
+        name: 'Emily Brown',
+        email: 'emily@startup.io',
+        phone: '+44 20 9876 5432',
+        company: 'Startup Innovations',
+        industry: 'Software',
+        businessType: 'B2C',
+        location: 'Manchester, UK',
+        companySize: '10-50',
+        contactPerson: 'Mike Wilson',
+        stage: 'Contacted',
+        leadType: 'Outbound',
+        assignedUser: 'John Doe',
+        campaignSource: 'LinkedIn Campaign',
+        crmAttribution: 'Cold Email',
+        leadPotential: 'Warm',
+        urgency: 'Medium',
+        followUps: [
+          { date: '2025-11-14', status: 'Completed', channel: 'WhatsApp' }
+        ],
+        leadScore: 55.0,
+        created: '2025-11-08',
+        lastActivity: '2025-11-14'
+      },
+      {
+        id: 9,
+        name: 'Robert Taylor',
+        email: 'robert@enterprise.co.uk',
+        phone: '+44 161 234 5678',
+        company: 'Enterprise Solutions',
+        industry: 'Finance',
+        businessType: 'B2B',
+        location: 'Birmingham, UK',
+        companySize: '200+',
+        contactPerson: 'David Lee',
+        stage: 'New',
+        leadType: 'Referral',
+        assignedUser: 'Sarah Smith',
+        campaignSource: 'Partner Referral',
+        crmAttribution: 'Referral',
+        leadPotential: 'Hot',
+        urgency: 'High',
+        followUps: [
+          { date: '2025-11-19', status: 'Scheduled', channel: 'LinkedIn' },
+          { date: '2025-11-20', status: 'Scheduled', channel: 'Call' }
+        ],
+        leadScore: 75.5,
+        created: '2025-11-12',
+        lastActivity: '2025-11-12'
+      },
+
+
+      {
+        id: 10,
+        name: 'John Smith',
+        email: 'john@company.com',
+        phone: '+44 20 1234 5678',
+        company: 'Tech Corp Ltd',
+        industry: 'Technology',
+        businessType: 'B2B',
+        location: 'London, UK',
+        companySize: '50-200',
+        contactPerson: 'Sarah Johnson',
+        stage: 'Qualified',
+        leadType: 'Inbound',
+        assignedUser: 'Jane Doe',
+        campaignSource: 'Google Ads Q4',
+        crmAttribution: 'Website Form',
+        leadPotential: 'Hot',
+        urgency: 'High',
+        followUps: [
+          { date: '2025-11-15', status: 'Completed', channel: 'Call' },
+          { date: '2025-11-18', status: 'Scheduled', channel: 'Email' }
+        ],
+        leadScore: 82.5,
+        created: '2025-11-10',
+        lastActivity: '2025-11-15'
+      },
+      {
+        id: 11,
+        name: 'Emily Brown',
+        email: 'emily@startup.io',
+        phone: '+44 20 9876 5432',
+        company: 'Startup Innovations',
+        industry: 'Software',
+        businessType: 'B2C',
+        location: 'Manchester, UK',
+        companySize: '10-50',
+        contactPerson: 'Mike Wilson',
+        stage: 'Contacted',
+        leadType: 'Outbound',
+        assignedUser: 'John Doe',
+        campaignSource: 'LinkedIn Campaign',
+        crmAttribution: 'Cold Email',
+        leadPotential: 'Warm',
+        urgency: 'Medium',
+        followUps: [
+          { date: '2025-11-14', status: 'Completed', channel: 'WhatsApp' }
+        ],
+        leadScore: 55.0,
+        created: '2025-11-08',
+        lastActivity: '2025-11-14'
+      },
+      {
+        id: 12,
+        name: 'Robert Taylor',
+        email: 'robert@enterprise.co.uk',
+        phone: '+44 161 234 5678',
+        company: 'Enterprise Solutions',
+        industry: 'Finance',
+        businessType: 'B2B',
+        location: 'Birmingham, UK',
+        companySize: '200+',
+        contactPerson: 'David Lee',
+        stage: 'New',
+        leadType: 'Referral',
+        assignedUser: 'Sarah Smith',
+        campaignSource: 'Partner Referral',
+        crmAttribution: 'Referral',
+        leadPotential: 'Hot',
+        urgency: 'High',
+        followUps: [
+          { date: '2025-11-19', status: 'Scheduled', channel: 'LinkedIn' },
+          { date: '2025-11-20', status: 'Scheduled', channel: 'Call' }
+        ],
+        leadScore: 75.5,
+        created: '2025-11-12',
+        lastActivity: '2025-11-12'
       }
     ];
 
@@ -3321,339 +7918,37 @@ const CRMPortal = () => {
       <div>
         {ConfirmationDialog()}
         {LeadViewModal()}
-        
-        {/* Lead Form Modal */}
-        <Modal show={showLeadFormModal} onHide={() => { setShowLeadFormModal(false); setEditingLead(null); setLeadFormStep(0); }} size="xl" style={{ maxWidth: '95%', width: '1200px', margin: '1.75rem auto' }}>
-          <Modal.Header closeButton>
-            <Modal.Title>{editingLead ? 'Edit Lead' : 'Add New Lead'}</Modal.Title>
-          </Modal.Header>
-          <Modal.Body>
-            {/* Timeline Navigation */}
-            <div className="mb-4">
-              <div className="d-flex align-items-center justify-content-between position-relative">
-                {/* Progress Line */}
-                <div 
-                  className="position-absolute bg-light" 
-                  style={{ 
-                    left: '0', 
-                    right: '0', 
-                    top: '20px', 
-                    height: '2px', 
-                    zIndex: 0 
-                  }}
-                />
-                <div 
-                  className="position-absolute bg-primary" 
-                  style={{ 
-                    left: '0', 
-                    top: '20px', 
-                    height: '2px', 
-                    width: `${(leadFormStep / 3) * 100}%`,
-                    zIndex: 0,
-                    transition: 'width 0.3s ease'
-                  }}
-                />
-                
-                {/* Step 1 */}
-                <div 
-                  className="text-center position-relative" 
-                  style={{ cursor: 'pointer', flex: 1 }}
-                  onClick={() => setLeadFormStep(0)}
-                >
-                  <div 
-                    className={`rounded-circle d-flex align-items-center justify-content-center mx-auto ${leadFormStep >= 0 ? 'bg-primary text-white' : 'bg-light text-muted'}`}
-                    style={{ width: '40px', height: '40px', zIndex: 1, position: 'relative' }}
-                  >
-                    {leadFormStep > 0 ? <CheckCircle size={20} /> : '1'}
-                  </div>
-                  <small className={`d-block mt-2 ${leadFormStep === 0 ? 'fw-bold text-primary' : 'text-muted'}`}>Lead Info</small>
-                </div>
-
-                {/* Step 2 */}
-                <div 
-                  className="text-center position-relative" 
-                  style={{ cursor: 'pointer', flex: 1 }}
-                  onClick={() => setLeadFormStep(1)}
-                >
-                  <div 
-                    className={`rounded-circle d-flex align-items-center justify-content-center mx-auto ${leadFormStep >= 1 ? 'bg-primary text-white' : 'bg-light text-muted'}`}
-                    style={{ width: '40px', height: '40px', zIndex: 1, position: 'relative' }}
-                  >
-                    {leadFormStep > 1 ? <CheckCircle size={20} /> : '2'}
-                  </div>
-                  <small className={`d-block mt-2 ${leadFormStep === 1 ? 'fw-bold text-primary' : 'text-muted'}`}>Company Info</small>
-                </div>
-
-                {/* Step 3 */}
-                <div 
-                  className="text-center position-relative" 
-                  style={{ cursor: 'pointer', flex: 1 }}
-                  onClick={() => setLeadFormStep(2)}
-                >
-                  <div 
-                    className={`rounded-circle d-flex align-items-center justify-content-center mx-auto ${leadFormStep >= 2 ? 'bg-primary text-white' : 'bg-light text-muted'}`}
-                    style={{ width: '40px', height: '40px', zIndex: 1, position: 'relative' }}
-                  >
-                    {leadFormStep > 2 ? <CheckCircle size={20} /> : '3'}
-                  </div>
-                  <small className={`d-block mt-2 ${leadFormStep === 2 ? 'fw-bold text-primary' : 'text-muted'}`}>Contact Info</small>
-                </div>
-
-                {/* Step 4 */}
-                <div 
-                  className="text-center position-relative" 
-                  style={{ cursor: 'pointer', flex: 1 }}
-                  onClick={() => setLeadFormStep(3)}
-                >
-                  <div 
-                    className={`rounded-circle d-flex align-items-center justify-content-center mx-auto ${leadFormStep >= 3 ? 'bg-primary text-white' : 'bg-light text-muted'}`}
-                    style={{ width: '40px', height: '40px', zIndex: 1, position: 'relative' }}
-                  >
-                    {leadFormStep > 3 ? <CheckCircle size={20} /> : '4'}
-                  </div>
-                  <small className={`d-block mt-2 ${leadFormStep === 3 ? 'fw-bold text-primary' : 'text-muted'}`}>Other Info</small>
-                </div>
-              </div>
-            </div>
-
-            {/* Form Content Based on Step */}
-            <div style={{ minHeight: '400px' }}>
-              {leadFormStep === 0 && (
-                <Card className="border-0 bg-light">
-                  <Card.Body>
-                    <h5 className="fw-bold mb-4 text-primary">Lead Information</h5>
-                    <Row>
-                      <Col md={6}>
-                        <Form.Group className="mb-3">
-                          <Form.Label>Lead Type</Form.Label>
-                          <Form.Select defaultValue={editingLead?.leadType || ''}>
-                            <option value="">Select Type</option>
-                            <option value="Inbound">Inbound</option>
-                            <option value="Outbound">Outbound</option>
-                            <option value="Referral">Referral</option>
-                          </Form.Select>
-                        </Form.Group>
-                      </Col>
-                      <Col md={6}>
-                        <Form.Group className="mb-3">
-                          <Form.Label>Assigned User</Form.Label>
-                          <Form.Select defaultValue={editingLead?.assignedUser || ''}>
-                            <option value="">Select User</option>
-                            <option value="John Doe">John Doe</option>
-                            <option value="Jane Doe">Jane Doe</option>
-                            <option value="Sarah Smith">Sarah Smith</option>
-                          </Form.Select>
-                        </Form.Group>
-                      </Col>
-                      <Col md={6}>
-                        <Form.Group className="mb-3">
-                          <Form.Label>Stage</Form.Label>
-                          <Form.Select defaultValue={editingLead?.stage || ''}>
-                            <option value="">Select Stage</option>
-                            <option value="New">New</option>
-                            <option value="Contacted">Contacted</option>
-                            <option value="Qualified">Qualified</option>
-                            <option value="Unqualified">Unqualified</option>
-                          </Form.Select>
-                        </Form.Group>
-                      </Col>
-                      <Col md={6}>
-                        <Form.Group className="mb-3">
-                          <Form.Label>Campaign Source</Form.Label>
-                          <Form.Control type="text" defaultValue={editingLead?.campaignSource || ''} placeholder="e.g., Google Ads Q4" />
-                        </Form.Group>
-                      </Col>
-                      <Col md={12}>
-                        <Form.Group className="mb-3">
-                          <Form.Label>CRM Attribution</Form.Label>
-                          <Form.Select defaultValue={editingLead?.crmAttribution || ''}>
-                            <option value="">Select Attribution</option>
-                            <option value="Website Form">Website Form</option>
-                            <option value="Cold Email">Cold Email</option>
-                            <option value="Referral">Referral</option>
-                            <option value="Event">Event</option>
-                          </Form.Select>
-                        </Form.Group>
-                      </Col>
-                    </Row>
-                  </Card.Body>
-                </Card>
-              )}
-
-              {leadFormStep === 1 && (
-                <Card className="border-0 bg-light">
-                  <Card.Body>
-                    <h5 className="fw-bold mb-4 text-success">Company Information</h5>
-                    <Row>
-                      <Col md={6}>
-                        <Form.Group className="mb-3">
-                          <Form.Label>Company Name</Form.Label>
-                          <Form.Control type="text" defaultValue={editingLead?.company || ''} placeholder="Company Name" />
-                        </Form.Group>
-                      </Col>
-                      <Col md={6}>
-                        <Form.Group className="mb-3">
-                          <Form.Label>Industry</Form.Label>
-                          <Form.Select defaultValue={editingLead?.industry || ''}>
-                            <option value="">Select Industry</option>
-                            <option value="Technology">Technology</option>
-                            <option value="Finance">Finance</option>
-                            <option value="Healthcare">Healthcare</option>
-                            <option value="Retail">Retail</option>
-                            <option value="Manufacturing">Manufacturing</option>
-                          </Form.Select>
-                        </Form.Group>
-                      </Col>
-                      <Col md={6}>
-                        <Form.Group className="mb-3">
-                          <Form.Label>Business Type</Form.Label>
-                          <Form.Select defaultValue={editingLead?.businessType || ''}>
-                            <option value="">Select Type</option>
-                            <option value="B2B">B2B</option>
-                            <option value="B2C">B2C</option>
-                            <option value="B2G">B2G</option>
-                          </Form.Select>
-                        </Form.Group>
-                      </Col>
-                      <Col md={6}>
-                        <Form.Group className="mb-3">
-                          <Form.Label>Location</Form.Label>
-                          <Form.Control type="text" defaultValue={editingLead?.location || ''} placeholder="City, Country" />
-                        </Form.Group>
-                      </Col>
-                      <Col md={6}>
-                        <Form.Group className="mb-3">
-                          <Form.Label>Company Size</Form.Label>
-                          <Form.Select defaultValue={editingLead?.companySize || ''}>
-                            <option value="">Select Size</option>
-                            <option value="1-10">1-10</option>
-                            <option value="10-50">10-50</option>
-                            <option value="50-200">50-200</option>
-                            <option value="200+">200+</option>
-                          </Form.Select>
-                        </Form.Group>
-                      </Col>
-                      <Col md={6}>
-                        <Form.Group className="mb-3">
-                          <Form.Label>Contact Person</Form.Label>
-                          <Form.Control type="text" defaultValue={editingLead?.contactPerson || ''} placeholder="Primary Contact Name" />
-                        </Form.Group>
-                      </Col>
-                    </Row>
-                  </Card.Body>
-                </Card>
-              )}
-
-              {leadFormStep === 2 && (
-                <Card className="border-0 bg-light">
-                  <Card.Body>
-                    <h5 className="fw-bold mb-4 text-info">Contact Information</h5>
-                    <Row>
-                      <Col md={6}>
-                        <Form.Group className="mb-3">
-                          <Form.Label>Full Name</Form.Label>
-                          <Form.Control type="text" defaultValue={editingLead?.name || ''} placeholder="Full Name" />
-                        </Form.Group>
-                      </Col>
-                      <Col md={6}>
-                        <Form.Group className="mb-3">
-                          <Form.Label>Email</Form.Label>
-                          <Form.Control type="email" defaultValue={editingLead?.email || ''} placeholder="email@example.com" />
-                        </Form.Group>
-                      </Col>
-                      <Col md={12}>
-                        <Form.Group className="mb-3">
-                          <Form.Label>Phone</Form.Label>
-                          <Form.Control type="tel" defaultValue={editingLead?.phone || ''} placeholder="+44 20 1234 5678" />
-                        </Form.Group>
-                      </Col>
-                    </Row>
-                  </Card.Body>
-                </Card>
-              )}
-
-              {leadFormStep === 3 && (
-                <Card className="border-0 bg-light">
-                  <Card.Body>
-                    <h5 className="fw-bold mb-4 text-warning">Other Information</h5>
-                    <Row>
-                      <Col md={6}>
-                        <Form.Group className="mb-3">
-                          <Form.Label>Lead Potential</Form.Label>
-                          <Form.Select defaultValue={editingLead?.leadPotential || ''}>
-                            <option value="">Select Potential</option>
-                            <option value="Hot">Hot</option>
-                            <option value="Warm">Warm</option>
-                            <option value="Cold">Cold</option>
-                          </Form.Select>
-                        </Form.Group>
-                      </Col>
-                      <Col md={6}>
-                        <Form.Group className="mb-3">
-                          <Form.Label>Urgency</Form.Label>
-                          <Form.Select defaultValue={editingLead?.urgency || ''}>
-                            <option value="">Select Urgency</option>
-                            <option value="High">High</option>
-                            <option value="Medium">Medium</option>
-                            <option value="Low">Low</option>
-                          </Form.Select>
-                        </Form.Group>
-                      </Col>
-                      <Col md={12}>
-                        <div className="alert alert-info small mb-0">
-                          <AlertCircle size={14} className="me-1" />
-                          Lead score will be auto-calculated based on potential, urgency, and follow-ups
-                        </div>
-                      </Col>
-                    </Row>
-                  </Card.Body>
-                </Card>
-              )}
-            </div>
-          </Modal.Body>
-          <Modal.Footer className="d-flex justify-content-between">
-            <Button 
-              variant="outline-secondary" 
-              onClick={() => setLeadFormStep(Math.max(0, leadFormStep - 1))}
-              disabled={leadFormStep === 0}
-            >
-              <ChevronLeft size={16} className="me-1" />
-              Back
-            </Button>
-            <Button variant="secondary" onClick={() => { setShowLeadFormModal(false); setEditingLead(null); setLeadFormStep(0); }}>
-              Cancel
-            </Button>
-            {leadFormStep < 3 ? (
-              <Button 
-                variant="primary" 
-                onClick={() => setLeadFormStep(Math.min(3, leadFormStep + 1))}
-              >
-                Next
-                <ChevronRight size={16} className="ms-1" />
-              </Button>
-            ) : (
-              <Button variant="success">
-                <CheckCircle size={16} className="me-2" />
-                {editingLead ? 'Update Lead' : 'Create Lead'}
-              </Button>
-            )}
-          </Modal.Footer>
-        </Modal>
+        {AddLeadFormModal()}
+        {ScheduleCallbackModal()}
+        {AddFollowupModal()}
+        {AddMeetingModal()}
 
         {/* Page Header */}
-        <div className="d-flex justify-content-between align-items-center mb-4">
-          <div>
+        <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4">
+          <div className="mb-3 mb-md-0">
             <h2 className="mb-1 fw-bold">Leads Management</h2>
             <p className="text-muted mb-0">Track and manage your qualified leads with scoring</p>
           </div>
-          <Button variant="primary" onClick={() => setShowLeadFormModal(true)}>
-            <Plus size={16} className="me-2" />
-            Add Lead
-          </Button>
+          <div className="d-flex flex-wrap gap-2">
+            <Button 
+              variant={showLeadsAnalytics ? "primary" : "outline-secondary"}
+              onClick={() => setShowLeadsAnalytics(!showLeadsAnalytics)}
+            >
+              <BarChart3 size={16} className="me-2" />
+              {showLeadsAnalytics ? 'Hide Analytics' : 'Show Analytics'}
+            </Button>
+            <Button variant="primary" onClick={() => setShowLeadFormModal(true)}>
+              <Plus size={16} className="me-2" />
+              Add Lead
+            </Button>
+          </div>
         </div>
 
-        {/* Summary Stats using KPICard */}
-        <Row className="mb-4">
+        {/* Analytics Section - Collapsible */}
+        {showLeadsAnalytics && (
+          <>
+            {/* Summary Stats using KPICard */}
+            <Row className="mb-4">
           <Col lg={3} md={6} className="mb-3">
             <KPICard 
               title="Total Leads"
@@ -3691,6 +7986,127 @@ const CRMPortal = () => {
               icon={<BarChart3 size={24} />}
               color="info"
             />
+          </Col>
+        </Row>
+
+        {/* Analytics Charts */}
+        <Row className="mb-4">
+          <Col md={6} className="mb-3">
+            <Card className="border-0 shadow-sm h-100">
+              <Card.Body>
+                <h6 className="fw-bold mb-3">Lead Potential Distribution</h6>
+                <ResponsiveContainer width="100%" height={250}>
+                  <PieChart>
+                    <Pie
+                      data={[
+                        { name: 'Hot', value: 15, color: '#dc3545' },
+                        { name: 'Warm', value: 28, color: '#ffc107' },
+                        { name: 'Cold', value: 15, color: '#0dcaf0' }
+                      ]}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={({ name, percent }: any) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                      outerRadius={80}
+                      fill="#8884d8"
+                      dataKey="value"
+                    >
+                      {[
+                        { name: 'Hot', value: 15, color: '#dc3545' },
+                        { name: 'Warm', value: 28, color: '#ffc107' },
+                        { name: 'Cold', value: 15, color: '#0dcaf0' }
+                      ].map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              </Card.Body>
+            </Card>
+          </Col>
+          <Col md={6} className="mb-3">
+            <Card className="border-0 shadow-sm h-100">
+              <Card.Body>
+                <h6 className="fw-bold mb-3">Urgency Levels</h6>
+                <ResponsiveContainer width="100%" height={250}>
+                  <PieChart>
+                    <Pie
+                      data={[
+                        { name: 'High', value: 22, color: '#dc3545' },
+                        { name: 'Medium', value: 19, color: '#ffc107' },
+                        { name: 'Low', value: 17, color: '#6c757d' }
+                      ]}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={({ name, percent }: any) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                      outerRadius={80}
+                      fill="#8884d8"
+                      dataKey="value"
+                    >
+                      {[
+                        { name: 'High', value: 22, color: '#dc3545' },
+                        { name: 'Medium', value: 19, color: '#ffc107' },
+                        { name: 'Low', value: 17, color: '#6c757d' }
+                      ].map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              </Card.Body>
+            </Card>
+          </Col>
+          <Col md={6} className="mb-3">
+            <Card className="border-0 shadow-sm h-100">
+              <Card.Body>
+                <h6 className="fw-bold mb-3">Lead Stage Distribution</h6>
+                <ResponsiveContainer width="100%" height={250}>
+                  <BarChart
+                    data={[
+                      { stage: 'New', count: 25 },
+                      { stage: 'Contacted', count: 18 },
+                      { stage: 'Qualified', count: 9 },
+                      { stage: 'Unqualified', count: 6 }
+                    ]}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="stage" />
+                    <YAxis />
+                    <Tooltip />
+                    <Bar dataKey="count" fill="#0d6efd" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </Card.Body>
+            </Card>
+          </Col>
+          <Col md={6} className="mb-3">
+            <Card className="border-0 shadow-sm h-100">
+              <Card.Body>
+                <h6 className="fw-bold mb-3">Lead to Deal Conversion</h6>
+                <ResponsiveContainer width="100%" height={250}>
+                  <BarChart
+                    layout="vertical"
+                    data={[
+                      { stage: 'Total Leads', value: 58 },
+                      { stage: 'Qualified', value: 9 },
+                      { stage: 'Converted to Deals', value: 5 }
+                    ]}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis type="number" />
+                    <YAxis type="category" dataKey="stage" width={140} />
+                    <Tooltip />
+                    <Bar dataKey="value" fill="#198754" />
+                  </BarChart>
+                </ResponsiveContainer>
+                <div className="text-center mt-2">
+                  <small className="text-muted">Conversion Rate: <strong className="text-success">8.6%</strong></small>
+                </div>
+              </Card.Body>
+            </Card>
           </Col>
         </Row>
 
@@ -3732,334 +8148,811 @@ const CRMPortal = () => {
             </div>
           </Card.Body>
         </Card> */}
+          </>
+        )}
 
-        {/* Filters */}
-        <Card className="border-0 shadow-sm mb-4">
-          <Card.Body className="bg-light">
-            <Row className="align-items-center">
-              <Col md={3}>
-                <Form.Control type="search" placeholder="Search leads..." />
-              </Col>
-              <Col md={2}>
-                <Form.Select>
-                  <option>All Stages</option>
-                  <option>New</option>
-                  <option>Contacted</option>
-                  <option>Qualified</option>
-                  <option>Unqualified</option>
-                </Form.Select>
-              </Col>
-              <Col md={2}>
-                <Form.Select>
-                  <option>All Potential</option>
-                  <option>Hot</option>
-                  <option>Warm</option>
-                  <option>Cold</option>
-                </Form.Select>
-              </Col>
-              <Col md={2}>
-                <Form.Select>
-                  <option>All Urgency</option>
-                  <option>High</option>
-                  <option>Medium</option>
-                  <option>Low</option>
-                </Form.Select>
-              </Col>
-              <Col md={2}>
-                <Form.Select>
-                  <option>All Assigned</option>
-                  <option>John Doe</option>
-                  <option>Jane Smith</option>
-                  <option>Mike Johnson</option>
-                </Form.Select>
-              </Col>
-              <Col md={1}>
-                <Button variant="primary" className="w-100">
-                  <Filter size={16} />
-                </Button>
-              </Col>
-            </Row>
-          </Card.Body>
-        </Card>
+        {/* Filter Bar  leads*/}
+        <FilterBar
+          quickFilters={[
+            {
+              id: 'all',
+              label: 'All Leads',
+              count: 89,
+              color: '#6c757d',
+              activeColor: '#0d6efd',
+              icon: <Users size={16} />
+            },
+            {
+              id: 'new',
+              label: 'New',
+              count: 34,
+              color: '#dc3545',
+              activeColor: '#0d6efd',
+              icon: <PlusCircle size={16} />
+            },
+            {
+              id: 'qualified',
+              label: 'Qualified',
+              count: 28,
+              color: '#0d6efd',
+              activeColor: '#0d6efd',
+              icon: <CheckSquare size={16} />
+            },
+            {
+              id: 'hot',
+              label: 'Hot Leads',
+              count: 15,
+              color: '#fd7e14',
+              activeColor: '#0d6efd',
+              icon: <Zap size={16} />
+            },
+            {
+              id: 'high-score',
+              label: 'High Score (>70)',
+              count: 21,
+              color: '#198754',
+              activeColor: '#0d6efd',
+              icon: <Star size={16} />
+            },
+            {
+              id: 'follow-up',
+              label: 'Follow-up Due',
+              count: 12,
+              color: '#ffc107',
+              activeColor: '#0d6efd',
+              icon: <Clock size={16} />
+            },
+            {
+              id: 'lost',
+              label: 'Lost',
+              count: 7,
+              color: '#dc3545',
+              activeColor: '#0d6efd',
+              icon: <X size={16} />
+            }
+          ]}
+          
+         
+          activeFilter={activeFilter}
+          onFilterChange={(filterId) => setActiveFilter(filterId)}
+          searchValue={leadsSearch}
+          onSearchChange={(value) => setLeadsSearch(value)}
+          onSearch={() => console.log('Searching leads:', leadsSearch)}
+          searchPlaceholder="Search leads by name, company, email..."
+          showAdvancedFilters={showAdvancedFilters}
+          onToggleAdvancedFilters={() => setShowAdvancedFilters(!showAdvancedFilters)}
+          advancedFilterCount={
+            leadsFilters.assignedTo.length +
+            leadsFilters.industry.length +
+            leadsFilters.stage.length +
+            leadsFilters.source.length +
+            leadsFilters.potential.length +
+            leadsFilters.campaign.length +
+            (leadsFilters.leadScoreMin ? 1 : 0) +
+            (leadsFilters.leadScoreMax ? 1 : 0) +
+            leadsFilters.dateRange.length
+          }
+        />
+
+        {/* Advanced Filters */}
+        {showAdvancedFilters && (
+          <Card className="border-0 shadow-sm mb-4">
+            <Card.Body>
+              <Row className="g-3 align-items-end">
+                {/* Row 1 */}
+                <Col md={2}>
+                  <Form.Label className="small fw-bold mb-2">Assigned To</Form.Label>
+                  <Select
+                    isMulti
+                    options={[
+                      { value: 'John Doe', label: 'John Doe' },
+                      { value: 'Jane Doe', label: 'Jane Doe' },
+                      { value: 'Sarah Smith', label: 'Sarah Smith' },
+                      { value: 'Mike Johnson', label: 'Mike Johnson' }
+                    ]}
+                    value={leadsFilters.assignedTo.map(u => ({ value: u, label: u }))}
+                    onChange={(selected) => {
+                      setLeadsFilters(prev => ({
+                        ...prev,
+                        assignedTo: selected ? selected.map(s => s.value) : []
+                      }));
+                    }}
+                    placeholder="Select users..."
+                    styles={customSelectStyles}
+                  />
+                </Col>
+                <Col md={2}>
+                  <Form.Label className="small fw-bold mb-2">Industry</Form.Label>
+                  <Select
+                    isMulti
+                    options={[
+                      { value: 'Technology', label: 'Technology' },
+                      { value: 'Healthcare', label: 'Healthcare' },
+                      { value: 'Finance', label: 'Finance' },
+                      { value: 'Manufacturing', label: 'Manufacturing' },
+                      { value: 'Retail', label: 'Retail' },
+                      { value: 'Education', label: 'Education' }
+                    ]}
+                    value={leadsFilters.industry.map(i => ({ value: i, label: i }))}
+                    onChange={(selected) => {
+                      setLeadsFilters(prev => ({
+                        ...prev,
+                        industry: selected ? selected.map(s => s.value) : []
+                      }));
+                    }}
+                    placeholder="Select industries..."
+                    styles={customSelectStyles}
+                  />
+                </Col>
+                <Col md={2}>
+                  <Form.Label className="small fw-bold mb-2">Stages</Form.Label>
+                  <Select
+                    isMulti
+                    options={[
+                      { value: 'New', label: 'New' },
+                      { value: 'Contacted', label: 'Contacted' },
+                      { value: 'Qualified', label: 'Qualified' },
+                      { value: 'Unqualified', label: 'Unqualified' }
+                    ]}
+                    value={leadsFilters.stage.map(s => ({ value: s, label: s }))}
+                    onChange={(selected) => {
+                      setLeadsFilters(prev => ({
+                        ...prev,
+                        stage: selected ? selected.map(s => s.value) : []
+                      }));
+                    }}
+                    placeholder="Select stages..."
+                    styles={customSelectStyles}
+                  />
+                </Col>
+                <Col md={2}>
+                  <Form.Label className="small fw-bold mb-2">Source</Form.Label>
+                  <Select
+                    isMulti
+                    options={[
+                      { value: 'Website', label: 'Website' },
+                      { value: 'Referral', label: 'Referral' },
+                      { value: 'Campaign', label: 'Campaign' },
+                      { value: 'Cold Call', label: 'Cold Call' },
+                      { value: 'Email', label: 'Email' },
+                      { value: 'Social Media', label: 'Social Media' }
+                    ]}
+                    value={leadsFilters.source.map(s => ({ value: s, label: s }))}
+                    onChange={(selected) => {
+                      setLeadsFilters(prev => ({
+                        ...prev,
+                        source: selected ? selected.map(s => s.value) : []
+                      }));
+                    }}
+                    placeholder="Select sources..."
+                    styles={customSelectStyles}
+                  />
+                </Col>
+                <Col md={2}>
+                  <Form.Label className="small fw-bold mb-2">Lead Potential</Form.Label>
+                  <Select
+                    isMulti
+                    options={[
+                      { value: 'Hot', label: 'Hot' },
+                      { value: 'Warm', label: 'Warm' },
+                      { value: 'Cold', label: 'Cold' }
+                    ]}
+                    value={leadsFilters.potential.map(p => ({ value: p, label: p }))}
+                    onChange={(selected) => {
+                      setLeadsFilters(prev => ({
+                        ...prev,
+                        potential: selected ? selected.map(s => s.value) : []
+                      }));
+                    }}
+                    placeholder="Select potential..."
+                    styles={customSelectStyles}
+                  />
+                </Col>
+                
+                {/* Row 2 */}
+                <Col md={2}>
+                  <Form.Label className="small fw-bold mb-2">Campaign</Form.Label>
+                  <Select
+                    isMulti
+                    options={[
+                      { value: 'Q4 2024 Outreach', label: 'Q4 2024 Outreach' },
+                      { value: 'Holiday Sale', label: 'Holiday Sale' },
+                      { value: 'Product Launch', label: 'Product Launch' },
+                      { value: 'Webinar Series', label: 'Webinar Series' }
+                    ]}
+                    value={leadsFilters.campaign.map(c => ({ value: c, label: c }))}
+                    onChange={(selected) => {
+                      setLeadsFilters(prev => ({
+                        ...prev,
+                        campaign: selected ? selected.map(s => s.value) : []
+                      }));
+                    }}
+                    placeholder="Select campaigns..."
+                    styles={customSelectStyles}
+                  />
+                </Col>
+                {/* <Col md={2}>
+                  <Form.Label className="small fw-bold mb-2">Lead Score Min</Form.Label>
+                  <Form.Control
+                    type="number"
+                    placeholder="Min score"
+                    size="sm"
+                    value={leadsFilters.leadScoreMin}
+                    onChange={(e) => {
+                      setLeadsFilters(prev => ({
+                        ...prev,
+                        leadScoreMin: e.target.value
+                      }));
+                    }}
+                    style={{ fontSize: '0.875rem' }}
+                  />
+                </Col> */}
+                <Col md={2}>
+                  <Form.Label className="small fw-bold mb-2">Lead Score</Form.Label>
+                  <Form.Control
+                    type="number"
+                    placeholder="Lead score"
+                    size="sm"
+                    value={leadsFilters.leadScoreMax}
+                    onChange={(e) => {
+                      setLeadsFilters(prev => ({
+                        ...prev,
+                        leadScoreMax: e.target.value
+                      }));
+                    }}
+                    style={{ fontSize: '0.875rem' }}
+                  />
+                </Col>
+                <Col md={2}>
+                  <Form.Label className="small fw-bold mb-2">Date Range</Form.Label>
+                  <Select
+                    options={[
+                      { value: 'Today', label: 'Today' },
+                      { value: 'Yesterday', label: 'Yesterday' },
+                      { value: 'Last 7 days', label: 'Last 7 days' },
+                      { value: 'Last 30 days', label: 'Last 30 days' },
+                      { value: 'This Month', label: 'This Month' },
+                      { value: 'Last Month', label: 'Last Month' },
+                      { value: 'Custom range', label: 'Custom range' }
+                    ]}
+                    value={leadsFilters.dateRange.length > 0 ? { value: leadsFilters.dateRange[0], label: leadsFilters.dateRange[0] } : null}
+                    onChange={(selected) => {
+                      setLeadsFilters(prev => ({
+                        ...prev,
+                        dateRange: selected ? [selected.value] : []
+                      }));
+                    }}
+                    placeholder="Select range..."
+                    isClearable
+                    styles={customSelectStyles}
+                  />
+                </Col>
+                <Col md={2}>
+                <div className="d-flex gap-2">
+  {/* Apply Button */}
+  <Button
+    variant="primary"
+    
+    className="flex-grow-1 d-flex align-items-center justify-content-center"
+    onClick={() => {
+      setLeadsPagination({ ...leadsPagination, currentPage: 1 });
+    }}
+  >
+    Apply
+  </Button>
+
+  {/* Reset Button */}
+  <Button
+    variant="outline-secondary"
+    
+    className="d-flex align-items-center justify-content-center"
+    onClick={() => {
+      setLeadsFilters({
+        assignedTo: [],
+        industry: [],
+        stage: [],
+        source: [],
+        potential: [],
+        campaign: [],
+        leadScoreMin: '',
+        leadScoreMax: '',
+        dateRange: [],
+        dateRangeCustomStart: '',
+        dateRangeCustomEnd: ''
+      });
+      setLeadsPagination({ ...leadsPagination, currentPage: 1 });
+    }}
+  >
+    Reset
+  </Button>
+</div>
+
+                </Col>
+              </Row>
+            </Card.Body>
+          </Card>
+        )}
+
+        {/* Bulk Actions and Column Customization - Leads */}
+        <div className="d-flex justify-content-end gap-2 mb-3">
+          {/* Bulk Actions Dropdown - Only show when items are selected */}
+          {selectedLeads.length > 0 && (
+            <Dropdown>
+              <Dropdown.Toggle variant="outline-primary" size="sm">
+                <CheckSquare size={16} className="me-2" />
+                Bulk Actions ({selectedLeads.length})
+              </Dropdown.Toggle>
+              <Dropdown.Menu align="end">
+                <Dropdown.Item 
+                  onClick={() => {
+                    // Get all selected leads
+                    const leadsToScheduleFollowup = leadsData.filter(l => selectedLeads.includes(l.id));
+                    if (leadsToScheduleFollowup.length === 1) {
+                      // If only one selected, open modal with pre-filled data
+                      const lead = leadsToScheduleFollowup[0];
+                      setFollowupData({
+                        ...followupData,
+                        leadId: lead.id,
+                        leadName: lead.name
+                      });
+                      setShowAddFollowupModal(true);
+                    } else {
+                      // For multiple selections, just open the modal
+                      setFollowupData({
+                        ...followupData,
+                        leadId: null,
+                        leadName: `${leadsToScheduleFollowup.length} leads selected`
+                      });
+                      setShowAddFollowupModal(true);
+                    }
+                  }}
+                  className="d-flex align-items-center"
+                >
+                  <Calendar size={14} className="me-2" />
+                  Add Follow-up
+                </Dropdown.Item>
+                <Dropdown.Item 
+                  onClick={() => {
+                    // Get all selected leads
+                    const leadsToScheduleMeeting = leadsData.filter(l => selectedLeads.includes(l.id));
+                    if (leadsToScheduleMeeting.length === 1) {
+                      // If only one selected, open modal with pre-filled data
+                      const lead = leadsToScheduleMeeting[0];
+                      setMeetingData({
+                        ...meetingData,
+                        leadId: lead.id,
+                        leadName: lead.name
+                      });
+                      setShowAddMeetingModal(true);
+                    } else {
+                      // For multiple selections, just open the modal
+                      setMeetingData({
+                        ...meetingData,
+                        leadId: null,
+                        leadName: `${leadsToScheduleMeeting.length} leads selected`
+                      });
+                      setShowAddMeetingModal(true);
+                    }
+                  }}
+                  className="d-flex align-items-center"
+                >
+                  <Users size={14} className="me-2" />
+                  Schedule Meeting
+                </Dropdown.Item>
+                <Dropdown.Divider />
+                <Dropdown.Item 
+                  onClick={() => {
+                    setConfirmAction({
+                      type: 'delete',
+                      data: { 
+                        itemType: 'Leads', 
+                        name: `${selectedLeads.length} selected leads`,
+                        count: selectedLeads.length
+                      }
+                    });
+                    setShowConfirmDialog(true);
+                  }}
+                  className="d-flex align-items-center text-danger"
+                >
+                  <Trash2 size={14} className="me-2" />
+                  Delete Selected ({selectedLeads.length})
+                </Dropdown.Item>
+              </Dropdown.Menu>
+            </Dropdown>
+          )}
+
+          {/* Column Customization */}
+          <Dropdown>
+            <Dropdown.Toggle variant="outline-secondary" size="sm">
+              <Layers size={16} className="me-2" />
+              Customize Table
+            </Dropdown.Toggle>
+            <Dropdown.Menu align="end" style={{ maxHeight: '300px', overflowY: 'auto' }}>
+              {[
+                { key: 'name', label: 'Name' },
+                { key: 'company', label: 'Company' },
+                { key: 'email', label: 'Email' },
+                { key: 'phone', label: 'Phone' },
+                { key: 'stage', label: 'Stage' },
+                { key: 'leadPotential', label: 'Lead Potential' },
+                { key: 'urgency', label: 'Urgency' },
+                { key: 'followUps', label: 'Follow-ups' },
+                { key: 'leadScore', label: 'Lead Score' },
+                { key: 'assignedUser', label: 'Assigned To' },
+                { key: 'created', label: 'Created' }
+              ].map((col) => (
+                <Dropdown.Item key={col.key} as="div">
+                  <Form.Check
+                    type="checkbox"
+                    label={col.label}
+                    checked={selectedLeadsColumns.includes(col.key)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedLeadsColumns([...selectedLeadsColumns, col.key]);
+                      } else {
+                        setSelectedLeadsColumns(selectedLeadsColumns.filter(c => c !== col.key));
+                      }
+                    }}
+                  />
+                </Dropdown.Item>
+              ))}
+              <Dropdown.Divider />
+              <Dropdown.Item onClick={() => setSelectedLeadsColumns(['name', 'company', 'email', 'phone', 'stage', 'leadPotential', 'urgency', 'followUps', 'leadScore', 'assignedUser', 'created'])}>
+                Select All
+              </Dropdown.Item>
+              <Dropdown.Item onClick={() => {
+                setSelectedLeadsColumns(['name', 'company', 'email', 'phone', 'stage', 'leadPotential', 'urgency', 'followUps', 'leadScore', 'assignedUser', 'created']);
+              }}>
+                Reset to Default
+              </Dropdown.Item>
+            </Dropdown.Menu>
+          </Dropdown>
+        </div>
 
         {/* Leads Table */}
         <Card className="border-0 shadow-sm">
-          <Card.Body>
-            <div className="d-flex justify-content-between align-items-center mb-3">
-              <h5 className="mb-0 fw-bold">Leads List</h5>
-              <div className="d-flex gap-2">
-                <Button variant="outline-primary" size="sm" onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}>
-                  <Filter size={16} className="me-1" />
-                  Advanced Filters
-                </Button>
-                <Button variant="outline-success" size="sm">
-                  <Download size={16} className="me-1" />
-                  Export
-                </Button>
-              </div>
-            </div>
-
-            {/* Advanced Filters for Leads */}
-            {showAdvancedFilters && (
-              <Card className="border bg-light mb-3">
-                <Card.Body>
-                  <h6 className="mb-3 fw-bold">Advanced Filters</h6>
-                  <Row>
-                    <Col md={3}>
-                      <Form.Group className="mb-3">
-                        <Form.Label className="small fw-semibold">Stage</Form.Label>
-                        <div style={{ maxHeight: '150px', overflowY: 'auto' }}>
-                          {['New', 'Contacted', 'Qualified', 'Unqualified'].map((stage) => (
-                            <Form.Check
-                              key={stage}
-                              type="checkbox"
-                              id={`lead-stage-${stage}`}
-                              label={stage}
-                              checked={leadsFilters.stage.includes(stage)}
-                              onChange={() => setLeadsFilters({
-                                ...leadsFilters,
-                                stage: leadsFilters.stage.includes(stage) 
-                                  ? leadsFilters.stage.filter(s => s !== stage)
-                                  : [...leadsFilters.stage, stage]
-                              })}
-                              className="mb-1"
-                            />
-                          ))}
-                        </div>
-                      </Form.Group>
-                    </Col>
-                    <Col md={3}>
-                      <Form.Group className="mb-3">
-                        <Form.Label className="small fw-semibold">Lead Potential</Form.Label>
-                        <div style={{ maxHeight: '150px', overflowY: 'auto' }}>
-                          {['Hot', 'Warm', 'Cold'].map((potential) => (
-                            <Form.Check
-                              key={potential}
-                              type="checkbox"
-                              id={`lead-potential-${potential}`}
-                              label={potential}
-                              checked={leadsFilters.potential.includes(potential)}
-                              onChange={() => setLeadsFilters({
-                                ...leadsFilters,
-                                potential: leadsFilters.potential.includes(potential)
-                                  ? leadsFilters.potential.filter(p => p !== potential)
-                                  : [...leadsFilters.potential, potential]
-                              })}
-                              className="mb-1"
-                            />
-                          ))}
-                        </div>
-                      </Form.Group>
-                    </Col>
-                    <Col md={3}>
-                      <Form.Group className="mb-3">
-                        <Form.Label className="small fw-semibold">Urgency</Form.Label>
-                        <div style={{ maxHeight: '150px', overflowY: 'auto' }}>
-                          {['High', 'Medium', 'Low'].map((urgency) => (
-                            <Form.Check
-                              key={urgency}
-                              type="checkbox"
-                              id={`lead-urgency-${urgency}`}
-                              label={urgency}
-                              checked={leadsFilters.urgency.includes(urgency)}
-                              onChange={() => setLeadsFilters({
-                                ...leadsFilters,
-                                urgency: leadsFilters.urgency.includes(urgency)
-                                  ? leadsFilters.urgency.filter(u => u !== urgency)
-                                  : [...leadsFilters.urgency, urgency]
-                              })}
-                              className="mb-1"
-                            />
-                          ))}
-                        </div>
-                      </Form.Group>
-                    </Col>
-                    <Col md={3}>
-                      <Form.Group className="mb-3">
-                        <Form.Label className="small fw-semibold">Assigned To</Form.Label>
-                        <div style={{ maxHeight: '150px', overflowY: 'auto' }}>
-                          {['John Doe', 'Jane Smith', 'Mike Johnson', 'Sarah Williams'].map((user) => (
-                            <Form.Check
-                              key={user}
-                              type="checkbox"
-                              id={`lead-assigned-${user}`}
-                              label={user}
-                              checked={leadsFilters.assignedTo.includes(user)}
-                              onChange={() => setLeadsFilters({
-                                ...leadsFilters,
-                                assignedTo: leadsFilters.assignedTo.includes(user)
-                                  ? leadsFilters.assignedTo.filter(a => a !== user)
-                                  : [...leadsFilters.assignedTo, user]
-                              })}
-                              className="mb-1"
-                            />
-                          ))}
-                        </div>
-                      </Form.Group>
-                    </Col>
-                  </Row>
-                  <div className="d-flex justify-content-end gap-2">
-                    <Button 
-                      variant="outline-secondary" 
-                      size="sm"
-                      onClick={() => setLeadsFilters({
-                        stage: [],
-                        potential: [],
-                        urgency: [],
-                        assignedTo: [],
-                        dateRange: { start: '', end: '' }
-                      })}
-                    >
-                      Clear
-                    </Button>
-                    <Button variant="primary" size="sm">
-                      Apply
-                    </Button>
-                  </div>
-                </Card.Body>
-              </Card>
-            )}
+          <Card.Body className="p-0">
             <div className="table-responsive">
               <Table hover className="mb-0">
               <thead className="bg-light">
                 <tr>
-                  <th>
-                    <Form.Check type="checkbox" />
+                  <th style={{ width: '50px' }}>
+                    <Form.Check
+                      type="checkbox"
+                      checked={(() => {
+                        const filtered = leadsData.filter(lead => {
+                          if (activeFilter === 'new') {
+                            if (lead.stage !== 'New') return false;
+                          } else if (activeFilter === 'qualified') {
+                            if (lead.stage !== 'Qualified') return false;
+                          } else if (activeFilter === 'hot') {
+                            if (lead.leadPotential !== 'Hot') return false;
+                          } else if (activeFilter === 'high-score') {
+                            if (lead.leadScore < 70) return false;
+                          } else if (activeFilter === 'follow-up') {
+                            if (!lead.followUps || lead.followUps.length === 0) return false;
+                            const hasScheduled = lead.followUps.some(f => f.status === 'Scheduled');
+                            if (!hasScheduled) return false;
+                          } else if (activeFilter === 'lost') {
+                            if (lead.stage !== 'Lost') return false;
+                          }
+                          
+                          const searchLower = leadsSearch.toLowerCase();
+                          const matchesSearch = !leadsSearch ||
+                            lead.name.toLowerCase().includes(searchLower) ||
+                            lead.company.toLowerCase().includes(searchLower) ||
+                            lead.email.toLowerCase().includes(searchLower);
+                          
+                          const matchesAssignedTo = leadsFilters.assignedTo.length === 0 || leadsFilters.assignedTo.includes(lead.assignedUser);
+                          const matchesIndustry = leadsFilters.industry.length === 0 || leadsFilters.industry.includes(lead.industry);
+                          const matchesStage = leadsFilters.stage.length === 0 || leadsFilters.stage.includes(lead.stage);
+                          const matchesSource = leadsFilters.source.length === 0 || leadsFilters.source.includes(lead.leadType);
+                          const matchesPotential = leadsFilters.potential.length === 0 || leadsFilters.potential.includes(lead.leadPotential);
+                          const matchesCampaign = leadsFilters.campaign.length === 0;
+                          const matchesLeadScoreMin = !leadsFilters.leadScoreMin || lead.leadScore >= parseInt(leadsFilters.leadScoreMin);
+                          const matchesLeadScoreMax = !leadsFilters.leadScoreMax || lead.leadScore <= parseInt(leadsFilters.leadScoreMax);
+                          const matchesDateRange = leadsFilters.dateRange.length === 0;
+                          
+                          return matchesSearch && matchesAssignedTo && matchesIndustry && matchesStage && 
+                            matchesSource && matchesPotential && matchesCampaign && 
+                            matchesLeadScoreMin && matchesLeadScoreMax && matchesDateRange;
+                        });
+                        const sorted = sortData(filtered, leadsPagination.sortColumn, leadsPagination.sortDirection);
+                        const paginated = paginateData(sorted, leadsPagination.currentPage, leadsPagination.rowsPerPage);
+                        return paginated.length > 0 && paginated.every(l => selectedLeads.includes(l.id));
+                      })()}
+                      onChange={(e) => {
+                        const filtered = leadsData.filter(lead => {
+                          if (activeFilter === 'new') {
+                            if (lead.stage !== 'New') return false;
+                          } else if (activeFilter === 'qualified') {
+                            if (lead.stage !== 'Qualified') return false;
+                          } else if (activeFilter === 'hot') {
+                            if (lead.leadPotential !== 'Hot') return false;
+                          } else if (activeFilter === 'high-score') {
+                            if (lead.leadScore < 70) return false;
+                          } else if (activeFilter === 'follow-up') {
+                            if (!lead.followUps || lead.followUps.length === 0) return false;
+                            const hasScheduled = lead.followUps.some(f => f.status === 'Scheduled');
+                            if (!hasScheduled) return false;
+                          } else if (activeFilter === 'lost') {
+                            if (lead.stage !== 'Lost') return false;
+                          }
+                          
+                          const searchLower = leadsSearch.toLowerCase();
+                          const matchesSearch = !leadsSearch ||
+                            lead.name.toLowerCase().includes(searchLower) ||
+                            lead.company.toLowerCase().includes(searchLower) ||
+                            lead.email.toLowerCase().includes(searchLower);
+                          
+                          const matchesAssignedTo = leadsFilters.assignedTo.length === 0 || leadsFilters.assignedTo.includes(lead.assignedUser);
+                          const matchesIndustry = leadsFilters.industry.length === 0 || leadsFilters.industry.includes(lead.industry);
+                          const matchesStage = leadsFilters.stage.length === 0 || leadsFilters.stage.includes(lead.stage);
+                          const matchesSource = leadsFilters.source.length === 0 || leadsFilters.source.includes(lead.leadType);
+                          const matchesPotential = leadsFilters.potential.length === 0 || leadsFilters.potential.includes(lead.leadPotential);
+                          const matchesCampaign = leadsFilters.campaign.length === 0;
+                          const matchesLeadScoreMin = !leadsFilters.leadScoreMin || lead.leadScore >= parseInt(leadsFilters.leadScoreMin);
+                          const matchesLeadScoreMax = !leadsFilters.leadScoreMax || lead.leadScore <= parseInt(leadsFilters.leadScoreMax);
+                          const matchesDateRange = leadsFilters.dateRange.length === 0;
+                          
+                          return matchesSearch && matchesAssignedTo && matchesIndustry && matchesStage && 
+                            matchesSource && matchesPotential && matchesCampaign && 
+                            matchesLeadScoreMin && matchesLeadScoreMax && matchesDateRange;
+                        });
+                        const sorted = sortData(filtered, leadsPagination.sortColumn, leadsPagination.sortDirection);
+                        const paginated = paginateData(sorted, leadsPagination.currentPage, leadsPagination.rowsPerPage);
+                        
+                        if (e.target.checked) {
+                          setSelectedLeads(paginated.map(l => l.id));
+                        } else {
+                          setSelectedLeads([]);
+                        }
+                      }}
+                    />
                   </th>
-                  <th 
-                    style={{ cursor: 'pointer', userSelect: 'none' }}
-                    onClick={() => handleSort('name', leadsPagination, setLeadsPagination)}
-                  >
-                    Name {renderSortIcon('name', leadsPagination)}
-                  </th>
-                  <th 
-                    style={{ cursor: 'pointer', userSelect: 'none' }}
-                    onClick={() => handleSort('company', leadsPagination, setLeadsPagination)}
-                  >
-                    Company {renderSortIcon('company', leadsPagination)}
-                  </th>
-                  <th 
-                    style={{ cursor: 'pointer', userSelect: 'none' }}
-                    onClick={() => handleSort('email', leadsPagination, setLeadsPagination)}
-                  >
-                    Email {renderSortIcon('email', leadsPagination)}
-                  </th>
-                  <th 
-                    style={{ cursor: 'pointer', userSelect: 'none' }}
-                    onClick={() => handleSort('phone', leadsPagination, setLeadsPagination)}
-                  >
-                    Phone {renderSortIcon('phone', leadsPagination)}
-                  </th>
-                  <th 
-                    style={{ cursor: 'pointer', userSelect: 'none' }}
-                    onClick={() => handleSort('stage', leadsPagination, setLeadsPagination)}
-                  >
-                    Stage {renderSortIcon('stage', leadsPagination)}
-                  </th>
-                  <th 
-                    style={{ cursor: 'pointer', userSelect: 'none' }}
-                    onClick={() => handleSort('leadPotential', leadsPagination, setLeadsPagination)}
-                  >
-                    Lead Potential {renderSortIcon('leadPotential', leadsPagination)}
-                  </th>
-                  <th 
-                    style={{ cursor: 'pointer', userSelect: 'none' }}
-                    onClick={() => handleSort('urgency', leadsPagination, setLeadsPagination)}
-                  >
-                    Urgency {renderSortIcon('urgency', leadsPagination)}
-                  </th>
-                  <th>Follow-ups</th>
-                  <th 
-                    style={{ cursor: 'pointer', userSelect: 'none' }}
-                    onClick={() => handleSort('leadScore', leadsPagination, setLeadsPagination)}
-                  >
-                    Lead Score {renderSortIcon('leadScore', leadsPagination)}
-                  </th>
-                  <th 
-                    style={{ cursor: 'pointer', userSelect: 'none' }}
-                    onClick={() => handleSort('assignedUser', leadsPagination, setLeadsPagination)}
-                  >
-                    Assigned To {renderSortIcon('assignedUser', leadsPagination)}
-                  </th>
-                  <th 
-                    style={{ cursor: 'pointer', userSelect: 'none' }}
-                    onClick={() => handleSort('created', leadsPagination, setLeadsPagination)}
-                  >
-                    Created {renderSortIcon('created', leadsPagination)}
-                  </th>
+                  {selectedLeadsColumns.includes('name') && (
+                    <th 
+                      style={{ cursor: 'pointer', userSelect: 'none' }}
+                      onClick={() => handleSort('name', leadsPagination, setLeadsPagination)}
+                    >
+                      Name {renderSortIcon('name', leadsPagination)}
+                    </th>
+                  )}
+                  {selectedLeadsColumns.includes('company') && (
+                    <th 
+                      style={{ cursor: 'pointer', userSelect: 'none' }}
+                      onClick={() => handleSort('company', leadsPagination, setLeadsPagination)}
+                    >
+                      Company {renderSortIcon('company', leadsPagination)}
+                    </th>
+                  )}
+                  {selectedLeadsColumns.includes('email') && (
+                    <th 
+                      style={{ cursor: 'pointer', userSelect: 'none' }}
+                      onClick={() => handleSort('email', leadsPagination, setLeadsPagination)}
+                    >
+                      Email {renderSortIcon('email', leadsPagination)}
+                    </th>
+                  )}
+                  {selectedLeadsColumns.includes('phone') && (
+                    <th 
+                      style={{ cursor: 'pointer', userSelect: 'none' }}
+                      onClick={() => handleSort('phone', leadsPagination, setLeadsPagination)}
+                    >
+                      Phone {renderSortIcon('phone', leadsPagination)}
+                    </th>
+                  )}
+                  {selectedLeadsColumns.includes('stage') && (
+                    <th 
+                      style={{ cursor: 'pointer', userSelect: 'none' }}
+                      onClick={() => handleSort('stage', leadsPagination, setLeadsPagination)}
+                    >
+                      Stage {renderSortIcon('stage', leadsPagination)}
+                    </th>
+                  )}
+                  {selectedLeadsColumns.includes('leadPotential') && (
+                    <th 
+                      style={{ cursor: 'pointer', userSelect: 'none' }}
+                      onClick={() => handleSort('leadPotential', leadsPagination, setLeadsPagination)}
+                    >
+                      Lead Potential {renderSortIcon('leadPotential', leadsPagination)}
+                    </th>
+                  )}
+                  {selectedLeadsColumns.includes('urgency') && (
+                    <th 
+                      style={{ cursor: 'pointer', userSelect: 'none' }}
+                      onClick={() => handleSort('urgency', leadsPagination, setLeadsPagination)}
+                    >
+                      Urgency {renderSortIcon('urgency', leadsPagination)}
+                    </th>
+                  )}
+                  {selectedLeadsColumns.includes('followUps') && (
+                    <th>Follow-ups</th>
+                  )}
+                  {selectedLeadsColumns.includes('leadScore') && (
+                    <th 
+                      style={{ cursor: 'pointer', userSelect: 'none' }}
+                      onClick={() => handleSort('leadScore', leadsPagination, setLeadsPagination)}
+                    >
+                      Lead Score {renderSortIcon('leadScore', leadsPagination)}
+                    </th>
+                  )}
+                  {selectedLeadsColumns.includes('assignedUser') && (
+                    <th 
+                      style={{ cursor: 'pointer', userSelect: 'none' }}
+                      onClick={() => handleSort('assignedUser', leadsPagination, setLeadsPagination)}
+                    >
+                      Assigned To {renderSortIcon('assignedUser', leadsPagination)}
+                    </th>
+                  )}
+                  {selectedLeadsColumns.includes('created') && (
+                    <th 
+                      style={{ cursor: 'pointer', userSelect: 'none' }}
+                      onClick={() => handleSort('created', leadsPagination, setLeadsPagination)}
+                    >
+                      Created {renderSortIcon('created', leadsPagination)}
+                    </th>
+                  )}
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {(() => {
-                  const sorted = sortData(leadsData, leadsPagination.sortColumn, leadsPagination.sortDirection);
+                  // Apply quick filters
+                  let filtered = leadsData.filter(lead => {
+                    // Apply quick filters first
+                    if (activeFilter === 'new') {
+                      if (lead.stage !== 'New') return false;
+                    } else if (activeFilter === 'qualified') {
+                      if (lead.stage !== 'Qualified') return false;
+                    } else if (activeFilter === 'hot') {
+                      if (lead.leadPotential !== 'Hot') return false;
+                    } else if (activeFilter === 'high-score') {
+                      if (lead.leadScore < 70) return false;
+                    } else if (activeFilter === 'follow-up') {
+                      // Filter for leads with follow-ups scheduled
+                      if (!lead.followUps || lead.followUps.length === 0) return false;
+                      const hasScheduled = lead.followUps.some(f => f.status === 'Scheduled');
+                      if (!hasScheduled) return false;
+                    } else if (activeFilter === 'lost') {
+                      if (lead.stage !== 'Lost') return false;
+                    }
+                    // 'all' filter shows everything
+
+                    // Apply search filter
+                    const searchLower = leadsSearch.toLowerCase();
+                    const matchesSearch = !leadsSearch ||
+                      lead.name.toLowerCase().includes(searchLower) ||
+                      lead.company.toLowerCase().includes(searchLower) ||
+                      lead.email.toLowerCase().includes(searchLower);
+
+                    // Apply advanced filters
+                    const matchesAssignedTo = leadsFilters.assignedTo.length === 0 || leadsFilters.assignedTo.includes(lead.assignedUser);
+                    const matchesIndustry = leadsFilters.industry.length === 0 || leadsFilters.industry.includes(lead.industry);
+                    const matchesStage = leadsFilters.stage.length === 0 || leadsFilters.stage.includes(lead.stage);
+                    const matchesSource = leadsFilters.source.length === 0 || leadsFilters.source.includes(lead.leadType);
+                    const matchesPotential = leadsFilters.potential.length === 0 || leadsFilters.potential.includes(lead.leadPotential);
+                    const matchesCampaign = leadsFilters.campaign.length === 0; // Campaign filter - can be implemented when campaign data is added
+                    const matchesLeadScoreMin = !leadsFilters.leadScoreMin || lead.leadScore >= parseInt(leadsFilters.leadScoreMin);
+                    const matchesLeadScoreMax = !leadsFilters.leadScoreMax || lead.leadScore <= parseInt(leadsFilters.leadScoreMax);
+                    const matchesDateRange = leadsFilters.dateRange.length === 0; // Date range logic can be implemented based on created date
+
+                    return matchesSearch && matchesAssignedTo && matchesIndustry && matchesStage && 
+                      matchesSource && matchesPotential && matchesCampaign && 
+                      matchesLeadScoreMin && matchesLeadScoreMax && matchesDateRange;
+                  });
+
+                  const sorted = sortData(filtered, leadsPagination.sortColumn, leadsPagination.sortDirection);
                   const paginated = paginateData(sorted, leadsPagination.currentPage, leadsPagination.rowsPerPage);
+                  
+                  if (filtered.length === 0) {
+                    return (
+                      <tr>
+                        <td colSpan={selectedLeadsColumns.length + 2} className="text-center py-4 text-muted">
+                          No leads found matching your criteria
+                        </td>
+                      </tr>
+                    );
+                  }
+
                   return paginated.map((lead) => (
                   <tr key={lead.id}>
                     <td>
-                      <Form.Check type="checkbox" />
+                      <Form.Check
+                        type="checkbox"
+                        checked={selectedLeads.includes(lead.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedLeads([...selectedLeads, lead.id]);
+                          } else {
+                            setSelectedLeads(selectedLeads.filter(id => id !== lead.id));
+                          }
+                        }}
+                      />
                     </td>
-                    <td className="fw-semibold">{lead.name}</td>
-                    <td>
-                      <div>
-                        <div className="fw-medium">{lead.company}</div>
-                        <small className="text-muted">{lead.industry}</small>
-                      </div>
-                    </td>
-                    <td>{lead.email}</td>
-                    <td>{lead.phone}</td>
-                    <td>
-                      <Badge 
-                        bg={
-                          lead.stage === 'Qualified' ? 'success' :
-                          lead.stage === 'Contacted' ? 'info' :
-                          'secondary'
-                        }
-                      >
-                        {lead.stage}
-                      </Badge>
-                    </td>
-                    <td>
-                      <Badge 
-                        bg={
-                          lead.leadPotential === 'Hot' ? 'danger' :
-                          lead.leadPotential === 'Warm' ? 'warning' :
-                          'secondary'
-                        }
-                      >
-                        {lead.leadPotential}
-                      </Badge>
-                    </td>
-                    <td>
-                      <Badge 
-                        bg={
-                          lead.urgency === 'High' ? 'danger' :
-                          lead.urgency === 'Medium' ? 'warning' :
-                          'secondary'
-                        }
-                      >
-                        {lead.urgency}
-                      </Badge>
-                    </td>
-                    <td className="text-center">
-                      <Badge bg="primary" pill>
-                        {lead.followUps.length}
-                      </Badge>
-                    </td>
-                    <td>
-                      <Badge 
-                        bg={
-                          lead.leadScore >= 70 ? 'success' :
-                          lead.leadScore >= 40 ? 'warning' :
-                          'danger'
-                        }
-                        className="px-3"
-                      >
-                        {lead.leadScore}
-                      </Badge>
-                    </td>
-                    <td>{lead.assignedUser}</td>
-                    <td>{lead.created}</td>
+                    {selectedLeadsColumns.includes('name') && (
+                      <td className="fw-semibold">{lead.name}</td>
+                    )}
+                    {selectedLeadsColumns.includes('company') && (
+                      <td>
+                        <div>
+                          <div className="fw-medium">{lead.company}</div>
+                          <small className="text-muted">{lead.industry}</small>
+                        </div>
+                      </td>
+                    )}
+                    {selectedLeadsColumns.includes('email') && (
+                      <td>{lead.email}</td>
+                    )}
+                    {selectedLeadsColumns.includes('phone') && (
+                      <td>{lead.phone}</td>
+                    )}
+                    {selectedLeadsColumns.includes('stage') && (
+                      <td>
+                        <Badge 
+                          bg={
+                            lead.stage === 'Qualified' ? 'success' :
+                            lead.stage === 'Contacted' ? 'info' :
+                            'secondary'
+                          }
+                        >
+                          {lead.stage}
+                        </Badge>
+                      </td>
+                    )}
+                    {selectedLeadsColumns.includes('leadPotential') && (
+                      <td>
+                        <Badge 
+                          bg={
+                            lead.leadPotential === 'Hot' ? 'danger' :
+                            lead.leadPotential === 'Warm' ? 'warning' :
+                            'secondary'
+                          }
+                        >
+                          {lead.leadPotential}
+                        </Badge>
+                      </td>
+                    )}
+                    {selectedLeadsColumns.includes('urgency') && (
+                      <td>
+                        <Badge 
+                          bg={
+                            lead.urgency === 'High' ? 'danger' :
+                            lead.urgency === 'Medium' ? 'warning' :
+                            'secondary'
+                          }
+                        >
+                          {lead.urgency}
+                        </Badge>
+                      </td>
+                    )}
+                    {selectedLeadsColumns.includes('followUps') && (
+                      <td className="text-center">
+                        <Badge bg="primary" pill>
+                          {lead.followUps.length}
+                        </Badge>
+                      </td>
+                    )}
+                    {selectedLeadsColumns.includes('leadScore') && (
+                      <td>
+                        <Badge 
+                          bg={
+                            lead.leadScore >= 70 ? 'success' :
+                            lead.leadScore >= 40 ? 'warning' :
+                            'danger'
+                          }
+                          className="px-3"
+                        >
+                          {lead.leadScore}
+                        </Badge>
+                      </td>
+                    )}
+                    {selectedLeadsColumns.includes('assignedUser') && (
+                      <td>{lead.assignedUser}</td>
+                    )}
+                    {selectedLeadsColumns.includes('created') && (
+                      <td>{lead.created}</td>
+                    )}
                     <td>
                       <div className="d-flex gap-1">
                         <Button 
@@ -4092,8 +8985,9 @@ const CRMPortal = () => {
                           className="p-1 text-success" 
                           title="Convert to Deal"
                           onClick={() => {
-                            setConfirmAction({ type: 'convert-deal', data: lead });
-                            setShowConfirmDialog(true);
+                            setEditingDeal(null);
+                            setDealFormStep(0);
+                            setShowDealFormModal(true);
                           }}
                         >
                           <Handshake size={16} />
@@ -4110,6 +9004,52 @@ const CRMPortal = () => {
                         >
                           <Trash2 size={16} />
                         </Button>
+                        <Dropdown className="d-inline">
+                          <Dropdown.Toggle 
+                            as={Button}
+                            variant="link" 
+                            size="sm" 
+                            className="p-1"
+                            title="More Actions"
+                          >
+                            <MoreVertical size={16} />
+                          </Dropdown.Toggle>
+                          <Dropdown.Menu align="end">
+                            <Dropdown.Item onClick={() => {
+                              setFollowupData({
+                                ...followupData,
+                                leadId: lead.id,
+                                leadName: lead.name
+                              });
+                              setShowAddFollowupModal(true);
+                            }}>
+                              <Calendar size={14} className="me-2" />
+                              Add Follow up
+                            </Dropdown.Item>
+                            <Dropdown.Item onClick={() => {
+                              setMeetingData({
+                                ...meetingData,
+                                leadId: lead.id,
+                                leadName: lead.name
+                              });
+                              setShowAddMeetingModal(true);
+                            }}>
+                              <Users size={14} className="me-2" />
+                              Add Meeting
+                            </Dropdown.Item>
+                            
+                            <Dropdown.Item 
+                              className="text-danger"
+                              // onClick={() => {
+                              //   setConfirmAction({ type: 'mark-lost', data: lead });
+                              //   setShowConfirmDialog(true);
+                              // }}
+                            >
+                              <X size={14} className="me-2" />
+                              Lost
+                            </Dropdown.Item>
+                          </Dropdown.Menu>
+                        </Dropdown>
                       </div>
                     </td>
                   </tr>
@@ -4118,7 +9058,49 @@ const CRMPortal = () => {
               </tbody>
             </Table>
             </div>
-            {renderPaginationControls(leadsData.length, leadsPagination, setLeadsPagination, 'leads')}
+            <div className="p-3">
+              {(() => {
+                let filtered = leadsData.filter(lead => {
+                  if (activeFilter === 'new') {
+                    if (lead.stage !== 'New') return false;
+                  } else if (activeFilter === 'qualified') {
+                    if (lead.stage !== 'Qualified') return false;
+                  } else if (activeFilter === 'hot') {
+                    if (lead.leadPotential !== 'Hot') return false;
+                  } else if (activeFilter === 'high-score') {
+                    if (lead.leadScore < 70) return false;
+                  } else if (activeFilter === 'follow-up') {
+                    if (!lead.followUps || lead.followUps.length === 0) return false;
+                    const hasScheduled = lead.followUps.some(f => f.status === 'Scheduled');
+                    if (!hasScheduled) return false;
+                  } else if (activeFilter === 'lost') {
+                    if (lead.stage !== 'Lost') return false;
+                  }
+                  
+                  const searchLower = leadsSearch.toLowerCase();
+                  const matchesSearch = !leadsSearch ||
+                    lead.name.toLowerCase().includes(searchLower) ||
+                    lead.company.toLowerCase().includes(searchLower) ||
+                    lead.email.toLowerCase().includes(searchLower);
+                  
+                  const matchesAssignedTo = leadsFilters.assignedTo.length === 0 || leadsFilters.assignedTo.includes(lead.assignedUser);
+                  const matchesIndustry = leadsFilters.industry.length === 0 || leadsFilters.industry.includes(lead.industry);
+                  const matchesStage = leadsFilters.stage.length === 0 || leadsFilters.stage.includes(lead.stage);
+                  const matchesSource = leadsFilters.source.length === 0 || leadsFilters.source.includes(lead.leadType);
+                  const matchesPotential = leadsFilters.potential.length === 0 || leadsFilters.potential.includes(lead.leadPotential);
+                  const matchesCampaign = leadsFilters.campaign.length === 0;
+                  const matchesLeadScoreMin = !leadsFilters.leadScoreMin || lead.leadScore >= parseInt(leadsFilters.leadScoreMin);
+                  const matchesLeadScoreMax = !leadsFilters.leadScoreMax || lead.leadScore <= parseInt(leadsFilters.leadScoreMax);
+                  const matchesDateRange = leadsFilters.dateRange.length === 0;
+                  
+                  return matchesSearch && matchesAssignedTo && matchesIndustry && matchesStage && 
+                    matchesSource && matchesPotential && matchesCampaign && 
+                    matchesLeadScoreMin && matchesLeadScoreMax && matchesDateRange;
+                });
+                
+                return renderPaginationControls(filtered.length, leadsPagination, setLeadsPagination, 'leads');
+              })()}
+            </div>
           </Card.Body>
         </Card>
       </div>
@@ -4193,378 +9175,608 @@ const CRMPortal = () => {
         {DealViewModal()}
         {ConfirmationDialog()}
         {/* Deal Form Modal */}
-        <Modal show={showDealFormModal} onHide={() => { setShowDealFormModal(false); setEditingDeal(null); }} size="xl" style={{ maxWidth: '95%', width: '1200px', margin: '1.75rem auto' }}>
+        <Modal show={showDealFormModal} onHide={() => { setShowDealFormModal(false); setEditingDeal(null); setDealFormStep(0); }} size="xl">
           <Modal.Header closeButton>
             <Modal.Title>{editingDeal ? 'Edit Deal' : 'Add New Deal'}</Modal.Title>
           </Modal.Header>
-          <Modal.Body style={{ maxHeight: '70vh', overflowY: 'auto' }}>
-            {/* Deal Information Section */}
-            <Card className="mb-3 border-0 bg-light">
-              <Card.Body>
-                <h6 className="fw-bold mb-3 text-primary">Deal Information</h6>
-                <Row>
-                  <Col md={6}>
-                    <Form.Group className="mb-3">
-                      <Form.Label>Deal Name <span className="text-danger">*</span></Form.Label>
-                      <Form.Control type="text" defaultValue={editingDeal?.name || ''} placeholder="Enter deal name" />
-                      <Form.Text className="text-muted">Enter a descriptive name for this deal</Form.Text>
-                    </Form.Group>
-                  </Col>
-                  <Col md={6}>
-                    <Form.Group className="mb-3">
-                      <Form.Label>Deal Value <span className="text-danger">*</span></Form.Label>
-                      <Form.Control type="text" defaultValue={editingDeal?.dealValue || ''} placeholder="£0.00" />
-                      <Form.Text className="text-muted">Enter the total value of this deal</Form.Text>
-                    </Form.Group>
-                  </Col>
-                </Row>
-                <Row>
-                  <Col md={6}>
-                    <Form.Group className="mb-3">
-                      <Form.Label>Stage <span className="text-danger">*</span></Form.Label>
-                      <Form.Select defaultValue={editingDeal?.stage || ''}>
-                        <option value="">Select Stage</option>
-                        <option value="Meeting">Meeting</option>
-                        <option value="Proposal">Proposal</option>
-                        <option value="Negotiation">Negotiation</option>
-                        <option value="Contract Sent">Contract Sent</option>
-                        <option value="Won">Won</option>
-                        <option value="Lost">Lost</option>
-                      </Form.Select>
-                      <Form.Text className="text-muted">Current stage in the sales pipeline</Form.Text>
-                    </Form.Group>
-                  </Col>
-                  <Col md={6}>
-                    <Form.Group className="mb-3">
-                      <Form.Label>Expected Close Date</Form.Label>
-                      <Form.Control type="date" defaultValue={editingDeal?.expectedCloseDate || ''} />
-                      <Form.Text className="text-muted">When do you expect to close this deal?</Form.Text>
-                    </Form.Group>
-                  </Col>
-                </Row>
-                <Row>
-                  <Col md={12}>
-                    <Form.Group className="mb-3">
-                      <Form.Label>Probability <span className="text-muted small">(Auto-syncs with stage)</span></Form.Label>
-                      <div className="d-flex align-items-center gap-2">
-                        <Form.Range defaultValue={editingDeal?.probability || 50} style={{ flex: 1 }} />
-                        <Badge bg="primary" style={{ minWidth: '60px' }}>{editingDeal?.probability || 50}%</Badge>
-                      </div>
-                      <Form.Text className="text-muted">Likelihood of closing this deal</Form.Text>
-                    </Form.Group>
-                  </Col>
-                </Row>
-              </Card.Body>
-            </Card>
+          <Modal.Body>
+            {/* Timeline Navigation */}
+            <div className="mb-4">
+              <div className="d-flex align-items-center justify-content-between position-relative">
+                {/* Progress Line */}
+                <div 
+                  className="position-absolute bg-light" 
+                  style={{ 
+                    left: '0', 
+                    right: '0', 
+                    top: '20px', 
+                    height: '2px', 
+                    zIndex: 0 
+                  }}
+                />
+                <div 
+                  className="position-absolute bg-primary" 
+                  style={{ 
+                    left: '0', 
+                    top: '20px', 
+                    height: '2px', 
+                    width: `${(dealFormStep / 4) * 100}%`,
+                    zIndex: 0,
+                    transition: 'width 0.3s ease'
+                  }}
+                />
+                
+                {/* Step 1 */}
+                <div 
+                  className="text-center position-relative" 
+                  style={{ cursor: 'pointer', flex: 1 }}
+                  onClick={() => setDealFormStep(0)}
+                >
+                  <div 
+                    className={`rounded-circle d-flex align-items-center justify-content-center mx-auto ${dealFormStep >= 0 ? 'bg-primary text-white' : 'bg-light text-muted'}`}
+                    style={{ width: '40px', height: '40px', zIndex: 1, position: 'relative' }}
+                  >
+                    {dealFormStep > 0 ? <CheckCircle size={20} /> : '1'}
+                  </div>
+                  <small className={`d-block mt-2 ${dealFormStep === 0 ? 'fw-bold text-primary' : 'text-muted'}`}>Deal Info</small>
+                </div>
 
-            {/* Company Information Section */}
-            <Card className="mb-3 border-0 bg-light">
-              <Card.Body>
-                <h6 className="fw-bold mb-3 text-success">Company Information <span className="text-muted small">(Auto-fetched from Lead)</span></h6>
-                <Row>
-                  <Col md={6}>
-                    <Form.Group className="mb-3">
-                      <Form.Label>Company Name</Form.Label>
-                      <Form.Control type="text" defaultValue={editingDeal?.company || ''} disabled />
-                      <Form.Text className="text-muted">Company name from lead record</Form.Text>
-                    </Form.Group>
-                  </Col>
-                  <Col md={6}>
-                    <Form.Group className="mb-3">
-                      <Form.Label>Industry</Form.Label>
-                      <Form.Control type="text" defaultValue={editingDeal?.industry || ''} disabled />
-                      <Form.Text className="text-muted">Industry from lead record</Form.Text>
-                    </Form.Group>
-                  </Col>
-                </Row>
-                <Row>
-                  <Col md={6}>
-                    <Form.Group className="mb-3">
-                      <Form.Label>Contact Person</Form.Label>
-                      <Form.Control type="text" defaultValue={editingDeal?.contactPerson || ''} disabled />
-                      <Form.Text className="text-muted">Primary contact from lead</Form.Text>
-                    </Form.Group>
-                  </Col>
-                  <Col md={6}>
-                    <Form.Group className="mb-3">
-                      <Form.Label>Owner <span className="text-danger">*</span></Form.Label>
-                      <Form.Select defaultValue={editingDeal?.owner || ''}>
-                        <option value="">Select Owner</option>
-                        <option value="John Doe">John Doe</option>
-                        <option value="Jane Doe">Jane Doe</option>
-                        <option value="Sarah Smith">Sarah Smith</option>
-                      </Form.Select>
-                      <Form.Text className="text-muted">Assign a deal owner</Form.Text>
-                    </Form.Group>
-                  </Col>
-                </Row>
-              </Card.Body>
-            </Card>
+                {/* Step 2 */}
+                <div 
+                  className="text-center position-relative" 
+                  style={{ cursor: 'pointer', flex: 1 }}
+                  onClick={() => setDealFormStep(1)}
+                >
+                  <div 
+                    className={`rounded-circle d-flex align-items-center justify-content-center mx-auto ${dealFormStep >= 1 ? 'bg-primary text-white' : 'bg-light text-muted'}`}
+                    style={{ width: '40px', height: '40px', zIndex: 1, position: 'relative' }}
+                  >
+                    {dealFormStep > 1 ? <CheckCircle size={20} /> : '2'}
+                  </div>
+                  <small className={`d-block mt-2 ${dealFormStep === 1 ? 'fw-bold text-primary' : 'text-muted'}`}>Company Info</small>
+                </div>
 
-            {/* Deal Characteristics Section */}
-            <Card className="mb-3 border-0 bg-light">
-              <Card.Body>
-                <h6 className="fw-bold mb-3 text-info">Deal Characteristics</h6>
-                <Row>
-                  <Col md={6}>
-                    <Form.Group className="mb-3">
-                      <Form.Label>Deal Type</Form.Label>
-                      <Form.Select defaultValue={editingDeal?.dealType || ''}>
-                        <option value="">Select Type</option>
-                        <option value="New Sale">New Sale</option>
-                        <option value="Renewal">Renewal</option>
-                        <option value="Migration">Migration</option>
-                        <option value="Cross-sell">Cross-sell</option>
-                        <option value="Upsell">Upsell</option>
-                      </Form.Select>
-                      <Form.Text className="text-muted">Type of deal (new, renewal, upsell, etc.)</Form.Text>
-                    </Form.Group>
-                  </Col>
-                  <Col md={6}>
-                    <Form.Group className="mb-3">
-                      <Form.Label>Contract Length</Form.Label>
-                      <Form.Select defaultValue={editingDeal?.contractLength || ''}>
-                        <option value="">Select Length</option>
-                        <option value="6 months">6 months</option>
-                        <option value="12 months">12 months</option>
-                        <option value="24 months">24 months</option>
-                        <option value="36 months">36 months</option>
-                      </Form.Select>
-                      <Form.Text className="text-muted">Duration of the contract</Form.Text>
-                    </Form.Group>
-                  </Col>
-                </Row>
-                <Row>
-                  <Col md={6}>
-                    <Form.Group className="mb-3">
-                      <Form.Label>Billing Model</Form.Label>
-                      <Form.Select defaultValue={editingDeal?.billingModel || ''}>
-                        <option value="">Select Model</option>
-                        <option value="Monthly">Monthly</option>
-                        <option value="Quarterly">Quarterly</option>
-                        <option value="Annual">Annual</option>
-                        <option value="One-time">One-time</option>
-                      </Form.Select>
-                      <Form.Text className="text-muted">How often customer will be billed</Form.Text>
-                    </Form.Group>
-                  </Col>
-                  <Col md={6}>
-                    <Form.Group className="mb-3">
-                      <Form.Label>Payment Terms</Form.Label>
-                      <Form.Select defaultValue={editingDeal?.paymentTerms || ''}>
-                        <option value="">Select Terms</option>
-                        <option value="Net 15">Net 15</option>
-                        <option value="Net 30">Net 30</option>
-                        <option value="Net 60">Net 60</option>
-                        <option value="Upfront">Upfront</option>
-                      </Form.Select>
-                      <Form.Text className="text-muted">Payment terms for the deal</Form.Text>
-                    </Form.Group>
-                  </Col>
-                </Row>
-                <Row>
-                  <Col md={6}>
-                    <Form.Group className="mb-3">
-                      <Form.Label>Risk Level</Form.Label>
-                      <Form.Select defaultValue={editingDeal?.riskLevel || ''}>
-                        <option value="">Select Risk</option>
-                        <option value="Low">Low</option>
-                        <option value="Medium">Medium</option>
-                        <option value="High">High</option>
-                      </Form.Select>
-                      <Form.Text className="text-muted">Risk assessment for this deal</Form.Text>
-                    </Form.Group>
-                  </Col>
-                  <Col md={6}>
-                    <Form.Group className="mb-3">
-                      <Form.Label>Competitors</Form.Label>
-                      <Form.Control 
-                        type="text" 
-                        defaultValue={editingDeal?.competitors?.join(', ') || ''} 
-                        placeholder="Comma separated (e.g., Company A, Company B)"
-                      />
-                      <Form.Text className="text-muted">Competing companies for this deal</Form.Text>
-                    </Form.Group>
-                  </Col>
-                </Row>
-              </Card.Body>
-            </Card>
+                {/* Step 3 */}
+                <div 
+                  className="text-center position-relative" 
+                  style={{ cursor: 'pointer', flex: 1 }}
+                  onClick={() => setDealFormStep(2)}
+                >
+                  <div 
+                    className={`rounded-circle d-flex align-items-center justify-content-center mx-auto ${dealFormStep >= 2 ? 'bg-primary text-white' : 'bg-light text-muted'}`}
+                    style={{ width: '40px', height: '40px', zIndex: 1, position: 'relative' }}
+                  >
+                    {dealFormStep > 2 ? <CheckCircle size={20} /> : '3'}
+                  </div>
+                  <small className={`d-block mt-2 ${dealFormStep === 2 ? 'fw-bold text-primary' : 'text-muted'}`}>Characteristics</small>
+                </div>
 
-            {/* Negotiation Progress Section */}
-            <Card className="mb-3 border-0 bg-light">
-              <Card.Body>
-                <h6 className="fw-bold mb-3 text-warning">Negotiation Progress</h6>
-                <Row>
-                  <Col md={6}>
-                    <Form.Group className="mb-3">
-                      <Form.Check 
-                        type="checkbox" 
-                        label="Quotation Sent" 
-                        defaultChecked={editingDeal?.quotationSent || false}
-                      />
-                    </Form.Group>
-                  </Col>
-                  <Col md={6}>
+                {/* Step 4 */}
+                <div 
+                  className="text-center position-relative" 
+                  style={{ cursor: 'pointer', flex: 1 }}
+                  onClick={() => setDealFormStep(3)}
+                >
+                  <div 
+                    className={`rounded-circle d-flex align-items-center justify-content-center mx-auto ${dealFormStep >= 3 ? 'bg-primary text-white' : 'bg-light text-muted'}`}
+                    style={{ width: '40px', height: '40px', zIndex: 1, position: 'relative' }}
+                  >
+                    {dealFormStep > 3 ? <CheckCircle size={20} /> : '4'}
+                  </div>
+                  <small className={`d-block mt-2 ${dealFormStep === 3 ? 'fw-bold text-primary' : 'text-muted'}`}>Progress & Notes</small>
+                </div>
+
+                {/* Step 5 */}
+                <div 
+                  className="text-center position-relative" 
+                  style={{ cursor: 'pointer', flex: 1 }}
+                  onClick={() => setDealFormStep(4)}
+                >
+                  <div 
+                    className={`rounded-circle d-flex align-items-center justify-content-center mx-auto ${dealFormStep >= 4 ? 'bg-primary text-white' : 'bg-light text-muted'}`}
+                    style={{ width: '40px', height: '40px', zIndex: 1, position: 'relative' }}
+                  >
+                    {dealFormStep > 4 ? <CheckCircle size={20} /> : '5'}
+                  </div>
+                  <small className={`d-block mt-2 ${dealFormStep === 4 ? 'fw-bold text-primary' : 'text-muted'}`}>Estimation</small>
+                </div>
+              </div>
+            </div>
+
+            {/* Form Content Based on Step */}
+            <div style={{ minHeight: '400px' }}>
+              {dealFormStep === 0 && (
+                <Card className="mb-3 border-0 bg-light">
+                  <Card.Body>
+                    <h5 className="fw-bold mb-4 text-primary">DEAL INFORMATION</h5>
+                    <Row>
+                      <Col md={6}>
                         <Form.Group className="mb-3">
-                          <Form.Check 
-                            type="checkbox" 
-                            label="Contract Sent" 
-                            defaultChecked={editingDeal?.contractSent || false}
+                          <Form.Label>Deal Name <span className="text-danger">*</span></Form.Label>
+                          <Form.Control type="text" defaultValue={editingDeal?.name || ''} placeholder="Enter deal name" required />
+                        </Form.Group>
+                      </Col>
+                      <Col md={6}>
+                        <Form.Group className="mb-3">
+                          <Form.Label>Type <span className="text-danger">*</span></Form.Label>
+                          <Form.Select defaultValue={editingDeal?.type || ''} required>
+                            <option value="">Select Type</option>
+                            <option value="New Business">New Business</option>
+                            <option value="Existing Business">Existing Business</option>
+                            <option value="Renewal">Renewal</option>
+                            <option value="Upsell">Upsell</option>
+                          </Form.Select>
+                        </Form.Group>
+                      </Col>
+                      <Col md={6}>
+                        <Form.Group className="mb-3">
+                          <Form.Label>Expected Close Date <span className="text-danger">*</span></Form.Label>
+                          <Form.Control type="date" defaultValue={editingDeal?.expectedCloseDate || ''} required />
+                        </Form.Group>
+                      </Col>
+                      <Col md={6}>
+                        <Form.Group className="mb-3">
+                          <Form.Label>Assigned to <span className="text-danger">*</span></Form.Label>
+                          <Form.Select defaultValue={editingDeal?.assignedTo || editingDeal?.owner || ''} required>
+                            <option value="">Select User</option>
+                            <option value="John Doe">John Doe</option>
+                            <option value="Jane Doe">Jane Doe</option>
+                            <option value="Sarah Smith">Sarah Smith</option>
+                            <option value="Mike Johnson">Mike Johnson</option>
+                          </Form.Select>
+                        </Form.Group>
+                      </Col>
+                      <Col md={6}>
+                        <Form.Group className="mb-3">
+                          <Form.Label>Stage <span className="text-danger">*</span></Form.Label>
+                          <Form.Select defaultValue={editingDeal?.stage || ''} required>
+                            <option value="">Select Stage</option>
+                            <option value="Qualification">Qualification</option>
+                            <option value="Meeting">Meeting</option>
+                            <option value="Proposal">Proposal</option>
+                            <option value="Negotiation">Negotiation</option>
+                            <option value="Contract Sent">Contract Sent</option>
+                            <option value="Won">Won</option>
+                            <option value="Lost">Lost</option>
+                          </Form.Select>
+                        </Form.Group>
+                      </Col>
+                      <Col md={6}>
+                        <Form.Group className="mb-3">
+                          <Form.Label>Probability <span className="text-danger">*</span></Form.Label>
+                          <div className="d-flex align-items-center gap-2">
+                            <Form.Range defaultValue={editingDeal?.probability || 50} style={{ flex: 1 }} />
+                            <Badge bg="primary" style={{ minWidth: '60px' }}>{editingDeal?.probability || 50}%</Badge>
+                          </div>
+                          <Form.Text className="text-muted">Likelihood of closing this deal</Form.Text>
+                        </Form.Group>
+                      </Col>
+                      <Col md={12}>
+                        <Form.Group className="mb-3">
+                          <Form.Label>Description</Form.Label>
+                          <Form.Control 
+                            as="textarea" 
+                            rows={3} 
+                            defaultValue={editingDeal?.description || ''} 
+                            placeholder="Enter deal description"
                           />
                         </Form.Group>
                       </Col>
                     </Row>
-                    <div className="alert alert-info small mb-0">
-                      <AlertCircle size={14} className="me-1" />
-                      Track key milestones in the negotiation process
-                    </div>
-              </Card.Body>
-            </Card>
+                  </Card.Body>
+                </Card>
+              )}
 
-            {/* Estimation Chart Section */}
-            <Card className="mb-3 border-0 bg-light">
-              <Card.Body>
+              {dealFormStep === 1 && (
+                <Card className="mb-3 border-0 bg-light">
+                  <Card.Body>
+                    <h5 className="fw-bold mb-4 text-success">COMPANY INFORMATION</h5>
+                    <Row>
+                      <Col md={6}>
+                        <Form.Group className="mb-3">
+                          <Form.Label>Company Name <span className="text-danger">*</span></Form.Label>
+                          <Form.Control type="text" defaultValue={editingDeal?.company || ''} placeholder="Enter company name" required />
+                        </Form.Group>
+                      </Col>
+                      <Col md={6}>
+                        <Form.Group className="mb-3">
+                          <Form.Label>Industry <span className="text-danger">*</span></Form.Label>
+                          <Form.Select defaultValue={editingDeal?.industry || ''} required>
+                            <option value="">Select Industry</option>
+                            <option value="Technology">Technology</option>
+                            <option value="Healthcare">Healthcare</option>
+                            <option value="Finance">Finance</option>
+                            <option value="Manufacturing">Manufacturing</option>
+                            <option value="Retail">Retail</option>
+                            <option value="Education">Education</option>
+                            <option value="Real Estate">Real Estate</option>
+                            <option value="Telecommunications">Telecommunications</option>
+                            <option value="Construction">Construction</option>
+                            <option value="Other">Other</option>
+                          </Form.Select>
+                        </Form.Group>
+                      </Col>
+                      <Col md={6}>
+                        <Form.Group className="mb-3">
+                          <Form.Label>Main Decision Maker <span className="text-danger">*</span></Form.Label>
+                          <Form.Control type="text" defaultValue={editingDeal?.decisionMaker || editingDeal?.contactPerson || ''} placeholder="Decision maker name" required />
+                        </Form.Group>
+                      </Col>
+                      <Col md={6}>
+                        <Form.Group className="mb-3">
+                          <Form.Label>Decision Maker Email <span className="text-danger">*</span></Form.Label>
+                          <Form.Control type="email" defaultValue={editingDeal?.decisionMakerEmail || editingDeal?.contactEmail || ''} placeholder="decisionmaker@company.com" required />
+                        </Form.Group>
+                      </Col>
+                      <Col md={6}>
+                        <Form.Group className="mb-3">
+                          <Form.Label>Decision Maker Phone <span className="text-danger">*</span></Form.Label>
+                          <Form.Control type="tel" defaultValue={editingDeal?.decisionMakerPhone || editingDeal?.contactPhone || ''} placeholder="+44 20 1234 5678" required />
+                        </Form.Group>
+                      </Col>
+                    </Row>
+                  </Card.Body>
+                </Card>
+              )}
+
+              {dealFormStep === 2 && (
+                <Card className="mb-3 border-0 bg-light">
+                  <Card.Body>
+                    <h5 className="fw-bold mb-4 text-info">DEAL CHARACTERISTICS</h5>
+                    <Row>
+                      <Col md={6}>
+                        <Form.Group className="mb-3">
+                          <Form.Label>Deal Type <span className="text-danger">*</span></Form.Label>
+                          <Form.Select defaultValue={editingDeal?.dealType || ''} required>
+                            <option value="">Select Deal Type</option>
+                            <option value="New Sale">New Sale</option>
+                            <option value="Renewal">Renewal</option>
+                            <option value="Migration">Migration</option>
+                            <option value="Cross-sell">Cross-sell</option>
+                            <option value="Upsell">Upsell</option>
+                          </Form.Select>
+                        </Form.Group>
+                      </Col>
+                      <Col md={6}>
+                        <Form.Group className="mb-3">
+                          <Form.Label>Contract Length <span className="text-danger">*</span></Form.Label>
+                          <Form.Select defaultValue={editingDeal?.contractLength || ''} required>
+                            <option value="">Select Length</option>
+                            <option value="1 month">1 month</option>
+                            <option value="3 months">3 months</option>
+                            <option value="6 months">6 months</option>
+                            <option value="12 months">12 months</option>
+                            <option value="24 months">24 months</option>
+                            <option value="36 months">36 months</option>
+                          </Form.Select>
+                        </Form.Group>
+                      </Col>
+                      <Col md={6}>
+                        <Form.Group className="mb-3">
+                          <Form.Label>Billing Model <span className="text-danger">*</span></Form.Label>
+                          <Form.Select defaultValue={editingDeal?.billingModel || ''} required>
+                            <option value="">Select Model</option>
+                            <option value="Monthly">Monthly</option>
+                            <option value="Quarterly">Quarterly</option>
+                            <option value="Semi-Annual">Semi-Annual</option>
+                            <option value="Annual">Annual</option>
+                            <option value="One-time">One-time</option>
+                          </Form.Select>
+                        </Form.Group>
+                      </Col>
+                      <Col md={6}>
+                        <Form.Group className="mb-3">
+                          <Form.Label>Payment Terms <span className="text-danger">*</span></Form.Label>
+                          <Form.Select defaultValue={editingDeal?.paymentTerms || ''} required>
+                            <option value="">Select Terms</option>
+                            <option value="Net 15">Net 15</option>
+                            <option value="Net 30">Net 30</option>
+                            <option value="Net 45">Net 45</option>
+                            <option value="Net 60">Net 60</option>
+                            <option value="Upfront">Upfront</option>
+                            <option value="50% Upfront">50% Upfront</option>
+                          </Form.Select>
+                        </Form.Group>
+                      </Col>
+                      <Col md={6}>
+                        <Form.Group className="mb-3">
+                          <Form.Label>Risk Level <span className="text-danger">*</span></Form.Label>
+                          <Form.Select defaultValue={editingDeal?.riskLevel || ''} required>
+                            <option value="">Select Risk Level</option>
+                            <option value="Low">Low</option>
+                            <option value="Medium">Medium</option>
+                            <option value="High">High</option>
+                          </Form.Select>
+                        </Form.Group>
+                      </Col>
+                      <Col md={6}>
+                        <Form.Group className="mb-3">
+                          <Form.Label>Competitors in Deal <span className="text-danger">*</span></Form.Label>
+                          <Form.Control 
+                            type="text" 
+                            defaultValue={editingDeal?.competitors?.join(', ') || ''} 
+                            placeholder="Enter competitor names (comma separated)"
+                            required
+                          />
+                        </Form.Group>
+                      </Col>
+                    </Row>
+                  </Card.Body>
+                </Card>
+              )}
+
+              {dealFormStep === 3 && (
+                <div>
+                  {/* Negotiation Progress */}
+                  <Card className="mb-3 border-0 bg-light">
+                    <Card.Body>
+                      <h5 className="fw-bold mb-4 text-warning">NEGOTIATION PROGRESS</h5>
+                      <Row>
+                        <Col md={12}>
+                          <Form.Group className="mb-3">
+                            <Form.Label>Progress <span className="text-danger">*</span></Form.Label>
+                            <div className="d-flex align-items-center gap-2">
+                              <Form.Range defaultValue={editingDeal?.negotiationProgress || 0} style={{ flex: 1 }} />
+                              <Badge bg="info" style={{ minWidth: '60px' }}>{editingDeal?.negotiationProgress || 0}%</Badge>
+                            </div>
+                            <Form.Text className="text-muted">Visual indicator of negotiation progress</Form.Text>
+                          </Form.Group>
+                        </Col>
+                        <Col md={4}>
+                          <Form.Group className="mb-3">
+                            <Form.Label>Quotation Sent <span className="text-danger">*</span></Form.Label>
+                            <Form.Select defaultValue={editingDeal?.quotationSent || ''} required>
+                              <option value="">Select</option>
+                              <option value="Yes">Yes</option>
+                              <option value="No">No</option>
+                            </Form.Select>
+                          </Form.Group>
+                        </Col>
+                        <Col md={4}>
+                          <Form.Group className="mb-3">
+                            <Form.Label>Contract Sent <span className="text-danger">*</span></Form.Label>
+                            <Form.Select defaultValue={editingDeal?.contractSent || ''} required>
+                              <option value="">Select</option>
+                              <option value="Yes">Yes</option>
+                              <option value="No">No</option>
+                            </Form.Select>
+                          </Form.Group>
+                        </Col>
+                        <Col md={4}>
+                          <Form.Group className="mb-3">
+                            <Form.Label>Contract Received <span className="text-danger">*</span></Form.Label>
+                            <Form.Select defaultValue={editingDeal?.contractReceived || ''} required>
+                              <option value="">Select</option>
+                              <option value="Yes">Yes</option>
+                              <option value="No">No</option>
+                            </Form.Select>
+                          </Form.Group>
+                        </Col>
+                      </Row>
+                    </Card.Body>
+                  </Card>
+
+                  {/* Attachments */}
+                  <Card className="mb-3 border-0 bg-light">
+                    <Card.Body>
+                      <h5 className="fw-bold mb-4 text-info">ATTACHMENTS</h5>
+                      <Row>
+                        <Col md={6}>
+                          <Form.Group className="mb-3">
+                            <Form.Label>Document Name <span className="text-danger">*</span></Form.Label>
+                            <Form.Control type="text" placeholder="Enter document name" />
+                          </Form.Group>
+                        </Col>
+                        <Col md={6}>
+                          <Form.Group className="mb-3">
+                            <Form.Label>Upload Document</Form.Label>
+                            <Form.Control type="file" />
+                          </Form.Group>
+                        </Col>
+                        <Col md={12}>
+                          {editingDeal?.attachments && editingDeal.attachments.length > 0 ? (
+                            <div className="border rounded p-2 bg-white">
+                              <small className="text-muted d-block mb-2">Attached Documents:</small>
+                              {editingDeal.attachments.map((doc: any, idx: number) => (
+                                <Badge key={idx} bg="secondary" className="me-2 mb-1">
+                                  <FileText size={12} className="me-1" />
+                                  {doc.name}
+                                </Badge>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="text-center text-muted p-3 border rounded bg-white">
+                              <FileText size={24} className="mb-2" />
+                              <div><small>No documents attached</small></div>
+                            </div>
+                          )}
+                        </Col>
+                      </Row>
+                    </Card.Body>
+                  </Card>
+
+                  {/* Additional Notes */}
+                  <Card className="mb-3 border-0 bg-light">
+                    <Card.Body>
+                      <h5 className="fw-bold mb-4 text-primary">ADDITIONAL NOTES</h5>
+                      <Form.Group className="mb-3">
+                        <Form.Control 
+                          as="textarea" 
+                          rows={4} 
+                          defaultValue={editingDeal?.additionalNotes || ''} 
+                          placeholder="Enter any additional notes about this deal"
+                        />
+                      </Form.Group>
+                    </Card.Body>
+                  </Card>
+
+                  {/* Remarks by Supervisor */}
+                  <Card className="mb-3 border-0 bg-light">
+                    <Card.Body>
+                      <h5 className="fw-bold mb-4 text-success">REMARKS BY SUPERVISOR</h5>
+                      <Form.Group className="mb-3">
+                        <Form.Control 
+                          as="textarea" 
+                          rows={4} 
+                          defaultValue={editingDeal?.supervisorRemarks || ''} 
+                          placeholder="Supervisor remarks and feedback"
+                        />
+                      </Form.Group>
+                    </Card.Body>
+                  </Card>
+                </div>
+              )}
+
+              {dealFormStep === 4 && (
+                <Card className="mb-3 border-0 bg-light">
+                  <Card.Body>
+                    <h5 className="fw-bold mb-4 text-success">ESTIMATION CHART</h5>
                     <div className="d-flex justify-content-between align-items-center mb-3">
-                      <h6 className="fw-bold mb-0 text-success">Estimation Chart</h6>
-                      <Button variant="outline-primary" size="sm">
+                      <div className="d-flex gap-2">
+                        <Button variant="outline-primary" size="sm">
+                          <Edit size={14} className="me-1" />
+                          Estimate Option
+                        </Button>
+                        <Button variant="outline-info" size="sm">
+                          <Eye size={14} className="me-1" />
+                          Revision History
+                        </Button>
+                      </div>
+                      <Button variant="primary" size="sm">
                         <Plus size={14} className="me-1" />
                         Add Item
                       </Button>
                     </div>
-                    <Table size="sm" hover className="bg-white">
-                      <thead>
-                        <tr>
-                          <th>Version</th>
-                          <th>Product/Service</th>
-                          <th>Quantity</th>
-                          <th>Price</th>
-                          <th>Discount %</th>
-                          <th>Total</th>
-                          <th>Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {editingDeal?.estimations?.map((est: any, index: number) => (
-                          <tr key={index}>
-                            <td><Badge bg="primary">{est.version}</Badge></td>
-                            <td>{est.product}</td>
-                            <td>{est.quantity}</td>
-                            <td>£{est.price.toLocaleString()}</td>
-                            <td>{est.discount}%</td>
-                            <td className="fw-bold">£{est.total.toLocaleString()}</td>
-                            <td>
-                              <Button variant="link" size="sm" className="p-0">
-                                <Edit size={14} />
-                              </Button>
-                            </td>
-                          </tr>
-                        ))}
-                        {(!editingDeal?.estimations || editingDeal.estimations.length === 0) && (
+                    <div className="table-responsive">
+                      <Table size="sm" hover className="bg-white">
+                        <thead>
                           <tr>
-                            <td colSpan={7} className="text-center text-muted">No estimations added</td>
+                            <th>#</th>
+                            <th>Product/Service</th>
+                            <th>Description/Specification</th>
+                            <th>Qty</th>
+                            <th>Unit Price</th>
+                            <th>Currency</th>
+                            <th>Tax %</th>
+                            <th>Sub Total</th>
+                            <th>Actions</th>
                           </tr>
-                        )}
-                      </tbody>
-                    </Table>
+                        </thead>
+                        <tbody>
+                          {editingDeal?.estimations?.map((est: any, index: number) => (
+                            <tr key={index}>
+                              <td>{index + 1}</td>
+                              <td>{est.product}</td>
+                              <td>{est.description || 'N/A'}</td>
+                              <td>{est.quantity}</td>
+                              <td>{est.unitPrice?.toLocaleString() || 0}</td>
+                              <td>
+                                <Badge bg="secondary">{est.currency || 'GBP'}</Badge>
+                              </td>
+                              <td>{est.tax || 0}%</td>
+                              <td className="fw-bold">
+                                {est.currency || '£'}{((est.unitPrice || 0) * (est.quantity || 0) * (1 + (est.tax || 0) / 100)).toLocaleString()}
+                              </td>
+                              <td>
+                                <Button variant="link" size="sm" className="p-0 me-2">
+                                  <Edit size={14} />
+                                </Button>
+                                <Button variant="link" size="sm" className="p-0 text-danger">
+                                  <Trash2 size={14} />
+                                </Button>
+                              </td>
+                            </tr>
+                          ))}
+                          {(!editingDeal?.estimations || editingDeal.estimations.length === 0) && (
+                            <tr>
+                              <td colSpan={9} className="text-center text-muted py-4">
+                                <Package size={32} className="text-muted mb-2" />
+                                <div>No items in estimation chart</div>
+                                <small>Click "Add Item" to add products or services</small>
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </Table>
+                    </div>
                     {editingDeal?.estimations && editingDeal.estimations.length > 0 && (
-                      <div className="text-end mt-2">
-                        <h5 className="mb-0">
-                          Grand Total: <span className="text-success">£{editingDeal.estimations.reduce((sum: number, est: any) => sum + est.total, 0).toLocaleString()}</span>
-                        </h5>
+                      <div className="text-end mt-3 p-3 bg-white rounded border">
+                        <h4 className="mb-0">
+                          <strong>Grand Total:</strong> <span className="text-success">
+                            £{editingDeal.estimations.reduce((sum: number, est: any) => 
+                              sum + ((est.unitPrice || 0) * (est.quantity || 0) * (1 + (est.tax || 0) / 100)), 0
+                            ).toLocaleString()}
+                          </span>
+                        </h4>
                       </div>
                     )}
-              </Card.Body>
-            </Card>
-
-            {/* Meetings Section */}
-            <Card className="mb-3 border-0 bg-light">
-              <Card.Body>
-                    <div className="d-flex justify-content-between align-items-center mb-3">
-                      <h6 className="fw-bold mb-0 text-danger">Meetings</h6>
-                      <Button variant="outline-primary" size="sm">
-                        <Plus size={14} className="me-1" />
-                        Schedule Meeting
-                      </Button>
-                    </div>
-                    <Table size="sm" hover className="bg-white">
-                      <thead>
-                        <tr>
-                          <th>Date</th>
-                          <th>Type</th>
-                          <th>Outcome</th>
-                          <th>Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {editingDeal?.meetings?.map((meeting: any, index: number) => (
-                          <tr key={index}>
-                            <td>{meeting.date}</td>
-                            <td>
-                              <Badge bg={
-                                meeting.type === 'In-person' ? 'primary' :
-                                meeting.type === 'Online' ? 'info' :
-                                'secondary'
-                              }>
-                                {meeting.type}
-                              </Badge>
-                            </td>
-                            <td>
-                              <Badge bg={meeting.outcome === 'Positive' ? 'success' : 'warning'}>
-                                {meeting.outcome}
-                              </Badge>
-                            </td>
-                            <td>
-                              <Button variant="link" size="sm" className="p-0">
-                                <Eye size={14} />
-                              </Button>
-                            </td>
-                          </tr>
-                        ))}
-                        {(!editingDeal?.meetings || editingDeal.meetings.length === 0) && (
-                          <tr>
-                            <td colSpan={4} className="text-center text-muted">No meetings scheduled</td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </Table>
-              </Card.Body>
-            </Card>
+                  </Card.Body>
+                </Card>
+              )}
+            </div>
           </Modal.Body>
-          <Modal.Footer>
-            <Button variant="secondary" onClick={() => { setShowDealFormModal(false); setEditingDeal(null); }}>
-              Cancel
-            </Button>
+          <Modal.Footer className="d-flex justify-content-between">
             <Button 
-              variant="success" 
-              className="me-auto"
-              onClick={() => {
-                setConfirmAction({ type: 'convert-order', data: editingDeal });
-                setShowConfirmDialog(true);
-              }}
+              variant="secondary" 
+              onClick={() => dealFormStep > 0 ? setDealFormStep(dealFormStep - 1) : setShowDealFormModal(false)}
             >
-              <ShoppingBag size={16} className="me-1" />
-              Convert to Order
+              {dealFormStep > 0 ? '← Previous' : 'Cancel'}
             </Button>
-            <Button variant="primary">
-              {editingDeal ? 'Update Deal' : 'Create Deal'}
-            </Button>
+            <div className="d-flex gap-2">
+              {dealFormStep < 4 ? (
+                <Button 
+                  variant="primary"
+                  onClick={() => setDealFormStep(dealFormStep + 1)}
+                >
+                  Next →
+                </Button>
+              ) : (
+                <>
+                  <Button 
+                    variant="success"
+                    onClick={() => {
+                      setConfirmAction({ type: 'convert-order', data: editingDeal });
+                      setShowConfirmDialog(true);
+                    }}
+                  >
+                    <ShoppingBag size={16} className="me-1" />
+                    Convert to Order
+                  </Button>
+                  <Button variant="primary">
+                    {editingDeal ? 'Update Deal' : 'Create Deal'}
+                  </Button>
+                </>
+              )}
+            </div>
           </Modal.Footer>
         </Modal>
 
         {/* Page Header */}
-        <div className="d-flex justify-content-between align-items-center mb-4">
-          <div>
+        <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4">
+          <div className="mb-3 mb-md-0">
             <h2 className="mb-1 fw-bold">Deals & Opportunities</h2>
             <p className="text-muted mb-0">Manage your sales pipeline and deals</p>
           </div>
-          <Button variant="primary" onClick={() => setShowDealFormModal(true)}>
-            <Plus size={16} className="me-2" />
-            Add Deal
-          </Button>
+          <div className="d-flex flex-wrap gap-2">
+            <Button 
+              variant={showDealsAnalytics ? "primary" : "outline-secondary"}
+              onClick={() => setShowDealsAnalytics(!showDealsAnalytics)}
+            >
+              <BarChart3 size={16} className="me-2" />
+              {showDealsAnalytics ? 'Hide Analytics' : 'Show Analytics'}
+            </Button>
+            <Button variant="primary" onClick={() => setShowDealFormModal(true)}>
+              <Plus size={16} className="me-2" />
+              Add Deal
+            </Button>
+          </div>
         </div>
 
-        {/* Summary Stats using KPICard */}
-        <Row className="mb-4">
+        {/* Analytics Section - Collapsible */}
+        {showDealsAnalytics && (
+          <>
+            {/* Summary Stats using KPICard */}
+            <Row className="mb-4">
           <Col lg={3} md={6} className="mb-3">
             <KPICard 
               title="Total Deals"
@@ -4605,155 +9817,696 @@ const CRMPortal = () => {
           </Col>
         </Row>
 
+        {/* Analytics Charts */}
+        <Row className="mb-4">
+          <Col md={6} className="mb-3">
+            <Card className="border-0 shadow-sm h-100">
+              <Card.Body>
+                <h6 className="fw-bold mb-3">Deals by Stage</h6>
+                <ResponsiveContainer width="100%" height={250}>
+                  <PieChart>
+                    <Pie
+                      data={[
+                        { name: 'Meeting', value: 12, color: '#0dcaf0' },
+                        { name: 'Proposal', value: 15, color: '#0d6efd' },
+                        { name: 'Negotiation', value: 8, color: '#ffc107' },
+                        { name: 'Contract Sent', value: 3, color: '#fd7e14' },
+                        { name: 'Won', value: 13, color: '#198754' }
+                      ]}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={({ name, percent }: any) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                      outerRadius={80}
+                      fill="#8884d8"
+                      dataKey="value"
+                    >
+                      {[
+                        { name: 'Meeting', value: 12, color: '#0dcaf0' },
+                        { name: 'Proposal', value: 15, color: '#0d6efd' },
+                        { name: 'Negotiation', value: 8, color: '#ffc107' },
+                        { name: 'Contract Sent', value: 3, color: '#fd7e14' },
+                        { name: 'Won', value: 13, color: '#198754' }
+                      ].map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              </Card.Body>
+            </Card>
+          </Col>
+          <Col md={6} className="mb-3">
+            <Card className="border-0 shadow-sm h-100">
+              <Card.Body>
+                <h6 className="fw-bold mb-3">Deal Value Distribution</h6>
+                <ResponsiveContainer width="100%" height={250}>
+                  <BarChart
+                    data={[
+                      { range: '£0-25K', count: 18 },
+                      { range: '£25-50K', count: 15 },
+                      { range: '£50-100K', count: 12 },
+                      { range: '£100K+', count: 6 }
+                    ]}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="range" />
+                    <YAxis />
+                    <Tooltip />
+                    <Bar dataKey="count" fill="#0d6efd" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </Card.Body>
+            </Card>
+          </Col>
+          <Col md={6} className="mb-3">
+            <Card className="border-0 shadow-sm h-100">
+              <Card.Body>
+                <h6 className="fw-bold mb-3">Win/Loss Ratio</h6>
+                <ResponsiveContainer width="100%" height={250}>
+                  <PieChart>
+                    <Pie
+                      data={[
+                        { name: 'Won', value: 13, color: '#198754' },
+                        { name: 'Lost', value: 7, color: '#dc3545' },
+                        { name: 'In Progress', value: 31, color: '#6c757d' }
+                      ]}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={({ name, percent }: any) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                      outerRadius={80}
+                      fill="#8884d8"
+                      dataKey="value"
+                    >
+                      {[
+                        { name: 'Won', value: 13, color: '#198754' },
+                        { name: 'Lost', value: 7, color: '#dc3545' },
+                        { name: 'In Progress', value: 31, color: '#6c757d' }
+                      ].map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="text-center mt-2">
+                  <small className="text-muted">Win Rate: <strong className="text-success">65%</strong></small>
+                </div>
+              </Card.Body>
+            </Card>
+          </Col>
+          <Col md={6} className="mb-3">
+            <Card className="border-0 shadow-sm h-100">
+              <Card.Body>
+                <h6 className="fw-bold mb-3">Deals by Industry</h6>
+                <ResponsiveContainer width="100%" height={250}>
+                  <BarChart
+                    data={[
+                      { industry: 'Technology', count: 18 },
+                      { industry: 'Finance', count: 14 },
+                      { industry: 'Healthcare', count: 9 },
+                      { industry: 'Retail', count: 6 },
+                      { industry: 'Other', count: 4 }
+                    ]}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="industry" />
+                    <YAxis />
+                    <Tooltip />
+                    <Bar dataKey="count" fill="#6f42c1" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </Card.Body>
+            </Card>
+          </Col>
+        </Row>
+          </>
+        )}
+
+        {/* Filter Bar  deals*/}
+        <FilterBar
+         quickFilters={[
+          { id: 'all', label: 'All Deals', count: 51, color: '#6c757d', activeColor: '#0d6efd', icon: <Users size={16} /> },
+          { id: 'negotiation', label: 'Negotiation', count: 8, color: '#0dcaf0', activeColor: '#0d6efd', icon: <DollarSign size={16} /> },
+          { id: 'proposal', label: 'Proposal', count: 15, color: '#0d6efd', activeColor: '#0d6efd', icon: <FileText size={16} /> },
+          { id: 'high-value', label: 'High Value (>£50k)', count: 12, color: '#198754', activeColor: '#0d6efd', icon: <Star size={16} /> },
+          { id: 'closing-soon', label: 'Closing This Month', count: 6, color: '#ffc107', activeColor: '#0d6efd', icon: <Calendar size={16} /> },
+          { id: 'won', label: 'Won', count: 13, color: '#198754', activeColor: '#0d6efd', icon: <CheckCircle size={16} /> }
+        ]}
+          activeFilter={activeFilter}
+          onFilterChange={(filterId) => setActiveFilter(filterId)}
+          searchValue={dealsSearch}
+          onSearchChange={(value) => setDealsSearch(value)}
+          onSearch={() => console.log('Searching deals:', dealsSearch)}
+          searchPlaceholder="Search deals by name, company..."
+          showAdvancedFilters={showAdvancedFilters}
+          onToggleAdvancedFilters={() => setShowAdvancedFilters(!showAdvancedFilters)}
+          advancedFilterCount={Object.values(dealsFilters).reduce((sum: number, arr: any) => sum + (Array.isArray(arr) ? arr.length : 0), 0)}
+        />
+
+        {/* Advanced Filters */}
+        {showAdvancedFilters && (
+          <Card className="border-0 shadow-sm mb-4">
+            <Card.Body>
+              <Row className="g-3 align-items-end">
+                <Col md={2}>
+                  <Form.Label className="small fw-bold mb-2">Stage</Form.Label>
+                  <Select
+                    isMulti
+                    options={[
+                      { value: 'Meeting', label: 'Meeting' },
+                      { value: 'Proposal', label: 'Proposal' },
+                      { value: 'Negotiation', label: 'Negotiation' },
+                      { value: 'Contract Sent', label: 'Contract Sent' },
+                      { value: 'Won', label: 'Won' },
+                      { value: 'Lost', label: 'Lost' }
+                    ]}
+                    value={dealsFilters.stage.map(s => ({ value: s, label: s }))}
+                    onChange={(selected) => {
+                      setDealsFilters(prev => ({
+                        ...prev,
+                        stage: selected ? selected.map(s => s.value) : []
+                      }));
+                    }}
+                    placeholder="Select..."
+                    styles={customSelectStyles}
+                  />
+                </Col>
+                <Col md={2}>
+                  <Form.Label className="small fw-bold mb-2">Deal Type</Form.Label>
+                  <Select
+                    isMulti
+                    options={[
+                      { value: 'New Sale', label: 'New Sale' },
+                      { value: 'Migration', label: 'Migration' },
+                      { value: 'Renewal', label: 'Renewal' },
+                      { value: 'Upsell', label: 'Upsell' }
+                    ]}
+                    value={dealsFilters.dealType.map(t => ({ value: t, label: t }))}
+                    onChange={(selected) => {
+                      setDealsFilters(prev => ({
+                        ...prev,
+                        dealType: selected ? selected.map(s => s.value) : []
+                      }));
+                    }}
+                    placeholder="Select..."
+                    styles={customSelectStyles}
+                  />
+                </Col>
+                <Col md={2}>
+                  <Form.Label className="small fw-bold mb-2">Owner</Form.Label>
+                  <Select
+                    isMulti
+                    options={[
+                      { value: 'Jane Doe', label: 'Jane Doe' },
+                      { value: 'John Doe', label: 'John Doe' },
+                      { value: 'Sarah Smith', label: 'Sarah Smith' },
+                      { value: 'Mike Johnson', label: 'Mike Johnson' }
+                    ]}
+                    value={dealsFilters.owner.map(o => ({ value: o, label: o }))}
+                    onChange={(selected) => {
+                      setDealsFilters(prev => ({
+                        ...prev,
+                        owner: selected ? selected.map(s => s.value) : []
+                      }));
+                    }}
+                    placeholder="Select..."
+                    styles={customSelectStyles}
+                  />
+                </Col>
+                <Col md={2}>
+                  <Form.Label className="small fw-bold mb-2">Min Value (£)</Form.Label>
+                  <Form.Control 
+                    type="number" 
+                    size="sm"
+                    placeholder="0"
+                    value={dealsFilters.minValue}
+                    onChange={(e) => setDealsFilters(prev => ({
+                      ...prev,
+                      minValue: e.target.value
+                    }))}
+                  />
+                </Col>
+                <Col md={2}>
+                  <Form.Label className="small fw-bold mb-2">Close Date</Form.Label>
+                  <Form.Control 
+                    type="date" 
+                    size="sm"
+                    value={dealsFilters.closeDate}
+                    onChange={(e) => setDealsFilters(prev => ({
+                      ...prev,
+                      closeDate: e.target.value
+                    }))}
+                  />
+                </Col>
+                <Col md={2}>
+                  <div className="d-flex gap-2">
+                    <Button 
+                      variant="primary" 
+                     
+                      className="flex-grow-1"
+                      onClick={() => {
+                        console.log('Applying filters:', dealsFilters);
+                      }}
+                    >
+                      Apply
+                    </Button>
+                    <Button 
+                      variant="outline-secondary" 
+                      
+                      onClick={() => {
+                        setDealsFilters({
+                          stage: [],
+                          dealType: [],
+                          owner: [],
+                          industry: [],
+                          riskLevel: [],
+                          minValue: '',
+                          closeDate: ''
+                        });
+                      }}
+                    >
+                      Reset
+                    </Button>
+                  </div>
+                </Col>
+              </Row>
+            </Card.Body>
+          </Card>
+        )}
+
+        {/* Bulk Actions and Column Customization - Deals */}
+        <div className="d-flex justify-content-end gap-2 mb-3">
+          {/* Bulk Actions Dropdown - Only show when items are selected */}
+          {selectedDeals.length > 0 && (
+            <Dropdown>
+              <Dropdown.Toggle variant="outline-primary" size="sm">
+                <CheckSquare size={16} className="me-2" />
+                Bulk Actions ({selectedDeals.length})
+              </Dropdown.Toggle>
+              <Dropdown.Menu align="end">
+                <Dropdown.Item 
+                  onClick={() => {
+                    setConfirmAction({
+                      type: 'delete',
+                      data: { 
+                        itemType: 'Deals', 
+                        name: `${selectedDeals.length} selected deals`,
+                        count: selectedDeals.length
+                      }
+                    });
+                    setShowConfirmDialog(true);
+                  }}
+                  className="d-flex align-items-center text-danger"
+                >
+                  <Trash2 size={14} className="me-2" />
+                  Delete Selected ({selectedDeals.length})
+                </Dropdown.Item>
+              </Dropdown.Menu>
+            </Dropdown>
+          )}
+
+          {/* Column Customization */}
+          <Dropdown>
+            <Dropdown.Toggle variant="outline-secondary" size="sm">
+              <Layers size={16} className="me-2" />
+              Customize Table
+            </Dropdown.Toggle>
+            <Dropdown.Menu align="end" style={{ maxHeight: '300px', overflowY: 'auto' }}>
+              {[
+                { key: 'dealName', label: 'Deal Name' },
+                { key: 'company', label: 'Company' },
+                { key: 'value', label: 'Value' },
+                { key: 'stage', label: 'Stage' },
+                { key: 'dealType', label: 'Deal Type' },
+                { key: 'owner', label: 'Owner' },
+                { key: 'industry', label: 'Industry' },
+                { key: 'probability', label: 'Probability' },
+                { key: 'closeDate', label: 'Close Date' },
+                { key: 'created', label: 'Created' }
+              ].map((col) => (
+                <Dropdown.Item key={col.key} as="div">
+                  <Form.Check
+                    type="checkbox"
+                    label={col.label}
+                    checked={selectedDealsColumns.includes(col.key)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedDealsColumns([...selectedDealsColumns, col.key]);
+                      } else {
+                        setSelectedDealsColumns(selectedDealsColumns.filter(c => c !== col.key));
+                      }
+                    }}
+                  />
+                </Dropdown.Item>
+              ))}
+              <Dropdown.Divider />
+              <Dropdown.Item onClick={() => setSelectedDealsColumns(['dealName', 'company', 'value', 'stage', 'dealType', 'owner', 'industry', 'probability', 'closeDate', 'created'])}>
+                Select All
+              </Dropdown.Item>
+              <Dropdown.Item onClick={() => {
+                setSelectedDealsColumns(['dealName', 'company', 'value', 'stage', 'dealType', 'owner', 'industry', 'probability', 'closeDate', 'created']);
+              }}>
+                Reset to Default
+              </Dropdown.Item>
+            </Dropdown.Menu>
+          </Dropdown>
+        </div>
+
         {/* Deals Table */}
         <Card className="border-0 shadow-sm">
-          <Card.Body>
-            <div className="d-flex justify-content-between align-items-center mb-3">
-              <h5 className="mb-0 fw-bold">Deals Pipeline</h5>
-              <div className="d-flex gap-2">
-                <Button variant="outline-primary" size="sm">
-                  <Filter size={16} className="me-1" />
-                  Filter
-                </Button>
-                <Button variant="outline-success" size="sm">
-                  <Download size={16} className="me-1" />
-                  Export
-                </Button>
-              </div>
-            </div>
-            <Table responsive hover>
+          <Card.Body className="p-0">
+            <div className="table-responsive">
+            <Table hover className="mb-0">
               <thead className="bg-light">
                 <tr>
-                  <th>
-                    <Form.Check type="checkbox" />
+                  <th style={{ width: '50px' }}>
+                    <Form.Check
+                      type="checkbox"
+                      checked={(() => {
+                        const filtered = dealsData.filter(deal => {
+                          if (activeFilter === 'negotiation') {
+                            if (deal.stage !== 'Negotiation') return false;
+                          } else if (activeFilter === 'proposal') {
+                            if (deal.stage !== 'Proposal') return false;
+                          } else if (activeFilter === 'high-value') {
+                            const value = parseInt(deal.dealValue.replace(/[£,]/g, ''));
+                            if (value <= 50000) return false;
+                          } else if (activeFilter === 'closing-soon') {
+                            const currentMonth = new Date().getMonth();
+                            const currentYear = new Date().getFullYear();
+                            const closeDate = new Date(deal.expectedCloseDate);
+                            if (closeDate.getMonth() !== currentMonth || closeDate.getFullYear() !== currentYear) return false;
+                          } else if (activeFilter === 'won') {
+                            if (deal.stage !== 'Won') return false;
+                          }
+                          
+                          const searchLower = dealsSearch.toLowerCase();
+                          const matchesSearch = !dealsSearch ||
+                            deal.name.toLowerCase().includes(searchLower) ||
+                            deal.company.toLowerCase().includes(searchLower);
+                          
+                          const matchesStage = dealsFilters.stage.length === 0 || dealsFilters.stage.includes(deal.stage);
+                          const matchesDealType = dealsFilters.dealType.length === 0 || dealsFilters.dealType.includes(deal.dealType);
+                          const matchesOwner = dealsFilters.owner.length === 0 || dealsFilters.owner.includes(deal.owner);
+                          const matchesIndustry = dealsFilters.industry.length === 0 || dealsFilters.industry.includes(deal.industry);
+                          const matchesMinValue = !dealsFilters.minValue || parseInt(deal.dealValue.replace(/[£,]/g, '')) >= parseInt(dealsFilters.minValue);
+                          const matchesCloseDate = !dealsFilters.closeDate || new Date(deal.expectedCloseDate) <= new Date(dealsFilters.closeDate);
+                          
+                          return matchesSearch && matchesStage && matchesDealType && matchesOwner && matchesIndustry && matchesMinValue && matchesCloseDate;
+                        });
+                        const sorted = sortData(filtered, dealsPagination.sortColumn, dealsPagination.sortDirection);
+                        const paginated = paginateData(sorted, dealsPagination.currentPage, dealsPagination.rowsPerPage);
+                        return paginated.length > 0 && paginated.every(d => selectedDeals.includes(d.id));
+                      })()}
+                      onChange={(e) => {
+                        const filtered = dealsData.filter(deal => {
+                          if (activeFilter === 'negotiation') {
+                            if (deal.stage !== 'Negotiation') return false;
+                          } else if (activeFilter === 'proposal') {
+                            if (deal.stage !== 'Proposal') return false;
+                          } else if (activeFilter === 'high-value') {
+                            const value = parseInt(deal.dealValue.replace(/[£,]/g, ''));
+                            if (value <= 50000) return false;
+                          } else if (activeFilter === 'closing-soon') {
+                            const currentMonth = new Date().getMonth();
+                            const currentYear = new Date().getFullYear();
+                            const closeDate = new Date(deal.expectedCloseDate);
+                            if (closeDate.getMonth() !== currentMonth || closeDate.getFullYear() !== currentYear) return false;
+                          } else if (activeFilter === 'won') {
+                            if (deal.stage !== 'Won') return false;
+                          }
+                          
+                          const searchLower = dealsSearch.toLowerCase();
+                          const matchesSearch = !dealsSearch ||
+                            deal.name.toLowerCase().includes(searchLower) ||
+                            deal.company.toLowerCase().includes(searchLower);
+                          
+                          const matchesStage = dealsFilters.stage.length === 0 || dealsFilters.stage.includes(deal.stage);
+                          const matchesDealType = dealsFilters.dealType.length === 0 || dealsFilters.dealType.includes(deal.dealType);
+                          const matchesOwner = dealsFilters.owner.length === 0 || dealsFilters.owner.includes(deal.owner);
+                          const matchesIndustry = dealsFilters.industry.length === 0 || dealsFilters.industry.includes(deal.industry);
+                          const matchesMinValue = !dealsFilters.minValue || parseInt(deal.dealValue.replace(/[£,]/g, '')) >= parseInt(dealsFilters.minValue);
+                          const matchesCloseDate = !dealsFilters.closeDate || new Date(deal.expectedCloseDate) <= new Date(dealsFilters.closeDate);
+                          
+                          return matchesSearch && matchesStage && matchesDealType && matchesOwner && matchesIndustry && matchesMinValue && matchesCloseDate;
+                        });
+                        const sorted = sortData(filtered, dealsPagination.sortColumn, dealsPagination.sortDirection);
+                        const paginated = paginateData(sorted, dealsPagination.currentPage, dealsPagination.rowsPerPage);
+                        
+                        if (e.target.checked) {
+                          setSelectedDeals(paginated.map(d => d.id));
+                        } else {
+                          setSelectedDeals([]);
+                        }
+                      }}
+                    />
                   </th>
-                  <th>Deal Name</th>
-                  <th>Company</th>
-                  <th>Stage</th>
-                  <th>Deal Type</th>
-                  <th>Value</th>
-                  <th>Probability</th>
-                  <th>Expected Close</th>
-                  <th>Owner</th>
+                  {selectedDealsColumns.includes('dealName') && <th>Deal Name</th>}
+                  {selectedDealsColumns.includes('company') && <th>Company</th>}
+                  {selectedDealsColumns.includes('stage') && <th>Stage</th>}
+                  {selectedDealsColumns.includes('dealType') && <th>Deal Type</th>}
+                  {selectedDealsColumns.includes('value') && <th>Value</th>}
+                  {selectedDealsColumns.includes('probability') && <th>Probability</th>}
+                  {selectedDealsColumns.includes('closeDate') && <th>Expected Close</th>}
+                  {selectedDealsColumns.includes('owner') && <th>Owner</th>}
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {dealsData.map((deal) => (
-                  <tr key={deal.id}>
-                    <td>
-                      <Form.Check type="checkbox" />
-                    </td>
-                    <td className="fw-semibold">{deal.name}</td>
-                    <td>
-                      <div>
-                        <div className="fw-medium">{deal.company}</div>
-                        <small className="text-muted">{deal.industry}</small>
-                      </div>
-                    </td>
-                    <td>
-                      <Badge 
-                        bg={
-                          deal.stage === 'Negotiation' ? 'warning' :
-                          deal.stage === 'Proposal' ? 'info' :
-                          deal.stage === 'Won' ? 'success' :
-                          'secondary'
-                        }
-                      >
-                        {deal.stage}
-                      </Badge>
-                    </td>
-                    <td>
-                      <Badge bg="primary" className="bg-opacity-10 text-dark">
-                        {deal.dealType}
-                      </Badge>
-                    </td>
-                    <td className="fw-semibold">{deal.dealValue}</td>
-                    <td>
-                      <div className="d-flex align-items-center gap-2">
-                        <ProgressBar 
-                          now={deal.probability} 
-                          style={{ width: '60px', height: '8px' }}
+                {(() => {
+                  // Filter deals based on active filter, search, and advanced filters
+                  let filteredDeals = dealsData.filter(deal => {
+                    // Quick filters
+                    if (activeFilter === 'negotiation') {
+                      if (deal.stage !== 'Negotiation') return false;
+                    } else if (activeFilter === 'proposal') {
+                      if (deal.stage !== 'Proposal') return false;
+                    } else if (activeFilter === 'high-value') {
+                      const value = parseInt(deal.dealValue.replace(/[£,]/g, ''));
+                      if (value <= 50000) return false;
+                    } else if (activeFilter === 'closing-soon') {
+                      const currentMonth = new Date().getMonth();
+                      const currentYear = new Date().getFullYear();
+                      const closeDate = new Date(deal.expectedCloseDate);
+                      if (closeDate.getMonth() !== currentMonth || closeDate.getFullYear() !== currentYear) return false;
+                    } else if (activeFilter === 'won') {
+                      if (deal.stage !== 'Won') return false;
+                    }
+                    
+                    // Search filter
+                    const searchLower = dealsSearch.toLowerCase();
+                    const matchesSearch = !dealsSearch || 
+                      deal.name.toLowerCase().includes(searchLower) ||
+                      deal.company.toLowerCase().includes(searchLower);
+                    
+                    // Advanced filters
+                    const matchesStage = dealsFilters.stage.length === 0 || 
+                      dealsFilters.stage.includes(deal.stage);
+                    const matchesDealType = dealsFilters.dealType.length === 0 || 
+                      dealsFilters.dealType.includes(deal.dealType);
+                    const matchesOwner = dealsFilters.owner.length === 0 || 
+                      dealsFilters.owner.includes(deal.owner);
+                    const matchesIndustry = dealsFilters.industry.length === 0 || 
+                      dealsFilters.industry.includes(deal.industry);
+                    const matchesMinValue = !dealsFilters.minValue || 
+                      parseInt(deal.dealValue.replace(/[£,]/g, '')) >= parseInt(dealsFilters.minValue);
+                    const matchesCloseDate = !dealsFilters.closeDate || 
+                      new Date(deal.expectedCloseDate) <= new Date(dealsFilters.closeDate);
+                    
+                    return matchesSearch && matchesStage && matchesDealType && 
+                      matchesOwner && matchesIndustry && matchesMinValue && matchesCloseDate;
+                  });
+                  
+                  const sorted = sortData(filteredDeals, dealsPagination.sortColumn, dealsPagination.sortDirection);
+                  const paginated = paginateData(sorted, dealsPagination.currentPage, dealsPagination.rowsPerPage);
+                  
+                  if (filteredDeals.length === 0) {
+                    return (
+                      <tr>
+                        <td colSpan={selectedDealsColumns.length + 2} className="text-center py-4 text-muted">
+                          No deals found matching your criteria
+                        </td>
+                      </tr>
+                    );
+                  }
+                  
+                  return paginated.map((deal) => (
+                    <tr key={deal.id}>
+                      <td>
+                        <Form.Check
+                          type="checkbox"
+                          checked={selectedDeals.includes(deal.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedDeals([...selectedDeals, deal.id]);
+                            } else {
+                              setSelectedDeals(selectedDeals.filter(id => id !== deal.id));
+                            }
+                          }}
                         />
-                        <small>{deal.probability}%</small>
-                      </div>
-                    </td>
-                    <td>{deal.expectedCloseDate}</td>
-                    <td>{deal.owner}</td>
-                    <td>
-                      <div className="d-flex gap-1">
-                        <Button 
-                          variant="link" 
-                          size="sm" 
-                          className="p-1" 
-                          title="View"
-                          onClick={() => {
-                            setViewingDeal(deal);
-                            setShowDealViewModal(true);
-                          }}
-                        >
-                          <Eye size={16} />
-                        </Button>
-                        <Button 
-                          variant="link" 
-                          size="sm" 
-                          className="p-1" 
-                          title="Edit"
-                          onClick={() => {
-                            setEditingDeal(deal);
-                            setShowDealFormModal(true);
-                          }}
-                        >
-                          <Edit size={16} />
-                        </Button>
-                        <Button 
-                          variant="link" 
-                          size="sm" 
-                          className="p-1 text-success" 
-                          title="Convert to Order"
-                          onClick={() => {
-                            setConfirmAction({
-                              type: 'convert-order',
-                              data: { ...deal, itemType: 'Deal' }
-                            });
-                            setShowConfirmDialog(true);
-                          }}
-                        >
-                          <ShoppingBag size={16} />
-                        </Button>
-                        <Button 
-                          variant="link" 
-                          size="sm" 
-                          className="p-1 text-danger" 
-                          title="Delete"
-                          onClick={() => {
-                            setConfirmAction({
-                              type: 'delete',
-                              data: { ...deal, itemType: 'Deal' }
-                            });
-                            setShowConfirmDialog(true);
-                          }}
-                        >
-                          <Trash2 size={16} />
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      {selectedDealsColumns.includes('dealName') && (
+                        <td className="fw-semibold">{deal.name}</td>
+                      )}
+                      {selectedDealsColumns.includes('company') && (
+                        <td>
+                          <div>
+                            <div className="fw-medium">{deal.company}</div>
+                            <small className="text-muted">{deal.industry}</small>
+                          </div>
+                        </td>
+                      )}
+                      {selectedDealsColumns.includes('stage') && (
+                        <td>
+                          <Badge 
+                            bg={
+                              deal.stage === 'Negotiation' ? 'warning' :
+                              deal.stage === 'Proposal' ? 'info' :
+                              deal.stage === 'Won' ? 'success' :
+                              'secondary'
+                            }
+                          >
+                            {deal.stage}
+                          </Badge>
+                        </td>
+                      )}
+                      {selectedDealsColumns.includes('dealType') && (
+                        <td>
+                          <Badge bg="primary" className="bg-opacity-10 text-dark">
+                            {deal.dealType}
+                          </Badge>
+                        </td>
+                      )}
+                      {selectedDealsColumns.includes('value') && (
+                        <td className="fw-semibold">{deal.dealValue}</td>
+                      )}
+                      {selectedDealsColumns.includes('probability') && (
+                        <td>
+                          <div className="d-flex align-items-center gap-2">
+                            <ProgressBar 
+                              now={deal.probability} 
+                              style={{ width: '60px', height: '8px' }}
+                            />
+                            <small>{deal.probability}%</small>
+                          </div>
+                        </td>
+                      )}
+                      {selectedDealsColumns.includes('closeDate') && (
+                        <td>{deal.expectedCloseDate}</td>
+                      )}
+                      {selectedDealsColumns.includes('owner') && (
+                        <td>{deal.owner}</td>
+                      )}
+                      <td>
+                        <div className="d-flex gap-1">
+                          <Button 
+                            variant="link" 
+                            size="sm" 
+                            className="p-1" 
+                            title="View"
+                            onClick={() => {
+                              setViewingDeal(deal);
+                              setShowDealViewModal(true);
+                            }}
+                          >
+                            <Eye size={16} />
+                          </Button>
+                          <Button 
+                            variant="link" 
+                            size="sm" 
+                            className="p-1" 
+                            title="Edit"
+                            onClick={() => {
+                              setEditingDeal(deal);
+                              setShowDealFormModal(true);
+                            }}
+                          >
+                            <Edit size={16} />
+                          </Button>
+                          <Button 
+                            variant="link" 
+                            size="sm" 
+                            className="p-1 text-success" 
+                            title="Convert to Order"
+                            onClick={() => {
+                              setConfirmAction({
+                                type: 'convert-order',
+                                data: { ...deal, itemType: 'Deal' }
+                              });
+                              setShowConfirmDialog(true);
+                            }}
+                          >
+                            <ShoppingBag size={16} />
+                          </Button>
+                          <Button 
+                            variant="link" 
+                            size="sm" 
+                            className="p-1 text-danger" 
+                            title="Delete"
+                            onClick={() => {
+                              setConfirmAction({
+                                type: 'delete',
+                                data: { ...deal, itemType: 'Deal' }
+                              });
+                              setShowConfirmDialog(true);
+                            }}
+                          >
+                            <Trash2 size={16} />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ));
+                })()}
               </tbody>
             </Table>
-            <div className="d-flex justify-content-between align-items-center mt-3">
-              <small className="text-muted">Showing 1 to {dealsData.length} of {dealsData.length} total deals</small>
-              <div className="d-flex gap-2">
-                <Button variant="outline-secondary" size="sm" disabled>
-                  <ChevronLeft size={16} />
-                  Previous
-                </Button>
-                <Button variant="outline-secondary" size="sm" disabled>
-                  Next
-                  <ChevronRight size={16} />
-                </Button>
-              </div>
+            </div>
+            <div className="p-3">
+            {(() => {
+              let filteredDeals = dealsData.filter(deal => {
+                if (activeFilter === 'negotiation') {
+                  if (deal.stage !== 'Negotiation') return false;
+                } else if (activeFilter === 'proposal') {
+                  if (deal.stage !== 'Proposal') return false;
+                } else if (activeFilter === 'high-value') {
+                  const value = parseInt(deal.dealValue.replace(/[£,]/g, ''));
+                  if (value <= 50000) return false;
+                } else if (activeFilter === 'closing-soon') {
+                  const currentMonth = new Date().getMonth();
+                  const currentYear = new Date().getFullYear();
+                  const closeDate = new Date(deal.expectedCloseDate);
+                  if (closeDate.getMonth() !== currentMonth || closeDate.getFullYear() !== currentYear) return false;
+                } else if (activeFilter === 'won') {
+                  if (deal.stage !== 'Won') return false;
+                }
+                
+                const searchLower = dealsSearch.toLowerCase();
+                const matchesSearch = !dealsSearch || 
+                  deal.name.toLowerCase().includes(searchLower) ||
+                  deal.company.toLowerCase().includes(searchLower);
+                
+                const matchesStage = dealsFilters.stage.length === 0 || 
+                  dealsFilters.stage.includes(deal.stage);
+                const matchesDealType = dealsFilters.dealType.length === 0 || 
+                  dealsFilters.dealType.includes(deal.dealType);
+                const matchesOwner = dealsFilters.owner.length === 0 || 
+                  dealsFilters.owner.includes(deal.owner);
+                const matchesIndustry = dealsFilters.industry.length === 0 || 
+                  dealsFilters.industry.includes(deal.industry);
+                const matchesMinValue = !dealsFilters.minValue || 
+                  parseInt(deal.dealValue.replace(/[£,]/g, '')) >= parseInt(dealsFilters.minValue);
+                const matchesCloseDate = !dealsFilters.closeDate || 
+                  new Date(deal.expectedCloseDate) <= new Date(dealsFilters.closeDate);
+                
+                return matchesSearch && matchesStage && matchesDealType && 
+                  matchesOwner && matchesIndustry && matchesMinValue && matchesCloseDate;
+              });
+              
+              return renderPaginationControls(filteredDeals.length, dealsPagination, setDealsPagination, 'deals');
+            })()}
             </div>
           </Card.Body>
         </Card>
@@ -5215,19 +10968,31 @@ const CRMPortal = () => {
         </Modal>
 
         {/* Page Header */}
-        <div className="d-flex justify-content-between align-items-center mb-4">
-          <div>
+        <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4">
+          <div className="mb-3 mb-md-0">
             <h2 className="mb-1 fw-bold">Orders Management</h2>
             <p className="text-muted mb-0">Track and fulfill customer orders</p>
           </div>
-          <Button variant="primary" onClick={() => setShowOrderFormModal(true)}>
-            <Plus size={16} className="me-2" />
-            Add Order
-          </Button>
+          <div className="d-flex flex-wrap gap-2">
+            <Button 
+              variant={showOrdersAnalytics ? "primary" : "outline-secondary"}
+              onClick={() => setShowOrdersAnalytics(!showOrdersAnalytics)}
+            >
+              <BarChart3 size={16} className="me-2" />
+              {showOrdersAnalytics ? 'Hide Analytics' : 'Show Analytics'}
+            </Button>
+            <Button variant="primary" onClick={() => setShowOrderFormModal(true)}>
+              <Plus size={16} className="me-2" />
+              Add Order
+            </Button>
+          </div>
         </div>
 
-        {/* Summary Stats using KPICard */}
-        <Row className="mb-4">
+        {/* Analytics Section - Collapsible */}
+        {showOrdersAnalytics && (
+          <>
+            {/* Summary Stats using KPICard */}
+            <Row className="mb-4">
           <Col lg={3} md={6} className="mb-3">
             <KPICard 
               title="Total Orders"
@@ -5266,139 +11031,666 @@ const CRMPortal = () => {
           </Col>
         </Row>
 
+        {/* Analytics Charts */}
+        <Row className="mb-4">
+          <Col md={6} className="mb-3">
+            <Card className="border-0 shadow-sm h-100">
+              <Card.Body>
+                <h6 className="fw-bold mb-3">Orders by Status</h6>
+                <ResponsiveContainer width="100%" height={250}>
+                  <PieChart>
+                    <Pie
+                      data={[
+                        { name: 'Delivered', value: 22, color: '#198754' },
+                        { name: 'In Progress', value: 8, color: '#0dcaf0' },
+                        { name: 'Pending Approval', value: 5, color: '#ffc107' }
+                      ]}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={({ name, percent }: any) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                      outerRadius={80}
+                      fill="#8884d8"
+                      dataKey="value"
+                    >
+                      {[
+                        { name: 'Delivered', value: 22, color: '#198754' },
+                        { name: 'In Progress', value: 8, color: '#0dcaf0' },
+                        { name: 'Pending Approval', value: 5, color: '#ffc107' }
+                      ].map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              </Card.Body>
+            </Card>
+          </Col>
+          <Col md={6} className="mb-3">
+            <Card className="border-0 shadow-sm h-100">
+              <Card.Body>
+                <h6 className="fw-bold mb-3">Order Value Trend (Last 6 Months)</h6>
+                <ResponsiveContainer width="100%" height={250}>
+                  <BarChart
+                    data={[
+                      { month: 'Jun', value: 125 },
+                      { month: 'Jul', value: 142 },
+                      { month: 'Aug', value: 138 },
+                      { month: 'Sep', value: 165 },
+                      { month: 'Oct', value: 178 },
+                      { month: 'Nov', value: 195 }
+                    ]}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="month" />
+                    <YAxis />
+                    <Tooltip formatter={(value) => `£${value}K`} />
+                    <Bar dataKey="value" fill="#198754" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </Card.Body>
+            </Card>
+          </Col>
+          <Col md={6} className="mb-3">
+            <Card className="border-0 shadow-sm h-100">
+              <Card.Body>
+                <h6 className="fw-bold mb-3">Fulfillment Status</h6>
+                <ResponsiveContainer width="100%" height={250}>
+                  <PieChart>
+                    <Pie
+                      data={[
+                        { name: 'Completed', value: 22, color: '#198754' },
+                        { name: 'In Progress', value: 8, color: '#0d6efd' },
+                        { name: 'Pending', value: 5, color: '#ffc107' }
+                      ]}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={({ name, percent }: any) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                      outerRadius={80}
+                      fill="#8884d8"
+                      dataKey="value"
+                    >
+                      {[
+                        { name: 'Completed', value: 22, color: '#198754' },
+                        { name: 'In Progress', value: 8, color: '#0d6efd' },
+                        { name: 'Pending', value: 5, color: '#ffc107' }
+                      ].map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              </Card.Body>
+            </Card>
+          </Col>
+          <Col md={6} className="mb-3">
+            <Card className="border-0 shadow-sm h-100">
+              <Card.Body>
+                <h6 className="fw-bold mb-3">Orders by Priority</h6>
+                <ResponsiveContainer width="100%" height={250}>
+                  <BarChart
+                    data={[
+                      { priority: 'High', count: 12 },
+                      { priority: 'Medium', count: 15 },
+                      { priority: 'Low', count: 8 }
+                    ]}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="priority" />
+                    <YAxis />
+                    <Tooltip />
+                    <Bar dataKey="count" fill="#dc3545" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </Card.Body>
+            </Card>
+          </Col>
+        </Row>
+          </>
+        )}
+
+        {/* Orders Filter Bar */}
+        <FilterBar
+          quickFilters={[
+            { id: 'all', label: 'All Orders', count: 35, color: '#6c757d', activeColor: '#0d6efd', icon: <ShoppingCart size={16} /> },
+            { id: 'pending-approval', label: 'Pending Approval', count: 5, color: '#ffc107', activeColor: '#0d6efd', icon: <AlertTriangle size={16} /> },
+            { id: 'in-progress', label: 'In Progress', count: 8, color: '#0dcaf0', activeColor: '#0d6efd', icon: <RefreshCw size={16} /> },
+            { id: 'delivered', label: 'Delivered', count: 22, color: '#198754', activeColor: '#0d6efd', icon: <CheckCircle size={16} /> },
+            { id: 'high-priority', label: 'High Priority', count: 12, color: '#dc3545', activeColor: '#0d6efd', icon: <Star size={16} /> }
+          ]}
+          activeFilter={activeFilter}
+          onFilterChange={(filterId) => setActiveFilter(filterId)}
+          searchValue={ordersSearch}
+          onSearchChange={(value) => setOrdersSearch(value)}
+          onSearch={() => console.log('Searching orders:', ordersSearch)}
+          searchPlaceholder="Search orders by ID, deal name..."
+          showAdvancedFilters={showAdvancedFilters}
+          onToggleAdvancedFilters={() => setShowAdvancedFilters(!showAdvancedFilters)}
+          advancedFilterCount={
+            ordersFilters.stage.length +
+            ordersFilters.approvalStatus.length +
+            ordersFilters.priority.length +
+            ordersFilters.fulfillmentStatus.length +
+            ordersFilters.billingStatus.length
+          }
+        />
+
+        {/* Orders Advanced Filters */}
+        {showAdvancedFilters && (
+          <Card className="border-0 shadow-sm mb-4">
+            <Card.Body>
+              <Row className="g-3 align-items-end">
+                <Col md={2}>
+                  <Form.Label className="small fw-bold mb-2">Stage</Form.Label>
+                  <Select
+                    isMulti
+                    options={[
+                      { value: 'Quote', label: 'Quote' },
+                      { value: 'Proposal', label: 'Proposal' },
+                      { value: 'Contract', label: 'Contract' },
+                      { value: 'Active', label: 'Active' },
+                      { value: 'Fulfilled', label: 'Fulfilled' }
+                    ]}
+                    value={ordersFilters.stage.map(s => ({ value: s, label: s }))}
+                    onChange={(selected) => {
+                      setOrdersFilters(prev => ({
+                        ...prev,
+                        stage: selected ? selected.map(s => s.value) : []
+                      }));
+                    }}
+                    placeholder="Select stages..."
+                    styles={customSelectStyles}
+                  />
+                </Col>
+                <Col md={2}>
+                  <Form.Label className="small fw-bold mb-2">Approval Status</Form.Label>
+                  <Select
+                    isMulti
+                    options={[
+                      { value: 'Pending', label: 'Pending' },
+                      { value: 'Approved', label: 'Approved' },
+                      { value: 'Rejected', label: 'Rejected' }
+                    ]}
+                    value={ordersFilters.approvalStatus.map(s => ({ value: s, label: s }))}
+                    onChange={(selected) => {
+                      setOrdersFilters(prev => ({
+                        ...prev,
+                        approvalStatus: selected ? selected.map(s => s.value) : []
+                      }));
+                    }}
+                    placeholder="Select status..."
+                    styles={customSelectStyles}
+                  />
+                </Col>
+                <Col md={2}>
+                  <Form.Label className="small fw-bold mb-2">Priority</Form.Label>
+                  <Select
+                    isMulti
+                    options={[
+                      { value: 'High', label: 'High' },
+                      { value: 'Medium', label: 'Medium' },
+                      { value: 'Low', label: 'Low' }
+                    ]}
+                    value={ordersFilters.priority.map(p => ({ value: p, label: p }))}
+                    onChange={(selected) => {
+                      setOrdersFilters(prev => ({
+                        ...prev,
+                        priority: selected ? selected.map(s => s.value) : []
+                      }));
+                    }}
+                    placeholder="Select priority..."
+                    styles={customSelectStyles}
+                  />
+                </Col>
+                <Col md={2}>
+                  <Form.Label className="small fw-bold mb-2">Fulfillment Status</Form.Label>
+                  <Select
+                    isMulti
+                    options={[
+                      { value: 'Pending', label: 'Pending' },
+                      { value: 'In Progress', label: 'In Progress' },
+                      { value: 'Completed', label: 'Completed' }
+                    ]}
+                    value={ordersFilters.fulfillmentStatus.map(s => ({ value: s, label: s }))}
+                    onChange={(selected) => {
+                      setOrdersFilters(prev => ({
+                        ...prev,
+                        fulfillmentStatus: selected ? selected.map(s => s.value) : []
+                      }));
+                    }}
+                    placeholder="Select status..."
+                    styles={customSelectStyles}
+                  />
+                </Col>
+                <Col md={2}>
+                  <Form.Label className="small fw-bold mb-2">Billing Status</Form.Label>
+                  <Select
+                    isMulti
+                    options={[
+                      { value: 'Pending', label: 'Pending' },
+                      { value: 'Paid', label: 'Paid' },
+                      { value: 'Partially Paid', label: 'Partially Paid' }
+                    ]}
+                    value={ordersFilters.billingStatus.map(s => ({ value: s, label: s }))}
+                    onChange={(selected) => {
+                      setOrdersFilters(prev => ({
+                        ...prev,
+                        billingStatus: selected ? selected.map(s => s.value) : []
+                      }));
+                    }}
+                    placeholder="Select status..."
+                    styles={customSelectStyles}
+                  />
+                </Col>
+                <Col md={2}>
+                  <div className="d-flex gap-2">
+                    <Button 
+                      variant="primary" 
+                      
+                      className="flex-grow-1"
+                      onClick={() => {
+                        // Apply filters - they are already applied in real-time
+                        console.log('Applying orders filters');
+                      }}
+                    >
+                      Apply
+                    </Button>
+                    <Button 
+                      variant="outline-secondary" 
+                      
+                      onClick={() => {
+                        setOrdersFilters({
+                          stage: [],
+                          approvalStatus: [],
+                          priority: [],
+                          fulfillmentStatus: [],
+                          billingStatus: []
+                        });
+                      }}
+                    >
+                      Reset
+                    </Button>
+                  </div>
+                </Col>
+              </Row>
+            </Card.Body>
+          </Card>
+        )}
+
+        {/* Bulk Actions and Column Customization - Orders */}
+        <div className="d-flex justify-content-end gap-2 mb-3">
+          {/* Bulk Actions Dropdown - Only show when items are selected */}
+          {selectedOrders.length > 0 && (
+            <Dropdown>
+              <Dropdown.Toggle variant="outline-primary" size="sm">
+                <CheckSquare size={16} className="me-2" />
+                Bulk Actions ({selectedOrders.length})
+              </Dropdown.Toggle>
+              <Dropdown.Menu align="end">
+                <Dropdown.Item 
+                  onClick={() => {
+                    setConfirmAction({
+                      type: 'delete',
+                      data: { 
+                        itemType: 'Orders', 
+                        name: `${selectedOrders.length} selected orders`,
+                        count: selectedOrders.length
+                      }
+                    });
+                    setShowConfirmDialog(true);
+                  }}
+                  className="d-flex align-items-center text-danger"
+                >
+                  <Trash2 size={14} className="me-2" />
+                  Delete Selected ({selectedOrders.length})
+                </Dropdown.Item>
+              </Dropdown.Menu>
+            </Dropdown>
+          )}
+
+          {/* Column Customization */}
+          <Dropdown>
+            <Dropdown.Toggle variant="outline-secondary" size="sm">
+              <Layers size={16} className="me-2" />
+              Customize Table
+            </Dropdown.Toggle>
+            <Dropdown.Menu align="end" style={{ maxHeight: '300px', overflowY: 'auto' }}>
+              {[
+                { key: 'orderId', label: 'Order ID' },
+                { key: 'linkedDeal', label: 'Linked Deal' },
+                { key: 'customer', label: 'Customer (POC)' },
+                { key: 'value', label: 'Value' },
+                { key: 'approval', label: 'Approval' },
+                { key: 'stage', label: 'Stage' },
+                { key: 'fulfillment', label: 'Fulfillment' },
+                { key: 'progress', label: 'Progress' },
+                { key: 'priority', label: 'Priority' },
+                { key: 'orderDate', label: 'Order Date' }
+              ].map((col) => (
+                <Dropdown.Item key={col.key} as="div">
+                  <Form.Check
+                    type="checkbox"
+                    label={col.label}
+                    checked={selectedOrdersColumns.includes(col.key)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedOrdersColumns([...selectedOrdersColumns, col.key]);
+                      } else {
+                        setSelectedOrdersColumns(selectedOrdersColumns.filter(c => c !== col.key));
+                      }
+                    }}
+                  />
+                </Dropdown.Item>
+              ))}
+              <Dropdown.Divider />
+              <Dropdown.Item onClick={() => setSelectedOrdersColumns(['orderId', 'linkedDeal', 'customer', 'value', 'approval', 'stage', 'fulfillment', 'progress', 'priority', 'orderDate'])}>
+                Select All
+              </Dropdown.Item>
+              <Dropdown.Item onClick={() => {
+                setSelectedOrdersColumns(['orderId', 'linkedDeal', 'customer', 'value', 'approval', 'stage', 'fulfillment', 'progress', 'priority', 'orderDate']);
+              }}>
+                Reset to Default
+              </Dropdown.Item>
+            </Dropdown.Menu>
+          </Dropdown>
+        </div>
+
         {/* Orders Table */}
         <Card className="border-0 shadow-sm">
-          <Card.Body>
-            <div className="d-flex justify-content-between align-items-center mb-3">
+          <Card.Body className="p-0">
+            {/* <div className="d-flex justify-content-between align-items-center mb-3 px-3 pt-3">
               <h5 className="mb-0 fw-bold">Orders List</h5>
               <div className="d-flex gap-2">
-                <Button variant="outline-primary" size="sm">
-                  <Filter size={16} className="me-1" />
-                  Filter
-                </Button>
                 <Button variant="outline-success" size="sm">
                   <Download size={16} className="me-1" />
                   Export
                 </Button>
               </div>
-            </div>
-            <Table responsive hover>
-              <thead className="bg-light">
-                <tr>
-                  <th>
-                    <Form.Check type="checkbox" />
-                  </th>
-                  <th>Order ID</th>
-                  <th>Linked Deal</th>
-                  <th>Customer (POC)</th>
-                  <th>Value</th>
-                  <th>Approval</th>
-                  <th>Stage</th>
-                  <th>Fulfillment</th>
-                  <th>Progress</th>
-                  <th>Priority</th>
-                  <th>Order Date</th>
+            </div> */}
+            <div className="table-responsive">
+              <Table hover className="mb-0">
+                <thead className="bg-light">
+                  <tr>
+                    <th style={{ width: '50px' }}>
+                      <Form.Check 
+                        type="checkbox"
+                        checked={(() => {
+                          let filteredOrders = ordersData.filter(order => {
+                            if (activeFilter === 'pending-approval') {
+                              if (order.approvalStatus !== 'Pending') return false;
+                            } else if (activeFilter === 'in-progress') {
+                              if (order.fulfillmentStatus !== 'In Progress') return false;
+                            } else if (activeFilter === 'delivered') {
+                              if (order.fulfillmentStatus !== 'Completed') return false;
+                            } else if (activeFilter === 'high-priority') {
+                              if (order.priority !== 'High' && order.priority !== 'Urgent') return false;
+                            }
+                            
+                            const searchLower = ordersSearch.toLowerCase();
+                            const matchesSearch = !ordersSearch || 
+                              order.id.toLowerCase().includes(searchLower) ||
+                              order.linkedDeal.toLowerCase().includes(searchLower) ||
+                              order.pocName.toLowerCase().includes(searchLower);
+                            
+                            const matchesStage = ordersFilters.stage.length === 0 || 
+                              ordersFilters.stage.includes(order.stage);
+                            const matchesApproval = ordersFilters.approvalStatus.length === 0 || 
+                              ordersFilters.approvalStatus.includes(order.approvalStatus);
+                            const matchesPriority = ordersFilters.priority.length === 0 || 
+                              ordersFilters.priority.includes(order.priority);
+                            const matchesFulfillment = ordersFilters.fulfillmentStatus.length === 0 || 
+                              ordersFilters.fulfillmentStatus.includes(order.fulfillmentStatus);
+                            const matchesBilling = ordersFilters.billingStatus.length === 0 || 
+                              ordersFilters.billingStatus.includes(order.billingStatus);
+                            
+                            return matchesSearch && matchesStage && matchesApproval && 
+                              matchesPriority && matchesFulfillment && matchesBilling;
+                          });
+                          
+                          const sorted = sortData(filteredOrders, ordersPagination.sortColumn, ordersPagination.sortDirection);
+                          const paginated = paginateData(sorted, ordersPagination.currentPage, ordersPagination.rowsPerPage);
+                          return paginated.length > 0 && paginated.every((order: any) => selectedOrders.includes(order.id));
+                        })()}
+                        onChange={(e) => {
+                          let filteredOrders = ordersData.filter(order => {
+                            if (activeFilter === 'pending-approval') {
+                              if (order.approvalStatus !== 'Pending') return false;
+                            } else if (activeFilter === 'in-progress') {
+                              if (order.fulfillmentStatus !== 'In Progress') return false;
+                            } else if (activeFilter === 'delivered') {
+                              if (order.fulfillmentStatus !== 'Completed') return false;
+                            } else if (activeFilter === 'high-priority') {
+                              if (order.priority !== 'High' && order.priority !== 'Urgent') return false;
+                            }
+                            
+                            const searchLower = ordersSearch.toLowerCase();
+                            const matchesSearch = !ordersSearch || 
+                              order.id.toLowerCase().includes(searchLower) ||
+                              order.linkedDeal.toLowerCase().includes(searchLower) ||
+                              order.pocName.toLowerCase().includes(searchLower);
+                            
+                            const matchesStage = ordersFilters.stage.length === 0 || 
+                              ordersFilters.stage.includes(order.stage);
+                            const matchesApproval = ordersFilters.approvalStatus.length === 0 || 
+                              ordersFilters.approvalStatus.includes(order.approvalStatus);
+                            const matchesPriority = ordersFilters.priority.length === 0 || 
+                              ordersFilters.priority.includes(order.priority);
+                            const matchesFulfillment = ordersFilters.fulfillmentStatus.length === 0 || 
+                              ordersFilters.fulfillmentStatus.includes(order.fulfillmentStatus);
+                            const matchesBilling = ordersFilters.billingStatus.length === 0 || 
+                              ordersFilters.billingStatus.includes(order.billingStatus);
+                            
+                            return matchesSearch && matchesStage && matchesApproval && 
+                              matchesPriority && matchesFulfillment && matchesBilling;
+                          });
+                          
+                          const sorted = sortData(filteredOrders, ordersPagination.sortColumn, ordersPagination.sortDirection);
+                          const paginated = paginateData(sorted, ordersPagination.currentPage, ordersPagination.rowsPerPage);
+                          
+                          if (e.target.checked) {
+                            const newIds = paginated.map((order: any) => order.id).filter((id: string) => !selectedOrders.includes(id));
+                            setSelectedOrders([...selectedOrders, ...newIds]);
+                          } else {
+                            const paginatedIds = paginated.map((order: any) => order.id);
+                            setSelectedOrders(selectedOrders.filter(id => !paginatedIds.includes(id)));
+                          }
+                        }}
+                      />
+                    </th>
+                  {selectedOrdersColumns.includes('orderId') && <th>Order ID</th>}
+                  {selectedOrdersColumns.includes('linkedDeal') && <th>Linked Deal</th>}
+                  {selectedOrdersColumns.includes('customer') && <th>Customer (POC)</th>}
+                  {selectedOrdersColumns.includes('value') && <th>Value</th>}
+                  {selectedOrdersColumns.includes('approval') && <th>Approval</th>}
+                  {selectedOrdersColumns.includes('stage') && <th>Stage</th>}
+                  {selectedOrdersColumns.includes('fulfillment') && <th>Fulfillment</th>}
+                  {selectedOrdersColumns.includes('progress') && <th>Progress</th>}
+                  {selectedOrdersColumns.includes('priority') && <th>Priority</th>}
+                  {selectedOrdersColumns.includes('orderDate') && <th>Order Date</th>}
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {ordersData.map((order) => (
-                  <tr key={order.id}>
-                    <td>
-                      <Form.Check type="checkbox" />
-                    </td>
-                    <td className="fw-semibold">{order.id}</td>
-                    <td>
-                      <div>
-                        <div className="fw-medium">{order.linkedDeal}</div>
-                        <Button variant="link" size="sm" className="p-0 text-decoration-none small">
-                          <Eye size={12} className="me-1" />
-                          View Deal
-                        </Button>
-                      </div>
-                    </td>
-                    <td>
-                      <div>
-                        <div className="fw-medium">{order.pocName}</div>
-                        <small className="text-muted">{order.pocTitle}</small>
-                      </div>
-                    </td>
-                    <td className="fw-semibold">{order.value}</td>
-                    <td>
-                      <Badge 
-                        bg={
-                          order.approvalStatus === 'Approved' ? 'success' :
-                          order.approvalStatus === 'Rejected' ? 'danger' :
-                          'warning'
-                        }
-                      >
-                        {order.approvalStatus}
-                      </Badge>
-                    </td>
-                    <td>
-                      <Badge bg="info">
-                        {order.stage}
-                      </Badge>
-                    </td>
-                    <td>
-                      <Badge 
-                        bg={
-                          order.fulfillmentStatus === 'In Progress' ? 'primary' :
-                          order.fulfillmentStatus === 'Completed' ? 'success' :
-                          'secondary'
-                        }
-                      >
-                        {order.fulfillmentStatus}
-                      </Badge>
-                    </td>
-                    <td>
-                      <div className="d-flex align-items-center gap-2">
-                        <ProgressBar 
-                          now={order.progressPercent} 
-                          style={{ width: '60px', height: '8px' }}
+                {(() => {
+                  // Filter orders based on active filter, search, and advanced filters
+                  let filteredOrders = ordersData.filter(order => {
+                    // Quick filters
+                    if (activeFilter === 'pending-approval') {
+                      if (order.approvalStatus !== 'Pending') return false;
+                    } else if (activeFilter === 'in-progress') {
+                      if (order.fulfillmentStatus !== 'In Progress') return false;
+                    } else if (activeFilter === 'delivered') {
+                      if (order.fulfillmentStatus !== 'Completed') return false;
+                    } else if (activeFilter === 'high-priority') {
+                      if (order.priority !== 'High' && order.priority !== 'Urgent') return false;
+                    }
+                    
+                    // Search filter
+                    const searchLower = ordersSearch.toLowerCase();
+                    const matchesSearch = !ordersSearch || 
+                      order.id.toLowerCase().includes(searchLower) ||
+                      order.linkedDeal.toLowerCase().includes(searchLower) ||
+                      order.pocName.toLowerCase().includes(searchLower);
+                    
+                    // Advanced filters
+                    const matchesStage = ordersFilters.stage.length === 0 || 
+                      ordersFilters.stage.includes(order.stage);
+                    const matchesApproval = ordersFilters.approvalStatus.length === 0 || 
+                      ordersFilters.approvalStatus.includes(order.approvalStatus);
+                    const matchesPriority = ordersFilters.priority.length === 0 || 
+                      ordersFilters.priority.includes(order.priority);
+                    const matchesFulfillment = ordersFilters.fulfillmentStatus.length === 0 || 
+                      ordersFilters.fulfillmentStatus.includes(order.fulfillmentStatus);
+                    const matchesBilling = ordersFilters.billingStatus.length === 0 || 
+                      ordersFilters.billingStatus.includes(order.billingStatus);
+                    
+                    return matchesSearch && matchesStage && matchesApproval && 
+                      matchesPriority && matchesFulfillment && matchesBilling;
+                  });
+                  
+                  const sorted = sortData(filteredOrders, ordersPagination.sortColumn, ordersPagination.sortDirection);
+                  const paginated = paginateData(sorted, ordersPagination.currentPage, ordersPagination.rowsPerPage);
+                  
+                  if (filteredOrders.length === 0) {
+                    return (
+                      <tr>
+                        <td colSpan={selectedOrdersColumns.length + 2} className="text-center py-4 text-muted">
+                          No orders found matching your criteria
+                        </td>
+                      </tr>
+                    );
+                  }
+                  
+                  return paginated.map((order) => (
+                    <tr key={order.id}>
+                      <td>
+                        <Form.Check 
+                          type="checkbox"
+                          checked={selectedOrders.includes(order.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedOrders([...selectedOrders, order.id]);
+                            } else {
+                              setSelectedOrders(selectedOrders.filter(id => id !== order.id));
+                            }
+                          }}
                         />
-                        <small>{order.progressPercent}%</small>
-                      </div>
-                    </td>
-                    <td>
-                      <Badge 
-                        bg={
-                          order.priority === 'Urgent' ? 'danger' :
-                          order.priority === 'High' ? 'warning' :
-                          order.priority === 'Medium' ? 'info' :
-                          'secondary'
-                        }
-                      >
-                        {order.priority}
-                      </Badge>
-                    </td>
-                    <td>{order.orderDate}</td>
-                    <td>
-                      <div className="d-flex gap-1">
-                        <Button 
-                          variant="link" 
-                          size="sm" 
-                          className="p-1" 
-                          title="View"
-                          onClick={() => {
-                            setViewingOrder(order);
-                            setShowOrderViewModal(true);
-                          }}
-                        >
-                          <Eye size={16} />
-                        </Button>
-                        <Button 
-                          variant="link" 
-                          size="sm" 
-                          className="p-1" 
-                          title="Edit"
-                          onClick={() => {
-                            setEditingOrder(order);
-                            setShowOrderFormModal(true);
-                          }}
-                        >
-                          <Edit size={16} />
-                        </Button>
+                      </td>
+                      {selectedOrdersColumns.includes('orderId') && (
+                        <td className="fw-semibold">{order.id}</td>
+                      )}
+                      {selectedOrdersColumns.includes('linkedDeal') && (
+                        <td>
+                          <div>
+                            <div className="fw-medium">{order.linkedDeal}</div>
+                            <Button variant="link" size="sm" className="p-0 text-decoration-none small">
+                              <Eye size={12} className="me-1" />
+                              View Deal
+                            </Button>
+                          </div>
+                        </td>
+                      )}
+                      {selectedOrdersColumns.includes('customer') && (
+                        <td>
+                          <div>
+                            <div className="fw-medium">{order.pocName}</div>
+                            <small className="text-muted">{order.pocTitle}</small>
+                          </div>
+                        </td>
+                      )}
+                      {selectedOrdersColumns.includes('value') && (
+                        <td className="fw-semibold">{order.value}</td>
+                      )}
+                      {selectedOrdersColumns.includes('approval') && (
+                        <td>
+                          <Badge 
+                            bg={
+                              order.approvalStatus === 'Approved' ? 'success' :
+                              order.approvalStatus === 'Rejected' ? 'danger' :
+                              'warning'
+                            }
+                          >
+                            {order.approvalStatus}
+                          </Badge>
+                        </td>
+                      )}
+                      {selectedOrdersColumns.includes('stage') && (
+                        <td>
+                          <Badge bg="info">
+                            {order.stage}
+                          </Badge>
+                        </td>
+                      )}
+                      {selectedOrdersColumns.includes('fulfillment') && (
+                        <td>
+                          <Badge 
+                            bg={
+                              order.fulfillmentStatus === 'In Progress' ? 'primary' :
+                              order.fulfillmentStatus === 'Completed' ? 'success' :
+                              'secondary'
+                            }
+                          >
+                            {order.fulfillmentStatus}
+                          </Badge>
+                        </td>
+                      )}
+                      {selectedOrdersColumns.includes('progress') && (
+                        <td>
+                          <div className="d-flex align-items-center gap-2">
+                            <ProgressBar 
+                              now={order.progressPercent} 
+                              style={{ width: '60px', height: '8px' }}
+                            />
+                            <small>{order.progressPercent}%</small>
+                          </div>
+                        </td>
+                      )}
+                      {selectedOrdersColumns.includes('priority') && (
+                        <td>
+                          <Badge 
+                            bg={
+                              order.priority === 'Urgent' ? 'danger' :
+                              order.priority === 'High' ? 'warning' :
+                              order.priority === 'Medium' ? 'info' :
+                              'secondary'
+                            }
+                          >
+                            {order.priority}
+                          </Badge>
+                        </td>
+                      )}
+                      {selectedOrdersColumns.includes('orderDate') && (
+                        <td>{order.orderDate}</td>
+                      )}
+                      <td>
+                        <div className="d-flex gap-1">
+                          <Button 
+                            variant="link" 
+                            size="sm" 
+                            className="p-1" 
+                            title="View"
+                            onClick={() => {
+                              setViewingOrder(order);
+                              setShowOrderViewModal(true);
+                            }}
+                          >
+                            <Eye size={16} />
+                          </Button>
+                          <Button 
+                            variant="link" 
+                            size="sm" 
+                            className="p-1" 
+                            title="Edit"
+                            onClick={() => {
+                              setEditingOrder(order);
+                              setShowOrderFormModal(true);
+                            }}
+                          >
+                            <Edit size={16} />
+                          </Button>
                         <Button 
                           variant="link" 
                           size="sm" 
@@ -5416,22 +11708,48 @@ const CRMPortal = () => {
                         </Button>
                       </div>
                     </td>
-                  </tr>
-                ))}
+                    </tr>
+                  ));
+                })()}
               </tbody>
             </Table>
-            <div className="d-flex justify-content-between align-items-center mt-3">
-              <small className="text-muted">Showing 1 to {ordersData.length} of {ordersData.length} total orders</small>
-              <div className="d-flex gap-2">
-                <Button variant="outline-secondary" size="sm" disabled>
-                  <ChevronLeft size={16} />
-                  Previous
-                </Button>
-                <Button variant="outline-secondary" size="sm" disabled>
-                  Next
-                  <ChevronRight size={16} />
-                </Button>
-              </div>
+            </div>
+            <div className="p-3">
+            {(() => {
+              let filteredOrders = ordersData.filter(order => {
+                if (activeFilter === 'pending-approval') {
+                  if (order.approvalStatus !== 'Pending') return false;
+                } else if (activeFilter === 'in-progress') {
+                  if (order.fulfillmentStatus !== 'In Progress') return false;
+                } else if (activeFilter === 'delivered') {
+                  if (order.fulfillmentStatus !== 'Completed') return false;
+                } else if (activeFilter === 'high-priority') {
+                  if (order.priority !== 'High' && order.priority !== 'Urgent') return false;
+                }
+                
+                const searchLower = ordersSearch.toLowerCase();
+                const matchesSearch = !ordersSearch || 
+                  order.id.toLowerCase().includes(searchLower) ||
+                  order.linkedDeal.toLowerCase().includes(searchLower) ||
+                  order.pocName.toLowerCase().includes(searchLower);
+                
+                const matchesStage = ordersFilters.stage.length === 0 || 
+                  ordersFilters.stage.includes(order.stage);
+                const matchesApproval = ordersFilters.approvalStatus.length === 0 || 
+                  ordersFilters.approvalStatus.includes(order.approvalStatus);
+                const matchesPriority = ordersFilters.priority.length === 0 || 
+                  ordersFilters.priority.includes(order.priority);
+                const matchesFulfillment = ordersFilters.fulfillmentStatus.length === 0 || 
+                  ordersFilters.fulfillmentStatus.includes(order.fulfillmentStatus);
+                const matchesBilling = ordersFilters.billingStatus.length === 0 || 
+                  ordersFilters.billingStatus.includes(order.billingStatus);
+                
+                return matchesSearch && matchesStage && matchesApproval && 
+                  matchesPriority && matchesFulfillment && matchesBilling;
+              });
+              
+              return renderPaginationControls(filteredOrders.length, ordersPagination, setOrdersPagination, 'orders');
+            })()}
             </div>
           </Card.Body>
         </Card>
@@ -5516,19 +11834,31 @@ const CRMPortal = () => {
         {CampaignViewModal()}
         {ConfirmationDialog()}
         {/* Header */}
-        <div className="d-flex justify-content-between align-items-center mb-4">
-          <div>
+        <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4">
+          <div className="mb-3 mb-md-0">
             <h2 className="mb-1">Campaigns Management</h2>
             <p className="text-muted mb-0">Create and manage marketing campaigns</p>
           </div>
-          <Button variant="primary">
-            <Plus size={16} className="me-2" />
-            New Campaign
-          </Button>
+          <div className="d-flex flex-wrap gap-2">
+            <Button 
+              variant={showCampaignsAnalytics ? "primary" : "outline-secondary"}
+              onClick={() => setShowCampaignsAnalytics(!showCampaignsAnalytics)}
+            >
+              <BarChart3 size={16} className="me-2" />
+              {showCampaignsAnalytics ? 'Hide Analytics' : 'Show Analytics'}
+            </Button>
+            <Button variant="primary">
+              <Plus size={16} className="me-2" />
+              New Campaign
+            </Button>
+          </div>
         </div>
 
-        {/* KPI Cards */}
-        <Row className="mb-4">
+        {/* Analytics Section - Collapsible */}
+        {showCampaignsAnalytics && (
+          <>
+            {/* KPI Cards */}
+            <Row className="mb-4">
           {campaignKPIData.map((kpi, index) => (
             <Col lg={3} md={6} key={index} className="mb-3">
               <KPICard {...kpi} />
@@ -5536,234 +11866,109 @@ const CRMPortal = () => {
           ))}
         </Row>
 
-        {/* Search Bar - Full Width */}
-        <Card className="border-0 shadow-sm mb-3">
-          <Card.Body>
-            <div className="position-relative">
-              <Search size={18} className="position-absolute" style={{ left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#6c757d' }} />
-              <Form.Control 
-                type="search" 
-                placeholder="Search campaigns by name, dates, owner, or status..." 
-                style={{ paddingLeft: '40px' }}
-                size="lg"
-              />
-            </div>
-          </Card.Body>
-        </Card>
-
-        {/* Filter Controls */}
-        <div className="d-flex gap-2 justify-content-between align-items-center mb-4 flex-wrap">
-          <div className="d-flex gap-2">
-            <Button 
-              variant={showAdvancedFilters ? 'primary' : 'outline-secondary'}
-              onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-            >
-              <Filter size={16} className="me-2" />
-              Filters
-              {(campaignFilters.status.length + campaignFilters.tags.length + campaignFilters.priority.length) > 0 && (
-                <Badge bg="light" text="dark" className="ms-2">
-                  {campaignFilters.status.length + campaignFilters.tags.length + campaignFilters.priority.length}
-                </Badge>
-              )}
-            </Button>
-            <Dropdown>
-              <Dropdown.Toggle variant="outline-secondary">
-                <TrendingUp size={16} className="me-2" />
-                Sort
-              </Dropdown.Toggle>
-              <Dropdown.Menu>
-                <Dropdown.Item>Date Created (Newest)</Dropdown.Item>
-                <Dropdown.Item>Date Created (Oldest)</Dropdown.Item>
-                <Dropdown.Item>Name (A-Z)</Dropdown.Item>
-                <Dropdown.Item>Name (Z-A)</Dropdown.Item>
-                <Dropdown.Item>Priority (High to Low)</Dropdown.Item>
-              </Dropdown.Menu>
-            </Dropdown>
-          </div>
-          <Button variant="outline-secondary">
-            <Download size={16} className="me-2" />
-            Export
-          </Button>
-        </div>
-
-        {/* Advanced Filters Panel */}
-        {showAdvancedFilters && (
-          <Card className="border-0 shadow-sm mb-4">
-            <Card.Body>
-              <h6 className="mb-3 fw-bold">Advanced Filters</h6>
-              <Row>
-                <Col md={3}>
-                  <Form.Group className="mb-3">
-                    <Form.Label className="small fw-bold">Status</Form.Label>
-                    {['Active', 'Draft', 'Completed', 'Paused'].map(status => (
-                      <Form.Check
-                        key={status}
-                        type="checkbox"
-                        label={status}
-                        checked={campaignFilters.status.includes(status)}
-                        onChange={(e) => {
-                          setCampaignFilters(prev => ({
-                            ...prev,
-                            status: e.target.checked 
-                              ? [...prev.status, status]
-                              : prev.status.filter(s => s !== status)
-                          }));
-                        }}
-                      />
-                    ))}
-                  </Form.Group>
-                </Col>
-                <Col md={3}>
-                  <Form.Group className="mb-3">
-                    <Form.Label className="small fw-bold">Priority</Form.Label>
-                    {['High', 'Medium', 'Low'].map(priority => (
-                      <Form.Check
-                        key={priority}
-                        type="checkbox"
-                        label={priority}
-                        checked={campaignFilters.priority.includes(priority)}
-                        onChange={(e) => {
-                          setCampaignFilters(prev => ({
-                            ...prev,
-                            priority: e.target.checked 
-                              ? [...prev.priority, priority]
-                              : prev.priority.filter(p => p !== priority)
-                          }));
-                        }}
-                      />
-                    ))}
-                  </Form.Group>
-                </Col>
-                <Col md={3}>
-                  <Form.Group className="mb-3">
-                    <Form.Label className="small fw-bold">Owner</Form.Label>
-                    {['Sarah Williams', 'John Doe', 'Mike Johnson', 'Jane Smith'].map(owner => (
-                      <Form.Check
-                        key={owner}
-                        type="checkbox"
-                        label={owner}
-                        checked={campaignFilters.owner.includes(owner)}
-                        onChange={(e) => {
-                          setCampaignFilters(prev => ({
-                            ...prev,
-                            owner: e.target.checked 
-                              ? [...prev.owner, owner]
-                              : prev.owner.filter(o => o !== owner)
-                          }));
-                        }}
-                      />
-                    ))}
-                  </Form.Group>
-                </Col>
-                <Col md={3}>
-                  <Form.Group className="mb-3">
-                    <Form.Label className="small fw-bold">Date Range</Form.Label>
-                    <Form.Control 
-                      type="date" 
-                      size="sm" 
-                      className="mb-2"
-                      placeholder="Start Date"
-                      value={campaignFilters.dateRange.start}
-                      onChange={(e) => setCampaignFilters(prev => ({
-                        ...prev,
-                        dateRange: { ...prev.dateRange, start: e.target.value }
-                      }))}
-                    />
-                    <Form.Control 
-                      type="date" 
-                      size="sm"
-                      placeholder="End Date"
-                      value={campaignFilters.dateRange.end}
-                      onChange={(e) => setCampaignFilters(prev => ({
-                        ...prev,
-                        dateRange: { ...prev.dateRange, end: e.target.value }
-                      }))}
-                    />
-                  </Form.Group>
-                </Col>
-              </Row>
-              <div className="d-flex gap-2">
-                <Button 
-                  variant="primary" 
-                  size="sm"
-                  onClick={() => {
-                    // Apply filters logic here
-                    console.log('Applying filters:', campaignFilters);
-                  }}
-                >
-                  Apply Filters
-                </Button>
-                <Button 
-                  variant="outline-secondary" 
-                  size="sm"
-                  onClick={() => {
-                    setCampaignFilters({
-                      status: [],
-                      owner: [],
-                      tags: [],
-                      priority: [],
-                      dateRange: { start: '', end: '' }
-                    });
-                  }}
-                >
-                  Clear All
-                </Button>
-              </div>
-            </Card.Body>
-          </Card>
+        {/* Analytics Charts */}
+        <Row className="mb-4">
+          <Col md={4} className="mb-3">
+            <Card className="border-0 shadow-sm h-100">
+              <Card.Body>
+                <h6 className="fw-bold mb-3">Campaign Status Distribution</h6>
+                <ResponsiveContainer width="100%" height={250}>
+                  <PieChart>
+                    <Pie
+                      data={[
+                        { name: 'Active', value: 3, color: '#198754' },
+                        { name: 'Draft', value: 2, color: '#6c757d' },
+                        { name: 'Completed', value: 1, color: '#0d6efd' },
+                        { name: 'Awaiting Review', value: 2, color: '#ffc107' }
+                      ]}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={({ name, percent }: any) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                      outerRadius={80}
+                      fill="#8884d8"
+                      dataKey="value"
+                    >
+                      {[
+                        { name: 'Active', value: 3, color: '#198754' },
+                        { name: 'Draft', value: 2, color: '#6c757d' },
+                        { name: 'Completed', value: 1, color: '#0d6efd' },
+                        { name: 'Awaiting Review', value: 2, color: '#ffc107' }
+                      ].map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              </Card.Body>
+            </Card>
+          </Col>
+          <Col md={4} className="mb-3">
+            <Card className="border-0 shadow-sm h-100">
+              <Card.Body>
+                <h6 className="fw-bold mb-3">Goal Achievement Rates</h6>
+                <ResponsiveContainer width="100%" height={250}>
+                  <BarChart
+                    data={[
+                      { campaign: 'Cloud Services', achievement: 78 },
+                      { campaign: 'UAE Real Estate', achievement: 92 },
+                      { campaign: 'Reseller Promo', achievement: 45 },
+                      { campaign: 'Customer Loyalty', achievement: 95 }
+                    ]}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="campaign" angle={-15} textAnchor="end" height={80} />
+                    <YAxis />
+                    <Tooltip formatter={(value) => `${value}%`} />
+                    <Bar dataKey="achievement" fill="#198754" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </Card.Body>
+            </Card>
+          </Col>
+          <Col md={4} className="mb-3">
+            <Card className="border-0 shadow-sm h-100">
+              <Card.Body>
+                <h6 className="fw-bold mb-3">Campaigns by Owner</h6>
+                <ResponsiveContainer width="100%" height={250}>
+                  <PieChart>
+                    <Pie
+                      data={[
+                        { name: 'Sarah W.', value: 4, color: '#0d6efd' },
+                        { name: 'John Doe', value: 3, color: '#6f42c1' },
+                        { name: 'Mike J.', value: 2, color: '#fd7e14' },
+                        { name: 'Jane S.', value: 2, color: '#20c997' }
+                      ]}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={({ name, percent }: any) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                      outerRadius={80}
+                      fill="#8884d8"
+                      dataKey="value"
+                    >
+                      {[
+                        { name: 'Sarah W.', value: 4, color: '#0d6efd' },
+                        { name: 'John Doe', value: 3, color: '#6f42c1' },
+                        { name: 'Mike J.', value: 2, color: '#fd7e14' },
+                        { name: 'Jane S.', value: 2, color: '#20c997' }
+                      ].map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              </Card.Body>
+            </Card>
+          </Col>
+        </Row>
+        </>
         )}
 
-        {/* Selectable Filter Tags */}
-        <div className="mb-4 d-flex gap-2 flex-wrap">
-          <Badge 
-            bg={activeFilter === 'all' ? 'primary' : 'light'} 
-            text={activeFilter === 'all' ? 'white' : 'dark'}
-            style={{ padding: '8px 16px', cursor: 'pointer', fontSize: '0.85rem' }}
-            onClick={() => setActiveFilter('all')}
-          >
-            All Campaigns (15)
-          </Badge>
-          <Badge 
-            bg={activeFilter === 'my' ? 'primary' : 'light'} 
-            text={activeFilter === 'my' ? 'white' : 'dark'}
-            style={{ padding: '8px 16px', cursor: 'pointer', fontSize: '0.85rem' }}
-            onClick={() => setActiveFilter('my')}
-          >
-            My Campaigns (3)
-          </Badge>
-          <Badge 
-            bg={activeFilter === 'drafts' ? 'primary' : 'light'} 
-            text={activeFilter === 'drafts' ? 'white' : 'dark'}
-            style={{ padding: '8px 16px', cursor: 'pointer', fontSize: '0.85rem' }}
-            onClick={() => setActiveFilter('drafts')}
-          >
-            Drafts (4)
-          </Badge>
-          <Badge 
-            bg={activeFilter === 'ending-soon' ? 'warning' : 'light'} 
-            text={activeFilter === 'ending-soon' ? 'dark' : 'dark'}
-            style={{ padding: '8px 16px', cursor: 'pointer', fontSize: '0.85rem' }}
-            onClick={() => setActiveFilter('ending-soon')}
-          >
-            Ending Soon (1)
-          </Badge>
-          <Badge 
-            bg={activeFilter === 'no-owner' ? 'danger' : 'light'} 
-            text={activeFilter === 'no-owner' ? 'white' : 'dark'}
-            style={{ padding: '8px 16px', cursor: 'pointer', fontSize: '0.85rem' }}
-            onClick={() => setActiveFilter('no-owner')}
-          >
-            No Owner (2)
-          </Badge>
-          <Badge 
-            bg={activeFilter === 'high-priority' ? 'info' : 'light'} 
-            text={activeFilter === 'high-priority' ? 'white' : 'dark'}
-            style={{ padding: '8px 16px', cursor: 'pointer', fontSize: '0.85rem' }}
-            onClick={() => setActiveFilter('high-priority')}
-          >
-            High Priority (2)
-          </Badge>
-        </div>
+       
+       {/* campaign filters if required here */}
 
         {/* Bulk Actions Bar */}
         {selectedCampaigns.length > 0 && (
@@ -5792,11 +11997,12 @@ const CRMPortal = () => {
             </Card.Body>
           </Card>
         )}
+        
 
         {/* Campaigns Table */}
         <Card className="border-0 shadow-sm">
           <Card.Body className="p-0">
-            <div className="d-flex justify-content-between align-items-center p-4 border-bottom">
+            {/* <div className="d-flex justify-content-between align-items-center mb-3 px-3 pt-3">
               <div className="d-flex align-items-center gap-2">
                 <span>Showing</span>
                 <Form.Select size="sm" style={{ width: 'auto' }}>
@@ -5810,20 +12016,76 @@ const CRMPortal = () => {
                 <Layers size={14} className="me-1" />
                 Customize Columns
               </Button>
-            </div>
+            </div> */}
 
-            <div style={{ overflowX: 'auto' }}>
+            <div className="table-responsive">
               <Table hover className="mb-0">
                 <thead className="bg-light">
                   <tr>
-                    <th style={{ width: '40px' }}>
+                    <th style={{ width: '50px' }}>
                       <Form.Check 
                         type="checkbox"
+                        checked={(() => {
+                          let filteredCampaigns = campaigns.filter(campaign => {
+                            // Quick filters
+                            if (activeFilter === 'my') return campaign.owner === 'Sarah Williams';
+                            if (activeFilter === 'drafts') return campaign.status === 'Draft';
+                            if (activeFilter === 'ending-soon') return campaign.id === 1;
+                            if (activeFilter === 'no-owner') return !campaign.owner;
+                            if (activeFilter === 'high-priority') return campaign.priority === 'High';
+                            
+                            // Search filter
+                            const searchLower = campaignsSearch.toLowerCase();
+                            const matchesSearch = !campaignsSearch || 
+                              campaign.name.toLowerCase().includes(searchLower) ||
+                              campaign.description.toLowerCase().includes(searchLower) ||
+                              campaign.owner.toLowerCase().includes(searchLower);
+                            
+                            // Advanced filters
+                            if (campaignFilters.status.length > 0 && !campaignFilters.status.includes(campaign.status)) return false;
+                            if (campaignFilters.owner.length > 0 && !campaignFilters.owner.includes(campaign.owner)) return false;
+                            if (campaignFilters.priority.length > 0 && !campaignFilters.priority.includes(campaign.priority)) return false;
+                            
+                            return matchesSearch;
+                          });
+                          
+                          const sorted = sortData(filteredCampaigns, campaignsPagination.sortColumn, campaignsPagination.sortDirection);
+                          const paginated = paginateData(sorted, campaignsPagination.currentPage, campaignsPagination.rowsPerPage);
+                          return paginated.length > 0 && paginated.every((campaign: any) => selectedCampaigns.includes(campaign.id));
+                        })()}
                         onChange={(e) => {
+                          let filteredCampaigns = campaigns.filter(campaign => {
+                            // Quick filters
+                            if (activeFilter === 'my') return campaign.owner === 'Sarah Williams';
+                            if (activeFilter === 'drafts') return campaign.status === 'Draft';
+                            if (activeFilter === 'ending-soon') return campaign.id === 1;
+                            if (activeFilter === 'no-owner') return !campaign.owner;
+                            if (activeFilter === 'high-priority') return campaign.priority === 'High';
+                            
+                            // Search filter
+                            const searchLower = campaignsSearch.toLowerCase();
+                            const matchesSearch = !campaignsSearch || 
+                              campaign.name.toLowerCase().includes(searchLower) ||
+                              campaign.description.toLowerCase().includes(searchLower) ||
+                              campaign.owner.toLowerCase().includes(searchLower);
+                            
+                            // Advanced filters
+                            if (campaignFilters.status.length > 0 && !campaignFilters.status.includes(campaign.status)) return false;
+                            if (campaignFilters.owner.length > 0 && !campaignFilters.owner.includes(campaign.owner)) return false;
+                            if (campaignFilters.priority.length > 0 && !campaignFilters.priority.includes(campaign.priority)) return false;
+                            
+                            return matchesSearch;
+                          });
+                          
+                          const sorted = sortData(filteredCampaigns, campaignsPagination.sortColumn, campaignsPagination.sortDirection);
+                          const paginated = paginateData(sorted, campaignsPagination.currentPage, campaignsPagination.rowsPerPage);
+                          
                           if (e.target.checked) {
-                            setSelectedCampaigns(campaigns.map(c => c.id));
+                            const newIds = paginated.map((campaign: any) => campaign.id).filter((id: number) => !selectedCampaigns.includes(id));
+                            setSelectedCampaigns([...selectedCampaigns, ...newIds]);
                           } else {
-                            setSelectedCampaigns([]);
+                            const paginatedIds = paginated.map((campaign: any) => campaign.id);
+                            setSelectedCampaigns(selectedCampaigns.filter(id => !paginatedIds.includes(id)));
                           }
                         }}
                       />
@@ -5839,23 +12101,45 @@ const CRMPortal = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {campaigns
-                    .filter(campaign => {
-                      // Apply filters
-                      if (activeFilter === 'my') return campaign.owner === 'Sarah Williams'; // Example user
+                  {(() => {
+                    // Filter campaigns based on active filter, search, and advanced filters
+                    let filteredCampaigns = campaigns.filter(campaign => {
+                      // Quick filters
+                      if (activeFilter === 'my') return campaign.owner === 'Sarah Williams';
                       if (activeFilter === 'drafts') return campaign.status === 'Draft';
-                      if (activeFilter === 'ending-soon') return campaign.id === 1; // Example
+                      if (activeFilter === 'ending-soon') return campaign.id === 1;
                       if (activeFilter === 'no-owner') return !campaign.owner;
                       if (activeFilter === 'high-priority') return campaign.priority === 'High';
+                      
+                      // Search filter
+                      const searchLower = campaignsSearch.toLowerCase();
+                      const matchesSearch = !campaignsSearch || 
+                        campaign.name.toLowerCase().includes(searchLower) ||
+                        campaign.description.toLowerCase().includes(searchLower) ||
+                        campaign.owner.toLowerCase().includes(searchLower);
                       
                       // Advanced filters
                       if (campaignFilters.status.length > 0 && !campaignFilters.status.includes(campaign.status)) return false;
                       if (campaignFilters.owner.length > 0 && !campaignFilters.owner.includes(campaign.owner)) return false;
                       if (campaignFilters.priority.length > 0 && !campaignFilters.priority.includes(campaign.priority)) return false;
                       
-                      return true;
-                    })
-                    .map((campaign) => (
+                      return matchesSearch;
+                    });
+                    
+                    const sorted = sortData(filteredCampaigns, campaignsPagination.sortColumn, campaignsPagination.sortDirection);
+                    const paginated = paginateData(sorted, campaignsPagination.currentPage, campaignsPagination.rowsPerPage);
+                    
+                    if (filteredCampaigns.length === 0) {
+                      return (
+                        <tr>
+                          <td colSpan={9} className="text-center py-4 text-muted">
+                            No campaigns found matching your criteria
+                          </td>
+                        </tr>
+                      );
+                    }
+                    
+                    return paginated.map((campaign) => (
                     <tr key={campaign.id}>
                       <td>
                         <Form.Check 
@@ -5876,7 +12160,7 @@ const CRMPortal = () => {
                             {campaign.name}
                           </a>
                           {campaign.comments > 0 && (
-                            <Badge bg="info" className="ms-2 bg-opacity-50 text-info">
+                            <Badge bg="info" className="ms-2 bg-opacity-10 text-info">
                               {campaign.comments} comments
                             </Badge>
                           )}
@@ -5897,7 +12181,7 @@ const CRMPortal = () => {
                       <td>
                         <div className="d-flex flex-wrap gap-1">
                           {campaign.tags.map((tag, idx) => (
-                            <Badge key={idx} bg="primary" className="bg-opacity-50 text-primary">
+                            <Badge key={idx} bg="primary" className="bg-opacity-10 text-primary">
                               {tag}
                             </Badge>
                           ))}
@@ -5911,7 +12195,7 @@ const CRMPortal = () => {
                             campaign.status === 'Completed' ? 'secondary' :
                             'warning'
                           }
-                          className="bg-opacity-50 text-dark"
+                          className="bg-opacity-10 text-dark"
                         >
                           {campaign.status}
                         </Badge>
@@ -5977,12 +12261,41 @@ const CRMPortal = () => {
                         </div>
                       </td>
                     </tr>
-                  ))}
+                    ));
+                  })()}
                 </tbody>
               </Table>
             </div>
 
-            <div className="d-flex justify-content-between align-items-center p-4 border-top">
+            <div className="p-3">
+              {(() => {
+                let filteredCampaigns = campaigns.filter(campaign => {
+                  // Quick filters
+                  if (activeFilter === 'my') return campaign.owner === 'Sarah Williams';
+                  if (activeFilter === 'drafts') return campaign.status === 'Draft';
+                  if (activeFilter === 'ending-soon') return campaign.id === 1;
+                  if (activeFilter === 'no-owner') return !campaign.owner;
+                  if (activeFilter === 'high-priority') return campaign.priority === 'High';
+                  
+                  // Search filter
+                  const searchLower = campaignsSearch.toLowerCase();
+                  const matchesSearch = !campaignsSearch || 
+                    campaign.name.toLowerCase().includes(searchLower) ||
+                    campaign.description.toLowerCase().includes(searchLower) ||
+                    campaign.owner.toLowerCase().includes(searchLower);
+                  
+                  // Advanced filters
+                  if (campaignFilters.status.length > 0 && !campaignFilters.status.includes(campaign.status)) return false;
+                  if (campaignFilters.owner.length > 0 && !campaignFilters.owner.includes(campaign.owner)) return false;
+                  if (campaignFilters.priority.length > 0 && !campaignFilters.priority.includes(campaign.priority)) return false;
+                  
+                  return matchesSearch;
+                });
+                
+                return renderPaginationControls(filteredCampaigns.length, campaignsPagination, setCampaignsPagination, 'campaigns');
+              })()}
+            </div>
+            <div className="d-none d-flex justify-content-between align-items-center p-4 border-top">
               <div className="small text-muted">
                 Showing <strong>1 to 4</strong> of <strong>15</strong> total campaigns
               </div>
@@ -6151,14 +12464,26 @@ const CRMPortal = () => {
             <h2 className="mb-1 fw-bold">Task Management</h2>
             <p className="text-muted mb-0">Track and manage tasks with complete history logging</p>
           </div>
-          <Button variant="primary" onClick={() => setShowTaskModal(true)}>
-            <Plus size={16} className="me-2" />
-            Create Task
-          </Button>
+          <div className="d-flex gap-2">
+            <Button 
+              variant={showTasksAnalytics ? "primary" : "outline-secondary"}
+              onClick={() => setShowTasksAnalytics(!showTasksAnalytics)}
+            >
+              <BarChart3 size={16} className="me-2" />
+              {showTasksAnalytics ? 'Hide Analytics' : 'Show Analytics'}
+            </Button>
+            <Button variant="primary" onClick={() => setShowTaskModal(true)}>
+              <Plus size={16} className="me-2" />
+              Create Task
+            </Button>
+          </div>
         </div>
 
-        {/* Summary Stats */}
-        <Row className="mb-4">
+        {/* Analytics Section - Collapsible */}
+        {showTasksAnalytics && (
+          <>
+            {/* Summary Stats */}
+            <Row className="mb-4">
           <Col lg={3} md={6} className="mb-3">
             <KPICard 
               title="Total Tasks"
@@ -6193,28 +12518,184 @@ const CRMPortal = () => {
           </Col>
         </Row>
 
+        {/* Analytics Charts */}
+        <Row className="mb-4">
+          <Col md={6} className="mb-3">
+            <Card className="border-0 shadow-sm h-100">
+              <Card.Body>
+                <h6 className="fw-bold mb-3">Tasks by Status</h6>
+                <ResponsiveContainer width="100%" height={250}>
+                  <PieChart>
+                    <Pie
+                      data={[
+                        { name: 'Completed', value: 12, color: '#198754' },
+                        { name: 'In Progress', value: 8, color: '#0dcaf0' },
+                        { name: 'Pending', value: 6, color: '#ffc107' },
+                        { name: 'Overdue', value: 3, color: '#dc3545' }
+                      ]}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={({ name, percent }: any) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                      outerRadius={80}
+                      fill="#8884d8"
+                      dataKey="value"
+                    >
+                      {[
+                        { name: 'Completed', value: 12, color: '#198754' },
+                        { name: 'In Progress', value: 8, color: '#0dcaf0' },
+                        { name: 'Pending', value: 6, color: '#ffc107' },
+                        { name: 'Overdue', value: 3, color: '#dc3545' }
+                      ].map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              </Card.Body>
+            </Card>
+          </Col>
+          <Col md={6} className="mb-3">
+            <Card className="border-0 shadow-sm h-100">
+              <Card.Body>
+                <h6 className="fw-bold mb-3">Tasks by Urgency</h6>
+                <ResponsiveContainer width="100%" height={250}>
+                  <BarChart
+                    data={[
+                      { urgency: 'High', count: 11 },
+                      { urgency: 'Medium', count: 9 },
+                      { urgency: 'Low', count: 9 }
+                    ]}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="urgency" />
+                    <YAxis />
+                    <Tooltip />
+                    <Bar dataKey="count" fill="#dc3545" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </Card.Body>
+            </Card>
+          </Col>
+          <Col md={6} className="mb-3">
+            <Card className="border-0 shadow-sm h-100">
+              <Card.Body>
+                <h6 className="fw-bold mb-3">Tasks by Assigned User</h6>
+                <ResponsiveContainer width="100%" height={250}>
+                  <BarChart
+                    data={[
+                      { user: 'John Doe', count: 8 },
+                      { user: 'Jane Smith', count: 7 },
+                      { user: 'Mike J.', count: 6 },
+                      { user: 'Sarah W.', count: 5 },
+                      { user: 'Tom B.', count: 3 }
+                    ]}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="user" />
+                    <YAxis />
+                    <Tooltip />
+                    <Bar dataKey="count" fill="#0d6efd" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </Card.Body>
+            </Card>
+          </Col>
+          <Col md={6} className="mb-3">
+            <Card className="border-0 shadow-sm h-100">
+              <Card.Body>
+                <h6 className="fw-bold mb-3">Overdue Tasks by User</h6>
+                <ResponsiveContainer width="100%" height={250}>
+                  <BarChart
+                    layout="vertical"
+                    data={[
+                      { user: 'John Doe', overdue: 1 },
+                      { user: 'Mike Johnson', overdue: 1 },
+                      { user: 'Sarah Williams', overdue: 1 },
+                      { user: 'Jane Smith', overdue: 0 },
+                      { user: 'Tom Brown', overdue: 0 }
+                    ]}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis type="number" />
+                    <YAxis type="category" dataKey="user" width={100} />
+                    <Tooltip />
+                    <Bar dataKey="overdue" fill="#dc3545" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </Card.Body>
+            </Card>
+          </Col>
+        </Row>
+          </>
+        )}
+
         {/* Tasks Table */}
         <Card className="border-0 shadow-sm">
-          <Card.Body>
-            <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-3">
-              <h5 className="mb-2 mb-md-0 fw-bold">All Tasks</h5>
-              <div className="d-flex gap-2">
-                <Button variant="outline-primary" size="sm">
-                  <Filter size={16} className="me-1" />
-                  Filter
-                </Button>
-                <Button variant="outline-success" size="sm">
-                  <Download size={16} className="me-1" />
-                  Export
-                </Button>
-              </div>
-            </div>
+          <Card.Body className="p-0">
+            
             <div className="table-responsive">
-              <Table hover>
+              <Table hover className="mb-0">
                 <thead className="bg-light">
                   <tr>
-                    <th>
-                      <Form.Check type="checkbox" />
+                    <th style={{ width: '50px' }}>
+                      <Form.Check 
+                        type="checkbox"
+                        checked={(() => {
+                          let filteredTasks = tasksData.filter(task => {
+                            // Quick filters
+                            if (activeFilter === 'my-tasks') return task.assignedTo === 'John Doe';
+                            if (activeFilter === 'high-urgency') return task.urgency === 'High';
+                            if (activeFilter === 'overdue') return false; // Add overdue logic
+                            if (activeFilter === 'completed') return task.status === 'Completed';
+                            
+                            // Search filter
+                            const searchLower = tasksSearch.toLowerCase();
+                            const matchesSearch = !tasksSearch || 
+                              task.title.toLowerCase().includes(searchLower) ||
+                              task.assignedTo.toLowerCase().includes(searchLower) ||
+                              task.prospect.toLowerCase().includes(searchLower) ||
+                              task.company.toLowerCase().includes(searchLower);
+                            
+                            return matchesSearch;
+                          });
+                          
+                          const sorted = sortData(filteredTasks, tasksPagination.sortColumn, tasksPagination.sortDirection);
+                          const paginated = paginateData(sorted, tasksPagination.currentPage, tasksPagination.rowsPerPage);
+                          return paginated.length > 0 && paginated.every((task: any) => selectedTasks.includes(task.id));
+                        })()}
+                        onChange={(e) => {
+                          let filteredTasks = tasksData.filter(task => {
+                            // Quick filters
+                            if (activeFilter === 'my-tasks') return task.assignedTo === 'John Doe';
+                            if (activeFilter === 'high-urgency') return task.urgency === 'High';
+                            if (activeFilter === 'overdue') return false;
+                            if (activeFilter === 'completed') return task.status === 'Completed';
+                            
+                            // Search filter
+                            const searchLower = tasksSearch.toLowerCase();
+                            const matchesSearch = !tasksSearch || 
+                              task.title.toLowerCase().includes(searchLower) ||
+                              task.assignedTo.toLowerCase().includes(searchLower) ||
+                              task.prospect.toLowerCase().includes(searchLower) ||
+                              task.company.toLowerCase().includes(searchLower);
+                            
+                            return matchesSearch;
+                          });
+                          
+                          const sorted = sortData(filteredTasks, tasksPagination.sortColumn, tasksPagination.sortDirection);
+                          const paginated = paginateData(sorted, tasksPagination.currentPage, tasksPagination.rowsPerPage);
+                          
+                          if (e.target.checked) {
+                            const newIds = paginated.map((task: any) => task.id).filter((id: number) => !selectedTasks.includes(id));
+                            setSelectedTasks([...selectedTasks, ...newIds]);
+                          } else {
+                            const paginatedIds = paginated.map((task: any) => task.id);
+                            setSelectedTasks(selectedTasks.filter(id => !paginatedIds.includes(id)));
+                          }
+                        }}
+                      />
                     </th>
                     <th>Task</th>
                     <th>Assigned To</th>
@@ -6227,10 +12708,53 @@ const CRMPortal = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {tasksData.map((task) => (
+                  {(() => {
+                    // Filter tasks based on active filter and search
+                    let filteredTasks = tasksData.filter(task => {
+                      // Quick filters
+                      if (activeFilter === 'my-tasks') return task.assignedTo === 'John Doe';
+                      if (activeFilter === 'high-urgency') return task.urgency === 'High';
+                      if (activeFilter === 'overdue') return false; // Add overdue logic
+                      if (activeFilter === 'completed') return task.status === 'Completed';
+                      
+                      // Search filter
+                      const searchLower = tasksSearch.toLowerCase();
+                      const matchesSearch = !tasksSearch || 
+                        task.title.toLowerCase().includes(searchLower) ||
+                        task.assignedTo.toLowerCase().includes(searchLower) ||
+                        task.prospect.toLowerCase().includes(searchLower) ||
+                        task.company.toLowerCase().includes(searchLower);
+                      
+                      return matchesSearch;
+                    });
+                    
+                    const sorted = sortData(filteredTasks, tasksPagination.sortColumn, tasksPagination.sortDirection);
+                    const paginated = paginateData(sorted, tasksPagination.currentPage, tasksPagination.rowsPerPage);
+                    
+                    if (filteredTasks.length === 0) {
+                      return (
+                        <tr>
+                          <td colSpan={9} className="text-center py-4 text-muted">
+                            No tasks found matching your criteria
+                          </td>
+                        </tr>
+                      );
+                    }
+                    
+                    return paginated.map((task) => (
                     <tr key={task.id}>
                       <td>
-                        <Form.Check type="checkbox" />
+                        <Form.Check 
+                          type="checkbox"
+                          checked={selectedTasks.includes(task.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedTasks([...selectedTasks, task.id]);
+                            } else {
+                              setSelectedTasks(selectedTasks.filter(id => id !== task.id));
+                            }
+                          }}
+                        />
                       </td>
                       <td>
                         <div className="fw-semibold">{task.title}</div>
@@ -6310,11 +12834,35 @@ const CRMPortal = () => {
                         </div>
                       </td>
                     </tr>
-                  ))}
+                    ));
+                  })()}
                 </tbody>
               </Table>
             </div>
-            <div className="d-flex flex-column flex-md-row justify-content-between align-items-center mt-3">
+            <div className="p-3">
+              {(() => {
+                let filteredTasks = tasksData.filter(task => {
+                  // Quick filters
+                  if (activeFilter === 'my-tasks') return task.assignedTo === 'John Doe';
+                  if (activeFilter === 'high-urgency') return task.urgency === 'High';
+                  if (activeFilter === 'overdue') return false;
+                  if (activeFilter === 'completed') return task.status === 'Completed';
+                  
+                  // Search filter
+                  const searchLower = tasksSearch.toLowerCase();
+                  const matchesSearch = !tasksSearch || 
+                    task.title.toLowerCase().includes(searchLower) ||
+                    task.assignedTo.toLowerCase().includes(searchLower) ||
+                    task.prospect.toLowerCase().includes(searchLower) ||
+                    task.company.toLowerCase().includes(searchLower);
+                  
+                  return matchesSearch;
+                });
+                
+                return renderPaginationControls(filteredTasks.length, tasksPagination, setTasksPagination, 'tasks');
+              })()}
+            </div>
+            <div className="d-none d-flex flex-column flex-md-row justify-content-between align-items-center mt-3">
               <small className="text-muted mb-2 mb-md-0">Showing 1 to {tasksData.length} of {tasksData.length} total tasks</small>
               <div className="d-flex gap-2">
                 <Button variant="outline-secondary" size="sm" disabled>
@@ -6336,31 +12884,190 @@ const CRMPortal = () => {
   // Stages Management Screen (Placeholder)
   const renderStages = () => {
     const pipelineStages = [
-      { id: 1, name: 'Prospect', color: '#6c757d', order: 1, conversion: '45%', avgDuration: '3 days', count: 241, description: 'Initial contact or imported lead', automated: false },
-      { id: 2, name: 'Qualified Lead', color: '#0d6efd', order: 2, conversion: '68%', avgDuration: '5 days', count: 58, description: 'Lead has been qualified and shows interest', automated: true },
-      { id: 3, name: 'Contact Made', color: '#17a2b8', order: 3, conversion: '52%', avgDuration: '2 days', count: 34, description: 'First successful contact established', automated: false },
-      { id: 4, name: 'Needs Analysis', color: '#ffc107', order: 4, conversion: '70%', avgDuration: '7 days', count: 18, description: 'Understanding customer requirements', automated: false },
-      { id: 5, name: 'Proposal Sent', color: '#fd7e14', order: 5, conversion: '55%', avgDuration: '4 days', count: 12, description: 'Proposal or quote sent to prospect', automated: true },
-      { id: 6, name: 'Negotiation', color: '#dc3545', order: 6, conversion: '75%', avgDuration: '6 days', count: 8, description: 'Active negotiation and discussion', automated: false },
-      { id: 7, name: 'Deal Won', color: '#28a745', order: 7, conversion: '100%', avgDuration: '1 day', count: 15, description: 'Deal successfully closed', automated: true },
-      { id: 8, name: 'Order Placed', color: '#20c997', order: 8, conversion: '100%', avgDuration: '0 days', count: 15, description: 'Order has been confirmed and placed', automated: false }
+      { id: 1, name: 'Prospect', type: 'Lead', color: '#6c757d', order: 1, conversion: '45%', avgDuration: '3 days', count: 241, description: 'Initial contact or imported lead', automated: false },
+      { id: 2, name: 'Qualified Lead', type: 'Lead', color: '#0d6efd', order: 2, conversion: '68%', avgDuration: '5 days', count: 58, description: 'Lead has been qualified and shows interest', automated: true },
+      { id: 3, name: 'Contact Made', type: 'Lead', color: '#17a2b8', order: 3, conversion: '52%', avgDuration: '2 days', count: 34, description: 'First successful contact established', automated: false },
+      { id: 4, name: 'Needs Analysis', type: 'Deal', color: '#ffc107', order: 4, conversion: '70%', avgDuration: '7 days', count: 18, description: 'Understanding customer requirements', automated: false },
+      { id: 5, name: 'Proposal Sent', type: 'Deal', color: '#fd7e14', order: 5, conversion: '55%', avgDuration: '4 days', count: 12, description: 'Proposal or quote sent to prospect', automated: true },
+      { id: 6, name: 'Negotiation', type: 'Deal', color: '#dc3545', order: 6, conversion: '75%', avgDuration: '6 days', count: 8, description: 'Active negotiation and discussion', automated: false },
+      { id: 7, name: 'Deal Won', type: 'Deal', color: '#28a745', order: 7, conversion: '100%', avgDuration: '1 day', count: 15, description: 'Deal successfully closed', automated: true },
+      { id: 8, name: 'Order Placed', type: 'Order', color: '#20c997', order: 8, conversion: '100%', avgDuration: '0 days', count: 15, description: 'Order has been confirmed and placed', automated: false }
+    ];
+
+    // Stage distribution data for charts
+    const stagesByType = [
+      { type: 'Lead', count: 333, fill: '#0d6efd' },
+      { type: 'Deal', count: 53, fill: '#ffc107' },
+      { type: 'Order', count: 15, fill: '#20c997' }
+    ];
+
+    const conversionData = [
+      { stage: 'Prospect', rate: 45 },
+      { stage: 'Qualified', rate: 68 },
+      { stage: 'Contact', rate: 52 },
+      { stage: 'Analysis', rate: 70 },
+      { stage: 'Proposal', rate: 55 },
+      { stage: 'Negotiation', rate: 75 },
+      { stage: 'Won', rate: 100 }
     ];
 
     return (
       <div>
-        <div className="d-flex justify-content-between align-items-center mb-4">
-          <div>
+        {ConfirmationDialog()}
+        
+        {/* Stage Form Modal */}
+        <Modal show={showStageModal} onHide={() => { setShowStageModal(false); setEditingStage(null); }} size="lg">
+          <Modal.Header closeButton>
+            <Modal.Title>{editingStage ? 'Edit Stage' : 'Add New Stage'}</Modal.Title>
+          </Modal.Header>
+          <Modal.Body>
+            <Form>
+              <Row>
+                <Col md={6}>
+                  <Form.Group className="mb-3">
+                    <Form.Label>Stage Name <span className="text-danger">*</span></Form.Label>
+                    <Form.Control type="text" defaultValue={editingStage?.name || ''} placeholder="Enter stage name" />
+                    <Form.Text className="text-muted">Name of the pipeline stage</Form.Text>
+                  </Form.Group>
+                </Col>
+                <Col md={6}>
+                  <Form.Group className="mb-3">
+                    <Form.Label>Type <span className="text-danger">*</span></Form.Label>
+                    <Form.Select defaultValue={editingStage?.type || ''}>
+                      <option value="">Select Type</option>
+                      <option value="Lead">Lead</option>
+                      <option value="Deal">Deal</option>
+                      <option value="Order">Order</option>
+                    </Form.Select>
+                    <Form.Text className="text-muted">Category this stage belongs to</Form.Text>
+                  </Form.Group>
+                </Col>
+              </Row>
+              <Row>
+                <Col md={6}>
+                  <Form.Group className="mb-3">
+                    <Form.Label>Color <span className="text-danger">*</span></Form.Label>
+                    <Form.Control type="color" defaultValue={editingStage?.color || '#0d6efd'} />
+                    <Form.Text className="text-muted">Visual indicator color for this stage</Form.Text>
+                  </Form.Group>
+                </Col>
+                <Col md={6}>
+                  <Form.Group className="mb-3">
+                    <Form.Label>Order Position</Form.Label>
+                    <Form.Control type="number" defaultValue={editingStage?.order || 1} min="1" />
+                    <Form.Text className="text-muted">Position in the pipeline sequence</Form.Text>
+                  </Form.Group>
+                </Col>
+              </Row>
+              <Form.Group className="mb-3">
+                <Form.Label>Description</Form.Label>
+                <Form.Control as="textarea" rows={3} defaultValue={editingStage?.description || ''} placeholder="Describe this stage..." />
+                <Form.Text className="text-muted">Brief description of what this stage represents</Form.Text>
+              </Form.Group>
+              <Form.Group className="mb-3">
+                <Form.Check 
+                  type="checkbox" 
+                  label="Enable Automation for this stage" 
+                  defaultChecked={editingStage?.automated || false}
+                />
+                <Form.Text className="text-muted">Automatically trigger actions when records enter this stage</Form.Text>
+              </Form.Group>
+            </Form>
+          </Modal.Body>
+          <Modal.Footer>
+            <Button variant="secondary" onClick={() => { setShowStageModal(false); setEditingStage(null); }}>
+              Cancel
+            </Button>
+            <Button variant="primary" onClick={() => {
+              alert(editingStage ? 'Stage updated!' : 'Stage created!');
+              setShowStageModal(false);
+              setEditingStage(null);
+            }}>
+              {editingStage ? 'Update Stage' : 'Create Stage'}
+            </Button>
+          </Modal.Footer>
+        </Modal>
+
+        {/* Stage Rules Modal */}
+        <Modal show={showStageRulesModal} onHide={() => { setShowStageRulesModal(false); setEditingStage(null); }} size="lg">
+          <Modal.Header closeButton>
+            <Modal.Title>Configure Rules - {editingStage?.name}</Modal.Title>
+          </Modal.Header>
+          <Modal.Body>
+            <p className="text-muted mb-4">Set up automation rules that trigger when records enter this stage.</p>
+            
+            <Card className="mb-3 border-0 bg-light">
+              <Card.Body>
+                <h6 className="fw-bold mb-3">Entry Actions</h6>
+                <Form.Group className="mb-3">
+                  <Form.Check type="checkbox" label="Send email notification to assigned user" />
+                  <Form.Text className="text-muted">Alert the owner when a record moves to this stage</Form.Text>
+                </Form.Group>
+                <Form.Group className="mb-3">
+                  <Form.Check type="checkbox" label="Create follow-up task automatically" />
+                  <Form.Text className="text-muted">Generate a task for the assigned user</Form.Text>
+                </Form.Group>
+                <Form.Group className="mb-3">
+                  <Form.Check type="checkbox" label="Update record status" />
+                  <Form.Text className="text-muted">Change the record's status field</Form.Text>
+                </Form.Group>
+              </Card.Body>
+            </Card>
+
+            <Card className="border-0 bg-light">
+              <Card.Body>
+                <h6 className="fw-bold mb-3">Exit Conditions</h6>
+                <Form.Group className="mb-3">
+                  <Form.Label>Move to next stage after:</Form.Label>
+                  <Form.Control type="number" placeholder="Number of days" />
+                  <Form.Text className="text-muted">Automatically progress after specified days</Form.Text>
+                </Form.Group>
+                <Form.Group className="mb-3">
+                  <Form.Check type="checkbox" label="Require approval before moving" />
+                  <Form.Text className="text-muted">Manager approval needed to progress</Form.Text>
+                </Form.Group>
+              </Card.Body>
+            </Card>
+          </Modal.Body>
+          <Modal.Footer>
+            <Button variant="secondary" onClick={() => { setShowStageRulesModal(false); setEditingStage(null); }}>
+              Cancel
+            </Button>
+            <Button variant="primary" onClick={() => {
+              alert('Rules saved successfully!');
+              setShowStageRulesModal(false);
+              setEditingStage(null);
+            }}>
+              Save Rules
+            </Button>
+          </Modal.Footer>
+        </Modal>
+
+        <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4">
+          <div className="mb-3 mb-md-0">
             <h2 className="mb-1 fw-bold">Stages Management</h2>
             <p className="text-muted mb-0">Configure and manage your sales pipeline stages</p>
           </div>
-          <Button variant="primary">
-            <Plus size={16} className="me-2" />
-            Add Custom Stage
-          </Button>
+          <div className="d-flex flex-wrap gap-2">
+            <Button 
+              variant={showStagesAnalytics ? "primary" : "outline-secondary"}
+              onClick={() => setShowStagesAnalytics(!showStagesAnalytics)}
+            >
+              <BarChart3 size={16} className="me-2" />
+              {showStagesAnalytics ? 'Hide Analytics' : 'Show Analytics'}
+            </Button>
+            <Button variant="primary" onClick={() => setShowStageModal(true)}>
+              <Plus size={16} className="me-2" />
+              Add Custom Stage
+            </Button>
+          </div>
         </div>
 
-        {/* Summary Stats */}
-        <Row className="mb-4">
+        {/* Analytics Section - Collapsible */}
+        {showStagesAnalytics && (
+          <>
+            {/* Summary Stats */}
+            <Row className="mb-4">
           <Col lg={3} md={6} className="mb-3">
             <KPICard 
               title="Total Stages"
@@ -6372,7 +13079,7 @@ const CRMPortal = () => {
           <Col lg={3} md={6} className="mb-3">
             <KPICard 
               title="Active Records"
-              value="386"
+              value="401"
               icon={<TrendingUp size={24} />}
               color="success"
             />
@@ -6380,7 +13087,7 @@ const CRMPortal = () => {
           <Col lg={3} md={6} className="mb-3">
             <KPICard 
               title="Avg Conversion Rate"
-              value="65.6%"
+              value="70.6%"
               change="+3.2%"
               isPositive={true}
               icon={<Target size={24} />}
@@ -6399,105 +13106,248 @@ const CRMPortal = () => {
           </Col>
         </Row>
 
+        {/* Analytics Charts */}
+        <Row className="mb-4">
+          {/* Stages by Type Distribution */}
+          <Col lg={4} className="mb-4">
+            <Card className="border-0 shadow-sm h-100">
+              <Card.Body>
+                <h5 className="mb-4 fw-bold">Records by Type</h5>
+                <ResponsiveContainer width="100%" height={200}>
+                  <PieChart>
+                    <Pie
+                      data={stagesByType}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={({ type, count }: any) => `${type}: ${count}`}
+                      outerRadius={70}
+                      dataKey="count"
+                    >
+                      {stagesByType.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.fill} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              </Card.Body>
+            </Card>
+          </Col>
+
+          {/* Conversion Rates by Stage */}
+          <Col lg={8} className="mb-4">
+            <Card className="border-0 shadow-sm h-100">
+              <Card.Body>
+                <h5 className="mb-4 fw-bold">Conversion Rates by Stage</h5>
+                <ResponsiveContainer width="100%" height={200}>
+                  <BarChart data={conversionData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="stage" tick={{ fontSize: 11 }} />
+                    <YAxis label={{ value: 'Conversion %', angle: -90, position: 'insideLeft' }} />
+                    <Tooltip />
+                    <Bar dataKey="rate" fill="#0d6efd" radius={[8, 8, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </Card.Body>
+            </Card>
+          </Col>
+        </Row>
+          </>
+        )}
+
         {/* Pipeline Stages Table */}
         <Card className="border-0 shadow-sm mb-4">
-          <Card.Body>
-            <div className="d-flex justify-content-between align-items-center mb-4">
-              <h5 className="mb-0 fw-bold">Sales Pipeline Stages</h5>
-              <div className="d-flex gap-2">
-                <Button variant="outline-secondary" size="sm">
-                  <Edit size={16} className="me-1" />
-                  Reorder Stages
-                </Button>
-                <Button variant="outline-info" size="sm">
-                  <Download size={16} className="me-1" />
-                  Export Configuration
-                </Button>
-              </div>
-            </div>
+          <Card.Body className="p-0">
+            
 
-            <Table responsive hover>
-              <thead className="bg-light">
-                <tr>
-                  <th style={{ width: '50px' }}>Order</th>
-                  <th>Stage Name</th>
-                  <th>Description</th>
-                  <th>Color</th>
-                  <th>Records</th>
-                  <th>Conversion Rate</th>
-                  <th>Avg Duration</th>
-                  <th>Automation</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pipelineStages.map((stage) => (
-                  <tr key={stage.id}>
-                    <td className="text-center fw-bold">{stage.order}</td>
-                    <td>
-                      <div className="d-flex align-items-center gap-2">
-                        <div 
-                          style={{ 
-                            width: '10px', 
-                            height: '10px', 
-                            backgroundColor: stage.color, 
-                            borderRadius: '50%' 
-                          }}
-                        />
-                        <span className="fw-semibold">{stage.name}</span>
-                      </div>
-                    </td>
-                    <td className="small text-muted">{stage.description}</td>
-                    <td>
-                      <Badge style={{ backgroundColor: stage.color }}>
-                        {stage.color}
-                      </Badge>
-                    </td>
-                    <td>
-                      <Badge bg="primary" pill className="bg-opacity-50 text-dark">
-                        {stage.count}
-                      </Badge>
-                    </td>
-                    <td>
-                      <div className="d-flex align-items-center gap-2">
-                        <ProgressBar 
-                          now={parseInt(stage.conversion)} 
-                          variant={parseInt(stage.conversion) >= 70 ? 'success' : parseInt(stage.conversion) >= 50 ? 'warning' : 'danger'}
-                          style={{ width: '80px', height: '8px' }}
-                        />
-                        <small className="fw-semibold">{stage.conversion}</small>
-                      </div>
-                    </td>
-                    <td className="text-muted small">{stage.avgDuration}</td>
-                    <td>
-                      {stage.automated ? (
-                        <Badge bg="success" className="bg-opacity-50">
-                          <CheckCircle size={14} className="me-1" />
-                          Automated
-                        </Badge>
-                      ) : (
-                        <Badge bg="secondary" className="bg-opacity-50">
-                          Manual
-                        </Badge>
-                      )}
-                    </td>
-                    <td>
-                      <div className="d-flex gap-1">
-                        <Button variant="link" size="sm" className="p-1" title="Edit Stage">
-                          <Edit size={16} />
-                        </Button>
-                        <Button variant="link" size="sm" className="p-1" title="Configure Rules">
-                          <GitBranch size={16} />
-                        </Button>
-                        <Button variant="link" size="sm" className="p-1 text-danger" title="Delete Stage">
-                          <Trash2 size={16} />
-                        </Button>
-                      </div>
-                    </td>
+            <div className="table-responsive">
+              <Table hover className="mb-0">
+                <thead className="bg-light">
+                  <tr>
+                    <th style={{ width: '50px' }}>
+                      <Form.Check 
+                        type="checkbox"
+                        checked={(() => {
+                          const sorted = sortData(pipelineStages, stagesPagination.sortColumn, stagesPagination.sortDirection);
+                          const paginated = paginateData(sorted, stagesPagination.currentPage, stagesPagination.rowsPerPage);
+                          return paginated.length > 0 && paginated.every((stage: any) => selectedStages.includes(stage.id));
+                        })()}
+                        onChange={(e) => {
+                          const sorted = sortData(pipelineStages, stagesPagination.sortColumn, stagesPagination.sortDirection);
+                          const paginated = paginateData(sorted, stagesPagination.currentPage, stagesPagination.rowsPerPage);
+                          
+                          if (e.target.checked) {
+                            const newIds = paginated.map((stage: any) => stage.id).filter((id: number) => !selectedStages.includes(id));
+                            setSelectedStages([...selectedStages, ...newIds]);
+                          } else {
+                            const paginatedIds = paginated.map((stage: any) => stage.id);
+                            setSelectedStages(selectedStages.filter(id => !paginatedIds.includes(id)));
+                          }
+                        }}
+                      />
+                    </th>
+                    <th 
+                      style={{ cursor: 'pointer', userSelect: 'none' }}
+                      onClick={() => handleSort('order', stagesPagination, setStagesPagination)}
+                    >
+                      Order {renderSortIcon('order', stagesPagination)}
+                    </th>
+                    <th 
+                      style={{ cursor: 'pointer', userSelect: 'none' }}
+                      onClick={() => handleSort('name', stagesPagination, setStagesPagination)}
+                    >
+                      Stage Name {renderSortIcon('name', stagesPagination)}
+                    </th>
+                    <th 
+                      style={{ cursor: 'pointer', userSelect: 'none' }}
+                      onClick={() => handleSort('type', stagesPagination, setStagesPagination)}
+                    >
+                      Type {renderSortIcon('type', stagesPagination)}
+                    </th>
+                    <th>Description</th>
+                    <th>Color</th>
+                    <th 
+                      style={{ cursor: 'pointer', userSelect: 'none' }}
+                      onClick={() => handleSort('count', stagesPagination, setStagesPagination)}
+                    >
+                      Records {renderSortIcon('count', stagesPagination)}
+                    </th>
+                    <th>Conversion Rate</th>
+                    <th>Avg Duration</th>
+                    <th>Automation</th>
+                    <th>Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </Table>
+                </thead>
+                <tbody>
+                  {(() => {
+                    const sorted = sortData(pipelineStages, stagesPagination.sortColumn, stagesPagination.sortDirection);
+                    const paginated = paginateData(sorted, stagesPagination.currentPage, stagesPagination.rowsPerPage);
+                    return paginated.map((stage) => (
+                      <tr key={stage.id}>
+                        <td>
+                          <Form.Check 
+                            type="checkbox"
+                            checked={selectedStages.includes(stage.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedStages([...selectedStages, stage.id]);
+                              } else {
+                                setSelectedStages(selectedStages.filter(id => id !== stage.id));
+                              }
+                            }}
+                          />
+                        </td>
+                        <td className="text-center fw-bold">{stage.order}</td>
+                        <td>
+                          <div className="d-flex align-items-center gap-2">
+                            <div 
+                              style={{ 
+                                width: '10px', 
+                                height: '10px', 
+                                backgroundColor: stage.color, 
+                                borderRadius: '50%' 
+                              }}
+                            />
+                            <span className="fw-semibold">{stage.name}</span>
+                          </div>
+                        </td>
+                        <td>
+                          <Badge bg={
+                            stage.type === 'Lead' ? 'primary' :
+                            stage.type === 'Deal' ? 'warning' :
+                            'success'
+                          } className="bg-opacity-10 text-dark">
+                            {stage.type}
+                          </Badge>
+                        </td>
+                        <td className="small text-muted">{stage.description}</td>
+                        <td>
+                          <Badge style={{ backgroundColor: stage.color }}>
+                            {stage.color}
+                          </Badge>
+                        </td>
+                        <td>
+                          <Badge bg="primary" pill className="bg-opacity-10 text-dark">
+                            {stage.count}
+                          </Badge>
+                        </td>
+                        <td>
+                          <div className="d-flex align-items-center gap-2">
+                            <ProgressBar 
+                              now={parseInt(stage.conversion)} 
+                              variant={parseInt(stage.conversion) >= 70 ? 'success' : parseInt(stage.conversion) >= 50 ? 'warning' : 'danger'}
+                              style={{ width: '80px', height: '8px' }}
+                            />
+                            <small className="fw-semibold">{stage.conversion}</small>
+                          </div>
+                        </td>
+                        <td className="text-muted small">{stage.avgDuration}</td>
+                        <td>
+                          {stage.automated ? (
+                            <Badge bg="success" className="bg-opacity-10">
+                              <CheckCircle size={14} className="me-1" />
+                              Automated
+                            </Badge>
+                          ) : (
+                            <Badge bg="secondary" className="bg-opacity-10">
+                              Manual
+                            </Badge>
+                          )}
+                        </td>
+                        <td>
+                          <div className="d-flex gap-1">
+                            <Button 
+                              variant="link" 
+                              size="sm" 
+                              className="p-1" 
+                              title="Edit Stage"
+                              onClick={() => {
+                                setEditingStage(stage);
+                                setShowStageModal(true);
+                              }}
+                            >
+                              <Edit size={16} />
+                            </Button>
+                            <Button 
+                              variant="link" 
+                              size="sm" 
+                              className="p-1 text-info" 
+                              title="Configure Automation Rules"
+                              onClick={() => {
+                                setEditingStage(stage);
+                                setShowStageRulesModal(true);
+                              }}
+                            >
+                              <GitBranch size={16} />
+                            </Button>
+                            <Button 
+                              variant="link" 
+                              size="sm" 
+                              className="p-1 text-danger" 
+                              title="Delete Stage"
+                              onClick={() => {
+                                setConfirmAction({
+                                  type: 'delete',
+                                  data: { ...stage, itemType: 'Stage' }
+                                });
+                                setShowConfirmDialog(true);
+                              }}
+                            >
+                              <Trash2 size={16} />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ));
+                  })()}
+                </tbody>
+              </Table>
+            </div>
+            
+            <div className="p-3">
+              {renderPaginationControls(pipelineStages.length, stagesPagination, setStagesPagination, 'stages')}
+            </div>
           </Card.Body>
         </Card>
 
@@ -6560,12 +13410,12 @@ const CRMPortal = () => {
 
     return (
       <div>
-        <div className="d-flex justify-content-between align-items-center mb-4">
-          <div>
+        <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4">
+          <div className="mb-3 mb-md-0">
             <h2 className="mb-1 fw-bold">Activity Tracker</h2>
             <p className="text-muted mb-0">Monitor all CRM activities and conversions in real-time</p>
           </div>
-          <div className="d-flex gap-2">
+          <div className="d-flex flex-wrap gap-2">
             <Button variant="outline-secondary">
               <Filter size={16} className="me-2" />
               Filter
@@ -6705,7 +13555,7 @@ const CRMPortal = () => {
                         </div>
                         <Badge 
                           bg={activity.color} 
-                          className="bg-opacity-50"
+                          className="bg-opacity-10"
                         >
                           {activity.type === 'conversion' ? 'Conversion' : activity.type}
                         </Badge>
@@ -6882,7 +13732,7 @@ const CRMPortal = () => {
                       cx="50%"
                       cy="50%"
                       labelLine={false}
-                      label={({ name, percent }) => `${name} ${((typeof percent === 'number' ? percent : 0) * 100).toFixed(0)}%`}
+                      label={(entry: any) => `${entry.name} ${(((entry.percent as number) || 0) * 100).toFixed(0)}%`}
                       outerRadius={80}
                       fill="#8884d8"
                       dataKey="value"
@@ -7016,9 +13866,9 @@ const CRMPortal = () => {
       case 'orders': return renderOrders();
       case 'campaigns': return renderCampaigns();
       case 'tasks': return renderTasks();
-      // case 'stages': return renderStages();
-      // case 'activities': return renderActivities();
-      // case 'reports': return renderReports();
+      case 'stages': return renderStages();
+      case 'activities': return renderActivities();
+      case 'reports': return renderReports();
       default: return renderDashboard();
     }
   };
@@ -7083,7 +13933,7 @@ const CRMPortal = () => {
 
         @media (min-width: 992px) {
           .content-wrapper {
-            margin-left: 280px;
+            /* margin-left controlled by inline style based on sidebar state */
           }
         }
 
@@ -7093,31 +13943,36 @@ const CRMPortal = () => {
           }
         }
 
-        /* Responsive Tables */
+        /* Responsive Tables - Keep horizontal scroll on mobile for better UX */
         @media (max-width: 768px) {
-          .table thead {
-            display: none;
+          .table-responsive {
+            font-size: 0.813rem;
           }
-          .table tbody tr {
-            display: block;
-            margin-bottom: 1rem;
-            border: 1px solid #dee2e6;
-            border-radius: 0.25rem;
+          .table th, .table td {
+            padding: 0.5rem;
+            white-space: nowrap;
           }
-          .table tbody td {
-            display: flex;
-            justify-content: space-between;
-            padding: 0.75rem;
-            border: none;
-            border-bottom: 1px solid #dee2e6;
+          .table .btn {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.75rem;
           }
-          .table tbody td:last-child {
-            border-bottom: none;
+          .badge {
+            font-size: 0.688rem;
+            padding: 0.25rem 0.5rem;
           }
-          .table tbody td::before {
-            content: attr(data-label);
-            font-weight: bold;
-            margin-right: 1rem;
+        }
+        
+        /* Small mobile devices - extra compact */
+        @media (max-width: 576px) {
+          .table-responsive {
+            font-size: 0.75rem;
+          }
+          .table th, .table td {
+            padding: 0.375rem;
+          }
+          .btn-sm {
+            font-size: 0.688rem;
+            padding: 0.188rem 0.375rem;
           }
         }
 
@@ -7125,6 +13980,57 @@ const CRMPortal = () => {
         @media (max-width: 576px) {
           .kpi-card {
             margin-bottom: 1rem;
+          }
+        }
+        
+        /* Filter Bar Responsive Improvements */
+        @media (max-width: 992px) {
+          .filter-bar .btn {
+            font-size: 0.875rem;
+            padding: 0.5rem 0.75rem;
+          }
+          .filter-bar .badge {
+            font-size: 0.688rem;
+          }
+        }
+        
+        @media (max-width: 768px) {
+          .filter-bar .btn {
+            font-size: 0.813rem;
+            padding: 0.375rem 0.625rem;
+          }
+        }
+        
+        /* Better button wrapping on small screens */
+        @media (max-width: 576px) {
+          .d-flex.gap-2 {
+            gap: 0.5rem !important;
+          }
+          .d-flex.flex-wrap {
+            justify-content: flex-start;
+          }
+          h2 {
+            font-size: 1.25rem;
+          }
+          .btn {
+            font-size: 0.813rem;
+          }
+        }
+        
+        /* Input Group Responsive */
+        @media (max-width: 576px) {
+          .input-group .form-control {
+            font-size: 0.875rem;
+          }
+        }
+        
+        /* Modal Responsive */
+        @media (max-width: 768px) {
+          .modal-dialog {
+            margin: 0.5rem;
+          }
+          .modal-body {
+            padding: 1rem;
           }
         }
       `}</style>
@@ -7177,7 +14083,12 @@ const CRMPortal = () => {
         </div>
       </nav>
       {/* Main Content Area */}
-      <div className="content-wrapper">
+      <div 
+        className="content-wrapper" 
+        style={{ 
+          marginLeft: window.innerWidth >= 992 ? (sidebarOpen ? '280px' : '80px') : '0'
+        }}
+      >
         <Container fluid style={{marginTop:'85px'}}>
           {renderContent()}
         </Container>

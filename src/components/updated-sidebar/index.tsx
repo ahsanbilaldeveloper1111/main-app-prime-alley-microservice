@@ -69,6 +69,24 @@ const ExpandableSidebar: React.FC<SidebarProps> = ({
 
   const mainMenuItems: MainMenuItem[] = [
     {
+      id: 'crm',
+      title: 'CRM System',
+      icon: <Briefcase size={20} />,
+      color: '#0d6efd',
+      subItems: [
+        { id: 'dashboard', title: 'Dashboard', icon: <LayoutDashboard size={16} /> },
+        { id: 'prospects', title: 'Prospects', icon: <Users size={16} /> },
+        { id: 'leads', title: 'Leads', icon: <Target size={16} /> },
+        { id: 'deals', title: 'Deals', icon: <Handshake size={16} /> },
+        { id: 'orders', title: 'Orders', icon: <ShoppingBag size={16} /> },
+        { id: 'campaigns', title: 'Campaigns', icon: <Megaphone size={16} /> },
+        { id: 'tasks', title: 'Task Management', icon: <CheckCircle size={16} /> },
+        { id: 'stages', title: 'Stages Management', icon: <GitBranch size={16} /> },
+        { id: 'activities', title: 'Activity Tracker', icon: <Activity size={16} /> },
+        { id: 'reports', title: 'Reports', icon: <BarChart3 size={16} /> },
+      ]
+    },
+    {
       id: 'dashboards',
       title: 'Dashboards',
       icon: <LayoutDashboard size={20} />,
