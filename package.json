@@ -50,6 +50,7 @@
     "feather-icons": "^4.29.2",
     "feather-icons-react": "^0.9.0",
     "file-saver": "^2.0.5",
+    "firebase": "^12.6.0",
     "formidable": "^3.5.4",
     "formik": "^2.4.6",
     "framer-motion": "^12.23.9",
