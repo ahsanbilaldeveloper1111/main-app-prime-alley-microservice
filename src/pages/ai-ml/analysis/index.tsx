@@ -127,18 +127,107 @@ const CallAnalysis = () => {
     imagicle: imagicle,
     preventAutoConnect: analysisComplete,
     onMessage: (data) => {
-      if (!data) return;
+      if (!data) {
+        console.log('onMessage called with no data');
+        return;
+      }
+
+      // Handle case where data might be a string that needs parsing
+      let parsedData = data;
+      if (typeof data === 'string') {
+        try {
+          parsedData = JSON.parse(data);
+          console.log('Parsed string data to JSON:', parsedData);
+        } catch (e) {
+          console.error('Failed to parse string data:', e);
+          return;
+        }
+      }
+
+      console.log('SSE message received in component:', parsedData);
+      console.log('Data type:', typeof parsedData);
+      console.log('Data status:', parsedData.status);
+      console.log('Data result:', parsedData.result);
 
       // Handle final analysis result
-      if (data.status === 'done' && data.result) {
-        const result = data.result;
+      if (parsedData.status === 'done') {
+        console.log('Status is done, checking result...');
         
-        // Set main analysis data
-        if (result.sentiment || result.customer_intent) {
-          setAnalysis(result);
+        if (!parsedData.result) {
+          console.warn('Status is done but result is missing:', parsedData);
+          return;
         }
         
+        const result = parsedData.result;
+        
+        console.log('Processing done status with result:', result);
+        console.log('Result keys:', Object.keys(result));
+        
+        // Set main analysis data - create analysis object with available fields
+        // Even if sentiment/customer_intent are missing, we should set analysis
+        // so the render condition passes
+        const analysisData: CallAnalysis = {
+          sentiment: result.sentiment || '',
+          customer_intent: result.customer_intent || result.interaction_type || '',
+          key_topics: result.main_topic ? [result.main_topic] : [],
+          action_items: [],
+          entities_customer: [],
+          customer_emotions: [],
+          operator_emotions: [],
+          call_categories: [],
+          resolution_status: '',
+          follow_up_required: false,
+          summary: result.summary || ''
+        };
+        setAnalysis(analysisData);
+        
+        // Handle the new response structure where data is directly in result
         // Set domain specific analysis
+        if (result.localPartyNumber || result.ownerUsername || result.qualified !== undefined) {
+          const domainAnalysis: DomainSpecificAnalysis = {
+            localPartyNumber: result.localPartyNumber || '',
+            ownerUsername: Array.isArray(result.ownerUsername) ? result.ownerUsername[0] : (result.ownerUsername || ''),
+            completion_percent: result.completion_percent || 0,
+            matched_fields_count: result.matched_fields_count || 0,
+            qualified: result.qualified || false
+          };
+          setDomainSpecificAnalysis(domainAnalysis);
+        }
+        
+        // Set summary data
+        if (result.summary || result.interaction_type || result.main_topic) {
+          const summaryData: SummaryData = {
+            summary: result.summary || '',
+            interaction_type: result.interaction_type || '',
+            main_topic: result.main_topic || '',
+            tags: result.tags || []
+          };
+          setSummaryData(summaryData);
+        }
+        
+        // Set transcription (directly in result, not in domain_specific_analysis)
+        if (result.transcription && Array.isArray(result.transcription)) {
+          // Convert string timestamps to numbers if needed
+          const transcription = result.transcription.map((item: any) => ({
+            speaker: item.speaker || '',
+            text: item.text || '',
+            start: typeof item.start === 'string' ? Number.parseFloat(item.start) : (item.start || 0),
+            end: typeof item.end === 'string' ? Number.parseFloat(item.end) : (item.end || 0)
+          }));
+          setTranscription(transcription);
+        }
+        
+        // Set extracted entities
+        if (result.extracted_qualification_fields) {
+          setExtractEntities(result.extracted_qualification_fields);
+        }
+        
+        // Set call duration if available
+        if (result.domain_specific_duration) {
+          setCallDuration(result.domain_specific_duration);
+        }
+        
+        // Also handle old structure for backward compatibility
         if (result.domain_specific_analysis) {
           const domainAnalysis = result.domain_specific_analysis;
           setDomainSpecificAnalysis(domainAnalysis);
@@ -148,30 +237,43 @@ const CallAnalysis = () => {
           setCallDuration(domainAnalysis?.domain_specific_duration);
         }
         
+        // Always set these flags when we receive done status
+        console.log('Setting dataFound=true, loading=false, analysisComplete=true');
         setDataFound(true);
         setLoading(false);
         setAnalysisComplete(true);
+        
+        console.log('Analysis data set, disconnecting socket');
+        console.log('Result data processed:', {
+          hasTranscription: !!(result.transcription),
+          hasSummary: !!(result.summary),
+          hasDomainAnalysis: !!(result.localPartyNumber || result.ownerUsername),
+          hasExtractEntities: !!(result.extracted_qualification_fields)
+        });
         
         // Disconnect socket when analysis is complete
         disconnectSocket();
       }
       // Handle processing
-      else if (data.status === 'processing') {
+      else if (parsedData.status === 'processing') {
+        console.log('Status is processing, setting loading to true');
         setLoading(true);
       }
       // Handle connection status
-      else if (data.type === 'connection') {
+      else if (parsedData.type === 'connection') {
         // Connection status handled by onOpen/onClose
       }
       // Handle ping messages
-      else if (data.type === 'ping') {
+      else if (parsedData.type === 'ping') {
         // Keep connection alive
       }
       // Fallback for other data structures
-      else if (data.analysis) {
-        setAnalysis(data.analysis);
-      } else if (data.sentiment || data.customer_intent) {
-        setAnalysis(data);
+      else if (parsedData.analysis) {
+        setAnalysis(parsedData.analysis);
+      } else if (parsedData.sentiment || parsedData.customer_intent) {
+        setAnalysis(parsedData);
+      } else {
+        console.log('Unhandled message type:', parsedData);
       }
     },
     onError: (error) => {
@@ -693,7 +795,7 @@ const CallAnalysis = () => {
             <div className="vbox">
               <h5>Summary</h5>
               <div className="card-text">
-                <h6>{analysis?.summary}</h6>
+                <h6>{summaryData?.summary || analysis?.summary}</h6>
               </div>
             </div>
           </div>
@@ -1282,7 +1384,7 @@ const CallAnalysis = () => {
               </div>
             </Col>
           </Row>
-        ) : analysis ? (
+        ) : (dataFound || analysis || summaryData || transcription) ? (
           <Tabs activeKey={activeTab} onSelect={(k) => setActiveTab(k || 'summary')} id="system-tabs" className="mb-3">
             <Tab eventKey="summary" title="Summary">
               {renderCustomerInfo()}
