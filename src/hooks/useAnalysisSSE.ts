@@ -51,8 +51,22 @@ export const useAnalysisSSE = (config: SSEConfig) => {
   }, [config.uuid, config.date, config.localPartyNumber, config.ownerUsername, config.imagicle]);
 
   const connect = useCallback(() => {
+    // Prevent multiple simultaneous connections
     if (eventSourceRef.current?.readyState === EventSource.OPEN) {
+      console.log('SSE already connected, skipping reconnect');
       return;
+    }
+    
+    // If already connecting, don't start another connection
+    if (eventSourceRef.current?.readyState === EventSource.CONNECTING) {
+      console.log('SSE already connecting, skipping reconnect');
+      return;
+    }
+    
+    // Clean up any existing connection before creating a new one
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+      eventSourceRef.current = null;
     }
 
     // Check if required parameters are available
@@ -119,22 +133,37 @@ export const useAnalysisSSE = (config: SSEConfig) => {
       };
 
       eventSource.onerror = (error) => {
-        setState(prev => ({
-          ...prev,
-          error: 'SSE connection error',
-          connecting: false,
-          connected: false
-        }));
-        configRef.current.onError?.(error);
+        // Check the readyState to determine if connection is actually closed
+        // EventSource.CONNECTING = 0, EventSource.OPEN = 1, EventSource.CLOSED = 2
+        const isClosed = eventSource.readyState === EventSource.CLOSED;
+        const isConnecting = eventSource.readyState === EventSource.CONNECTING;
         
-        // Attempt to reconnect if not a manual close
-        if (reconnectAttempts.current < maxReconnectAttempts) {
-          const delay = Math.min(1000 * Math.pow(2, reconnectAttempts.current), 30000);
+        // Only treat as error if connection is actually closed
+        // If it's still connecting or open, don't reconnect (might be temporary network hiccup)
+        if (isClosed) {
+          setState(prev => ({
+            ...prev,
+            error: 'SSE connection closed',
+            connecting: false,
+            connected: false
+          }));
+          configRef.current.onError?.(error);
           
-          reconnectTimeoutRef.current = setTimeout(() => {
-            reconnectAttempts.current++;
-            connect();
-          }, delay);
+          // Only attempt to reconnect if connection is actually closed and we haven't exceeded max attempts
+          if (reconnectAttempts.current < maxReconnectAttempts) {
+            const delay = Math.min(1000 * Math.pow(2, reconnectAttempts.current), 30000);
+            
+            reconnectTimeoutRef.current = setTimeout(() => {
+              reconnectAttempts.current++;
+              connect();
+            }, delay);
+          }
+        } else if (isConnecting) {
+          // Connection is still trying to establish, just log but don't reconnect
+          console.log('SSE connection still connecting, waiting...');
+        } else {
+          // Connection is open, might be a temporary error, don't reconnect
+          console.log('SSE connection is open, ignoring temporary error');
         }
       };
 
@@ -159,6 +188,9 @@ export const useAnalysisSSE = (config: SSEConfig) => {
       eventSourceRef.current = null;
     }
 
+    // Reset reconnect attempts on manual disconnect
+    reconnectAttempts.current = 0;
+
     setState(prev => ({
       ...prev,
       connected: false,
@@ -169,7 +201,19 @@ export const useAnalysisSSE = (config: SSEConfig) => {
 
   // Auto-connect when parameters are ready (unless prevented)
   useEffect(() => {
-    if (state.parametersReady && !state.connected && !state.connecting && !configRef.current.preventAutoConnect) {
+    // Only auto-connect if:
+    // 1. Parameters are ready
+    // 2. Not already connected
+    // 3. Not currently connecting
+    // 4. Not prevented by config
+    // 5. No existing EventSource connection
+    if (
+      state.parametersReady && 
+      !state.connected && 
+      !state.connecting && 
+      !configRef.current.preventAutoConnect &&
+      (!eventSourceRef.current || eventSourceRef.current.readyState === EventSource.CLOSED)
+    ) {
       connect();
     }
   }, [state.parametersReady, state.connected, state.connecting, connect]);
