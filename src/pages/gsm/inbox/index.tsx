@@ -9,11 +9,13 @@ import { ListGsmInbox } from '@utils/GsmManagement';
 import GsmInboxFilter from '@components/filters/GsmInboxFilter';
 import moment from 'moment';
 import '@assets/scss/common.scss';
+import { useSession } from 'next-auth/react';
 
 import '@assets/scss/gsm-inbox.scss';
 import { toast } from 'react-toastify';
 
 const GsmInbox = () => {
+  const { data: session, status } = useSession();
   const [refreshKey, setRefreshKey] = useState<number>(0);
   const [currentFilters, setCurrentFilters] = useState<{[key: string]: any}>({});
 
@@ -257,7 +259,12 @@ const GsmInbox = () => {
         <Col md={8} className="d-flex justify-content-end">
                       
                     <div className="action-buttons">
+                      <>
+                      {session?.user?.permissions?.includes('filters-gsm-inbox') && (
                         <GsmInboxFilter onFiltersChange={handleFiltersChange} showExport={false} />
+                      )}
+                      </>
+                        
                         
                         
                          
@@ -284,7 +291,8 @@ const GsmInbox = () => {
         </Col>
       </Row>
 
-
+{session?.user?.permissions?.includes('list-gsm-inbox') && (
+     <>
       {gsmInbox?.data?.length > 0 ? (
         <Row>
           <Col md={12}>
@@ -338,9 +346,15 @@ const GsmInbox = () => {
           <p className="mb-0">No data found</p>
         </div>
       )}
+     </>
+      )}
+
+
         </Col>
       </Row>
-
+      {session?.user?.permissions?.includes('list-gsm-inbox') && (
+      <>
+     
       {showDetailsModal && selectedMessage && (
         <div id="detail-modal" className="modal" style={{display: 'flex'}}>
         <div className="modal-content">
@@ -403,6 +417,12 @@ const GsmInbox = () => {
           </button>
         </div>
       )}
+
+
+</>
+      )}
+
+      
 
     </>
   );

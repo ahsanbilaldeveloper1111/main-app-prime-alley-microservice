@@ -1519,6 +1519,7 @@ const TicketList = () => {
       {session?.user?.permissions?.includes("view-ticket-tickets") && (
 
       <>
+      {session?.user?.permissions?.includes('search-ticket-tickets') && (
         <Row className="mb-0">
           <Col md={12}>
             <Card>
@@ -1598,6 +1599,8 @@ const TicketList = () => {
             </Card>
           </Col>
         </Row>
+        )}
+
   
           <GenericListPage
             columns={columns}
