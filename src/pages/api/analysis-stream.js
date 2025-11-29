@@ -61,11 +61,15 @@ export default function handler(req, res) {
     res.write(`data: ${JSON.stringify({ type: 'error', status: 'timeout', message: 'Connection timeout to analysis server' })}\n\n`);
   }, 10000);
   
+  // Build WebSocket options
+  // Note: The 'ws' library automatically sets the 'Host' header from the URL
+  // We should NOT manually set 'Host' as it must match the server we're connecting to
   const wsOptions = {
     headers: {
       'User-Agent': 'MainApp',
-      'Origin': process.env.NEXT_PUBLIC_BASE_URL,
-      'host': process.env.NEXT_PUBLIC_BASE_URL,
+      // Origin header identifies where the request is coming from (client app)
+      // Only set if NEXT_PUBLIC_BASE_URL is available, otherwise let ws library handle it
+      ...(process.env.NEXT_PUBLIC_BASE_URL && { 'Origin': process.env.NEXT_PUBLIC_BASE_URL }),
     }
   };
 
@@ -74,6 +78,7 @@ export default function handler(req, res) {
     wsOptions.rejectUnauthorized = false; // Accept self-signed certificates
   }
 
+  console.log('WebSocket connection options:', JSON.stringify(wsOptions, null, 2));
   const wsAnalysis = new WebSocket(analysisServerUrl, wsOptions);
 
   // Send initial connection status
@@ -123,6 +128,9 @@ export default function handler(req, res) {
 
   wsAnalysis.on('error', (error) => {
     console.error('Analysis server error:', error.message);
+    console.error('Error code:', error.code);
+    console.error('Connection URL:', analysisServerUrl);
+    console.error('WebSocket options:', JSON.stringify(wsOptions, null, 2));
     clearTimeout(connectionTimeout);
     res.write(`data: ${JSON.stringify({ 
       type: 'error', 
