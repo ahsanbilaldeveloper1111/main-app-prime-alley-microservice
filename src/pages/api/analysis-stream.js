@@ -50,6 +50,8 @@ export default function handler(req, res) {
   const analysisServerHost = process.env.NEXT_PUBLIC_PRIVATE_AIML_SOCKET_URL;
   const analysisServerUrl = `${websocketProtocol}://${analysisServerHost}/ws/analysis/${uuid}/${date}/${localPartyNumber}/${ownerUsername}/${imagicle}/`;
   
+  //const analysisServerUrl = `${websocketProtocol}://${analysisServerHost}/ws/analysis/${uuid}/${date}/${localPartyNumber}/${ownerUsername}/${imagicle}/10000/10001/OUTGOING/`;
+  
   console.log('🔗 Connecting to analysis server:', analysisServerUrl);
   
   // Add connection timeout
@@ -60,8 +62,9 @@ export default function handler(req, res) {
   
   const wsOptions = {
     headers: {
-      'User-Agent': 'Next.js Analysis Client',
-      'Origin': 'http://localhost:3000'
+      'User-Agent': 'MainApp',
+      'Origin': process.env.NEXT_PUBLIC_BASE_URL,
+      'host': process.env.NEXT_PUBLIC_BASE_URL,
     }
   };
 
