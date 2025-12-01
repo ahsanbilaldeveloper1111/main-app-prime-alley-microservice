@@ -61,7 +61,16 @@ import {
   Briefcase,
   User,
   History,
-  Hash
+  Hash,
+  Tag,
+  MessageSquare,
+  ArrowRight,
+  Send,
+  UserCheck,
+  Info,
+  Paperclip,
+  Upload,
+  Download as DownloadIcon
 } from 'lucide-react';
 import { 
   PieChart, 
@@ -560,6 +569,23 @@ const CRMPortal = () => {
   const [editingDeal, setEditingDeal] = useState<any>(null);
   const [editingOrder, setEditingOrder] = useState<any>(null);
   const [editingStage, setEditingStage] = useState<any>(null);
+  const [showAddItemModal, setShowAddItemModal] = useState(false);
+  const [showRevisionHistoryModal, setShowRevisionHistoryModal] = useState(false);
+  const [showRevisionDetailModal, setShowRevisionDetailModal] = useState(false);
+  const [selectedRevision, setSelectedRevision] = useState<any>(null);
+  const [showDealHistoryModal, setShowDealHistoryModal] = useState(false);
+  const [selectedDealForHistory, setSelectedDealForHistory] = useState<any>(null);
+  const [showAttachmentModal, setShowAttachmentModal] = useState(false);
+  const [selectedDealForAttachments, setSelectedDealForAttachments] = useState<any>(null);
+  const [editingItem, setEditingItem] = useState<any>(null);
+  const [itemFormData, setItemFormData] = useState({
+    product: '',
+    description: '',
+    quantity: 1,
+    unitPrice: 0,
+    currency: 'GBP',
+    tax: 20
+  });
   const [taskFormData, setTaskFormData] = useState<Task>({
     title: '',
     name: '',
@@ -628,6 +654,18 @@ const CRMPortal = () => {
     const saved = localStorage.getItem('ordersSelectedColumns');
     return saved ? JSON.parse(saved) : ['orderId', 'linkedDeal', 'customer', 'value', 'approval', 'stage', 'fulfillment', 'progress', 'priority', 'orderDate'];
   });
+  const [selectedCampaignsColumns, setSelectedCampaignsColumns] = useState<string[]>(() => {
+    const saved = localStorage.getItem('campaignsSelectedColumns');
+    return saved ? JSON.parse(saved) : ['campaignName', 'owner', 'status', 'dateRange', 'created'];
+  });
+  const [selectedTasksColumns, setSelectedTasksColumns] = useState<string[]>(() => {
+    const saved = localStorage.getItem('tasksSelectedColumns');
+    return saved ? JSON.parse(saved) : ['task', 'assignedTo', 'contact', 'company', 'urgency', 'status', 'dueDate'];
+  });
+  const [selectedStagesColumns, setSelectedStagesColumns] = useState<string[]>(() => {
+    const saved = localStorage.getItem('stagesSelectedColumns');
+    return saved ? JSON.parse(saved) : ['stageName', 'category', 'duration', 'successRate', 'activeDeals', 'automation'];
+  });
   const [leadFormData, setLeadFormData] = useState({
     leadPotential: '',
     urgency: '',
@@ -646,6 +684,12 @@ const CRMPortal = () => {
   const [distributionMode, setDistributionMode] = useState<string>('');
   const [assignToCampaigns, setAssignToCampaigns] = useState<string[]>([]);
   const [customExtensions, setCustomExtensions] = useState<string>('');
+
+  // Activity Tracker States
+  const [activityStageFilter, setActivityStageFilter] = useState('all');
+  const [activityDateRange, setActivityDateRange] = useState({ start: '', end: '' });
+  const [activityRecordsLimit, setActivityRecordsLimit] = useState(50);
+  const [activitySearchTerm, setActivitySearchTerm] = useState('');
   const [recordsToAssign, setRecordsToAssign] = useState<number>(0);
   const [includeAssignedRecords, setIncludeAssignedRecords] = useState<boolean>(false);
   const [selectedLeads, setSelectedLeads] = useState<number[]>([]);
@@ -674,6 +718,17 @@ const CRMPortal = () => {
     tags: [] as string[],
     priority: [] as string[],
     dateRange: { start: '', end: '' }
+  });
+  const [showCampaignModal, setShowCampaignModal] = useState(false);
+  const [editingCampaign, setEditingCampaign] = useState<any>(null);
+  const [campaignFormData, setCampaignFormData] = useState({
+    name: '',
+    description: '',
+    owner: '',
+    status: 'Draft',
+    startDate: '',
+    endDate: '',
+    created: new Date().toLocaleDateString('en-GB')
   });
   const [showProspectModal, setShowProspectModal] = useState(false);
   const [leadFormStep, setLeadFormStep] = useState(0);
@@ -770,6 +825,7 @@ const CRMPortal = () => {
   const [showProspectViewModal, setShowProspectViewModal] = useState(false);
   const [showCampaignViewModal, setShowCampaignViewModal] = useState(false);
   const [showTaskViewModal, setShowTaskViewModal] = useState(false);
+  const [editingTask, setEditingTask] = useState<any>(null);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [confirmAction, setConfirmAction] = useState<{ type: string; data: any } | null>(null);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
@@ -934,6 +990,10 @@ const CRMPortal = () => {
   React.useEffect(() => {
     localStorage.setItem('ordersSelectedColumns', JSON.stringify(selectedOrdersColumns));
   }, [selectedOrdersColumns]);
+
+  React.useEffect(() => {
+    localStorage.setItem('campaignsSelectedColumns', JSON.stringify(selectedCampaignsColumns));
+  }, [selectedCampaignsColumns]);
 
   // Custom styles for React Select
   const customSelectStyles = {
@@ -3247,6 +3307,1858 @@ const CRMPortal = () => {
     </Modal>
   );
 
+  // Helper function for downloading revision PDF
+  const handleDownloadRevisionPDF = (revision: any) => {
+    // Simulate PDF download
+    console.log('Downloading PDF for:', revision.version);
+    alert(`Downloading estimate ${revision.version} as PDF...\n\nGrand Total: £${revision.grandTotal.toLocaleString()}\nNet Value: £${revision.netValue.toLocaleString()}\nCreated: ${revision.created}`);
+    // In real implementation, this would generate and download a PDF
+  };
+
+  // Add/Edit Item Modal Component
+  const AddItemModal = () => {
+    const handleSubmit = (e: React.FormEvent) => {
+      e.preventDefault();
+      
+      if (!editingDeal) return;
+      
+      const newItem = {
+        ...itemFormData,
+        subTotal: (itemFormData.unitPrice * itemFormData.quantity * (1 + itemFormData.tax / 100))
+      };
+      
+      let updatedEstimations = [...(editingDeal.estimations || [])];
+      
+      if (editingItem !== null) {
+        // Edit existing item
+        updatedEstimations[editingItem] = newItem;
+      } else {
+        // Add new item
+        updatedEstimations.push(newItem);
+      }
+      
+      setEditingDeal({
+        ...editingDeal,
+        estimations: updatedEstimations
+      });
+      
+      // Reset and close
+      setShowAddItemModal(false);
+      setEditingItem(null);
+      setItemFormData({
+        product: '',
+        description: '',
+        quantity: 1,
+        unitPrice: 0,
+        currency: 'GBP',
+        tax: 20
+      });
+    };
+    
+    return (
+      <Modal show={showAddItemModal} onHide={() => {
+        setShowAddItemModal(false);
+        setEditingItem(null);
+        setItemFormData({
+          product: '',
+          description: '',
+          quantity: 1,
+          unitPrice: 0,
+          currency: 'GBP',
+          tax: 20
+        });
+      }} size="lg" centered>
+        <Modal.Header closeButton>
+          <Modal.Title>{editingItem !== null ? 'Edit Item' : 'Add New Item'}</Modal.Title>
+        </Modal.Header>
+        <Form onSubmit={handleSubmit}>
+          <Modal.Body>
+            <Row className="g-3">
+              <Col md={12}>
+                <Form.Group>
+                  <Form.Label>Product/Service Name <span className="text-danger">*</span></Form.Label>
+                  <Form.Control
+                    type="text"
+                    placeholder="Enter product or service name"
+                    value={itemFormData.product}
+                    onChange={(e) => setItemFormData({ ...itemFormData, product: e.target.value })}
+                    required
+                    disabled={editingItem !== null}
+                  />
+                  {editingItem !== null && (
+                    <Form.Text className="text-muted">Product name cannot be edited</Form.Text>
+                  )}
+                </Form.Group>
+              </Col>
+              
+              <Col md={12}>
+                <Form.Group>
+                  <Form.Label>Description/Specification</Form.Label>
+                  <Form.Control
+                    as="textarea"
+                    rows={3}
+                    placeholder="Enter product description or specifications"
+                    value={itemFormData.description}
+                    onChange={(e) => setItemFormData({ ...itemFormData, description: e.target.value })}
+                    disabled={editingItem !== null}
+                  />
+                  {editingItem !== null && (
+                    <Form.Text className="text-muted">Description cannot be edited</Form.Text>
+                  )}
+                </Form.Group>
+              </Col>
+              
+              <Col md={6}>
+                <Form.Group>
+                  <Form.Label>Quantity <span className="text-danger">*</span></Form.Label>
+                  <Form.Control
+                    type="number"
+                    min="1"
+                    placeholder="Enter quantity"
+                    value={itemFormData.quantity}
+                    onChange={(e) => setItemFormData({ ...itemFormData, quantity: parseInt(e.target.value) || 1 })}
+                    required
+                  />
+                </Form.Group>
+              </Col>
+              
+              <Col md={6}>
+                <Form.Group>
+                  <Form.Label>Unit Price <span className="text-danger">*</span></Form.Label>
+                  <Form.Control
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="Enter unit price"
+                    value={itemFormData.unitPrice}
+                    onChange={(e) => setItemFormData({ ...itemFormData, unitPrice: parseFloat(e.target.value) || 0 })}
+                    required
+                  />
+                </Form.Group>
+              </Col>
+              
+              <Col md={6}>
+                <Form.Group>
+                  <Form.Label>Currency <span className="text-danger">*</span></Form.Label>
+                  <Form.Select
+                    value={itemFormData.currency}
+                    onChange={(e) => setItemFormData({ ...itemFormData, currency: e.target.value })}
+                    required
+                  >
+                    <option value="GBP">GBP (£)</option>
+                    <option value="USD">USD ($)</option>
+                    <option value="EUR">EUR (€)</option>
+                  </Form.Select>
+                </Form.Group>
+              </Col>
+              
+              <Col md={6}>
+                <Form.Group>
+                  <Form.Label>Tax % <span className="text-danger">*</span></Form.Label>
+                  <Form.Control
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.01"
+                    placeholder="Enter tax percentage"
+                    value={itemFormData.tax}
+                    onChange={(e) => setItemFormData({ ...itemFormData, tax: parseFloat(e.target.value) || 0 })}
+                    required
+                  />
+                </Form.Group>
+              </Col>
+              
+              <Col md={12}>
+                <Card className="bg-light border-0">
+                  <Card.Body>
+                    <div className="d-flex justify-content-between align-items-center">
+                      <span className="text-muted">Sub Total (with tax):</span>
+                      <h5 className="mb-0 text-success">
+                        {itemFormData.currency === 'GBP' ? '£' : itemFormData.currency === 'USD' ? '$' : '€'}
+                        {(itemFormData.unitPrice * itemFormData.quantity * (1 + itemFormData.tax / 100)).toFixed(2)}
+                      </h5>
+                    </div>
+                  </Card.Body>
+                </Card>
+              </Col>
+            </Row>
+          </Modal.Body>
+          <Modal.Footer>
+            <Button variant="outline-secondary" onClick={() => {
+              setShowAddItemModal(false);
+              setEditingItem(null);
+              setItemFormData({
+                product: '',
+                description: '',
+                quantity: 1,
+                unitPrice: 0,
+                currency: 'GBP',
+                tax: 20
+              });
+            }}>
+              Cancel
+            </Button>
+            <Button variant="primary" type="submit">
+              {editingItem !== null ? 'Update Item' : 'Add Item'}
+            </Button>
+          </Modal.Footer>
+        </Form>
+      </Modal>
+    );
+  };
+
+  // Revision History Modal Component
+  const RevisionHistoryModal = () => {
+    // Mock revision history data with detailed items
+    const revisionHistory = [
+      {
+        version: 'v3.0',
+        created: '2025-11-28 14:30',
+        grandTotal: 15420.50,
+        netValue: 12850.42,
+        items: [
+          { product: 'Software License Pro', description: 'Annual subscription', quantity: 10, unitPrice: 450, currency: 'GBP', tax: 20, subTotal: 5400 },
+          { product: 'Cloud Storage 5TB', description: 'Monthly plan', quantity: 5, unitPrice: 120, currency: 'GBP', tax: 20, subTotal: 720 },
+          { product: 'Support Package Premium', description: '24/7 support', quantity: 1, unitPrice: 9300.50, currency: 'GBP', tax: 20, subTotal: 11160.60 }
+        ]
+      },
+      {
+        version: 'v2.0',
+        created: '2025-11-25 10:15',
+        grandTotal: 14200.00,
+        netValue: 11833.33,
+        items: [
+          { product: 'Software License Pro', description: 'Annual subscription', quantity: 10, unitPrice: 450, currency: 'GBP', tax: 20, subTotal: 5400 },
+          { product: 'Cloud Storage 5TB', description: 'Monthly plan', quantity: 4, unitPrice: 120, currency: 'GBP', tax: 20, subTotal: 576 },
+          { product: 'Support Package Standard', description: 'Business hours support', quantity: 1, unitPrice: 8224, currency: 'GBP', tax: 20, subTotal: 9868.80 }
+        ]
+      },
+      {
+        version: 'v1.0',
+        created: '2025-11-20 16:45',
+        grandTotal: 12500.00,
+        netValue: 10416.67,
+        items: [
+          { product: 'Software License Basic', description: 'Annual subscription', quantity: 10, unitPrice: 350, currency: 'GBP', tax: 20, subTotal: 4200 },
+          { product: 'Cloud Storage 2TB', description: 'Monthly plan', quantity: 5, unitPrice: 80, currency: 'GBP', tax: 20, subTotal: 480 },
+          { product: 'Support Package Basic', description: 'Email support', quantity: 1, unitPrice: 7820, currency: 'GBP', tax: 20, subTotal: 9384 }
+        ]
+      }
+    ];
+    
+    const handleViewDetails = (revision: any) => {
+      setSelectedRevision(revision);
+      setShowRevisionDetailModal(true);
+    };
+    
+    const handleRestoreVersion = (revision: any) => {
+      if (window.confirm(`Are you sure you want to restore ${revision.version}?\n\nThis will replace the current estimation with the selected version.`)) {
+        // Restore the revision items to editingDeal
+        if (editingDeal) {
+          setEditingDeal({
+            ...editingDeal,
+            estimations: revision.items
+          });
+          setShowRevisionHistoryModal(false);
+          alert(`${revision.version} has been restored successfully!`);
+        }
+      }
+    };
+    
+    return (
+      <Modal show={showRevisionHistoryModal} onHide={() => setShowRevisionHistoryModal(false)} size="lg" centered>
+        <Modal.Header closeButton>
+          <Modal.Title>
+            <History size={20} className="me-2" />
+            Revision History
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <div className="table-responsive">
+            <Table hover>
+              <thead className="bg-light">
+                <tr>
+                  <th>Version</th>
+                  <th>Created</th>
+                  <th>Grand Total</th>
+                  <th>Net Value</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {revisionHistory.map((revision, index) => (
+                  <tr key={index}>
+                    <td>
+                      <Badge bg={index === 0 ? 'success' : 'secondary'}>
+                        {revision.version}
+                      </Badge>
+                      {index === 0 && (
+                        <Badge bg="info" className="ms-2">Current</Badge>
+                      )}
+                    </td>
+                    <td>
+                      <div className="d-flex align-items-center">
+                        <Calendar size={14} className="me-2 text-muted" />
+                        {revision.created}
+                      </div>
+                    </td>
+                    <td className="fw-bold text-success">£{revision.grandTotal.toLocaleString()}</td>
+                    <td>£{revision.netValue.toLocaleString()}</td>
+                    <td>
+                      <div className="d-flex gap-1">
+                        <Button 
+                          variant="link" 
+                          size="sm" 
+                          className="p-1" 
+                          title="View Details"
+                          onClick={() => handleViewDetails(revision)}
+                        >
+                          <Eye size={14} />
+                        </Button>
+                        {/* <Button 
+                          variant="link" 
+                          size="sm" 
+                          className="p-1" 
+                          title="Download PDF"
+                          onClick={() => handleDownloadRevisionPDF(revision)}
+                        >
+                          <Download size={14} />
+                        </Button>
+                        {index !== 0 && (
+                          <Button 
+                            variant="link" 
+                            size="sm" 
+                            className="p-1 text-info" 
+                            title="Restore Version"
+                            onClick={() => handleRestoreVersion(revision)}
+                          >
+                            <RefreshCw size={14} />
+                          </Button>
+                        )} */}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </Table>
+          </div>
+          
+          <Card className="border-0 bg-light mt-3">
+            <Card.Body>
+              <Row>
+                <Col md={6}>
+                  <small className="text-muted">Total Revisions</small>
+                  <div className="fw-bold">{revisionHistory.length}</div>
+                </Col>
+                <Col md={6}>
+                  <small className="text-muted">Latest Update</small>
+                  <div className="fw-bold">{revisionHistory[0].created}</div>
+                </Col>
+              </Row>
+            </Card.Body>
+          </Card>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowRevisionHistoryModal(false)}>
+            Close
+          </Button>
+        </Modal.Footer>
+      </Modal>
+    );
+  };
+
+  // Deal Complete History Modal Component
+  const DealCompleteHistoryModal = () => {
+    if (!selectedDealForHistory) return null;
+    
+    // Comprehensive history tracking all deal activities
+    const dealHistory = [
+      {
+        id: 1,
+        timestamp: '2025-11-30 15:45',
+        category: 'Stage Change',
+        action: 'Stage Updated',
+        details: 'Deal moved from "Proposal" to "Negotiation"',
+        performedBy: 'John Doe (501)',
+        icon: <GitBranch size={16} />,
+        color: '#0d6efd',
+        metadata: { from: 'Proposal', to: 'Negotiation' }
+      },
+      {
+        id: 2,
+        timestamp: '2025-11-29 14:20',
+        category: 'Financial',
+        action: 'Value Updated',
+        details: `Deal value changed from £45,000 to £${selectedDealForHistory.value}`,
+        performedBy: 'Sarah Williams (504)',
+        icon: <DollarSign size={16} />,
+        color: '#198754',
+        metadata: { from: '£45,000', to: selectedDealForHistory.value }
+      },
+      {
+        id: 3,
+        timestamp: '2025-11-28 16:30',
+        category: 'Estimation',
+        action: 'Revision Created',
+        details: 'New estimate version v3.0 created with updated items',
+        performedBy: 'John Doe (501)',
+        icon: <FileText size={16} />,
+        color: '#6f42c1',
+        metadata: { version: 'v3.0', grandTotal: '£15,420.50' }
+      },
+      {
+        id: 4,
+        timestamp: '2025-11-27 11:15',
+        category: 'Communication',
+        action: 'Meeting Scheduled',
+        details: 'Follow-up meeting scheduled for Dec 5, 2025 at 2:00 PM',
+        performedBy: 'Jane Smith (502)',
+        icon: <Calendar size={16} />,
+        color: '#0dcaf0',
+        metadata: { meetingDate: '2025-12-05 14:00', type: 'Follow-up' }
+      },
+      {
+        id: 5,
+        timestamp: '2025-11-26 10:00',
+        category: 'Document',
+        action: 'Proposal Sent',
+        details: 'Proposal document sent to client via email',
+        performedBy: 'Mike Johnson (503)',
+        icon: <Send size={16} />,
+        color: '#fd7e14',
+        metadata: { documentType: 'Proposal', recipient: selectedDealForHistory.company }
+      },
+      {
+        id: 6,
+        timestamp: '2025-11-25 13:45',
+        category: 'Estimation',
+        action: 'Revision Created',
+        details: 'Estimate version v2.0 created',
+        performedBy: 'John Doe (501)',
+        icon: <FileText size={16} />,
+        color: '#6f42c1',
+        metadata: { version: 'v2.0', grandTotal: '£14,200.00' }
+      },
+      {
+        id: 7,
+        timestamp: '2025-11-24 09:30',
+        category: 'Assignment',
+        action: 'Owner Changed',
+        details: `Deal reassigned from Mike Johnson to ${selectedDealForHistory.owner}`,
+        performedBy: 'Manager One (601)',
+        icon: <UserCheck size={16} />,
+        color: '#20c997',
+        metadata: { from: 'Mike Johnson', to: selectedDealForHistory.owner }
+      },
+      {
+        id: 8,
+        timestamp: '2025-11-23 14:15',
+        category: 'Communication',
+        action: 'Call Logged',
+        details: 'Discovery call completed - 45 minutes duration',
+        performedBy: 'John Doe (501)',
+        icon: <Phone size={16} />,
+        color: '#0d6efd',
+        metadata: { duration: '45 min', outcome: 'Positive' }
+      },
+      {
+        id: 9,
+        timestamp: '2025-11-22 16:20',
+        category: 'Stage Change',
+        action: 'Stage Updated',
+        details: 'Deal moved from "Qualified" to "Proposal"',
+        performedBy: 'John Doe (501)',
+        icon: <GitBranch size={16} />,
+        color: '#0d6efd',
+        metadata: { from: 'Qualified', to: 'Proposal' }
+      },
+      {
+        id: 10,
+        timestamp: '2025-11-21 11:00',
+        category: 'Note',
+        action: 'Note Added',
+        details: 'Client interested in premium package with extended support',
+        performedBy: 'Sarah Williams (504)',
+        icon: <MessageSquare size={16} />,
+        color: '#6c757d',
+        metadata: { noteType: 'General' }
+      },
+      {
+        id: 11,
+        timestamp: '2025-11-20 15:30',
+        category: 'Estimation',
+        action: 'Initial Estimate',
+        details: 'First estimate version v1.0 created',
+        performedBy: 'John Doe (501)',
+        icon: <FileText size={16} />,
+        color: '#6f42c1',
+        metadata: { version: 'v1.0', grandTotal: '£12,500.00' }
+      },
+      {
+        id: 12,
+        timestamp: '2025-11-20 14:00',
+        category: 'Creation',
+        action: 'Deal Created',
+        details: `Deal "${selectedDealForHistory.name}" created from lead qualification`,
+        performedBy: 'John Doe (501)',
+        icon: <Plus size={16} />,
+        color: '#198754',
+        metadata: { initialStage: 'New', source: 'Lead Conversion' }
+      }
+    ];
+    
+    const categoryColors: { [key: string]: string } = {
+      'Stage Change': '#0d6efd',
+      'Financial': '#198754',
+      'Estimation': '#6f42c1',
+      'Communication': '#0dcaf0',
+      'Document': '#fd7e14',
+      'Assignment': '#20c997',
+      'Note': '#6c757d',
+      'Creation': '#198754'
+    };
+    
+    return (
+      <Modal 
+        show={showDealHistoryModal} 
+        onHide={() => {
+          setShowDealHistoryModal(false);
+          setSelectedDealForHistory(null);
+        }} 
+        size="xl" 
+        centered
+      >
+        {/* Custom Header */}
+        <div style={{
+          borderBottom: '1px solid #ccc',
+          color: 'black',
+          padding: '30px',
+          position: 'relative',
+        }}>
+          <button 
+            onClick={() => {
+              setShowDealHistoryModal(false);
+              setSelectedDealForHistory(null);
+            }}
+            style={{
+              position: 'absolute',
+              top: '20px',
+              right: '20px',
+              background: 'rgba(255,255,255,0.2)',
+              border: 'none',
+              color: 'black',
+              width: '36px',
+              height: '36px',
+              borderRadius: '50%',
+              cursor: 'pointer',
+              transition: 'all 0.3s',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = 'rgba(255,255,255,0.3)';
+              e.currentTarget.style.transform = 'rotate(90deg)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = 'rgba(255,255,255,0.2)';
+              e.currentTarget.style.transform = 'rotate(0deg)';
+            }}
+          >
+            <X size={20} />
+          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+            <div style={{
+              width: '50px',
+              height: '50px',
+              background: 'rgba(255,255,255,0.2)',
+              borderRadius: '12px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
+              <History size={28} />
+            </div>
+            <div>
+              <h3 style={{ margin: 0, fontWeight: 600, fontSize: '24px' }}>
+                Complete Deal History
+              </h3>
+              <p style={{ margin: '8px 0 0 0', opacity: 0.9, fontSize: '14px' }}>
+                {selectedDealForHistory.name} - All Activities & Changes
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <Modal.Body style={{ padding: '30px', maxHeight: '70vh', overflowY: 'auto' }}>
+          {/* Deal Summary Card */}
+          <Card className="border-0 shadow-sm mb-4" style={{ background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)' }}>
+            <Card.Body>
+              <Row>
+                <Col md={3}>
+                  <div style={{ fontSize: '12px', color: '#6c757d', marginBottom: '4px' }}>Deal Name</div>
+                  <div style={{ fontSize: '16px', fontWeight: 600 }}>{selectedDealForHistory.name}</div>
+                </Col>
+                <Col md={3}>
+                  <div style={{ fontSize: '12px', color: '#6c757d', marginBottom: '4px' }}>Current Value</div>
+                  <div style={{ fontSize: '16px', fontWeight: 600, color: '#198754' }}>{selectedDealForHistory.value}</div>
+                </Col>
+                <Col md={3}>
+                  <div style={{ fontSize: '12px', color: '#6c757d', marginBottom: '4px' }}>Current Stage</div>
+                  <Badge bg="primary" style={{ fontSize: '13px', padding: '6px 12px' }}>{selectedDealForHistory.stage}</Badge>
+                </Col>
+                <Col md={3}>
+                  <div style={{ fontSize: '12px', color: '#6c757d', marginBottom: '4px' }}>Owner</div>
+                  <div style={{ fontSize: '16px', fontWeight: 600 }}>{selectedDealForHistory.owner}</div>
+                </Col>
+              </Row>
+            </Card.Body>
+          </Card>
+
+          {/* Timeline */}
+          <div style={{ position: 'relative' }}>
+            {/* Vertical Timeline Line */}
+            <div style={{
+              position: 'absolute',
+              left: '25px',
+              top: '0',
+              bottom: '0',
+              width: '2px',
+              background: 'linear-gradient(180deg, #667eea 0%, #764ba2 100%)',
+              opacity: 0.3
+            }} />
+            
+            {dealHistory.map((item, index) => (
+              <div 
+                key={item.id} 
+                style={{
+                  position: 'relative',
+                  paddingLeft: '60px',
+                  paddingBottom: '30px',
+                  opacity: 0,
+                  animation: `slideIn 0.4s ease forwards ${index * 0.05}s`
+                }}
+              >
+                {/* Timeline Node */}
+                <div style={{
+                  position: 'absolute',
+                  left: '16px',
+                  top: '0',
+                  width: '20px',
+                  height: '20px',
+                  borderRadius: '50%',
+                  background: 'white',
+                  border: `3px solid ${item.color}`,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  zIndex: 1,
+                  boxShadow: `0 0 0 4px ${item.color}20`
+                }} />
+                
+                {/* Activity Card */}
+                <Card 
+                  className="border-0 shadow-sm"
+                  style={{
+                    transition: 'all 0.3s',
+                    cursor: 'pointer'
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.transform = 'translateX(5px)';
+                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.transform = 'translateX(0)';
+                    e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
+                  }}
+                >
+                  <Card.Body style={{ padding: '16px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1 }}>
+                        <div style={{
+                          width: '36px',
+                          height: '36px',
+                          borderRadius: '8px',
+                          background: `${item.color}15`,
+                          color: item.color,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}>
+                          {item.icon}
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                            <span style={{ fontSize: '14px', fontWeight: 600, color: '#1f2937' }}>
+                              {item.action}
+                            </span>
+                            <div
+  style={{
+    display: "inline-block",
+    backgroundColor: item.color,   // dynamic background
+    color: "#fff",
+    fontSize: "11px",
+    padding: "3px 8px",
+    fontWeight: 500,
+    borderRadius: "0.375rem",      // same as Bootstrap badge rounded corners
+    lineHeight: 1,
+    textAlign: "center",
+    whiteSpace: "nowrap",
+    verticalAlign: "baseline",
+  }}
+>
+  {item.category}
+</div>
+
+                            {/* <Badge 
+                              style={{ 
+                                background: `${item.color}`, 
+                                color: "#fff",
+                                fontSize: '11px',
+                                padding: '3px 8px',
+                                fontWeight: 500
+                              }}
+                            >
+                              {item.category}
+                            </Badge> */}
+                          </div>
+                          <div style={{ fontSize: '13px', color: '#6b7280', marginBottom: '4px' }}>
+                            {item.details}
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '12px', color: '#9ca3af' }}>
+                            <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <Clock size={12} />
+                              {item.timestamp}
+                            </span>
+                            <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <User size={12} />
+                              {item.performedBy}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Metadata Tags */}
+                    {item.metadata && Object.keys(item.metadata).length > 0 && (
+                      <div style={{ 
+                        marginTop: '12px', 
+                        paddingTop: '12px', 
+                        borderTop: '1px solid #f3f4f6',
+                        display: 'flex',
+                        flexWrap: 'wrap',
+                        gap: '8px'
+                      }}>
+                        {Object.entries(item.metadata).map(([key, value]) => (
+                          <span 
+                            key={key}
+                            style={{
+                              fontSize: '11px',
+                              padding: '4px 8px',
+                              background: '#f9fafb',
+                              border: '1px solid #e5e7eb',
+                              borderRadius: '4px',
+                              color: '#4b5563'
+                            }}
+                          >
+                            <strong>{key}:</strong> {value}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </Card.Body>
+                </Card>
+              </div>
+            ))}
+          </div>
+
+          {/* Animation Keyframes */}
+          <style>{`
+            @keyframes slideIn {
+              from {
+                opacity: 0;
+                transform: translateX(-20px);
+              }
+              to {
+                opacity: 1;
+                transform: translateX(0);
+              }
+            }
+            @keyframes shimmer {
+              0% {
+                transform: translateX(-100%);
+              }
+              100% {
+                transform: translateX(100%);
+              }
+            }
+          `}</style>
+        </Modal.Body>
+
+        <Modal.Footer style={{ background: '#f9fafb', borderTop: '1px solid #e5e7eb', padding: '20px 30px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
+            <div style={{ fontSize: '13px', color: '#6b7280' }}>
+              <strong>{dealHistory.length}</strong> activities recorded
+            </div>
+            <Button
+              variant="outline-secondary"
+              onClick={() => {
+                setShowDealHistoryModal(false);
+                setSelectedDealForHistory(null);
+              }}
+              style={{
+                padding: '10px 24px',
+                borderRadius: '8px',
+                fontWeight: 500,
+                fontSize: '14px'
+              }}
+            >
+              Close
+            </Button>
+          </div>
+        </Modal.Footer>
+      </Modal>
+    );
+  };
+
+  // Revision Detail Modal Component
+  const RevisionDetailModal = () => {
+    if (!selectedRevision) return null;
+    
+    return (
+      <Modal show={showRevisionDetailModal} onHide={() => {
+        setShowRevisionDetailModal(false);
+        setSelectedRevision(null);
+      }} size="xl" centered>
+        <Modal.Header closeButton>
+          <Modal.Title>
+            <FileText size={20} className="me-2" />
+            Estimate Details - {selectedRevision.version}
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <Card className="border-0 bg-light mb-3">
+            <Card.Body>
+              <Row>
+                <Col md={3}>
+                  <small className="text-muted">Version</small>
+                  <div className="fw-bold">
+                    <Badge bg="success" className="me-2">{selectedRevision.version}</Badge>
+                  </div>
+                </Col>
+                <Col md={3}>
+                  <small className="text-muted">Created</small>
+                  <div className="fw-bold">{selectedRevision.created}</div>
+                </Col>
+                <Col md={3}>
+                  <small className="text-muted">Grand Total</small>
+                  <div className="fw-bold text-success">£{selectedRevision.grandTotal.toLocaleString()}</div>
+                </Col>
+                <Col md={3}>
+                  <small className="text-muted">Net Value</small>
+                  <div className="fw-bold">£{selectedRevision.netValue.toLocaleString()}</div>
+                </Col>
+              </Row>
+            </Card.Body>
+          </Card>
+          
+          <h6 className="fw-bold mb-3">Items in this Estimate</h6>
+          <div className="table-responsive">
+            <Table hover className="bg-white">
+              <thead className="bg-light">
+                <tr>
+                  <th>#</th>
+                  <th>Product/Service</th>
+                  <th>Description</th>
+                  <th>Qty</th>
+                  <th>Unit Price</th>
+                  <th>Currency</th>
+                  <th>Tax %</th>
+                  <th>Sub Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {selectedRevision.items.map((item: any, index: number) => (
+                  <tr key={index}>
+                    <td>{index + 1}</td>
+                    <td className="fw-semibold">{item.product}</td>
+                    <td className="text-muted small">{item.description}</td>
+                    <td>{item.quantity}</td>
+                    <td>£{item.unitPrice.toLocaleString()}</td>
+                    <td>
+                      <Badge bg="secondary">{item.currency}</Badge>
+                    </td>
+                    <td>{item.tax}%</td>
+                    <td className="fw-bold">£{item.subTotal.toLocaleString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot className="bg-light">
+                <tr>
+                  <td colSpan={7} className="text-end fw-bold">Net Value:</td>
+                  <td className="fw-bold">£{selectedRevision.netValue.toLocaleString()}</td>
+                </tr>
+                <tr>
+                  <td colSpan={7} className="text-end fw-bold">Tax (20%):</td>
+                  <td className="fw-bold">£{(selectedRevision.grandTotal - selectedRevision.netValue).toLocaleString()}</td>
+                </tr>
+                <tr>
+                  <td colSpan={7} className="text-end fw-bold text-success">Grand Total:</td>
+                  <td className="fw-bold text-success">£{selectedRevision.grandTotal.toLocaleString()}</td>
+                </tr>
+              </tfoot>
+            </Table>
+          </div>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="outline-secondary" onClick={() => {
+            setShowRevisionDetailModal(false);
+            setSelectedRevision(null);
+          }}>
+            Close
+          </Button>
+          <Button 
+            variant="outline-primary" 
+            onClick={() => {
+              handleDownloadRevisionPDF(selectedRevision);
+            }}
+          >
+            <Download size={16} className="me-2" />
+            Download PDF
+          </Button>
+          {selectedRevision.version !== 'v3.0' && (
+            <Button 
+              variant="info" 
+              onClick={() => {
+                setShowRevisionDetailModal(false);
+                if (window.confirm(`Restore ${selectedRevision.version}?\n\nThis will replace the current estimation.`)) {
+                  if (editingDeal) {
+                    setEditingDeal({
+                      ...editingDeal,
+                      estimations: selectedRevision.items
+                    });
+                    setShowRevisionHistoryModal(false);
+                    setSelectedRevision(null);
+                    alert(`${selectedRevision.version} has been restored successfully!`);
+                  }
+                }
+              }}
+            >
+              <RefreshCw size={16} className="me-2" />
+              Restore This Version
+            </Button>
+          )}
+        </Modal.Footer>
+      </Modal>
+    );
+  };
+
+  // Manage Attachments Modal Component
+  const ManageAttachmentsModal = () => {
+    if (!selectedDealForAttachments) return null;
+
+    // Mock attachments data - you can replace with actual data from deal
+    const attachments = selectedDealForAttachments.attachments || [
+      { id: 1, name: 'Contract_Draft.pdf', size: '2.5 MB', uploadedBy: 'John Doe', uploadedAt: '2024-11-20', type: 'application/pdf' },
+      { id: 2, name: 'Proposal_Final.docx', size: '1.8 MB', uploadedBy: 'Jane Smith', uploadedAt: '2024-11-22', type: 'application/docx' },
+      { id: 3, name: 'Budget_Breakdown.xlsx', size: '856 KB', uploadedBy: 'Sarah Johnson', uploadedAt: '2024-11-25', type: 'application/xlsx' }
+    ];
+
+    const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+      const files = event.target.files;
+      if (files && files.length > 0) {
+        // Handle file upload logic here
+        alert(`${files.length} file(s) selected for upload: ${Array.from(files).map(f => f.name).join(', ')}`);
+      }
+    };
+
+    const handleDownload = (attachment: any) => {
+      alert(`Downloading: ${attachment.name}`);
+      // Implement actual download logic here
+    };
+
+    const handleDelete = (attachment: any) => {
+      if (window.confirm(`Are you sure you want to delete "${attachment.name}"?`)) {
+        alert(`Deleted: ${attachment.name}`);
+        // Implement actual delete logic here
+      }
+    };
+
+    return (
+      <Modal 
+        show={showAttachmentModal} 
+        onHide={() => {
+          setShowAttachmentModal(false);
+          setSelectedDealForAttachments(null);
+        }} 
+        size="lg" 
+        centered
+      >
+        <Modal.Header closeButton className="border-0 pb-0">
+          <Modal.Title className="d-flex align-items-center gap-2">
+            <div 
+              className="rounded-circle d-flex align-items-center justify-content-center" 
+              style={{ width: '40px', height: '40px', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}
+            >
+              <Paperclip size={20} color="white" />
+            </div>
+            <div>
+              <div style={{ fontSize: '20px', fontWeight: 600 }}>Manage Attachments</div>
+              <div style={{ fontSize: '13px', color: '#6c757d', fontWeight: 'normal' }}>
+                {selectedDealForAttachments.name}
+              </div>
+            </div>
+          </Modal.Title>
+        </Modal.Header>
+
+        <Modal.Body className="p-4">
+          {/* Upload Section */}
+          <div className="mb-4 p-4 border rounded" style={{ background: '#f8f9fa' }}>
+            <div className="d-flex align-items-center justify-content-between mb-3">
+              <div>
+                <h6 className="mb-1 fw-bold">Upload New Attachments</h6>
+                <small className="text-muted">Supported formats: PDF, DOC, DOCX, XLS, XLSX, PNG, JPG (Max 10MB)</small>
+              </div>
+            </div>
+            <div className="d-flex gap-2">
+              <Form.Control
+                type="file"
+                multiple
+                onChange={handleFileUpload}
+                accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg"
+                style={{ flex: 1 }}
+              />
+              <Button variant="primary" className="d-flex align-items-center gap-2">
+                <Upload size={16} />
+                Upload
+              </Button>
+            </div>
+          </div>
+
+          {/* Attachments List */}
+          <div>
+            <h6 className="mb-3 fw-bold d-flex align-items-center gap-2">
+              <FileText size={18} />
+              Attached Files ({attachments.length})
+            </h6>
+            
+            {attachments.length === 0 ? (
+              <div className="text-center py-5 text-muted">
+                <Paperclip size={48} className="mb-3 opacity-25" />
+                <div>No attachments yet</div>
+                <small>Upload files using the form above</small>
+              </div>
+            ) : (
+              <div className="d-flex flex-column gap-2">
+                {attachments.map((attachment: any) => (
+                  <Card key={attachment.id} className="border shadow-sm">
+                    <Card.Body className="p-3">
+                      <div className="d-flex align-items-center justify-content-between">
+                        <div className="d-flex align-items-center gap-3 flex-grow-1">
+                          {/* File Icon */}
+                          <div 
+                            className="rounded d-flex align-items-center justify-content-center"
+                            style={{ 
+                              width: '45px', 
+                              height: '45px', 
+                              background: attachment.type.includes('pdf') ? '#dc3545' : 
+                                         attachment.type.includes('doc') ? '#0d6efd' : 
+                                         attachment.type.includes('xls') ? '#198754' : '#6c757d',
+                              color: 'white'
+                            }}
+                          >
+                            <FileText size={22} />
+                          </div>
+                          
+                          {/* File Info */}
+                          <div className="flex-grow-1">
+                            <div className="fw-semibold" style={{ fontSize: '14px' }}>{attachment.name}</div>
+                            <div style={{ fontSize: '12px', color: '#6c757d' }}>
+                              {attachment.size} • Uploaded by {attachment.uploadedBy} • {attachment.uploadedAt}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Actions */}
+                        <div className="d-flex gap-1">
+                          <Button 
+                            variant="link" 
+                            size="sm" 
+                            className="p-2 text-primary" 
+                            title="Download"
+                            onClick={() => handleDownload(attachment)}
+                          >
+                            <DownloadIcon size={18} />
+                          </Button>
+                          <Button 
+                            variant="link" 
+                            size="sm" 
+                            className="p-2 text-danger" 
+                            title="Delete"
+                            onClick={() => handleDelete(attachment)}
+                          >
+                            <Trash2 size={18} />
+                          </Button>
+                        </div>
+                      </div>
+                    </Card.Body>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
+        </Modal.Body>
+
+        <Modal.Footer className="border-0">
+          <Button
+            variant="secondary"
+            onClick={() => {
+              setShowAttachmentModal(false);
+              setSelectedDealForAttachments(null);
+            }}
+          >
+            Close
+          </Button>
+        </Modal.Footer>
+      </Modal>
+    );
+  };
+  
+  // Deal Form Modal Component (Reusable)
+  const DealFormModal = () => (
+    <Modal show={showDealFormModal} onHide={() => { setShowDealFormModal(false); setEditingDeal(null); setDealFormStep(0); }} size="xl">
+      <Modal.Header closeButton>
+        <Modal.Title>{editingDeal ? 'Edit Deal' : 'Add New Deal'}</Modal.Title>
+      </Modal.Header>
+      <Modal.Body>
+        {/* Timeline Navigation */}
+        <div className="mb-4">
+          <div className="d-flex align-items-center justify-content-between position-relative">
+            {/* Progress Line */}
+            <div 
+              className="position-absolute bg-light" 
+              style={{ 
+                left: '0', 
+                right: '0', 
+                top: '20px', 
+                height: '2px', 
+                zIndex: 0 
+              }}
+            />
+            <div 
+              className="position-absolute bg-primary" 
+              style={{ 
+                left: '0', 
+                top: '20px', 
+                height: '2px', 
+                width: `${(dealFormStep / 4) * 100}%`,
+                zIndex: 0,
+                transition: 'width 0.3s ease'
+              }}
+            />
+            
+            {/* Step 1 */}
+            <div 
+              className="text-center position-relative" 
+              style={{ cursor: 'pointer', flex: 1 }}
+              onClick={() => setDealFormStep(0)}
+            >
+              <div 
+                className={`rounded-circle d-flex align-items-center justify-content-center mx-auto ${dealFormStep >= 0 ? 'bg-primary text-white' : 'bg-light text-muted'}`}
+                style={{ width: '40px', height: '40px', zIndex: 1, position: 'relative' }}
+              >
+                {dealFormStep > 0 ? <CheckCircle size={20} /> : '1'}
+              </div>
+              <small className={`d-block mt-2 ${dealFormStep === 0 ? 'fw-bold text-primary' : 'text-muted'}`}>Deal Info</small>
+            </div>
+
+            {/* Step 2 */}
+            <div 
+              className="text-center position-relative" 
+              style={{ cursor: 'pointer', flex: 1 }}
+              onClick={() => setDealFormStep(1)}
+            >
+              <div 
+                className={`rounded-circle d-flex align-items-center justify-content-center mx-auto ${dealFormStep >= 1 ? 'bg-primary text-white' : 'bg-light text-muted'}`}
+                style={{ width: '40px', height: '40px', zIndex: 1, position: 'relative' }}
+              >
+                {dealFormStep > 1 ? <CheckCircle size={20} /> : '2'}
+              </div>
+              <small className={`d-block mt-2 ${dealFormStep === 1 ? 'fw-bold text-primary' : 'text-muted'}`}>Company Info</small>
+            </div>
+
+            {/* Step 3 */}
+            <div 
+              className="text-center position-relative" 
+              style={{ cursor: 'pointer', flex: 1 }}
+              onClick={() => setDealFormStep(2)}
+            >
+              <div 
+                className={`rounded-circle d-flex align-items-center justify-content-center mx-auto ${dealFormStep >= 2 ? 'bg-primary text-white' : 'bg-light text-muted'}`}
+                style={{ width: '40px', height: '40px', zIndex: 1, position: 'relative' }}
+              >
+                {dealFormStep > 2 ? <CheckCircle size={20} /> : '3'}
+              </div>
+              <small className={`d-block mt-2 ${dealFormStep === 2 ? 'fw-bold text-primary' : 'text-muted'}`}>Characteristics</small>
+            </div>
+
+            {/* Step 4 */}
+            <div 
+              className="text-center position-relative" 
+              style={{ cursor: 'pointer', flex: 1 }}
+              onClick={() => setDealFormStep(3)}
+            >
+              <div 
+                className={`rounded-circle d-flex align-items-center justify-content-center mx-auto ${dealFormStep >= 3 ? 'bg-primary text-white' : 'bg-light text-muted'}`}
+                style={{ width: '40px', height: '40px', zIndex: 1, position: 'relative' }}
+              >
+                {dealFormStep > 3 ? <CheckCircle size={20} /> : '4'}
+              </div>
+              <small className={`d-block mt-2 ${dealFormStep === 3 ? 'fw-bold text-primary' : 'text-muted'}`}>Progress & Notes</small>
+            </div>
+
+            {/* Step 5 */}
+            <div 
+              className="text-center position-relative" 
+              style={{ cursor: 'pointer', flex: 1 }}
+              onClick={() => setDealFormStep(4)}
+            >
+              <div 
+                className={`rounded-circle d-flex align-items-center justify-content-center mx-auto ${dealFormStep >= 4 ? 'bg-primary text-white' : 'bg-light text-muted'}`}
+                style={{ width: '40px', height: '40px', zIndex: 1, position: 'relative' }}
+              >
+                {dealFormStep > 4 ? <CheckCircle size={20} /> : '5'}
+              </div>
+              <small className={`d-block mt-2 ${dealFormStep === 4 ? 'fw-bold text-primary' : 'text-muted'}`}>Estimation</small>
+            </div>
+          </div>
+        </div>
+
+        {/* Form Content Based on Step */}
+        <div style={{ minHeight: '400px' }}>
+          {dealFormStep === 0 && (
+            <Card className="mb-3 border-0 bg-light">
+              <Card.Body>
+                <h5 className="fw-bold mb-4 text-primary">DEAL INFORMATION</h5>
+                <Row>
+                  <Col md={6}>
+                    <Form.Group className="mb-3">
+                      <Form.Label>Deal Name <span className="text-danger">*</span></Form.Label>
+                      <Form.Control type="text" defaultValue={editingDeal?.name || ''} placeholder="Enter deal name" required />
+                    </Form.Group>
+                  </Col>
+                  <Col md={6}>
+                    <Form.Group className="mb-3">
+                      <Form.Label>Type <span className="text-danger">*</span></Form.Label>
+                      <Form.Select defaultValue={editingDeal?.type || ''} required>
+                        <option value="">Select Type</option>
+                        <option value="New Business">New Business</option>
+                        <option value="Existing Business">Existing Business</option>
+                        <option value="Renewal">Renewal</option>
+                        <option value="Upsell">Upsell</option>
+                      </Form.Select>
+                    </Form.Group>
+                  </Col>
+                  <Col md={6}>
+                    <Form.Group className="mb-3">
+                      <Form.Label>Expected Close Date <span className="text-danger">*</span></Form.Label>
+                      <Form.Control type="date" defaultValue={editingDeal?.expectedCloseDate || ''} required />
+                    </Form.Group>
+                  </Col>
+                  <Col md={6}>
+                    <Form.Group className="mb-3">
+                      <Form.Label>Assigned to <span className="text-danger">*</span></Form.Label>
+                      <Form.Select defaultValue={editingDeal?.assignedTo || editingDeal?.owner || ''} required>
+                        <option value="">Select User</option>
+                        <option value="John Doe">John Doe</option>
+                        <option value="Jane Doe">Jane Doe</option>
+                        <option value="Sarah Smith">Sarah Smith</option>
+                        <option value="Mike Johnson">Mike Johnson</option>
+                      </Form.Select>
+                    </Form.Group>
+                  </Col>
+                  <Col md={6}>
+                    <Form.Group className="mb-3">
+                      <Form.Label>Stage <span className="text-danger">*</span></Form.Label>
+                      <Form.Select defaultValue={editingDeal?.stage || ''} required>
+                        <option value="">Select Stage</option>
+                        <option value="Qualification">Qualification</option>
+                        <option value="Meeting">Meeting</option>
+                        <option value="Proposal">Proposal</option>
+                        <option value="Negotiation">Negotiation</option>
+                        <option value="Contract Sent">Contract Sent</option>
+                        <option value="Won">Won</option>
+                        <option value="Lost">Lost</option>
+                      </Form.Select>
+                    </Form.Group>
+                  </Col>
+                  <Col md={6}>
+                    <Form.Group className="mb-3">
+                      <Form.Label>Probability <span className="text-danger">*</span></Form.Label>
+                      <div className="d-flex align-items-center gap-2">
+                        <Form.Range defaultValue={editingDeal?.probability || 50} style={{ flex: 1 }} />
+                        <Badge bg="primary" style={{ minWidth: '60px' }}>{editingDeal?.probability || 50}%</Badge>
+                      </div>
+                      <Form.Text className="text-muted">Likelihood of closing this deal</Form.Text>
+                    </Form.Group>
+                  </Col>
+                  <Col md={12}>
+                    <Form.Group className="mb-3">
+                      <Form.Label>Description</Form.Label>
+                      <Form.Control 
+                        as="textarea" 
+                        rows={3} 
+                        defaultValue={editingDeal?.description || ''} 
+                        placeholder="Enter deal description"
+                      />
+                    </Form.Group>
+                  </Col>
+                </Row>
+              </Card.Body>
+            </Card>
+          )}
+
+          {dealFormStep === 1 && (
+            <Card className="mb-3 border-0 bg-light">
+              <Card.Body>
+                <h5 className="fw-bold mb-4 text-success">COMPANY INFORMATION</h5>
+                <Row>
+                  <Col md={6}>
+                    <Form.Group className="mb-3">
+                      <Form.Label>Company Name <span className="text-danger">*</span></Form.Label>
+                      <Form.Control type="text" defaultValue={editingDeal?.company || ''} placeholder="Enter company name" required />
+                    </Form.Group>
+                  </Col>
+                  <Col md={6}>
+                    <Form.Group className="mb-3">
+                      <Form.Label>Industry <span className="text-danger">*</span></Form.Label>
+                      <Form.Select defaultValue={editingDeal?.industry || ''} required>
+                        <option value="">Select Industry</option>
+                        <option value="Technology">Technology</option>
+                        <option value="Healthcare">Healthcare</option>
+                        <option value="Finance">Finance</option>
+                        <option value="Manufacturing">Manufacturing</option>
+                        <option value="Retail">Retail</option>
+                        <option value="Education">Education</option>
+                        <option value="Real Estate">Real Estate</option>
+                        <option value="Telecommunications">Telecommunications</option>
+                        <option value="Construction">Construction</option>
+                        <option value="Other">Other</option>
+                      </Form.Select>
+                    </Form.Group>
+                  </Col>
+                  <Col md={6}>
+                    <Form.Group className="mb-3">
+                      <Form.Label>Main Decision Maker <span className="text-danger">*</span></Form.Label>
+                      <Form.Control type="text" defaultValue={editingDeal?.decisionMaker || editingDeal?.contactPerson || ''} placeholder="Decision maker name" required />
+                    </Form.Group>
+                  </Col>
+                  <Col md={6}>
+                    <Form.Group className="mb-3">
+                      <Form.Label>Decision Maker Email <span className="text-danger">*</span></Form.Label>
+                      <Form.Control type="email" defaultValue={editingDeal?.decisionMakerEmail || editingDeal?.contactEmail || ''} placeholder="decisionmaker@company.com" required />
+                    </Form.Group>
+                  </Col>
+                  <Col md={6}>
+                    <Form.Group className="mb-3">
+                      <Form.Label>Decision Maker Phone <span className="text-danger">*</span></Form.Label>
+                      <Form.Control type="tel" defaultValue={editingDeal?.decisionMakerPhone || editingDeal?.contactPhone || ''} placeholder="+44 20 1234 5678" required />
+                    </Form.Group>
+                  </Col>
+                </Row>
+              </Card.Body>
+            </Card>
+          )}
+
+          {dealFormStep === 2 && (
+            <Card className="mb-3 border-0 bg-light">
+              <Card.Body>
+                <h5 className="fw-bold mb-4 text-info">DEAL CHARACTERISTICS</h5>
+                <Row>
+                  <Col md={6}>
+                    <Form.Group className="mb-3">
+                      <Form.Label>Deal Type <span className="text-danger">*</span></Form.Label>
+                      <Form.Select defaultValue={editingDeal?.dealType || ''} required>
+                        <option value="">Select Deal Type</option>
+                        <option value="New Sale">New Sale</option>
+                        <option value="Renewal">Renewal</option>
+                        <option value="Migration">Migration</option>
+                        <option value="Cross-sell">Cross-sell</option>
+                        <option value="Upsell">Upsell</option>
+                      </Form.Select>
+                    </Form.Group>
+                  </Col>
+                  <Col md={6}>
+                    <Form.Group className="mb-3">
+                      <Form.Label>Contract Length <span className="text-danger">*</span></Form.Label>
+                      <Form.Select defaultValue={editingDeal?.contractLength || ''} required>
+                        <option value="">Select Length</option>
+                        <option value="1 month">1 month</option>
+                        <option value="3 months">3 months</option>
+                        <option value="6 months">6 months</option>
+                        <option value="12 months">12 months</option>
+                        <option value="24 months">24 months</option>
+                        <option value="36 months">36 months</option>
+                      </Form.Select>
+                    </Form.Group>
+                  </Col>
+                  <Col md={6}>
+                    <Form.Group className="mb-3">
+                      <Form.Label>Billing Model <span className="text-danger">*</span></Form.Label>
+                      <Form.Select defaultValue={editingDeal?.billingModel || ''} required>
+                        <option value="">Select Model</option>
+                        <option value="Monthly">Monthly</option>
+                        <option value="Quarterly">Quarterly</option>
+                        <option value="Semi-Annual">Semi-Annual</option>
+                        <option value="Annual">Annual</option>
+                        <option value="One-time">One-time</option>
+                      </Form.Select>
+                    </Form.Group>
+                  </Col>
+                  <Col md={6}>
+                    <Form.Group className="mb-3">
+                      <Form.Label>Payment Terms <span className="text-danger">*</span></Form.Label>
+                      <Form.Select defaultValue={editingDeal?.paymentTerms || ''} required>
+                        <option value="">Select Terms</option>
+                        <option value="Net 15">Net 15</option>
+                        <option value="Net 30">Net 30</option>
+                        <option value="Net 45">Net 45</option>
+                        <option value="Net 60">Net 60</option>
+                        <option value="Upfront">Upfront</option>
+                        <option value="50% Upfront">50% Upfront</option>
+                      </Form.Select>
+                    </Form.Group>
+                  </Col>
+                  <Col md={6}>
+                    <Form.Group className="mb-3">
+                      <Form.Label>Risk Level <span className="text-danger">*</span></Form.Label>
+                      <Form.Select defaultValue={editingDeal?.riskLevel || ''} required>
+                        <option value="">Select Risk Level</option>
+                        <option value="Low">Low</option>
+                        <option value="Medium">Medium</option>
+                        <option value="High">High</option>
+                      </Form.Select>
+                    </Form.Group>
+                  </Col>
+                  <Col md={6}>
+                    <Form.Group className="mb-3">
+                      <Form.Label>Competitors in Deal <span className="text-danger">*</span></Form.Label>
+                      <Form.Control 
+                        type="text" 
+                        defaultValue={editingDeal?.competitors?.join(', ') || ''} 
+                        placeholder="Enter competitor names (comma separated)"
+                        required
+                      />
+                    </Form.Group>
+                  </Col>
+                </Row>
+              </Card.Body>
+            </Card>
+          )}
+
+          {dealFormStep === 3 && (
+            <div>
+              {/* Negotiation Progress */}
+              <Card className="mb-3 border-0 bg-light">
+                <Card.Body>
+                  <h5 className="fw-bold mb-4 text-warning">NEGOTIATION PROGRESS</h5>
+                  <Row>
+                    <Col md={12}>
+                      <div className="d-flex align-items-center gap-4 mb-4 p-4 bg-white rounded shadow-sm">
+                        {/* Circular Progress Indicator */}
+                        <div className="position-relative" style={{ width: '140px', height: '140px', flexShrink: 0 }}>
+                          {/* Background Circle */}
+                          <svg width="140" height="140" style={{ transform: 'rotate(-90deg)' }}>
+                            <circle
+                              cx="70"
+                              cy="70"
+                              r="60"
+                              fill="none"
+                              stroke="#e9ecef"
+                              strokeWidth="12"
+                            />
+                            {/* Progress Circle */}
+                            <circle
+                              cx="70"
+                              cy="70"
+                              r="60"
+                              fill="none"
+                              stroke="url(#progressGradient)"
+                              strokeWidth="12"
+                              strokeDasharray={`${2 * Math.PI * 60}`}
+                              strokeDashoffset={`${2 * Math.PI * 60 * (1 - 50 / 100)}`}
+                              strokeLinecap="round"
+                              style={{ transition: 'stroke-dashoffset 1s ease' }}
+                            />
+                            <defs>
+                              <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" style={{ stopColor: '#0d6efd', stopOpacity: 1 }} />
+                                <stop offset="100%" style={{ stopColor: '#0dcaf0', stopOpacity: 1 }} />
+                              </linearGradient>
+                            </defs>
+                          </svg>
+                          {/* Center Text */}
+                          <div className="position-absolute top-50 start-50 translate-middle text-center">
+                            <div className="fw-bold" style={{ fontSize: '32px', color: '#0d6efd', lineHeight: 1 }}>
+                              50%
+                            </div>
+                            <div style={{ fontSize: '11px', color: '#6c757d', marginTop: '4px' }}>Complete</div>
+                          </div>
+                        </div>
+                        
+                        {/* Progress Details */}
+                        <div style={{ flex: 1 }}>
+                          <h6 className="fw-bold mb-3" style={{ color: '#495057' }}>Deal Progress Tracker</h6>
+                          
+                          <div className="text-muted" style={{ fontSize: '12px' }}>
+                          <Info size={16} className="me-1" />
+                            Progress automatically calculated based on completed milestones
+                          </div>
+                        </div>
+                      </div>
+                    </Col>
+                    <Col md={4}>
+                        <Form.Group className="mb-3">
+  <Form.Label className="fw-semibold">
+    Quotation Sent <span className="text-danger">*</span>
+  </Form.Label>
+
+  <div className="d-flex gap-3 mt-2">
+    <div className="custom-radio">
+      <input
+        type="radio"
+        id="quotationSent-yes"
+        name="quotationSent"
+        value="Yes"
+        defaultChecked={editingDeal?.quotationSent === "Yes"}
+      />
+      <label htmlFor="quotationSent-yes">Yes</label>
+    </div>
+
+    <div className="custom-radio">
+      <input
+        type="radio"
+        id="quotationSent-no"
+        name="quotationSent"
+        value="No"
+        defaultChecked={editingDeal?.quotationSent === "No" || !editingDeal?.quotationSent}
+      />
+      <label htmlFor="quotationSent-no">No</label>
+    </div>
+  </div>
+</Form.Group>
+
+
+                        </Col>
+                        <Col md={4}>
+  <Form.Group className="mb-3">
+    <Form.Label className="fw-semibold">
+      Contract Sent <span className="text-danger">*</span>
+    </Form.Label>
+    <div className="d-flex gap-3 mt-2">
+      <div className="custom-radio">
+        <input
+          type="radio"
+          id="contractSent-yes"
+          name="contractSent"
+          value="Yes"
+          defaultChecked={editingDeal?.contractSent === "Yes"}
+        />
+        <label htmlFor="contractSent-yes">Yes</label>
+      </div>
+      <div className="custom-radio">
+        <input
+          type="radio"
+          id="contractSent-no"
+          name="contractSent"
+          value="No"
+          defaultChecked={editingDeal?.contractSent === "No" || !editingDeal?.contractSent}
+        />
+        <label htmlFor="contractSent-no">No</label>
+      </div>
+    </div>
+  </Form.Group>
+</Col>
+
+<Col md={4}>
+  <Form.Group className="mb-3">
+    <Form.Label className="fw-semibold">
+      Contract Received <span className="text-danger">*</span>
+    </Form.Label>
+    <div className="d-flex gap-3 mt-2">
+      <div className="custom-radio">
+        <input
+          type="radio"
+          id="contractReceived-yes"
+          name="contractReceived"
+          value="Yes"
+          defaultChecked={editingDeal?.contractReceived === "Yes"}
+        />
+        <label htmlFor="contractReceived-yes">Yes</label>
+      </div>
+      <div className="custom-radio">
+        <input
+          type="radio"
+          id="contractReceived-no"
+          name="contractReceived"
+          value="No"
+          defaultChecked={editingDeal?.contractReceived === "No" || !editingDeal?.contractReceived}
+        />
+        <label htmlFor="contractReceived-no">No</label>
+      </div>
+    </div>
+  </Form.Group>
+</Col>
+                  </Row>
+                </Card.Body>
+              </Card>
+
+              {/* Attachments */}
+              <Card className="mb-3 border-0 bg-light">
+                <Card.Body>
+                  <h5 className="fw-bold mb-4 text-info">ATTACHMENTS</h5>
+                  <Row>
+                    <Col md={6}>
+                      <Form.Group className="mb-3">
+                        <Form.Label>Document Name <span className="text-danger">*</span></Form.Label>
+                        <Form.Control type="text" placeholder="Enter document name" />
+                      </Form.Group>
+                    </Col>
+                    <Col md={6}>
+                      <Form.Group className="mb-3">
+                        <Form.Label>Upload Document</Form.Label>
+                        <Form.Control type="file" />
+                      </Form.Group>
+                    </Col>
+                    <Col md={12}>
+                      {editingDeal?.attachments && editingDeal.attachments.length > 0 ? (
+                        <div className="border rounded p-2 bg-white">
+                          <small className="text-muted d-block mb-2">Attached Documents:</small>
+                          {editingDeal.attachments.map((doc: any, idx: number) => (
+                            <Badge key={idx} bg="secondary" className="me-2 mb-1">
+                              <FileText size={12} className="me-1" />
+                              {doc.name}
+                            </Badge>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-center text-muted p-3 border rounded bg-white">
+                          <FileText size={24} className="mb-2" />
+                          <div><small>No documents attached</small></div>
+                        </div>
+                      )}
+                    </Col>
+                  </Row>
+                </Card.Body>
+              </Card>
+
+              {/* Additional Notes */}
+              <Card className="mb-3 border-0 bg-light">
+                <Card.Body>
+                  <h5 className="fw-bold mb-4 text-primary">ADDITIONAL NOTES</h5>
+                  <Form.Group className="mb-3">
+                    <Form.Control 
+                      as="textarea" 
+                      rows={4} 
+                      defaultValue={editingDeal?.additionalNotes || ''} 
+                      placeholder="Enter any additional notes about this deal"
+                    />
+                  </Form.Group>
+                </Card.Body>
+              </Card>
+
+              {/* Remarks by Supervisor */}
+              <Card className="mb-3 border-0 bg-light">
+                <Card.Body>
+                  <h5 className="fw-bold mb-4 text-success">REMARKS BY SUPERVISOR</h5>
+                  <Form.Group className="mb-3">
+                    <Form.Control 
+                      as="textarea" 
+                      rows={4} 
+                      defaultValue={editingDeal?.supervisorRemarks || ''} 
+                      placeholder="Supervisor remarks and feedback"
+                    />
+                  </Form.Group>
+                </Card.Body>
+              </Card>
+            </div>
+          )}
+
+          {dealFormStep === 4 && (
+            <Card className="mb-3 border-0 bg-light">
+              <Card.Body>
+                <h5 className="fw-bold mb-4 text-success">ESTIMATION CHART</h5>
+                <div className="d-flex justify-content-between align-items-center mb-3">
+                  <div className="d-flex gap-2">
+                    {/* <Button variant="outline-primary" size="sm">
+                      <Edit size={14} className="me-1" />
+                      Estimate Option
+                    </Button> */}
+                    <Button 
+                      variant="outline-info" 
+                      size="sm"
+                      onClick={() => setShowRevisionHistoryModal(true)}
+                    >
+                      <Eye size={14} className="me-1" />
+                      Revision History
+                    </Button>
+                  </div>
+                  <Button 
+                    variant="primary" 
+                    size="sm"
+                    onClick={() => {
+                      setEditingItem(null);
+                      setItemFormData({
+                        product: '',
+                        description: '',
+                        quantity: 1,
+                        unitPrice: 0,
+                        currency: 'GBP',
+                        tax: 20
+                      });
+                      setShowAddItemModal(true);
+                    }}
+                  >
+                    <Plus size={14} className="me-1" />
+                    Add Item
+                  </Button>
+                </div>
+                <div className="table-responsive">
+                  <Table size="sm" hover className="bg-white">
+                    <thead>
+                      <tr>
+                        <th>#</th>
+                        <th>Product/Service</th>
+                        <th>Description/Specification</th>
+                        <th>Qty</th>
+                        <th>Unit Price</th>
+                        <th>Currency</th>
+                        <th>Tax %</th>
+                        <th>Sub Total</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {editingDeal?.estimations?.map((est: any, index: number) => (
+                        <tr key={index}>
+                          <td>{index + 1}</td>
+                          <td>{est.product}</td>
+                          <td>{est.description || 'N/A'}</td>
+                          <td>{est.quantity}</td>
+                          <td>{est.unitPrice?.toLocaleString() || 0}</td>
+                          <td>
+                            <Badge bg="secondary">{est.currency || 'GBP'}</Badge>
+                          </td>
+                          <td>{est.tax || 0}%</td>
+                          <td className="fw-bold">
+                            {est.currency || '£'}{((est.unitPrice || 0) * (est.quantity || 0) * (1 + (est.tax || 0) / 100)).toLocaleString()}
+                          </td>
+                          <td>
+                            <Button 
+                              variant="link" 
+                              size="sm" 
+                              className="p-0 me-2"
+                              title="Edit Item"
+                              onClick={() => {
+                                setEditingItem(index);
+                                setItemFormData({
+                                  product: est.product,
+                                  description: est.description || '',
+                                  quantity: est.quantity,
+                                  unitPrice: est.unitPrice,
+                                  currency: est.currency || 'GBP',
+                                  tax: est.tax || 20
+                                });
+                                setShowAddItemModal(true);
+                              }}
+                            >
+                              <Edit size={14} />
+                            </Button>
+                            <Button 
+                              variant="link" 
+                              size="sm" 
+                              className="p-0 text-danger"
+                              title="Delete Item"
+                              onClick={() => {
+                                if (window.confirm('Are you sure you want to delete this item?')) {
+                                  const updatedEstimations = editingDeal.estimations.filter((_: any, i: number) => i !== index);
+                                  setEditingDeal({
+                                    ...editingDeal,
+                                    estimations: updatedEstimations
+                                  });
+                                }
+                              }}
+                            >
+                              <Trash2 size={14} />
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                      {(!editingDeal?.estimations || editingDeal.estimations.length === 0) && (
+                        <tr>
+                          <td colSpan={9} className="text-center text-muted py-4">
+                            <Package size={32} className="text-muted mb-2" />
+                            <div>No items in estimation chart</div>
+                            <small>Click "Add Item" to add products or services</small>
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </Table>
+                </div>
+                {editingDeal?.estimations && editingDeal.estimations.length > 0 && (
+                  <div className="text-end mt-3 p-3 bg-white rounded border">
+                    <h4 className="mb-0">
+                      <strong>Grand Total:</strong> <span className="text-success">
+                        £{editingDeal.estimations.reduce((sum: number, est: any) => 
+                          sum + ((est.unitPrice || 0) * (est.quantity || 0) * (1 + (est.tax || 0) / 100)), 0
+                        ).toLocaleString()}
+                      </span>
+                    </h4>
+                  </div>
+                )}
+              </Card.Body>
+            </Card>
+          )}
+        </div>
+      </Modal.Body>
+      <Modal.Footer className="d-flex justify-content-between">
+        <Button 
+          variant="secondary" 
+          onClick={() => dealFormStep > 0 ? setDealFormStep(dealFormStep - 1) : setShowDealFormModal(false)}
+        >
+          {dealFormStep > 0 ? '← Previous' : 'Cancel'}
+        </Button>
+        <div className="d-flex gap-2">
+          {dealFormStep < 4 ? (
+            <Button 
+              variant="primary"
+              onClick={() => setDealFormStep(dealFormStep + 1)}
+            >
+              Next →
+            </Button>
+          ) : (
+            <>
+              <Button 
+                variant="success"
+                onClick={() => {
+                  setConfirmAction({ type: 'convert-order', data: editingDeal });
+                  setShowConfirmDialog(true);
+                }}
+              >
+                <ShoppingBag size={16} className="me-1" />
+                Convert to Order
+              </Button>
+              <Button variant="primary">
+                {editingDeal ? 'Update Deal' : 'Create Deal'}
+              </Button>
+            </>
+          )}
+        </div>
+      </Modal.Footer>
+    </Modal>
+  );
+
   // Filter Drawer Component
   // Column customization drawer (keeping simple version)
   const FilterDrawer = () => {
@@ -4103,6 +6015,8 @@ const CRMPortal = () => {
         </div>
 
         <Modal.Body style={{ padding: '30px' }}>
+          
+
           {/* Deal Information Section */}
           <div style={{
             fontSize: '16px',
@@ -4435,6 +6349,9 @@ const CRMPortal = () => {
           </div>
 
           {/* Action Buttons */}
+
+          {/* Action Buttons Bar */}
+          
           <div style={{
             display: 'flex',
             gap: '12px',
@@ -4442,6 +6359,41 @@ const CRMPortal = () => {
             paddingTop: '20px',
             borderTop: '1px solid #e5e7eb'
           }}>
+            <Button
+              variant="outline-primary"
+              style={{
+                padding: '10px 20px',
+                borderRadius: '8px',
+                fontWeight: 500,
+                fontSize: '14px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                background: 'white',
+                color: '#4680ff',
+                border: '2px solid #4680ff',
+                transition: 'all 0.3s'
+              }}
+              onClick={() => {
+                setSelectedDealForHistory(viewingDeal);
+                setShowDealHistoryModal(true);
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.background = '#4680ff';
+                e.currentTarget.style.color = 'white';
+                e.currentTarget.style.transform = 'translateY(-2px)';
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(70, 128, 255, 0.3)';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.background = 'white';
+                e.currentTarget.style.color = '#4680ff';
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = 'none';
+              }}
+            >
+              <History size={16} />
+              Complete History
+            </Button>
             <Button
               variant="primary"
               style={{
@@ -5771,179 +7723,862 @@ const CRMPortal = () => {
     if (!viewingCampaign) return null;
     
     return (
-      <Modal show={showCampaignViewModal} onHide={() => setShowCampaignViewModal(false)} size="lg" centered>
-        <Modal.Header closeButton className="border-bottom bg-light">
-          <Modal.Title>Campaign Details</Modal.Title>
-        </Modal.Header>
-        <Modal.Body className="p-4">
-          <Row className="mb-4">
-            <Col md={12}>
-              <div className="d-flex align-items-center justify-content-between mb-3">
-                <h4 className="mb-0">{viewingCampaign.name}</h4>
-                <Badge bg={
-                  viewingCampaign.status === 'Active' ? 'success' :
-                  viewingCampaign.status === 'Draft' ? 'primary' :
-                  viewingCampaign.status === 'Completed' ? 'secondary' :
-                  'warning'
-                } className="px-3 py-2">
+      <Modal show={showCampaignViewModal} onHide={() => setShowCampaignViewModal(false)} size="xl" centered>
+        {/* Custom Header with Gradient */}
+        <div style={{
+          color: 'black',
+          padding: '30px',
+          position: 'relative',
+          borderTopLeftRadius: '8px',
+          borderTopRightRadius: '8px',
+          borderBottom: '1px solid #e5e7eb'
+        }}>
+          <button 
+            onClick={() => setShowCampaignViewModal(false)}
+            style={{
+              position: 'absolute',
+              top: '20px',
+              right: '20px',
+              background: 'rgba(255,255,255,0.2)',
+              border: 'none',
+              color: 'black',
+              width: '36px',
+              height: '36px',
+              borderRadius: '50%',
+              cursor: 'pointer',
+              transition: 'all 0.3s',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = 'rgba(255,255,255,0.3)';
+              e.currentTarget.style.transform = 'rotate(90deg)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = 'rgba(255,255,255,0.2)';
+              e.currentTarget.style.transform = 'rotate(0deg)';
+            }}
+          >
+            <X size={20} />
+          </button>
+          <h3 style={{ margin: 0, fontWeight: 600, fontSize: '24px' }}>
+            {viewingCampaign.name}
+          </h3>
+          <p style={{ margin: '8px 0 0 0', opacity: 0.9, fontSize: '14px' }}>
+            Campaign Details
+          </p>
+        </div>
+
+        <Modal.Body style={{ padding: '30px' }}>
+          {/* Campaign Information Section */}
+          <div style={{
+            fontSize: '16px',
+            fontWeight: 600,
+            color: '#1f2937',
+            marginBottom: '20px',
+            paddingBottom: '10px',
+            borderBottom: '2px solid #f8f9fa',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px'
+          }}>
+            <Megaphone size={18} style={{ color: '#4680ff' }} />
+            Campaign Information
+          </div>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+            gap: '20px',
+            marginBottom: '30px'
+          }}>
+            <div style={{
+              background: '#f8f9fa',
+              padding: '16px',
+              borderRadius: '10px',
+              transition: 'all 0.3s'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = '#e5e7eb';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = '#f8f9fa';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}>
+              <div style={{
+                fontSize: '12px',
+                fontWeight: 600,
+                color: '#6b7280',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                marginBottom: '6px'
+              }}>Campaign Name</div>
+              <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                {viewingCampaign.name}
+              </div>
+            </div>
+            <div style={{
+              background: '#f8f9fa',
+              padding: '16px',
+              borderRadius: '10px',
+              transition: 'all 0.3s'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = '#e5e7eb';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = '#f8f9fa';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}>
+              <div style={{
+                fontSize: '12px',
+                fontWeight: 600,
+                color: '#6b7280',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                marginBottom: '6px'
+              }}>Owner</div>
+              <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                <User size={14} style={{ color: '#4680ff', marginRight: '6px' }} />
+                {viewingCampaign.owner}
+              </div>
+            </div>
+            <div style={{
+              background: '#f8f9fa',
+              padding: '16px',
+              borderRadius: '10px',
+              transition: 'all 0.3s'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = '#e5e7eb';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = '#f8f9fa';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}>
+              <div style={{
+                fontSize: '12px',
+                fontWeight: 600,
+                color: '#6b7280',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                marginBottom: '6px'
+              }}>Status</div>
+              <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                <Badge 
+                  bg={
+                    viewingCampaign.status === 'Active' ? 'success' :
+                    viewingCampaign.status === 'Draft' ? 'primary' :
+                    viewingCampaign.status === 'Completed' ? 'secondary' :
+                    'warning'
+                  }
+                  style={{
+                    padding: '6px 14px',
+                    borderRadius: '20px',
+                    fontSize: '12px',
+                    fontWeight: 600
+                  }}
+                >
                   {viewingCampaign.status}
                 </Badge>
               </div>
-            </Col>
-          </Row>
-
-          <Row>
-            <Col md={6}>
-              <Card className="border-0 bg-light mb-3">
-                <Card.Body>
-                  <h6 className="text-muted mb-3">Campaign Information</h6>
-                  <div className="mb-2">
-                    <strong>Description:</strong> {viewingCampaign.description}
-                  </div>
-                  <div className="mb-2">
-                    <strong>Owner:</strong> {viewingCampaign.owner}
-                  </div>
-                  <div className="mb-0">
-                    <strong>Priority:</strong>{' '}
-                    <Badge bg={
-                      viewingCampaign.priority === 'High' ? 'danger' :
-                      viewingCampaign.priority === 'Medium' ? 'warning' :
-                      'info'
-                    }>
-                      {viewingCampaign.priority}
-                    </Badge>
-                  </div>
-                </Card.Body>
-              </Card>
-            </Col>
-
-            <Col md={6}>
-              <Card className="border-0 bg-light mb-3">
-                <Card.Body>
-                  <h6 className="text-muted mb-3">Performance Metrics</h6>
-                  <div className="mb-2">
-                    <strong>Goal Metric:</strong> {viewingCampaign.goalMetric}
-                  </div>
-                  <div className="mb-2">
-                    <strong>Goal Label:</strong> {viewingCampaign.goalLabel}
-                  </div>
-                  <div className="mb-0">
-                    <strong>Date Range:</strong> {viewingCampaign.dateRange}
-                  </div>
-                </Card.Body>
-              </Card>
-            </Col>
-          </Row>
-
-          <Row>
-            <Col md={12}>
-              <Card className="border-0 bg-light mb-3">
-                <Card.Body>
-                  <h6 className="text-muted mb-3">Tags & Comments</h6>
-                  <div className="mb-2">
-                    <strong>Tags:</strong>{' '}
-                    {viewingCampaign.tags?.map((tag: string, idx: number) => (
-                      <Badge key={idx} bg="primary" className="me-1 bg-opacity-10 text-primary">{tag}</Badge>
-                    ))}
-                  </div>
-                  <div className="mb-0">
-                    <strong>Comments:</strong> {viewingCampaign.comments || 0}
-                  </div>
-                </Card.Body>
-              </Card>
-            </Col>
-          </Row>
-        </Modal.Body>
-        <Modal.Footer className="border-top">
-          <Button variant="secondary" onClick={() => setShowCampaignViewModal(false)}>
-            Close
-          </Button>
-          <Button 
-            variant="primary" 
-            onClick={() => {
-              setShowCampaignViewModal(false);
-              // Add edit functionality
+            </div>
+            <div style={{
+              background: '#f8f9fa',
+              padding: '16px',
+              borderRadius: '10px',
+              transition: 'all 0.3s',
+              gridColumn: 'span 2'
             }}
-          >
-            <Edit size={16} className="me-1" />
-            Edit Campaign
-          </Button>
-        </Modal.Footer>
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = '#e5e7eb';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = '#f8f9fa';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}>
+              <div style={{
+                fontSize: '12px',
+                fontWeight: 600,
+                color: '#6b7280',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                marginBottom: '6px'
+              }}>Description</div>
+              <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                {viewingCampaign.description}
+              </div>
+            </div>
+          </div>
+
+          {/* Date Information Section */}
+          <div style={{
+            fontSize: '16px',
+            fontWeight: 600,
+            color: '#1f2937',
+            marginBottom: '20px',
+            paddingBottom: '10px',
+            borderBottom: '2px solid #f8f9fa',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px'
+          }}>
+            <Calendar size={18} style={{ color: '#4680ff' }} />
+            Date Information
+          </div>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+            gap: '20px',
+            marginBottom: '30px'
+          }}>
+            <div style={{
+              background: '#f8f9fa',
+              padding: '16px',
+              borderRadius: '10px',
+              transition: 'all 0.3s'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = '#e5e7eb';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = '#f8f9fa';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}>
+              <div style={{
+                fontSize: '12px',
+                fontWeight: 600,
+                color: '#6b7280',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                marginBottom: '6px'
+              }}>Date Range</div>
+              <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                {viewingCampaign.dateRange}
+              </div>
+            </div>
+            <div style={{
+              background: '#f8f9fa',
+              padding: '16px',
+              borderRadius: '10px',
+              transition: 'all 0.3s'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = '#e5e7eb';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = '#f8f9fa';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}>
+              <div style={{
+                fontSize: '12px',
+                fontWeight: 600,
+                color: '#6b7280',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                marginBottom: '6px'
+              }}>Created Date</div>
+              <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                {viewingCampaign.created}
+              </div>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div style={{
+            display: 'flex',
+            gap: '12px',
+            justifyContent: 'flex-end',
+            paddingTop: '20px',
+            borderTop: '1px solid #e5e7eb'
+          }}>
+            <Button 
+              variant="outline-secondary"
+              onClick={() => setShowCampaignViewModal(false)}
+              style={{
+                borderRadius: '8px',
+                padding: '10px 24px',
+                fontWeight: 500
+              }}
+            >
+              Close
+            </Button>
+            <Button 
+              variant="primary"
+              onClick={() => {
+                setShowCampaignViewModal(false);
+                setEditingCampaign(viewingCampaign);
+                setCampaignFormData({
+                  name: viewingCampaign.name,
+                  description: viewingCampaign.description,
+                  owner: viewingCampaign.owner,
+                  status: viewingCampaign.status,
+                  startDate: viewingCampaign.dateRange.split(' - ')[0],
+                  endDate: viewingCampaign.dateRange.split(' - ')[1],
+                  created: viewingCampaign.created
+                });
+                setShowCampaignModal(true);
+              }}
+              style={{
+                borderRadius: '8px',
+                padding: '10px 24px',
+                fontWeight: 500,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}
+            >
+              <Edit size={16} />
+              Edit Campaign
+            </Button>
+          </div>
+        </Modal.Body>
       </Modal>
     );
   };
 
   // Task View Modal
+  const TaskModal = () => {
+    const handleSubmit = (e: React.FormEvent) => {
+      e.preventDefault();
+      console.log('Task saved:', taskFormData);
+      setShowTaskModal(false);
+      setEditingTask(null);
+      setTaskFormData({
+        title: '',
+        name: '',
+        phone: '',
+        email: '',
+        companyName: '',
+        assignedTo: '',
+        assignedBy: '',
+        dateAssigned: new Date().toISOString().split('T')[0],
+        urgency: '',
+        dueDate: '',
+        notes: ''
+      });
+    };
+
+    return (
+      <Modal show={showTaskModal} onHide={() => {
+        setShowTaskModal(false);
+        setEditingTask(null);
+        setTaskFormData({
+          title: '',
+          name: '',
+          phone: '',
+          email: '',
+          companyName: '',
+          assignedTo: '',
+          assignedBy: '',
+          dateAssigned: new Date().toISOString().split('T')[0],
+          urgency: '',
+          dueDate: '',
+          notes: ''
+        });
+      }} size="lg" centered>
+        <Modal.Header closeButton className="border-bottom">
+          <Modal.Title>{editingTask ? 'Edit Task' : 'Create New Task'}</Modal.Title>
+        </Modal.Header>
+        <Form onSubmit={handleSubmit}>
+          <Modal.Body className="p-4">
+            <Row className="g-3">
+              <Col md={12}>
+                <Form.Group>
+                  <Form.Label>Task Title <span className="text-danger">*</span></Form.Label>
+                  <Form.Control
+                    type="text"
+                    placeholder="Enter task title"
+                    value={taskFormData.title}
+                    onChange={(e) => setTaskFormData({ ...taskFormData, title: e.target.value })}
+                    required
+                  />
+                </Form.Group>
+              </Col>
+              
+              <Col md={6}>
+                <Form.Group>
+                  <Form.Label>Assigned To <span className="text-danger">*</span></Form.Label>
+                  <Form.Select
+                    value={taskFormData.assignedTo}
+                    onChange={(e) => setTaskFormData({ ...taskFormData, assignedTo: e.target.value })}
+                    required
+                  >
+                    <option value="">Select user...</option>
+                    <option value="John Doe">John Doe</option>
+                    <option value="Jane Smith">Jane Smith</option>
+                    <option value="Mike Johnson">Mike Johnson</option>
+                    <option value="Sarah Williams">Sarah Williams</option>
+                    <option value="Tom Brown">Tom Brown</option>
+                  </Form.Select>
+                </Form.Group>
+              </Col>
+              
+              <Col md={6}>
+                <Form.Group>
+                  <Form.Label>Assigned By</Form.Label>
+                  <Form.Control
+                    type="text"
+                    placeholder="Enter assigner name"
+                    value={taskFormData.assignedBy}
+                    onChange={(e) => setTaskFormData({ ...taskFormData, assignedBy: e.target.value })}
+                  />
+                </Form.Group>
+              </Col>
+              
+              <Col md={6}>
+                <Form.Group>
+                  <Form.Label>Prospect Name</Form.Label>
+                  <Form.Control
+                    type="text"
+                    placeholder="Enter prospect name"
+                    value={taskFormData.name}
+                    onChange={(e) => setTaskFormData({ ...taskFormData, name: e.target.value })}
+                  />
+                </Form.Group>
+              </Col>
+              
+              <Col md={6}>
+                <Form.Group>
+                  <Form.Label>Company</Form.Label>
+                  <Form.Control
+                    type="text"
+                    placeholder="Enter company name"
+                    value={taskFormData.companyName}
+                    onChange={(e) => setTaskFormData({ ...taskFormData, companyName: e.target.value })}
+                  />
+                </Form.Group>
+              </Col>
+              
+              <Col md={6}>
+                <Form.Group>
+                  <Form.Label>Phone</Form.Label>
+                  <Form.Control
+                    type="tel"
+                    placeholder="Enter phone number"
+                    value={taskFormData.phone}
+                    onChange={(e) => setTaskFormData({ ...taskFormData, phone: e.target.value })}
+                  />
+                </Form.Group>
+              </Col>
+              
+              <Col md={6}>
+                <Form.Group>
+                  <Form.Label>Email</Form.Label>
+                  <Form.Control
+                    type="email"
+                    placeholder="Enter email address"
+                    value={taskFormData.email}
+                    onChange={(e) => setTaskFormData({ ...taskFormData, email: e.target.value })}
+                  />
+                </Form.Group>
+              </Col>
+              
+              <Col md={12}>
+                <Form.Group>
+                  <Form.Label>Urgency <span className="text-danger">*</span></Form.Label>
+                  <Form.Select
+                    value={taskFormData.urgency}
+                    onChange={(e) => setTaskFormData({ ...taskFormData, urgency: e.target.value })}
+                    required
+                  >
+                    <option value="">Select urgency...</option>
+                    <option value="High">High</option>
+                    <option value="Medium">Medium</option>
+                    <option value="Low">Low</option>
+                  </Form.Select>
+                </Form.Group>
+              </Col>
+              
+              <Col md={6}>
+                <Form.Group>
+                  <Form.Label>Due Date <span className="text-danger">*</span></Form.Label>
+                  <Form.Control
+                    type="date"
+                    value={taskFormData.dueDate}
+                    onChange={(e) => setTaskFormData({ ...taskFormData, dueDate: e.target.value })}
+                    required
+                  />
+                </Form.Group>
+              </Col>
+              
+              <Col md={6}>
+                <Form.Group>
+                  <Form.Label>Date Assigned</Form.Label>
+                  <Form.Control
+                    type="date"
+                    value={taskFormData.dateAssigned}
+                    onChange={(e) => setTaskFormData({ ...taskFormData, dateAssigned: e.target.value })}
+                  />
+                </Form.Group>
+              </Col>
+              
+              <Col md={12}>
+                <Form.Group>
+                  <Form.Label>Notes</Form.Label>
+                  <Form.Control
+                    as="textarea"
+                    rows={3}
+                    placeholder="Enter task notes or description"
+                    value={taskFormData.notes}
+                    onChange={(e) => setTaskFormData({ ...taskFormData, notes: e.target.value })}
+                  />
+                </Form.Group>
+              </Col>
+            </Row>
+          </Modal.Body>
+          <Modal.Footer className="border-top">
+            <Button variant="outline-secondary" onClick={() => {
+              setShowTaskModal(false);
+              setEditingTask(null);
+              setTaskFormData({
+                title: '',
+                name: '',
+                phone: '',
+                email: '',
+                companyName: '',
+                assignedTo: '',
+                assignedBy: '',
+                dateAssigned: new Date().toISOString().split('T')[0],
+                urgency: '',
+                dueDate: '',
+                notes: ''
+              });
+            }}>
+              Cancel
+            </Button>
+            <Button variant="primary" type="submit">
+              {editingTask ? 'Update Task' : 'Create Task'}
+            </Button>
+          </Modal.Footer>
+        </Form>
+      </Modal>
+    );
+  };
+
   const TaskViewModal = () => {
     if (!viewingTask) return null;
     
     return (
-      <Modal show={showTaskViewModal} onHide={() => setShowTaskViewModal(false)} size="lg" centered>
-        <Modal.Header closeButton className="border-bottom bg-light">
-          <Modal.Title>Task Details</Modal.Title>
-        </Modal.Header>
-        <Modal.Body className="p-4">
-          <Row className="mb-4">
-            <Col md={12}>
-              <div className="d-flex align-items-center justify-content-between mb-3">
-                <h4 className="mb-0">{viewingTask.task}</h4>
-                <Badge bg={
-                  viewingTask.status === 'Completed' ? 'success' :
-                  viewingTask.status === 'In Progress' ? 'info' :
-                  viewingTask.status === 'Pending' ? 'warning' :
-                  'secondary'
-                } className="px-3 py-2">
+      <Modal show={showTaskViewModal} onHide={() => setShowTaskViewModal(false)} size="xl" centered>
+        {/* Custom Header */}
+        <div style={{
+          color: 'black',
+          padding: '30px',
+          position: 'relative',
+          borderTopLeftRadius: '8px',
+          borderTopRightRadius: '8px',
+          borderBottom: '1px solid #e5e7eb'
+        }}>
+          <button 
+            onClick={() => setShowTaskViewModal(false)}
+            style={{
+              position: 'absolute',
+              top: '20px',
+              right: '20px',
+              background: 'rgba(255,255,255,0.2)',
+              border: 'none',
+              color: 'black',
+              width: '36px',
+              height: '36px',
+              borderRadius: '50%',
+              cursor: 'pointer',
+              transition: 'all 0.3s',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = 'rgba(255,255,255,0.3)';
+              e.currentTarget.style.transform = 'rotate(90deg)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = 'rgba(255,255,255,0.2)';
+              e.currentTarget.style.transform = 'rotate(0deg)';
+            }}
+          >
+            <X size={20} />
+          </button>
+          <h3 style={{ margin: 0, fontWeight: 600, fontSize: '24px' }}>
+            {viewingTask.task}
+          </h3>
+          <p style={{ margin: '8px 0 0 0', opacity: 0.9, fontSize: '14px' }}>
+            Task Details
+          </p>
+        </div>
+
+        <Modal.Body style={{ padding: '30px' }}>
+          {/* Task Information Section */}
+          <div style={{
+            fontSize: '16px',
+            fontWeight: 600,
+            color: '#1f2937',
+            marginBottom: '20px',
+            paddingBottom: '10px',
+            borderBottom: '2px solid #f8f9fa',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px'
+          }}>
+            <CheckSquare size={18} style={{ color: '#4680ff' }} />
+            Task Information
+          </div>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+            gap: '20px',
+            marginBottom: '30px'
+          }}>
+            <div style={{
+              background: '#f8f9fa',
+              padding: '16px',
+              borderRadius: '10px',
+              transition: 'all 0.3s'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = '#e5e7eb';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = '#f8f9fa';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}>
+              <div style={{
+                fontSize: '12px',
+                fontWeight: 600,
+                color: '#6b7280',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                marginBottom: '6px'
+              }}>Type</div>
+              <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                {viewingTask.type}
+              </div>
+            </div>
+            <div style={{
+              background: '#f8f9fa',
+              padding: '16px',
+              borderRadius: '10px',
+              transition: 'all 0.3s'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = '#e5e7eb';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = '#f8f9fa';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}>
+              <div style={{
+                fontSize: '12px',
+                fontWeight: 600,
+                color: '#6b7280',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                marginBottom: '6px'
+              }}>Assigned To</div>
+              <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                <User size={14} style={{ color: '#4680ff', marginRight: '6px' }} />
+                {viewingTask.assignedTo}
+              </div>
+            </div>
+            <div style={{
+              background: '#f8f9fa',
+              padding: '16px',
+              borderRadius: '10px',
+              transition: 'all 0.3s'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = '#e5e7eb';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = '#f8f9fa';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}>
+              <div style={{
+                fontSize: '12px',
+                fontWeight: 600,
+                color: '#6b7280',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                marginBottom: '6px'
+              }}>Priority</div>
+              <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                <Badge 
+                  bg={
+                    viewingTask.priority === 'High' ? 'danger' :
+                    viewingTask.priority === 'Medium' ? 'warning' :
+                    'info'
+                  }
+                  style={{
+                    padding: '6px 14px',
+                    borderRadius: '20px',
+                    fontSize: '12px',
+                    fontWeight: 600
+                  }}
+                >
+                  {viewingTask.priority}
+                </Badge>
+              </div>
+            </div>
+            <div style={{
+              background: '#f8f9fa',
+              padding: '16px',
+              borderRadius: '10px',
+              transition: 'all 0.3s'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = '#e5e7eb';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = '#f8f9fa';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}>
+              <div style={{
+                fontSize: '12px',
+                fontWeight: 600,
+                color: '#6b7280',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                marginBottom: '6px'
+              }}>Status</div>
+              <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                <Badge 
+                  bg={
+                    viewingTask.status === 'Completed' ? 'success' :
+                    viewingTask.status === 'In Progress' ? 'info' :
+                    viewingTask.status === 'Pending' ? 'warning' :
+                    'secondary'
+                  }
+                  style={{
+                    padding: '6px 14px',
+                    borderRadius: '20px',
+                    fontSize: '12px',
+                    fontWeight: 600
+                  }}
+                >
                   {viewingTask.status}
                 </Badge>
               </div>
-            </Col>
-          </Row>
+            </div>
+          </div>
 
-          <Row>
-            <Col md={6}>
-              <Card className="border-0 bg-light mb-3">
-                <Card.Body>
-                  <h6 className="text-muted mb-3">Task Information</h6>
-                  <div className="mb-2">
-                    <strong>Type:</strong> {viewingTask.type}
-                  </div>
-                  <div className="mb-2">
-                    <strong>Assigned To:</strong> {viewingTask.assignedTo}
-                  </div>
-                  <div className="mb-0">
-                    <strong>Priority:</strong>{' '}
-                    <Badge bg={
-                      viewingTask.priority === 'High' ? 'danger' :
-                      viewingTask.priority === 'Medium' ? 'warning' :
-                      'info'
-                    }>
-                      {viewingTask.priority}
-                    </Badge>
-                  </div>
-                </Card.Body>
-              </Card>
-            </Col>
-
-            <Col md={6}>
-              <Card className="border-0 bg-light mb-3">
-                <Card.Body>
-                  <h6 className="text-muted mb-3">Dates & Links</h6>
-                  <div className="mb-2">
-                    <strong>Due Date:</strong> {viewingTask.dueDate}
-                  </div>
-                  <div className="mb-2">
-                    <strong>Created:</strong> {viewingTask.created}
-                  </div>
-                  <div className="mb-0">
-                    <strong>Related To:</strong> {viewingTask.relatedTo}
-                  </div>
-                </Card.Body>
-              </Card>
-            </Col>
-          </Row>
+          {/* Dates & Timeline Section */}
+          <div style={{
+            fontSize: '16px',
+            fontWeight: 600,
+            color: '#1f2937',
+            marginBottom: '20px',
+            paddingBottom: '10px',
+            borderBottom: '2px solid #f8f9fa',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px'
+          }}>
+            <Calendar size={18} style={{ color: '#4680ff' }} />
+            Dates & Timeline
+          </div>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+            gap: '20px',
+            marginBottom: '30px'
+          }}>
+            <div style={{
+              background: '#f8f9fa',
+              padding: '16px',
+              borderRadius: '10px',
+              transition: 'all 0.3s'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = '#e5e7eb';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = '#f8f9fa';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}>
+              <div style={{
+                fontSize: '12px',
+                fontWeight: 600,
+                color: '#6b7280',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                marginBottom: '6px'
+              }}>Due Date</div>
+              <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                {viewingTask.dueDate}
+              </div>
+            </div>
+            <div style={{
+              background: '#f8f9fa',
+              padding: '16px',
+              borderRadius: '10px',
+              transition: 'all 0.3s'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = '#e5e7eb';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = '#f8f9fa';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}>
+              <div style={{
+                fontSize: '12px',
+                fontWeight: 600,
+                color: '#6b7280',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                marginBottom: '6px'
+              }}>Created</div>
+              <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                {viewingTask.created}
+              </div>
+            </div>
+            <div style={{
+              background: '#f8f9fa',
+              padding: '16px',
+              borderRadius: '10px',
+              transition: 'all 0.3s'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = '#e5e7eb';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = '#f8f9fa';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}>
+              <div style={{
+                fontSize: '12px',
+                fontWeight: 600,
+                color: '#6b7280',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                marginBottom: '6px'
+              }}>Related To</div>
+              <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                {viewingTask.relatedTo}
+              </div>
+            </div>
+          </div>
         </Modal.Body>
-        <Modal.Footer className="border-top">
-          <Button variant="secondary" onClick={() => setShowTaskViewModal(false)}>
+        
+        <Modal.Footer className="border-top" style={{ background: 'white', padding: '1rem 1.5rem' }}>
+          <Button 
+            variant="outline-secondary" 
+            onClick={() => setShowTaskViewModal(false)}
+            style={{ borderRadius: '8px', padding: '0.5rem 1.5rem' }}
+          >
             Close
           </Button>
           <Button 
@@ -5952,6 +8587,7 @@ const CRMPortal = () => {
               setShowTaskViewModal(false);
               // Add edit functionality
             }}
+            style={{ borderRadius: '8px', padding: '0.5rem 1.5rem' }}
           >
             <Edit size={16} className="me-1" />
             Edit Task
@@ -7922,6 +10558,7 @@ const CRMPortal = () => {
         {ScheduleCallbackModal()}
         {AddFollowupModal()}
         {AddMeetingModal()}
+        {DealFormModal()}
 
         {/* Page Header */}
         <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4">
@@ -9172,6 +11809,11 @@ const CRMPortal = () => {
 
     return (
       <div>
+        {AddItemModal()}
+        {RevisionHistoryModal()}
+        {RevisionDetailModal()}
+        {DealCompleteHistoryModal()}
+        {ManageAttachmentsModal()}
         {DealViewModal()}
         {ConfirmationDialog()}
         {/* Deal Form Modal */}
@@ -9513,45 +12155,224 @@ const CRMPortal = () => {
                       <h5 className="fw-bold mb-4 text-warning">NEGOTIATION PROGRESS</h5>
                       <Row>
                         <Col md={12}>
-                          <Form.Group className="mb-3">
-                            <Form.Label>Progress <span className="text-danger">*</span></Form.Label>
-                            <div className="d-flex align-items-center gap-2">
-                              <Form.Range defaultValue={editingDeal?.negotiationProgress || 0} style={{ flex: 1 }} />
-                              <Badge bg="info" style={{ minWidth: '60px' }}>{editingDeal?.negotiationProgress || 0}%</Badge>
+                          <div className="d-flex align-items-center gap-4 mb-4 p-4 bg-white rounded shadow-sm">
+                            {/* Circular Progress Indicator */}
+                            <div className="position-relative" style={{ width: '140px', height: '140px', flexShrink: 0 }}>
+                              {/* Background Circle */}
+                              <svg width="140" height="140" style={{ transform: 'rotate(-90deg)' }}>
+                                <circle
+                                  cx="70"
+                                  cy="70"
+                                  r="60"
+                                  fill="none"
+                                  stroke="#e9ecef"
+                                  strokeWidth="12"
+                                />
+                                {/* Progress Circle */}
+                                <circle
+                                  cx="70"
+                                  cy="70"
+                                  r="60"
+                                  fill="none"
+                                  stroke="url(#progressGradient2)"
+                                  strokeWidth="12"
+                                  strokeDasharray={`${2 * Math.PI * 60}`}
+                                  strokeDashoffset={`${2 * Math.PI * 60 * (1 - 50 / 100)}`}
+                                  strokeLinecap="round"
+                                  style={{ transition: 'stroke-dashoffset 1s ease' }}
+                                />
+                                <defs>
+                                  <linearGradient id="progressGradient2" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" style={{ stopColor: '#0d6efd', stopOpacity: 1 }} />
+                                    <stop offset="100%" style={{ stopColor: '#0dcaf0', stopOpacity: 1 }} />
+                                  </linearGradient>
+                                </defs>
+                              </svg>
+                              {/* Center Text */}
+                              <div className="position-absolute top-50 start-50 translate-middle text-center">
+                                <div className="fw-bold" style={{ fontSize: '32px', color: '#0d6efd', lineHeight: 1 }}>
+                                  50%
+                                </div>
+                                <div style={{ fontSize: '11px', color: '#6c757d', marginTop: '4px' }}>Complete</div>
+                              </div>
                             </div>
-                            <Form.Text className="text-muted">Visual indicator of negotiation progress</Form.Text>
-                          </Form.Group>
+                            
+                            {/* Progress Details */}
+                            <div style={{ flex: 1 }}>
+                              <h6 className="fw-bold mb-3" style={{ color: '#495057' }}>Deal Progress Tracker</h6>
+                              {/* <div className="d-flex gap-3 mb-3"> */}
+                                {/* Milestone Indicators */}
+                                {/* <div className="d-flex align-items-center gap-2">
+                                  <div 
+                                    className="rounded-circle d-flex align-items-center justify-content-center"
+                                    style={{
+                                      width: '40px',
+                                      height: '40px',
+                                      background: (editingDeal?.quotationSent === 'Yes') ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : '#e9ecef',
+                                      boxShadow: (editingDeal?.quotationSent === 'Yes') ? '0 4px 12px rgba(16, 185, 129, 0.3)' : 'none',
+                                      transition: 'all 0.3s ease'
+                                    }}
+                                  >
+                                    {(editingDeal?.quotationSent === 'Yes') ? (
+                                      <CheckCircle size={20} color="white" />
+                                    ) : (
+                                      <FileText size={20} color="#6c757d" />
+                                    )}
+                                  </div>
+                                  <div>
+                                    <div style={{ fontSize: '12px', fontWeight: '600', color: '#495057' }}>Quotation</div>
+                                    <div style={{ fontSize: '10px', color: '#6c757d' }}>Sent to Client</div>
+                                  </div>
+                                </div> */}
+                                
+                                {/* <div className="d-flex align-items-center gap-2">
+                                  <div 
+                                    className="rounded-circle d-flex align-items-center justify-content-center"
+                                    style={{
+                                      width: '40px',
+                                      height: '40px',
+                                      background: (editingDeal?.contractSent === 'Yes') ? 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)' : '#e9ecef',
+                                      boxShadow: (editingDeal?.contractSent === 'Yes') ? '0 4px 12px rgba(59, 130, 246, 0.3)' : 'none',
+                                      transition: 'all 0.3s ease'
+                                    }}
+                                  >
+                                    {(editingDeal?.contractSent === 'Yes') ? (
+                                      <CheckCircle size={20} color="white" />
+                                    ) : (
+                                      <Send size={20} color="#6c757d" />
+                                    )}
+                                  </div>
+                                  <div>
+                                    <div style={{ fontSize: '12px', fontWeight: '600', color: '#495057' }}>Contract Sent</div>
+                                    <div style={{ fontSize: '10px', color: '#6c757d' }}>Out for Signature</div>
+                                  </div>
+                                </div>
+                                
+                                <div className="d-flex align-items-center gap-2">
+                                  <div 
+                                    className="rounded-circle d-flex align-items-center justify-content-center"
+                                    style={{
+                                      width: '40px',
+                                      height: '40px',
+                                      background: (editingDeal?.contractReceived === 'Yes') ? 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)' : '#e9ecef',
+                                      boxShadow: (editingDeal?.contractReceived === 'Yes') ? '0 4px 12px rgba(139, 92, 246, 0.3)' : 'none',
+                                      transition: 'all 0.3s ease'
+                                    }}
+                                  >
+                                    {(editingDeal?.contractReceived === 'Yes') ? (
+                                      <CheckCircle size={20} color="white" />
+                                    ) : (
+                                      <UserCheck size={20} color="#6c757d" />
+                                    )}
+                                  </div>
+                                  <div>
+                                    <div style={{ fontSize: '12px', fontWeight: '600', color: '#495057' }}>Contract Back</div>
+                                    <div style={{ fontSize: '10px', color: '#6c757d' }}>Signed & Received</div>
+                                  </div>
+                                </div> */}
+                              {/* </div> */}
+                              <div className="text-muted" style={{ fontSize: '12px' }}>
+                                {/* <i className="bi bi-info-circle me-1"></i> */}
+                                <Info size={16} className="me-1" />
+
+                                Progress automatically calculated based on completed milestones
+                              </div>
+                            </div>
+                          </div>
                         </Col>
                         <Col md={4}>
-                          <Form.Group className="mb-3">
-                            <Form.Label>Quotation Sent <span className="text-danger">*</span></Form.Label>
-                            <Form.Select defaultValue={editingDeal?.quotationSent || ''} required>
-                              <option value="">Select</option>
-                              <option value="Yes">Yes</option>
-                              <option value="No">No</option>
-                            </Form.Select>
-                          </Form.Group>
+                        <Form.Group className="mb-3">
+  <Form.Label className="fw-semibold">
+    Quotation Sent <span className="text-danger">*</span>
+  </Form.Label>
+
+  <div className="d-flex gap-3 mt-2">
+    <div className="custom-radio">
+      <input
+        type="radio"
+        id="quotationSent-yes"
+        name="quotationSent"
+        value="Yes"
+        defaultChecked={editingDeal?.quotationSent === "Yes"}
+      />
+      <label htmlFor="quotationSent-yes">Yes</label>
+    </div>
+
+    <div className="custom-radio">
+      <input
+        type="radio"
+        id="quotationSent-no"
+        name="quotationSent"
+        value="No"
+        defaultChecked={editingDeal?.quotationSent === "No" || !editingDeal?.quotationSent}
+      />
+      <label htmlFor="quotationSent-no">No</label>
+    </div>
+  </div>
+</Form.Group>
+
+
                         </Col>
                         <Col md={4}>
-                          <Form.Group className="mb-3">
-                            <Form.Label>Contract Sent <span className="text-danger">*</span></Form.Label>
-                            <Form.Select defaultValue={editingDeal?.contractSent || ''} required>
-                              <option value="">Select</option>
-                              <option value="Yes">Yes</option>
-                              <option value="No">No</option>
-                            </Form.Select>
-                          </Form.Group>
-                        </Col>
-                        <Col md={4}>
-                          <Form.Group className="mb-3">
-                            <Form.Label>Contract Received <span className="text-danger">*</span></Form.Label>
-                            <Form.Select defaultValue={editingDeal?.contractReceived || ''} required>
-                              <option value="">Select</option>
-                              <option value="Yes">Yes</option>
-                              <option value="No">No</option>
-                            </Form.Select>
-                          </Form.Group>
-                        </Col>
+  <Form.Group className="mb-3">
+    <Form.Label className="fw-semibold">
+      Contract Sent <span className="text-danger">*</span>
+    </Form.Label>
+    <div className="d-flex gap-3 mt-2">
+      <div className="custom-radio">
+        <input
+          type="radio"
+          id="contractSent-yes"
+          name="contractSent"
+          value="Yes"
+          defaultChecked={editingDeal?.contractSent === "Yes"}
+        />
+        <label htmlFor="contractSent-yes">Yes</label>
+      </div>
+      <div className="custom-radio">
+        <input
+          type="radio"
+          id="contractSent-no"
+          name="contractSent"
+          value="No"
+          defaultChecked={editingDeal?.contractSent === "No" || !editingDeal?.contractSent}
+        />
+        <label htmlFor="contractSent-no">No</label>
+      </div>
+    </div>
+  </Form.Group>
+</Col>
+
+<Col md={4}>
+  <Form.Group className="mb-3">
+    <Form.Label className="fw-semibold">
+      Contract Received <span className="text-danger">*</span>
+    </Form.Label>
+    <div className="d-flex gap-3 mt-2">
+      <div className="custom-radio">
+        <input
+          type="radio"
+          id="contractReceived-yes"
+          name="contractReceived"
+          value="Yes"
+          defaultChecked={editingDeal?.contractReceived === "Yes"}
+        />
+        <label htmlFor="contractReceived-yes">Yes</label>
+      </div>
+      <div className="custom-radio">
+        <input
+          type="radio"
+          id="contractReceived-no"
+          name="contractReceived"
+          value="No"
+          defaultChecked={editingDeal?.contractReceived === "No" || !editingDeal?.contractReceived}
+        />
+        <label htmlFor="contractReceived-no">No</label>
+      </div>
+    </div>
+  </Form.Group>
+</Col>
+
                       </Row>
                     </Card.Body>
                   </Card>
@@ -9633,16 +12454,35 @@ const CRMPortal = () => {
                     <h5 className="fw-bold mb-4 text-success">ESTIMATION CHART</h5>
                     <div className="d-flex justify-content-between align-items-center mb-3">
                       <div className="d-flex gap-2">
-                        <Button variant="outline-primary" size="sm">
+                        {/* <Button variant="outline-primary" size="sm">
                           <Edit size={14} className="me-1" />
                           Estimate Option
-                        </Button>
-                        <Button variant="outline-info" size="sm">
+                        </Button> */}
+                        <Button 
+                          variant="outline-info" 
+                          size="sm"
+                          onClick={() => setShowRevisionHistoryModal(true)}
+                        >
                           <Eye size={14} className="me-1" />
                           Revision History
                         </Button>
                       </div>
-                      <Button variant="primary" size="sm">
+                      <Button 
+                        variant="primary" 
+                        size="sm"
+                        onClick={() => {
+                          setEditingItem(null);
+                          setItemFormData({
+                            product: '',
+                            description: '',
+                            quantity: 1,
+                            unitPrice: 0,
+                            currency: 'GBP',
+                            tax: 20
+                          });
+                          setShowAddItemModal(true);
+                        }}
+                      >
                         <Plus size={14} className="me-1" />
                         Add Item
                       </Button>
@@ -9678,10 +12518,41 @@ const CRMPortal = () => {
                                 {est.currency || '£'}{((est.unitPrice || 0) * (est.quantity || 0) * (1 + (est.tax || 0) / 100)).toLocaleString()}
                               </td>
                               <td>
-                                <Button variant="link" size="sm" className="p-0 me-2">
+                                <Button 
+                                  variant="link" 
+                                  size="sm" 
+                                  className="p-0 me-2"
+                                  title="Edit Item"
+                                  onClick={() => {
+                                    setEditingItem(index);
+                                    setItemFormData({
+                                      product: est.product,
+                                      description: est.description || '',
+                                      quantity: est.quantity,
+                                      unitPrice: est.unitPrice,
+                                      currency: est.currency || 'GBP',
+                                      tax: est.tax || 20
+                                    });
+                                    setShowAddItemModal(true);
+                                  }}
+                                >
                                   <Edit size={14} />
                                 </Button>
-                                <Button variant="link" size="sm" className="p-0 text-danger">
+                                <Button 
+                                  variant="link" 
+                                  size="sm" 
+                                  className="p-0 text-danger"
+                                  title="Delete Item"
+                                  onClick={() => {
+                                    if (window.confirm('Are you sure you want to delete this item?')) {
+                                      const updatedEstimations = editingDeal.estimations.filter((_: any, i: number) => i !== index);
+                                      setEditingDeal({
+                                        ...editingDeal,
+                                        estimations: updatedEstimations
+                                      });
+                                    }
+                                  }}
+                                >
                                   <Trash2 size={14} />
                                 </Button>
                               </td>
@@ -10425,6 +13296,18 @@ const CRMPortal = () => {
                             }}
                           >
                             <Edit size={16} />
+                          </Button>
+                          <Button 
+                            variant="link" 
+                            size="sm" 
+                            className="p-1 text-info" 
+                            title="Manage Attachments"
+                            onClick={() => {
+                              setSelectedDealForAttachments(deal);
+                              setShowAttachmentModal(true);
+                            }}
+                          >
+                            <Paperclip size={16} />
                           </Button>
                           <Button 
                             variant="link" 
@@ -11831,6 +14714,148 @@ const CRMPortal = () => {
 
     return (
       <div>
+        {/* Add New Campaign Modal */}
+        <Modal 
+          show={showCampaignModal} 
+          onHide={() => {
+            setShowCampaignModal(false);
+            setEditingCampaign(null);
+          }}
+          size="lg"
+          centered
+        >
+          <Modal.Header closeButton>
+            <Modal.Title>{editingCampaign ? 'Edit Campaign' : 'Add New Campaign'}</Modal.Title>
+          </Modal.Header>
+          <Modal.Body>
+            <Form>
+              <Row>
+                <Col md={12}>
+                  <Form.Group className="mb-3">
+                    <Form.Label>Campaign Name <span className="text-danger">*</span></Form.Label>
+                    <Form.Control
+                      type="text"
+                      placeholder="Enter campaign name"
+                      value={campaignFormData.name}
+                      onChange={(e) => setCampaignFormData({ ...campaignFormData, name: e.target.value })}
+                    />
+                  </Form.Group>
+                </Col>
+                
+                <Col md={12}>
+                  <Form.Group className="mb-3">
+                    <Form.Label>Description</Form.Label>
+                    <Form.Control
+                      as="textarea"
+                      rows={3}
+                      placeholder="Enter campaign description"
+                      value={campaignFormData.description}
+                      onChange={(e) => setCampaignFormData({ ...campaignFormData, description: e.target.value })}
+                    />
+                  </Form.Group>
+                </Col>
+
+                <Col md={6}>
+                  <Form.Group className="mb-3">
+                    <Form.Label>Owner <span className="text-danger">*</span></Form.Label>
+                    <Form.Select
+                      value={campaignFormData.owner}
+                      onChange={(e) => setCampaignFormData({ ...campaignFormData, owner: e.target.value })}
+                    >
+                      <option value="">Select owner</option>
+                      <option value="Sarah Williams">Sarah Williams</option>
+                      <option value="John Doe">John Doe</option>
+                      <option value="Mike Johnson">Mike Johnson</option>
+                      <option value="Jane Smith">Jane Smith</option>
+                    </Form.Select>
+                  </Form.Group>
+                </Col>
+
+                <Col md={6}>
+                  <Form.Group className="mb-3">
+                    <Form.Label>Status <span className="text-danger">*</span></Form.Label>
+                    <Form.Select
+                      value={campaignFormData.status}
+                      onChange={(e) => setCampaignFormData({ ...campaignFormData, status: e.target.value })}
+                    >
+                      <option value="Draft">Draft</option>
+                      <option value="Active">Active</option>
+                      <option value="Completed">Completed</option>
+                      <option value="Awaiting Review">Awaiting Review</option>
+                    </Form.Select>
+                  </Form.Group>
+                </Col>
+
+                <Col md={6}>
+                  <Form.Group className="mb-3">
+                    <Form.Label>Start Date <span className="text-danger">*</span></Form.Label>
+                    <Form.Control
+                      type="date"
+                      value={campaignFormData.startDate}
+                      onChange={(e) => setCampaignFormData({ ...campaignFormData, startDate: e.target.value })}
+                    />
+                  </Form.Group>
+                </Col>
+
+                <Col md={6}>
+                  <Form.Group className="mb-3">
+                    <Form.Label>End Date <span className="text-danger">*</span></Form.Label>
+                    <Form.Control
+                      type="date"
+                      value={campaignFormData.endDate}
+                      onChange={(e) => setCampaignFormData({ ...campaignFormData, endDate: e.target.value })}
+                    />
+                  </Form.Group>
+                </Col>
+
+                <Col md={12}>
+                  <Form.Group className="mb-3">
+                    <Form.Label>Created Date</Form.Label>
+                    <Form.Control
+                      type="text"
+                      value={campaignFormData.created}
+                      disabled
+                      className="bg-light"
+                    />
+                    <Form.Text className="text-muted">
+                      This field is automatically set to today's date
+                    </Form.Text>
+                  </Form.Group>
+                </Col>
+              </Row>
+            </Form>
+          </Modal.Body>
+          <Modal.Footer>
+            <Button 
+              variant="outline-secondary" 
+              onClick={() => {
+                setShowCampaignModal(false);
+                setEditingCampaign(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button 
+              variant="primary"
+              onClick={() => {
+                // Validation
+                if (!campaignFormData.name || !campaignFormData.owner || !campaignFormData.status || !campaignFormData.startDate || !campaignFormData.endDate) {
+                  alert('Please fill in all required fields');
+                  return;
+                }
+                
+                // Here you would typically save the campaign to your backend
+                console.log('Saving campaign:', campaignFormData);
+                
+                setShowCampaignModal(false);
+                setEditingCampaign(null);
+              }}
+            >
+              {editingCampaign ? 'Update Campaign' : 'Create Campaign'}
+            </Button>
+          </Modal.Footer>
+        </Modal>
+
         {CampaignViewModal()}
         {ConfirmationDialog()}
         {/* Header */}
@@ -11847,7 +14872,22 @@ const CRMPortal = () => {
               <BarChart3 size={16} className="me-2" />
               {showCampaignsAnalytics ? 'Hide Analytics' : 'Show Analytics'}
             </Button>
-            <Button variant="primary">
+            <Button 
+              variant="primary"
+              onClick={() => {
+                setEditingCampaign(null);
+                setCampaignFormData({
+                  name: '',
+                  description: '',
+                  owner: '',
+                  status: 'Draft',
+                  startDate: '',
+                  endDate: '',
+                  created: new Date().toLocaleDateString('en-GB')
+                });
+                setShowCampaignModal(true);
+              }}
+            >
               <Plus size={16} className="me-2" />
               New Campaign
             </Button>
@@ -11971,7 +15011,7 @@ const CRMPortal = () => {
        {/* campaign filters if required here */}
 
         {/* Bulk Actions Bar */}
-        {selectedCampaigns.length > 0 && (
+        {/* {selectedCampaigns.length > 0 && (
           <Card className="mb-4 border-0" style={{ backgroundColor: '#0d6efd' }}>
             <Card.Body className="py-3">
               <div className="d-flex justify-content-between align-items-center text-white">
@@ -11996,27 +15036,109 @@ const CRMPortal = () => {
               </div>
             </Card.Body>
           </Card>
-        )}
+        )} */}
         
 
         {/* Campaigns Table */}
         <Card className="border-0 shadow-sm">
           <Card.Body className="p-0">
-            {/* <div className="d-flex justify-content-between align-items-center mb-3 px-3 pt-3">
+            <div className="d-flex justify-content-between align-items-center mb-3 px-3 pt-3">
               <div className="d-flex align-items-center gap-2">
-                <span>Showing</span>
-                <Form.Select size="sm" style={{ width: 'auto' }}>
-                  <option value="15">15</option>
-                  <option value="25">25</option>
-                  <option value="50">50</option>
-                </Form.Select>
-                <span>results</span>
+                <span className="text-muted">Manage your campaigns</span>
               </div>
-              <Button variant="outline-secondary" size="sm">
-                <Layers size={14} className="me-1" />
-                Customize Columns
-              </Button>
-            </div> */}
+              <div className="d-flex gap-2">
+                {/* Bulk Actions Dropdown */}
+                {selectedCampaigns.length > 0 && (
+                  <Dropdown>
+                    <Dropdown.Toggle variant="outline-primary" size="sm">
+                      <CheckSquare size={16} className="me-2" />
+                      Bulk Actions ({selectedCampaigns.length})
+                    </Dropdown.Toggle>
+                    <Dropdown.Menu align="end">
+                      {/* <Dropdown.Item 
+                        onClick={() => {
+                          console.log('Pausing campaigns:', selectedCampaigns);
+                          // Add pause logic here
+                        }}
+                        className="d-flex align-items-center"
+                      >
+                        <Clock size={14} className="me-2" />
+                        Pause Selected ({selectedCampaigns.length})
+                      </Dropdown.Item> */}
+                      {/* <Dropdown.Item 
+                        onClick={() => {
+                          console.log('Archiving campaigns:', selectedCampaigns);
+                          // Add archive logic here
+                        }}
+                        className="d-flex align-items-center"
+                      >
+                        <Package size={14} className="me-2" />
+                        Archive Selected ({selectedCampaigns.length})
+                      </Dropdown.Item> */}
+                      <Dropdown.Divider />
+                      <Dropdown.Item 
+                        onClick={() => {
+                          setConfirmAction({
+                            type: 'delete',
+                            data: { 
+                              itemType: 'Campaigns', 
+                              name: `${selectedCampaigns.length} selected campaigns`,
+                              count: selectedCampaigns.length
+                            }
+                          });
+                          setShowConfirmDialog(true);
+                        }}
+                        className="d-flex align-items-center text-danger"
+                      >
+                        <Trash2 size={14} className="me-2" />
+                        Delete Selected ({selectedCampaigns.length})
+                      </Dropdown.Item>
+                    </Dropdown.Menu>
+                  </Dropdown>
+                )}
+
+                {/* Column Customization */}
+                <Dropdown>
+                  <Dropdown.Toggle variant="outline-secondary" size="sm">
+                    <Layers size={16} className="me-2" />
+                    Customize Table
+                  </Dropdown.Toggle>
+                  <Dropdown.Menu align="end" style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                    {[
+                      { key: 'campaignName', label: 'Campaign Name' },
+                      { key: 'owner', label: 'Owner' },
+                      { key: 'status', label: 'Status' },
+                      { key: 'dateRange', label: 'Date Range' },
+                      { key: 'created', label: 'Created' }
+                    ].map((col) => (
+                      <Dropdown.Item key={col.key} as="div">
+                        <Form.Check
+                          type="checkbox"
+                          label={col.label}
+                          checked={selectedCampaignsColumns.includes(col.key)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedCampaignsColumns([...selectedCampaignsColumns, col.key]);
+                            } else {
+                              setSelectedCampaignsColumns(selectedCampaignsColumns.filter(c => c !== col.key));
+                            }
+                          }}
+                        />
+                      </Dropdown.Item>
+                    ))}
+                    <Dropdown.Divider />
+                    <Dropdown.Item onClick={() => setSelectedCampaignsColumns(['campaignName', 'owner', 'status', 'dateRange', 'created'])}>
+                      Select All
+                    </Dropdown.Item>
+                    <Dropdown.Item onClick={() => {
+                      setSelectedCampaignsColumns(['campaignName', 'owner', 'status', 'dateRange', 'created']);
+                    }}>
+                      Reset to Default
+                    </Dropdown.Item>
+                  </Dropdown.Menu>
+                </Dropdown>
+              </div>
+            </div>
 
             <div className="table-responsive">
               <Table hover className="mb-0">
@@ -12090,13 +15212,11 @@ const CRMPortal = () => {
                         }}
                       />
                     </th>
-                    <th>Campaign Name</th>
-                    <th>Owner</th>
-                    <th>Tags</th>
-                    <th>Status</th>
-                    <th>Goal Metric</th>
-                    <th>Date Range</th>
-                    <th>Created</th>
+                    {selectedCampaignsColumns.includes('campaignName') && <th>Campaign Name</th>}
+                    {selectedCampaignsColumns.includes('owner') && <th>Owner</th>}
+                    {selectedCampaignsColumns.includes('status') && <th>Status</th>}
+                    {selectedCampaignsColumns.includes('dateRange') && <th>Date Range</th>}
+                    {selectedCampaignsColumns.includes('created') && <th>Created</th>}
                     <th>Actions</th>
                   </tr>
                 </thead>
@@ -12154,79 +15274,65 @@ const CRMPortal = () => {
                           }}
                         />
                       </td>
-                      <td>
+                      {selectedCampaignsColumns.includes('campaignName') && (
+                        <td>
                         <div>
-                          <a href="#" className="fw-semibold text-primary text-decoration-none">
+                          <div className="fw-semibold">
                             {campaign.name}
-                          </a>
-                          {campaign.comments > 0 && (
-                            <Badge bg="info" className="ms-2 bg-opacity-10 text-info">
-                              {campaign.comments} comments
-                            </Badge>
-                          )}
+                          </div>
                           <div className="small text-muted mt-1">{campaign.description}</div>
                         </div>
                       </td>
-                      <td>
-                        <div className="d-flex align-items-center gap-2">
-                          <div 
-                            className="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center" 
-                            style={{ width: '32px', height: '32px', fontSize: '0.75rem', fontWeight: '600' }}
+                      )}
+                      {selectedCampaignsColumns.includes('owner') && (
+                        <td>
+                          <div className="d-flex align-items-center gap-2">
+                            <div 
+                              className="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center" 
+                              style={{ width: '32px', height: '32px', fontSize: '0.75rem', fontWeight: '600' }}
+                            >
+                              {campaign.ownerInitials}
+                            </div>
+                            <span className="small">{campaign.owner}</span>
+                          </div>
+                        </td>
+                      )}
+                      {selectedCampaignsColumns.includes('status') && (
+                        <td>
+                          <Badge 
+                            bg={
+                              campaign.status === 'Active' ? 'success' :
+                              campaign.status === 'Draft' ? 'primary' :
+                              campaign.status === 'Completed' ? 'secondary' :
+                              'warning'
+                            }
+                            className="bg-opacity-10 text-dark"
                           >
-                            {campaign.ownerInitials}
+                            {campaign.status}
+                          </Badge>
+                        </td>
+                      )}
+                      {selectedCampaignsColumns.includes('dateRange') && (
+                        <td>
+                          <div>
+                            <div className="fw-semibold small">{campaign.dateRange.split(' - ')[0]}</div>
+                            <small className="text-muted">
+                              {campaign.status === 'Completed' ? 'Ended' : campaign.status === 'Draft' ? 'Starts' : 'Ends'}: {campaign.dateRange.split(' - ')[1]}
+                            </small>
                           </div>
-                          <span className="small">{campaign.owner}</span>
-                        </div>
-                      </td>
-                      <td>
-                        <div className="d-flex flex-wrap gap-1">
-                          {campaign.tags.map((tag, idx) => (
-                            <Badge key={idx} bg="primary" className="bg-opacity-10 text-primary">
-                              {tag}
-                            </Badge>
-                          ))}
-                        </div>
-                      </td>
-                      <td>
-                        <Badge 
-                          bg={
-                            campaign.status === 'Active' ? 'success' :
-                            campaign.status === 'Draft' ? 'primary' :
-                            campaign.status === 'Completed' ? 'secondary' :
-                            'warning'
-                          }
-                          className="bg-opacity-10 text-dark"
-                        >
-                          {campaign.status}
-                        </Badge>
-                      </td>
-                      <td>
-                        <div>
-                          <div className={`fw-bold ${campaign.goalMetric === '--' ? 'text-danger' : ''}`}>
-                            {campaign.goalMetric}
-                          </div>
-                          <small className={campaign.goalMetric === '--' ? 'text-danger fw-semibold' : 'text-muted'}>
-                            {campaign.goalLabel}
-                          </small>
-                        </div>
-                      </td>
-                      <td>
-                        <div>
-                          <div className="fw-semibold small">{campaign.dateRange.split(' - ')[0]}</div>
-                          <small className="text-muted">
-                            {campaign.status === 'Completed' ? 'Ended' : campaign.status === 'Draft' ? 'Starts' : 'Ends'}: {campaign.dateRange.split(' - ')[1]}
-                          </small>
-                        </div>
-                      </td>
-                      <td>
-                        <small className="text-muted">{campaign.created}</small>
-                      </td>
+                        </td>
+                      )}
+                      {selectedCampaignsColumns.includes('created') && (
+                        <td>
+                          <small className="text-muted">{campaign.created}</small>
+                        </td>
+                      )}
                       <td>
                         <div className="d-flex gap-1">
                           <Button 
                             variant="link" 
                             size="sm" 
-                            className="p-1 text-muted"
+                            className="p-1"
                             onClick={() => {
                               setViewingCampaign(campaign);
                               setShowCampaignViewModal(true);
@@ -12239,6 +15345,19 @@ const CRMPortal = () => {
                             variant="link" 
                             size="sm" 
                             className="p-1 text-primary"
+                            onClick={() => {
+                              setEditingCampaign(campaign);
+                              setCampaignFormData({
+                                name: campaign.name,
+                                description: campaign.description,
+                                owner: campaign.owner,
+                                status: campaign.status,
+                                startDate: campaign.dateRange.split(' - ')[0].split('/').reverse().join('-'),
+                                endDate: campaign.dateRange.split(' - ')[1].split('/').reverse().join('-'),
+                                created: campaign.created
+                              });
+                              setShowCampaignModal(true);
+                            }}
                             title="Edit Campaign"
                           >
                             <Edit size={16} />
@@ -12380,6 +15499,7 @@ const CRMPortal = () => {
 
     return (
       <div>
+        {TaskModal()}
         {TaskViewModal()}
         {ConfirmationDialog()}
         {/* Task History Modal */}
@@ -12631,6 +15751,112 @@ const CRMPortal = () => {
           </>
         )}
 
+        {/* Bulk Actions and Column Customization - Tasks */}
+        <div className="d-flex justify-content-end gap-2 mb-3">
+          {/* Bulk Actions Dropdown - Only show when items are selected */}
+          {selectedTasks.length > 0 && (
+            <Dropdown>
+              <Dropdown.Toggle variant="outline-primary" size="sm">
+                <CheckSquare size={16} className="me-2" />
+                Bulk Actions ({selectedTasks.length})
+              </Dropdown.Toggle>
+              <Dropdown.Menu align="end">
+                <Dropdown.Item
+                  onClick={() => {
+                    console.log('Mark as completed:', selectedTasks);
+                    // Add logic to mark selected tasks as completed
+                  }}
+                  className="d-flex align-items-center"
+                >
+                  <CheckCircle size={14} className="me-2" />
+                  Mark as Completed
+                </Dropdown.Item>
+                <Dropdown.Item
+                  onClick={() => {
+                    console.log('Change urgency:', selectedTasks);
+                    // Add logic to change urgency
+                  }}
+                  className="d-flex align-items-center"
+                >
+                  <AlertCircle size={14} className="me-2" />
+                  Change Urgency
+                </Dropdown.Item>
+                <Dropdown.Item
+                  onClick={() => {
+                    console.log('Reassign tasks:', selectedTasks);
+                    // Add logic to reassign tasks
+                  }}
+                  className="d-flex align-items-center"
+                >
+                  <User size={14} className="me-2" />
+                  Reassign Tasks
+                </Dropdown.Item>
+                <Dropdown.Divider />
+                <Dropdown.Item 
+                  onClick={() => {
+                    setConfirmAction({
+                      type: 'delete',
+                      data: { 
+                        itemType: 'Tasks', 
+                        name: `${selectedTasks.length} selected tasks`,
+                        count: selectedTasks.length
+                      }
+                    });
+                    setShowConfirmDialog(true);
+                  }}
+                  className="d-flex align-items-center text-danger"
+                >
+                  <Trash2 size={14} className="me-2" />
+                  Delete Selected ({selectedTasks.length})
+                </Dropdown.Item>
+              </Dropdown.Menu>
+            </Dropdown>
+          )}
+
+          {/* Column Customization */}
+          <Dropdown>
+            <Dropdown.Toggle variant="outline-secondary" size="sm">
+              <Layers size={16} className="me-2" />
+              Customize Table
+            </Dropdown.Toggle>
+            <Dropdown.Menu align="end" style={{ maxHeight: '300px', overflowY: 'auto' }}>
+              {[
+                { key: 'task', label: 'Task' },
+                { key: 'assignedTo', label: 'Assigned To' },
+                { key: 'contact', label: 'Contact' },
+                { key: 'company', label: 'Company' },
+                { key: 'urgency', label: 'Urgency' },
+                { key: 'status', label: 'Status' },
+                { key: 'dueDate', label: 'Due Date' }
+              ].map((col) => (
+                <Dropdown.Item key={col.key} as="div">
+                  <Form.Check
+                    type="checkbox"
+                    label={col.label}
+                    checked={selectedTasksColumns.includes(col.key)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedTasksColumns([...selectedTasksColumns, col.key]);
+                      } else {
+                        setSelectedTasksColumns(selectedTasksColumns.filter(c => c !== col.key));
+                      }
+                    }}
+                  />
+                </Dropdown.Item>
+              ))}
+              <Dropdown.Divider />
+              <Dropdown.Item onClick={() => setSelectedTasksColumns(['task', 'assignedTo', 'contact', 'company', 'urgency', 'status', 'dueDate'])}>
+                Select All
+              </Dropdown.Item>
+              <Dropdown.Item onClick={() => {
+                setSelectedTasksColumns(['task', 'assignedTo', 'contact', 'company', 'urgency', 'status', 'dueDate']);
+              }}>
+                Reset to Default
+              </Dropdown.Item>
+            </Dropdown.Menu>
+          </Dropdown>
+        </div>
+
         {/* Tasks Table */}
         <Card className="border-0 shadow-sm">
           <Card.Body className="p-0">
@@ -12697,13 +15923,13 @@ const CRMPortal = () => {
                         }}
                       />
                     </th>
-                    <th>Task</th>
-                    <th>Assigned To</th>
-                    <th>Contact</th>
-                    <th>Company</th>
-                    <th>Urgency</th>
-                    <th>Status</th>
-                    <th>Due Date</th>
+                    {selectedTasksColumns.includes('task') && <th>Task</th>}
+                    {selectedTasksColumns.includes('assignedTo') && <th>Assigned To</th>}
+                    {selectedTasksColumns.includes('contact') && <th>Contact</th>}
+                    {selectedTasksColumns.includes('company') && <th>Company</th>}
+                    {selectedTasksColumns.includes('urgency') && <th>Urgency</th>}
+                    {selectedTasksColumns.includes('status') && <th>Status</th>}
+                    {selectedTasksColumns.includes('dueDate') && <th>Due Date</th>}
                     <th>Actions</th>
                   </tr>
                 </thead>
@@ -12756,35 +15982,43 @@ const CRMPortal = () => {
                           }}
                         />
                       </td>
-                      <td>
-                        <div className="fw-semibold">{task.title}</div>
-                        <small className="text-muted">Assigned: {task.dateAssigned}</small>
-                      </td>
-                      <td>{task.assignedTo}</td>
-                      <td>
-                        <div className="fw-medium">{task.prospect}</div>
-                        <small className="text-muted">{task.email}</small>
-                      </td>
-                      <td>{task.company}</td>
-                      <td>
-                        <Badge bg={
-                          task.urgency === 'High' ? 'danger' :
-                          task.urgency === 'Medium' ? 'warning' :
-                          'secondary'
-                        }>
-                          {task.urgency}
-                        </Badge>
-                      </td>
-                      <td>
-                        <Badge bg={
-                          task.status === 'Completed' ? 'success' :
-                          task.status === 'In Progress' ? 'info' :
-                          'warning'
-                        }>
-                          {task.status}
-                        </Badge>
-                      </td>
-                      <td>{task.dueDate}</td>
+                      {selectedTasksColumns.includes('task') && (
+                        <td>
+                          <div className="fw-semibold">{task.title}</div>
+                          <small className="text-muted">Assigned: {task.dateAssigned}</small>
+                        </td>
+                      )}
+                      {selectedTasksColumns.includes('assignedTo') && <td>{task.assignedTo}</td>}
+                      {selectedTasksColumns.includes('contact') && (
+                        <td>
+                          <div className="fw-medium">{task.prospect}</div>
+                          <small className="text-muted">{task.email}</small>
+                        </td>
+                      )}
+                      {selectedTasksColumns.includes('company') && <td>{task.company}</td>}
+                      {selectedTasksColumns.includes('urgency') && (
+                        <td>
+                          <Badge bg={
+                            task.urgency === 'High' ? 'danger' :
+                            task.urgency === 'Medium' ? 'warning' :
+                            'secondary'
+                          }>
+                            {task.urgency}
+                          </Badge>
+                        </td>
+                      )}
+                      {selectedTasksColumns.includes('status') && (
+                        <td>
+                          <Badge bg={
+                            task.status === 'Completed' ? 'success' :
+                            task.status === 'In Progress' ? 'info' :
+                            'warning'
+                          }>
+                            {task.status}
+                          </Badge>
+                        </td>
+                      )}
+                      {selectedTasksColumns.includes('dueDate') && <td>{task.dueDate}</td>}
                       <td>
                         <div className="d-flex gap-1">
                           <Button 
@@ -12813,6 +16047,23 @@ const CRMPortal = () => {
                             size="sm" 
                             className="p-1" 
                             title="Edit Task"
+                            onClick={() => {
+                              setEditingTask(task);
+                              setTaskFormData({
+                                title: task.title,
+                                name: task.prospect,
+                                phone: task.phone,
+                                email: task.email,
+                                companyName: task.company,
+                                assignedTo: task.assignedTo,
+                                assignedBy: task.assignedBy,
+                                dateAssigned: task.dateAssigned,
+                                urgency: task.urgency,
+                                dueDate: task.dueDate,
+                                notes: task.notes || ''
+                              });
+                              setShowTaskModal(true);
+                            }}
                           >
                             <Edit size={16} />
                           </Button>
@@ -13156,6 +16407,110 @@ const CRMPortal = () => {
           </>
         )}
 
+        {/* Bulk Actions and Column Customization - Stages */}
+        <div className="d-flex justify-content-end gap-2 mb-3">
+          {/* Bulk Actions Dropdown - Only show when items are selected */}
+          {selectedStages.length > 0 && (
+            <Dropdown>
+              <Dropdown.Toggle variant="outline-primary" size="sm">
+                <CheckSquare size={16} className="me-2" />
+                Bulk Actions ({selectedStages.length})
+              </Dropdown.Toggle>
+              <Dropdown.Menu align="end">
+                <Dropdown.Item
+                  onClick={() => {
+                    console.log('Enable selected stages:', selectedStages);
+                    // Add logic to enable stages
+                  }}
+                  className="d-flex align-items-center"
+                >
+                  <CheckCircle size={14} className="me-2" />
+                  Enable Selected
+                </Dropdown.Item>
+                <Dropdown.Item
+                  onClick={() => {
+                    console.log('Disable selected stages:', selectedStages);
+                    // Add logic to disable stages
+                  }}
+                  className="d-flex align-items-center"
+                >
+                  <XCircle size={14} className="me-2" />
+                  Disable Selected
+                </Dropdown.Item>
+                <Dropdown.Item
+                  onClick={() => {
+                    console.log('Reorder stages:', selectedStages);
+                    // Add logic to reorder stages
+                  }}
+                  className="d-flex align-items-center"
+                >
+                  <ArrowUpDown size={14} className="me-2" />
+                  Reorder Stages
+                </Dropdown.Item>
+                <Dropdown.Divider />
+                <Dropdown.Item 
+                  onClick={() => {
+                    setConfirmAction({
+                      type: 'delete',
+                      data: { 
+                        itemType: 'Stages', 
+                        name: `${selectedStages.length} selected stages`,
+                        count: selectedStages.length
+                      }
+                    });
+                    setShowConfirmDialog(true);
+                  }}
+                  className="d-flex align-items-center text-danger"
+                >
+                  <Trash2 size={14} className="me-2" />
+                  Delete Selected ({selectedStages.length})
+                </Dropdown.Item>
+              </Dropdown.Menu>
+            </Dropdown>
+          )}
+
+          {/* Column Customization */}
+          <Dropdown>
+            <Dropdown.Toggle variant="outline-secondary" size="sm">
+              <Layers size={16} className="me-2" />
+              Customize Table
+            </Dropdown.Toggle>
+            <Dropdown.Menu align="end" style={{ maxHeight: '300px', overflowY: 'auto' }}>
+              {[
+                { key: 'stageName', label: 'Stage Name' },
+                { key: 'category', label: 'Type' },
+                { key: 'description', label: 'Description' },
+                { key: 'color', label: 'Color' },
+                { key: 'order', label: 'Order' }
+              ].map((col) => (
+                <Dropdown.Item key={col.key} as="div">
+                  <Form.Check
+                    type="checkbox"
+                    label={col.label}
+                    checked={selectedStagesColumns.includes(col.key)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedStagesColumns([...selectedStagesColumns, col.key]);
+                      } else {
+                        setSelectedStagesColumns(selectedStagesColumns.filter(c => c !== col.key));
+                      }
+                    }}
+                  />
+                </Dropdown.Item>
+              ))}
+              <Dropdown.Divider />
+              <Dropdown.Item onClick={() => setSelectedStagesColumns(['stageName', 'category', 'description', 'color', 'order'])}>
+                Select All
+              </Dropdown.Item>
+              <Dropdown.Item onClick={() => {
+                setSelectedStagesColumns(['stageName', 'category', 'description', 'color', 'order']);
+              }}>
+                Reset to Default
+              </Dropdown.Item>
+            </Dropdown.Menu>
+          </Dropdown>
+        </div>
+
         {/* Pipeline Stages Table */}
         <Card className="border-0 shadow-sm mb-4">
           <Card.Body className="p-0">
@@ -13187,35 +16542,32 @@ const CRMPortal = () => {
                         }}
                       />
                     </th>
-                    <th 
-                      style={{ cursor: 'pointer', userSelect: 'none' }}
-                      onClick={() => handleSort('order', stagesPagination, setStagesPagination)}
-                    >
-                      Order {renderSortIcon('order', stagesPagination)}
-                    </th>
-                    <th 
-                      style={{ cursor: 'pointer', userSelect: 'none' }}
-                      onClick={() => handleSort('name', stagesPagination, setStagesPagination)}
-                    >
-                      Stage Name {renderSortIcon('name', stagesPagination)}
-                    </th>
-                    <th 
-                      style={{ cursor: 'pointer', userSelect: 'none' }}
-                      onClick={() => handleSort('type', stagesPagination, setStagesPagination)}
-                    >
-                      Type {renderSortIcon('type', stagesPagination)}
-                    </th>
-                    <th>Description</th>
-                    <th>Color</th>
-                    <th 
-                      style={{ cursor: 'pointer', userSelect: 'none' }}
-                      onClick={() => handleSort('count', stagesPagination, setStagesPagination)}
-                    >
-                      Records {renderSortIcon('count', stagesPagination)}
-                    </th>
-                    <th>Conversion Rate</th>
-                    <th>Avg Duration</th>
-                    <th>Automation</th>
+                    {selectedStagesColumns.includes('order') && (
+                      <th 
+                        style={{ cursor: 'pointer', userSelect: 'none' }}
+                        onClick={() => handleSort('order', stagesPagination, setStagesPagination)}
+                      >
+                        Order {renderSortIcon('order', stagesPagination)}
+                      </th>
+                    )}
+                    {selectedStagesColumns.includes('stageName') && (
+                      <th 
+                        style={{ cursor: 'pointer', userSelect: 'none' }}
+                        onClick={() => handleSort('name', stagesPagination, setStagesPagination)}
+                      >
+                        Stage Name {renderSortIcon('name', stagesPagination)}
+                      </th>
+                    )}
+                    {selectedStagesColumns.includes('category') && (
+                      <th 
+                        style={{ cursor: 'pointer', userSelect: 'none' }}
+                        onClick={() => handleSort('type', stagesPagination, setStagesPagination)}
+                      >
+                        Type {renderSortIcon('type', stagesPagination)}
+                      </th>
+                    )}
+                    {selectedStagesColumns.includes('description') && <th>Description</th>}
+                    {selectedStagesColumns.includes('color') && <th>Color</th>}
                     <th>Actions</th>
                   </tr>
                 </thead>
@@ -13238,36 +16590,46 @@ const CRMPortal = () => {
                             }}
                           />
                         </td>
-                        <td className="text-center fw-bold">{stage.order}</td>
-                        <td>
-                          <div className="d-flex align-items-center gap-2">
-                            <div 
-                              style={{ 
-                                width: '10px', 
-                                height: '10px', 
-                                backgroundColor: stage.color, 
-                                borderRadius: '50%' 
-                              }}
-                            />
-                            <span className="fw-semibold">{stage.name}</span>
-                          </div>
-                        </td>
-                        <td>
-                          <Badge bg={
-                            stage.type === 'Lead' ? 'primary' :
-                            stage.type === 'Deal' ? 'warning' :
-                            'success'
-                          } className="bg-opacity-10 text-dark">
-                            {stage.type}
-                          </Badge>
-                        </td>
-                        <td className="small text-muted">{stage.description}</td>
-                        <td>
-                          <Badge style={{ backgroundColor: stage.color }}>
-                            {stage.color}
-                          </Badge>
-                        </td>
-                        <td>
+                        {selectedStagesColumns.includes('order') && (
+                          <td className="text-center fw-bold">{stage.order}</td>
+                        )}
+                        {selectedStagesColumns.includes('stageName') && (
+                          <td>
+                            <div className="d-flex align-items-center gap-2">
+                              <div 
+                                style={{ 
+                                  width: '10px', 
+                                  height: '10px', 
+                                  backgroundColor: stage.color, 
+                                  borderRadius: '50%' 
+                                }}
+                              />
+                              <span className="fw-semibold">{stage.name}</span>
+                            </div>
+                          </td>
+                        )}
+                        {selectedStagesColumns.includes('category') && (
+                          <td>
+                            <Badge bg={
+                              stage.type === 'Lead' ? 'primary' :
+                              stage.type === 'Deal' ? 'warning' :
+                              'success'
+                            } className="bg-opacity-10 text-dark">
+                              {stage.type}
+                            </Badge>
+                          </td>
+                        )}
+                        {selectedStagesColumns.includes('description') && (
+                          <td className="small text-muted">{stage.description}</td>
+                        )}
+                        {selectedStagesColumns.includes('color') && (
+                          <td>
+                            <Badge style={{ backgroundColor: stage.color }}>
+                              {stage.color}
+                            </Badge>
+                          </td>
+                        )}
+                        {/* <td>
                           <Badge bg="primary" pill className="bg-opacity-10 text-dark">
                             {stage.count}
                           </Badge>
@@ -13294,7 +16656,7 @@ const CRMPortal = () => {
                               Manual
                             </Badge>
                           )}
-                        </td>
+                        </td> */}
                         <td>
                           <div className="d-flex gap-1">
                             <Button 
@@ -13309,7 +16671,7 @@ const CRMPortal = () => {
                             >
                               <Edit size={16} />
                             </Button>
-                            <Button 
+                            {/* <Button 
                               variant="link" 
                               size="sm" 
                               className="p-1 text-info" 
@@ -13320,7 +16682,7 @@ const CRMPortal = () => {
                               }}
                             >
                               <GitBranch size={16} />
-                            </Button>
+                            </Button> */}
                             <Button 
                               variant="link" 
                               size="sm" 
@@ -13386,7 +16748,314 @@ const CRMPortal = () => {
     );
   };
 
-  // Activity Tracker Screen
+  // New Modern Activity Tracker Screen
+  const renderActivityTrackerNew = () => {
+    // Pipeline stages with colors and icons
+    const pipelineStages = [
+      { id: 'all', label: 'All Stages', color: '#6c757d', icon: <Activity size={16} />, bgColor: '#f8f9fa' },
+      { id: 'prospect', label: 'Prospect', color: '#6c757d', icon: <Users size={16} />, bgColor: '#f8f9fa' },
+      { id: 'qualified', label: 'Qualified Lead', color: '#0d6efd', icon: <Target size={16} />, bgColor: '#e7f1ff' },
+      { id: 'contact', label: 'Contact Made', color: '#17a2b8', icon: <Phone size={16} />, bgColor: '#d1ecf1' },
+      { id: 'analysis', label: 'Needs Analysis', color: '#ffc107', icon: <FileText size={16} />, bgColor: '#fff3cd' },
+      { id: 'proposal', label: 'Proposal Sent', color: '#fd7e14', icon: <Mail size={16} />, bgColor: '#ffe5d0' },
+      { id: 'negotiation', label: 'Negotiation', color: '#dc3545', icon: <Handshake size={16} />, bgColor: '#f8d7da' },
+      { id: 'won', label: 'Deal Won', color: '#28a745', icon: <CheckCircle size={16} />, bgColor: '#d4edda' },
+      { id: 'order', label: 'Order Placed', color: '#20c997', icon: <ShoppingBag size={16} />, bgColor: '#d1f4ea' }
+    ];
+
+    // Sample activity data
+    const allActivities = [
+      { id: 1, entityName: 'Global Services Ltd', entityType: 'Company', currentStage: 'order', previousStage: 'won', movedBy: 'Sarah Williams', movedAt: '2025-11-29 14:20', duration: '2 days', value: '£45,000', owner: 'Sarah Williams', notes: 'Order confirmed, contract signed', tags: ['High Value', 'Priority'] },
+      { id: 2, entityName: 'Acme Corporation', entityType: 'Company', currentStage: 'won', previousStage: 'negotiation', movedBy: 'John Doe', movedAt: '2025-11-29 09:15', duration: '5 days', value: '£32,000', owner: 'John Doe', notes: 'Successfully closed deal after negotiation', tags: ['Enterprise'] },
+      { id: 3, entityName: 'John Smith', entityType: 'Contact', currentStage: 'qualified', previousStage: 'prospect', movedBy: 'Jane Smith', movedAt: '2025-11-28 10:30', duration: '1 day', value: '-', owner: 'Jane Smith', notes: 'Qualified after initial conversation', tags: ['New'] },
+      { id: 4, entityName: 'Tech Innovations Ltd', entityType: 'Company', currentStage: 'proposal', previousStage: 'analysis', movedBy: 'Mike Johnson', movedAt: '2025-11-28 16:45', duration: '4 days', value: '£28,500', owner: 'Mike Johnson', notes: 'Proposal sent with custom pricing', tags: ['Tech'] },
+      { id: 5, entityName: 'Emily Davis', entityType: 'Contact', currentStage: 'contact', previousStage: 'qualified', movedBy: 'Tom Brown', movedAt: '2025-11-27 15:30', duration: '2 days', value: '-', owner: 'Tom Brown', notes: 'First contact made via phone', tags: [] },
+      { id: 6, entityName: 'DataTech Systems', entityType: 'Company', currentStage: 'negotiation', previousStage: 'proposal', movedBy: 'Sarah Williams', movedAt: '2025-11-27 11:00', duration: '3 days', value: '£52,000', owner: 'Sarah Williams', notes: 'In negotiation on pricing and terms', tags: ['High Value'] },
+      { id: 7, entityName: 'Innovation Hub', entityType: 'Company', currentStage: 'analysis', previousStage: 'contact', movedBy: 'Jane Smith', movedAt: '2025-11-26 14:20', duration: '3 days', value: '£22,500', owner: 'Jane Smith', notes: 'Requirements gathering in progress', tags: ['Startup'] },
+      { id: 8, entityName: 'Robert Wilson', entityType: 'Contact', currentStage: 'prospect', previousStage: '', movedBy: 'System', movedAt: '2025-11-26 10:15', duration: '-', value: '-', owner: 'Sarah Williams', notes: 'New prospect imported from campaign', tags: ['Campaign'] },
+      { id: 9, entityName: 'Cloud Solutions Inc', entityType: 'Company', currentStage: 'order', previousStage: 'won', movedBy: 'John Doe', movedAt: '2025-11-25 13:45', duration: '1 day', value: '£38,000', owner: 'John Doe', notes: 'Order processing started', tags: ['Cloud'] },
+      { id: 10, entityName: 'Sarah Johnson', entityType: 'Contact', currentStage: 'contact', previousStage: 'qualified', movedBy: 'Mike Johnson', movedAt: '2025-11-25 10:20', duration: '1 day', value: '-', owner: 'Mike Johnson', notes: 'Email sent, waiting for response', tags: [] },
+    ];
+
+    // Filter activities based on stage and search
+    const filteredActivities = allActivities
+      .filter(activity => activityStageFilter === 'all' || activity.currentStage === activityStageFilter)
+      .filter(activity => {
+        if (!activitySearchTerm) return true;
+        const searchLower = activitySearchTerm.toLowerCase();
+        return activity.entityName.toLowerCase().includes(searchLower) ||
+               activity.owner.toLowerCase().includes(searchLower) ||
+               activity.movedBy.toLowerCase().includes(searchLower);
+      })
+      .slice(0, activityRecordsLimit);
+
+    // Get stage info
+    const getStageInfo = (stageId: string) => {
+      return pipelineStages.find(s => s.id === stageId) || pipelineStages[0];
+    };
+
+    // Statistics - count activities per stage
+    const stageStats = pipelineStages.slice(1).map(stage => ({
+      ...stage,
+      count: allActivities.filter(a => a.currentStage === stage.id).length
+    }));
+
+    // Prepare quick filters for FilterBar
+    const quickFilters = pipelineStages.map(stage => {
+      const count = stage.id === 'all' ? allActivities.length : allActivities.filter(a => a.currentStage === stage.id).length;
+      return {
+        id: stage.id,
+        label: stage.label,
+        count: count,
+        color: stage.color,
+        activeColor: stage.color,
+        icon: stage.icon
+      };
+    });
+
+    return (
+      <div>
+        {/* Header */}
+        <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4">
+          <div className="mb-3 mb-md-0">
+            <h2 className="mb-1 fw-bold">Activity Tracker</h2>
+            <p className="text-muted mb-0">Track entities moving through your sales pipeline stages</p>
+          </div>
+          <div className="d-flex flex-wrap gap-2">
+            <Button variant="outline-secondary" size="sm">
+              <Download size={16} className="me-2" />
+              Export
+            </Button>
+          </div>
+        </div>
+
+        {/* Filter Bar with Stage Tabs */}
+        <FilterBar
+          quickFilters={quickFilters}
+          activeFilter={activityStageFilter}
+          onFilterChange={(filterId) => setActivityStageFilter(filterId)}
+          searchValue={activitySearchTerm}
+          onSearchChange={(value) => setActivitySearchTerm(value)}
+          onSearch={() => console.log('Searching activities:', activitySearchTerm)}
+          searchPlaceholder="Search by entity name or owner..."
+          showAdvancedFilters={showAdvancedFilters}
+          onToggleAdvancedFilters={() => setShowAdvancedFilters(!showAdvancedFilters)}
+          advancedFilterCount={(activityDateRange.start || activityDateRange.end) ? 1 : 0}
+        />
+
+        {/* Advanced Filters */}
+        {showAdvancedFilters && (
+          <Card className="border-0 shadow-sm mb-4">
+            <Card.Body>
+              <Row className="g-3 align-items-end">
+                <Col md={3}>
+                  <Form.Label className="small fw-bold mb-2">Records Limit</Form.Label>
+                  <Form.Select 
+                    value={activityRecordsLimit} 
+                    onChange={(e) => setActivityRecordsLimit(Number(e.target.value))}
+                  >
+                    <option value="10">10 Records</option>
+                    <option value="25">25 Records</option>
+                    <option value="50">50 Records</option>
+                    <option value="100">100 Records</option>
+                    <option value="250">250 Records</option>
+                  </Form.Select>
+                </Col>
+                <Col md={3}>
+                  <Form.Label className="small fw-bold mb-2">Start Date</Form.Label>
+                  <Form.Control 
+                    type="date" 
+                    value={activityDateRange.start}
+                    onChange={(e) => setActivityDateRange({ ...activityDateRange, start: e.target.value })}
+                  />
+                </Col>
+                <Col md={3}>
+                  <Form.Label className="small fw-bold mb-2">End Date</Form.Label>
+                  <Form.Control 
+                    type="date" 
+                    value={activityDateRange.end}
+                    onChange={(e) => setActivityDateRange({ ...activityDateRange, end: e.target.value })}
+                  />
+                </Col>
+                <Col md={3} className="d-flex gap-2">
+                  <Button 
+                    variant="outline-secondary"
+                    className="flex-fill"
+                    onClick={() => {
+                      setActivityStageFilter('all');
+                      setActivitySearchTerm('');
+                      setActivityDateRange({ start: '', end: '' });
+                      setActivityRecordsLimit(50);
+                    }}
+                  >
+                    <XCircle size={16} className="me-2" />
+                   Reset
+                  </Button>
+                </Col>
+              </Row>
+              <div className="mt-3">
+                <span className="small text-muted">
+                  Showing <strong>{filteredActivities.length}</strong> of <strong>{allActivities.length}</strong> activities
+                </span>
+              </div>
+            </Card.Body>
+          </Card>
+        )}
+
+        {/* Activities Table */}
+        <Card className="border-0 shadow-sm">
+          <Card.Body className="p-0">
+            <div className="table-responsive">
+              <Table hover className="mb-0">
+                <thead style={{ backgroundColor: '#f8f9fa' }}>
+                  <tr>
+                    <th style={{ width: '5%' }}>#</th>
+                    <th style={{ width: '20%' }}>Entity</th>
+                    <th style={{ width: '15%' }}>Stage Transition</th>
+                    <th style={{ width: '12%' }}>Value</th>
+                    <th style={{ width: '12%' }}>Owner</th>
+                    {/* <th style={{ width: '10%' }}>Duration</th> */}
+                    <th style={{ width: '15%' }}>Moved At</th>
+                    {/* <th style={{ width: '11%' }}>Actions</th> */}
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredActivities.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="text-center py-5 text-muted">
+                        <AlertCircle size={48} className="mb-3 opacity-50" />
+                        <div>No activities found matching your criteria</div>
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredActivities.map((activity, index) => {
+                      const currentStageInfo = getStageInfo(activity.currentStage);
+                      const previousStageInfo = activity.previousStage ? getStageInfo(activity.previousStage) : null;
+                      
+                      return (
+                        <tr key={activity.id}>
+                          <td className="text-muted">{index + 1}</td>
+                          <td>
+                            <div>
+                              <div className="fw-semibold text-dark">{activity.entityName}</div>
+                              <div className="small text-muted">{activity.entityType}</div>
+                              {activity.tags.length > 0 && (
+                                <div className="mt-1">
+                                  {activity.tags.map((tag, idx) => (
+                                    <Badge key={idx} bg="light" text="dark" className="me-1" style={{ fontSize: '0.7rem' }}>
+                                      {tag}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                          <td>
+                            <div className="d-flex align-items-center gap-2">
+                              {previousStageInfo && (
+                                <>
+                                  <Badge 
+                                    style={{ 
+                                      backgroundColor: previousStageInfo.bgColor,
+                                      color: "#fff",
+                                      // border: `1px solid ${previousStageInfo.color}`,
+                                      fontSize: '0.7rem',
+                                      padding: '4px 8px'
+                                    }}
+                                  >
+                                    {previousStageInfo.label}
+                                  </Badge>
+                                  <ArrowRight size={14} className="text-muted" />
+                                </>
+                              )}
+                              <Badge 
+                                style={{ 
+                                  backgroundColor: currentStageInfo.bgColor,
+                                  color: "#fff",
+                                  // border: `1px solid ${currentStageInfo.color}`,
+                                  fontSize: '0.7rem',
+                                  padding: '4px 8px',
+                                  fontWeight: 600
+                                }}
+                              >
+                                {currentStageInfo.label}
+                              </Badge>
+                            </div>
+                          </td>
+                          <td>
+                            {activity.value !== '-' ? (
+                              <span className="fw-semibold text-success">{activity.value}</span>
+                            ) : (
+                              <span className="text-muted">-</span>
+                            )}
+                          </td>
+                          <td>
+                            <div className="d-flex align-items-center gap-2">
+                              <div 
+                                style={{
+                                  width: '32px',
+                                  height: '32px',
+                                  borderRadius: '50%',
+                                  backgroundColor: '#0d6efd',
+                                  color: 'white',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  fontSize: '0.75rem',
+                                  fontWeight: 600
+                                }}
+                              >
+                                {activity.owner.split(' ').map(n => n[0]).join('')}
+                              </div>
+                              <div className="small">{activity.owner}</div>
+                            </div>
+                          </td>
+                          {/* <td>
+                            <Badge bg="secondary" className="bg-opacity-10 text-dark">
+                              <Clock size={12} className="me-1" />
+                              {activity.duration}
+                            </Badge>
+                          </td> */}
+                          <td>
+                            <div className="small">
+                              <div className="text-dark">{activity.movedAt.split(' ')[0]}</div>
+                              <div className="text-muted">{activity.movedAt.split(' ')[1]}</div>
+                            </div>
+                          </td>
+                          {/* <td>
+                            <div className="d-flex gap-1">
+                              <Button 
+                                variant="link" 
+                                size="sm" 
+                                className="p-1 text-primary"
+                                title="View Details"
+                              >
+                                <Eye size={16} />
+                              </Button>
+                              <Button 
+                                variant="link" 
+                                size="sm" 
+                                className="p-1 text-muted"
+                                title="View History"
+                              >
+                                <History size={16} />
+                              </Button>
+                            </div>
+                          </td> */}
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </Table>
+            </div>
+          </Card.Body>
+        </Card>
+      </div>
+    );
+  };
+
+  // Activity Tracker Screen (Original)
   const renderActivities = () => {
     const recentActivities = [
       { id: 1, type: 'conversion', from: 'Deal', to: 'Order', entity: 'Global Services Ltd', value: '$45,000', user: 'Sarah Williams', date: '2025-11-19 14:20', icon: <ShoppingBag size={18} />, color: 'success' },
@@ -13867,7 +17536,7 @@ const CRMPortal = () => {
       case 'campaigns': return renderCampaigns();
       case 'tasks': return renderTasks();
       case 'stages': return renderStages();
-      case 'activities': return renderActivities();
+      case 'activities': return renderActivityTrackerNew(); // Use renderActivities() for old version
       case 'reports': return renderReports();
       default: return renderDashboard();
     }
