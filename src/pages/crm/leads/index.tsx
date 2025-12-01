@@ -1,4 +1,5 @@
 import "@assets/scss/datatable-style.scss";
+import { useRouter } from 'next/router';
 import React, {
   ReactElement,
   useState,
@@ -8,69 +9,362 @@ import React, {
 } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
-import GenericListPage from "@components/GenericListPage";
-import CrmFilters from "@components/filters/CrmFilters";
 import {
   getLeads,
+  getLead,
   deleteLead,
   convertLead,
   markLeadLost,
   getStages,
-  getLostReasons,
 } from "@utils/crm";
 import { GetHierarchyData } from "@utils/users";
-import { Column } from "@components/CustomDataTable";
 import {
   Button,
-  Modal,
   Row,
   Col,
   Badge,
   Dropdown,
   Form,
-  Alert,
   Card,
+  Table,
+  InputGroup,
+  Modal,
 } from "react-bootstrap";
+import Select from 'react-select';
 import { ModuleSlug } from "@utils/Helper";
 import {
-  FiEdit,
-  FiTrash2,
-  FiEye,
-  FiTarget,
-  FiXCircle,
-  FiPlus,
-} from "react-icons/fi";
+  Target,
+  CheckCircle,
+  TrendingUp,
+  BarChart3,
+  Plus,
+  Eye,
+  Edit,
+  Trash2,
+  Handshake,
+  MoreVertical,
+  X,
+  Users,
+  PlusCircle,
+  CheckSquare,
+  Zap,
+  Star,
+  Clock,
+  Search,
+  Filter,
+  Layers,
+  Calendar,
+  ArrowUp,
+  ArrowDown,
+  ArrowUpDown,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  Mail,
+  Phone,
+  Building2,
+  User,
+  History,
+  FileText,
+  Hash,
+} from 'lucide-react';
+import { 
+  PieChart, 
+  Pie, 
+  Cell, 
+  ResponsiveContainer, 
+  Tooltip,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+} from 'recharts';
 import Link from "next/link";
 import { toast } from "react-toastify";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
-import PageHeader from "@components/PageHeader";
 import FormModal from "../../partial/FormModal";
 import ConfirmModal from "@pages/partial/ConfirmModal";
 import SuccessfulModal from "@pages/partial/SuccessfulModal";
-import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
-import DatatableActionButton from "@components/DatatableActionButton";
 import { useSession } from "next-auth/react";
 
+// KPI Card Component
+interface KPICardData {
+  title: string;
+  value: string;
+  change?: string;
+  isPositive?: boolean;
+  icon: React.ReactNode;
+  color: string;
+  onClick?: () => void;
+}
+
+const KPICard: React.FC<KPICardData> = ({ title, value, change, isPositive, icon, color, onClick }) => {
+  return (
+    <Card 
+      className={onClick ? 'h-100' : ''} 
+      style={{ 
+        cursor: onClick ? 'pointer' : 'default',
+        transition: 'all 0.2s ease',
+        border: '1px solid #e9ecef'
+      }}
+      onClick={onClick}
+      onMouseEnter={(e) => {
+        if (onClick) {
+          e.currentTarget.style.transform = 'translateY(-4px)';
+          e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)';
+        }
+      }}
+      onMouseLeave={(e) => {
+        if (onClick) {
+          e.currentTarget.style.transform = 'translateY(0)';
+          e.currentTarget.style.boxShadow = 'none';
+        }
+      }}
+    >
+      <Card.Body>
+        <div className="d-flex justify-content-between align-items-start mb-3">
+          <div className={`bg-${color} bg-opacity-10 rounded p-3`}>
+            <div className={`text-${color}`}>{icon}</div>
+          </div>
+          {change && (
+            <Badge bg={isPositive ? 'success' : 'danger'} className="bg-opacity-10">
+              {isPositive ? <ArrowUp size={12} /> : <ArrowDown size={12} />}
+              {change}
+            </Badge>
+          )}
+        </div>
+        <h3 className="mb-1">{value}</h3>
+        <p className="text-muted mb-0 small">{title}</p>
+      </Card.Body>
+    </Card>
+  );
+};
+
+// Filter Bar Component
+interface FilterBarProps {
+  quickFilters: { id: string; label: string; count: number; variant?: string; color?: string; activeColor?: string; icon?: React.ReactNode }[];
+  activeFilter: string;
+  onFilterChange: (filterId: string) => void;
+  searchValue: string;
+  onSearchChange: (value: string) => void;
+  onSearch: () => void;
+  searchPlaceholder?: string;
+  showAdvancedFilters: boolean;
+  onToggleAdvancedFilters: () => void;
+  advancedFilterCount?: number;
+}
+
+const FilterBar: React.FC<FilterBarProps> = ({
+  quickFilters,
+  activeFilter,
+  onFilterChange,
+  searchValue,
+  onSearchChange,
+  onSearch,
+  searchPlaceholder = "Search...",
+  showAdvancedFilters,
+  onToggleAdvancedFilters,
+  advancedFilterCount = 0
+}) => {
+  return (
+    <Card className="border-0 shadow-sm mb-3">
+      <Card.Body className="p-3">
+        <div className="d-flex flex-column flex-lg-row justify-content-between align-items-stretch align-items-lg-center gap-3">
+          <div className="d-flex gap-2 flex-wrap align-items-center flex-grow-1">
+            {quickFilters.map(filter => {
+              const isActive = activeFilter === filter.id;
+              const hasCustomColor = filter.color || filter.activeColor;
+              const buttonStyle: React.CSSProperties = {};
+              if (hasCustomColor) {
+                if (isActive) {
+                  const bgColor = filter.activeColor || filter.color;
+                  buttonStyle.background = '#fff';
+                  buttonStyle.borderColor = bgColor;
+                  buttonStyle.color = bgColor;
+                } else {
+                  buttonStyle.background = '#fff';
+                  buttonStyle.borderColor = filter.color;
+                  buttonStyle.color = filter.color;
+                  buttonStyle.opacity = '0.7';
+                }
+              }
+
+              return (
+                <Button
+                  key={filter.id}
+                  variant={hasCustomColor ? undefined : (isActive ? (filter.variant || 'primary') : 'outline-secondary')}
+                  onClick={() => onFilterChange(filter.id)}
+                  className="d-flex align-items-center gap-2"
+                  style={hasCustomColor ? buttonStyle : undefined}
+                >
+                  {filter.icon && <span className="d-flex align-items-center">{filter.icon}</span>}
+                  {filter.label}
+                  <Badge
+                    bg={isActive ? 'light' : 'light'}
+                    text={isActive ? 'dark' : 'dark'}
+                    className="ms-2"
+                  >
+                    {filter.count}
+                  </Badge>
+                </Button>
+              );
+            })}
+          </div>
+
+          <div className="d-flex flex-column flex-sm-row gap-2 align-items-stretch align-items-sm-center flex-shrink-0">
+            <InputGroup style={{ width: '300px', minWidth: '200px' }} className="flex-shrink-0">
+              <Form.Control
+                style={{ height: '41px' }}
+                type="text"
+                placeholder={searchPlaceholder}
+                value={searchValue}
+                onChange={(e) => onSearchChange(e.target.value)}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter') {
+                    onSearch();
+                  }
+                }}
+              />
+              <Button 
+                variant="outline-secondary"
+                onClick={onSearch}
+              >
+                <Search size={16} />
+              </Button>
+            </InputGroup>
+            <Button 
+              variant={showAdvancedFilters ? 'primary' : 'outline-secondary'}
+              onClick={onToggleAdvancedFilters}
+              className="d-flex align-items-center flex-shrink-0"
+            >
+              <Filter size={16} className="me-2" />
+              Filters
+              {advancedFilterCount > 0 && (
+                <Badge bg="light" text="dark" className="ms-2">
+                  {advancedFilterCount}
+                </Badge>
+              )}
+            </Button>
+          </div>
+        </div>
+      </Card.Body>
+    </Card>
+  );
+};
 
 const CrmLeads = () => {
   const { data: session } = useSession();
 
   const [stages, setStages] = useState<any[]>([]);
-  const [lostReasons, setLostReasons] = useState<
-    { id: number; name: string }[]
-  >([]);
+  const [lostReasons, setLostReasons] = useState<any[]>([]);
   const [extensions, setExtensions] = useState<any[]>([]);
   const [refreshKey, setRefreshKey] = useState(0);
   const [currentFilters, setCurrentFilters] = useState<Record<string, any>>({});
+  const [leadsData, setLeadsData] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [totalLeads, setTotalLeads] = useState(0);
+  const [summaryTiles, setSummaryTiles] = useState<any>(null);
+  
+  // UI State
+  const [showLeadsAnalytics, setShowLeadsAnalytics] = useState(false);
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const [activeFilter, setActiveFilter] = useState('all');
+  const [leadsSearch, setLeadsSearch] = useState('');
+  const [selectedLeads, setSelectedLeads] = useState<number[]>([]);
+  const [showLeadViewModal, setShowLeadViewModal] = useState(false);
+  const [viewingLead, setViewingLead] = useState<any>(null);
+  const [loadingLead, setLoadingLead] = useState(false);
+  const [selectedLeadsColumns, setSelectedLeadsColumns] = useState<string[]>(() => {
+    const saved = localStorage.getItem('leadsSelectedColumns');
+    return saved ? JSON.parse(saved) : ['name', 'company', 'email', 'phone', 'stage', 'leadPotential', 'followUps', 'assignedUser', 'created'];
+  });
+  const [leadsPagination, setLeadsPagination] = useState({ currentPage: 1, rowsPerPage: 10, sortColumn: '', sortDirection: 'asc' as 'asc' | 'desc' });
+  const [leadsFilters, setLeadsFilters] = useState({
+    assignedTo: [] as string[],
+    industry: [] as string[],
+    stage: [] as string[],
+    source: [] as string[],
+    potential: [] as string[],
+    campaign: [] as string[],
+    dateRange: [] as string[],
+    dateRangeCustomStart: '',
+    dateRangeCustomEnd: ''
+  });
 
-  // Fetch stages and lost reasons on component mount
+  // Fetch stages and extensions on component mount
   useEffect(() => {
     fetchStages();
     fetchLostReasons();
     fetchExtensions(ModuleSlug.CRM_LEADS);
   }, []);
+
+  // Fetch leads when filters or search change
+  const fetchLeads = useCallback(
+    async (page = 1, perPage = 15, search = "") => {
+      setLoading(true);
+      try {
+      const params: any = {
+        page,
+        per_page: perPage,
+        ...(currentFilters || {}),
+      };
+
+      // Use search from filters if available, otherwise use the search parameter
+        const searchTerm = currentFilters.search || search || leadsSearch;
+      if (searchTerm) {
+        params.search = searchTerm;
+      }
+
+      // Add filter parameters at top level
+      if (currentFilters.stage_id) {
+        params.stage_id = currentFilters.stage_id;
+      }
+      if (currentFilters.is_lost !== undefined) {
+        params.is_lost = currentFilters.is_lost;
+      }
+
+      const response: any = await getLeads(params);
+      console.log("Raw response from getLeads:", response);
+
+      // Handle nested response structure
+      // The API returns: { code, message, data: { success, data: [...], pagination, summary_tiles } }
+      const responseData: any = (response as any)?.data;
+      // The leads array is at response.data.data (not response.data.data.data)
+      const leadsArray: any[] = responseData?.data || [];
+      const pagination: any = responseData?.pagination || {};
+      const summary: any = responseData?.summary_tiles || null;
+      
+      // Set leads data, total, and summary tiles
+      setLeadsData(Array.isArray(leadsArray) ? leadsArray : []);
+      setTotalLeads(pagination?.total || (Array.isArray(leadsArray) ? leadsArray.length : 0) || 0);
+      setSummaryTiles(summary);
+
+      // Transform to GenericListPage expected format
+      const transformedData = {
+        dataList: Array.isArray(leadsArray) ? leadsArray : [],
+        meta: {
+          total: pagination?.total || (Array.isArray(leadsArray) ? leadsArray.length : 0) || 0,
+          current_page: pagination?.current_page || page,
+          per_page: pagination?.per_page || perPage,
+          last_page: pagination?.last_page || 1,
+        },
+      };
+      console.log("Transformed data:", transformedData);
+      return transformedData;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [currentFilters, leadsSearch] // Add currentFilters and leadsSearch as dependencies
+  );
+
+  useEffect(() => {
+    fetchLeads(leadsPagination.currentPage, leadsPagination.rowsPerPage, leadsSearch);
+  }, [refreshKey, currentFilters, leadsPagination.currentPage, leadsPagination.rowsPerPage, fetchLeads]);
 
   // Handle filter changes
   const handleFiltersChange = useCallback((filters: Record<string, any>) => {
@@ -89,8 +383,8 @@ const CrmLeads = () => {
 
   const fetchLostReasons = async () => {
     try {
-      const reasonsData = await getLostReasons();
-      setLostReasons(reasonsData || []);
+      const lostReasonsData = await (getStages as any)('lost_reason');
+      setLostReasons(lostReasonsData || []);
     } catch (error) {
       console.error("Failed to fetch lost reasons:", error);
     }
@@ -107,61 +401,194 @@ const CrmLeads = () => {
     }
   };
 
-  const fetchLeads = useCallback(
-    async (page = 1, perPage = 15, search = "") => {
-      const params: any = {
-        page,
-        per_page: perPage,
-        ...(currentFilters || {}),
-      };
 
-      // Use search from filters if available, otherwise use the search parameter
-      const searchTerm = currentFilters.search || search;
-      if (searchTerm) {
-        params.search = searchTerm;
+  // Helper functions
+  const handleSort = (column: string, paginationState: any, setPaginationState: (state: any) => void) => {
+    const newDirection = paginationState.sortColumn === column && paginationState.sortDirection === 'asc' ? 'desc' : 'asc';
+    setPaginationState({ ...paginationState, sortColumn: column, sortDirection: newDirection, currentPage: 1 });
+  };
+
+  const sortData = <T extends Record<string, any>>(data: T[], sortColumn: string, sortDirection: 'asc' | 'desc'): T[] => {
+    if (!sortColumn) return data;
+    
+    return [...data].sort((a, b) => {
+      let aVal = a[sortColumn];
+      let bVal = b[sortColumn];
+      
+      if (aVal === undefined) aVal = '';
+      if (bVal === undefined) bVal = '';
+      
+      const aStr = String(aVal).toLowerCase();
+      const bStr = String(bVal).toLowerCase();
+      
+      if (aStr < bStr) return sortDirection === 'asc' ? -1 : 1;
+      if (aStr > bStr) return sortDirection === 'asc' ? 1 : -1;
+      return 0;
+    });
+  };
+
+  const paginateData = <T,>(data: T[], currentPage: number, rowsPerPage: number): T[] => {
+    const startIndex = (currentPage - 1) * rowsPerPage;
+    const endIndex = startIndex + rowsPerPage;
+    return data.slice(startIndex, endIndex);
+  };
+
+  const getTotalPages = (dataLength: number, rowsPerPage: number): number => {
+    return Math.ceil(dataLength / rowsPerPage);
+  };
+
+  const renderPaginationControls = (
+    dataLength: number,
+    paginationState: any,
+    setPaginationState: (state: any) => void,
+    label: string
+  ) => {
+    const totalPages = getTotalPages(dataLength, paginationState.rowsPerPage);
+    const { currentPage, rowsPerPage } = paginationState;
+    const startRow = (currentPage - 1) * rowsPerPage + 1;
+    const endRow = Math.min(currentPage * rowsPerPage, dataLength);
+
+    return (
+      <div className="d-flex justify-content-between align-items-center mt-3">
+        <div className="d-flex align-items-center gap-2">
+          <span className="text-muted small">Show</span>
+          <Form.Select
+            size="sm"
+            value={rowsPerPage}
+            onChange={(e) => setPaginationState({ ...paginationState, rowsPerPage: Number(e.target.value), currentPage: 1 })}
+            style={{ width: 'auto' }}
+          >
+            <option value={10}>10</option>
+            <option value={25}>25</option>
+            <option value={50}>50</option>
+            <option value={100}>100</option>
+          </Form.Select>
+          <span className="text-muted small">entries</span>
+        </div>
+        
+        <div className="text-muted small">
+          Showing {startRow} to {endRow} of {dataLength} {label}
+        </div>
+
+        <div className="d-flex gap-1">
+          <Button
+            size="sm"
+            variant="outline-secondary"
+            disabled={currentPage === 1}
+            onClick={() => setPaginationState({ ...paginationState, currentPage: 1 })}
+          >
+            <ChevronsLeft size={14} />
+          </Button>
+          <Button
+            size="sm"
+            variant="outline-secondary"
+            disabled={currentPage === 1}
+            onClick={() => setPaginationState({ ...paginationState, currentPage: currentPage - 1 })}
+          >
+            <ChevronLeft size={14} />
+          </Button>
+          
+          {[...Array(totalPages)].map((_, index) => {
+            const pageNum = index + 1;
+            if (
+              pageNum === 1 ||
+              pageNum === totalPages ||
+              (pageNum >= currentPage - 1 && pageNum <= currentPage + 1)
+            ) {
+              return (
+                <Button
+                  key={pageNum}
+                  size="sm"
+                  variant={currentPage === pageNum ? 'primary' : 'outline-secondary'}
+                  onClick={() => setPaginationState({ ...paginationState, currentPage: pageNum })}
+                >
+                  {pageNum}
+                </Button>
+              );
+            } else if (pageNum === currentPage - 2 || pageNum === currentPage + 2) {
+              return <span key={pageNum} className="px-2">...</span>;
+            }
+            return null;
+          })}
+          
+          <Button
+            size="sm"
+            variant="outline-secondary"
+            disabled={currentPage === totalPages}
+            onClick={() => setPaginationState({ ...paginationState, currentPage: currentPage + 1 })}
+          >
+            <ChevronRight size={14} />
+          </Button>
+          <Button
+            size="sm"
+            variant="outline-secondary"
+            disabled={currentPage === totalPages}
+            onClick={() => setPaginationState({ ...paginationState, currentPage: totalPages })}
+          >
+            <ChevronsRight size={14} />
+          </Button>
+        </div>
+      </div>
+    );
+  };
+
+  const renderSortIcon = (column: string, paginationState: any) => {
+    if (paginationState.sortColumn !== column) {
+      return <ArrowUpDown size={14} className="ms-1 text-muted" />;
+    }
+    return paginationState.sortDirection === 'asc' ? 
+      <ArrowUp size={14} className="ms-1" /> : 
+      <ArrowDown size={14} className="ms-1" />;
+  };
+
+  // Transform API lead data to UI format
+  const transformLeadData = (lead: any) => {
+    // Parse contact_persons - it can be a JSON string or an array
+    let contactPersonsArray: any[] = [];
+    if (lead.contact_persons) {
+      if (typeof lead.contact_persons === 'string') {
+        try {
+          contactPersonsArray = JSON.parse(lead.contact_persons);
+        } catch (e) {
+          console.error("Failed to parse contact_persons:", e);
+          contactPersonsArray = [];
+        }
+      } else if (Array.isArray(lead.contact_persons)) {
+        contactPersonsArray = lead.contact_persons;
       }
+    }
 
-      // Add filter parameters at top level
-      if (currentFilters.stage_id) {
-        params.stage_id = currentFilters.stage_id;
-      }
-      if (currentFilters.is_lost !== undefined) {
-        params.is_lost = currentFilters.is_lost;
-      }
+    // Get first available contact person
+    const contactPerson = contactPersonsArray.find(cp => cp.email || cp.phone) || contactPersonsArray[0] || {};
+    
+    // Use contact person data if available, otherwise fall back to top-level fields
+    const email = contactPerson.email || '';
+    const phone = contactPerson.phone 
+      ? `${contactPerson.phone_country_code || ''} ${contactPerson.phone}`.trim()
+      : (lead.contact_phone ? `${lead.contact_phone_country_code || ''} ${lead.contact_phone}`.trim() : '');
 
-      const response = await getLeads(params);
-      console.log("Raw response from getLeads:", response);
-
-      // Transform PaginationWrapper to GenericListPage expected format
-      if (response?.data && response?.total !== undefined) {
-        const transformedData = {
-          dataList: response.data || [],
-          meta: {
-            total: response.total || 0,
-            current_page: response.current_page || page,
-            per_page: response.per_page || perPage,
-            last_page: response.last_page || 1,
-          },
-        };
-        console.log("Transformed data:", transformedData);
-        return transformedData;
-      }
-
-      // Fallback for other response structures
-      const fallbackData = {
-        dataList: response?.data || [],
-        meta: {
-          total: response?.total || 0,
-          current_page: response?.current_page || page,
-          per_page: response?.per_page || perPage,
-          last_page: response?.last_page || 1,
-        },
-      };
-      console.log("Fallback data:", fallbackData);
-      return fallbackData;
-    },
-    [currentFilters] // Add currentFilters as dependency
-  );
+    return {
+      id: lead.id,
+      name: lead.name || '',
+      email: email,
+      phone: phone,
+      company: lead.company_name || '',
+      industry: lead.industry || '',
+      stage: lead.stage?.name || (lead.stage_id ? 'Unknown' : 'New'),
+      leadPotential: lead.lead_potential || 'Warm',
+      assignedUser: extensions.find((ext: any) => ext?.id == lead?.user_extension || ext?.extension == lead?.user_extension)?.display_name || 
+                    extensions.find((ext: any) => ext?.id == lead?.user_extension || ext?.extension == lead?.user_extension)?.name || 
+                    lead.user_extension || '',
+      created: lead.created_at ? new Date(lead.created_at).toLocaleDateString() : '',
+      lastActivity: lead.last_activity_at ? new Date(lead.last_activity_at).toLocaleDateString() : '',
+      followUps: lead.follow_ups || [],
+      meetings: lead.meetings || [],
+      source: lead.source || '',
+      campaign: lead.campaign?.name || '',
+      isLost: lead.is_lost || false,
+      rawData: lead // Keep original data for actions
+    };
+  };
 
   // Delete Lead Modal
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -200,17 +627,9 @@ const CrmLeads = () => {
     expected_close_date: "",
     description: "",
   });
-
+  const router = useRouter();
   const handleConvertLead = useCallback((lead: any) => {
-    setLeadToConvert(lead);
-    setConvertFormData({
-      opportunity_name: lead.name || "",
-      value: lead.value?.toString() || "",
-      probability: "50",
-      expected_close_date: lead.expected_close_date || "",
-      description: lead.description || "",
-    });
-    setShowConvertModal(true);
+    router.push(`/crm/deals/create?lead_id=${lead.id}`);  
   }, []);
 
   const handleConvertSubmit = useCallback(async () => {
@@ -275,162 +694,167 @@ const CrmLeads = () => {
     }
   }, [leadToMarkLost, lostReasonId, lostFeedback]);
 
-  // Define columns after all handler functions
-  const columns: Column[] = useMemo(
-    () => [
-      {
-        key: "name",
-        name: "Name",
-        selector: (row: any) => row.name,
-        sortable: true,
-        cell: (props: any) => (
-          <div>
-            <div className="fw-medium">{props.name || "Unnamed Lead"}</div>
-            <small 
-              className="text-muted" 
-              style={{
-                display: 'block',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-                maxWidth: '300px'
-              }}
-            >
-              {props.description || "No Description"}
-            </small>
-          </div>
-        ),
-      },
-      {
-        key: "company_name",
-        name: "Company",
-        selector: (row: any) => row.company_name,
-        sortable: true,
-        cell: (props: any) => (
-          <div>
-              <div>{props.company_name || "No Company"}</div>
-          </div>
-        ),
-      },
-      {
-        key: "stage_name",
-        name: "Stage",
-        selector: (row: any) => row.stage?.name || "New",
-        sortable: true,
-        cell: (props: any) => (
-          <>
-          <span className="status-badge text-capitalize primary">{props.stage?.name || "New"}</span>
-          <br />
-          <small className="text-muted">{props?.lost_reason?.name}</small>
-          </>
-        ),
-      },
-      {
-        key: "status",
-        name: "Status",
-        selector: (row: any) => {
-          const stageName = (row.stage?.name || "New").toLowerCase();
-          
-          if (stageName.includes("new")) return "New";
-          if (stageName.includes("lost") || stageName.includes("won")) return "Closed";
-          return "In Progress";
-        },
-        sortable: true,
-        cell: (props: any) => {
-          const stageName = (props.stage?.name || "New").toLowerCase();
-          let status = "In Progress";
-          let statusClass = "info";
-
-          if (stageName.includes("new")) {
-            status = "New";
-            statusClass = "primary";
-          } else if (stageName.includes("lost") || stageName.includes("won")) {
-            status = "Closed";
-            statusClass = "danger";
-          }
-          if(props?.is_lost) {
-            status = "Lost";
-            statusClass = "danger";
-          }
-
-          return (
-            <span className={`status-badge text-capitalize ${statusClass}`}>
-              {status}
-            </span>
-          );
-        },
-      },
-      {
-        key: "created_at",
-        name: "Created",
-        selector: (row: any) => row.created_at,
-        sortable: true,
-        cell: (props: any) => {
-          const user = extensions.find((extension: any) => extension?.id == props?.created_by);
-          const name = user?.display_name || user?.name || props?.created_by;
-          return <span>
-          {props?.created_by ? name : ""}
-          {props?.created_by && <br />}
-          {props.created_at
-            ? new Date(props.created_at).toLocaleDateString()
-            : "Unknown"}
-        </span>
+  // Handle view lead
+  const handleViewLead = useCallback(async (leadId: number) => {
+    setLoadingLead(true);
+    try {
+      const leadData: any = await getLead(leadId);
+      
+      // Parse contact_persons if it's a string
+      if (leadData.contact_persons && typeof leadData.contact_persons === 'string') {
+        try {
+          leadData.contact_persons = JSON.parse(leadData.contact_persons);
+        } catch (e) {
+          console.error("Failed to parse contact_persons:", e);
+          leadData.contact_persons = [];
         }
-      },
-      {
-        key: "user_extension",
-        name: "User Extension",
-        selector: (row: any) => row.user_extension,
-        sortable: true,
-        cell: (props: any) => {
-          const user = extensions.find((extension: any) => extension?.id == props?.user_extension);
-          const name = user?.display_name || user?.name || props?.user_extension;
-          return <span>
-          {props?.user_extension ? name : ""}
-        </span>
-        }
-      },
-      {
-        key: "Action",
-        name: "ACTION",
-        selector: (row: any) => row.id,
-        sortable: false,
-        cell: (props: any) => (
-          <DatatableActionButton
-            actions={[
-              ...(session?.user?.permissions?.includes('view-crm-leads') ? [{
-                label: 'View',
-                icon: <FiEye className="me-2" />,
-                onClick: () => window.location.href = `/crm/leads/${props.id}`,
-              }] : []),
-              ...(session?.user?.permissions?.includes('edit-crm-leads') ? [{
-                label: 'Edit',
-                icon: <FiEdit className="me-2" />,
-                onClick: () => window.location.href = `/crm/leads/${props.id}/edit`,
-              }] : []),
-              ...(session?.user?.permissions?.includes('convert-to-opportunity-crm-leads') ? [{
-                label: 'Convert to Opportunity',
-                icon: <FiTarget className="me-2" />,
-                onClick: () => handleConvertLead(props),
-              }] : []),
-              ...(session?.user?.permissions?.includes('mark-as-lost-crm-leads') ? [{
-                label: 'Mark Lost Reason',
-                icon: <FiXCircle className="me-2" />,
-                onClick: () => handleMarkLost(props),
-              }] : []),
-              ...(session?.user?.permissions?.includes('delete-crm-leads') ? [{
-                label: 'Delete',
-                icon: <FiTrash2 className="me-2" />,
-                onClick: () => handleDeleteLead(props.id),
-                className: 'text-danger',
-              }] : []),
-            ]}
-          />
-        ),
-      },
-    ],
-    [extensions, session?.user?.permissions]
-  );
+      }
+      
+      setViewingLead(leadData);
+      setShowLeadViewModal(true);
+    } catch (error) {
+      console.error("Failed to fetch lead:", error);
+      toast.error("Failed to load lead details");
+    } finally {
+      setLoadingLead(false);
+    }
+  }, []);
+
+  // Calculate analytics data
+  const analyticsData = useMemo(() => {
+    const transformedLeads = leadsData.map(transformLeadData);
+    
+    // Use summary_tiles if available, otherwise calculate from data
+    const total = summaryTiles ? totalLeads : transformedLeads.length;
+    const hot = summaryTiles?.hot_leads || transformedLeads.filter(l => l.leadPotential === 'Hot').length;
+    // Removed lead score calculation
+    const qualified = transformedLeads.filter(l => l.stage === 'Qualified' || (l.stage?.toLowerCase().includes('qualified'))).length;
+    
+    // Stage distribution
+    const stageCounts: Record<string, number> = {};
+    transformedLeads.forEach(l => {
+      const stage = l.stage || 'New';
+      stageCounts[stage] = (stageCounts[stage] || 0) + 1;
+    });
+    
+    // Potential distribution
+    const potentialCounts: Record<string, number> = {};
+    transformedLeads.forEach(l => {
+      const potential = l.leadPotential || 'Warm';
+      potentialCounts[potential] = (potentialCounts[potential] || 0) + 1;
+    });
+
+    return { total, qualified, hot, stageCounts, potentialCounts };
+  }, [leadsData, extensions, summaryTiles, totalLeads]);
+
+  // Custom select styles
+  const customSelectStyles = {
+    control: (provided: any, state: any) => ({
+      ...provided,
+      minHeight: '45px',
+      fontSize: '0.875rem',
+      borderColor: state.isFocused ? '#86b7fe' : '#dee2e6',
+      boxShadow: state.isFocused ? '0 0 0 0.2rem rgba(13, 110, 253, 0.25)' : 'none',
+      '&:hover': {
+        borderColor: '#86b7fe'
+      }
+    }),
+    multiValue: (provided: any) => ({
+      ...provided,
+      backgroundColor: '#0d6efd',
+      color: 'white',
+      fontSize: '0.813rem'
+    }),
+    multiValueLabel: (provided: any) => ({
+      ...provided,
+      color: 'white',
+      padding: '2px 6px'
+    }),
+    multiValueRemove: (provided: any) => ({
+      ...provided,
+      color: 'white',
+      '&:hover': {
+        backgroundColor: '#0b5ed7',
+        color: 'white'
+      }
+    }),
+    menu: (provided: any) => ({
+      ...provided,
+      fontSize: '0.875rem'
+    })
+  };
+
+  // Filter and transform leads data
+  const filteredLeads = useMemo(() => {
+    const transformed = leadsData.map(transformLeadData);
+    
+    return transformed.filter(lead => {
+      // Quick filters
+      if (activeFilter === 'new') {
+        if (lead.stage !== 'New' && !lead.stage?.toLowerCase().includes('new')) return false;
+      } else if (activeFilter === 'qualified') {
+        if (lead.stage !== 'Qualified' && !lead.stage?.toLowerCase().includes('qualified')) return false;
+      } else if (activeFilter === 'hot') {
+        if (lead.leadPotential !== 'Hot') return false;
+      } else if (activeFilter === 'high-score') {
+        // Removed high-score filter
+        return false;
+      } else if (activeFilter === 'follow-up') {
+        if (!lead.followUps || lead.followUps.length === 0) return false;
+        // Check for scheduled or pending follow-ups
+        const hasScheduled = lead.followUps.some((f: any) => {
+          const status = f.follow_up_status || f.status;
+          return status === 'Scheduled' || status === 'Pending' || status === 'scheduled' || status === 'pending';
+        });
+        if (!hasScheduled) return false;
+      } else if (activeFilter === 'lost') {
+        if (!lead.isLost) return false;
+      }
+
+      // Search filter
+      const matchesSearch = !leadsSearch || !leadsSearch.trim() ||
+        (lead.name && lead.name.toLowerCase().includes(leadsSearch.toLowerCase())) ||
+        (lead.company && lead.company.toLowerCase().includes(leadsSearch.toLowerCase())) ||
+        (lead.email && lead.email.toLowerCase().includes(leadsSearch.toLowerCase()));
+
+      // Advanced filters
+      const matchesAssignedTo = leadsFilters.assignedTo.length === 0 || leadsFilters.assignedTo.includes(lead.assignedUser);
+      const matchesIndustry = leadsFilters.industry.length === 0 || leadsFilters.industry.includes(lead.industry);
+      const matchesStage = leadsFilters.stage.length === 0 || leadsFilters.stage.includes(lead.stage);
+      const matchesSource = leadsFilters.source.length === 0 || leadsFilters.source.includes(lead.source);
+      const matchesPotential = leadsFilters.potential.length === 0 || leadsFilters.potential.includes(lead.leadPotential);
+      const matchesCampaign = leadsFilters.campaign.length === 0;
+      const matchesDateRange = leadsFilters.dateRange.length === 0;
+
+      return matchesSearch && matchesAssignedTo && matchesIndustry && matchesStage && 
+        matchesSource && matchesPotential && matchesCampaign && 
+        matchesDateRange;
+    });
+  }, [leadsData, activeFilter, leadsSearch, leadsFilters, extensions]);
+
+  // Calculate filter counts
+  const filterCounts = useMemo(() => {
+    const transformed = leadsData.map(transformLeadData);
+    return {
+      all: transformed.length,
+      new: transformed.filter(l => l.stage === 'New' || l.stage?.toLowerCase().includes('new')).length,
+      qualified: transformed.filter(l => l.stage === 'Qualified' || l.stage?.toLowerCase().includes('qualified')).length,
+      hot: transformed.filter(l => l.leadPotential === 'Hot').length,
+      // Removed highScore filter count
+      followUp: transformed.filter(l => {
+        if (!l.followUps || l.followUps.length === 0) return false;
+        return l.followUps.some((f: any) => {
+          const status = f.follow_up_status || f.status;
+          return status === 'Scheduled' || status === 'Pending' || status === 'scheduled' || status === 'pending';
+        });
+      }).length,
+      lost: transformed.filter(l => l.isLost).length
+    };
+  }, [leadsData, extensions]);
+
+  if (!session?.user?.permissions?.includes('list-crm-leads')) {
+    return null;
+  }
 
   return (
     <React.Fragment>
@@ -440,49 +864,667 @@ const CrmLeads = () => {
         subTitle="Leads"
       />
 
-      <PageHeader
-        title="Leads"
-        filters={
-          session?.user?.permissions?.includes('list-crm-leads') ? (
-          <CrmFilters onFiltersChange={handleFiltersChange} type="lead" />
-        ) : (
-          <></>
-        )}
-        showSearch={session?.user?.permissions?.includes('list-crm-leads')}
-        searchValue={currentFilters.search || ""}
-        onSearchChange={(value) => handleFiltersChange({...currentFilters, search: value})}
-        searchPlaceholder="Search leads..."
-        buttons={
-          <>
-          {session?.user?.permissions?.includes('add-crm-leads') ? (
-          <Link href="/crm/leads/create" className="btn btn-primary">
-                  <FiPlus className="me-2" />
-                  New Lead
-                </Link>
-                ) : (
-                  <></>
-                )}
-                </>
-        }
-        leftGrid={3}
-        rightGrid={9}
-      />
+          <div>
+        {/* Page Header */}
+        <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4">
+          <div className="mb-3 mb-md-0">
+            <h2 className="mb-1 fw-bold">Leads Management</h2>
+            <p className="text-muted mb-0">Track and manage your qualified leads with scoring</p>
+          </div>
+          <div className="d-flex flex-wrap gap-2">
+            <Button 
+              variant={showLeadsAnalytics ? "primary" : "outline-secondary"}
+              onClick={() => setShowLeadsAnalytics(!showLeadsAnalytics)}
+            >
+              <BarChart3 size={16} className="me-2" />
+              {showLeadsAnalytics ? 'Hide Analytics' : 'Show Analytics'}
+            </Button>
+            {session?.user?.permissions?.includes('add-crm-leads') && (
+              <Link href="/crm/leads/create">
+                <Button variant="primary">
+                  <Plus size={16} className="me-2" />
+                  Add Lead
+                </Button>
+              </Link>
+            )}
+          </div>
+          </div>
 
-{session?.user?.permissions?.includes('list-crm-leads') ? (
-<GenericListPage
-                  columns={columns}
-                  fetchData={fetchLeads}
-                  title="Leads"
-                  searchPlaceholder="Search leads..."
-                  defaultPageSize={15}
-                  filters={currentFilters}
-                  refreshKey={refreshKey}
-                  search={false}
-                  tableStyle="table-style-2"
+        {/* Analytics Section - Collapsible */}
+        {showLeadsAnalytics && (
+          <>
+            {/* Summary Stats using KPICard */}
+            <Row className="mb-4">
+              <Col lg={3} md={6} className="mb-3">
+                <KPICard 
+                  title="Total Leads"
+                  value={analyticsData.total.toString()}
+                  icon={<Target size={24} />}
+                  color="primary"
                 />
-                ) : (
-                  <></>
-                )}
+              </Col>
+              <Col lg={3} md={6} className="mb-3">
+                <KPICard 
+                  title="Qualified Leads"
+                  value={analyticsData.qualified.toString()}
+                  icon={<CheckCircle size={24} />}
+                  color="success"
+                />
+              </Col>
+              <Col lg={3} md={6} className="mb-3">
+                <KPICard 
+                  title="Hot Leads"
+                  value={analyticsData.hot.toString()}
+                  icon={<TrendingUp size={24} />}
+                  color="danger"
+                />
+              </Col>
+            </Row>
+
+            {/* Analytics Charts */}
+            <Row className="mb-4">
+              <Col md={6} className="mb-3">
+                <Card className="border-0 shadow-sm h-100">
+                  <Card.Body>
+                    <h6 className="fw-bold mb-3">Lead Potential Distribution</h6>
+                    <ResponsiveContainer width="100%" height={250}>
+                      <PieChart>
+                        <Pie
+                          data={[
+                            { name: 'Hot', value: analyticsData.potentialCounts['Hot'] || 0, color: '#dc3545' },
+                            { name: 'Warm', value: analyticsData.potentialCounts['Warm'] || 0, color: '#ffc107' },
+                            { name: 'Cold', value: analyticsData.potentialCounts['Cold'] || 0, color: '#0dcaf0' }
+                          ]}
+                          cx="50%"
+                          cy="50%"
+                          labelLine={false}
+                          label={({ name, percent }: any) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                          outerRadius={80}
+                          fill="#8884d8"
+                          dataKey="value"
+                        >
+                          {[
+                            { name: 'Hot', value: analyticsData.potentialCounts['Hot'] || 0, color: '#dc3545' },
+                            { name: 'Warm', value: analyticsData.potentialCounts['Warm'] || 0, color: '#ffc107' },
+                            { name: 'Cold', value: analyticsData.potentialCounts['Cold'] || 0, color: '#0dcaf0' }
+                          ].map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <Tooltip />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </Card.Body>
+                </Card>
+              </Col>
+              <Col md={6} className="mb-3">
+                <Card className="border-0 shadow-sm h-100">
+                  <Card.Body>
+                    <h6 className="fw-bold mb-3">Lead Stage Distribution</h6>
+                    <ResponsiveContainer width="100%" height={250}>
+                      <BarChart
+                        data={Object.entries(analyticsData.stageCounts).map(([stage, count]) => ({ stage, count }))}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="stage" />
+                        <YAxis />
+                        <Tooltip />
+                        <Bar dataKey="count" fill="#0d6efd" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </Card.Body>
+                </Card>
+              </Col>
+            </Row>
+          </>
+        )}
+
+        {/* Filter Bar */}
+        <FilterBar
+          quickFilters={[
+            {
+              id: 'all',
+              label: 'All Leads',
+              count: filterCounts.all,
+              color: '#6c757d',
+              activeColor: '#0d6efd',
+              icon: <Users size={16} />
+            },
+            {
+              id: 'new',
+              label: 'New',
+              count: filterCounts.new,
+              color: '#dc3545',
+              activeColor: '#0d6efd',
+              icon: <PlusCircle size={16} />
+            },
+            {
+              id: 'qualified',
+              label: 'Qualified',
+              count: filterCounts.qualified,
+              color: '#0d6efd',
+              activeColor: '#0d6efd',
+              icon: <CheckSquare size={16} />
+            },
+            {
+              id: 'hot',
+              label: 'Hot Leads',
+              count: filterCounts.hot,
+              color: '#fd7e14',
+              activeColor: '#0d6efd',
+              icon: <Zap size={16} />
+            },
+            {
+              id: 'follow-up',
+              label: 'Follow-up Due',
+              count: filterCounts.followUp,
+              color: '#ffc107',
+              activeColor: '#0d6efd',
+              icon: <Clock size={16} />
+            },
+            {
+              id: 'lost',
+              label: 'Lost',
+              count: filterCounts.lost,
+              color: '#dc3545',
+              activeColor: '#0d6efd',
+              icon: <X size={16} />
+            }
+          ]}
+          activeFilter={activeFilter}
+          onFilterChange={(filterId) => setActiveFilter(filterId)}
+          searchValue={leadsSearch}
+          onSearchChange={(value) => setLeadsSearch(value)}
+          onSearch={() => {
+            setLeadsPagination({ ...leadsPagination, currentPage: 1 });
+            setRefreshKey(prev => prev + 1);
+          }}
+          searchPlaceholder="Search leads by name, company, email..."
+          showAdvancedFilters={showAdvancedFilters}
+          onToggleAdvancedFilters={() => setShowAdvancedFilters(!showAdvancedFilters)}
+          advancedFilterCount={
+            leadsFilters.assignedTo.length +
+            leadsFilters.industry.length +
+            leadsFilters.stage.length +
+            leadsFilters.source.length +
+            leadsFilters.potential.length +
+            leadsFilters.campaign.length +
+            leadsFilters.dateRange.length
+          }
+        />
+
+        {/* Advanced Filters */}
+        {showAdvancedFilters && (
+          <Card className="border-0 shadow-sm mb-4">
+            <Card.Body>
+              <Row className="g-3 align-items-end">
+                <Col md={2}>
+                  <Form.Label className="small fw-bold mb-2">Assigned To</Form.Label>
+                  <Select
+                    isMulti
+                    options={extensions.map((ext: any) => ({ 
+                      value: ext.display_name || ext.name || ext.id, 
+                      label: ext.display_name || ext.name || ext.id 
+                    }))}
+                    value={leadsFilters.assignedTo.map(u => ({ value: u, label: u }))}
+                    onChange={(selected) => {
+                      setLeadsFilters(prev => ({
+                        ...prev,
+                        assignedTo: selected ? selected.map(s => s.value) : []
+                      }));
+                    }}
+                    placeholder="Select users..."
+                    styles={customSelectStyles}
+                  />
+                </Col>
+                <Col md={2}>
+                  <Form.Label className="small fw-bold mb-2">Industry</Form.Label>
+                  <Select
+                    isMulti
+                    options={Array.from(new Set(leadsData.map(l => l.industry).filter(Boolean))).map(i => ({ value: i, label: i }))}
+                    value={leadsFilters.industry.map(i => ({ value: i, label: i }))}
+                    onChange={(selected) => {
+                      setLeadsFilters(prev => ({
+                        ...prev,
+                        industry: selected ? selected.map(s => s.value) : []
+                      }));
+                    }}
+                    placeholder="Select industries..."
+                    styles={customSelectStyles}
+                  />
+                </Col>
+                <Col md={2}>
+                  <Form.Label className="small fw-bold mb-2">Stages</Form.Label>
+                  <Select
+                    isMulti
+                    options={stages.map(s => ({ value: s.name, label: s.name }))}
+                    value={leadsFilters.stage.map(s => ({ value: s, label: s }))}
+                    onChange={(selected) => {
+                      setLeadsFilters(prev => ({
+                        ...prev,
+                        stage: selected ? selected.map(s => s.value) : []
+                      }));
+                    }}
+                    placeholder="Select stages..."
+                    styles={customSelectStyles}
+                  />
+                </Col>
+                <Col md={2}>
+                  <Form.Label className="small fw-bold mb-2">Source</Form.Label>
+                  <Select
+                    isMulti
+                    options={Array.from(new Set(leadsData.map(l => l.source).filter(Boolean))).map(s => ({ value: s, label: s }))}
+                    value={leadsFilters.source.map(s => ({ value: s, label: s }))}
+                    onChange={(selected) => {
+                      setLeadsFilters(prev => ({
+                        ...prev,
+                        source: selected ? selected.map(s => s.value) : []
+                      }));
+                    }}
+                    placeholder="Select sources..."
+                    styles={customSelectStyles}
+                  />
+                </Col>
+                <Col md={2}>
+                  <Form.Label className="small fw-bold mb-2">Lead Potential</Form.Label>
+                  <Select
+                    isMulti
+                    options={[
+                      { value: 'Hot', label: 'Hot' },
+                      { value: 'Warm', label: 'Warm' },
+                      { value: 'Cold', label: 'Cold' }
+                    ]}
+                    value={leadsFilters.potential.map(p => ({ value: p, label: p }))}
+                    onChange={(selected) => {
+                      setLeadsFilters(prev => ({
+                        ...prev,
+                        potential: selected ? selected.map(s => s.value) : []
+                      }));
+                    }}
+                    placeholder="Select potential..."
+                    styles={customSelectStyles}
+                  />
+                </Col>
+                <Col md={2}>
+                  <div className="d-flex gap-2">
+                    <Button
+                      variant="primary"
+                      className="flex-grow-1 d-flex align-items-center justify-content-center"
+                      onClick={() => {
+                        setLeadsPagination({ ...leadsPagination, currentPage: 1 });
+                      }}
+                    >
+                      Apply
+                    </Button>
+                    <Button
+                      variant="outline-secondary"
+                      className="d-flex align-items-center justify-content-center"
+                      onClick={() => {
+                        setLeadsFilters({
+                          assignedTo: [],
+                          industry: [],
+                          stage: [],
+                          source: [],
+                          potential: [],
+                          campaign: [],
+                          dateRange: [],
+                          dateRangeCustomStart: '',
+                          dateRangeCustomEnd: ''
+                        });
+                        setLeadsPagination({ ...leadsPagination, currentPage: 1 });
+                      }}
+                    >
+                      Reset
+                    </Button>
+                  </div>
+                </Col>
+              </Row>
+            </Card.Body>
+          </Card>
+        )}
+
+        {/* Bulk Actions and Column Customization */}
+        <div className="d-flex justify-content-end gap-2 mb-3">
+          {selectedLeads.length > 0 && (
+            <Dropdown>
+              <Dropdown.Toggle variant="outline-primary" size="sm">
+                <CheckSquare size={16} className="me-2" />
+                Bulk Actions ({selectedLeads.length})
+              </Dropdown.Toggle>
+              <Dropdown.Menu align="end">
+                <Dropdown.Item 
+                  onClick={() => {
+                    // For bulk delete, we'll need to handle multiple IDs
+                    // For now, just show the delete modal - you may want to enhance this
+                    if (selectedLeads.length === 1) {
+                      setLeadToDelete({ id: selectedLeads[0] });
+                      setShowDeleteModal(true);
+                    } else {
+                      // Handle bulk delete - you may want to create a separate handler
+                      toast.info(`Bulk delete for ${selectedLeads.length} leads - implement bulk delete handler`);
+                    }
+                  }}
+                  className="d-flex align-items-center text-danger"
+                >
+                  <Trash2 size={14} className="me-2" />
+                  Delete Selected ({selectedLeads.length})
+                </Dropdown.Item>
+              </Dropdown.Menu>
+            </Dropdown>
+          )}
+
+          <Dropdown>
+            <Dropdown.Toggle variant="outline-secondary" size="sm">
+              <Layers size={16} className="me-2" />
+              Customize Table
+            </Dropdown.Toggle>
+            <Dropdown.Menu align="end" style={{ maxHeight: '300px', overflowY: 'auto' }}>
+              {[
+                { key: 'name', label: 'Name' },
+                { key: 'company', label: 'Company' },
+                { key: 'email', label: 'Email' },
+                { key: 'phone', label: 'Phone' },
+                { key: 'stage', label: 'Stage' },
+                { key: 'leadPotential', label: 'Lead Potential' },
+                { key: 'followUps', label: 'Follow-ups' },
+                { key: 'assignedUser', label: 'Assigned To' },
+                { key: 'created', label: 'Created' }
+              ].map((col) => (
+                <Dropdown.Item key={col.key} as="div">
+                  <Form.Check
+                    type="checkbox"
+                    label={col.label}
+                    checked={selectedLeadsColumns.includes(col.key)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedLeadsColumns([...selectedLeadsColumns, col.key]);
+                        localStorage.setItem('leadsSelectedColumns', JSON.stringify([...selectedLeadsColumns, col.key]));
+                      } else {
+                        const newCols = selectedLeadsColumns.filter(c => c !== col.key);
+                        setSelectedLeadsColumns(newCols);
+                        localStorage.setItem('leadsSelectedColumns', JSON.stringify(newCols));
+                      }
+                    }}
+                  />
+                </Dropdown.Item>
+              ))}
+              <Dropdown.Divider />
+              <Dropdown.Item onClick={() => {
+                const allCols = ['name', 'company', 'email', 'phone', 'stage', 'leadPotential', 'followUps', 'assignedUser', 'created'];
+                setSelectedLeadsColumns(allCols);
+                localStorage.setItem('leadsSelectedColumns', JSON.stringify(allCols));
+              }}>
+                Select All
+              </Dropdown.Item>
+              <Dropdown.Item onClick={() => {
+                const defaultCols = ['name', 'company', 'email', 'phone', 'stage', 'leadPotential', 'followUps', 'assignedUser', 'created'];
+                setSelectedLeadsColumns(defaultCols);
+                localStorage.setItem('leadsSelectedColumns', JSON.stringify(defaultCols));
+              }}>
+                Reset to Default
+              </Dropdown.Item>
+            </Dropdown.Menu>
+          </Dropdown>
+        </div>
+
+        {/* Leads Table */}
+        <Card className="border-0 shadow-sm">
+          <Card.Body className="p-0">
+            <div className="table-responsive">
+              <Table hover className="mb-0">
+                <thead className="bg-light">
+                  <tr>
+                    <th style={{ width: '50px' }}>
+                      <Form.Check
+                        type="checkbox"
+                        checked={filteredLeads.length > 0 && filteredLeads.every(l => selectedLeads.includes(l.id))}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedLeads(filteredLeads.map(l => l.id));
+                          } else {
+                            setSelectedLeads([]);
+                          }
+                        }}
+                      />
+                    </th>
+                    {selectedLeadsColumns.includes('name') && (
+                      <th 
+                        style={{ cursor: 'pointer', userSelect: 'none' }}
+                        onClick={() => handleSort('name', leadsPagination, setLeadsPagination)}
+                      >
+                        Name {renderSortIcon('name', leadsPagination)}
+                      </th>
+                    )}
+                    {selectedLeadsColumns.includes('company') && (
+                      <th 
+                        style={{ cursor: 'pointer', userSelect: 'none' }}
+                        onClick={() => handleSort('company', leadsPagination, setLeadsPagination)}
+                      >
+                        Company {renderSortIcon('company', leadsPagination)}
+                      </th>
+                    )}
+                    {selectedLeadsColumns.includes('email') && (
+                      <th 
+                        style={{ cursor: 'pointer', userSelect: 'none' }}
+                        onClick={() => handleSort('email', leadsPagination, setLeadsPagination)}
+                      >
+                        Email {renderSortIcon('email', leadsPagination)}
+                      </th>
+                    )}
+                    {selectedLeadsColumns.includes('phone') && (
+                      <th 
+                        style={{ cursor: 'pointer', userSelect: 'none' }}
+                        onClick={() => handleSort('phone', leadsPagination, setLeadsPagination)}
+                      >
+                        Phone {renderSortIcon('phone', leadsPagination)}
+                      </th>
+                    )}
+                    {selectedLeadsColumns.includes('stage') && (
+                      <th 
+                        style={{ cursor: 'pointer', userSelect: 'none' }}
+                        onClick={() => handleSort('stage', leadsPagination, setLeadsPagination)}
+                      >
+                        Stage {renderSortIcon('stage', leadsPagination)}
+                      </th>
+                    )}
+                    {selectedLeadsColumns.includes('leadPotential') && (
+                      <th 
+                        style={{ cursor: 'pointer', userSelect: 'none' }}
+                        onClick={() => handleSort('leadPotential', leadsPagination, setLeadsPagination)}
+                      >
+                        Lead Potential {renderSortIcon('leadPotential', leadsPagination)}
+                      </th>
+                    )}
+                    {selectedLeadsColumns.includes('followUps') && (
+                      <th>Follow-ups</th>
+                    )}
+                    {selectedLeadsColumns.includes('assignedUser') && (
+                      <th 
+                        style={{ cursor: 'pointer', userSelect: 'none' }}
+                        onClick={() => handleSort('assignedUser', leadsPagination, setLeadsPagination)}
+                      >
+                        Assigned To {renderSortIcon('assignedUser', leadsPagination)}
+                      </th>
+                    )}
+                    {selectedLeadsColumns.includes('created') && (
+                      <th 
+                        style={{ cursor: 'pointer', userSelect: 'none' }}
+                        onClick={() => handleSort('created', leadsPagination, setLeadsPagination)}
+                      >
+                        Created {renderSortIcon('created', leadsPagination)}
+                      </th>
+                    )}
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {loading ? (
+                    <tr>
+                      <td colSpan={selectedLeadsColumns.length + 2} className="text-center py-4">
+                        Loading...
+                      </td>
+                    </tr>
+                  ) : filteredLeads.length === 0 ? (
+                    <tr>
+                      <td colSpan={selectedLeadsColumns.length + 2} className="text-center py-4 text-muted">
+                        No leads found matching your criteria
+                      </td>
+                    </tr>
+                  ) : (
+                    sortData(filteredLeads, leadsPagination.sortColumn, leadsPagination.sortDirection).map((lead) => (
+                      <tr key={lead.id}>
+                        <td>
+                          <Form.Check
+                            type="checkbox"
+                            checked={selectedLeads.includes(lead.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedLeads([...selectedLeads, lead.id]);
+                              } else {
+                                setSelectedLeads(selectedLeads.filter(id => id !== lead.id));
+                              }
+                            }}
+                          />
+                        </td>
+                        {selectedLeadsColumns.includes('name') && (
+                          <td className="fw-semibold">{lead.name}</td>
+                        )}
+                        {selectedLeadsColumns.includes('company') && (
+                          <td>
+                            <div>
+                              <div className="fw-medium">{lead.company || 'No Company'}</div>
+                              {lead.industry && <small className="text-muted">{lead.industry}</small>}
+                            </div>
+                          </td>
+                        )}
+                        {selectedLeadsColumns.includes('email') && (
+                          <td>{lead.email || '-'}</td>
+                        )}
+                        {selectedLeadsColumns.includes('phone') && (
+                          <td>{lead.phone || '-'}</td>
+                        )}
+                        {selectedLeadsColumns.includes('stage') && (
+                          <td>
+                            <Badge 
+                              bg={
+                                lead.stage?.toLowerCase().includes('qualified') ? 'success' :
+                                lead.stage?.toLowerCase().includes('contacted') ? 'info' :
+                                'secondary'
+                              }
+                            >
+                              {lead.stage}
+                            </Badge>
+                          </td>
+                        )}
+                        {selectedLeadsColumns.includes('leadPotential') && (
+                          <td>
+                            <Badge 
+                              bg={
+                                lead.leadPotential === 'Hot' ? 'danger' :
+                                lead.leadPotential === 'Warm' ? 'warning' :
+                                'secondary'
+                              }
+                            >
+                              {lead.leadPotential}
+                            </Badge>
+                          </td>
+                        )}
+                        {selectedLeadsColumns.includes('followUps') && (
+                          <td className="text-center">
+                            <Badge bg="primary" pill>
+                              {lead.followUps?.length || 0}
+                            </Badge>
+                          </td>
+                        )}
+                        {selectedLeadsColumns.includes('assignedUser') && (
+                          <td>{lead.assignedUser || '-'}</td>
+                        )}
+                        {selectedLeadsColumns.includes('created') && (
+                          <td>{lead.created || '-'}</td>
+                        )}
+                        <td>
+                          <div className="d-flex gap-1">
+                            <Button 
+                              variant="link" 
+                              size="sm" 
+                              className="p-1" 
+                              title="View"
+                              onClick={() => handleViewLead(lead.rawData?.id || lead.id)}
+                            >
+                              <Eye size={16} />
+                            </Button>
+                            {session?.user?.permissions?.includes('edit-crm-leads') && (
+                              <Button 
+                                variant="link" 
+                                size="sm" 
+                                className="p-1" 
+                                title="Edit"
+                                onClick={() => window.location.href = `/crm/leads/${lead.rawData?.id || lead.id}/edit`}
+                              >
+                                <Edit size={16} />
+                              </Button>
+                            )}
+                            {session?.user?.permissions?.includes('convert-to-opportunity-crm-leads') && (
+                              <Button 
+                                variant="link" 
+                                size="sm" 
+                                className="p-1 text-success" 
+                                title="Convert to Deal"
+                                onClick={() => handleConvertLead(lead.rawData || lead)}
+                              >
+                                <Handshake size={16} />
+                              </Button>
+                            )}
+                            {session?.user?.permissions?.includes('delete-crm-leads') && (
+                              <Button 
+                                variant="link" 
+                                size="sm" 
+                                className="p-1 text-danger" 
+                                title="Delete"
+                                onClick={() => {
+                                  setLeadToDelete({ id: lead.rawData?.id || lead.id });
+                                  setShowDeleteModal(true);
+                                }}
+                              >
+                                <Trash2 size={16} />
+                              </Button>
+                            )}
+                            <Dropdown className="d-inline">
+                              <Dropdown.Toggle 
+                                as={Button}
+                                variant="link" 
+                                size="sm" 
+                                className="p-1"
+                                title="More Actions"
+                              >
+                                <MoreVertical size={16} />
+                              </Dropdown.Toggle>
+                              <Dropdown.Menu align="end">
+                                {session?.user?.permissions?.includes('mark-as-lost-crm-leads') && (
+                                  <Dropdown.Item 
+                                    className="text-danger"
+                                    onClick={() => handleMarkLost(lead.rawData || lead)}
+                                  >
+                                    <X size={14} className="me-2" />
+                                    Lost
+                                  </Dropdown.Item>
+                                )}
+                              </Dropdown.Menu>
+                            </Dropdown>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </Table>
+            </div>
+            <div className="p-3">
+              {renderPaginationControls(totalLeads, leadsPagination, setLeadsPagination, 'leads')}
+            </div>
+          </Card.Body>
+        </Card>
+      </div>
 
       <ConfirmModal
         show={showDeleteModal}
@@ -650,8 +1692,814 @@ const CrmLeads = () => {
           title={successModalTitle}
           description={successModalDescription}
         />
-		
 
+      {/* Lead View Modal */}
+      {viewingLead && (
+        <Modal show={showLeadViewModal} onHide={() => setShowLeadViewModal(false)} size="xl" centered>
+          {/* Custom Header */}
+          <div style={{
+            color: 'black',
+            padding: '30px',
+            position: 'relative',
+            borderTopLeftRadius: '8px',
+            borderTopRightRadius: '8px',
+            borderBottom: '1px solid #e5e7eb'
+          }}>
+            <button 
+              onClick={() => setShowLeadViewModal(false)}
+              style={{
+                position: 'absolute',
+                top: '20px',
+                right: '20px',
+                background: 'rgba(255,255,255,0.2)',
+                border: 'none',
+                color: 'black',
+                width: '36px',
+                height: '36px',
+                borderRadius: '50%',
+                cursor: 'pointer',
+                transition: 'all 0.3s',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.background = 'rgba(255,255,255,0.3)';
+                e.currentTarget.style.transform = 'rotate(90deg)';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.background = 'rgba(255,255,255,0.2)';
+                e.currentTarget.style.transform = 'rotate(0deg)';
+              }}
+            >
+              <X size={20} />
+            </button>
+            <h3 style={{ margin: 0, fontWeight: 600, fontSize: '24px' }}>
+              {viewingLead.name}
+            </h3>
+            <p style={{ margin: '8px 0 0 0', opacity: 0.9, fontSize: '14px' }}>
+              Lead Details
+            </p>
+          </div>
+
+          <Modal.Body style={{ padding: '30px' }}>
+            {loadingLead ? (
+              <div className="text-center py-4">
+                <div className="spinner-border" role="status">
+                  <span className="visually-hidden">Loading...</span>
+                </div>
+              </div>
+            ) : (
+              <>
+                {/* Lead Information Section */}
+                <div style={{
+                  fontSize: '16px',
+                  fontWeight: 600,
+                  color: '#1f2937',
+                  marginBottom: '20px',
+                  paddingBottom: '10px',
+                  borderBottom: '2px solid #f8f9fa',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px'
+                }}>
+                  <Target size={18} style={{ color: '#4680ff' }} />
+                  Lead Information
+                </div>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+                  gap: '20px',
+                  marginBottom: '30px'
+                }}>
+                  <div style={{
+                    background: '#f8f9fa',
+                    padding: '16px',
+                    borderRadius: '10px',
+                    transition: 'all 0.3s'
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.background = '#e5e7eb';
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.background = '#f8f9fa';
+                    e.currentTarget.style.transform = 'translateY(0)';
+                  }}>
+                    <div style={{
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      color: '#6b7280',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px',
+                      marginBottom: '6px'
+                    }}>Lead Name</div>
+                    <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                      {viewingLead.name}
+                    </div>
+                  </div>
+                  <div style={{
+                    background: '#f8f9fa',
+                    padding: '16px',
+                    borderRadius: '10px',
+                    transition: 'all 0.3s'
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.background = '#e5e7eb';
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.background = '#f8f9fa';
+                    e.currentTarget.style.transform = 'translateY(0)';
+                  }}>
+                    <div style={{
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      color: '#6b7280',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px',
+                      marginBottom: '6px'
+                    }}>Stage</div>
+                    <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                      <Badge 
+                        bg={viewingLead.stage?.name?.toLowerCase().includes('qualified') ? 'success' : viewingLead.stage?.name?.toLowerCase().includes('contacted') ? 'info' : 'secondary'}
+                        style={{
+                          padding: '6px 14px',
+                          borderRadius: '20px',
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          backgroundColor: viewingLead.stage?.color || '#6c757d'
+                        }}
+                      >
+                        {viewingLead.stage?.name || 'Not assigned'}
+                      </Badge>
+                    </div>
+                  </div>
+                  <div style={{
+                    background: '#f8f9fa',
+                    padding: '16px',
+                    borderRadius: '10px',
+                    transition: 'all 0.3s'
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.background = '#e5e7eb';
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.background = '#f8f9fa';
+                    e.currentTarget.style.transform = 'translateY(0)';
+                  }}>
+                    <div style={{
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      color: '#6b7280',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px',
+                      marginBottom: '6px'
+                    }}>Lead Potential</div>
+                    <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                      <Badge 
+                        bg={viewingLead.lead_potential === 'Hot' ? 'danger' : viewingLead.lead_potential === 'Warm' ? 'warning' : 'secondary'}
+                        style={{
+                          padding: '6px 14px',
+                          borderRadius: '20px',
+                          fontSize: '12px',
+                          fontWeight: 600
+                        }}
+                      >
+                        {viewingLead.lead_potential || 'N/A'}
+                      </Badge>
+                    </div>
+                  </div>
+                  <div style={{
+                    background: '#f8f9fa',
+                    padding: '16px',
+                    borderRadius: '10px',
+                    transition: 'all 0.3s'
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.background = '#e5e7eb';
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.background = '#f8f9fa';
+                    e.currentTarget.style.transform = 'translateY(0)';
+                  }}>
+                    <div style={{
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      color: '#6b7280',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px',
+                      marginBottom: '6px'
+                    }}>Status</div>
+                    <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                      <Badge bg={viewingLead.is_lost ? 'danger' : viewingLead.status === 'new' ? 'primary' : 'success'}>
+                        {viewingLead.is_lost ? 'Lost' : viewingLead.status || 'N/A'}
+                      </Badge>
+                    </div>
+                  </div>
+                  <div style={{
+                    background: '#f8f9fa',
+                    padding: '16px',
+                    borderRadius: '10px',
+                    transition: 'all 0.3s'
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.background = '#e5e7eb';
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.background = '#f8f9fa';
+                    e.currentTarget.style.transform = 'translateY(0)';
+                  }}>
+                    <div style={{
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      color: '#6b7280',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px',
+                      marginBottom: '6px'
+                    }}>Assigned To</div>
+                    <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                      <User size={14} style={{ color: '#4680ff', marginRight: '6px', display: 'inline' }} />
+                      {extensions.find((ext: any) => ext?.id == viewingLead?.user_extension || ext?.extension == viewingLead?.user_extension)?.display_name || 
+                       extensions.find((ext: any) => ext?.id == viewingLead?.user_extension || ext?.extension == viewingLead?.user_extension)?.name || 
+                       viewingLead.user_extension || 'Not assigned'}
+                    </div>
+                  </div>
+                  <div style={{
+                    background: '#f8f9fa',
+                    padding: '16px',
+                    borderRadius: '10px',
+                    transition: 'all 0.3s'
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.background = '#e5e7eb';
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.background = '#f8f9fa';
+                    e.currentTarget.style.transform = 'translateY(0)';
+                  }}>
+                    <div style={{
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      color: '#6b7280',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px',
+                      marginBottom: '6px'
+                    }}>Created Date</div>
+                    <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                      <Calendar size={14} style={{ color: '#4680ff', marginRight: '6px', display: 'inline' }} />
+                      {viewingLead.created_at ? new Date(viewingLead.created_at).toLocaleDateString() : 'N/A'}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Company Information Section */}
+                {viewingLead.company_name && (
+                  <>
+                    <div style={{
+                      fontSize: '16px',
+                      fontWeight: 600,
+                      color: '#1f2937',
+                      marginBottom: '20px',
+                      paddingBottom: '10px',
+                      borderBottom: '2px solid #f8f9fa',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px'
+                    }}>
+                      <Building2 size={18} style={{ color: '#4680ff' }} />
+                      Company Information
+                    </div>
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+                      gap: '20px',
+                      marginBottom: '30px'
+                    }}>
+                      <div style={{
+                        background: '#f8f9fa',
+                        padding: '16px',
+                        borderRadius: '10px',
+                        transition: 'all 0.3s'
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.background = '#e5e7eb';
+                        e.currentTarget.style.transform = 'translateY(-2px)';
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.background = '#f8f9fa';
+                        e.currentTarget.style.transform = 'translateY(0)';
+                      }}>
+                        <div style={{
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          color: '#6b7280',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.5px',
+                          marginBottom: '6px'
+                        }}>Company Name</div>
+                        <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                          <Building2 size={14} style={{ color: '#4680ff', marginRight: '6px', display: 'inline' }} />
+                          {viewingLead.company_name}
+                        </div>
+                      </div>
+                      {viewingLead.industry && (
+                        <div style={{
+                          background: '#f8f9fa',
+                          padding: '16px',
+                          borderRadius: '10px',
+                          transition: 'all 0.3s'
+                        }}
+                        onMouseOver={(e) => {
+                          e.currentTarget.style.background = '#e5e7eb';
+                          e.currentTarget.style.transform = 'translateY(-2px)';
+                        }}
+                        onMouseOut={(e) => {
+                          e.currentTarget.style.background = '#f8f9fa';
+                          e.currentTarget.style.transform = 'translateY(0)';
+                        }}>
+                          <div style={{
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            color: '#6b7280',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.5px',
+                            marginBottom: '6px'
+                          }}>Industry</div>
+                          <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                            {viewingLead.industry}
+                          </div>
+                        </div>
+                      )}
+                      {viewingLead.business_type && (
+                        <div style={{
+                          background: '#f8f9fa',
+                          padding: '16px',
+                          borderRadius: '10px',
+                          transition: 'all 0.3s'
+                        }}
+                        onMouseOver={(e) => {
+                          e.currentTarget.style.background = '#e5e7eb';
+                          e.currentTarget.style.transform = 'translateY(-2px)';
+                        }}
+                        onMouseOut={(e) => {
+                          e.currentTarget.style.background = '#f8f9fa';
+                          e.currentTarget.style.transform = 'translateY(0)';
+                        }}>
+                          <div style={{
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            color: '#6b7280',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.5px',
+                            marginBottom: '6px'
+                          }}>Business Type</div>
+                          <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                            {viewingLead.business_type}
+                          </div>
+                        </div>
+                      )}
+                      {viewingLead.company_size && (
+                        <div style={{
+                          background: '#f8f9fa',
+                          padding: '16px',
+                          borderRadius: '10px',
+                          transition: 'all 0.3s'
+                        }}
+                        onMouseOver={(e) => {
+                          e.currentTarget.style.background = '#e5e7eb';
+                          e.currentTarget.style.transform = 'translateY(-2px)';
+                        }}
+                        onMouseOut={(e) => {
+                          e.currentTarget.style.background = '#f8f9fa';
+                          e.currentTarget.style.transform = 'translateY(0)';
+                        }}>
+                          <div style={{
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            color: '#6b7280',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.5px',
+                            marginBottom: '6px'
+                          }}>Company Size</div>
+                          <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                            {viewingLead.company_size}
+                          </div>
+                        </div>
+                      )}
+                      {viewingLead.company_city && (
+                        <div style={{
+                          background: '#f8f9fa',
+                          padding: '16px',
+                          borderRadius: '10px',
+                          transition: 'all 0.3s'
+                        }}
+                        onMouseOver={(e) => {
+                          e.currentTarget.style.background = '#e5e7eb';
+                          e.currentTarget.style.transform = 'translateY(-2px)';
+                        }}
+                        onMouseOut={(e) => {
+                          e.currentTarget.style.background = '#f8f9fa';
+                          e.currentTarget.style.transform = 'translateY(0)';
+                        }}>
+                          <div style={{
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            color: '#6b7280',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.5px',
+                            marginBottom: '6px'
+                          }}>Location</div>
+                          <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                            {[viewingLead.company_city, viewingLead.company_country].filter(Boolean).join(', ') || 'N/A'}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
+
+                {/* Contact Persons Section */}
+                {viewingLead.contact_persons && Array.isArray(viewingLead.contact_persons) && viewingLead.contact_persons.length > 0 && (
+                  <>
+                    <div style={{
+                      fontSize: '16px',
+                      fontWeight: 600,
+                      color: '#1f2937',
+                      marginBottom: '20px',
+                      paddingBottom: '10px',
+                      borderBottom: '2px solid #f8f9fa',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px'
+                    }}>
+                      <Users size={18} style={{ color: '#4680ff' }} />
+                      Contact Persons ({viewingLead.contact_persons.length})
+                    </div>
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+                      gap: '20px',
+                      marginBottom: '30px'
+                    }}>
+                      {viewingLead.contact_persons.map((person: any, index: number) => (
+                        <div key={index} style={{
+                          background: '#f8f9fa',
+                          padding: '16px',
+                          borderRadius: '10px',
+                          transition: 'all 0.3s'
+                        }}
+                        onMouseOver={(e) => {
+                          e.currentTarget.style.background = '#e5e7eb';
+                          e.currentTarget.style.transform = 'translateY(-2px)';
+                        }}
+                        onMouseOut={(e) => {
+                          e.currentTarget.style.background = '#f8f9fa';
+                          e.currentTarget.style.transform = 'translateY(0)';
+                        }}>
+                          <div style={{ fontSize: '14px', fontWeight: 600, color: '#1f2937', marginBottom: '12px' }}>
+                            {person.title} {person.name}
+                          </div>
+                          {person.email && (
+                            <div style={{ fontSize: '13px', color: '#6b7280', marginBottom: '6px' }}>
+                              <Mail size={12} style={{ marginRight: '6px', display: 'inline' }} />
+                              {person.email}
+                            </div>
+                          )}
+                          {person.phone && (
+                            <div style={{ fontSize: '13px', color: '#6b7280' }}>
+                              <Phone size={12} style={{ marginRight: '6px', display: 'inline' }} />
+                              {person.phone_country_code} {person.phone}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+
+                {/* Campaign Information */}
+                {viewingLead.campaign && (
+                  <>
+                    <div style={{
+                      fontSize: '16px',
+                      fontWeight: 600,
+                      color: '#1f2937',
+                      marginBottom: '20px',
+                      paddingBottom: '10px',
+                      borderBottom: '2px solid #f8f9fa',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px'
+                    }}>
+                      <FileText size={18} style={{ color: '#4680ff' }} />
+                      Campaign Information
+                    </div>
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+                      gap: '20px',
+                      marginBottom: '30px'
+                    }}>
+                      <div style={{
+                        background: '#f8f9fa',
+                        padding: '16px',
+                        borderRadius: '10px',
+                        transition: 'all 0.3s'
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.background = '#e5e7eb';
+                        e.currentTarget.style.transform = 'translateY(-2px)';
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.background = '#f8f9fa';
+                        e.currentTarget.style.transform = 'translateY(0)';
+                      }}>
+                        <div style={{
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          color: '#6b7280',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.5px',
+                          marginBottom: '6px'
+                        }}>Campaign Name</div>
+                        <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                          {viewingLead.campaign.name}
+                        </div>
+                      </div>
+                      {viewingLead.campaign_field_values && Object.keys(viewingLead.campaign_field_values).length > 0 && (
+                        Object.entries(viewingLead.campaign_field_values).map(([key, value]: [string, any]) => (
+                          <div key={key} style={{
+                            background: '#f8f9fa',
+                            padding: '16px',
+                            borderRadius: '10px',
+                            transition: 'all 0.3s'
+                          }}
+                          onMouseOver={(e) => {
+                            e.currentTarget.style.background = '#e5e7eb';
+                            e.currentTarget.style.transform = 'translateY(-2px)';
+                          }}
+                          onMouseOut={(e) => {
+                            e.currentTarget.style.background = '#f8f9fa';
+                            e.currentTarget.style.transform = 'translateY(0)';
+                          }}>
+                            <div style={{
+                              fontSize: '12px',
+                              fontWeight: 600,
+                              color: '#6b7280',
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.5px',
+                              marginBottom: '6px'
+                            }}>{key}</div>
+                            <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                              {String(value)}
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </>
+                )}
+
+                {/* Lost Reason */}
+                {viewingLead.is_lost && viewingLead.lost_reason && (
+                  <div style={{
+                    background: '#fee2e2',
+                    border: '1px solid #fecaca',
+                    borderRadius: '8px',
+                    padding: '16px',
+                    marginBottom: '30px'
+                  }}>
+                    <div style={{ fontSize: '14px', fontWeight: 600, color: '#dc2626', marginBottom: '8px' }}>
+                      Lead Lost
+                    </div>
+                    <div style={{ fontSize: '13px', color: '#991b1b' }}>
+                      Reason: {viewingLead.lost_reason.name}
+                    </div>
+                    {viewingLead.lost_feedback && (
+                      <div style={{ fontSize: '13px', color: '#991b1b', marginTop: '8px' }}>
+                        Feedback: {viewingLead.lost_feedback}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Audit Trail / History */}
+                {viewingLead.audit_trail && Array.isArray(viewingLead.audit_trail) && viewingLead.audit_trail.length > 0 && (
+                  <>
+                    <div style={{
+                      fontSize: '16px',
+                      fontWeight: 600,
+                      color: '#1f2937',
+                      marginBottom: '20px',
+                      paddingBottom: '10px',
+                      borderBottom: '2px solid #f8f9fa',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px'
+                    }}>
+                      <History size={18} style={{ color: '#4680ff' }} />
+                      Activity History ({viewingLead.audit_trail.length})
+                    </div>
+                    <div style={{ position: 'relative', paddingLeft: '30px', marginBottom: '30px' }}>
+                      <div style={{
+                        content: '',
+                        position: 'absolute',
+                        left: '8px',
+                        top: 0,
+                        bottom: 0,
+                        width: '2px',
+                        background: '#e5e7eb'
+                      }} />
+                      {viewingLead.audit_trail.map((audit: any, idx: number) => (
+                        <div key={audit.id || idx} style={{ position: 'relative', paddingBottom: '20px' }}>
+                          <div style={{
+                            content: '',
+                            position: 'absolute',
+                            left: '-26px',
+                            top: '4px',
+                            width: '12px',
+                            height: '12px',
+                            borderRadius: '50%',
+                            background: audit.event === 'created' ? '#10b981' : '#4680ff',
+                            border: '3px solid white',
+                            boxShadow: '0 0 0 2px #e5e7eb'
+                          }} />
+                          <div style={{
+                            background: '#f8f9fa',
+                            padding: '12px 16px',
+                            borderRadius: '8px'
+                          }}>
+                            <div style={{ fontSize: '12px', color: '#6b7280', fontWeight: 600, marginBottom: '4px' }}>
+                              {audit.created_at_human || new Date(audit.created_at).toLocaleString()}
+                            </div>
+                            <div style={{ fontSize: '14px', color: '#1f2937', marginBottom: '4px', fontWeight: 500 }}>
+                              {audit.event === 'created' ? 'Created' : audit.event === 'updated' ? 'Updated' : audit.event}
+                            </div>
+                            {audit.description && (
+                              <div style={{ fontSize: '13px', color: '#6b7280', marginBottom: '8px' }}>
+                                {audit.description}
+                              </div>
+                            )}
+                            {audit.changes && Object.keys(audit.changes).length > 0 && (
+                              <div style={{ fontSize: '12px', color: '#6b7280' }}>
+                                {Object.entries(audit.changes).map(([key, change]: [string, any]) => (
+                                  <div key={key} style={{ marginTop: '4px' }}>
+                                    <strong>{key}:</strong> {change.old ? `${change.old} → ` : ''}{change.new || 'N/A'}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+
+                {/* Description */}
+                {viewingLead.description && (
+                  <React.Fragment>
+                  <div style={{
+                    fontSize: '16px',
+                    fontWeight: 600,
+                    color: '#1f2937',
+                    marginBottom: '20px',
+                    paddingBottom: '10px',
+                    borderBottom: '2px solid #f8f9fa',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px'
+                  }}>
+                    <FileText size={18} style={{ color: '#4680ff' }} />
+                    Description
+                  </div>
+                  <div style={{
+                    background: '#f8f9fa',
+                    padding: '16px',
+                    borderRadius: '10px',
+                    marginBottom: '30px',
+                    fontSize: '14px',
+                    color: '#1f2937',
+                    whiteSpace: 'pre-wrap'
+                  }}>
+                    {viewingLead.description}
+                  </div>
+                  </React.Fragment>
+                )}
+
+                {/* Action Buttons */}
+                <div style={{
+                  display: 'flex',
+                  gap: '12px',
+                  flexWrap: 'wrap',
+                  paddingTop: '20px',
+                  borderTop: '1px solid #e5e7eb'
+                }}>
+                  {session?.user?.permissions?.includes('edit-crm-leads') && (
+                    <Button
+                      variant="primary"
+                      style={{
+                        padding: '10px 20px',
+                        borderRadius: '8px',
+                        fontWeight: 500,
+                        fontSize: '14px',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        background: '#4680ff',
+                        border: 'none'
+                      }}
+                      onClick={() => {
+                        setShowLeadViewModal(false);
+                        window.location.href = `/crm/leads/${viewingLead.id}/edit`;
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.background = '#3b6ce5';
+                        e.currentTarget.style.transform = 'translateY(-2px)';
+                        e.currentTarget.style.boxShadow = '0 4px 12px rgba(70, 128, 255, 0.4)';
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.background = '#4680ff';
+                        e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.boxShadow = 'none';
+                      }}
+                    >
+                      <Edit size={16} />
+                      Edit Lead
+                    </Button>
+                  )}
+                  {session?.user?.permissions?.includes('convert-to-opportunity-crm-leads') && (
+                    <Button
+                      variant="success"
+                      style={{
+                        padding: '10px 20px',
+                        borderRadius: '8px',
+                        fontWeight: 500,
+                        fontSize: '14px',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        background: '#10b981',
+                        border: 'none'
+                      }}
+                      onClick={() => {
+                        setShowLeadViewModal(false);
+                        handleConvertLead(viewingLead);
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.background = '#059669';
+                        e.currentTarget.style.transform = 'translateY(-2px)';
+                        e.currentTarget.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.4)';
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.background = '#10b981';
+                        e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.boxShadow = 'none';
+                      }}
+                    >
+                      <Handshake size={16} />
+                      Convert to Deal
+                    </Button>
+                  )}
+                  <Button
+                    variant="outline-secondary"
+                    style={{
+                      padding: '10px 20px',
+                      borderRadius: '8px',
+                      fontWeight: 500,
+                      fontSize: '14px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      background: 'white',
+                      color: '#6b7280',
+                      border: '2px solid #e5e7eb'
+                    }}
+                    onClick={() => setShowLeadViewModal(false)}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.borderColor = '#4680ff';
+                      e.currentTarget.style.color = '#4680ff';
+                      e.currentTarget.style.background = '#f0f4ff';
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.borderColor = '#e5e7eb';
+                      e.currentTarget.style.color = '#6b7280';
+                      e.currentTarget.style.background = 'white';
+                    }}
+                  >
+                    Close
+                  </Button>
+                </div>
+              </>
+            )}
+          </Modal.Body>
+        </Modal>
+      )}
 
     </React.Fragment>
   );
