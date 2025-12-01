@@ -23,6 +23,7 @@ import {
   FiTarget,
   FiPlus,
 } from "react-icons/fi";
+import { CheckCircle, ChevronLeft, ChevronRight, AlertCircle, X } from "lucide-react";
 import Link from "next/link";
 import { toast } from "react-toastify";
 import { useRouter } from "next/router";
@@ -39,18 +40,41 @@ import { ModuleSlug } from '@utils/Helper';
 
 const CreateLead = () => {
   const router = useRouter();
+  const [formStep, setFormStep] = useState(0);
   const [formData, setFormData] = useState({
     name: "",
     user_extension: null as string | null,
     type: "lead" as "lead" | "opportunity",
     description: "",
+    source: "",
     company_name: "",
     company_contact: "",
     company_description: "",
+    industry: "",
+    business_type: "",
+    company_country: "",
+    company_province: "",
+    company_city: "",
+    company_location_other: "",
+    company_size: "",
+    contact_person_title: "",
+    contact_person_name: "",
+    contact_phone_country_code: "",
+    contact_phone: "",
     stage_id: undefined as number | undefined,
     campaign_id: undefined as number | undefined,
     crm_data_id: undefined as number | undefined,
+    lead_potential: "",
+    other_information: {} as Record<string, any>,
     campaign_field_values: {} as Record<string, any>,
+    called_by: null as string | null,
+    contact_persons: [] as Array<{
+      title: string;
+      name: string;
+      phone_country_code: string;
+      phone: string;
+      email: string;
+    }>,
   });
 
   const [stages, setStages] = useState<StageData[]>([]);
@@ -264,6 +288,38 @@ const CreateLead = () => {
     }
   };
 
+  const addContactPerson = () => {
+    setFormData((prev) => ({
+      ...prev,
+      contact_persons: [
+        ...prev.contact_persons,
+        {
+          title: "",
+          name: "",
+          phone_country_code: "",
+          phone: "",
+          email: "",
+        },
+      ],
+    }));
+  };
+
+  const removeContactPerson = (index: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      contact_persons: prev.contact_persons.filter((_, i) => i !== index),
+    }));
+  };
+
+  const updateContactPerson = (index: number, field: string, value: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      contact_persons: prev.contact_persons.map((person, i) =>
+        i === index ? { ...person, [field]: value } : person
+      ),
+    }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -273,10 +329,41 @@ const CreateLead = () => {
       return;
     }
     
+    if (!formData.name) {
+      toast.error("Please enter lead name");
+      return;
+    }
+    
     setLoading(true);
 
     try {
-      await createLead(formData);
+      // Format payload according to API structure
+      const payload: any = {
+        name: formData.name,
+        user_extension: formData.user_extension,
+        ...(formData.stage_id && { stage_id: String(formData.stage_id) }),
+        ...(formData.campaign_id && { campaign_id: String(formData.campaign_id) }),
+        ...(formData.crm_data_id && { crm_data_id: String(formData.crm_data_id) }),
+        ...(formData.source && { source: formData.source }),
+        ...(formData.company_name && { company_name: formData.company_name }),
+        ...(formData.industry && { industry: formData.industry }),
+        ...(formData.business_type && { business_type: formData.business_type }),
+        ...(formData.company_country && { company_country: formData.company_country }),
+        ...(formData.company_city && { company_city: formData.company_city }),
+        ...(formData.company_location_other && { company_location_other: formData.company_location_other }),
+        ...(formData.company_size && { company_size: formData.company_size }),
+        ...(formData.contact_person_title && { contact_person_title: formData.contact_person_title }),
+        ...(formData.contact_person_name && { contact_person_name: formData.contact_person_name }),
+        ...(formData.contact_phone_country_code && { contact_phone_country_code: formData.contact_phone_country_code }),
+        ...(formData.contact_phone && { contact_phone: formData.contact_phone }),
+        ...(formData.lead_potential && { lead_potential: formData.lead_potential }),
+        ...(formData.other_information && Object.keys(formData.other_information).length > 0 && { other_information: formData.other_information }),
+        ...(formData.campaign_field_values && Object.keys(formData.campaign_field_values).length > 0 && { campaign_field_values: formData.campaign_field_values }),
+        ...(formData.called_by && { called_by: formData.called_by }),
+        ...(formData.contact_persons.length > 0 && { contact_persons: formData.contact_persons }),
+      };
+
+      await createLead(payload);
       toast.success("Lead created successfully!");
       if (formData.type === "lead") {
         router.push("/crm/leads");
@@ -491,385 +578,571 @@ const CreateLead = () => {
                 </div>
               </Card.Header>
               <Card.Body>
-                <Form onSubmit={handleSubmit}>
-                  <Row>
-                    <Col md={6}>
-                      <Form.Group className="mb-3">
-                        <Form.Label>
-                          {isOpportunity ? "Opportunity" : "Lead"} Name *
-                        </Form.Label>
-                        <Form.Control
-                          type="text"
-                          value={formData.name}
-                          onChange={(e) =>
-                            handleInputChange("name", e.target.value)
-                          }
-                          placeholder={`Enter ${isOpportunity ? "opportunity" : "lead"} name`}
-                          required
-                        />
-                      </Form.Group>
-                    </Col>
-                    <Col md={6}>
-                      <Form.Group className="mb-3">
-                        <Form.Label>User Extension *</Form.Label>
-
-                        {formData.type === "opportunity" ? (
-                          <>
-                          
-                        <Select
-                          value={
-                            formData.user_extension
-                              ? {
-                                  value: formData.user_extension,
-                                  label:
-                                    extensionsOpportunities.find(
-                                      (ext: any) =>
-                                        ext.id.toString() ===
-                                        formData.user_extension?.toString()
-                                    )?.display_name || "",
-                                }
-                              : null
-                          }
-                          onChange={(selectedOption: any) => {
-                            handleInputChange(
-                              "user_extension",
-                              selectedOption?.value || null
-                            );
-                          }}
-                          options={extensionsOpportunities.map((extension: any) => ({
-                            value: extension.id,
-                            label: extension.display_name,
-                          }))}
-                          placeholder="Select User Extension"
-                          isClearable
-                          isSearchable
-                          required
-                        />
-                        </>
-                        ) : (
-                          <>
-                          
-                          <Select
-                          value={
-                            formData.user_extension
-                              ? {
-                                  value: formData.user_extension,
-                                  label:
-                                    extensions.find(
-                                      (ext: any) =>
-                                        ext.id.toString() ===
-                                        formData.user_extension?.toString()
-                                    )?.display_name || "",
-                                }
-                              : null
-                          }
-                          onChange={(selectedOption: any) => {
-                            handleInputChange(
-                              "user_extension",
-                              selectedOption?.value || null
-                            );
-                          }}
-                          options={extensions.map((extension: any) => ({
-                            value: extension.id,
-                            label: extension.display_name,
-                          }))}
-                          placeholder="Select User Extension"
-                          isClearable
-                          isSearchable
-                          required
-                        />
-                        </>
-                        )}
-                      </Form.Group>
-                    </Col>
-                  </Row>
-
-                  <Row>
-                    <Col md={6}>
-                      <Form.Group className="mb-3">
-                        <Form.Label>Type *</Form.Label>
-                        <Form.Select
-                          value={formData.type}
-                          onChange={(e) =>
-                            handleInputChange("type", e.target.value)
-                          }
-                          required
-                        >
-                          <option value="lead">Lead</option>
-                          <option value="opportunity">Opportunity</option>
-                        </Form.Select>
-                      </Form.Group>
-                    </Col>
-                    <Col md={6}>
-                      <Form.Group className="mb-3">
-                        <Form.Label>Stage</Form.Label>
-                        <Form.Select
-                          value={formData.stage_id || ""}
-                          onChange={(e) =>
-                            handleInputChange(
-                              "stage_id",
-                              e.target.value
-                                ? Number(e.target.value)
-                                : undefined
-                            )
-                          }
-                        >
-                          <option value="">Select a stage</option>
-                          {stages.map((stage) => (
-                            <option key={stage.id} value={stage.id}>
-                              {stage.name}
-                            </option>
-                          ))}
-                        </Form.Select>
-                      </Form.Group>
-                    </Col>
-                  </Row>
-
-                  <Row>
-                    <Col md={6}>
-                      <Form.Group className="mb-3">
-                        <Form.Label>Campaign</Form.Label>
-                        <Select
-                          value={
-                            formData.campaign_id
-                              ? {
-                                  value: formData.campaign_id,
-                                  label:
-                                    campaigns.find(
-                                      (c) => c.id === formData.campaign_id
-                                    )?.name || "",
-                                }
-                              : null
-                          }
-                          onChange={handleCampaignChange}
-                          options={campaigns.map((campaign) => ({
-                            value: campaign.id,
-                            label: campaign.name,
-                          }))}
-                          placeholder="Select a campaign (Optional)"
-                          isClearable
-                          isSearchable
-                        />
-                      </Form.Group>
-                    </Col>
-                    <Col md={6}>
-                      <Form.Group className="mb-3">
-                        <Form.Label>CRM Data Attribution</Form.Label>
-                        <Select
-                          value={
-                            formData.crm_data_id
-                              ? {
-                                  value: formData.crm_data_id,
-                                  label: `#${formData.crm_data_id} - ${
-                                    crmData.find(
-                                      (d) => d.id === formData.crm_data_id
-                                    )?.phone || "No Phone"
-                                  }`,
-                                }
-                              : null
-                          }
-                          onChange={(selectedOption: any) => {
-                            handleInputChange(
-                              "crm_data_id",
-                              selectedOption?.value || undefined
-                            );
-                          }}
-                          options={crmData.map((data) => ({
-                            value: data.id,
-                            label: `#${data.id} - ${data.phone || "No Phone"}`,
-                          }))}
-                          placeholder="Select CRM data (Optional)"
-                          isClearable
-                          isSearchable
-                        />
-                      </Form.Group>
-                    </Col>
-                  </Row>
-
-                  <Form.Group className="mb-3">
-                    <Form.Label>Description</Form.Label>
-                    <Form.Control
-                      as="textarea"
-                      rows={3}
-                      value={formData.description}
-                      onChange={(e) =>
-                        handleInputChange("description", e.target.value)
-                      }
-                      placeholder={`Enter ${isOpportunity ? "opportunity" : "lead"} description`}
+                {/* Timeline Navigation */}
+                <div className="mb-4">
+                  <div className="d-flex align-items-center justify-content-between position-relative">
+                    {/* Progress Line */}
+                    <div 
+                      className="position-absolute bg-light" 
+                      style={{ 
+                        left: '0', 
+                        right: '0', 
+                        top: '20px', 
+                        height: '2px', 
+                        zIndex: 0 
+                      }}
                     />
-                  </Form.Group>
+                    <div 
+                      className="position-absolute bg-primary" 
+                      style={{ 
+                        left: '0', 
+                        top: '20px', 
+                        height: '2px', 
+                        width: `${(formStep / 3) * 100}%`,
+                        zIndex: 0,
+                        transition: 'width 0.3s ease'
+                      }}
+                    />
+                    
+                    {/* Step 1 */}
+                    <div 
+                      className="text-center position-relative" 
+                      style={{ cursor: 'pointer', flex: 1 }}
+                      onClick={() => setFormStep(0)}
+                    >
+                      <div 
+                        className={`rounded-circle d-flex align-items-center justify-content-center mx-auto ${formStep >= 0 ? 'bg-primary text-white' : 'bg-light text-muted'}`}
+                        style={{ width: '40px', height: '40px', zIndex: 1, position: 'relative' }}
+                      >
+                        {formStep > 0 ? <CheckCircle size={20} /> : '1'}
+                      </div>
+                      <small className={`d-block mt-2 ${formStep === 0 ? 'fw-bold text-primary' : 'text-muted'}`}>Lead Info</small>
+                    </div>
 
-                  {/* Company Information Section */}
-                  <div className="border-top pt-3 mt-4">
-                    <h4 className="mb-3 app-heading">Company Information</h4>
-                    <Row>
-                      <Col md={6}>
-                        <Form.Group className="mb-3">
-                          <Form.Label>Company Name</Form.Label>
-                          <Form.Control
-                            type="text"
-                            value={formData.company_name}
-                            onChange={(e) =>
-                              handleInputChange("company_name", e.target.value)
-                            }
-                            placeholder="Enter company name"
-                          />
-                        </Form.Group>
-                      </Col>
-                      <Col md={6}>
-                        <Form.Group className="mb-3">
-                          <Form.Label>Contact Information</Form.Label>
-                          <Form.Control
-                            type="text"
-                            value={formData.company_contact}
-                            onChange={(e) =>
-                              handleInputChange(
-                                "company_contact",
-                                e.target.value
-                              )
-                            }
-                            placeholder="Enter phone or email"
-                          />
-                        </Form.Group>
-                      </Col>
-                    </Row>
-                    <Form.Group className="mb-3">
-                      <Form.Label>Additional Contact Information</Form.Label>
-                      <Form.Control
-                        as="textarea"
-                        rows={3}
-                        value={formData.company_description}
-                        onChange={(e) =>
-                          handleInputChange(
-                            "company_description",
-                            e.target.value
-                          )
-                        }
-                        placeholder="Enter additional company contact details"
-                      />
-                    </Form.Group>
+                    {/* Step 2 */}
+                    <div 
+                      className="text-center position-relative" 
+                      style={{ cursor: 'pointer', flex: 1 }}
+                      onClick={() => setFormStep(1)}
+                    >
+                      <div 
+                        className={`rounded-circle d-flex align-items-center justify-content-center mx-auto ${formStep >= 1 ? 'bg-primary text-white' : 'bg-light text-muted'}`}
+                        style={{ width: '40px', height: '40px', zIndex: 1, position: 'relative' }}
+                      >
+                        {formStep > 1 ? <CheckCircle size={20} /> : '2'}
+                      </div>
+                      <small className={`d-block mt-2 ${formStep === 1 ? 'fw-bold text-primary' : 'text-muted'}`}>Company Info</small>
+                    </div>
+
+                    {/* Step 3 */}
+                    <div 
+                      className="text-center position-relative" 
+                      style={{ cursor: 'pointer', flex: 1 }}
+                      onClick={() => setFormStep(2)}
+                    >
+                      <div 
+                        className={`rounded-circle d-flex align-items-center justify-content-center mx-auto ${formStep >= 2 ? 'bg-primary text-white' : 'bg-light text-muted'}`}
+                        style={{ width: '40px', height: '40px', zIndex: 1, position: 'relative' }}
+                      >
+                        {formStep > 2 ? <CheckCircle size={20} /> : '3'}
+                      </div>
+                      <small className={`d-block mt-2 ${formStep === 2 ? 'fw-bold text-primary' : 'text-muted'}`}>Contact Persons</small>
+                    </div>
+
+                    {/* Step 4 */}
+                    <div 
+                      className="text-center position-relative" 
+                      style={{ cursor: 'pointer', flex: 1 }}
+                      onClick={() => setFormStep(3)}
+                    >
+                      <div 
+                        className={`rounded-circle d-flex align-items-center justify-content-center mx-auto ${formStep >= 3 ? 'bg-primary text-white' : 'bg-light text-muted'}`}
+                        style={{ width: '40px', height: '40px', zIndex: 1, position: 'relative' }}
+                      >
+                        {formStep > 3 ? <CheckCircle size={20} /> : '4'}
+                      </div>
+                      <small className={`d-block mt-2 ${formStep === 3 ? 'fw-bold text-primary' : 'text-muted'}`}>Other Info</small>
+                    </div>
                   </div>
+                </div>
 
-                  {/* Campaign Custom Fields */}
-                  {selectedCampaign &&
-                    selectedCampaign.fields &&
-                    selectedCampaign.fields.length > 0 && (
-                      <div className="border-top pt-3 mt-4">
-                        <div className="d-flex align-items-center mb-3">
-                          <FiTarget className="me-2" />
-                          <h6 className="mb-0">
-                            Campaign Fields: {selectedCampaign.name}
-                          </h6>
-                          {selectedCrmData && (
-                            <Badge bg="success" className="ms-2 small">
-                              Auto-filled from CRM Data
-                            </Badge>
-                          )}
-                        </div>
-                        <Alert variant="info" className="mb-3">
-                          <small>
-                            Fill in the custom fields for the selected campaign.
-                            These fields will be stored with the
-                            {isOpportunity ? "opportunity" : "lead"}.
-                            {selectedCrmData && (
-                              <>
-                                <br />
-                                <strong>Note:</strong> Fields have been
-                                automatically filled from the selected CRM data
-                                record. Dropdown fields are excluded from
-                                auto-fill.
-                              </>
-                            )}
-                          </small>
-                        </Alert>
-                        <Row>
-                          {selectedCampaign.fields.map((field, index) => (
-                            <Col md={6} key={index} className="mb-3">
-                              <Form.Group>
-                                <Form.Label>
-                                  {field.field_name}
-                                  {field.field_type === "email" && " (Email)"}
-                                  {field.field_type === "integer" &&
-                                    " (Number)"}
-                                  {field.field_type === "date" && " (Date)"}
-                                  {field.field_type === "dropdown" &&
-                                    " (Select)"}
-                                </Form.Label>
-                                {renderCampaignField(field)}
-                              </Form.Group>
-                            </Col>
-                          ))}
-                        </Row>
-                      </div>
-                    )}
-
-                  {/* CRM Data Preview */}
-                  {selectedCrmData && (
-                    <div className="border-top pt-3 mt-4">
-                      <div className="d-flex align-items-center mb-3">
-                        <FiDatabase className="me-2" />
-                        <h6 className="mb-0">CRM Data Attribution Preview</h6>
-                      </div>
-                      <Alert variant="success" className="mb-3">
-                        <small>
-                          This {isOpportunity ? "opportunity" : "lead"} will be attributed to the
-                          selected CRM data record.
-                        </small>
-                      </Alert>
-                      <Card className="bg-light">
+                <Form onSubmit={handleSubmit}>
+                  {/* Form Content Based on Step */}
+                  <div style={{ minHeight: '400px' }}>
+                    {formStep === 0 && (
+                      <Card className="border-0 bg-light">
                         <Card.Body>
+                          <h5 className="fw-bold mb-4 text-primary">LEAD INFORMATION</h5>
                           <Row>
                             <Col md={6}>
-                              <strong>Record ID:</strong> #{selectedCrmData.id}
+                              <Form.Group className="mb-3">
+                                <Form.Label>Lead Name <span className="text-danger">*</span></Form.Label>
+                                <Form.Control 
+                                  type="text" 
+                                  value={formData.name}
+                                  onChange={(e) => handleInputChange("name", e.target.value)}
+                                  placeholder="Enter lead name" 
+                                  required 
+                                />
+                              </Form.Group>
                             </Col>
                             <Col md={6}>
-                              <strong>Phone:</strong>{" "}
-                              {selectedCrmData.phone || "N/A"}
+                              <Form.Group className="mb-3">
+                                <Form.Label>User Extension <span className="text-danger">*</span></Form.Label>
+                                {formData.type === "opportunity" ? (
+                                  <Select
+                                    value={
+                                      formData.user_extension
+                                        ? {
+                                            value: formData.user_extension,
+                                            label: extensionsOpportunities.find(
+                                              (ext: any) => ext.id.toString() === formData.user_extension?.toString()
+                                            )?.display_name || "",
+                                          }
+                                        : null
+                                    }
+                                    onChange={(selectedOption: any) => {
+                                      handleInputChange("user_extension", selectedOption?.value || null);
+                                    }}
+                                    options={extensionsOpportunities.map((extension: any) => ({
+                                      value: extension.id,
+                                      label: extension.display_name,
+                                    }))}
+                                    placeholder="Select User Extension"
+                                    isClearable
+                                    isSearchable
+                                    required
+                                  />
+                                ) : (
+                                  <Select
+                                    value={
+                                      formData.user_extension
+                                        ? {
+                                            value: formData.user_extension,
+                                            label: extensions.find(
+                                              (ext: any) => ext.id.toString() === formData.user_extension?.toString()
+                                            )?.display_name || "",
+                                          }
+                                        : null
+                                    }
+                                    onChange={(selectedOption: any) => {
+                                      handleInputChange("user_extension", selectedOption?.value || null);
+                                    }}
+                                    options={extensions.map((extension: any) => ({
+                                      value: extension.id,
+                                      label: extension.display_name,
+                                    }))}
+                                    placeholder="Select User Extension"
+                                    isClearable
+                                    isSearchable
+                                    required
+                                  />
+                                )}
+                              </Form.Group>
                             </Col>
-                            {Object.entries(selectedCrmData.data || {})
-                              .slice(0, 4)
-                              .map(([key, value]) => (
-                                <Col md={6} key={key} className="mt-2">
-                                  <strong>{key}:</strong>{" "}
-                                  {String(value) || "N/A"}
-                                </Col>
-                              ))}
-                            {Object.entries(selectedCrmData.data || {}).length >
-                              4 && (
-                              <Col md={12} className="mt-2">
-                                <small className="text-muted">
-                                  +
-                                  {Object.entries(selectedCrmData.data || {})
-                                    .length - 4}{" "}
-                                  more fields
-                                </small>
-                              </Col>
-                            )}
+                            <Col md={6}>
+                              <Form.Group className="mb-3">
+                                <Form.Label>Stage</Form.Label>
+                                <Form.Select
+                                  value={formData.stage_id || ""}
+                                  onChange={(e) =>
+                                    handleInputChange("stage_id", e.target.value ? Number(e.target.value) : undefined)
+                                  }
+                                >
+                                  <option value="">Select a stage</option>
+                                  {stages.map((stage) => (
+                                    <option key={stage.id} value={stage.id}>
+                                      {stage.name}
+                                    </option>
+                                  ))}
+                                </Form.Select>
+                              </Form.Group>
+                            </Col>
+                            <Col md={6}>
+                              <Form.Group className="mb-3">
+                                <Form.Label>Source</Form.Label>
+                                <Form.Control
+                                  type="text"
+                                  value={formData.source}
+                                  onChange={(e) => handleInputChange("source", e.target.value)}
+                                  placeholder="e.g., LinkedIn, Website, Referral"
+                                />
+                              </Form.Group>
+                            </Col>
+                            <Col md={6}>
+                              <Form.Group className="mb-3">
+                                <Form.Label>Campaign</Form.Label>
+                                <Select
+                                  value={
+                                    formData.campaign_id
+                                      ? {
+                                          value: formData.campaign_id,
+                                          label: campaigns.find((c) => c.id === formData.campaign_id)?.name || "",
+                                        }
+                                      : null
+                                  }
+                                  onChange={handleCampaignChange}
+                                  options={campaigns.map((campaign) => ({
+                                    value: campaign.id,
+                                    label: campaign.name,
+                                  }))}
+                                  placeholder="Select a campaign (Optional)"
+                                  isClearable
+                                  isSearchable
+                                />
+                              </Form.Group>
+                            </Col>
+                            <Col md={6}>
+                              <Form.Group className="mb-3">
+                                <Form.Label>CRM Data Attribution</Form.Label>
+                                <Select
+                                  value={
+                                    formData.crm_data_id
+                                      ? {
+                                          value: formData.crm_data_id,
+                                          label: `#${formData.crm_data_id} - ${crmData.find((d) => d.id === formData.crm_data_id)?.phone || "No Phone"}`,
+                                        }
+                                      : null
+                                  }
+                                  onChange={(selectedOption: any) => {
+                                    handleInputChange("crm_data_id", selectedOption?.value || undefined);
+                                  }}
+                                  options={crmData.map((data) => ({
+                                    value: data.id,
+                                    label: `#${data.id} - ${data.phone || "No Phone"}`,
+                                  }))}
+                                  placeholder="Select CRM data (Optional)"
+                                  isClearable
+                                  isSearchable
+                                />
+                              </Form.Group>
+                            </Col>
+                            <Col md={6}>
+                              <Form.Group className="mb-3">
+                                <Form.Label>Called By</Form.Label>
+                                <Select
+                                  value={
+                                    formData.called_by
+                                      ? {
+                                          value: formData.called_by,
+                                          label: extensions.find(
+                                            (ext: any) => ext.id.toString() === formData.called_by?.toString()
+                                          )?.display_name || "",
+                                        }
+                                      : null
+                                  }
+                                  onChange={(selectedOption: any) => {
+                                    handleInputChange("called_by", selectedOption?.value || null);
+                                  }}
+                                  options={extensions.map((extension: any) => ({
+                                    value: extension.id,
+                                    label: extension.display_name,
+                                  }))}
+                                  placeholder="Select user (Optional)"
+                                  isClearable
+                                  isSearchable
+                                />
+                              </Form.Group>
+                            </Col>
+                            <Col md={12}>
+                              <Form.Group className="mb-3">
+                                <Form.Label>Description</Form.Label>
+                                <Form.Control 
+                                  as="textarea" 
+                                  rows={3} 
+                                  value={formData.description}
+                                  onChange={(e) => handleInputChange("description", e.target.value)}
+                                  placeholder="Enter lead description or notes"
+                                />
+                              </Form.Group>
+                            </Col>
                           </Row>
                         </Card.Body>
                       </Card>
-                    </div>
-                  )}
+                    )}
 
-                  <div className="d-flex gap-2">
-                    <Button
-                      type="submit"
-                      variant="primary"
-                      className="app-button"
-                      disabled={loading}
+                    {formStep === 1 && (
+                      <Card className="border-0 bg-light">
+                        <Card.Body>
+                          <h5 className="fw-bold mb-4 text-success">COMPANY INFORMATION</h5>
+                          <Row>
+                            <Col md={6}>
+                              <Form.Group className="mb-3">
+                                <Form.Label>Company Name</Form.Label>
+                                <Form.Control 
+                                  type="text" 
+                                  value={formData.company_name}
+                                  onChange={(e) => handleInputChange("company_name", e.target.value)}
+                                  placeholder="Enter company name" 
+                                />
+                              </Form.Group>
+                            </Col>
+                            <Col md={6}>
+                              <Form.Group className="mb-3">
+                                <Form.Label>Industry</Form.Label>
+                                <Form.Control
+                                  type="text"
+                                  value={formData.industry}
+                                  onChange={(e) => handleInputChange("industry", e.target.value)}
+                                  placeholder="e.g., Technology, Finance, Healthcare"
+                                />
+                              </Form.Group>
+                            </Col>
+                            <Col md={6}>
+                              <Form.Group className="mb-3">
+                                <Form.Label>Business Type</Form.Label>
+                                <Form.Select
+                                  value={formData.business_type}
+                                  onChange={(e) => handleInputChange("business_type", e.target.value)}
+                                >
+                                  <option value="">Select Type</option>
+                                  <option value="B2B">B2B (Business to Business)</option>
+                                  <option value="B2C">B2C (Business to Consumer)</option>
+                                  <option value="B2G">B2G (Business to Government)</option>
+                                  <option value="Non-profit / NGO">Non-profit / NGO</option>
+                                </Form.Select>
+                              </Form.Group>
+                            </Col>
+                            <Col md={6}>
+                              <Form.Group className="mb-3">
+                                <Form.Label>Company Country</Form.Label>
+                                <Form.Control
+                                  type="text"
+                                  value={formData.company_country}
+                                  onChange={(e) => handleInputChange("company_country", e.target.value)}
+                                  placeholder="Enter country"
+                                />
+                              </Form.Group>
+                            </Col>
+                            <Col md={6}>
+                              <Form.Group className="mb-3">
+                                <Form.Label>Company City</Form.Label>
+                                <Form.Control
+                                  type="text"
+                                  value={formData.company_city}
+                                  onChange={(e) => handleInputChange("company_city", e.target.value)}
+                                  placeholder="Enter city"
+                                />
+                              </Form.Group>
+                            </Col>
+                            <Col md={6}>
+                              <Form.Group className="mb-3">
+                                <Form.Label>Company Size</Form.Label>
+                                <Form.Select
+                                  value={formData.company_size}
+                                  onChange={(e) => handleInputChange("company_size", e.target.value)}
+                                >
+                                  <option value="">Select Size</option>
+                                  <option value="Micro (1-10 employees)">Micro (1-10 employees)</option>
+                                  <option value="Small (11-50 employees)">Small (11-50 employees)</option>
+                                  <option value="Medium (51-200 employees)">Medium (51-200 employees)</option>
+                                  <option value="Large (201-500 employees)">Large (201-500 employees)</option>
+                                  <option value="Enterprise (500+ employees)">Enterprise (500+ employees)</option>
+                                </Form.Select>
+                              </Form.Group>
+                            </Col>
+                            <Col md={12}>
+                              <Form.Group className="mb-3">
+                                <Form.Label>Company Location Other</Form.Label>
+                                <Form.Control
+                                  type="text"
+                                  value={formData.company_location_other}
+                                  onChange={(e) => handleInputChange("company_location_other", e.target.value)}
+                                  placeholder="Additional location information"
+                                />
+                              </Form.Group>
+                            </Col>
+                          </Row>
+                        </Card.Body>
+                      </Card>
+                    )}
+
+                    {formStep === 2 && (
+                      <Card className="border-0 bg-light">
+                        <Card.Body>
+                          <h5 className="fw-bold mb-4 text-warning">CONTACT PERSONS</h5>
+                          {formData.contact_persons.map((person, index) => (
+                            <Card key={index} className="mb-3 border">
+                              <Card.Body>
+                                <div className="d-flex justify-content-between align-items-center mb-3">
+                                  <h6 className="mb-0">Contact Person {index + 1}</h6>
+                                  <Button
+                                    variant="outline-danger"
+                                    size="sm"
+                                    onClick={() => removeContactPerson(index)}
+                                  >
+                                    <X size={16} />
+                                  </Button>
+                                </div>
+                                <Row>
+                                  <Col md={6}>
+                                    <Form.Group className="mb-3">
+                                      <Form.Label>Title</Form.Label>
+                                      <Form.Select
+                                        value={person.title}
+                                        onChange={(e) => updateContactPerson(index, "title", e.target.value)}
+                                      >
+                                        <option value="">Select Title</option>
+                                        <option value="Mr.">Mr.</option>
+                                        <option value="Mrs.">Mrs.</option>
+                                        <option value="Ms.">Ms.</option>
+                                        <option value="Dr.">Dr.</option>
+                                        <option value="Prof.">Prof.</option>
+                                      </Form.Select>
+                                    </Form.Group>
+                                  </Col>
+                                  <Col md={6}>
+                                    <Form.Group className="mb-3">
+                                      <Form.Label>Name</Form.Label>
+                                      <Form.Control
+                                        type="text"
+                                        value={person.name}
+                                        onChange={(e) => updateContactPerson(index, "name", e.target.value)}
+                                        placeholder="Enter contact name"
+                                      />
+                                    </Form.Group>
+                                  </Col>
+                                  <Col md={6}>
+                                    <Form.Group className="mb-3">
+                                      <Form.Label>Phone Country Code</Form.Label>
+                                      <Form.Control
+                                        type="text"
+                                        value={person.phone_country_code}
+                                        onChange={(e) => updateContactPerson(index, "phone_country_code", e.target.value)}
+                                        placeholder="e.g., +1, +44"
+                                      />
+                                    </Form.Group>
+                                  </Col>
+                                  <Col md={6}>
+                                    <Form.Group className="mb-3">
+                                      <Form.Label>Phone</Form.Label>
+                                      <Form.Control
+                                        type="tel"
+                                        value={person.phone}
+                                        onChange={(e) => updateContactPerson(index, "phone", e.target.value)}
+                                        placeholder="Enter phone number"
+                                      />
+                                    </Form.Group>
+                                  </Col>
+                                  <Col md={12}>
+                                    <Form.Group className="mb-3">
+                                      <Form.Label>Email</Form.Label>
+                                      <Form.Control
+                                        type="email"
+                                        value={person.email}
+                                        onChange={(e) => updateContactPerson(index, "email", e.target.value)}
+                                        placeholder="Enter email address"
+                                      />
+                                    </Form.Group>
+                                  </Col>
+                                </Row>
+                              </Card.Body>
+                            </Card>
+                          ))}
+                          <Button
+                            variant="outline-primary"
+                            onClick={addContactPerson}
+                            className="w-100"
+                          >
+                            <FiPlus className="me-2" />
+                            Add Contact Person
+                          </Button>
+                        </Card.Body>
+                      </Card>
+                    )}
+
+                    {formStep === 3 && (
+                      <Card className="border-0 bg-light">
+                        <Card.Body>
+                          <h5 className="fw-bold mb-4 text-info">OTHER INFORMATION</h5>
+                          <Row>
+                            <Col md={6}>
+                              <Form.Group className="mb-3">
+                                <Form.Label>Lead Potential</Form.Label>
+                                <Form.Select
+                                  value={formData.lead_potential}
+                                  onChange={(e) => handleInputChange("lead_potential", e.target.value)}
+                                >
+                                  <option value="">Select Potential</option>
+                                  <option value="Hot">Hot</option>
+                                  <option value="Warm">Warm</option>
+                                  <option value="Cold">Cold</option>
+                                </Form.Select>
+                                <Form.Text className="text-muted">Likelihood of converting based on engagement</Form.Text>
+                              </Form.Group>
+                            </Col>
+                          </Row>
+
+                          {/* Campaign Custom Fields */}
+                          {selectedCampaign && selectedCampaign.fields && selectedCampaign.fields.length > 0 && (
+                            <div className="border-top pt-3 mt-4">
+                              <div className="d-flex align-items-center mb-3">
+                                <FiTarget className="me-2" />
+                                <h6 className="mb-0">Campaign Fields: {selectedCampaign.name}</h6>
+                                {selectedCrmData && (
+                                  <Badge bg="success" className="ms-2 small">
+                                    Auto-filled from CRM Data
+                                  </Badge>
+                                )}
+                              </div>
+                              <Row>
+                                {selectedCampaign.fields.map((field, index) => (
+                                  <Col md={6} key={index} className="mb-3">
+                                    <Form.Group>
+                                      <Form.Label>{field.field_name}</Form.Label>
+                                      {renderCampaignField(field)}
+                                    </Form.Group>
+                                  </Col>
+                                ))}
+                              </Row>
+                            </div>
+                          )}
+
+                          <div className="alert alert-success small mt-3">
+                            <CheckCircle size={14} className="me-1" />
+                            All required fields are marked with <span className="text-danger">*</span>. Complete all sections to create the lead.
+                          </div>
+                        </Card.Body>
+                      </Card>
+                    )}
+                  </div>
+                  
+                  <div className="d-flex justify-content-between mt-4">
+                    <Button 
+                      variant="outline-secondary" 
+                      onClick={() => setFormStep(Math.max(0, formStep - 1))}
+                      disabled={formStep === 0}
                     >
-                      {loading ? (
-                        "Creating..."
-                      ) : (
-                        <>
-                          <FiSave className="me-2" />
-                          Create {isOpportunity ? "Opportunity" : "Lead"}
-                        </>
-                      )}
+                      <ChevronLeft size={16} className="me-1" />
+                      Back
                     </Button>
-                    <Link href={isOpportunity ? "/crm/opportunities" : "/crm/leads"} className="btn btn-info app-button">
+                    <Link 
+                      href={isOpportunity ? "/crm/opportunities" : "/crm/leads"} 
+                      className="btn btn-secondary"
+                    >
                       Cancel
                     </Link>
+                    {formStep < 3 ? (
+                      <Button 
+                        variant="primary" 
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setFormStep(Math.min(3, formStep + 1));
+                        }}
+                      >
+                        Next
+                        <ChevronRight size={16} className="ms-1" />
+                      </Button>
+                    ) : (
+                      <Button 
+                        type="submit"
+                        variant="success"
+                        disabled={loading}
+                      >
+                        <CheckCircle size={16} className="me-2" />
+                        {loading ? "Creating..." : "Create Lead"}
+                      </Button>
+                    )}
                   </div>
                 </Form>
               </Card.Body>

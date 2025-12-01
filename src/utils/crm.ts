@@ -239,7 +239,7 @@ export const getLeads = async (
 ): Promise<PaginationWrapper<LeadData>> => {
   try {
     const response = await axiosInstance.get("/crm/leads", { params });
-    return extractData<PaginationWrapper<LeadData>>(response.data);
+    return extractData<PaginationWrapper<LeadData>>(response);
   } catch (error: any) {
     toast.error(error?.message || "Failed to fetch leads");
     throw error;
@@ -407,7 +407,7 @@ export const getAssigneeComments = async (leadId: number): Promise<any[]> => {
 };
 
 // Stage Management
-export const getStages = async (type?: 'lead' | 'opportunity'): Promise<StageData[]> => {
+export const getStages = async (type?: 'lead' | 'opportunity' | 'deal' | 'order'): Promise<StageData[]> => {
   try {
     console.log("getStages: Making API call to /crm/stages");
     const params = type ? { type } : {};
@@ -1370,6 +1370,340 @@ export const getCrmDataHistory = async (
     };
   } catch (error: any) {
     console.error("Failed to get CRM data history:", error);
+    throw error;
+  }
+};
+
+// Deal Management
+export interface DealData {
+  id: number;
+  name: string;
+  type: string;
+  ticket_id: string;
+  stage_id: string;
+  assigned_to: string;
+  probability: number;
+  expected_close_date: string;
+  company_name: string;
+  industry: string;
+  decision_maker_title: string;
+  decision_maker_name: string;
+  decision_maker_phone_country_code: string;
+  decision_maker_phone: string;
+  deal_type: string;
+  contract_length: string;
+  contract_length_custom: string | null;
+  billing_model: string;
+  payment_terms: string;
+  payment_terms_custom: string | null;
+  risk_level: string;
+  competitors: string | null;
+  negotiation_bar: number;
+  quotation_sent: boolean;
+  contract_sent: boolean;
+  contract_received: boolean;
+  estimation_chart: any | null;
+  grand_total: string;
+  final_estimation_chart: any | null;
+  discount_applied: string;
+  net_value: string;
+  follow_up_date: string | null;
+  last_activity_at: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+  is_lost: boolean;
+  lost_reason_id: number | null;
+  lost_feedback: string | null;
+  currency: string;
+  deleted_at: string | null;
+  created_by: string | null;
+  stage?: StageData;
+  ticket?: any;
+  estimates?: Array<{
+    id: number;
+    deal_id: string;
+    version: string;
+    estimation_chart: Array<{
+      product_service: string;
+      description: string;
+      qty: number;
+      unit_price: number;
+      product_id: number;
+      original_currency: string;
+      original_price: number;
+    }>;
+    standard_discount_percentage: string;
+    special_discount_percentage: string;
+    grand_total: string;
+    discount_amount: string;
+    net_value: string;
+    currency: string;
+    tax_percentage: string;
+    is_final: boolean;
+    created_by: string | null;
+    created_at: string;
+    updated_at: string;
+  }>;
+  meetings?: any[];
+  orders?: any[];
+}
+
+export const getDeals = async (
+  params: PaginationParams = {}
+): Promise<{
+  dataList: DealData[];
+  meta: {
+    total: number;
+    current_page: number;
+    per_page: number;
+    last_page: number;
+  };
+  summary_tiles?: {
+    upcoming_follow_ups?: number;
+    upcoming_meetings?: number;
+    deal_types?: Record<string, string>;
+  };
+}> => {
+  try {
+    const response = await axiosInstance.get("/crm/deals", { params });
+    console.log("Raw response from getDeals:", response);
+    
+    // Handle nested response structure
+    // The API returns: { code: 200, data: { success: true, data: { current_page, data: [...], total, ... }, summary_tiles: {...} } }
+    const responseData: any = response.data?.data;
+    const paginationData: any = responseData?.data || {};
+    const dealsArray: DealData[] = paginationData?.data || [];
+    const pagination = paginationData || {};
+    const summaryTiles = responseData?.summary_tiles || null;
+    
+    return {
+      dataList: Array.isArray(dealsArray) ? dealsArray : [],
+      meta: {
+        total: pagination?.total || (Array.isArray(dealsArray) ? dealsArray.length : 0) || 0,
+        current_page: pagination?.current_page || 1,
+        per_page: pagination?.per_page || 15,
+        last_page: pagination?.last_page || 1,
+      },
+      summary_tiles: summaryTiles,
+    };
+  } catch (error: any) {
+    toast.error(error?.message || "Failed to fetch deals");
+    throw error;
+  }
+};
+
+export const getDeal = async (id: number): Promise<DealData> => {
+  try {
+    const response = await axiosInstance.get(`/crm/deals/${id}`);
+    console.log("Raw response from getDeal:", response);
+    // Handle nested response structure
+    // The API returns: { code: 200, data: { success: true, data: {...} } }
+    const responseData: any = response.data?.data;
+    const dealData: DealData = responseData?.data || responseData || response.data;
+    return dealData;
+  } catch (error: any) {
+    toast.error(error?.message || "Failed to fetch deal");
+    throw error;
+  }
+};
+
+export const createDeal = async (data: Partial<DealData>): Promise<DealData> => {
+  try {
+    const response = await axiosInstance.post("/crm/deals", data);
+    const responseData: any = response.data?.data;
+    toast.success("Deal created successfully");
+    return responseData || response.data;
+  } catch (error: any) {
+    toast.error(error?.response?.data?.message || error?.message || "Failed to create deal");
+    throw error;
+  }
+};
+
+export const updateDeal = async (
+  id: number,
+  data: Partial<DealData>
+): Promise<DealData> => {
+  try {
+    data.id = id;
+    console.log("updateDeal data:", data);
+    const response = await axiosInstance.put(`/crm/update-deal`, data);
+    const responseData: any = response.data?.data;
+    toast.success("Deal updated successfully");
+    return responseData || response.data;
+  } catch (error: any) {
+    toast.error(error?.response?.data?.message || error?.message || "Failed to update deal");
+    throw error;
+  }
+};
+
+export const deleteDeal = async (id: number): Promise<void> => {
+  try {
+    await axiosInstance.delete(`/crm/deals/${id}`);
+    toast.success("Deal deleted successfully");
+  } catch (error: any) {
+    toast.error(error?.response?.data?.message || error?.message || "Failed to delete deal");
+    throw error;
+  }
+};
+
+// Order Management
+export interface OrderData {
+  id: number;
+  order_number: string;
+  customer_name: string;
+  customer_email: string;
+  customer_phone: string;
+  customer_address: string | null;
+  total_amount: string;
+  tax_amount: string;
+  discount_amount: string;
+  final_amount: string;
+  order_stage_id: string;
+  lost_reason_id: number | null;
+  notes: string | null;
+  order_date: string;
+  expected_delivery_date: string | null;
+  actual_delivery_date: string | null;
+  status: string;
+  created_at: string;
+  updated_at: string;
+  inventory_updated: boolean;
+  ticket_id: string;
+  deal_id: string;
+  assigned_to: string | null;
+  order_approval_status: string;
+  order_priority: string | null;
+  contract_type: string | null;
+  contract_length: string;
+  contract_start_date: string | null;
+  contract_end_date: string | null;
+  billing_model: string | null;
+  billing_status: string | null;
+  payment_terms: string | null;
+  payment_terms_custom: string | null;
+  payment_status: string;
+  auto_renewal: boolean | null;
+  fulfillment_status: string;
+  progress_dial: number;
+  poc_title: string | null;
+  poc_name: string | null;
+  poc_phone_country_code: string | null;
+  poc_phone: string | null;
+  company: string | null;
+  industry: string | null;
+  currency: string;
+  deleted_at: string | null;
+  created_by: string | null;
+  stage?: StageData;
+  lost_reason?: LostReasonData;
+  ticket?: any;
+  deal?: DealData;
+  items?: Array<{
+    id: number;
+    order_id: string;
+    product_id: string;
+    product_variant_id: string | null;
+    product_name: string;
+    variant_info: string | null;
+    quantity: string;
+    unit_price: string;
+    unit_cost: string | null;
+    total_price: string;
+    total_cost: string | null;
+    tax_percentage: string | null;
+    description: string;
+    product?: any;
+  }>;
+}
+
+export const getOrders = async (
+  params: PaginationParams = {}
+): Promise<{
+  dataList: OrderData[];
+  meta: {
+    total: number;
+    current_page: number;
+    per_page: number;
+    last_page: number;
+  };
+  summary_tiles?: any;
+}> => {
+  try {
+    const response = await axiosInstance.get("/crm/orders", { params });
+    console.log("Raw response from getOrders:", response);
+    
+    // Handle nested response structure
+    const responseData: any = response.data?.data;
+    const paginationData: any = responseData?.data || {};
+    const ordersArray: OrderData[] = paginationData?.data || [];
+    const pagination = paginationData || {};
+    const summaryTiles = responseData?.summary_tiles || null;
+    
+    return {
+      dataList: Array.isArray(ordersArray) ? ordersArray : [],
+      meta: {
+        total: pagination?.total || (Array.isArray(ordersArray) ? ordersArray.length : 0) || 0,
+        current_page: pagination?.current_page || 1,
+        per_page: pagination?.per_page || 15,
+        last_page: pagination?.last_page || 1,
+      },
+      summary_tiles: summaryTiles,
+    };
+  } catch (error: any) {
+    toast.error(error?.message || "Failed to fetch orders");
+    throw error;
+  }
+};
+
+export const getOrder = async (id: number): Promise<OrderData> => {
+  try {
+    const response = await axiosInstance.get(`/crm/orders/${id}`);
+    console.log("Raw response from getOrder:", response);
+    const responseData: any = response.data?.data;
+    const orderData: OrderData = responseData?.data || responseData || response.data;
+    return orderData;
+  } catch (error: any) {
+    toast.error(error?.message || "Failed to fetch order");
+    throw error;
+  }
+};
+
+export const deleteOrder = async (id: number): Promise<void> => {
+  try {
+    await axiosInstance.delete(`/crm/orders/${id}`);
+    toast.success("Order deleted successfully");
+  } catch (error: any) {
+    toast.error(error?.response?.data?.message || error?.message || "Failed to delete order");
+    throw error;
+  }
+};
+
+export const createOrder = async (data: Partial<OrderData>): Promise<OrderData> => {
+  try {
+    const response = await axiosInstance.post("/crm/orders", data);
+    const responseData: any = response.data?.data;
+    toast.success("Order created successfully");
+    return responseData || response.data;
+  } catch (error: any) {
+    toast.error(error?.response?.data?.message || error?.message || "Failed to create order");
+    throw error;
+  }
+};
+
+export const updateOrder = async (
+  id: number,
+  data: Partial<OrderData>
+): Promise<OrderData> => {
+  try {
+    data.id = id;
+    console.log("updateOrder data:", data);
+    const response = await axiosInstance.put(`/crm/update-order`, data);
+    const responseData: any = response.data?.data;
+    toast.success("Order updated successfully");
+    return responseData || response.data;
+  } catch (error: any) {
+    toast.error(error?.response?.data?.message || error?.message || "Failed to update order");
     throw error;
   }
 };

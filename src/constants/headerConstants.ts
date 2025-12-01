@@ -136,6 +136,8 @@ MENU_COLORS: {
     // CRM
     CRM_DASHBOARD: 'Dashboard',
     LEADS: 'Leads',
+    DEALS: 'Deals',
+    ORDERS: 'Orders',
     OPPORTUNITIES: 'Opportunities',
     STAGES: 'Stages',
     LOST_REASONS_CRM: 'Lost Reasons',

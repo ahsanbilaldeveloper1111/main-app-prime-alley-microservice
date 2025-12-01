@@ -276,6 +276,20 @@ export const routePermissions: RoutePermission[] = [
                     { path: '/create',permissions: [PERMISSIONS.CREATE_CRM_LEADS]},
                 ]
             },
+            { 
+                path: '/deals',permissions: [PERMISSIONS.VIEW_CRM_LEADS],
+                children: [
+                    { path: '/',permissions: [PERMISSIONS.VIEW_CRM_LEADS]},
+                    { path: '/create',permissions: [PERMISSIONS.CREATE_CRM_LEADS]},
+                ]
+            },
+            { 
+                path: '/orders',permissions: [PERMISSIONS.VIEW_CRM_LEADS],
+                children: [
+                    { path: '/',permissions: [PERMISSIONS.VIEW_CRM_LEADS]},
+                    { path: '/create',permissions: [PERMISSIONS.CREATE_CRM_LEADS]},
+                ]
+            },
             { path: '/lost-reasons',permissions: [PERMISSIONS.VIEW_CRM_LOST_REASONS]},
             { path: '/opportunities',permissions: [PERMISSIONS.VIEW_CRM_OPPORTUNITIES]},
             { path: '/opportunities/create',permissions: [PERMISSIONS.CREATE_CRM_OPPORTUNITIES]},
