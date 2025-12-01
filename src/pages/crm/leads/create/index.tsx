@@ -67,7 +67,6 @@ const CreateLead = () => {
     lead_potential: "",
     other_information: {} as Record<string, any>,
     campaign_field_values: {} as Record<string, any>,
-    called_by: null as string | null,
     contact_persons: [] as Array<{
       title: string;
       name: string;
@@ -143,17 +142,41 @@ const CreateLead = () => {
           console.log("ZE CRM DATA RECORD", crmDataRecord);
           setSelectedCrmData(crmDataRecord);
 
+          // Extract prospect name for lead name
+          const prospectName =
+            crmDataRecord.data?.name ||
+            crmDataRecord.data?.full_name ||
+            crmDataRecord.data?.first_name ||
+            crmDataRecord.name ||
+            crmDataRecord.phone ||
+            "";
+
+          // Extract contact person name
+          const contactPersonName =
+            crmDataRecord.data?.contact_person_name ||
+            crmDataRecord.data?.contact_name ||
+            crmDataRecord.data?.name ||
+            crmDataRecord.data?.full_name ||
+            crmDataRecord.data?.first_name ||
+            crmDataRecord.name ||
+            "";
+
+          // Extract email
+          const email =
+            crmDataRecord.data?.email ||
+            crmDataRecord.data?.contact_email ||
+            crmDataRecord.data?.email_address ||
+            "";
+
+          // Extract phone
+          const phone = crmDataRecord.phone || crmDataRecord.data?.phone || "";
+
           // Pre-fill basic form fields
           setFormData((prev) => ({
             ...prev,
             crm_data_id: crmDataId,
             campaign_id: Number(crmDataRecord.campaign_id) || undefined,
-            name:
-              crmDataRecord.data?.name ||
-              crmDataRecord.data?.full_name ||
-              crmDataRecord.data?.first_name ||
-              crmDataRecord.phone ||
-              "",
+            name: prospectName,
             description:
               crmDataRecord.data?.description ||
               crmDataRecord.data?.notes ||
@@ -166,12 +189,27 @@ const CreateLead = () => {
             company_contact:
               crmDataRecord.data?.company_contact ||
               crmDataRecord.data?.contact ||
-              crmDataRecord.phone ||
+              phone ||
               "",
             company_description:
               crmDataRecord.data?.company_description ||
               crmDataRecord.data?.company_notes ||
               "",
+            // Pre-fill contact person fields
+            contact_person_name: contactPersonName,
+            contact_phone: phone,
+            // Add contact person to contact_persons array if we have name, phone, or email
+            contact_persons: contactPersonName || phone || email
+              ? [
+                  {
+                    title: crmDataRecord.data?.contact_person_title || "",
+                    name: contactPersonName,
+                    phone_country_code: crmDataRecord.data?.phone_country_code || "",
+                    phone: phone,
+                    email: email,
+                  },
+                ]
+              : prev.contact_persons,
           }));
         } catch (error) {
           console.error("Failed to fetch CRM data record:", error);
@@ -193,28 +231,51 @@ const CreateLead = () => {
 
           setSelectedCampaign(campaign);
 
-          // Pre-fill campaign fields with CRM data (excluding dropdown fields)
+          // Pre-fill campaign fields with CRM data (matching by field name)
           const preFilledFields: Record<string, any> = {};
 
           if (campaign.fields && selectedCrmData.data) {
             campaign.fields.forEach((field) => {
-              // Skip dropdown fields as requested
-              if (field.field_type === "dropdown") {
-                return;
-              }
-
-              // Try to find matching CRM data field
+              // Try to find matching CRM data field by exact name, lowercase, or uppercase
               const crmDataValue =
                 selectedCrmData.data[field.field_name] ||
                 selectedCrmData.data[field.field_name.toLowerCase()] ||
-                selectedCrmData.data[field.field_name.toUpperCase()];
+                selectedCrmData.data[field.field_name.toUpperCase()] ||
+                // Also try with underscores replaced by spaces and vice versa
+                selectedCrmData.data[field.field_name.replace(/_/g, ' ')] ||
+                selectedCrmData.data[field.field_name.replace(/ /g, '_')] ||
+                selectedCrmData.data[field.field_name.replace(/_/g, ' ').toLowerCase()] ||
+                selectedCrmData.data[field.field_name.replace(/ /g, '_').toLowerCase()];
 
               if (
                 crmDataValue !== null &&
                 crmDataValue !== undefined &&
                 crmDataValue !== ""
               ) {
-                preFilledFields[field.field_name] = String(crmDataValue);
+                // For dropdown fields, check if the value matches one of the options
+                if (field.field_type === "dropdown" && field.options) {
+                  const optionValues = field.options.map((opt: any) => 
+                    typeof opt === 'string' ? opt : opt.value || opt.label
+                  );
+                  const optionLabels = field.options.map((opt: any) => 
+                    typeof opt === 'string' ? opt : opt.label || opt.value
+                  );
+                  
+                  // Check if CRM data value matches any option value or label
+                  const stringValue = String(crmDataValue);
+                  const matchesOption = optionValues.some((opt: string) => 
+                    opt.toLowerCase() === stringValue.toLowerCase()
+                  ) || optionLabels.some((opt: string) => 
+                    opt.toLowerCase() === stringValue.toLowerCase()
+                  );
+                  
+                  if (matchesOption) {
+                    preFilledFields[field.field_name] = stringValue;
+                  }
+                } else {
+                  // For non-dropdown fields, directly assign the value
+                  preFilledFields[field.field_name] = String(crmDataValue);
+                }
               }
             });
           }
@@ -359,7 +420,6 @@ const CreateLead = () => {
         ...(formData.lead_potential && { lead_potential: formData.lead_potential }),
         ...(formData.other_information && Object.keys(formData.other_information).length > 0 && { other_information: formData.other_information }),
         ...(formData.campaign_field_values && Object.keys(formData.campaign_field_values).length > 0 && { campaign_field_values: formData.campaign_field_values }),
-        ...(formData.called_by && { called_by: formData.called_by }),
         ...(formData.contact_persons.length > 0 && { contact_persons: formData.contact_persons }),
       };
 
@@ -812,33 +872,6 @@ const CreateLead = () => {
                                     label: `#${data.id} - ${data.phone || "No Phone"}`,
                                   }))}
                                   placeholder="Select CRM data (Optional)"
-                                  isClearable
-                                  isSearchable
-                                />
-                              </Form.Group>
-                            </Col>
-                            <Col md={6}>
-                              <Form.Group className="mb-3">
-                                <Form.Label>Called By</Form.Label>
-                                <Select
-                                  value={
-                                    formData.called_by
-                                      ? {
-                                          value: formData.called_by,
-                                          label: extensions.find(
-                                            (ext: any) => ext.id.toString() === formData.called_by?.toString()
-                                          )?.display_name || "",
-                                        }
-                                      : null
-                                  }
-                                  onChange={(selectedOption: any) => {
-                                    handleInputChange("called_by", selectedOption?.value || null);
-                                  }}
-                                  options={extensions.map((extension: any) => ({
-                                    value: extension.id,
-                                    label: extension.display_name,
-                                  }))}
-                                  placeholder="Select user (Optional)"
                                   isClearable
                                   isSearchable
                                 />

@@ -6,11 +6,15 @@ import {
   updateDeal,
   getDeal,
   getStages,
+  getCrmProducts,
+  createEstimate,
+  CrmProduct,
   StageData,
 } from "@utils/crm";
 import { GetHierarchyData } from "@utils/users";
-import { Button, Row, Col, Form, Card, Badge, Table } from "react-bootstrap";
-import { CheckCircle, ChevronLeft, ChevronRight, ArrowLeft, FileText, Eye } from "lucide-react";
+import { Button, Row, Col, Form, Card, Badge, Table, Modal } from "react-bootstrap";
+import { CheckCircle, ChevronLeft, ChevronRight, ArrowLeft, FileText, Eye, Plus, Edit, Trash2, Package, History, Calendar, RefreshCw } from "lucide-react";
+import Select from 'react-select';
 import Link from "next/link";
 import { toast } from "react-toastify";
 import { useRouter } from "next/router";
@@ -35,6 +39,27 @@ const EditDeal = () => {
   const [negotiationBar, setNegotiationBar] = useState(0);
   const [probability, setProbability] = useState(0);
   const isInitialLoad = useRef(true);
+  const [products, setProducts] = useState<CrmProduct[]>([]);
+  const [loadingProducts, setLoadingProducts] = useState(false);
+  const [estimationItems, setEstimationItems] = useState<Array<{
+    product_id: number;
+    product_service: string;
+    description: string;
+    qty: number;
+    unit_price: number;
+    original_currency: string;
+    original_price: number;
+  }>>([]);
+  const [showAddItemModal, setShowAddItemModal] = useState(false);
+  const [editingItemIndex, setEditingItemIndex] = useState<number | null>(null);
+  const [itemFormData, setItemFormData] = useState({
+    product_id: null as number | null,
+    product_service: "",
+    description: "",
+    qty: 1,
+    unit_price: 0,
+  });
+  const [showRevisionHistoryModal, setShowRevisionHistoryModal] = useState(false);
   
   const [formData, setFormData] = useState({
     name: "",
@@ -62,12 +87,28 @@ const EditDeal = () => {
     contract_received: false,
     follow_up_date: "",
     currency: "USD",
+    tax_percentage: "0",
+    standard_discount_percentage: "0",
+    special_discount_percentage: "0",
   });
 
   useEffect(() => {
     fetchStages();
     fetchExtensions();
+    fetchProducts();
   }, []);
+
+  const fetchProducts = async () => {
+    try {
+      setLoadingProducts(true);
+      const response = await getCrmProducts({ per_page: 100 });
+      setProducts(response.data || []);
+    } catch (error) {
+      console.error("Failed to fetch products:", error);
+    } finally {
+      setLoadingProducts(false);
+    }
+  };
 
   useEffect(() => {
     const fetchDealData = async () => {
@@ -109,6 +150,9 @@ const EditDeal = () => {
           contract_received: deal.contract_received || false,
           follow_up_date: formatDate(deal.follow_up_date),
           currency: deal.currency || "USD",
+          tax_percentage: deal.tax_percentage?.toString() || "0",
+          standard_discount_percentage: deal.standard_discount_percentage?.toString() || "0",
+          special_discount_percentage: deal.special_discount_percentage?.toString() || "0",
         });
 
         // Set additional data
@@ -117,6 +161,53 @@ const EditDeal = () => {
         setHistories(deal.histories || []);
         setNegotiationBar(deal.negotiation_bar || 0);
         setProbability(deal.probability || 0);
+
+        // Load estimation chart from the most recent estimate or deal
+        if (deal.estimates && deal.estimates.length > 0) {
+          // Sort estimates by created_at date to get the latest one
+          const sortedEstimates = [...deal.estimates].sort((a: any, b: any) => {
+            const dateA = new Date(a.created_at).getTime();
+            const dateB = new Date(b.created_at).getTime();
+            return dateB - dateA; // Sort descending (newest first)
+          });
+          const latestEstimate = sortedEstimates[0];
+          
+          // Load tax and discount percentages from the latest estimate
+          if (latestEstimate.tax_percentage) {
+            setFormData(prev => ({ ...prev, tax_percentage: latestEstimate.tax_percentage.toString() }));
+          }
+          if (latestEstimate.standard_discount_percentage) {
+            setFormData(prev => ({ ...prev, standard_discount_percentage: latestEstimate.standard_discount_percentage.toString() }));
+          }
+          if (latestEstimate.special_discount_percentage) {
+            setFormData(prev => ({ ...prev, special_discount_percentage: latestEstimate.special_discount_percentage.toString() }));
+          }
+          
+          if (latestEstimate.estimation_chart && latestEstimate.estimation_chart.length > 0) {
+            setEstimationItems(latestEstimate.estimation_chart.map((item: any) => ({
+              product_id: item.product_id || 0,
+              product_service: item.product_service || "",
+              description: item.description || "",
+              qty: item.qty || 1,
+              unit_price: item.unit_price || 0,
+              original_currency: item.original_currency || deal.currency || "USD",
+              original_price: item.original_price || item.unit_price || 0,
+            })));
+          } else {
+            // If latest estimate has no items, clear estimation items
+            setEstimationItems([]);
+          }
+        } else if (deal.estimation_chart && Array.isArray(deal.estimation_chart) && deal.estimation_chart.length > 0) {
+          setEstimationItems(deal.estimation_chart.map((item: any) => ({
+            product_id: item.product_id || 0,
+            product_service: item.product_service || "",
+            description: item.description || "",
+            qty: item.qty || 1,
+            unit_price: item.unit_price || 0,
+            original_currency: item.original_currency || deal.currency || "USD",
+            original_price: item.original_price || item.unit_price || 0,
+          })));
+        }
         
         isInitialLoad.current = false;
       } catch (error) {
@@ -195,7 +286,31 @@ const EditDeal = () => {
         payload.ticket_id = formData.ticket_id;
       }
 
+      // Update deal first
       await updateDeal(Number(id), payload);
+
+      // Create/update estimation chart separately if items exist
+      if (estimationItems.length > 0) {
+        const estimatePayload = {
+          deal_id: Number(id),
+          estimation_chart: estimationItems.map(item => ({
+            product_id: item.product_id,
+            product_service: item.product_service,
+            description: item.description || "",
+            qty: item.qty,
+            unit_price: item.unit_price,
+            original_currency: item.original_currency || formData.currency,
+            original_price: item.original_price || item.unit_price,
+          })),
+          standard_discount_percentage: parseFloat(formData.standard_discount_percentage || "0"),
+          special_discount_percentage: parseFloat(formData.special_discount_percentage || "0"),
+          tax_percentage: parseFloat(formData.tax_percentage || "0"),
+          currency: formData.currency,
+        };
+
+        await createEstimate(estimatePayload);
+      }
+
       toast.success("Deal updated successfully!");
       router.push("/crm/deals");
     } catch (error: any) {
@@ -763,97 +878,544 @@ const EditDeal = () => {
               <Card className="mb-3 border-0 bg-light">
                 <Card.Body>
                   <h5 className="fw-bold mb-4 text-success">ESTIMATION CHART</h5>
-                  {estimates.length > 0 ? (
-                    <>
-                      {estimates.map((estimate: any, estimateIndex: number) => (
-                        <Card key={estimate.id} className="mb-3 border bg-white">
-                          <Card.Body>
-                            <div className="d-flex justify-content-between align-items-center mb-3">
-                              <div>
-                                <h6 className="mb-0">Version {estimate.version}</h6>
-                                <small className="text-muted">
-                                  Created: {new Date(estimate.created_at).toLocaleDateString()}
-                                  {estimate.is_final && <Badge bg="success" className="ms-2">Final</Badge>}
-                                </small>
-                              </div>
-                              <div className="d-flex gap-2">
-                                <Button variant="outline-info" size="sm">
-                                  <Eye size={14} className="me-1" />
-                                  View Details
+                  
+                  {/* Deal-level settings */}
+                  <Row className="mb-4">
+                    <Col md={4}>
+                      <Form.Group className="mb-3">
+                        <Form.Label>Tax Percentage (%)</Form.Label>
+                        <Form.Control
+                          type="number"
+                          min="0"
+                          max="100"
+                          step="0.01"
+                          value={formData.tax_percentage}
+                          onChange={(e) => setFormData({ ...formData, tax_percentage: e.target.value })}
+                          placeholder="0"
+                        />
+                      </Form.Group>
+                    </Col>
+                    <Col md={4}>
+                      <Form.Group className="mb-3">
+                        <Form.Label>Standard Discount (%)</Form.Label>
+                        <Form.Control
+                          type="number"
+                          min="0"
+                          max="100"
+                          step="0.01"
+                          value={formData.standard_discount_percentage}
+                          onChange={(e) => setFormData({ ...formData, standard_discount_percentage: e.target.value })}
+                          placeholder="0"
+                        />
+                      </Form.Group>
+                    </Col>
+                    <Col md={4}>
+                      <Form.Group className="mb-3">
+                        <Form.Label>Special Discount (%)</Form.Label>
+                        <Form.Control
+                          type="number"
+                          min="0"
+                          max="100"
+                          step="0.01"
+                          value={formData.special_discount_percentage}
+                          onChange={(e) => setFormData({ ...formData, special_discount_percentage: e.target.value })}
+                          placeholder="0"
+                        />
+                      </Form.Group>
+                    </Col>
+                  </Row>
+
+                  {/* Action Buttons */}
+                  <div className="d-flex justify-content-between align-items-center mb-3">
+                    <Button
+                      variant="outline-info"
+                      size="sm"
+                      onClick={() => setShowRevisionHistoryModal(true)}
+                    >
+                      <History size={14} className="me-1" />
+                      Revision History
+                    </Button>
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={() => {
+                        setEditingItemIndex(null);
+                        setItemFormData({
+                          product_id: null,
+                          product_service: "",
+                          description: "",
+                          qty: 1,
+                          unit_price: 0,
+                        });
+                        setShowAddItemModal(true);
+                      }}
+                    >
+                      <Plus size={14} className="me-1" />
+                      Add Item
+                    </Button>
+                  </div>
+
+                  {/* Estimation Items Table */}
+                  <div className="table-responsive">
+                    <Table size="sm" hover className="bg-white">
+                      <thead>
+                        <tr>
+                          <th>#</th>
+                          <th>Product/Service</th>
+                          <th>Description</th>
+                          <th>Qty</th>
+                          <th>Unit Price</th>
+                          <th>Sub Total</th>
+                          <th>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {estimationItems.map((item, index) => {
+                          const subtotal = item.qty * item.unit_price;
+                          return (
+                            <tr key={index}>
+                              <td>{index + 1}</td>
+                              <td>{item.product_service}</td>
+                              <td>{item.description || 'N/A'}</td>
+                              <td>{item.qty}</td>
+                              <td>{item.unit_price.toLocaleString()} {formData.currency}</td>
+                              <td className="fw-bold">{subtotal.toLocaleString()} {formData.currency}</td>
+                              <td>
+                                <Button
+                                  variant="link"
+                                  size="sm"
+                                  className="p-0 me-2"
+                                  title="Edit Item"
+                                  onClick={() => {
+                                    setEditingItemIndex(index);
+                                    setItemFormData({
+                                      product_id: item.product_id,
+                                      product_service: item.product_service,
+                                      description: item.description,
+                                      qty: item.qty,
+                                      unit_price: item.unit_price,
+                                    });
+                                    setShowAddItemModal(true);
+                                  }}
+                                >
+                                  <Edit size={14} />
                                 </Button>
-                              </div>
-                            </div>
-                            
-                            {estimate.estimation_chart && estimate.estimation_chart.length > 0 && (
-                              <div className="table-responsive">
-                                <Table size="sm" hover>
-                                  <thead>
-                                    <tr>
-                                      <th>#</th>
-                                      <th>Product/Service</th>
-                                      <th>Description</th>
-                                      <th>Qty</th>
-                                      <th>Unit Price</th>
-                                      <th>Currency</th>
-                                      <th>Sub Total</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody>
-                                    {estimate.estimation_chart.map((item: any, itemIndex: number) => (
-                                      <tr key={itemIndex}>
-                                        <td>{itemIndex + 1}</td>
-                                        <td>{item.product_service}</td>
-                                        <td>{item.description || 'N/A'}</td>
-                                        <td>{item.qty}</td>
-                                        <td>{item.unit_price?.toLocaleString() || 0}</td>
-                                        <td>
-                                          <Badge bg="secondary">{item.original_currency || estimate.currency}</Badge>
-                                        </td>
-                                        <td className="fw-bold">
-                                          {(item.qty * item.unit_price).toLocaleString()} {item.original_currency || estimate.currency}
-                                        </td>
-                                      </tr>
-                                    ))}
-                                  </tbody>
-                                  <tfoot>
-                                    <tr>
-                                      <td colSpan={6} className="text-end fw-bold">Subtotal:</td>
-                                      <td className="fw-bold">{estimate.grand_total} {estimate.currency}</td>
-                                    </tr>
-                                    {parseFloat(estimate.discount_amount || 0) > 0 && (
-                                      <tr>
-                                        <td colSpan={6} className="text-end">Discount ({estimate.standard_discount_percentage}%):</td>
-                                        <td>-{estimate.discount_amount} {estimate.currency}</td>
-                                      </tr>
-                                    )}
-                                    <tr>
-                                      <td colSpan={6} className="text-end fw-bold">Tax ({estimate.tax_percentage}%):</td>
-                                      <td className="fw-bold">
-                                        {((parseFloat(estimate.grand_total || 0) - parseFloat(estimate.discount_amount || 0)) * parseFloat(estimate.tax_percentage || 0) / 100).toFixed(2)} {estimate.currency}
-                                      </td>
-                                    </tr>
-                                    <tr className="table-primary">
-                                      <td colSpan={6} className="text-end fw-bold">Net Value:</td>
-                                      <td className="fw-bold">{estimate.net_value} {estimate.currency}</td>
-                                    </tr>
-                                  </tfoot>
-                                </Table>
-                              </div>
+                                <Button
+                                  variant="link"
+                                  size="sm"
+                                  className="p-0 text-danger"
+                                  title="Delete Item"
+                                  onClick={() => {
+                                    if (window.confirm('Are you sure you want to delete this item?')) {
+                                      setEstimationItems(estimationItems.filter((_, i) => i !== index));
+                                    }
+                                  }}
+                                >
+                                  <Trash2 size={14} />
+                                </Button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                        {estimationItems.length === 0 && (
+                          <tr>
+                            <td colSpan={7} className="text-center text-muted py-4">
+                              <Package size={32} className="text-muted mb-2" />
+                              <div>No items in estimation chart</div>
+                              <small>Click "Add Item" to add products or services</small>
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                      {estimationItems.length > 0 && (() => {
+                        const grandTotal = estimationItems.reduce((sum, item) => sum + (item.qty * item.unit_price), 0);
+                        const standardDiscount = (grandTotal * parseFloat(formData.standard_discount_percentage || "0")) / 100;
+                        const specialDiscount = ((grandTotal - standardDiscount) * parseFloat(formData.special_discount_percentage || "0")) / 100;
+                        const totalDiscount = standardDiscount + specialDiscount;
+                        const subtotalAfterDiscount = grandTotal - totalDiscount;
+                        const taxAmount = (subtotalAfterDiscount * parseFloat(formData.tax_percentage || "0")) / 100;
+                        const netValue = subtotalAfterDiscount + taxAmount;
+                        return (
+                          <tfoot>
+                            <tr>
+                              <td colSpan={5} className="text-end fw-bold">Subtotal:</td>
+                              <td className="fw-bold">{grandTotal.toFixed(2)} {formData.currency}</td>
+                              <td></td>
+                            </tr>
+                            {totalDiscount > 0 && (
+                              <tr>
+                                <td colSpan={5} className="text-end">
+                                  Discount ({parseFloat(formData.standard_discount_percentage || "0") + parseFloat(formData.special_discount_percentage || "0")}%):
+                                </td>
+                                <td>-{totalDiscount.toFixed(2)} {formData.currency}</td>
+                                <td></td>
+                              </tr>
                             )}
-                          </Card.Body>
-                        </Card>
-                      ))}
-                    </>
-                  ) : (
-                    <div className="text-center text-muted p-5 border rounded bg-white">
-                      <FileText size={48} className="mb-3 text-muted" />
-                      <p className="mb-0">No estimation charts available</p>
-                      <small>Estimation charts will appear here when created</small>
-                    </div>
-                  )}
+                            {parseFloat(formData.tax_percentage || "0") > 0 && (
+                              <tr>
+                                <td colSpan={5} className="text-end fw-bold">Tax ({formData.tax_percentage}%):</td>
+                                <td className="fw-bold">{taxAmount.toFixed(2)} {formData.currency}</td>
+                                <td></td>
+                              </tr>
+                            )}
+                            <tr className="table-primary">
+                              <td colSpan={5} className="text-end fw-bold">Net Value:</td>
+                              <td className="fw-bold">{netValue.toFixed(2)} {formData.currency}</td>
+                              <td></td>
+                            </tr>
+                          </tfoot>
+                        );
+                      })()}
+                    </Table>
+                  </div>
                 </Card.Body>
               </Card>
             )}
+
+            {/* Add/Edit Item Modal */}
+            <Modal show={showAddItemModal} onHide={() => {
+              setShowAddItemModal(false);
+              setEditingItemIndex(null);
+              setItemFormData({
+                product_id: null,
+                product_service: "",
+                description: "",
+                qty: 1,
+                unit_price: 0,
+              });
+            }} size="lg" centered>
+              <Modal.Header closeButton>
+                <Modal.Title>{editingItemIndex !== null ? 'Edit Item' : 'Add New Item'}</Modal.Title>
+              </Modal.Header>
+              <Form onSubmit={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const selectedProduct = products.find(p => p.id === itemFormData.product_id);
+                const newItem = {
+                  product_id: itemFormData.product_id!,
+                  product_service: itemFormData.product_service,
+                  description: itemFormData.description,
+                  qty: itemFormData.qty,
+                  unit_price: itemFormData.unit_price,
+                  original_currency: selectedProduct?.currency || formData.currency,
+                  original_price: parseFloat(selectedProduct?.price || "0") || itemFormData.unit_price,
+                };
+
+                if (editingItemIndex !== null) {
+                  const updated = [...estimationItems];
+                  updated[editingItemIndex] = newItem;
+                  setEstimationItems(updated);
+                } else {
+                  setEstimationItems([...estimationItems, newItem]);
+                }
+
+                setShowAddItemModal(false);
+                setEditingItemIndex(null);
+                setItemFormData({
+                  product_id: null,
+                  product_service: "",
+                  description: "",
+                  qty: 1,
+                  unit_price: 0,
+                });
+              }} noValidate>
+                <Modal.Body>
+                  <Row className="g-3">
+                    <Col md={12}>
+                      <Form.Group>
+                        <Form.Label>Product <span className="text-danger">*</span></Form.Label>
+                        <Select
+                          value={itemFormData.product_id ? {
+                            value: itemFormData.product_id,
+                            label: itemFormData.product_service || products.find(p => p.id === itemFormData.product_id)?.name || ""
+                          } : null}
+                          onChange={(selectedOption: any) => {
+                            const product = products.find(p => p.id === selectedOption?.value);
+                            if (product) {
+                              setItemFormData({
+                                ...itemFormData,
+                                product_id: product.id,
+                                product_service: product.name,
+                                unit_price: parseFloat(product.price) || 0,
+                              });
+                            }
+                          }}
+                          options={products.map(product => ({
+                            value: product.id,
+                            label: `${product.name} (${product.sku}) - ${product.currency} ${product.price}`,
+                          }))}
+                          placeholder="Select a product"
+                          isSearchable
+                          isLoading={loadingProducts}
+                          isDisabled={editingItemIndex !== null}
+                        />
+                      </Form.Group>
+                    </Col>
+                    <Col md={12}>
+                      <Form.Group>
+                        <Form.Label>Description</Form.Label>
+                        <Form.Control
+                          as="textarea"
+                          rows={3}
+                          placeholder="Enter product description or specifications"
+                          value={itemFormData.description}
+                          onChange={(e) => setItemFormData({ ...itemFormData, description: e.target.value })}
+                        />
+                      </Form.Group>
+                    </Col>
+                    <Col md={6}>
+                      <Form.Group>
+                        <Form.Label>Quantity <span className="text-danger">*</span></Form.Label>
+                        <Form.Control
+                          type="number"
+                          min="1"
+                          placeholder="Enter quantity"
+                          value={itemFormData.qty}
+                          onChange={(e) => setItemFormData({ ...itemFormData, qty: parseInt(e.target.value) || 1 })}
+                          required
+                        />
+                      </Form.Group>
+                    </Col>
+                    <Col md={6}>
+                      <Form.Group>
+                        <Form.Label>Unit Price <span className="text-danger">*</span></Form.Label>
+                        <Form.Control
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          placeholder="Enter unit price"
+                          value={itemFormData.unit_price}
+                          onChange={(e) => setItemFormData({ ...itemFormData, unit_price: parseFloat(e.target.value) || 0 })}
+                          required
+                        />
+                      </Form.Group>
+                    </Col>
+                    <Col md={12}>
+                      <Card className="bg-light border-0">
+                        <Card.Body>
+                          <div className="d-flex justify-content-between align-items-center">
+                            <span className="text-muted">Sub Total:</span>
+                            <h5 className="mb-0 text-success">
+                              {formData.currency} {(itemFormData.qty * itemFormData.unit_price).toFixed(2)}
+                            </h5>
+                          </div>
+                        </Card.Body>
+                      </Card>
+                    </Col>
+                  </Row>
+                </Modal.Body>
+                <Modal.Footer>
+                  <Button variant="outline-secondary" onClick={() => {
+                    setShowAddItemModal(false);
+                    setEditingItemIndex(null);
+                    setItemFormData({
+                      product_id: null,
+                      product_service: "",
+                      description: "",
+                      qty: 1,
+                      unit_price: 0,
+                    });
+                  }}>
+                    Cancel
+                  </Button>
+                  <Button 
+                    variant="primary" 
+                    type="button"
+                    disabled={!itemFormData.product_id || itemFormData.qty < 1 || itemFormData.unit_price <= 0}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      const selectedProduct = products.find(p => p.id === itemFormData.product_id);
+                      const newItem = {
+                        product_id: itemFormData.product_id!,
+                        product_service: itemFormData.product_service,
+                        description: itemFormData.description,
+                        qty: itemFormData.qty,
+                        unit_price: itemFormData.unit_price,
+                        original_currency: selectedProduct?.currency || formData.currency,
+                        original_price: parseFloat(selectedProduct?.price || "0") || itemFormData.unit_price,
+                      };
+
+                      if (editingItemIndex !== null) {
+                        const updated = [...estimationItems];
+                        updated[editingItemIndex] = newItem;
+                        setEstimationItems(updated);
+                      } else {
+                        setEstimationItems([...estimationItems, newItem]);
+                      }
+
+                      setShowAddItemModal(false);
+                      setEditingItemIndex(null);
+                      setItemFormData({
+                        product_id: null,
+                        product_service: "",
+                        description: "",
+                        qty: 1,
+                        unit_price: 0,
+                      });
+                    }}
+                  >
+                    {editingItemIndex !== null ? 'Update Item' : 'Add Item'}
+                  </Button>
+                </Modal.Footer>
+              </Form>
+            </Modal>
+
+            {/* Revision History Modal */}
+            <Modal show={showRevisionHistoryModal} onHide={() => setShowRevisionHistoryModal(false)} size="lg" centered>
+              <Modal.Header closeButton>
+                <Modal.Title>
+                  <History size={20} className="me-2" />
+                  Revision History
+                </Modal.Title>
+              </Modal.Header>
+              <Modal.Body>
+                {estimates.length > 0 ? (
+                  <>
+                    <div className="table-responsive">
+                      <Table hover>
+                        <thead className="bg-light">
+                          <tr>
+                            <th>Version</th>
+                            <th>Created</th>
+                            <th>Grand Total</th>
+                            <th>Net Value</th>
+                            <th>Items</th>
+                            <th>Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {estimates.map((estimate: any, index: number) => {
+                            const isCurrent = index === estimates.length - 1;
+                            const grandTotal = parseFloat(estimate.grand_total || "0");
+                            const netValue = parseFloat(estimate.net_value || "0");
+                            const itemCount = estimate.estimation_chart?.length || 0;
+                            
+                            return (
+                              <tr key={estimate.id || index}>
+                                <td>
+                                  <Badge bg={isCurrent ? 'success' : 'secondary'}>
+                                    {estimate.version || `v${estimates.length - index}.0`}
+                                  </Badge>
+                                  {isCurrent && (
+                                    <Badge bg="info" className="ms-2">Current</Badge>
+                                  )}
+                                </td>
+                                <td>
+                                  <div className="d-flex align-items-center">
+                                    <Calendar size={14} className="me-2 text-muted" />
+                                    {new Date(estimate.created_at).toLocaleString()}
+                                  </div>
+                                </td>
+                                <td className="fw-bold text-success">
+                                  {grandTotal.toLocaleString()} {estimate.currency || formData.currency}
+                                </td>
+                                <td>
+                                  {netValue.toLocaleString()} {estimate.currency || formData.currency}
+                                </td>
+                                <td>
+                                  <Badge bg="secondary">{itemCount} items</Badge>
+                                </td>
+                                <td>
+                                  <div className="d-flex gap-1">
+                                    <Button
+                                      variant="link"
+                                      size="sm"
+                                      className="p-1"
+                                      title="View Details"
+                                      onClick={() => {
+                                        // Show details in a simple way - could be expanded to a detail modal
+                                        const items = estimate.estimation_chart || [];
+                                        const itemsList = items.map((item: any, idx: number) => 
+                                          `${idx + 1}. ${item.product_service} - Qty: ${item.qty} - Price: ${item.unit_price}`
+                                        ).join('\n');
+                                        alert(`Version ${estimate.version || `v${estimates.length - index}.0`}\n\nItems:\n${itemsList || 'No items'}`);
+                                      }}
+                                    >
+                                      <Eye size={14} />
+                                    </Button>
+                                    {!isCurrent && (
+                                      <Button
+                                        variant="link"
+                                        size="sm"
+                                        className="p-1 text-info"
+                                        title="Restore Version"
+                                        onClick={() => {
+                                          if (window.confirm(`Are you sure you want to restore ${estimate.version || `v${estimates.length - index}.0`}?\n\nThis will replace the current estimation with the selected version.`)) {
+                                            // Restore the revision items
+                                            if (estimate.estimation_chart && estimate.estimation_chart.length > 0) {
+                                              setEstimationItems(estimate.estimation_chart.map((item: any) => ({
+                                                product_id: item.product_id || 0,
+                                                product_service: item.product_service || "",
+                                                description: item.description || "",
+                                                qty: item.qty || 1,
+                                                unit_price: item.unit_price || 0,
+                                                original_currency: item.original_currency || estimate.currency || formData.currency,
+                                                original_price: item.original_price || item.unit_price || 0,
+                                              })));
+                                              
+                                              // Also restore tax and discount percentages if available
+                                              if (estimate.tax_percentage) {
+                                                setFormData(prev => ({ ...prev, tax_percentage: estimate.tax_percentage.toString() }));
+                                              }
+                                              if (estimate.standard_discount_percentage) {
+                                                setFormData(prev => ({ ...prev, standard_discount_percentage: estimate.standard_discount_percentage.toString() }));
+                                              }
+                                              if (estimate.special_discount_percentage) {
+                                                setFormData(prev => ({ ...prev, special_discount_percentage: estimate.special_discount_percentage.toString() }));
+                                              }
+                                              
+                                              setShowRevisionHistoryModal(false);
+                                              toast.success(`${estimate.version || `v${estimates.length - index}.0`} has been restored successfully!`);
+                                            } else {
+                                              toast.error("This revision has no items to restore");
+                                            }
+                                          }
+                                        }}
+                                      >
+                                        <RefreshCw size={14} />
+                                      </Button>
+                                    )}
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </Table>
+                    </div>
+                    
+                    <Card className="border-0 bg-light mt-3">
+                      <Card.Body>
+                        <Row>
+                          <Col md={6}>
+                            <small className="text-muted">Total Revisions</small>
+                            <div className="fw-bold">{estimates.length}</div>
+                          </Col>
+                          <Col md={6}>
+                            <small className="text-muted">Latest Update</small>
+                            <div className="fw-bold">
+                              {estimates.length > 0 ? new Date(estimates[estimates.length - 1].created_at).toLocaleString() : 'N/A'}
+                            </div>
+                          </Col>
+                        </Row>
+                      </Card.Body>
+                    </Card>
+                  </>
+                ) : (
+                  <div className="text-center text-muted p-5">
+                    <History size={48} className="mb-3 text-muted" />
+                    <p className="mb-0">No revision history available</p>
+                    <small>Revisions will appear here when estimates are created</small>
+                  </div>
+                )}
+              </Modal.Body>
+              <Modal.Footer>
+                <Button variant="secondary" onClick={() => setShowRevisionHistoryModal(false)}>
+                  Close
+                </Button>
+              </Modal.Footer>
+            </Modal>
           </div>
 
           {/* Form Footer */}

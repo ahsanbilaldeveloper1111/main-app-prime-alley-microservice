@@ -63,7 +63,6 @@ const EditLead = () => {
     lead_potential: "",
     other_information: {} as Record<string, any>,
     campaign_field_values: {} as Record<string, any>,
-    called_by: null as number | null,
     contact_persons: [] as Array<{
       title: string;
       name: string;
@@ -143,7 +142,6 @@ const EditLead = () => {
         
         // Convert user_extension to number (it might be number or string)
         const userExtension = leadDataAny.user_extension ? Number(leadDataAny.user_extension) : null;
-        const calledBy = leadDataAny.called_by ? Number(leadDataAny.called_by) : null;
 
         // Handle other_information - it might be an array or object
         let otherInformation: Record<string, any> = {};
@@ -183,7 +181,6 @@ const EditLead = () => {
           lead_potential: leadDataAny.lead_potential || "",
           other_information: otherInformation,
           campaign_field_values: leadDataAny.campaign_field_values || {},
-          called_by: calledBy,
           contact_persons: contactPersonsArray,
         });
 
@@ -433,7 +430,6 @@ const EditLead = () => {
         ...(formData.lead_potential && { lead_potential: formData.lead_potential }),
         ...(formData.other_information && Object.keys(formData.other_information).length > 0 && { other_information: formData.other_information }),
         ...(formData.campaign_field_values && Object.keys(formData.campaign_field_values).length > 0 && { campaign_field_values: formData.campaign_field_values }),
-        ...(formData.called_by && { called_by: String(formData.called_by) }),
         ...(formData.contact_persons.length > 0 && { contact_persons: formData.contact_persons }),
       };
 
@@ -824,33 +820,6 @@ const EditLead = () => {
                                     label: `#${data.id} - ${data.phone || "No Phone"}`,
                                   }))}
                                   placeholder="Select CRM data (Optional)"
-                                  isClearable
-                                  isSearchable
-                                />
-                              </Form.Group>
-                            </Col>
-                            <Col md={6}>
-                              <Form.Group className="mb-3">
-                                <Form.Label>Called By</Form.Label>
-                                <Select
-                                  value={
-                                    formData.called_by
-                                      ? {
-                                          value: formData.called_by,
-                                          label: extensions.find(
-                                            (ext: any) => Number(ext.id) === formData.called_by
-                                          )?.display_name || "",
-                                        }
-                                      : null
-                                  }
-                                  onChange={(selectedOption: any) => {
-                                    handleInputChange("called_by", selectedOption?.value ? Number(selectedOption.value) : null);
-                                  }}
-                                  options={extensions.map((extension: any) => ({
-                                    value: Number(extension.id),
-                                    label: extension.display_name,
-                                  }))}
-                                  placeholder="Select user (Optional)"
                                   isClearable
                                   isSearchable
                                 />

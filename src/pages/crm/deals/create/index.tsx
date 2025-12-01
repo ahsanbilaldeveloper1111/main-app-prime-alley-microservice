@@ -5,11 +5,15 @@ import BreadcrumbItem from "@common/BreadcrumbItem";
 import {
   createDeal,
   getStages,
+  getLead,
+  getCrmProducts,
+  CrmProduct,
   StageData,
 } from "@utils/crm";
 import { GetHierarchyData } from "@utils/users";
-import { Button, Row, Col, Form, Card, Badge } from "react-bootstrap";
-import { CheckCircle, ChevronLeft, ChevronRight, ArrowLeft } from "lucide-react";
+import { Button, Row, Col, Form, Card, Badge, Table, Modal } from "react-bootstrap";
+import { CheckCircle, ChevronLeft, ChevronRight, ArrowLeft, Plus, Edit, Trash2, Package } from "lucide-react";
+import Select from 'react-select';
 import Link from "next/link";
 import { toast } from "react-toastify";
 import { useRouter } from "next/router";
@@ -26,10 +30,34 @@ const CreateDeal = () => {
   const [loading, setLoading] = useState(false);
   const [stages, setStages] = useState<StageData[]>([]);
   const [extensions, setExtensions] = useState<any[]>([]);
+  const [products, setProducts] = useState<CrmProduct[]>([]);
+  const [loadingProducts, setLoadingProducts] = useState(false);
+  const [estimationItems, setEstimationItems] = useState<Array<{
+    product_id: number;
+    product_service: string;
+    description: string;
+    qty: number;
+    unit_price: number;
+    original_currency: string;
+    original_price: number;
+  }>>([]);
+  const [showAddItemModal, setShowAddItemModal] = useState(false);
+  const [editingItemIndex, setEditingItemIndex] = useState<number | null>(null);
+  const [itemFormData, setItemFormData] = useState({
+    product_id: null as number | null,
+    product_service: "",
+    description: "",
+    qty: 1,
+    unit_price: 0,
+  });
+  const [taxPercentage, setTaxPercentage] = useState(0);
+  const [standardDiscountPercentage, setStandardDiscountPercentage] = useState(0);
+  const [specialDiscountPercentage, setSpecialDiscountPercentage] = useState(0);
   
   const [formData, setFormData] = useState({
     name: "",
     ticket_id: null as number | null,
+    lead_id: null as number | null,
     stage_id: undefined as number | undefined,
     assigned_to: null as string | null,
     expected_close_date: "",
@@ -53,12 +81,93 @@ const CreateDeal = () => {
     contract_received: false,
     follow_up_date: "",
     currency: "USD",
+    tax_percentage: "0",
+    standard_discount_percentage: "0",
+    special_discount_percentage: "0",
   });
+  const [loadingLead, setLoadingLead] = useState(false);
+  const [sourceLead, setSourceLead] = useState<any>(null);
 
   useEffect(() => {
     fetchStages();
     fetchExtensions();
+    fetchProducts();
   }, []);
+
+  const fetchProducts = async () => {
+    try {
+      setLoadingProducts(true);
+      const response = await getCrmProducts({ per_page: 100 });
+      setProducts(response.data || []);
+    } catch (error) {
+      console.error("Failed to fetch products:", error);
+    } finally {
+      setLoadingProducts(false);
+    }
+  };
+
+  // Fetch lead data if lead_id is in query params
+  useEffect(() => {
+    const fetchLeadData = async () => {
+      if (router.isReady && router.query.lead_id) {
+        try {
+          setLoadingLead(true);
+          const leadId = Number(router.query.lead_id);
+          const leadData: any = await getLead(leadId);
+          setSourceLead(leadData);
+
+          // Parse contact_persons if it's a string
+          let contactPersonsArray: any[] = [];
+          if (leadData.contact_persons) {
+            if (typeof leadData.contact_persons === 'string') {
+              try {
+                contactPersonsArray = JSON.parse(leadData.contact_persons);
+              } catch (e) {
+                console.error("Failed to parse contact_persons:", e);
+                contactPersonsArray = [];
+              }
+            } else if (Array.isArray(leadData.contact_persons)) {
+              contactPersonsArray = leadData.contact_persons;
+            }
+          }
+
+          // Get the best contact person - prioritize one with email, then phone, then first one
+          const primaryContact = contactPersonsArray.find(cp => cp.email) || 
+                                 contactPersonsArray.find(cp => cp.phone) || 
+                                 contactPersonsArray[0] || {};
+
+          // Calculate default expected close date (30 days from now)
+          const defaultCloseDate = new Date();
+          defaultCloseDate.setDate(defaultCloseDate.getDate() + 30);
+          const formattedCloseDate = defaultCloseDate.toISOString().split('T')[0];
+
+          // Auto-fill form data from lead
+          setFormData(prev => ({
+            ...prev,
+            lead_id: leadId,
+            ticket_id: leadId, // ticket_id should be the lead id when converting from lead
+            name: leadData.name || "",
+            assigned_to: leadData.user_extension ? String(leadData.user_extension) : null,
+            expected_close_date: formattedCloseDate,
+            company_name: leadData.company_name || "",
+            industry: leadData.industry || "",
+            decision_maker_title: primaryContact.title || "",
+            decision_maker_name: primaryContact.name || "",
+            decision_maker_phone_country_code: primaryContact.phone_country_code || "",
+            decision_maker_phone: primaryContact.phone || "",
+            decision_maker_email: primaryContact.email || "",
+          }));
+        } catch (error) {
+          console.error("Failed to fetch lead:", error);
+          toast.error("Failed to load lead data for conversion");
+        } finally {
+          setLoadingLead(false);
+        }
+      }
+    };
+
+    fetchLeadData();
+  }, [router.isReady, router.query.lead_id]);
 
   const fetchStages = async () => {
     try {
@@ -114,12 +223,24 @@ const CreateDeal = () => {
         contract_received: formData.contract_received,
         follow_up_date: formData.follow_up_date || "",
         currency: formData.currency,
+        tax_percentage: formData.tax_percentage || "0",
+        standard_discount_percentage: formData.standard_discount_percentage || "0",
+        special_discount_percentage: formData.special_discount_percentage || "0",
       };
 
+      // ticket_id is required when converting from lead
       if (formData.ticket_id) {
         payload.ticket_id = formData.ticket_id;
+      } else if (formData.lead_id) {
+        // If ticket_id is not set but lead_id is, use lead_id as ticket_id
+        payload.ticket_id = formData.lead_id;
       }
 
+      if (formData.lead_id) {
+        payload.lead_id = formData.lead_id;
+      }
+
+      // Note: Estimation chart is created separately in edit page, not during deal creation
       await createDeal(payload);
       toast.success("Deal created successfully!");
       router.push("/crm/deals");
@@ -143,7 +264,9 @@ const CreateDeal = () => {
         <div className="d-flex justify-content-between align-items-center mb-4">
           <div>
             <h2 className="mb-1 fw-bold">Create New Deal</h2>
-            <p className="text-muted mb-0">Fill in the details below to create a new deal</p>
+            <p className="text-muted mb-0">
+              {sourceLead ? `Converting from Lead: ${sourceLead.name}` : "Fill in the details below to create a new deal"}
+            </p>
           </div>
           <Link href="/crm/deals">
             <Button variant="outline-secondary">
@@ -152,6 +275,32 @@ const CreateDeal = () => {
             </Button>
           </Link>
         </div>
+
+        {sourceLead && (
+          <Card className="mb-3 border-0 bg-info bg-opacity-10">
+            <Card.Body>
+              <div className="d-flex align-items-center gap-2">
+                <Badge bg="info">Converted from Lead</Badge>
+                <span className="small text-muted">
+                  Lead: <strong>{sourceLead.name}</strong>
+                  {sourceLead.company_name && ` • Company: ${sourceLead.company_name}`}
+                  {sourceLead.id && ` • ID: #${sourceLead.id}`}
+                </span>
+              </div>
+            </Card.Body>
+          </Card>
+        )}
+
+        {loadingLead && (
+          <Card className="mb-3 border-0">
+            <Card.Body className="text-center py-4">
+              <div className="spinner-border text-primary" role="status">
+                <span className="visually-hidden">Loading lead data...</span>
+              </div>
+              <p className="mt-2 text-muted">Loading lead information...</p>
+            </Card.Body>
+          </Card>
+        )}
 
         <Form onSubmit={handleSubmit}>
           {/* Timeline Navigation */}
@@ -578,15 +727,385 @@ const CreateDeal = () => {
               </Card>
             )}
 
-            {/* Step 4: Estimation - Placeholder for now */}
+            {/* Step 4: Estimation Chart */}
             {formStep === 4 && (
               <Card className="mb-3 border-0 bg-light">
                 <Card.Body>
                   <h5 className="fw-bold mb-4 text-success">ESTIMATION CHART</h5>
-                  <p className="text-muted">Estimation chart functionality will be added in a future update.</p>
+                  
+                  {/* Deal-level settings */}
+                  <Row className="mb-4">
+                    <Col md={4}>
+                      <Form.Group className="mb-3">
+                        <Form.Label>Tax Percentage (%)</Form.Label>
+                        <Form.Control
+                          type="number"
+                          min="0"
+                          max="100"
+                          step="0.01"
+                          value={formData.tax_percentage}
+                          onChange={(e) => setFormData({ ...formData, tax_percentage: e.target.value })}
+                          placeholder="0"
+                        />
+                      </Form.Group>
+                    </Col>
+                    <Col md={4}>
+                      <Form.Group className="mb-3">
+                        <Form.Label>Standard Discount (%)</Form.Label>
+                        <Form.Control
+                          type="number"
+                          min="0"
+                          max="100"
+                          step="0.01"
+                          value={formData.standard_discount_percentage}
+                          onChange={(e) => setFormData({ ...formData, standard_discount_percentage: e.target.value })}
+                          placeholder="0"
+                        />
+                      </Form.Group>
+                    </Col>
+                    <Col md={4}>
+                      <Form.Group className="mb-3">
+                        <Form.Label>Special Discount (%)</Form.Label>
+                        <Form.Control
+                          type="number"
+                          min="0"
+                          max="100"
+                          step="0.01"
+                          value={formData.special_discount_percentage}
+                          onChange={(e) => setFormData({ ...formData, special_discount_percentage: e.target.value })}
+                          placeholder="0"
+                        />
+                      </Form.Group>
+                    </Col>
+                  </Row>
+
+                  {/* Add Item Button */}
+                  <div className="d-flex justify-content-end mb-3">
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={() => {
+                        setEditingItemIndex(null);
+                        setItemFormData({
+                          product_id: null,
+                          product_service: "",
+                          description: "",
+                          qty: 1,
+                          unit_price: 0,
+                        });
+                        setShowAddItemModal(true);
+                      }}
+                    >
+                      <Plus size={14} className="me-1" />
+                      Add Item
+                    </Button>
+                  </div>
+
+                  {/* Estimation Items Table */}
+                  <div className="table-responsive">
+                    <Table size="sm" hover className="bg-white">
+                      <thead>
+                        <tr>
+                          <th>#</th>
+                          <th>Product/Service</th>
+                          <th>Description</th>
+                          <th>Qty</th>
+                          <th>Unit Price</th>
+                          <th>Sub Total</th>
+                          <th>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {estimationItems.map((item, index) => {
+                          const subtotal = item.qty * item.unit_price;
+                          return (
+                            <tr key={index}>
+                              <td>{index + 1}</td>
+                              <td>{item.product_service}</td>
+                              <td>{item.description || 'N/A'}</td>
+                              <td>{item.qty}</td>
+                              <td>{item.unit_price.toLocaleString()} {formData.currency}</td>
+                              <td className="fw-bold">{subtotal.toLocaleString()} {formData.currency}</td>
+                              <td>
+                                <Button
+                                  variant="link"
+                                  size="sm"
+                                  className="p-0 me-2"
+                                  title="Edit Item"
+                                  onClick={() => {
+                                    setEditingItemIndex(index);
+                                    setItemFormData({
+                                      product_id: item.product_id,
+                                      product_service: item.product_service,
+                                      description: item.description,
+                                      qty: item.qty,
+                                      unit_price: item.unit_price,
+                                    });
+                                    setShowAddItemModal(true);
+                                  }}
+                                >
+                                  <Edit size={14} />
+                                </Button>
+                                <Button
+                                  variant="link"
+                                  size="sm"
+                                  className="p-0 text-danger"
+                                  title="Delete Item"
+                                  onClick={() => {
+                                    if (window.confirm('Are you sure you want to delete this item?')) {
+                                      setEstimationItems(estimationItems.filter((_, i) => i !== index));
+                                    }
+                                  }}
+                                >
+                                  <Trash2 size={14} />
+                                </Button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                        {estimationItems.length === 0 && (
+                          <tr>
+                            <td colSpan={7} className="text-center text-muted py-4">
+                              <Package size={32} className="text-muted mb-2" />
+                              <div>No items in estimation chart</div>
+                              <small>Click "Add Item" to add products or services</small>
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                      {estimationItems.length > 0 && (() => {
+                        const grandTotal = estimationItems.reduce((sum, item) => sum + (item.qty * item.unit_price), 0);
+                        const standardDiscount = (grandTotal * parseFloat(formData.standard_discount_percentage || "0")) / 100;
+                        const specialDiscount = ((grandTotal - standardDiscount) * parseFloat(formData.special_discount_percentage || "0")) / 100;
+                        const totalDiscount = standardDiscount + specialDiscount;
+                        const subtotalAfterDiscount = grandTotal - totalDiscount;
+                        const taxAmount = (subtotalAfterDiscount * parseFloat(formData.tax_percentage || "0")) / 100;
+                        const netValue = subtotalAfterDiscount + taxAmount;
+                        return (
+                          <tfoot>
+                            <tr>
+                              <td colSpan={5} className="text-end fw-bold">Subtotal:</td>
+                              <td className="fw-bold">{grandTotal.toFixed(2)} {formData.currency}</td>
+                              <td></td>
+                            </tr>
+                            {totalDiscount > 0 && (
+                              <tr>
+                                <td colSpan={5} className="text-end">
+                                  Discount ({parseFloat(formData.standard_discount_percentage || "0") + parseFloat(formData.special_discount_percentage || "0")}%):
+                                </td>
+                                <td>-{totalDiscount.toFixed(2)} {formData.currency}</td>
+                                <td></td>
+                              </tr>
+                            )}
+                            {parseFloat(formData.tax_percentage || "0") > 0 && (
+                              <tr>
+                                <td colSpan={5} className="text-end fw-bold">Tax ({formData.tax_percentage}%):</td>
+                                <td className="fw-bold">{taxAmount.toFixed(2)} {formData.currency}</td>
+                                <td></td>
+                              </tr>
+                            )}
+                            <tr className="table-primary">
+                              <td colSpan={5} className="text-end fw-bold">Net Value:</td>
+                              <td className="fw-bold">{netValue.toFixed(2)} {formData.currency}</td>
+                              <td></td>
+                            </tr>
+                          </tfoot>
+                        );
+                      })()}
+                    </Table>
+                  </div>
                 </Card.Body>
               </Card>
             )}
+
+            {/* Add/Edit Item Modal */}
+            <Modal show={showAddItemModal} onHide={() => {
+              setShowAddItemModal(false);
+              setEditingItemIndex(null);
+              setItemFormData({
+                product_id: null,
+                product_service: "",
+                description: "",
+                qty: 1,
+                unit_price: 0,
+              });
+            }} size="lg" centered>
+              <Modal.Header closeButton>
+                <Modal.Title>{editingItemIndex !== null ? 'Edit Item' : 'Add New Item'}</Modal.Title>
+              </Modal.Header>
+              <Form onSubmit={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const selectedProduct = products.find(p => p.id === itemFormData.product_id);
+                const newItem = {
+                  product_id: itemFormData.product_id!,
+                  product_service: itemFormData.product_service,
+                  description: itemFormData.description,
+                  qty: itemFormData.qty,
+                  unit_price: itemFormData.unit_price,
+                  original_currency: selectedProduct?.currency || formData.currency,
+                  original_price: parseFloat(selectedProduct?.price || "0") || itemFormData.unit_price,
+                };
+
+                if (editingItemIndex !== null) {
+                  const updated = [...estimationItems];
+                  updated[editingItemIndex] = newItem;
+                  setEstimationItems(updated);
+                } else {
+                  setEstimationItems([...estimationItems, newItem]);
+                }
+
+                setShowAddItemModal(false);
+                setEditingItemIndex(null);
+                setItemFormData({
+                  product_id: null,
+                  product_service: "",
+                  description: "",
+                  qty: 1,
+                  unit_price: 0,
+                });
+              }} noValidate>
+                <Modal.Body>
+                  <Row className="g-3">
+                    <Col md={12}>
+                      <Form.Group>
+                        <Form.Label>Product <span className="text-danger">*</span></Form.Label>
+                        <Select
+                          value={itemFormData.product_id ? {
+                            value: itemFormData.product_id,
+                            label: itemFormData.product_service || products.find(p => p.id === itemFormData.product_id)?.name || ""
+                          } : null}
+                          onChange={(selectedOption: any) => {
+                            const product = products.find(p => p.id === selectedOption?.value);
+                            if (product) {
+                              setItemFormData({
+                                ...itemFormData,
+                                product_id: product.id,
+                                product_service: product.name,
+                                unit_price: parseFloat(product.price) || 0,
+                              });
+                            }
+                          }}
+                          options={products.map(product => ({
+                            value: product.id,
+                            label: `${product.name} (${product.sku}) - ${product.currency} ${product.price}`,
+                          }))}
+                          placeholder="Select a product"
+                          isSearchable
+                          isLoading={loadingProducts}
+                          isDisabled={editingItemIndex !== null}
+                        />
+                      </Form.Group>
+                    </Col>
+                    <Col md={12}>
+                      <Form.Group>
+                        <Form.Label>Description</Form.Label>
+                        <Form.Control
+                          as="textarea"
+                          rows={3}
+                          placeholder="Enter product description or specifications"
+                          value={itemFormData.description}
+                          onChange={(e) => setItemFormData({ ...itemFormData, description: e.target.value })}
+                        />
+                      </Form.Group>
+                    </Col>
+                    <Col md={6}>
+                      <Form.Group>
+                        <Form.Label>Quantity <span className="text-danger">*</span></Form.Label>
+                        <Form.Control
+                          type="number"
+                          min="1"
+                          placeholder="Enter quantity"
+                          value={itemFormData.qty}
+                          onChange={(e) => setItemFormData({ ...itemFormData, qty: parseInt(e.target.value) || 1 })}
+                          required
+                        />
+                      </Form.Group>
+                    </Col>
+                    <Col md={6}>
+                      <Form.Group>
+                        <Form.Label>Unit Price <span className="text-danger">*</span></Form.Label>
+                        <Form.Control
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          placeholder="Enter unit price"
+                          value={itemFormData.unit_price}
+                          onChange={(e) => setItemFormData({ ...itemFormData, unit_price: parseFloat(e.target.value) || 0 })}
+                          required
+                        />
+                      </Form.Group>
+                    </Col>
+                    <Col md={12}>
+                      <Card className="bg-light border-0">
+                        <Card.Body>
+                          <div className="d-flex justify-content-between align-items-center">
+                            <span className="text-muted">Sub Total:</span>
+                            <h5 className="mb-0 text-success">
+                              {formData.currency} {(itemFormData.qty * itemFormData.unit_price).toFixed(2)}
+                            </h5>
+                          </div>
+                        </Card.Body>
+                      </Card>
+                    </Col>
+                  </Row>
+                </Modal.Body>
+                <Modal.Footer>
+                  <Button variant="outline-secondary" onClick={() => {
+                    setShowAddItemModal(false);
+                    setEditingItemIndex(null);
+                    setItemFormData({
+                      product_id: null,
+                      product_service: "",
+                      description: "",
+                      qty: 1,
+                      unit_price: 0,
+                    });
+                  }}>
+                    Cancel
+                  </Button>
+                  <Button 
+                    variant="primary" 
+                    type="button"
+                    disabled={!itemFormData.product_id || itemFormData.qty < 1 || itemFormData.unit_price <= 0}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      const selectedProduct = products.find(p => p.id === itemFormData.product_id);
+                      const newItem = {
+                        product_id: itemFormData.product_id!,
+                        product_service: itemFormData.product_service,
+                        description: itemFormData.description,
+                        qty: itemFormData.qty,
+                        unit_price: itemFormData.unit_price,
+                        original_currency: selectedProduct?.currency || formData.currency,
+                        original_price: parseFloat(selectedProduct?.price || "0") || itemFormData.unit_price,
+                      };
+
+                      if (editingItemIndex !== null) {
+                        const updated = [...estimationItems];
+                        updated[editingItemIndex] = newItem;
+                        setEstimationItems(updated);
+                      } else {
+                        setEstimationItems([...estimationItems, newItem]);
+                      }
+
+                      setShowAddItemModal(false);
+                      setEditingItemIndex(null);
+                      setItemFormData({
+                        product_id: null,
+                        product_service: "",
+                        description: "",
+                        qty: 1,
+                        unit_price: 0,
+                      });
+                    }}
+                  >
+                    {editingItemIndex !== null ? 'Update Item' : 'Add Item'}
+                  </Button>
+                </Modal.Footer>
+              </Form>
+            </Modal>
           </div>
 
           {/* Form Footer */}

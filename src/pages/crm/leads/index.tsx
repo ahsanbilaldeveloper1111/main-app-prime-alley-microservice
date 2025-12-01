@@ -11,6 +11,7 @@ import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import {
   getLeads,
+  getLead,
   deleteLead,
   convertLead,
   markLeadLost,
@@ -27,6 +28,7 @@ import {
   Card,
   Table,
   InputGroup,
+  Modal,
 } from "react-bootstrap";
 import Select from 'react-select';
 import { ModuleSlug } from "@utils/Helper";
@@ -59,6 +61,13 @@ import {
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
+  Mail,
+  Phone,
+  Building2,
+  User,
+  History,
+  FileText,
+  Hash,
 } from 'lucide-react';
 import { 
   PieChart, 
@@ -266,6 +275,9 @@ const CrmLeads = () => {
   const [activeFilter, setActiveFilter] = useState('all');
   const [leadsSearch, setLeadsSearch] = useState('');
   const [selectedLeads, setSelectedLeads] = useState<number[]>([]);
+  const [showLeadViewModal, setShowLeadViewModal] = useState(false);
+  const [viewingLead, setViewingLead] = useState<any>(null);
+  const [loadingLead, setLoadingLead] = useState(false);
   const [selectedLeadsColumns, setSelectedLeadsColumns] = useState<string[]>(() => {
     const saved = localStorage.getItem('leadsSelectedColumns');
     return saved ? JSON.parse(saved) : ['name', 'company', 'email', 'phone', 'stage', 'leadPotential', 'followUps', 'assignedUser', 'created'];
@@ -681,6 +693,32 @@ const CrmLeads = () => {
       console.error("Failed to mark lead as lost:", error);
     }
   }, [leadToMarkLost, lostReasonId, lostFeedback]);
+
+  // Handle view lead
+  const handleViewLead = useCallback(async (leadId: number) => {
+    setLoadingLead(true);
+    try {
+      const leadData: any = await getLead(leadId);
+      
+      // Parse contact_persons if it's a string
+      if (leadData.contact_persons && typeof leadData.contact_persons === 'string') {
+        try {
+          leadData.contact_persons = JSON.parse(leadData.contact_persons);
+        } catch (e) {
+          console.error("Failed to parse contact_persons:", e);
+          leadData.contact_persons = [];
+        }
+      }
+      
+      setViewingLead(leadData);
+      setShowLeadViewModal(true);
+    } catch (error) {
+      console.error("Failed to fetch lead:", error);
+      toast.error("Failed to load lead details");
+    } finally {
+      setLoadingLead(false);
+    }
+  }, []);
 
   // Calculate analytics data
   const analyticsData = useMemo(() => {
@@ -1406,6 +1444,15 @@ const CrmLeads = () => {
                         )}
                         <td>
                           <div className="d-flex gap-1">
+                            <Button 
+                              variant="link" 
+                              size="sm" 
+                              className="p-1" 
+                              title="View"
+                              onClick={() => handleViewLead(lead.rawData?.id || lead.id)}
+                            >
+                              <Eye size={16} />
+                            </Button>
                             {session?.user?.permissions?.includes('edit-crm-leads') && (
                               <Button 
                                 variant="link" 
@@ -1645,8 +1692,814 @@ const CrmLeads = () => {
           title={successModalTitle}
           description={successModalDescription}
         />
-		
 
+      {/* Lead View Modal */}
+      {viewingLead && (
+        <Modal show={showLeadViewModal} onHide={() => setShowLeadViewModal(false)} size="xl" centered>
+          {/* Custom Header */}
+          <div style={{
+            color: 'black',
+            padding: '30px',
+            position: 'relative',
+            borderTopLeftRadius: '8px',
+            borderTopRightRadius: '8px',
+            borderBottom: '1px solid #e5e7eb'
+          }}>
+            <button 
+              onClick={() => setShowLeadViewModal(false)}
+              style={{
+                position: 'absolute',
+                top: '20px',
+                right: '20px',
+                background: 'rgba(255,255,255,0.2)',
+                border: 'none',
+                color: 'black',
+                width: '36px',
+                height: '36px',
+                borderRadius: '50%',
+                cursor: 'pointer',
+                transition: 'all 0.3s',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.background = 'rgba(255,255,255,0.3)';
+                e.currentTarget.style.transform = 'rotate(90deg)';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.background = 'rgba(255,255,255,0.2)';
+                e.currentTarget.style.transform = 'rotate(0deg)';
+              }}
+            >
+              <X size={20} />
+            </button>
+            <h3 style={{ margin: 0, fontWeight: 600, fontSize: '24px' }}>
+              {viewingLead.name}
+            </h3>
+            <p style={{ margin: '8px 0 0 0', opacity: 0.9, fontSize: '14px' }}>
+              Lead Details
+            </p>
+          </div>
+
+          <Modal.Body style={{ padding: '30px' }}>
+            {loadingLead ? (
+              <div className="text-center py-4">
+                <div className="spinner-border" role="status">
+                  <span className="visually-hidden">Loading...</span>
+                </div>
+              </div>
+            ) : (
+              <>
+                {/* Lead Information Section */}
+                <div style={{
+                  fontSize: '16px',
+                  fontWeight: 600,
+                  color: '#1f2937',
+                  marginBottom: '20px',
+                  paddingBottom: '10px',
+                  borderBottom: '2px solid #f8f9fa',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px'
+                }}>
+                  <Target size={18} style={{ color: '#4680ff' }} />
+                  Lead Information
+                </div>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+                  gap: '20px',
+                  marginBottom: '30px'
+                }}>
+                  <div style={{
+                    background: '#f8f9fa',
+                    padding: '16px',
+                    borderRadius: '10px',
+                    transition: 'all 0.3s'
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.background = '#e5e7eb';
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.background = '#f8f9fa';
+                    e.currentTarget.style.transform = 'translateY(0)';
+                  }}>
+                    <div style={{
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      color: '#6b7280',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px',
+                      marginBottom: '6px'
+                    }}>Lead Name</div>
+                    <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                      {viewingLead.name}
+                    </div>
+                  </div>
+                  <div style={{
+                    background: '#f8f9fa',
+                    padding: '16px',
+                    borderRadius: '10px',
+                    transition: 'all 0.3s'
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.background = '#e5e7eb';
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.background = '#f8f9fa';
+                    e.currentTarget.style.transform = 'translateY(0)';
+                  }}>
+                    <div style={{
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      color: '#6b7280',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px',
+                      marginBottom: '6px'
+                    }}>Stage</div>
+                    <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                      <Badge 
+                        bg={viewingLead.stage?.name?.toLowerCase().includes('qualified') ? 'success' : viewingLead.stage?.name?.toLowerCase().includes('contacted') ? 'info' : 'secondary'}
+                        style={{
+                          padding: '6px 14px',
+                          borderRadius: '20px',
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          backgroundColor: viewingLead.stage?.color || '#6c757d'
+                        }}
+                      >
+                        {viewingLead.stage?.name || 'Not assigned'}
+                      </Badge>
+                    </div>
+                  </div>
+                  <div style={{
+                    background: '#f8f9fa',
+                    padding: '16px',
+                    borderRadius: '10px',
+                    transition: 'all 0.3s'
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.background = '#e5e7eb';
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.background = '#f8f9fa';
+                    e.currentTarget.style.transform = 'translateY(0)';
+                  }}>
+                    <div style={{
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      color: '#6b7280',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px',
+                      marginBottom: '6px'
+                    }}>Lead Potential</div>
+                    <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                      <Badge 
+                        bg={viewingLead.lead_potential === 'Hot' ? 'danger' : viewingLead.lead_potential === 'Warm' ? 'warning' : 'secondary'}
+                        style={{
+                          padding: '6px 14px',
+                          borderRadius: '20px',
+                          fontSize: '12px',
+                          fontWeight: 600
+                        }}
+                      >
+                        {viewingLead.lead_potential || 'N/A'}
+                      </Badge>
+                    </div>
+                  </div>
+                  <div style={{
+                    background: '#f8f9fa',
+                    padding: '16px',
+                    borderRadius: '10px',
+                    transition: 'all 0.3s'
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.background = '#e5e7eb';
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.background = '#f8f9fa';
+                    e.currentTarget.style.transform = 'translateY(0)';
+                  }}>
+                    <div style={{
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      color: '#6b7280',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px',
+                      marginBottom: '6px'
+                    }}>Status</div>
+                    <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                      <Badge bg={viewingLead.is_lost ? 'danger' : viewingLead.status === 'new' ? 'primary' : 'success'}>
+                        {viewingLead.is_lost ? 'Lost' : viewingLead.status || 'N/A'}
+                      </Badge>
+                    </div>
+                  </div>
+                  <div style={{
+                    background: '#f8f9fa',
+                    padding: '16px',
+                    borderRadius: '10px',
+                    transition: 'all 0.3s'
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.background = '#e5e7eb';
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.background = '#f8f9fa';
+                    e.currentTarget.style.transform = 'translateY(0)';
+                  }}>
+                    <div style={{
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      color: '#6b7280',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px',
+                      marginBottom: '6px'
+                    }}>Assigned To</div>
+                    <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                      <User size={14} style={{ color: '#4680ff', marginRight: '6px', display: 'inline' }} />
+                      {extensions.find((ext: any) => ext?.id == viewingLead?.user_extension || ext?.extension == viewingLead?.user_extension)?.display_name || 
+                       extensions.find((ext: any) => ext?.id == viewingLead?.user_extension || ext?.extension == viewingLead?.user_extension)?.name || 
+                       viewingLead.user_extension || 'Not assigned'}
+                    </div>
+                  </div>
+                  <div style={{
+                    background: '#f8f9fa',
+                    padding: '16px',
+                    borderRadius: '10px',
+                    transition: 'all 0.3s'
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.background = '#e5e7eb';
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.background = '#f8f9fa';
+                    e.currentTarget.style.transform = 'translateY(0)';
+                  }}>
+                    <div style={{
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      color: '#6b7280',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px',
+                      marginBottom: '6px'
+                    }}>Created Date</div>
+                    <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                      <Calendar size={14} style={{ color: '#4680ff', marginRight: '6px', display: 'inline' }} />
+                      {viewingLead.created_at ? new Date(viewingLead.created_at).toLocaleDateString() : 'N/A'}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Company Information Section */}
+                {viewingLead.company_name && (
+                  <>
+                    <div style={{
+                      fontSize: '16px',
+                      fontWeight: 600,
+                      color: '#1f2937',
+                      marginBottom: '20px',
+                      paddingBottom: '10px',
+                      borderBottom: '2px solid #f8f9fa',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px'
+                    }}>
+                      <Building2 size={18} style={{ color: '#4680ff' }} />
+                      Company Information
+                    </div>
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+                      gap: '20px',
+                      marginBottom: '30px'
+                    }}>
+                      <div style={{
+                        background: '#f8f9fa',
+                        padding: '16px',
+                        borderRadius: '10px',
+                        transition: 'all 0.3s'
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.background = '#e5e7eb';
+                        e.currentTarget.style.transform = 'translateY(-2px)';
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.background = '#f8f9fa';
+                        e.currentTarget.style.transform = 'translateY(0)';
+                      }}>
+                        <div style={{
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          color: '#6b7280',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.5px',
+                          marginBottom: '6px'
+                        }}>Company Name</div>
+                        <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                          <Building2 size={14} style={{ color: '#4680ff', marginRight: '6px', display: 'inline' }} />
+                          {viewingLead.company_name}
+                        </div>
+                      </div>
+                      {viewingLead.industry && (
+                        <div style={{
+                          background: '#f8f9fa',
+                          padding: '16px',
+                          borderRadius: '10px',
+                          transition: 'all 0.3s'
+                        }}
+                        onMouseOver={(e) => {
+                          e.currentTarget.style.background = '#e5e7eb';
+                          e.currentTarget.style.transform = 'translateY(-2px)';
+                        }}
+                        onMouseOut={(e) => {
+                          e.currentTarget.style.background = '#f8f9fa';
+                          e.currentTarget.style.transform = 'translateY(0)';
+                        }}>
+                          <div style={{
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            color: '#6b7280',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.5px',
+                            marginBottom: '6px'
+                          }}>Industry</div>
+                          <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                            {viewingLead.industry}
+                          </div>
+                        </div>
+                      )}
+                      {viewingLead.business_type && (
+                        <div style={{
+                          background: '#f8f9fa',
+                          padding: '16px',
+                          borderRadius: '10px',
+                          transition: 'all 0.3s'
+                        }}
+                        onMouseOver={(e) => {
+                          e.currentTarget.style.background = '#e5e7eb';
+                          e.currentTarget.style.transform = 'translateY(-2px)';
+                        }}
+                        onMouseOut={(e) => {
+                          e.currentTarget.style.background = '#f8f9fa';
+                          e.currentTarget.style.transform = 'translateY(0)';
+                        }}>
+                          <div style={{
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            color: '#6b7280',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.5px',
+                            marginBottom: '6px'
+                          }}>Business Type</div>
+                          <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                            {viewingLead.business_type}
+                          </div>
+                        </div>
+                      )}
+                      {viewingLead.company_size && (
+                        <div style={{
+                          background: '#f8f9fa',
+                          padding: '16px',
+                          borderRadius: '10px',
+                          transition: 'all 0.3s'
+                        }}
+                        onMouseOver={(e) => {
+                          e.currentTarget.style.background = '#e5e7eb';
+                          e.currentTarget.style.transform = 'translateY(-2px)';
+                        }}
+                        onMouseOut={(e) => {
+                          e.currentTarget.style.background = '#f8f9fa';
+                          e.currentTarget.style.transform = 'translateY(0)';
+                        }}>
+                          <div style={{
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            color: '#6b7280',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.5px',
+                            marginBottom: '6px'
+                          }}>Company Size</div>
+                          <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                            {viewingLead.company_size}
+                          </div>
+                        </div>
+                      )}
+                      {viewingLead.company_city && (
+                        <div style={{
+                          background: '#f8f9fa',
+                          padding: '16px',
+                          borderRadius: '10px',
+                          transition: 'all 0.3s'
+                        }}
+                        onMouseOver={(e) => {
+                          e.currentTarget.style.background = '#e5e7eb';
+                          e.currentTarget.style.transform = 'translateY(-2px)';
+                        }}
+                        onMouseOut={(e) => {
+                          e.currentTarget.style.background = '#f8f9fa';
+                          e.currentTarget.style.transform = 'translateY(0)';
+                        }}>
+                          <div style={{
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            color: '#6b7280',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.5px',
+                            marginBottom: '6px'
+                          }}>Location</div>
+                          <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                            {[viewingLead.company_city, viewingLead.company_country].filter(Boolean).join(', ') || 'N/A'}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
+
+                {/* Contact Persons Section */}
+                {viewingLead.contact_persons && Array.isArray(viewingLead.contact_persons) && viewingLead.contact_persons.length > 0 && (
+                  <>
+                    <div style={{
+                      fontSize: '16px',
+                      fontWeight: 600,
+                      color: '#1f2937',
+                      marginBottom: '20px',
+                      paddingBottom: '10px',
+                      borderBottom: '2px solid #f8f9fa',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px'
+                    }}>
+                      <Users size={18} style={{ color: '#4680ff' }} />
+                      Contact Persons ({viewingLead.contact_persons.length})
+                    </div>
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+                      gap: '20px',
+                      marginBottom: '30px'
+                    }}>
+                      {viewingLead.contact_persons.map((person: any, index: number) => (
+                        <div key={index} style={{
+                          background: '#f8f9fa',
+                          padding: '16px',
+                          borderRadius: '10px',
+                          transition: 'all 0.3s'
+                        }}
+                        onMouseOver={(e) => {
+                          e.currentTarget.style.background = '#e5e7eb';
+                          e.currentTarget.style.transform = 'translateY(-2px)';
+                        }}
+                        onMouseOut={(e) => {
+                          e.currentTarget.style.background = '#f8f9fa';
+                          e.currentTarget.style.transform = 'translateY(0)';
+                        }}>
+                          <div style={{ fontSize: '14px', fontWeight: 600, color: '#1f2937', marginBottom: '12px' }}>
+                            {person.title} {person.name}
+                          </div>
+                          {person.email && (
+                            <div style={{ fontSize: '13px', color: '#6b7280', marginBottom: '6px' }}>
+                              <Mail size={12} style={{ marginRight: '6px', display: 'inline' }} />
+                              {person.email}
+                            </div>
+                          )}
+                          {person.phone && (
+                            <div style={{ fontSize: '13px', color: '#6b7280' }}>
+                              <Phone size={12} style={{ marginRight: '6px', display: 'inline' }} />
+                              {person.phone_country_code} {person.phone}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+
+                {/* Campaign Information */}
+                {viewingLead.campaign && (
+                  <>
+                    <div style={{
+                      fontSize: '16px',
+                      fontWeight: 600,
+                      color: '#1f2937',
+                      marginBottom: '20px',
+                      paddingBottom: '10px',
+                      borderBottom: '2px solid #f8f9fa',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px'
+                    }}>
+                      <FileText size={18} style={{ color: '#4680ff' }} />
+                      Campaign Information
+                    </div>
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+                      gap: '20px',
+                      marginBottom: '30px'
+                    }}>
+                      <div style={{
+                        background: '#f8f9fa',
+                        padding: '16px',
+                        borderRadius: '10px',
+                        transition: 'all 0.3s'
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.background = '#e5e7eb';
+                        e.currentTarget.style.transform = 'translateY(-2px)';
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.background = '#f8f9fa';
+                        e.currentTarget.style.transform = 'translateY(0)';
+                      }}>
+                        <div style={{
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          color: '#6b7280',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.5px',
+                          marginBottom: '6px'
+                        }}>Campaign Name</div>
+                        <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                          {viewingLead.campaign.name}
+                        </div>
+                      </div>
+                      {viewingLead.campaign_field_values && Object.keys(viewingLead.campaign_field_values).length > 0 && (
+                        Object.entries(viewingLead.campaign_field_values).map(([key, value]: [string, any]) => (
+                          <div key={key} style={{
+                            background: '#f8f9fa',
+                            padding: '16px',
+                            borderRadius: '10px',
+                            transition: 'all 0.3s'
+                          }}
+                          onMouseOver={(e) => {
+                            e.currentTarget.style.background = '#e5e7eb';
+                            e.currentTarget.style.transform = 'translateY(-2px)';
+                          }}
+                          onMouseOut={(e) => {
+                            e.currentTarget.style.background = '#f8f9fa';
+                            e.currentTarget.style.transform = 'translateY(0)';
+                          }}>
+                            <div style={{
+                              fontSize: '12px',
+                              fontWeight: 600,
+                              color: '#6b7280',
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.5px',
+                              marginBottom: '6px'
+                            }}>{key}</div>
+                            <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                              {String(value)}
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </>
+                )}
+
+                {/* Lost Reason */}
+                {viewingLead.is_lost && viewingLead.lost_reason && (
+                  <div style={{
+                    background: '#fee2e2',
+                    border: '1px solid #fecaca',
+                    borderRadius: '8px',
+                    padding: '16px',
+                    marginBottom: '30px'
+                  }}>
+                    <div style={{ fontSize: '14px', fontWeight: 600, color: '#dc2626', marginBottom: '8px' }}>
+                      Lead Lost
+                    </div>
+                    <div style={{ fontSize: '13px', color: '#991b1b' }}>
+                      Reason: {viewingLead.lost_reason.name}
+                    </div>
+                    {viewingLead.lost_feedback && (
+                      <div style={{ fontSize: '13px', color: '#991b1b', marginTop: '8px' }}>
+                        Feedback: {viewingLead.lost_feedback}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Audit Trail / History */}
+                {viewingLead.audit_trail && Array.isArray(viewingLead.audit_trail) && viewingLead.audit_trail.length > 0 && (
+                  <>
+                    <div style={{
+                      fontSize: '16px',
+                      fontWeight: 600,
+                      color: '#1f2937',
+                      marginBottom: '20px',
+                      paddingBottom: '10px',
+                      borderBottom: '2px solid #f8f9fa',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px'
+                    }}>
+                      <History size={18} style={{ color: '#4680ff' }} />
+                      Activity History ({viewingLead.audit_trail.length})
+                    </div>
+                    <div style={{ position: 'relative', paddingLeft: '30px', marginBottom: '30px' }}>
+                      <div style={{
+                        content: '',
+                        position: 'absolute',
+                        left: '8px',
+                        top: 0,
+                        bottom: 0,
+                        width: '2px',
+                        background: '#e5e7eb'
+                      }} />
+                      {viewingLead.audit_trail.map((audit: any, idx: number) => (
+                        <div key={audit.id || idx} style={{ position: 'relative', paddingBottom: '20px' }}>
+                          <div style={{
+                            content: '',
+                            position: 'absolute',
+                            left: '-26px',
+                            top: '4px',
+                            width: '12px',
+                            height: '12px',
+                            borderRadius: '50%',
+                            background: audit.event === 'created' ? '#10b981' : '#4680ff',
+                            border: '3px solid white',
+                            boxShadow: '0 0 0 2px #e5e7eb'
+                          }} />
+                          <div style={{
+                            background: '#f8f9fa',
+                            padding: '12px 16px',
+                            borderRadius: '8px'
+                          }}>
+                            <div style={{ fontSize: '12px', color: '#6b7280', fontWeight: 600, marginBottom: '4px' }}>
+                              {audit.created_at_human || new Date(audit.created_at).toLocaleString()}
+                            </div>
+                            <div style={{ fontSize: '14px', color: '#1f2937', marginBottom: '4px', fontWeight: 500 }}>
+                              {audit.event === 'created' ? 'Created' : audit.event === 'updated' ? 'Updated' : audit.event}
+                            </div>
+                            {audit.description && (
+                              <div style={{ fontSize: '13px', color: '#6b7280', marginBottom: '8px' }}>
+                                {audit.description}
+                              </div>
+                            )}
+                            {audit.changes && Object.keys(audit.changes).length > 0 && (
+                              <div style={{ fontSize: '12px', color: '#6b7280' }}>
+                                {Object.entries(audit.changes).map(([key, change]: [string, any]) => (
+                                  <div key={key} style={{ marginTop: '4px' }}>
+                                    <strong>{key}:</strong> {change.old ? `${change.old} → ` : ''}{change.new || 'N/A'}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+
+                {/* Description */}
+                {viewingLead.description && (
+                  <React.Fragment>
+                  <div style={{
+                    fontSize: '16px',
+                    fontWeight: 600,
+                    color: '#1f2937',
+                    marginBottom: '20px',
+                    paddingBottom: '10px',
+                    borderBottom: '2px solid #f8f9fa',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px'
+                  }}>
+                    <FileText size={18} style={{ color: '#4680ff' }} />
+                    Description
+                  </div>
+                  <div style={{
+                    background: '#f8f9fa',
+                    padding: '16px',
+                    borderRadius: '10px',
+                    marginBottom: '30px',
+                    fontSize: '14px',
+                    color: '#1f2937',
+                    whiteSpace: 'pre-wrap'
+                  }}>
+                    {viewingLead.description}
+                  </div>
+                  </React.Fragment>
+                )}
+
+                {/* Action Buttons */}
+                <div style={{
+                  display: 'flex',
+                  gap: '12px',
+                  flexWrap: 'wrap',
+                  paddingTop: '20px',
+                  borderTop: '1px solid #e5e7eb'
+                }}>
+                  {session?.user?.permissions?.includes('edit-crm-leads') && (
+                    <Button
+                      variant="primary"
+                      style={{
+                        padding: '10px 20px',
+                        borderRadius: '8px',
+                        fontWeight: 500,
+                        fontSize: '14px',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        background: '#4680ff',
+                        border: 'none'
+                      }}
+                      onClick={() => {
+                        setShowLeadViewModal(false);
+                        window.location.href = `/crm/leads/${viewingLead.id}/edit`;
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.background = '#3b6ce5';
+                        e.currentTarget.style.transform = 'translateY(-2px)';
+                        e.currentTarget.style.boxShadow = '0 4px 12px rgba(70, 128, 255, 0.4)';
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.background = '#4680ff';
+                        e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.boxShadow = 'none';
+                      }}
+                    >
+                      <Edit size={16} />
+                      Edit Lead
+                    </Button>
+                  )}
+                  {session?.user?.permissions?.includes('convert-to-opportunity-crm-leads') && (
+                    <Button
+                      variant="success"
+                      style={{
+                        padding: '10px 20px',
+                        borderRadius: '8px',
+                        fontWeight: 500,
+                        fontSize: '14px',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        background: '#10b981',
+                        border: 'none'
+                      }}
+                      onClick={() => {
+                        setShowLeadViewModal(false);
+                        handleConvertLead(viewingLead);
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.background = '#059669';
+                        e.currentTarget.style.transform = 'translateY(-2px)';
+                        e.currentTarget.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.4)';
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.background = '#10b981';
+                        e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.boxShadow = 'none';
+                      }}
+                    >
+                      <Handshake size={16} />
+                      Convert to Deal
+                    </Button>
+                  )}
+                  <Button
+                    variant="outline-secondary"
+                    style={{
+                      padding: '10px 20px',
+                      borderRadius: '8px',
+                      fontWeight: 500,
+                      fontSize: '14px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      background: 'white',
+                      color: '#6b7280',
+                      border: '2px solid #e5e7eb'
+                    }}
+                    onClick={() => setShowLeadViewModal(false)}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.borderColor = '#4680ff';
+                      e.currentTarget.style.color = '#4680ff';
+                      e.currentTarget.style.background = '#f0f4ff';
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.borderColor = '#e5e7eb';
+                      e.currentTarget.style.color = '#6b7280';
+                      e.currentTarget.style.background = 'white';
+                    }}
+                  >
+                    Close
+                  </Button>
+                </div>
+              </>
+            )}
+          </Modal.Body>
+        </Modal>
+      )}
 
     </React.Fragment>
   );

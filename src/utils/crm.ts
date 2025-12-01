@@ -1510,7 +1510,7 @@ export const getDeal = async (id: number): Promise<DealData> => {
 
 export const createDeal = async (data: Partial<DealData>): Promise<DealData> => {
   try {
-    const response = await axiosInstance.post("/crm/deals", data);
+    const response = await axiosInstance.post("/crm/create-deal", data);
     const responseData: any = response.data?.data;
     toast.success("Deal created successfully");
     return responseData || response.data;
@@ -1543,6 +1543,61 @@ export const deleteDeal = async (id: number): Promise<void> => {
     toast.success("Deal deleted successfully");
   } catch (error: any) {
     toast.error(error?.response?.data?.message || error?.message || "Failed to delete deal");
+    throw error;
+  }
+};
+
+// Create/Update Estimation Chart
+export interface CreateEstimatePayload {
+  deal_id: number;
+  estimation_chart: Array<{
+    product_service: string;
+    description: string;
+    qty: number;
+    unit_price: number;
+    product_id: number;
+    original_currency: string;
+    original_price: number;
+  }>;
+  standard_discount_percentage: number;
+  special_discount_percentage: number;
+  tax_percentage: number;
+  currency: string;
+}
+
+export const createEstimate = async (data: CreateEstimatePayload): Promise<any> => {
+  try {
+    const response = await axiosInstance.post("/crm/create-estimate", data);
+    const responseData: any = response.data?.data;
+    toast.success("Estimation chart saved successfully");
+    return responseData || response.data;
+  } catch (error: any) {
+    toast.error(error?.response?.data?.message || error?.message || "Failed to save estimation chart");
+    throw error;
+  }
+};
+
+// Product Management for CRM
+export interface CrmProduct {
+  id: number;
+  name: string;
+  description: string;
+  sku: string;
+  price: string;
+  category: string;
+  brand: string;
+  active: boolean;
+  currency: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export const getCrmProducts = async (params: PaginationParams = {}): Promise<PaginationWrapper<CrmProduct>> => {
+  try {
+    const response = await axiosInstance.get("/crm/products", { params });
+    return extractData<PaginationWrapper<CrmProduct>>(response.data);
+  } catch (error: any) {
+    toast.error(error?.response?.data?.message || error?.message || "Failed to fetch products");
     throw error;
   }
 };
@@ -1681,7 +1736,7 @@ export const deleteOrder = async (id: number): Promise<void> => {
 
 export const createOrder = async (data: Partial<OrderData>): Promise<OrderData> => {
   try {
-    const response = await axiosInstance.post("/crm/orders", data);
+    const response = await axiosInstance.post("/crm/create-order", data);
     const responseData: any = response.data?.data;
     toast.success("Order created successfully");
     return responseData || response.data;

@@ -12,6 +12,7 @@ import {
   getDeals,
   getStages,
   deleteDeal,
+  getDeal,
 } from "@utils/crm";
 import { GetHierarchyData } from "@utils/users";
 import {
@@ -59,6 +60,7 @@ import {
   DollarSign,
   Activity,
   FileText,
+  ShoppingBag,
 } from 'lucide-react';
 import { 
   PieChart, 
@@ -1282,6 +1284,15 @@ const CrmDeals = () => {
                               >
                                 <Edit size={16} />
                               </Button>
+                                <Button 
+                                  variant="link" 
+                                  size="sm" 
+                                  className="p-1 text-success" 
+                                  title="Convert to Order"
+                                  onClick={() => window.location.href = `/crm/orders/create?deal_id=${deal.rawData?.id || deal.id}`}
+                                >
+                                  <ShoppingBag size={16} />
+                                </Button>
                               <Button 
                                 variant="link" 
                                 size="sm" 
