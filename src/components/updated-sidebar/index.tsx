@@ -79,6 +79,7 @@ const ExpandableSidebar: React.FC<SidebarProps> = ({
         { id: 'campaigns', title: 'Campaigns', icon: <Megaphone size={16} /> },
         { id: 'tasks', title: 'Task Management', icon: <CheckCircle size={16} /> },
         { id: 'stages', title: 'Stages Management', icon: <GitBranch size={16} /> },
+        { id: 'products', title: 'Products', icon: <Package size={16} /> },
         { id: 'activities', title: 'Activity Tracker', icon: <Activity size={16} /> },
         { id: 'reports', title: 'Reports', icon: <BarChart3 size={16} /> },
       ]
