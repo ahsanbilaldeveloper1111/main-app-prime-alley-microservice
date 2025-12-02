@@ -10,6 +10,7 @@ import "@assets/scss/dashboard.scss";
 import "@assets/scss/common.scss";
 import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
 import { HEADER_CONSTANTS } from '@constants/headerConstants';
+import { useFCM } from '@hooks/useFCM';
 const { BASE_URL, MENU_LABELS, SUBMENU_LABELS, ICONS, PERMISSIONS } = HEADER_CONSTANTS;
 
 interface Summary {
@@ -23,6 +24,7 @@ const Dashboard = () => {
     const router = useRouter();
     const [permissions, setPermissions] = useState<string[]>([]);
     const [isAdmin, setIsAdmin] = useState(false);
+    const { permission: notificationPermission, isSupported: isNotificationSupported, requestPermission } = useFCM(false, false);
 
     const [summary, setSummary] = useState<Summary>({
         online_agents: 22,
@@ -204,8 +206,42 @@ const Dashboard = () => {
         <React.Fragment>
 
             <p className='topTicker'>
-            🚀 New Feature: AI-Powered Call Summaries now available! Check it out
+            🚀 New Feature: AI-Powered Call Summaries now available! Check it out
             </p>
+            {isNotificationSupported && notificationPermission !== 'granted' && (
+                <div className="container-fluid py-2">
+                    <div className="alert alert-warning alert-dismissible fade show d-flex align-items-center" role="alert">
+                        <div className="flex-grow-1">
+                            <strong className="d-block mb-2">
+                                <i className="fas fa-bell me-2"></i>
+                                Notification Permission Required
+                            </strong>
+                            <p className="mb-2">
+                                Please enable browser notifications to receive important updates and alerts.
+                                {notificationPermission === 'denied' && (
+                                    <span className="d-block mt-1 text-muted small">
+                                        You have previously denied notifications. Please enable them in your browser settings or click below to try again.
+                                    </span>
+                                )}
+                            </p>
+                            <button 
+                                type="button" 
+                                className="btn btn-primary btn-sm"
+                                onClick={async () => {
+                                    const result = await requestPermission();
+                                    if (result === 'granted') {
+                                        // Permission granted - alert will disappear automatically
+                                    }
+                                }}
+                            >
+                                <i className="fas fa-bell me-1"></i>
+                                {notificationPermission === 'denied' ? 'Request Permission Again' : 'Allow Notifications'}
+                            </button>
+                        </div>
+                        <button type="button" className="btn-close ms-2" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                </div>
+            )}
             <div className="container-fluid  py-5">
                 {/* Header Section */}
                 <div className="row mb-2">
