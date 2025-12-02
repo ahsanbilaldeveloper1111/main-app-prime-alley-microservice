@@ -136,6 +136,14 @@ interface Opportunity {
   lastActivity: string;
 }
 
+interface Meeting {
+  id: number;
+  title: string;
+  dateTime: string;
+  relatedTo: string;
+  status: string;
+}
+
 interface Task {
   title: string;
   name: string;
@@ -691,6 +699,19 @@ const CRMPortal = () => {
   const [activityRecordsLimit, setActivityRecordsLimit] = useState(50);
   const [activitySearchTerm, setActivitySearchTerm] = useState('');
   const [recordsToAssign, setRecordsToAssign] = useState<number>(0);
+
+  // New Activity Tracker States (for renderActivityTrackerUpdated)
+  const [activityTypeFilter, setActivityTypeFilter] = useState('all');
+  const [showActivityAdvancedFilters, setShowActivityAdvancedFilters] = useState(false);
+  const [activityFilters, setActivityFilters] = useState({
+    campaigns: [] as string[],
+    agents: [] as string[],
+    stages: [] as string[],
+    dateRange: { start: '', end: '' }
+  });
+  const [showActivityTimelineModal, setShowActivityTimelineModal] = useState(false);
+  const [selectedActivityRecord, setSelectedActivityRecord] = useState<any>(null);
+  const [activitySearch, setActivitySearch] = useState('');
   const [includeAssignedRecords, setIncludeAssignedRecords] = useState<boolean>(false);
   const [selectedLeads, setSelectedLeads] = useState<number[]>([]);
   const [selectedDeals, setSelectedDeals] = useState<number[]>([]);
@@ -876,21 +897,27 @@ const CRMPortal = () => {
     { id: 2, name: 'Mr. Shayir', email: 'shayir@email.com', phone: '+1234567891', company: 'Digital Inc', stage: 'New', created: 'Nov 17, 2025', lastActivity: 'Nov 17, 2025 17:31', assignedTo: 'Jane Smith', leadPotential: 'Hot', urgency: 'Medium', followUpCount: 1, leadScore: 72.5 },
     { id: 3, name: 'Mr Hassan Khokhar', email: 'hassan@email.com', phone: '+1234567892', company: 'Solutions Ltd', stage: 'Contacted', created: 'Nov 15, 2025', lastActivity: 'Nov 15, 2025 14:55', assignedTo: 'Mike Johnson', leadPotential: 'Hot', urgency: 'High', followUpCount: 3, leadScore: 90.25 },
     { id: 4, name: 'Mr Niazi', email: 'niazi@email.com', phone: '+1234567893', company: 'Global Co', stage: 'New', created: 'Nov 13, 2025', lastActivity: 'Nov 13, 2025 16:40', assignedTo: 'Sarah Williams', leadPotential: 'Cold', urgency: 'Low', followUpCount: 0, leadScore: 0 },
-    { id: 5, name: 'Mr Hilal', email: 'hilal@email.com', phone: '+1234567894', company: 'Enterprise Systems', stage: 'Contacted', created: 'Nov 12, 2025', lastActivity: 'Nov 12, 2025 17:18', assignedTo: 'Tom Brown', leadPotential: 'Warm', urgency: 'Medium', followUpCount: 1, leadScore: 50 },
+    // { id: 5, name: 'Mr Hilal', email: 'hilal@email.com', phone: '+1234567894', company: 'Enterprise Systems', stage: 'Contacted', created: 'Nov 12, 2025', lastActivity: 'Nov 12, 2025 17:18', assignedTo: 'Tom Brown', leadPotential: 'Warm', urgency: 'Medium', followUpCount: 1, leadScore: 50 },
   
-    { id: 6, name: 'Miss Ayesha', email: 'ayesha@email.com', phone: '+1234567895', company: 'Tech Hive', stage: 'New', created: 'Nov 11, 2025', lastActivity: 'Nov 11, 2025 14:22', assignedTo: 'John Doe', leadPotential: 'Warm', urgency: 'Medium', followUpCount: 1, leadScore: 61 },
-    { id: 7, name: 'Mr Danish', email: 'danish@email.com', phone: '+1234567896', company: 'CloudSoft', stage: 'Contacted', created: 'Nov 10, 2025', lastActivity: 'Nov 10, 2025 11:45', assignedTo: 'Jane Smith', leadPotential: 'Hot', urgency: 'High', followUpCount: 2, leadScore: 88.2 },
-    { id: 8, name: 'Miss Noor', email: 'noor@email.com', phone: '+1234567897', company: 'Creative Labs', stage: 'New', created: 'Nov 09, 2025', lastActivity: 'Nov 09, 2025 17:32', assignedTo: 'Mike Johnson', leadPotential: 'Cold', urgency: 'Low', followUpCount: 0, leadScore: 12 },
-    { id: 9, name: 'Mr Ali Raza', email: 'ali@email.com', phone: '+1234567898', company: 'SmartWorks', stage: 'Contacted', created: 'Nov 08, 2025', lastActivity: 'Nov 08, 2025 13:10', assignedTo: 'Sarah Williams', leadPotential: 'Warm', urgency: 'High', followUpCount: 3, leadScore: 69 },
-    { id: 10, name: 'Mr Kamran', email: 'kamran@email.com', phone: '+1234567899', company: 'Global Co', stage: 'New', created: 'Nov 07, 2025', lastActivity: 'Nov 07, 2025 15:55', assignedTo: 'Tom Brown', leadPotential: 'Cold', urgency: 'Medium', followUpCount: 1, leadScore: 22 },
+    // { id: 6, name: 'Miss Ayesha', email: 'ayesha@email.com', phone: '+1234567895', company: 'Tech Hive', stage: 'New', created: 'Nov 11, 2025', lastActivity: 'Nov 11, 2025 14:22', assignedTo: 'John Doe', leadPotential: 'Warm', urgency: 'Medium', followUpCount: 1, leadScore: 61 },
+    // { id: 7, name: 'Mr Danish', email: 'danish@email.com', phone: '+1234567896', company: 'CloudSoft', stage: 'Contacted', created: 'Nov 10, 2025', lastActivity: 'Nov 10, 2025 11:45', assignedTo: 'Jane Smith', leadPotential: 'Hot', urgency: 'High', followUpCount: 2, leadScore: 88.2 },
+    // { id: 8, name: 'Miss Noor', email: 'noor@email.com', phone: '+1234567897', company: 'Creative Labs', stage: 'New', created: 'Nov 09, 2025', lastActivity: 'Nov 09, 2025 17:32', assignedTo: 'Mike Johnson', leadPotential: 'Cold', urgency: 'Low', followUpCount: 0, leadScore: 12 },
+    // { id: 9, name: 'Mr Ali Raza', email: 'ali@email.com', phone: '+1234567898', company: 'SmartWorks', stage: 'Contacted', created: 'Nov 08, 2025', lastActivity: 'Nov 08, 2025 13:10', assignedTo: 'Sarah Williams', leadPotential: 'Warm', urgency: 'High', followUpCount: 3, leadScore: 69 },
+    // { id: 10, name: 'Mr Kamran', email: 'kamran@email.com', phone: '+1234567899', company: 'Global Co', stage: 'New', created: 'Nov 07, 2025', lastActivity: 'Nov 07, 2025 15:55', assignedTo: 'Tom Brown', leadPotential: 'Cold', urgency: 'Medium', followUpCount: 1, leadScore: 22 },
   
-    { id: 11, name: 'Mr Bilal', email: 'bilal@email.com', phone: '+1234500000', company: 'Alpha Systems', stage: 'Contacted', created: 'Nov 06, 2025', lastActivity: 'Nov 06, 2025 12:45', assignedTo: 'John Doe', leadPotential: 'Hot', urgency: 'High', followUpCount: 4, leadScore: 94 },
-    { id: 12, name: 'Miss Hira', email: 'hira@email.com', phone: '+1234500001', company: 'Tech Corp', stage: 'New', created: 'Nov 05, 2025', lastActivity: 'Nov 05, 2025 16:20', assignedTo: 'Jane Smith', leadPotential: 'Warm', urgency: 'Medium', followUpCount: 2, leadScore: 58 },
-    { id: 13, name: 'Mr Saif', email: 'saif@email.com', phone: '+1234500002', company: 'Digital Hub', stage: 'Contacted', created: 'Nov 04, 2025', lastActivity: 'Nov 04, 2025 12:05', assignedTo: 'Mike Johnson', leadPotential: 'Hot', urgency: 'High', followUpCount: 3, leadScore: 82 },
-    { id: 14, name: 'Miss Reema', email: 'reema@email.com', phone: '+1234500003', company: 'BlueStone', stage: 'New', created: 'Nov 03, 2025', lastActivity: 'Nov 03, 2025 17:20', assignedTo: 'Sarah Williams', leadPotential: 'Cold', urgency: 'Low', followUpCount: 0, leadScore: 10 },
-    { id: 15, name: 'Mr Hashim', email: 'hashim@email.com', phone: '+1234500004', company: 'Tech Hive', stage: 'Contacted', created: 'Nov 02, 2025', lastActivity: 'Nov 02, 2025 15:12', assignedTo: 'Tom Brown', leadPotential: 'Warm', urgency: 'Medium', followUpCount: 1, leadScore: 55 }
+    // { id: 11, name: 'Mr Bilal', email: 'bilal@email.com', phone: '+1234500000', company: 'Alpha Systems', stage: 'Contacted', created: 'Nov 06, 2025', lastActivity: 'Nov 06, 2025 12:45', assignedTo: 'John Doe', leadPotential: 'Hot', urgency: 'High', followUpCount: 4, leadScore: 94 },
+    // { id: 12, name: 'Miss Hira', email: 'hira@email.com', phone: '+1234500001', company: 'Tech Corp', stage: 'New', created: 'Nov 05, 2025', lastActivity: 'Nov 05, 2025 16:20', assignedTo: 'Jane Smith', leadPotential: 'Warm', urgency: 'Medium', followUpCount: 2, leadScore: 58 },
+    // { id: 13, name: 'Mr Saif', email: 'saif@email.com', phone: '+1234500002', company: 'Digital Hub', stage: 'Contacted', created: 'Nov 04, 2025', lastActivity: 'Nov 04, 2025 12:05', assignedTo: 'Mike Johnson', leadPotential: 'Hot', urgency: 'High', followUpCount: 3, leadScore: 82 },
+    // { id: 14, name: 'Miss Reema', email: 'reema@email.com', phone: '+1234500003', company: 'BlueStone', stage: 'New', created: 'Nov 03, 2025', lastActivity: 'Nov 03, 2025 17:20', assignedTo: 'Sarah Williams', leadPotential: 'Cold', urgency: 'Low', followUpCount: 0, leadScore: 10 },
+    // { id: 15, name: 'Mr Hashim', email: 'hashim@email.com', phone: '+1234500004', company: 'Tech Hive', stage: 'Contacted', created: 'Nov 02, 2025', lastActivity: 'Nov 02, 2025 15:12', assignedTo: 'Tom Brown', leadPotential: 'Warm', urgency: 'Medium', followUpCount: 1, leadScore: 55 }
   ];
   
+  const recentMeetings: Meeting[] = [
+    { id: 1, title: 'Project Kick-off and initial discussion', dateTime: '2023-11-25 10:00 AM', relatedTo: 'Enterprise Software Contract with a very long name', status: 'Scheduled' },
+    { id: 2, title: 'Proposal Review', dateTime: '2023-11-23 02:30 PM', relatedTo: 'Consulting Project', status: 'Completed' },
+    { id: 3, title: 'Initial Discovery Call', dateTime: '2023-11-22 09:00 AM', relatedTo: 'Hardware Procurement', status: 'Completed' },
+    { id: 4, title: 'Follow-up', dateTime: '2023-11-26 11:00 AM', relatedTo: 'Hardware Procurement', status: 'Scheduled' },
+  ];
 
   const recentOpportunities: Opportunity[] = [
     { id: 1, name: 'Mr Afrasiab Niazi', stage: 'Contacted', value: '£25,000', created: 'Nov 15, 2025', lastActivity: 'Nov 17, 2025 13:33' },
@@ -1237,7 +1264,7 @@ const CRMPortal = () => {
       }
     ];
 
-    const displayedKpiData = dashboardExpanded ? kpiData : kpiData.slice(0, 4);
+    const displayedKpiData = dashboardExpanded ? kpiData : kpiData.slice(0, 5);
     const widgetData = expandedWidget ? getWidgetData(expandedWidget) : [];
 
     const leadsByStage = [
@@ -1288,9 +1315,26 @@ const CRMPortal = () => {
         </div>
 
         {/* KPI Cards */}
+        <style>{`
+          @media (min-width: 1400px) {
+            .kpi-card-col { flex: 0 0 20% !important; max-width: 20% !important; }
+          }
+          @media (min-width: 1200px) and (max-width: 1399px) {
+            .kpi-card-col { flex: 0 0 25% !important; max-width: 25% !important; }
+          }
+          @media (min-width: 992px) and (max-width: 1199px) {
+            .kpi-card-col { flex: 0 0 33.333% !important; max-width: 33.333% !important; }
+          }
+          @media (min-width: 768px) and (max-width: 991px) {
+            .kpi-card-col { flex: 0 0 50% !important; max-width: 50% !important; }
+          }
+          @media (max-width: 767px) {
+            .kpi-card-col { flex: 0 0 100% !important; max-width: 100% !important; }
+          }
+        `}</style>
         <Row className="mb-4">
           {displayedKpiData.map((kpi, index) => (
-            <Col lg={3} md={6} key={index} className="mb-3">
+            <Col key={index} className="mb-3 kpi-card-col">
               <KPICard {...kpi} />
             </Col>
           ))}
@@ -1427,11 +1471,11 @@ const CRMPortal = () => {
         {/* Charts Row */}
         <Row className="mb-4">
           {/* Sales Pipeline Bar Chart */}
-          <Col lg={8} className="mb-4">
+          <Col lg={6} className="mb-4">
             <Card className="border-0 shadow-sm">
               <Card.Body>
                 <h5 className="mb-4 fw-bold">Sales Pipeline</h5>
-                <ResponsiveContainer width="100%" height={300}>
+                <ResponsiveContainer width="100%" height={200}>
                   <BarChart data={salesPipelineData}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="stage" tick={{ fontSize: 12 }} />
@@ -1444,132 +1488,204 @@ const CRMPortal = () => {
             </Card>
           </Col>
 
-          {/* Order Approval Status Pie Chart */}
-          <Col lg={4} className="mb-4">
-            <Card className="border-0 shadow-sm">
-              <Card.Body>
-                <h5 className="mb-4 fw-bold">Order Approval Status</h5>
-                <ResponsiveContainer width="100%" height={300}>
-                  <PieChart>
-                    <Pie
-                      data={orderApprovalData}
-                      cx="50%"
-                      cy="50%"
-                      outerRadius={80}
-                      dataKey="value"
-                      label={({ name, value }) => `${name}: ${value}`}
-                    >
-                      {orderApprovalData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                  </PieChart>
-                </ResponsiveContainer>
-              </Card.Body>
-            </Card>
-          </Col>
+      {/* Order Approval Status Pie Chart */}
+<Col lg={3} className="mb-4">
+  <Card className="border-0 shadow-sm">
+    <Card.Body>
+      <h5 className="mb-4 fw-bold">Order Approval Status</h5>
+      <ResponsiveContainer width="100%" height={200}>
+        <PieChart>
+          <Pie
+            data={orderApprovalData}
+            cx="50%"
+            cy="50%"
+            outerRadius="55%"
+            dataKey="value"
+            // label={({ name, value }) => `${name}: ${value}`}
+            // labelLine={{ stroke: '#666', strokeWidth: 1 }}
+          >
+            {orderApprovalData.map((entry, index) => (
+              <Cell key={`cell-${index}`} fill={entry.color} />
+            ))}
+          </Pie>
+          <Tooltip />
+        </PieChart>
+      </ResponsiveContainer>
+    </Card.Body>
+  </Card>
+</Col>
+
+{/* Order Fulfillment Status */}
+<Col lg={3} className="mb-4">
+  <Card className="border-0 shadow-sm">
+    <Card.Body>
+      <h5 className="mb-4 fw-bold">Order Fulfillment Status</h5>
+      <ResponsiveContainer width="100%" height={200}>
+        <PieChart>
+          <Pie
+            data={orderFulfillmentData}
+            cx="50%"
+            cy="50%"
+            innerRadius="35%"
+            outerRadius="55%"
+            dataKey="value"
+            // label={({ name, value }) => `${name}: ${value}`}
+            // labelLine={{ stroke: '#666', strokeWidth: 1 }}
+          >
+            {orderFulfillmentData.map((entry, index) => (
+              <Cell key={`cell-${index}`} fill={entry.color} />
+            ))}
+          </Pie>
+          <Tooltip />
+        </PieChart>
+      </ResponsiveContainer>
+    </Card.Body>
+  </Card>
+</Col>
         </Row>
 
-        {/* Second Charts Row */}
-        <Row className="mb-4">
-          {/* Leads by Stage */}
-          <Col lg={6} className="mb-4">
-            <Card className="border-0 shadow-sm">
-              <Card.Body style={{minHeight: '344px'}}>
-                <h5 className="mb-4 fw-bold">Leads by Stage</h5>
-                {leadsByStage.map((item, index) => (
-                  <div key={index} className="mb-3">
-                    <div className="d-flex justify-content-between align-items-center mb-2">
-                      <span className="fw-semibold">{item.stage}</span>
-                      <Badge bg="primary" className="bg-opacity-10 text-dark">{item.count}</Badge>
-                    </div>
-                    <ProgressBar 
-                      now={(item.count / 45) * 100} 
-                      style={{ height: '8px', backgroundColor: '#e9ecef' }}
-                      className="rounded"
-                    />
-                  </div>
-                ))}
-              </Card.Body>
-            </Card>
-          </Col>
-
-          {/* Order Fulfillment Status */}
-          <Col lg={6} className="mb-4">
-            <Card className="border-0 shadow-sm">
-              <Card.Body>
-                <h5 className="mb-4 fw-bold">Order Fulfillment Status</h5>
-                <ResponsiveContainer width="100%" height={250}>
-                  <PieChart>
-                    <Pie
-                      data={orderFulfillmentData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={50}
-                      outerRadius={90}
-                      dataKey="value"
-                      label={({ name, value }) => `${name}: ${value}`}
-                    >
-                      {orderFulfillmentData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                  </PieChart>
-                </ResponsiveContainer>
-              </Card.Body>
-            </Card>
-          </Col>
-        </Row>
+      
 
         {/* Recent Activities */}
-        <Row>
-          {/* Recent Leads */}
-          <Col lg={4} className="mb-4">
-            <Card className="border-0 shadow-sm">
-              <Card.Body>
-                <div className="d-flex justify-content-between align-items-center mb-4">
-                  <h5 className="mb-0 fw-bold">Recent Leads</h5>
-                  <Button variant="link" size="sm" className="text-decoration-none" onClick={() => setActiveScreen('leads')}>
-                    View All →
-                  </Button>
-                </div>
-                <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
-                  {recentLeads.map((lead) => (
-                    <div key={lead.id} className="mb-3 pb-3 border-bottom">
-                      <div className="d-flex justify-content-between align-items-start mb-2">
-                        <h6 className="mb-1">{lead.name}</h6>
-                        <Badge bg="primary" className="bg-opacity-10 text-dark">{lead.stage}</Badge>
-                      </div>
-                      <small className="text-muted d-block">Created: {lead.created}</small>
-                      <small className="text-muted d-block">Last activity: {lead.lastActivity}</small>
-                    </div>
-                  ))}
-                </div>
-              </Card.Body>
-            </Card>
-          </Col>
+        
 
-          {/* Recent Opportunities */}
-          <Col lg={4} className="mb-4">
+
+
+{/* Second Charts Row */}
+<Row className="mb-4">
+  {/* Leads by Stage */}
+  <Col lg={6} className="mb-4">
+    <Card className="border-0 shadow-sm">
+      <Card.Body style={{minHeight: '344px'}}>
+        <h5 className="mb-4 fw-bold">Leads by Stage</h5>
+        {leadsByStage.map((item, index) => (
+          <div key={index} className="mb-3">
+            <div className="d-flex justify-content-between align-items-center mb-2">
+              <span className="fw-semibold">{item.stage}</span>
+              <Badge bg="primary" className="bg-opacity-10 text-dark">{item.count}</Badge>
+            </div>
+            <ProgressBar 
+              now={(item.count / 45) * 100} 
+              style={{ height: '8px', backgroundColor: '#e9ecef' }}
+              className="rounded"
+            />
+          </div>
+        ))}
+      </Card.Body>
+    </Card>
+  </Col>
+
+  {/* Recent Leads */}
+  {/* Recent Leads */}
+<Col lg={6} className="mb-4">
+  <Card className="border-0 shadow-sm">
+    <Card.Body>
+      <div className="d-flex justify-content-between align-items-center mb-4">
+        <h5 className="mb-0 fw-bold">Recent Leads</h5>
+        <Button variant="link" size="sm" className="text-decoration-none" onClick={() => setActiveScreen('leads')}>
+          View All →
+        </Button>
+      </div>
+      <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
+        <Table hover responsive className="mb-0">
+          <thead style={{ position: 'sticky', top: 0, backgroundColor: '#fff', zIndex: 1 }}>
+            <tr>
+              <th style={{ fontSize: '0.85rem', fontWeight: 600, borderBottom: '2px solid #dee2e6' }}>Name</th>
+              <th style={{ fontSize: '0.85rem', fontWeight: 600, borderBottom: '2px solid #dee2e6' }}>Stage</th>
+              <th style={{ fontSize: '0.85rem', fontWeight: 600, borderBottom: '2px solid #dee2e6' }}>Created</th>
+              <th style={{ fontSize: '0.85rem', fontWeight: 600, borderBottom: '2px solid #dee2e6' }}>Last Activity</th>
+            </tr>
+          </thead>
+          <tbody>
+            {recentLeads.map((lead) => (
+              <tr key={lead.id}>
+                <td style={{ fontSize: '0.9rem', fontWeight: 500 }}>{lead.name}</td>
+                <td>
+                  <Badge bg="primary" className="bg-opacity-10 text-dark">
+                    {lead.stage}
+                  </Badge>
+                </td>
+                <td style={{ fontSize: '0.85rem', color: '#6c757d' }}>{lead.created}</td>
+                <td style={{ fontSize: '0.85rem', color: '#6c757d' }}>{lead.lastActivity}</td>
+              </tr>
+            ))}
+          </tbody>
+        </Table>
+      </div>
+    </Card.Body>
+  </Card>
+</Col>
+</Row>
+        {/* Recent Activities */}
+<Row>
+  {/* Recent Opportunities */}
+  <Col lg={6} className="mb-4">
             <Card className="border-0 shadow-sm">
               <Card.Body>
                 <div className="d-flex justify-content-between align-items-center mb-4">
-                  <h5 className="mb-0 fw-bold">Recent Opportunities</h5>
+                  <h5 className="mb-0 fw-bold" style={{ color: '#2c3e50' }}>Recent Opportunities</h5>
                   <Button variant="link" size="sm" className="text-decoration-none" onClick={() => setActiveScreen('deals')}>
                     View All →
                   </Button>
                 </div>
                 <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
-                  {recentOpportunities.map((opp) => (
-                    <div key={opp.id} className="mb-3 pb-3 border-bottom">
-                      <div className="d-flex justify-content-between align-items-start mb-2">
-                        <h6 className="mb-1">{opp.name}</h6>
-                        <Badge bg="success" className="bg-opacity-10 text-dark">{opp.stage}</Badge>
+                  {recentOpportunities.slice(0, 5).map((opp) => (
+                    <div key={opp.id} className="mb-3 d-flex align-items-start gap-2">
+                      {/* Blue Dot Indicator */}
+                      <div style={{
+                        width: '8px',
+                        height: '8px',
+                        borderRadius: '50%',
+                        backgroundColor: '#0d6efd',
+                        marginTop: '6px',
+                        flexShrink: 0
+                      }} />
+                      
+                      <div className="flex-grow-1">
+                        {/* Opportunity Name */}
+                        <h6 className="mb-2" style={{ fontSize: '0.95rem', fontWeight: 600, color: '#2c3e50' }}>
+                          {opp.name}
+                        </h6>
+                        
+                        {/* Meta Information */}
+                        <div className="d-flex flex-wrap align-items-center gap-2 mb-2">
+                          <small className="text-muted d-flex align-items-center gap-1">
+                            <Calendar size={14} />
+                            {opp.created}
+                          </small>
+                          <small className="text-muted d-flex align-items-center gap-1">
+                            <Tag size={14} />
+                            {opp.value}
+                          </small>
+                          <Badge 
+                            bg={
+                              opp.stage === 'Won' ? 'success' :
+                              opp.stage === 'Lost' ? 'danger' :
+                              opp.stage === 'Meeting' ? 'primary' :
+                              'secondary'
+                            }
+                            style={{
+                              fontSize: '0.7rem',
+                              fontWeight: 500,
+                              padding: '4px 10px',
+                              textTransform: 'uppercase',
+                              backgroundColor: 
+                                opp.stage === 'Won' ? '#d4edda' :
+                                opp.stage === 'Lost' ? '#f8d7da' :
+                                opp.stage === 'Meeting' ? '#d1ecf1' :
+                                '#e2e3e5',
+                              color:
+                                opp.stage === 'Won' ? '#155724' :
+                                opp.stage === 'Lost' ? '#721c24' :
+                                opp.stage === 'Meeting' ? '#0c5460' :
+                                '#383d41',
+                              border: 'none'
+                            }}
+                          >
+                            {opp.stage}
+                          </Badge>
+                        </div>
                       </div>
-                      <small className="text-muted d-block">Created: {opp.created}</small>
-                      <small className="text-muted d-block">Last activity: {opp.lastActivity}</small>
                     </div>
                   ))}
                 </div>
@@ -1578,41 +1694,80 @@ const CRMPortal = () => {
           </Col>
 
           {/* Recent Orders */}
-          <Col lg={4} className="mb-4">
+          <Col lg={6} className="mb-4">
             <Card className="border-0 shadow-sm">
               <Card.Body>
                 <div className="d-flex justify-content-between align-items-center mb-4">
-                  <h5 className="mb-0 fw-bold">Recent Orders</h5>
+                  <h5 className="mb-0 fw-bold" style={{ color: '#2c3e50' }}>Recent Orders</h5>
                   <Button variant="link" size="sm" className="text-decoration-none" onClick={() => setActiveScreen('orders')}>
                     View All →
                   </Button>
                 </div>
                 <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
-                  {recentOrders.map((order) => (
-                    <div key={order.id} className="mb-3 pb-3 border-bottom">
-                      <div className="d-flex justify-content-between align-items-start mb-2">
-                        <div>
-                          <h6 className="mb-1">{order.id}</h6>
-                          <small className="text-muted">{order.customer}</small>
+                  {recentOrders.slice(0, 5).map((order) => (
+                    <div key={order.id} className="mb-3 d-flex align-items-start gap-2">
+                      {/* Blue Dot Indicator */}
+                      <div style={{
+                        width: '8px',
+                        height: '8px',
+                        borderRadius: '50%',
+                        backgroundColor: '#0d6efd',
+                        marginTop: '6px',
+                        flexShrink: 0
+                      }} />
+                      
+                      <div className="flex-grow-1">
+                        {/* Order ID and Customer */}
+                        <h6 className="mb-2" style={{ fontSize: '0.95rem', fontWeight: 600, color: '#2c3e50' }}>
+                          {order.id} - {order.customer}
+                        </h6>
+                        
+                        {/* Meta Information */}
+                        <div className="d-flex flex-wrap align-items-center gap-2 mb-2">
+                          <small className="text-muted d-flex align-items-center gap-1">
+                            <Calendar size={14} />
+                            {order.date}
+                          </small>
+                          <small className="text-muted d-flex align-items-center gap-1">
+                            <Tag size={14} />
+                            {order.product}
+                          </small>
+                          <Badge 
+                            bg={
+                              order.status === 'Delivered' ? 'success' :
+                              order.status === 'In Progress' ? 'info' :
+                              order.status === 'Approved' ? 'primary' :
+                              'warning'
+                            }
+                            style={{
+                              fontSize: '0.7rem',
+                              fontWeight: 500,
+                              padding: '4px 10px',
+                              textTransform: 'uppercase',
+                              backgroundColor: 
+                                order.status === 'Delivered' ? '#d4edda' :
+                                order.status === 'In Progress' ? '#d1ecf1' :
+                                order.status === 'Approved' ? '#cce5ff' :
+                                '#fff3cd',
+                              color:
+                                order.status === 'Delivered' ? '#155724' :
+                                order.status === 'In Progress' ? '#0c5460' :
+                                order.status === 'Approved' ? '#004085' :
+                                '#856404',
+                              border: 'none'
+                            }}
+                          >
+                            {order.status}
+                          </Badge>
                         </div>
-                        <Badge bg={
-                          order.status === 'Delivered' ? 'success' :
-                          order.status === 'In Progress' ? 'info' :
-                          order.status === 'Approved' ? 'primary' :
-                          'warning'
-                        } className="bg-opacity-10 text-dark">
-                          {order.status}
-                        </Badge>
                       </div>
-                      <small className="text-muted d-block">Status: {order.status}</small>
-                      <small className="text-muted d-block">Created: {order.date}</small>
                     </div>
                   ))}
                 </div>
               </Card.Body>
             </Card>
           </Col>
-        </Row>
+</Row>
       </div>
     );
   };
@@ -9215,7 +9370,7 @@ const CRMPortal = () => {
           <>
             {/* Summary Stats Grid - Collapsible */}
             <Row className="mb-2">
-          <Col xl={3} lg={4} md={6} className="mb-3">
+          <Col className="mb-3 kpi-card-col">
             <KPICard 
               title="Total Records"
               value="241"
@@ -9223,7 +9378,7 @@ const CRMPortal = () => {
               color="primary"
             />
           </Col>
-          <Col xl={3} lg={4} md={6} className="mb-3">
+          <Col className="mb-3 kpi-card-col">
             <KPICard 
               title="Scheduled"
               value="8"
@@ -9231,7 +9386,7 @@ const CRMPortal = () => {
               color="success"
             />
           </Col>
-          <Col xl={3} lg={4} md={6} className="mb-3">
+          <Col className="mb-3 kpi-card-col">
             <KPICard 
               title="Not Scheduled"
               value="233"
@@ -9239,7 +9394,7 @@ const CRMPortal = () => {
               color="secondary"
             />
           </Col>
-          <Col xl={3} lg={4} md={6} className="mb-3">
+          <Col className="mb-3 kpi-card-col">
             <KPICard 
               title="Next Hour"
               value="0"
@@ -9249,7 +9404,7 @@ const CRMPortal = () => {
           </Col>
           {showAllProspectStats && (
             <>
-              <Col xl={3} lg={4} md={6} className="mb-3">
+              <Col className="mb-3 kpi-card-col">
                 <KPICard 
                   title="Next 24h"
                   value="0"
@@ -9257,7 +9412,7 @@ const CRMPortal = () => {
                   color="warning"
                 />
               </Col>
-              <Col xl={3} lg={4} md={6} className="mb-3">
+              <Col className="mb-3 kpi-card-col">
                 <KPICard 
                   title="Overdue Calls"
                   value="8"
@@ -9265,7 +9420,7 @@ const CRMPortal = () => {
                   color="danger"
                 />
               </Col>
-              <Col xl={3} lg={4} md={6} className="mb-3">
+              <Col className="mb-3 kpi-card-col">
                 <KPICard 
                   title="Assigned Entries"
                   value="169"
@@ -9273,7 +9428,7 @@ const CRMPortal = () => {
                   color="primary"
                 />
               </Col>
-              <Col xl={3} lg={4} md={6} className="mb-3">
+              <Col className="mb-3 kpi-card-col">
                 <KPICard 
                   title="Unassigned Entries"
                   value="72"
@@ -9331,7 +9486,7 @@ const CRMPortal = () => {
               <Card.Body>
                 <h5 className="mb-4 fw-bold">Call Status Distribution</h5>
                 <ResponsiveContainer width="100%" height={250}>
-                  <PieChart>
+                  <PieChart margin={{ top: 5, right: 5, bottom: 5, left: 5 }}>
                     <Pie
                       data={[
                         { name: 'Answered', value: 125, fill: '#198754' },
@@ -9341,9 +9496,9 @@ const CRMPortal = () => {
                       ]}
                       cx="50%"
                       cy="50%"
-                      labelLine={false}
+                      labelLine={true}
                       label={({ name, percent }: any) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                      outerRadius={80}
+                      outerRadius="55%"
                       dataKey="value"
                     />
                     <Tooltip />
@@ -9361,7 +9516,7 @@ const CRMPortal = () => {
               <Card.Body>
                 <h5 className="mb-4 fw-bold">Lead Source Distribution</h5>
                 <ResponsiveContainer width="100%" height={250}>
-                  <PieChart>
+                  <PieChart margin={{ top: 5, right: 5, bottom: 5, left: 5 }}>
                     <Pie
                       data={[
                         { name: 'Campaign', value: 145, fill: '#0d6efd' },
@@ -9371,9 +9526,9 @@ const CRMPortal = () => {
                       ]}
                       cx="50%"
                       cy="50%"
-                      labelLine={false}
+                      labelLine={true}
                       label={({ name, percent }: any) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                      outerRadius={80}
+                      outerRadius="55%"
                       dataKey="value"
                     />
                     <Tooltip />
@@ -10633,7 +10788,7 @@ const CRMPortal = () => {
               <Card.Body>
                 <h6 className="fw-bold mb-3">Lead Potential Distribution</h6>
                 <ResponsiveContainer width="100%" height={250}>
-                  <PieChart>
+                  <PieChart margin={{ top: 5, right: 5, bottom: 5, left: 5 }}>
                     <Pie
                       data={[
                         { name: 'Hot', value: 15, color: '#dc3545' },
@@ -10642,9 +10797,9 @@ const CRMPortal = () => {
                       ]}
                       cx="50%"
                       cy="50%"
-                      labelLine={false}
+                      labelLine={true}
                       label={({ name, percent }: any) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                      outerRadius={80}
+                      outerRadius="55%"
                       fill="#8884d8"
                       dataKey="value"
                     >
@@ -10667,7 +10822,7 @@ const CRMPortal = () => {
               <Card.Body>
                 <h6 className="fw-bold mb-3">Urgency Levels</h6>
                 <ResponsiveContainer width="100%" height={250}>
-                  <PieChart>
+                  <PieChart margin={{ top: 5, right: 5, bottom: 5, left: 5 }}>
                     <Pie
                       data={[
                         { name: 'High', value: 22, color: '#dc3545' },
@@ -10676,9 +10831,9 @@ const CRMPortal = () => {
                       ]}
                       cx="50%"
                       cy="50%"
-                      labelLine={false}
+                      labelLine={true}
                       label={({ name, percent }: any) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                      outerRadius={80}
+                      outerRadius="55%"
                       fill="#8884d8"
                       dataKey="value"
                     >
@@ -12695,7 +12850,7 @@ const CRMPortal = () => {
               <Card.Body>
                 <h6 className="fw-bold mb-3">Deals by Stage</h6>
                 <ResponsiveContainer width="100%" height={250}>
-                  <PieChart>
+                  <PieChart margin={{ top: 5, right: 5, bottom: 5, left: 5 }}>
                     <Pie
                       data={[
                         { name: 'Meeting', value: 12, color: '#0dcaf0' },
@@ -12706,9 +12861,9 @@ const CRMPortal = () => {
                       ]}
                       cx="50%"
                       cy="50%"
-                      labelLine={false}
+                      labelLine={true}
                       label={({ name, percent }: any) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                      outerRadius={80}
+                      outerRadius="50%"
                       fill="#8884d8"
                       dataKey="value"
                     >
@@ -12756,7 +12911,7 @@ const CRMPortal = () => {
               <Card.Body>
                 <h6 className="fw-bold mb-3">Win/Loss Ratio</h6>
                 <ResponsiveContainer width="100%" height={250}>
-                  <PieChart>
+                  <PieChart margin={{ top: 5, right: 5, bottom: 5, left: 5 }}>
                     <Pie
                       data={[
                         { name: 'Won', value: 13, color: '#198754' },
@@ -12765,9 +12920,9 @@ const CRMPortal = () => {
                       ]}
                       cx="50%"
                       cy="50%"
-                      labelLine={false}
+                      labelLine={true}
                       label={({ name, percent }: any) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                      outerRadius={80}
+                      outerRadius="55%"
                       fill="#8884d8"
                       dataKey="value"
                     >
@@ -13921,7 +14076,7 @@ const CRMPortal = () => {
               <Card.Body>
                 <h6 className="fw-bold mb-3">Orders by Status</h6>
                 <ResponsiveContainer width="100%" height={250}>
-                  <PieChart>
+                  <PieChart margin={{ top: 5, right: 5, bottom: 5, left: 5 }}>
                     <Pie
                       data={[
                         { name: 'Delivered', value: 22, color: '#198754' },
@@ -13930,9 +14085,9 @@ const CRMPortal = () => {
                       ]}
                       cx="50%"
                       cy="50%"
-                      labelLine={false}
+                      labelLine={true}
                       label={({ name, percent }: any) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                      outerRadius={80}
+                      outerRadius="55%"
                       fill="#8884d8"
                       dataKey="value"
                     >
@@ -13980,7 +14135,7 @@ const CRMPortal = () => {
               <Card.Body>
                 <h6 className="fw-bold mb-3">Fulfillment Status</h6>
                 <ResponsiveContainer width="100%" height={250}>
-                  <PieChart>
+                  <PieChart margin={{ top: 5, right: 5, bottom: 5, left: 5 }}>
                     <Pie
                       data={[
                         { name: 'Completed', value: 22, color: '#198754' },
@@ -13989,9 +14144,9 @@ const CRMPortal = () => {
                       ]}
                       cx="50%"
                       cy="50%"
-                      labelLine={false}
+                      labelLine={true}
                       label={({ name, percent }: any) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                      outerRadius={80}
+                      outerRadius="55%"
                       fill="#8884d8"
                       dataKey="value"
                     >
@@ -17256,6 +17411,494 @@ const CRMPortal = () => {
     );
   };
 
+  // NEW Activity Tracker with Leads Page Structure
+  const renderActivityTrackerUpdated = () => {
+    // Sample activity data with types (Prospects, Leads, Deals, Orders)
+    const allActivityRecords = [
+      { id: 1, customer: 'Global Services Ltd', type: 'Order', campaign: 'Enterprise Q4', agent: 'Sarah Williams', lastActivity: '2025-11-29 14:20', stage: 'Order Placed', tags: ['High Value', 'Priority'] },
+      { id: 2, customer: 'Acme Corporation', type: 'Deal', campaign: 'Tech Solutions', agent: 'John Doe', lastActivity: '2025-11-29 09:15', stage: 'Deal Won', tags: ['Enterprise'] },
+      { id: 3, customer: 'John Smith', type: 'Lead', campaign: 'LinkedIn Campaign', agent: 'Jane Smith', lastActivity: '2025-11-28 10:30', stage: 'Qualified', tags: ['New'] },
+      { id: 4, customer: 'Tech Innovations Ltd', type: 'Deal', campaign: 'Google Ads Q4', agent: 'Mike Johnson', lastActivity: '2025-11-28 16:45', stage: 'Proposal Sent', tags: ['Tech'] },
+      { id: 5, customer: 'Emily Davis', type: 'Prospect', campaign: 'Cold Outreach', agent: 'Tom Brown', lastActivity: '2025-11-27 15:30', stage: 'New', tags: [] },
+      { id: 6, customer: 'DataTech Systems', type: 'Deal', campaign: 'Partner Referral', agent: 'Sarah Williams', lastActivity: '2025-11-27 11:00', stage: 'Negotiation', tags: ['High Value'] },
+      { id: 7, customer: 'Innovation Hub', type: 'Lead', campaign: 'Website Form', agent: 'Jane Smith', lastActivity: '2025-11-26 14:20', stage: 'Contacted', tags: ['Startup'] },
+      { id: 8, customer: 'Robert Wilson', type: 'Prospect', campaign: 'Email Campaign', agent: 'Sarah Williams', lastActivity: '2025-11-26 10:15', stage: 'New', tags: ['Campaign'] },
+      { id: 9, customer: 'Cloud Solutions Inc', type: 'Order', campaign: 'Enterprise Q4', agent: 'John Doe', lastActivity: '2025-11-25 13:45', stage: 'Order Placed', tags: ['Cloud'] },
+      { id: 10, customer: 'Sarah Johnson', type: 'Lead', campaign: 'LinkedIn Campaign', agent: 'Mike Johnson', lastActivity: '2025-11-25 10:20', stage: 'Qualified', tags: [] },
+      { id: 11, customer: 'Finance Corp', type: 'Deal', campaign: 'Google Ads Q4', agent: 'Sarah Williams', lastActivity: '2025-11-24 09:30', stage: 'Needs Analysis', tags: ['Finance'] },
+      { id: 12, customer: 'Startup Labs', type: 'Prospect', campaign: 'Cold Outreach', agent: 'Tom Brown', lastActivity: '2025-11-24 14:15', stage: 'New', tags: ['Tech'] },
+    ];
+
+    // Available campaigns, agents, and stages for dropdowns
+    const availableCampaigns = ['All Campaigns', 'Enterprise Q4', 'Tech Solutions', 'LinkedIn Campaign', 'Google Ads Q4', 'Cold Outreach', 'Partner Referral', 'Website Form', 'Email Campaign'];
+    const availableAgents = ['All Agents', 'Sarah Williams', 'John Doe', 'Jane Smith', 'Mike Johnson', 'Tom Brown'];
+    const availableStages = ['All Stages', 'New', 'Contacted', 'Qualified', 'Needs Analysis', 'Proposal Sent', 'Negotiation', 'Deal Won', 'Order Placed'];
+
+    // Filter activities based on type, search, and advanced filters
+    const filteredActivityRecords = allActivityRecords
+      .filter(activity => {
+        // Type filter
+        if (activityTypeFilter === 'all') return true;
+        if (activityTypeFilter === 'prospects') return activity.type === 'Prospect';
+        if (activityTypeFilter === 'leads') return activity.type === 'Lead';
+        if (activityTypeFilter === 'deals') return activity.type === 'Deal';
+        if (activityTypeFilter === 'orders') return activity.type === 'Order';
+        return true;
+      })
+      .filter(activity => {
+        // Search filter
+        if (!activitySearch) return true;
+        const searchLower = activitySearch.toLowerCase();
+        return activity.customer.toLowerCase().includes(searchLower) ||
+               activity.agent.toLowerCase().includes(searchLower) ||
+               activity.campaign.toLowerCase().includes(searchLower);
+      })
+      .filter(activity => {
+        // Campaign filter
+        if (activityFilters.campaigns.length === 0 || activityFilters.campaigns.includes('All Campaigns')) return true;
+        return activityFilters.campaigns.includes(activity.campaign);
+      })
+      .filter(activity => {
+        // Agent filter
+        if (activityFilters.agents.length === 0 || activityFilters.agents.includes('All Agents')) return true;
+        return activityFilters.agents.includes(activity.agent);
+      })
+      .filter(activity => {
+        // Stage filter
+        if (activityFilters.stages.length === 0 || activityFilters.stages.includes('All Stages')) return true;
+        return activityFilters.stages.includes(activity.stage);
+      });
+
+    // Quick filter counts
+    const typeFilterCounts = {
+      all: allActivityRecords.length,
+      prospects: allActivityRecords.filter(a => a.type === 'Prospect').length,
+      leads: allActivityRecords.filter(a => a.type === 'Lead').length,
+      deals: allActivityRecords.filter(a => a.type === 'Deal').length,
+      orders: allActivityRecords.filter(a => a.type === 'Order').length,
+    };
+
+    // Activity Timeline Modal
+    const ActivityTimelineModal = () => {
+      if (!selectedActivityRecord) return null;
+
+      // Sample timeline data for the selected record
+      const timelineData = [
+        { date: '2025-11-29 14:20', action: 'Stage Changed', description: `Moved to ${selectedActivityRecord.stage}`, user: selectedActivityRecord.agent, icon: <ArrowRight size={16} />, color: 'primary' },
+        { date: '2025-11-28 10:15', action: 'Call Made', description: 'Initial discovery call completed', user: selectedActivityRecord.agent, icon: <Phone size={16} />, color: 'info' },
+        { date: '2025-11-27 16:30', action: 'Email Sent', description: 'Follow-up email sent', user: selectedActivityRecord.agent, icon: <Mail size={16} />, color: 'secondary' },
+        { date: '2025-11-26 09:00', action: 'Meeting Scheduled', description: 'Demo meeting scheduled', user: selectedActivityRecord.agent, icon: <Calendar size={16} />, color: 'warning' },
+        { date: '2025-11-25 14:45', action: 'Note Added', description: 'Requirements documented', user: selectedActivityRecord.agent, icon: <FileText size={16} />, color: 'secondary' },
+        { date: '2025-11-24 11:20', action: 'Record Created', description: `${selectedActivityRecord.type} record created`, user: 'System', icon: <PlusCircle size={16} />, color: 'success' },
+      ];
+
+      return (
+        <Modal show={showActivityTimelineModal} onHide={() => setShowActivityTimelineModal(false)} size="lg">
+          <Modal.Header closeButton className="border-0 pb-0">
+            <Modal.Title className="fw-bold">Activity Timeline</Modal.Title>
+          </Modal.Header>
+          <Modal.Body>
+            {/* Record Header */}
+            <Card className="border-0 shadow-sm mb-4" style={{ backgroundColor: '#f8f9fa' }}>
+              <Card.Body>
+                <Row>
+                  <Col md={6}>
+                    <div className="mb-2">
+                      <small className="text-muted d-block mb-1">Customer</small>
+                      <h6 className="mb-0 fw-bold">{selectedActivityRecord.customer}</h6>
+                    </div>
+                    <div className="mb-2">
+                      <small className="text-muted d-block mb-1">Type</small>
+                      <Badge bg="primary">{selectedActivityRecord.type}</Badge>
+                    </div>
+                  </Col>
+                  <Col md={6}>
+                    <div className="mb-2">
+                      <small className="text-muted d-block mb-1">Campaign</small>
+                      <div className="fw-semibold">{selectedActivityRecord.campaign}</div>
+                    </div>
+                    <div className="mb-2">
+                      <small className="text-muted d-block mb-1">Current Stage</small>
+                      <Badge bg="success">{selectedActivityRecord.stage}</Badge>
+                    </div>
+                  </Col>
+                </Row>
+              </Card.Body>
+            </Card>
+
+            {/* Timeline */}
+            <div className="position-relative">
+              {/* Vertical line */}
+              <div 
+                style={{
+                  position: 'absolute',
+                  left: '19px',
+                  top: '0',
+                  bottom: '0',
+                  width: '2px',
+                  backgroundColor: '#e0e0e0'
+                }}
+              />
+
+              {timelineData.map((item, index) => (
+                <div key={index} className="d-flex gap-3 mb-4 position-relative">
+                  {/* Timeline Icon */}
+                  <div 
+                    className={`rounded-circle d-flex align-items-center justify-content-center bg-${item.color} text-white position-relative`}
+                    style={{ 
+                      width: '40px', 
+                      height: '40px', 
+                      minWidth: '40px',
+                      zIndex: 1
+                    }}
+                  >
+                    {item.icon}
+                  </div>
+                  
+                  {/* Timeline Card */}
+                  <Card className="flex-grow-1 border-0 shadow-sm">
+                    <Card.Body className="p-3">
+                      <div className="d-flex justify-content-between align-items-start mb-2">
+                        <div>
+                          <h6 className="mb-1 fw-semibold">{item.action}</h6>
+                          <p className="mb-1 text-dark">{item.description}</p>
+                        </div>
+                        <Badge bg={item.color} className="bg-opacity-50">
+                          {item.action.split(' ')[0]}
+                        </Badge>
+                      </div>
+                      <div className="d-flex justify-content-between align-items-center text-muted small">
+                        <span>
+                          <Users size={14} className="me-1" />
+                          {item.user}
+                        </span>
+                        <span>
+                          <Clock size={14} className="me-1" />
+                          {item.date}
+                        </span>
+                      </div>
+                    </Card.Body>
+                  </Card>
+                </div>
+              ))}
+            </div>
+          </Modal.Body>
+          <Modal.Footer className="border-0">
+            <Button variant="secondary" onClick={() => setShowActivityTimelineModal(false)}>
+              Close
+            </Button>
+          </Modal.Footer>
+        </Modal>
+      );
+    };
+
+    return (
+      <div>
+        {ActivityTimelineModal()}
+
+        {/* Header */}
+        <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4">
+          <div className="mb-3 mb-md-0">
+            <h2 className="mb-1 fw-bold">Activity Management</h2>
+            <p className="text-muted mb-0">Track and manage all customer activities across the pipeline</p>
+          </div>
+          <div className="d-flex flex-wrap gap-2">
+            <Button variant="outline-secondary" size="sm">
+              <Download size={16} className="me-2" />
+              Export
+            </Button>
+          </div>
+        </div>
+
+        {/* Filter Bar with Type Tabs */}
+        <FilterBar
+          quickFilters={[
+            {
+              id: 'all',
+              label: 'All Types',
+              count: typeFilterCounts.all,
+              color: '#6c757d',
+              activeColor: '#0d6efd',
+              icon: <Activity size={16} />
+            },
+            {
+              id: 'prospects',
+              label: 'Prospects',
+              count: typeFilterCounts.prospects,
+              color: '#6c757d',
+              activeColor: '#0d6efd',
+              icon: <Users size={16} />
+            },
+            {
+              id: 'leads',
+              label: 'Leads',
+              count: typeFilterCounts.leads,
+              color: '#0d6efd',
+              activeColor: '#0d6efd',
+              icon: <Target size={16} />
+            },
+            {
+              id: 'deals',
+              label: 'Deals',
+              count: typeFilterCounts.deals,
+              color: '#28a745',
+              activeColor: '#0d6efd',
+              icon: <Handshake size={16} />
+            },
+            {
+              id: 'orders',
+              label: 'Orders',
+              count: typeFilterCounts.orders,
+              color: '#20c997',
+              activeColor: '#0d6efd',
+              icon: <ShoppingBag size={16} />
+            }
+          ]}
+          activeFilter={activityTypeFilter}
+          onFilterChange={(filterId) => setActivityTypeFilter(filterId)}
+          searchValue={activitySearch}
+          onSearchChange={(value) => setActivitySearch(value)}
+          onSearch={() => console.log('Searching activities:', activitySearch)}
+          searchPlaceholder="Search by customer, agent, or campaign..."
+          showAdvancedFilters={showActivityAdvancedFilters}
+          onToggleAdvancedFilters={() => setShowActivityAdvancedFilters(!showActivityAdvancedFilters)}
+          advancedFilterCount={
+            activityFilters.campaigns.length +
+            activityFilters.agents.length +
+            activityFilters.stages.length +
+            (activityFilters.dateRange.start ? 1 : 0) +
+            (activityFilters.dateRange.end ? 1 : 0)
+          }
+        />
+
+        {/* Advanced Filters Panel */}
+        {showActivityAdvancedFilters && (
+          <Card className="border-0 shadow-sm mb-4">
+            <Card.Body>
+              <Row className="g-3 align-items-end">
+                <Col md={2}>
+                  <Form.Label className="small fw-bold mb-2">Campaigns</Form.Label>
+                  <Select
+                    isMulti
+                    options={availableCampaigns.map(c => ({ value: c, label: c }))}
+                    value={activityFilters.campaigns.map(c => ({ value: c, label: c }))}
+                    onChange={(selected) => {
+                      setActivityFilters(prev => ({
+                        ...prev,
+                        campaigns: selected ? selected.map(s => s.value) : []
+                      }));
+                    }}
+                    placeholder="Select campaigns..."
+                    styles={customSelectStyles}
+                  />
+                </Col>
+                <Col md={2}>
+                  <Form.Label className="small fw-bold mb-2">Agents</Form.Label>
+                  <Select
+                    isMulti
+                    options={availableAgents.map(a => ({ value: a, label: a }))}
+                    value={activityFilters.agents.map(a => ({ value: a, label: a }))}
+                    onChange={(selected) => {
+                      setActivityFilters(prev => ({
+                        ...prev,
+                        agents: selected ? selected.map(s => s.value) : []
+                      }));
+                    }}
+                    placeholder="Select agents..."
+                    styles={customSelectStyles}
+                  />
+                </Col>
+                <Col md={2}>
+                  <Form.Label className="small fw-bold mb-2">Stages</Form.Label>
+                  <Select
+                    isMulti
+                    options={availableStages.map(s => ({ value: s, label: s }))}
+                    value={activityFilters.stages.map(s => ({ value: s, label: s }))}
+                    onChange={(selected) => {
+                      setActivityFilters(prev => ({
+                        ...prev,
+                        stages: selected ? selected.map(s => s.value) : []
+                      }));
+                    }}
+                    placeholder="Select stages..."
+                    styles={customSelectStyles}
+                  />
+                </Col>
+                <Col md={2}>
+                  <Form.Label className="small fw-bold mb-2">From</Form.Label>
+                  <Form.Control 
+                    type="date" 
+                    value={activityFilters.dateRange.start}
+                    onChange={(e) => setActivityFilters(prev => ({ 
+                      ...prev, 
+                      dateRange: { ...prev.dateRange, start: e.target.value } 
+                    }))}
+                    style={{ fontSize: '0.875rem' }}
+                  />
+                </Col>
+                <Col md={2}>
+                  <Form.Label className="small fw-bold mb-2">To</Form.Label>
+                  <Form.Control 
+                    type="date" 
+                    value={activityFilters.dateRange.end}
+                    onChange={(e) => setActivityFilters(prev => ({ 
+                      ...prev, 
+                      dateRange: { ...prev.dateRange, end: e.target.value } 
+                    }))}
+                    style={{ fontSize: '0.875rem' }}
+                  />
+                </Col>
+                <Col md={2}>
+                  <div className="d-flex gap-2">
+                    {/* Apply Button */}
+                    <Button
+                      variant="primary"
+                      className="flex-grow-1 d-flex align-items-center justify-content-center"
+                      onClick={() => {
+                        // Apply filters - filters are already applied in real-time via filteredActivityRecords
+                        // This button can be used for additional actions like analytics tracking
+                        console.log('Activity filters applied:', activityFilters);
+                      }}
+                    >
+                      Apply
+                    </Button>
+
+                    {/* Reset Button */}
+                    <Button
+                      variant="outline-secondary"
+                      className="d-flex align-items-center justify-content-center"
+                      onClick={() => {
+                        setActivityTypeFilter('all');
+                        setActivitySearch('');
+                        setActivityFilters({
+                          campaigns: [],
+                          agents: [],
+                          stages: [],
+                          dateRange: { start: '', end: '' }
+                        });
+                      }}
+                    >
+                      Reset
+                    </Button>
+                  </div>
+                </Col>
+              </Row>
+            </Card.Body>
+          </Card>
+        )}
+
+        {/* Activities Table */}
+        <Card className="border-0 shadow-sm">
+          <Card.Body className="p-0">
+            <div className="table-responsive">
+              <Table hover className="mb-0">
+                <thead style={{ backgroundColor: '#f8f9fa' }}>
+                  <tr>
+                    <th style={{ width: '20%' }}>Customer</th>
+                    <th style={{ width: '15%' }}>Campaign</th>
+                    <th style={{ width: '12%' }}>Agent</th>
+                    <th style={{ width: '15%' }}>Last Activity</th>
+                    <th style={{ width: '10%' }}>Type</th>
+                    <th style={{ width: '15%' }}>Stage</th>
+                    <th style={{ width: '13%' }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredActivityRecords.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="text-center py-5 text-muted">
+                        <AlertCircle size={48} className="mb-3 opacity-50" />
+                        <div>No activities found matching your criteria</div>
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredActivityRecords.map((activity) => (
+                      <tr key={activity.id}>
+                        <td>
+                          <div>
+                            <div className="fw-semibold text-dark">{activity.customer}</div>
+                            {activity.tags.length > 0 && (
+                              <div className="mt-1">
+                                {activity.tags.map((tag, idx) => (
+                                  <Badge key={idx} bg="light" text="dark" className="me-1" style={{ fontSize: '0.7rem' }}>
+                                    {tag}
+                                  </Badge>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                        <td>
+                          <div className="small">{activity.campaign}</div>
+                        </td>
+                        <td>
+                          <div className="d-flex align-items-center gap-2">
+                            <div 
+                              style={{
+                                width: '32px',
+                                height: '32px',
+                                borderRadius: '50%',
+                                backgroundColor: '#0d6efd',
+                                color: 'white',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: '0.75rem',
+                                fontWeight: 600
+                              }}
+                            >
+                              {activity.agent.split(' ').map(n => n[0]).join('')}
+                            </div>
+                            <div className="small">{activity.agent}</div>
+                          </div>
+                        </td>
+                        <td>
+                          <div className="small">
+                            <div className="text-dark">{activity.lastActivity.split(' ')[0]}</div>
+                            <div className="text-muted">{activity.lastActivity.split(' ')[1]}</div>
+                          </div>
+                        </td>
+                        <td>
+                          <Badge 
+                            bg={
+                              activity.type === 'Prospect' ? 'secondary' :
+                              activity.type === 'Lead' ? 'primary' :
+                              activity.type === 'Deal' ? 'success' :
+                              'info'
+                            }
+                          >
+                            {activity.type}
+                          </Badge>
+                        </td>
+                        <td>
+                          <div className="small fw-semibold">{activity.stage}</div>
+                        </td>
+                        <td>
+                          <Button 
+                           variant="link" 
+                           size="sm" 
+                           className="p-1" 
+                            onClick={() => {
+                              setSelectedActivityRecord(activity);
+                              setShowActivityTimelineModal(true);
+                            }}
+                          >
+                            <Eye size={16} className="me-1" />
+                            
+                          </Button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </Table>
+            </div>
+          </Card.Body>
+        </Card>
+      </div>
+    );
+  };
+
   // Reports Screen
   const renderReports = () => {
     const conversionFunnelData = [
@@ -17536,7 +18179,7 @@ const CRMPortal = () => {
       case 'campaigns': return renderCampaigns();
       case 'tasks': return renderTasks();
       case 'stages': return renderStages();
-      case 'activities': return renderActivityTrackerNew(); // Use renderActivities() for old version
+      case 'activities': return renderActivityTrackerUpdated(); // Use renderActivityTrackerNew() or renderActivities() for old versions
       case 'reports': return renderReports();
       default: return renderDashboard();
     }
