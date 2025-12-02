@@ -279,17 +279,17 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
       selector: (row: any) => row.Duration,
       sortable: true,
       cell: (props: any) => {
-        const formatDuration = (seconds: number) => {
-          const minutes = Math.floor(seconds / 60);
-          let secs = seconds % 60;
-          secs = parseFloat(secs.toFixed(2));
+        // const formatDuration = (seconds: number) => {
+        //   const minutes = Math.floor(seconds / 60);
+        //   let secs = seconds % 60;
+        //   secs = parseFloat(secs.toFixed(2));
           
-          if (minutes > 0) {
-            return `${minutes} Min ${secs} Sec`;
-          } else {
-            return `${secs} Sec`;
-          }
-        };
+        //   if (minutes > 0) {
+        //     return `${minutes} Min ${secs} Sec`;
+        //   } else {
+        //     return `${secs} Sec`;
+        //   }
+        // };
         
         const duration = parseInt(props.Duration.toString())/10000000 || 0;
         return (
@@ -558,8 +558,8 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
     if (response?.summary) {
       setShowDateRange(true);
       const dataFilters = response?.filters;
-      setStartDateTime(dataFilters?.start_datetime);
-      setEndDateTime(dataFilters?.end_datetime);
+      setStartDateTime(dataFilters?.start_date);
+      setEndDateTime(dataFilters?.end_date);
     }
     // Return modified data if data has been manually added, otherwise return original response
     if (isDataModified && modifiedDataRef.current.length > 0) {
@@ -719,10 +719,16 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
     }
   };
 
+
   const handleAnalysis = async (props: any) => {
     try {
       const { Id, AudioTrack } = props;
-      window.open(`/ai-ml/analysis?id=${Id}&file=${AudioTrack}&direction=${props.Direction}&phone=${props.RemotePartyNumber}&imagicle=${props.imagicle}`, '_blank');
+
+      const tempUrl = `/ai-ml/analysis?id=${Id}&file=${AudioTrack}&direction=${props.Direction}&phone=${props.RemotePartyNumber}&imagicle=${props.imagicle}&duration=${props.Duration}`;
+
+      window.open(tempUrl, '_blank');
+      
+
     } catch (error) {
       console.error('Error navigating to analysis:', error);
     }

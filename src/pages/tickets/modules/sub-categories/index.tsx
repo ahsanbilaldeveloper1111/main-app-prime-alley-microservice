@@ -3,7 +3,7 @@ import React, { ReactElement, useState, useCallback, useMemo, useEffect } from '
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
 import GenericListPage from '@components/GenericListPage';
-import { ListSubmodules, CreateSubmodule, DeleteSubmodule, GetAllModules, ListSubmoduleChildren, CreateSubmoduleChild, DeleteSubmoduleChild } from '@utils/ticket-module';
+import { GetAllSubmodules,ListSubmodules, CreateSubmodule, DeleteSubmodule, GetAllModules, ListSubmoduleChildren, CreateSubmoduleChild, DeleteSubmoduleChild } from '@utils/ticket-module';
 import { Column } from '@components/CustomDataTable';
 import { Button, Row, Col, Card, Badge } from 'react-bootstrap';
 import { toast } from 'react-toastify';
@@ -71,6 +71,7 @@ const ModuleSubCategories = () => {
   const [isLoadingChildren, setIsLoadingChildren] = useState<boolean>(false);
 
   const memoizedFilters = useMemo(() => currentFilters, [currentFilters]);
+  
 
   // Fetch modules and extensions
   useEffect(() => {
@@ -96,8 +97,23 @@ const ModuleSubCategories = () => {
     fetchData();
   }, []);
 
+  const [newChildSubmoduleId, setNewChildSubmoduleId] = useState<string>("");
+  const [newChildModuleId, setNewChildModuleId] = useState<string>("");
+
+  const [submodules, setSubmodules] = useState<Submodule[]>([]);
+  const handleChangeModule = useCallback(async (moduleId: string) => {
+    setSubmodules([]);
+    setNewChildModuleId(moduleId);
+    const submodules = await ListSubmodules({ filters: { module_id: moduleId } });
+    if (submodules?.data) {
+      setSubmodules(submodules.data);
+    }
+  }, []);
+
   const fetchSubmodules = useCallback(async (page = 1, perPage = 15, search = "") => {
-    return await ListSubmoduleChildren({ page, perPage, search:currentFilters.search || search, filters: memoizedFilters });
+    // Exclude search from filters since it's passed as a separate parameter
+    const { search: _, ...filtersWithoutSearch } = memoizedFilters;
+    return await ListSubmoduleChildren({ page, perPage, search: search || currentFilters.search || "", filters: filtersWithoutSearch });
   }, [memoizedFilters, currentFilters]);
 
   const handleFiltersChange = useCallback((filters: any) => {
@@ -135,17 +151,9 @@ const ModuleSubCategories = () => {
 
   const [selectedSubmoduleForDelete, setSelectedSubmoduleForDelete] = useState<string | null>(null);
   const [showSubmoduleDeleteModal, setShowSubmoduleDeleteModal] = useState<boolean>(false);
+  const [selectedSubcategoryForDelete, setSelectedSubcategoryForDelete] = useState<string | null>(null);
 
-  const handleDeleteSubmodule = useCallback(async () => {
-    console.log(selectedSubmoduleForDelete);
-    const response = await DeleteSubmodule(selectedSubmoduleForDelete?.toString() || "");
-    if (response) {
-      setRefreshKey(prev => prev + 1);
-      toast.success('Submodule deleted successfully');
-      setSelectedSubmoduleForDelete(null);
-      setShowSubmoduleDeleteModal(false);
-    }
-  }, [selectedSubmoduleForDelete]);
+  
 
   const openSubmoduleChildrenModal = useCallback(async (submodule: Submodule) => {
     setSelectedSubmodule(submodule);
@@ -185,7 +193,7 @@ const ModuleSubCategories = () => {
   }, []);
 
   const handleCreateChild = useCallback(async () => {
-    if (!newChildName.trim() || !selectedSubmodule) {
+    if (!newChildName.trim() || !newChildModuleId ||!newChildSubmoduleId) {
       toast.error('Please fill in all required fields');
       return;
     }
@@ -194,8 +202,8 @@ const ModuleSubCategories = () => {
       const response = await CreateSubmoduleChild(
         newChildName,
         newChildDescription,
-        selectedSubmodule.module_id,
-        selectedSubmodule.id,
+        newChildModuleId,
+        newChildSubmoduleId,
         newChildUserExtension
       );
 
@@ -204,8 +212,11 @@ const ModuleSubCategories = () => {
         setNewChildDescription("");
         setNewChildUserExtension(null);
         // Refresh the children list
-        await fetchSubmoduleChildren(selectedSubmodule.id);
-        toast.success('Submodule child created successfully');
+        setRefreshKey(prev => prev + 1);
+        setNewChildSubmoduleId("");
+        setNewChildModuleId("");
+        closeSubmoduleChildrenModal();
+      //  toast.success('Submodule child created successfully');
       }
     } catch (error) {
       console.error('Error creating submodule child:', error);
@@ -213,14 +224,16 @@ const ModuleSubCategories = () => {
     }
   }, [newChildName, newChildDescription, newChildUserExtension, selectedSubmodule, fetchSubmoduleChildren]);
 
-  const handleDeleteChild = useCallback(async (child: SubmoduleChild) => {
-    const response = await DeleteSubmoduleChild(child.id);
-        if (response && selectedSubmodule) {
+  const handleDeleteChild = useCallback(async () => {
+    const response = await DeleteSubmoduleChild(selectedSubcategoryForDelete?.toString() || "");
+        if (response) {
           // Refresh the children list
-          await fetchSubmoduleChildren(selectedSubmodule.id);
-          toast.success('Submodule child deleted successfully');
+          setRefreshKey(prev => prev + 1);
+          setSelectedSubcategoryForDelete(null);
+          setShowSubmoduleDeleteModal(false);
+          //toast.success('Submodule child deleted successfully');
         }
-  }, [selectedSubmodule, fetchSubmoduleChildren]);
+  }, [selectedSubcategoryForDelete]);
 
   const columns: Column[] = useMemo(() => [
     {
@@ -241,9 +254,13 @@ const ModuleSubCategories = () => {
       sortable: true,
       cell: (props: Submodule) => (
         <span className="text-muted" style={{ fontSize: '0.875rem' }}>
-           {props.description.length >50 && (
+           {props.description && props.description.length > 50 ? (
             <span className="text-muted text-overflow-ellipsis" style={{ fontSize: '0.875rem' }}>
               {props.description.substring(0, 50)+'...'}
+            </span>
+          ) : (
+            <span className="text-muted" style={{ fontSize: '0.875rem' }}>
+              {props.description || 'No description'}
             </span>
           )}
         </span>
@@ -282,25 +299,6 @@ const ModuleSubCategories = () => {
       selector: (row: Submodule) => row.id,
       sortable: false,
       cell: (props: Submodule) => (
-      //   <DatatableActionButton
-      //     actions={[
-      //       {
-      //         label: 'Manage Children',
-      //         icon: <FiEye />,
-      //         onClick: () => openSubmoduleChildrenModal(props),
-      //         className: 'gap-2'
-      //       },
-      //       {
-      //         label: 'Delete',
-      //         icon: <FiTrash2 />,
-      //         onClick: () => {
-      //           setSelectedSubmoduleForDelete(props.id);
-      //           setShowSubmoduleDeleteModal(true);
-      //         },
-      //         className: 'text-danger gap-2'
-      //       }
-      //     ]}
-      //   />
       <>
       <div className="d-flex gap-2">
 
@@ -308,7 +306,7 @@ const ModuleSubCategories = () => {
       <Button variant="light" size="sm" className="btn-action-style-2 p-1 text-danger" title="Delete">
             <Trash2 size={16} 
             onClick={() => {
-              setSelectedSubmoduleForDelete(props.id);
+              setSelectedSubcategoryForDelete(props.id);
               setShowSubmoduleDeleteModal(true);
               console.log(props.id);
             }}
@@ -318,7 +316,7 @@ const ModuleSubCategories = () => {
       </>
       )
     }
-  ], [modules, extensions, openSubmoduleChildrenModal, handleDeleteSubmodule]);
+  ], [modules, extensions, openSubmoduleChildrenModal, handleDeleteChild]);
 
   return (
     <React.Fragment>
@@ -441,6 +439,42 @@ const ModuleSubCategories = () => {
           <div className="row">
             {/* Create New Child Section */}
             <div className="col-md-12">
+
+            <div className="form-group mb-3">
+                <label htmlFor="module">Module</label>
+                <select
+                  className="form-control"
+                  id="module"
+                  value={newChildModuleId}
+                  onChange={(e) => handleChangeModule(e.target.value)}
+                >
+                  <option value="">Select Module</option>
+                  {modules.map((module) => (
+                  <option key={module.id} value={module.id}>
+                    {module.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+              <div className="form-group mb-3">
+                <label htmlFor="submodule">Category</label>
+                <select
+                  className="form-control"
+                  id="submodule"
+                  value={newChildSubmoduleId}
+                  onChange={(e) => setNewChildSubmoduleId(e.target.value)}
+                >
+                  <option value="">Select Category</option>
+                  {submodules && submodules.length > 0 && submodules.map((submodule) => (
+                  <option key={submodule.id} value={submodule.id}>
+                    {submodule.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+
               <div className="form-group mb-3">
                 <label htmlFor="childName">SubCategory Name *</label>
                 <input
@@ -477,12 +511,12 @@ const ModuleSubCategories = () => {
       <ConfirmModal
         show={showSubmoduleDeleteModal}
         onHide={() => setShowSubmoduleDeleteModal(false)}
-        title="Delete Submodule"
-        description="Are you sure you want to delete this submodule? This action cannot be undone."
+        title="Delete SubCategory"
+        description="Are you sure you want to delete this subcategory? This action cannot be undone."
         targetName=""
         confirmButtonText="Delete"
         cancelButtonText="Cancel"
-        onConfirm={handleDeleteSubmodule}
+        onConfirm={() => handleDeleteChild()}
         onCancel={() => setShowSubmoduleDeleteModal(false)}
       />
     </React.Fragment>

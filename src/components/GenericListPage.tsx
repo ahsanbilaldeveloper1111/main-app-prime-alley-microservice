@@ -151,7 +151,8 @@ const GenericListPage: React.FC<GenericListPageProps> = ({
 
     const handleSearch = (search: string) => {
         setSearchTerm(search);
-        fetchAndSetData(1, paginationInfo.perPage, search);
+        // Don't call fetchAndSetData here - let the useEffect handle it
+        // This prevents double API calls
     };
 
     // Handle row click with canvas functionality
