@@ -14,7 +14,7 @@ import { useSession } from 'next-auth/react';
 import { ModuleSlug } from '@utils/Helper';
 import AnimatedNumber from '@components/AnimatedNumber';
 import EmptyState from '@components/EmptyState';
-import { formatDateTimeToLocal, GlobalDateTimeFormat } from '@utils/Helper';
+import { formatDateTimeToLocal, GlobalDateTimeFormat ,formatDuration} from '@utils/Helper';
 import { useHierarchyData } from '@components/filters/useHierarchyData';
 import CreatableSelect from 'react-select/creatable';
 import AudioPlayer, { AudioPlayerRef } from '@components/AudioPlayer';
@@ -298,17 +298,17 @@ const AnalyzeRecordings = () => {
             selector: (row: any) => row.Duration,
             sortable: true,
             cell: (props: any) => {
-                const formatDuration = (seconds: number) => {
-                    const minutes = Math.floor(seconds / 60);
-                    let secs = seconds % 60;
-                    secs = parseFloat(secs.toFixed(2));
+                // const formatDuration = (seconds: number) => {
+                //     const minutes = Math.floor(seconds / 60);
+                //     let secs = seconds % 60;
+                //     secs = parseFloat(secs.toFixed(2));
                     
-                    if (minutes > 0) {
-                        return `${minutes} Min ${secs} Sec`;
-                    } else {
-                        return `${secs} Sec`;
-                    }
-                };
+                //     if (minutes > 0) {
+                //         return `${minutes} Min ${secs} Sec`;
+                //     } else {
+                //         return `${secs} Sec`;
+                //     }
+                // };
                 
                 const duration = parseInt(props.Duration.toString())/10000000 || 0;
                 return (
@@ -931,7 +931,11 @@ const AnalyzeRecordings = () => {
     const handleAnalysis = async (props: any) => {
         try {
             const { Id, AudioTrack } = props;
-            window.open(`/ai-ml/analysis?id=${Id}&file=${AudioTrack}&direction=${props.Direction}&phone=${props.RemotePartyNumber}&imagicle=${props.imagicle}`, '_blank');
+      
+            const tempUrl = `/ai-ml/analysis?id=${Id}&file=${AudioTrack}&direction=${props.Direction}&phone=${props.RemotePartyNumber}&imagicle=${props.imagicle}&duration=${props.Duration}`;
+
+            window.open(tempUrl, '_blank');
+
         } catch (error) {
             console.error('Error navigating to analysis:', error);
         }

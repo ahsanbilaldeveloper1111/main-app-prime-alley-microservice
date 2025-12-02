@@ -175,6 +175,35 @@ export const useAnalysisSSE = (config: SSEConfig) => {
         try {
           const data = JSON.parse(event.data);
           console.log('Parsed SSE data:', data);
+          
+          // Check if message indicates an error - stop connection and don't reconnect
+          if (data.status === 'error') {
+            console.error('Error status received, stopping connection:', data);
+            isConnectingRef.current = false;
+            autoConnectTriggeredRef.current = false;
+            reconnectAttempts.current = maxReconnectAttempts; // Prevent reconnection
+            currentConnectionUrlRef.current = '';
+            
+            // Close the EventSource immediately
+            if (eventSourceRef.current) {
+              eventSourceRef.current.close();
+              eventSourceRef.current = null;
+            }
+            
+            setState(prev => ({
+              ...prev,
+              error: data.msg || data.message || 'Error received from server',
+              connecting: false,
+              connected: false,
+              lastMessage: data
+            }));
+            
+            // Call onMessage with error data
+            configRef.current.onMessage?.(data);
+            configRef.current.onError?.(data);
+            return;
+          }
+          
           setState(prev => ({
             ...prev,
             lastMessage: data
@@ -198,9 +227,9 @@ export const useAnalysisSSE = (config: SSEConfig) => {
         // If it's still connecting or open, don't reconnect (might be temporary network hiccup)
         if (isClosed) {
           isConnectingRef.current = false;
-          // Clear the URL ref so we can reconnect if needed
+          // Clear the URL ref
           currentConnectionUrlRef.current = '';
-          // Don't reset autoConnectTriggeredRef here - let reconnect logic handle it
+          
           setState(prev => ({
             ...prev,
             error: 'SSE connection closed',
@@ -209,20 +238,12 @@ export const useAnalysisSSE = (config: SSEConfig) => {
           }));
           configRef.current.onError?.(error);
           
-          // Only attempt to reconnect if connection is actually closed and we haven't exceeded max attempts
-          if (reconnectAttempts.current < maxReconnectAttempts) {
-            const delay = Math.min(1000 * Math.pow(2, reconnectAttempts.current), 30000);
-            
-            reconnectTimeoutRef.current = setTimeout(() => {
-              reconnectAttempts.current++;
-              isConnectingRef.current = false; // Reset before reconnecting
-              // Keep autoConnectTriggeredRef true for reconnection attempts
-              connect();
-            }, delay);
-          } else {
-            // Max attempts reached, reset so we can try again if parameters change
-            autoConnectTriggeredRef.current = false;
-          }
+          // DO NOT automatically reconnect on error
+          // User must manually retry if needed
+          autoConnectTriggeredRef.current = false;
+          reconnectAttempts.current = maxReconnectAttempts; // Prevent automatic reconnection
+          
+          console.log('SSE connection closed, not reconnecting automatically');
         } else if (isConnecting) {
           // Connection is still trying to establish, just log but don't reconnect
           console.log('SSE connection still connecting, waiting...');

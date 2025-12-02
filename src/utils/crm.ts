@@ -1047,6 +1047,7 @@ export interface CampaignField {
   field_name: string;
   field_type: 'string' | 'text' | 'integer' | 'date' | 'email' | 'dropdown';
   field_options?: string[];
+  options?: Array<string | { value?: string; label?: string }>;
   sort_order?: number;
 }
 
@@ -1390,6 +1391,13 @@ export interface DealData {
   decision_maker_name: string;
   decision_maker_phone_country_code: string;
   decision_maker_phone: string;
+  decision_maker_email?: string;
+  main_decision_maker?: {
+    name?: string;
+    phone_country_code?: string;
+    phone?: string;
+    email?: string;
+  };
   deal_type: string;
   contract_length: string;
   contract_length_custom: string | null;
@@ -1416,6 +1424,9 @@ export interface DealData {
   lost_reason_id: number | null;
   lost_feedback: string | null;
   currency: string;
+  tax_percentage?: string | number;
+  standard_discount_percentage?: string | number;
+  special_discount_percentage?: string | number;
   deleted_at: string | null;
   created_by: string | null;
   stage?: StageData;
@@ -1447,6 +1458,15 @@ export interface DealData {
   }>;
   meetings?: any[];
   orders?: any[];
+  attachments?: Array<{
+    id: number;
+    file_path: string;
+    [key: string]: any;
+  }>;
+  histories?: Array<{
+    id: number;
+    [key: string]: any;
+  }>;
 }
 
 export const getDeals = async (

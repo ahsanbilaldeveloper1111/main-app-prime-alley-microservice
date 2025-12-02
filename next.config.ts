@@ -1,5 +1,5 @@
 import type { NextConfig } from "next";
-import path from "path";
+import path from "node:path";
 
 const nextConfig: NextConfig = {
     sassOptions: {
@@ -41,7 +41,6 @@ const nextConfig: NextConfig = {
         maxInactiveAge: 25 * 1000,
         pagesBufferLength: 2,
     },
-    
 };
 
 export default nextConfig;

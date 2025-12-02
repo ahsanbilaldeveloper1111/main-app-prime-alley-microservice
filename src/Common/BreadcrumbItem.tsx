@@ -9,14 +9,17 @@ interface BreadcrumbItemProps {
   mainTitle: string;
   mainLink: string;
   subTitle: string;
+  subLink?: string;
+  currentTitle?: string;
   showPageLoader?: boolean;
 }
 
-const BreadcrumbItem: React.FC<BreadcrumbItemProps> = ({ mainTitle,mainLink, subTitle, showPageLoader=false }) => {
+const BreadcrumbItem: React.FC<BreadcrumbItemProps> = ({ mainTitle,mainLink, subTitle, subLink, currentTitle, showPageLoader=false }) => {
+  const displayTitle = currentTitle || subTitle;
   return (
     <React.Fragment>
     <Head>
-      <title>{subTitle} | Business Contact Center</title>
+      <title>{displayTitle} | Business Contact Center</title>
     </Head>
     <PageLoader isLoading={showPageLoader} />
     {/* <div className="page-header">
@@ -34,9 +37,20 @@ const BreadcrumbItem: React.FC<BreadcrumbItemProps> = ({ mainTitle,mainLink, sub
                        <Link href={`${baseUrl}${mainLink}`}>{mainTitle}</Link>
                   </li>
             )}
-              <li className="breadcrumb-item" aria-current="page">
-                {subTitle}
+            {subTitle && (
+              <li className="breadcrumb-item">
+                {subLink ? (
+                  <Link href={`${baseUrl}${subLink}`}>{subTitle}</Link>
+                ) : (
+                  subTitle
+                )}
               </li>
+            )}
+            {currentTitle && (
+              <li className="breadcrumb-item" aria-current="page">
+                {currentTitle}
+              </li>
+            )}
             </ul>
           </Col>
         </Row>

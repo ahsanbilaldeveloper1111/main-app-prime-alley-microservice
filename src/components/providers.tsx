@@ -6,6 +6,8 @@ import { ReactNode } from 'react';
 import { TokenServiceProvider } from './TokenServiceProvider';
 import SessionHandler from './SessionHandler';
 import { TmsSessionProvider } from '../contexts/TmsSessionContext';
+import { FirebaseNotificationProvider } from './FirebaseNotificationProvider';
+import { NotificationProvider } from '../contexts/NotificationContext';
 
 interface ProvidersProps {
   children: ReactNode;
@@ -16,17 +18,21 @@ export default function Providers({ children, store }: ProvidersProps) {
   return (
     <SessionProvider>
       <TmsSessionProvider>
-        <TokenServiceProvider>
-          <SessionHandler>
-            {store ? (
-              <Provider store={store}>
-                {children}
-              </Provider>
-            ) : (
-              children
-            )}
-          </SessionHandler>
-        </TokenServiceProvider>
+        <NotificationProvider>
+          <FirebaseNotificationProvider>
+            <TokenServiceProvider>
+              <SessionHandler>
+                {store ? (
+                  <Provider store={store}>
+                    {children}
+                  </Provider>
+                ) : (
+                  children
+                )}
+              </SessionHandler>
+            </TokenServiceProvider>
+          </FirebaseNotificationProvider>
+        </NotificationProvider>
       </TmsSessionProvider>
     </SessionProvider>
   );

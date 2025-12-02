@@ -13,6 +13,7 @@ import { useAnalysisSSE } from '@hooks/useAnalysisSSE';
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
 import AudioPlayer, { AudioPlayerRef } from '@components/AudioPlayer';
+import { formatDuration } from '@utils/Helper';
 
 // Utils
 import { GetCallAnalysis, GetTranscriptions, GetTranslations } from '@utils/aiml';
@@ -32,6 +33,8 @@ import '@assets/scss/aiml.scss';
 import '@assets/scss/chat.scss';
 import '@assets/scss/audio-player.scss';
 import '@assets/scss/tabs.scss';
+
+const UNABLE_TO_ANALYZE_CALL = 'Unable to process request at this moment. Please try again later.';
 
 interface SummaryData {
   summary: string;
@@ -87,10 +90,18 @@ const CallAnalysis = () => {
   const [domainSpecificAnalysis, setDomainSpecificAnalysis] = useState<DomainSpecificAnalysis | null>(null);
   const [transcription, setTranscription] = useState<Transcription[] | null>(null);
   const [extractEntities, setExtractEntities] = useState<ExtractEntities | null>(null);
+
   const [callDuration, setCallDuration] = useState<string | null>(null);
+  const [callDurationFormatted, setCallDurationFormatted] = useState<string | null>(null);
+
+
   const [callType, setCallType] = useState<string | null>(null);
   const [dataFound, setDataFound] = useState<boolean>(false);
   const [analysisComplete, setAnalysisComplete] = useState<boolean>(false);
+  
+  // Step tracking state
+  const [steps, setSteps] = useState<Array<{ step: string; message: string; status: string; timestamp: number }>>([]);
+  const [currentStep, setCurrentStep] = useState<string | null>(null);
   
   // Audio related state
   const [uuid, setUuid] = useState('');
@@ -105,6 +116,7 @@ const CallAnalysis = () => {
   const [lastClickedTime, setLastClickedTime] = useState<string | null>(null);
   const [playingSegment, setPlayingSegment] = useState<{ start: number; end: number } | null>(null);
   const [mediaPlayerShow, setMediaPlayerShow] = useState(false);
+  const [validAnalysis, setValidAnalysis] = useState(false);
 
   // Refs
   const audioPlayerRef = useRef<AudioPlayerRef>(null);
@@ -147,8 +159,42 @@ const CallAnalysis = () => {
       console.log('SSE message received in component:', parsedData);
       console.log('Data type:', typeof parsedData);
       console.log('Data status:', parsedData.status);
+      console.log('Data step:', parsedData.step);
       console.log('Data result:', parsedData.result);
 
+      // IMPORTANT: Handle processing steps BEFORE done status
+      // This ensures all steps including final "processing" step are captured
+      if (parsedData.status === 'processing') {
+        console.log('Processing status detected:', { step: parsedData.step, message: parsedData.message, uuid: parsedData.uuid });
+        setLoading(true);
+        
+        // Track processing steps if step field exists
+        if (parsedData.step) {
+          const stepEntry = {
+            step: parsedData.step,
+            message: parsedData.message || '',
+            status: 'processing',
+            timestamp: Date.now()
+          };
+          
+          setSteps(prev => {
+            const existingIndex = prev.findIndex(s => s.step === parsedData.step);
+            if (existingIndex >= 0) {
+              const updated = [...prev];
+              updated[existingIndex] = stepEntry;
+              console.log('Updated existing step:', parsedData.step, 'Total steps:', updated.length);
+              return updated;
+            }
+            const newSteps = [...prev, stepEntry];
+            console.log('Added new step:', parsedData.step, 'Total steps:', newSteps.length, 'All steps:', newSteps.map(s => s.step));
+            return newSteps;
+          });
+          setCurrentStep(parsedData.step);
+        } else {
+          console.log('Processing status without step field:', parsedData);
+        }
+      }
+      
       // Handle final analysis result
       if (parsedData.status === 'done') {
         console.log('Status is done, checking result...');
@@ -159,6 +205,22 @@ const CallAnalysis = () => {
         }
         
         const result = parsedData.result;
+
+        //if result has analysis with error
+        if (result.analysis && result.analysis.error) {
+          console.error('Analysis error:', result.analysis.error);
+          //setError(result.analysis.error);
+          setError(UNABLE_TO_ANALYZE_CALL);
+          //toast.error(result.analysis.error);
+          setLoading(false);
+          setAnalysisComplete(true);
+          setValidAnalysis(false);
+          
+        }else{
+          setValidAnalysis(true);
+        }
+
+
         
         console.log('Processing done status with result:', result);
         console.log('Result keys:', Object.keys(result));
@@ -180,6 +242,7 @@ const CallAnalysis = () => {
           summary: result.summary || ''
         };
         setAnalysis(analysisData);
+       
         
         // Handle the new response structure where data is directly in result
         // Set domain specific analysis
@@ -223,9 +286,9 @@ const CallAnalysis = () => {
         }
         
         // Set call duration if available
-        if (result.domain_specific_duration) {
-          setCallDuration(result.domain_specific_duration);
-        }
+        // if (result.domain_specific_duration) {
+        //   setCallDuration(result.domain_specific_duration);
+        // }
         
         // Also handle old structure for backward compatibility
         if (result.domain_specific_analysis) {
@@ -234,7 +297,7 @@ const CallAnalysis = () => {
           setSummaryData(domainAnalysis?.summary_data);
           setTranscription(domainAnalysis?.transcription);
           setExtractEntities(domainAnalysis?.extracted_qualification_fields);
-          setCallDuration(domainAnalysis?.domain_specific_duration);
+          // setCallDuration(domainAnalysis?.domain_specific_duration);
         }
         
         // Always set these flags when we receive done status
@@ -242,6 +305,14 @@ const CallAnalysis = () => {
         setDataFound(true);
         setLoading(false);
         setAnalysisComplete(true);
+        
+        // Mark all steps as completed - preserve all existing steps
+        setSteps(prev => {
+          const completedSteps = prev.map(s => ({ ...s, status: 'completed' }));
+          console.log('Marking all steps as completed. Total steps:', completedSteps.length, 'Steps:', completedSteps.map(s => s.step));
+          return completedSteps;
+        });
+        setCurrentStep(null);
         
         console.log('Analysis data set, disconnecting socket');
         console.log('Result data processed:', {
@@ -254,14 +325,78 @@ const CallAnalysis = () => {
         // Disconnect socket when analysis is complete
         disconnectSocket();
       }
-      // Handle processing
-      else if (parsedData.status === 'processing') {
-        console.log('Status is processing, setting loading to true');
-        setLoading(true);
+      // Handle error status - stop connection and don't retry
+      else if (parsedData.status === 'error') {
+        console.error('Error status received from server:', parsedData);
+        const errorMessage = parsedData.msg || parsedData.message || 'Analysis error occurred';
+        setError(errorMessage);
+        setLoading(false);
+        setAnalysisComplete(true); // Prevent auto-reconnect
+        
+        // Mark current step as error, or add error as a new step if no current step
+        if (currentStep) {
+          setSteps(prev => prev.map(s => 
+            s.step === currentStep ? { ...s, status: 'error', message: errorMessage } : s
+          ));
+        } else if (parsedData.step) {
+          // If error has a step field, add it as an error step
+          const stepEntry = {
+            step: parsedData.step,
+            message: errorMessage,
+            status: 'error',
+            timestamp: Date.now()
+          };
+          setSteps(prev => {
+            const existingIndex = prev.findIndex(s => s.step === parsedData.step);
+            if (existingIndex >= 0) {
+              const updated = [...prev];
+              updated[existingIndex] = stepEntry;
+              return updated;
+            }
+            return [...prev, stepEntry];
+          });
+          setCurrentStep(parsedData.step);
+        } else {
+          // If no step, mark the last step as error
+          setSteps(prev => {
+            if (prev.length > 0) {
+              const updated = [...prev];
+              updated[updated.length - 1] = { ...updated[updated.length - 1], status: 'error', message: errorMessage };
+              return updated;
+            }
+            return prev;
+          });
+        }
+        
+        // Disconnect socket immediately on error
+        disconnectSocket();
+       // toast.error(errorMessage);
       }
+      // Note: Processing steps are now handled at the top of the handler
+      // to ensure they're captured before "done" status
       // Handle connection status
       else if (parsedData.type === 'connection') {
-        // Connection status handled by onOpen/onClose
+        // Track connection steps - always add/update step if step field exists
+        if (parsedData.step) {
+          const stepEntry = {
+            step: parsedData.step,
+            message: parsedData.message || '',
+            status: parsedData.status || 'processing',
+            timestamp: Date.now()
+          };
+          setSteps(prev => {
+            // Check if step already exists, if so update it, otherwise add it
+            const existingIndex = prev.findIndex(s => s.step === parsedData.step);
+            if (existingIndex >= 0) {
+              const updated = [...prev];
+              updated[existingIndex] = stepEntry;
+              return updated;
+            }
+            // Add new step at the end
+            return [...prev, stepEntry];
+          });
+          setCurrentStep(parsedData.step);
+        }
       }
       // Handle ping messages
       else if (parsedData.type === 'ping') {
@@ -278,9 +413,13 @@ const CallAnalysis = () => {
     },
     onError: (error) => {
       console.error('Analysis SSE error:', error);
-      //toast.error(`WebSocket connection failed: ${error.message || error}`);
-      //setError(error.message || 'Analysis connection failed');
+      const errorMessage = error?.msg || error?.message || (typeof error === 'string' ? error : 'Analysis connection failed');
+      setError(errorMessage);
       setLoading(false);
+      setAnalysisComplete(true); // Prevent auto-reconnect
+      // Disconnect socket on error
+      disconnectSocket();
+      toast.error(errorMessage);
     },
     onOpen: () => {
       setError(null);
@@ -298,7 +437,7 @@ const CallAnalysis = () => {
     if (!router.isReady) return;
 
     try {
-      const { id, file, direction, phone, imagicle } = router.query;
+      const { id, file, direction, phone, imagicle, duration } = router.query;
       
       // Set basic parameters
       if (id) {
@@ -314,6 +453,12 @@ const CallAnalysis = () => {
 
       if (imagicle) {
         setImagicle(imagicle as string);
+      }
+      if (duration) {
+        
+        setCallDuration(duration as string);
+        const formatedDuration = formatDuration(parseInt(duration as string)/10000000);
+        setCallDuration(formatedDuration as string);
       }
       
       // Parse file path for additional parameters
@@ -375,6 +520,10 @@ const CallAnalysis = () => {
     setError(null);
     setAnalysisComplete(false);
     
+    // Reset steps for new analysis
+    setSteps([]);
+    setCurrentStep(null);
+    
     // Connect to WebSocket for analysis
     if (socketParametersReady && !socketConnected && !socketConnecting) {
       connectSocket();
@@ -392,6 +541,10 @@ const CallAnalysis = () => {
     setLoading(true);
     setError(null);
     setAnalysisComplete(false);
+    
+    // Reset steps for new analysis
+    setSteps([]);
+    setCurrentStep(null);
   };
 
   const loadAuthenticatedAudio = async (trackId?: string) => {
@@ -505,7 +658,7 @@ const CallAnalysis = () => {
 
 
   const renderAnalysisForm = () => (
-    <Row className="mb-4">
+    <Row className="mb-1">
       <Col md={12}>
 
 
@@ -513,7 +666,7 @@ const CallAnalysis = () => {
           <Card.Header>
             <div className="d-flex justify-content-between align-items-center">
               <h5 className="card-title mb-0">Analysis Parameters</h5>
-              {socketConnected && (
+              {/* {socketConnected && (
                 <span className="badge bg-success">
                   <i className="ti ti-wifi me-1"></i>
                   Connected
@@ -530,7 +683,7 @@ const CallAnalysis = () => {
                   <i className="ti ti-wifi-off me-1"></i>
                   Connection Error
                 </span>
-              )}
+              )} */}
             </div>
           </Card.Header>
           <Card.Body>
@@ -648,6 +801,10 @@ const CallAnalysis = () => {
                         setLoading(false);
                         setError(null);
                         
+                        // Clear step tracking
+                        setSteps([]);
+                        setCurrentStep(null);
+                        
                         // Clear audio data
                         setAudioUrl('');
                         setMediaPlayerShow(false);
@@ -751,7 +908,7 @@ const CallAnalysis = () => {
                 <div className="callType">
                   <div className="desc">
                     <small className="card-title">Call Duration</small>
-                    <h5 className="card-text">{callDuration}</h5>
+                    <h5 className="card-text">{callDurationFormatted}</h5>
                   </div>
                 </div>
               </Col>
@@ -1270,7 +1427,10 @@ const CallAnalysis = () => {
   const [subActiveTab, setSubActiveTab] = useState('en');
 
   useEffect(() => {
-    handleGetTranslations();
+    
+    if(validAnalysis){
+      handleGetTranslations();
+    }
   }, [uuid]);
 
   const handleGetTranslations = async () => {
@@ -1280,7 +1440,7 @@ const CallAnalysis = () => {
       console.log(response);
 
   } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
+      //setError(err instanceof Error ? err.message : 'An error occurred');
       //console.error('Error fetching transcription:', err);
   } finally {
       setLoading(false);
@@ -1358,8 +1518,295 @@ const CallAnalysis = () => {
 
       {/* Always show the form */}
       {renderAnalysisForm()}
-
-      {/* Show error if any */}
+      
+      {/* Show steps progress */}
+      {/* {(loading || steps.length > 0) && (
+        <Row className="mb-3">
+          <Col md={12}>
+            <Card>
+               <Card.Header className="py-2">
+                <h6 className="card-title mb-0">Analysis Progress</h6>
+              </Card.Header>
+              <Card.Body className="py-2">
+                {steps.length === 0 ? (
+                  <div className="text-center p-2">
+                    <Spinner animation="border" size="sm" className="me-2" />
+                    <span>Initializing analysis...</span>
+                  </div>
+                ) : (
+                  <div className="analysis-progress-container">
+                    <div className="analysis-progress-wrapper">
+                      {steps.map((stepEntry, index) => {
+                        const isActive = stepEntry.step === currentStep && stepEntry.status === 'processing';
+                        const isCompleted = stepEntry.status === 'completed';
+                        const isError = stepEntry.status === 'error';
+                        const isLast = index === steps.length - 1;
+                        const prevCompleted = index > 0 && steps[index - 1]?.status === 'completed';
+                        
+                        return (
+                          <React.Fragment key={`${stepEntry.step}-${stepEntry.timestamp}-${index}`}>
+                            <div 
+                              className="analysis-progress-step-wrapper"
+                              style={{ 
+                                flex: `1 1 ${100 / steps.length}%`,
+                                maxWidth: `${100 / steps.length}%`,
+                                minWidth: 0
+                              }}
+                            >
+                              <div 
+                                className={`analysis-progress-step ${
+                                  isActive ? 'active' : 
+                                  isCompleted ? 'completed' : 
+                                  isError ? 'error' : 
+                                  'pending'
+                                }`}
+                              >
+                                <div className="step-indicator-wrapper">
+                                  <div 
+                                    className={`step-circle ${
+                                      isActive ? 'active' : 
+                                      isCompleted ? 'completed' : 
+                                      isError ? 'error' : 
+                                      'pending'
+                                    }`}
+                                  >
+                                    {isCompleted ? (
+                                      <i className="ti ti-check"></i>
+                                    ) : isError ? (
+                                      <i className="ti ti-x"></i>
+                                    ) : isActive ? (
+                                      <Spinner animation="border" size="sm" variant="light" />
+                                    ) : (
+                                      <span className="step-number">{index + 1}</span>
+                                    )}
+                                  </div>
+                                  {!isLast && (
+                                    <div 
+                                      className={`step-connector ${
+                                        isCompleted || prevCompleted ? 'completed' : ''
+                                      }`}
+                                    />
+                                  )}
+                                </div>
+                                <div className="step-content">
+                                  <div className="step-title">
+                                    {stepEntry.step.replace(/_/g, ' ')}
+                                  </div>
+                                  {stepEntry.message && (
+                                    <div className="step-message">
+                                      {stepEntry.message}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </React.Fragment>
+                        );
+                      })}
+                    </div>
+                    <style>{`
+                      .analysis-progress-container {
+                        padding: 0.5rem 0;
+                      }
+                      
+                      .analysis-progress-wrapper {
+                        display: flex;
+                        align-items: flex-start;
+                        gap: 0.25rem;
+                        padding: 0.5rem 0;
+                        width: 100%;
+                      }
+                      
+                      .analysis-progress-step-wrapper {
+                        flex: 1 1 auto;
+                        padding: 0 0.15rem;
+                        min-width: 0;
+                      }
+                      
+                      .analysis-progress-step {
+                        display: flex;
+                        flex-direction: column;
+                        align-items: center;
+                        position: relative;
+                        transition: all 0.3s ease;
+                      }
+                      
+                      .step-indicator-wrapper {
+                        display: flex;
+                        align-items: center;
+                        width: 100%;
+                        position: relative;
+                        margin-bottom: 0.4rem;
+                        min-height: 32px;
+                        justify-content: center;
+                      }
+                      
+                      .step-circle {
+                        width: 32px;
+                        height: 32px;
+                        border-radius: 50%;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        font-weight: bold;
+                        font-size: 0.85rem;
+                        position: relative;
+                        z-index: 2;
+                        transition: all 0.3s ease;
+                        flex-shrink: 0;
+                        margin: 0 auto;
+                      }
+                      
+                      .step-circle.pending {
+                        background: #e9ecef;
+                        color: #6c757d;
+                        border: 2px solid #ced4da;
+                        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                      }
+                      
+                      .step-circle.active {
+                        background: linear-gradient(135deg, #0d6efd 0%, #0056b3 100%);
+                        color: white;
+                        border: 2px solid #0a58ca;
+                        box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.2), 0 2px 8px rgba(13, 110, 253, 0.3);
+                        animation: pulse-ring 2s infinite;
+                      }
+                      
+                      .step-circle.completed {
+                        background: linear-gradient(135deg, #198754 0%, #146c43 100%);
+                        color: white;
+                        border: 2px solid #146c43;
+                        box-shadow: 0 2px 8px rgba(25, 135, 84, 0.25);
+                      }
+                      
+                      .step-circle.error {
+                        background: linear-gradient(135deg, #dc3545 0%, #b02a37 100%);
+                        color: white;
+                        border: 2px solid #b02a37;
+                        box-shadow: 0 2px 8px rgba(220, 53, 69, 0.25);
+                      }
+                      
+                      .step-circle i {
+                        font-size: 1rem;
+                      }
+                      
+                      .step-number {
+                        font-size: 0.9rem;
+                        font-weight: 700;
+                      }
+                      
+                      .step-connector {
+                        position: absolute;
+                        height: 2px;
+                        width: calc(100% + 0.25rem);
+                        left: calc(50% + 16px);
+                        top: 50%;
+                        transform: translateY(-50%);
+                        background: #dee2e6;
+                        border-radius: 1px;
+                        transition: all 0.3s ease;
+                        z-index: 1;
+                      }
+                      
+                      .step-connector.completed {
+                        background: linear-gradient(90deg, #198754 0%, #20c997 100%);
+                      }
+                      
+                      .step-content {
+                        text-align: center;
+                        width: 100%;
+                        padding: 0;
+                      }
+                      
+                      .step-title {
+                        font-weight: 600;
+                        font-size: 0.75rem;
+                        line-height: 1.2;
+                        margin-bottom: 0.1rem;
+                        text-transform: capitalize;
+                        word-break: break-word;
+                        transition: color 0.3s ease;
+                        overflow: hidden;
+                        text-overflow: ellipsis;
+                        white-space: nowrap;
+                      }
+                      
+                      .analysis-progress-step.pending .step-title {
+                        color: #6c757d;
+                      }
+                      
+                      .analysis-progress-step.active .step-title {
+                        color: #0d6efd;
+                        font-weight: 700;
+                      }
+                      
+                      .analysis-progress-step.completed .step-title {
+                        color: #198754;
+                        font-weight: 600;
+                      }
+                      
+                      .analysis-progress-step.error .step-title {
+                        color: #dc3545;
+                        font-weight: 600;
+                      }
+                      
+                      .step-message {
+                        font-size: 0.65rem;
+                        color: #6c757d;
+                        line-height: 1.2;
+                        margin-top: 0.1rem;
+                        word-break: break-word;
+                        overflow: hidden;
+                        text-overflow: ellipsis;
+                        white-space: nowrap;
+                      }
+                      
+                      @keyframes pulse-ring {
+                        0% {
+                          box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.2), 0 2px 8px rgba(13, 110, 253, 0.3);
+                        }
+                        50% {
+                          box-shadow: 0 0 0 6px rgba(13, 110, 253, 0.15), 0 2px 10px rgba(13, 110, 253, 0.4);
+                        }
+                        100% {
+                          box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.2), 0 2px 8px rgba(13, 110, 253, 0.3);
+                        }
+                      }
+                      
+                      @media (max-width: 768px) {
+                        .step-circle {
+                          width: 28px;
+                          height: 28px;
+                          font-size: 0.75rem;
+                        }
+                        
+                        .step-circle i {
+                          font-size: 0.85rem;
+                        }
+                        
+                        .step-title {
+                          font-size: 0.7rem;
+                        }
+                        
+                        .step-message {
+                          font-size: 0.6rem;
+                        }
+                        
+                        .step-indicator-wrapper {
+                          min-height: 28px;
+                          margin-bottom: 0.3rem;
+                        }
+                      }
+                    `}</style>
+                  </div>
+                )}
+              </Card.Body>
+            </Card>
+          </Col>
+        </Row>
+      )} */}
+      
+      {/* Show error if any - after progress bar */}
       {error && (
         <Row className="mb-3">
           <Col md={12}>
@@ -1371,7 +1818,8 @@ const CallAnalysis = () => {
         </Row>
       )}
       
-      <div className="analysis-container">
+      {!error && validAnalysis && (
+        <div className="analysis-container">
         {loading ? (
           <Row>
             {/* <PageLoader isLoading={true} /> */}
@@ -1387,9 +1835,14 @@ const CallAnalysis = () => {
         ) : (dataFound || analysis || summaryData || transcription) ? (
           <Tabs activeKey={activeTab} onSelect={(k) => setActiveTab(k || 'summary')} id="system-tabs" className="mb-3">
             <Tab eventKey="summary" title="Summary">
-              {renderCustomerInfo()}
-              {renderSummaryCards()}
-              {renderEmotionsAndTopics()}
+            
+            {validAnalysis && (
+              <>
+                {renderCustomerInfo()}
+                {renderSummaryCards()}
+                {renderEmotionsAndTopics()}
+              </>
+            )}
             </Tab>
             
             <Tab eventKey="transcript" title="Transcript">
@@ -1406,6 +1859,8 @@ const CallAnalysis = () => {
           <></>
         )}
       </div>
+      )}
+
     </React.Fragment>
   );
 };

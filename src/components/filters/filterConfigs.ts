@@ -14,17 +14,17 @@ export const userFiltersConfig: FilterTab[] = [
         label: 'Name',
         placeholder: 'Type Name'
       },
+      // {
+      //   type: 'text',
+      //   name: 'email',
+      //   label: 'Email',
+      //   placeholder: 'Type Email'
+      // },
       {
         type: 'text',
-        name: 'email',
-        label: 'Email',
-        placeholder: 'Type Email'
-      },
-      {
-        type: 'text',
-        name: 'phone',
-        label: 'Phone',
-        placeholder: 'Type Phone'
+        name: 'extension',
+        label: 'Extension',
+        placeholder: 'Type Extension'
       }
     ]
   },
