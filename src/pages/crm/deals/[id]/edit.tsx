@@ -133,10 +133,10 @@ const EditDeal = () => {
           company_name: deal.company_name || "",
           industry: deal.industry || "",
           decision_maker_title: deal.decision_maker_title || "",
-          decision_maker_name: deal.decision_maker_name || deal.main_decision_maker?.name || "",
-          decision_maker_phone_country_code: deal.decision_maker_phone_country_code || deal.main_decision_maker?.phone_country_code || "",
-          decision_maker_phone: deal.decision_maker_phone || deal.main_decision_maker?.phone || "",
-          decision_maker_email: deal.main_decision_maker?.email || "",
+          decision_maker_name: deal.decision_maker_name || (deal as any).main_decision_maker?.name || "",
+          decision_maker_phone_country_code: deal.decision_maker_phone_country_code || (deal as any).main_decision_maker?.phone_country_code || "",
+          decision_maker_phone: deal.decision_maker_phone || (deal as any).main_decision_maker?.phone || "",
+          decision_maker_email: (deal as any).main_decision_maker?.email || "",
           deal_type: deal.deal_type || "",
           contract_length: deal.contract_length || "",
           contract_length_custom: deal.contract_length_custom || "",
@@ -150,15 +150,15 @@ const EditDeal = () => {
           contract_received: deal.contract_received || false,
           follow_up_date: formatDate(deal.follow_up_date),
           currency: deal.currency || "USD",
-          tax_percentage: deal.tax_percentage?.toString() || "0",
-          standard_discount_percentage: deal.standard_discount_percentage?.toString() || "0",
-          special_discount_percentage: deal.special_discount_percentage?.toString() || "0",
+          tax_percentage: (deal as any).tax_percentage?.toString() || "0",
+          standard_discount_percentage: (deal as any).standard_discount_percentage?.toString() || "0",
+          special_discount_percentage: (deal as any).special_discount_percentage?.toString() || "0",
         });
 
         // Set additional data
         setEstimates(deal.estimates || []);
-        setAttachments(deal.attachments || []);
-        setHistories(deal.histories || []);
+        setAttachments((deal as any).attachments || []);
+        setHistories((deal as any).histories || []);
         setNegotiationBar(deal.negotiation_bar || 0);
         setProbability(deal.probability || 0);
 
@@ -327,8 +327,6 @@ const EditDeal = () => {
           mainTitle="CRM"
           mainLink="/crm/dashboard"
           subTitle="Deals"
-          subLink="/crm/deals"
-          currentTitle="Edit Deal"
         />
         <div className="text-center py-5">
           <p>Loading deal data...</p>
@@ -343,8 +341,6 @@ const EditDeal = () => {
         mainTitle="CRM"
         mainLink="/crm/dashboard"
         subTitle="Deals"
-        subLink="/crm/deals"
-        currentTitle="Edit Deal"
       />
       <div>
         <div className="d-flex justify-content-between align-items-center mb-4">

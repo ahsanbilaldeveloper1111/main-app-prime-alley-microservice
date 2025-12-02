@@ -253,13 +253,13 @@ const CreateLead = () => {
                 crmDataValue !== ""
               ) {
                 // For dropdown fields, check if the value matches one of the options
-                if (field.field_type === "dropdown" && field.options) {
-                  const optionValues = field.options.map((opt: any) => 
+                if (field.field_type === "dropdown" && field.field_options) {
+                  const optionValues = field.field_options?.map((opt: any) => 
                     typeof opt === 'string' ? opt : opt.value || opt.label
-                  );
-                  const optionLabels = field.options.map((opt: any) => 
+                  ) || [];
+                  const optionLabels = field.field_options?.map((opt: any) => 
                     typeof opt === 'string' ? opt : opt.label || opt.value
-                  );
+                  ) || [];
                   
                   // Check if CRM data value matches any option value or label
                   const stringValue = String(crmDataValue);

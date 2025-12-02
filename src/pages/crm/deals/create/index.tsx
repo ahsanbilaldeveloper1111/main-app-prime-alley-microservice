@@ -257,8 +257,6 @@ const CreateDeal = () => {
         mainTitle="CRM"
         mainLink="/crm/dashboard"
         subTitle="Deals"
-        subLink="/crm/deals"
-        currentTitle="Create Deal"
       />
       <div>
         <div className="d-flex justify-content-between align-items-center mb-4">
