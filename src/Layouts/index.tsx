@@ -4,14 +4,14 @@ import { useRouter } from 'next/router';
 import Footer from '@components/Footer';
 import ApplicationSidebar from './Moduler/AppSidebar';
 import { useSession, signOut } from "next-auth/react";
+import { useNotifications } from '../contexts/NotificationContext';
 
 import CompanyLogo2 from "@assets/images/Prime3.png";
 import { 
 	Bell, ChevronLeft, ChevronRight, Users, LogOut,
-	User
+	User, X, CheckCheck, Plus, Pencil, Trash2
     } from 'lucide-react';
 import { Badge, Button, Dropdown } from 'react-bootstrap';
-import Link from 'next/link';
 
 interface LayoutProps {
 	children: ReactNode;
@@ -21,6 +21,7 @@ const Layout = ({ children }: LayoutProps) => {
 
 	const router = useRouter();
 	const { data: session, status } = useSession();
+	const { notifications, unreadCount, markAsRead, markAllAsRead, clearNotification } = useNotifications();
 
 	const [hasTmsSession, setHasTmsSession] = useState<boolean | null>(null);
 	const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -158,10 +159,198 @@ const Layout = ({ children }: LayoutProps) => {
 			<img src={CompanyLogo2.src} alt="logo" className="img-fluid header-logo" /></a>
           </div>
           <div className="ms-auto d-flex align-items-center gap-3">
-            {/* <Button variant="link" className="text-dark position-relative">
-              <Bell size={20} />
-              <Badge bg="danger" pill className="position-absolute translate-middle" style={{top:'10px', left:'37px'}}>3</Badge>
-            </Button> */}
+            <Dropdown align="end">
+              <Dropdown.Toggle 
+                variant="link" 
+                className="text-primary position-relative p-0 border-0"
+                style={{ border: 'none', boxShadow: 'none' }}
+              >
+                
+                  <Bell size={32} className="text-primary" />
+               
+                {unreadCount > 0 && (
+                  <Badge 
+                    bg="danger" 
+                    pill 
+                    className="position-absolute"
+                    style={{
+                      top: '0px',
+                      right: '0px',
+                      fontSize: '8px',
+                      minWidth: '18px',
+                      height: '18px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      padding: '0 5px'
+                    }}
+                  >
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </Badge>
+                )}
+              </Dropdown.Toggle>
+              <Dropdown.Menu style={{ width: '350px', maxHeight: '400px', overflowY: 'auto' }}>
+                <div className="d-flex justify-content-between align-items-center px-2 py-2 border-bottom p-0">
+                  <h6 className="mb-0 fw-bold">Notifications</h6>
+                  {unreadCount > 0 && (
+                    <Button
+                      variant="link"
+                      size="sm"
+                      className="p-0 text-primary"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        markAllAsRead();
+                      }}
+                    >
+                      <CheckCheck size={14} className="me-1" />
+                      Clear
+                    </Button>
+                  )}
+                </div>
+                {notifications.length === 0 ? (
+                  <div className="text-center py-4 text-muted">
+                    <Bell size={32} className="mb-2 opacity-50" />
+                    <p className="mb-0">No notifications</p>
+                  </div>
+                ) : (
+                  <>
+                    {notifications.map((notification: any) => {
+                      // Determine action icon based on notification data
+                      const getActionIcon = () => {
+                        // Check multiple sources for action type
+                        const action = notification.data?.action 
+                          || notification.data?.type 
+                          || notification.title 
+                          || notification.description 
+                          || '';
+                        const actionUpper = action.toUpperCase();
+                        
+                        if (actionUpper.includes('CREATE') || actionUpper.includes('CREATED') || actionUpper.includes('ADD') || actionUpper.includes('NEW')) {
+                          return <Plus size={20} className="m-0" />;
+                        } else if (actionUpper.includes('UPDATE') || actionUpper.includes('UPDATED') || actionUpper.includes('EDIT') || actionUpper.includes('MODIFIED') || actionUpper.includes('CHANGE')) {
+                          return <Pencil size={20} className="m-0" />;
+                        } else if (actionUpper.includes('DELETE') || actionUpper.includes('DELETED') || actionUpper.includes('REMOVE') || actionUpper.includes('REMOVED')) {
+                          return <Trash2 size={20} className="m-0" />;
+                        }
+                        // Default to Bell icon if no action matches
+                        return <Bell size={20} className="m-0" />;
+                      };
+
+                      return (
+                        <Dropdown.Item
+                        key={notification.id}
+                        className={`d-block p-2 border-bottom radius-0 ${!notification.read ? '' : ''}`}
+                        style={{ borderRadius: '0px' }}
+                        onClick={() => {
+                          if (!notification.read) {
+                            markAsRead(notification.id);
+                          }
+                          if (notification.url) {
+                            router.push(notification.url);
+                          }
+                        }}
+                      >
+                        <div className="d-flex align-items-center gap-3">
+                          {/* Block 1: Icon - Based on Action */}
+                          <div className="flex-shrink-0 position-relative d-flex align-items-center justify-content-center">
+                            {notification.icon ? (
+                              <img 
+                                src={notification.icon} 
+                                alt="notification" 
+                                style={{ width: '40px', height: '40px', borderRadius: '8px', objectFit: 'cover' }}
+                                onError={(e) => {
+                                  // Fallback to action icon if image fails to load
+                                  e.currentTarget.style.display = 'none';
+                                  const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                                  if (fallback) fallback.style.display = 'flex';
+                                }}
+                              />
+                            ) : null}
+                            <div 
+                              className="d-flex align-items-center justify-content-center"
+                              style={{
+                                width: '40px',
+                                height: '40px',
+                                borderRadius: '8px',
+                                backgroundColor: !notification.read ? '#0d6efd' : '#e9ecef',
+                                color: !notification.read ? '#fff' : '#6c757d',
+                                display: notification.icon ? 'none' : 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
+                              }}
+                            >
+                              {getActionIcon()}
+                            </div>
+                            {!notification.read && (
+                              <span 
+                                className="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger border border-white" 
+                                style={{
+                                  fontSize: '6px',
+                                  padding: '2px 4px',
+                                  minWidth: '8px',
+                                  height: '8px'
+                                }}
+                              >
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Block 2: Title, Description, Module, Time */}
+                          <div className="flex-grow-1 min-w-0">
+                            <div className="d-flex align-items-center gap-2 mb-1">
+                              <h6 className="mb-0 fw-semibold" style={{ fontSize: '14px', lineHeight: '1.3' }}>
+                                {notification.title}
+                              </h6>
+                              {!notification.read && (
+                                <span 
+                                  className="badge bg-primary rounded-circle" 
+                                  style={{ width: '8px', height: '8px', padding: 0, flexShrink: 0 }}
+                                ></span>
+                              )}
+                            </div>
+                            {notification.description && (
+                              <p className="mb-1 text-muted" style={{ fontSize: '13px', lineHeight: '1.4', marginBottom: '4px' }}>
+                                {notification.description}
+                              </p>
+                            )}
+                            <div className="d-flex align-items-center gap-2 flex-wrap">
+                              {/* {notification.module && (
+                                <small className="text-muted" style={{ fontSize: '11px', fontWeight: '500' }}>
+                                  {notification.module}
+                                </small>
+                              )} */}
+                              {/* {notification.module && (
+                                <span className="text-muted" style={{ fontSize: '11px' }}>•</span>
+                              )} */}
+                              <small className="text-muted" style={{ fontSize: '10px' }}>
+                                {new Date(notification.timestamp).toLocaleString()}
+                              </small>
+                            </div>
+                          </div>
+
+                          {/* Block 3: Clear Icon */}
+                          <div className="flex-shrink-0 d-flex align-items-center justify-content-center">
+                            <Button
+                              variant="link"
+                              size="sm"
+                              className="p-0 text-muted d-flex align-items-center justify-content-center"
+                              style={{ minWidth: '20px', height: '20px' }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                clearNotification(notification.id);
+                              }}
+                            >
+                              <X size={16} />
+                            </Button>
+                          </div>
+                        </div>
+                        </Dropdown.Item>
+                      );
+                    })}
+                  </>
+                )}
+              </Dropdown.Menu>
+            </Dropdown>
             <Dropdown>
               <Dropdown.Toggle 
                 variant="link" 

@@ -51,7 +51,7 @@ export default function handler(req, res) {
    
   const analysisServerUrl = `${websocketProtocol}://${analysisServerHost}/ws/analysis/${uuid}/${date}/${localPartyNumber}/${ownerUsername}/${imagicle}/`;
   
-  // const analysisServerUrl = `${websocketProtocol}://${analysisServerHost}/ws/analysis/${uuid}/${date}/${localPartyNumber}/${ownerUsername}/${imagicle}/10000/10001/OUTGOING/`;
+  //  const analysisServerUrl = `${websocketProtocol}://${analysisServerHost}/ws/analysis/${uuid}/${date}/${localPartyNumber}/${ownerUsername}/${imagicle}/10000/10001/OUTGOING/`;
   
   console.log('🔗 Connecting to analysis server:', analysisServerUrl);
   
@@ -82,7 +82,7 @@ export default function handler(req, res) {
   const wsAnalysis = new WebSocket(analysisServerUrl, wsOptions);
 
   // Send initial connection status
-  res.write(`data: ${JSON.stringify({ type: 'connection', status: 'connecting', message: 'Connecting to analysis server...' })}\n\n`);
+  res.write(`data: ${JSON.stringify({ type: 'connection', status: 'connecting', message: 'Connecting to analysis server...', step: 'Connecting to server' })}\n\n`);
   
   // Send keep-alive ping every 30 seconds
   const keepAlive = setInterval(() => {
@@ -95,7 +95,7 @@ export default function handler(req, res) {
   wsAnalysis.on('open', () => {
     console.log('Connected to analysis server');
     clearTimeout(connectionTimeout);
-    res.write(`data: ${JSON.stringify({ type: 'connection', status: 'connected', message: 'Connected to analysis server' })}\n\n`);
+    res.write(`data: ${JSON.stringify({ type: 'connection', status: 'connected', message: 'Connected to analysis server',step: 'Connected to server' })}\n\n`);
     
     // Send command to start analysis
     const analysisCommand = {
@@ -111,12 +111,64 @@ export default function handler(req, res) {
   });
 
   wsAnalysis.on('message', (data) => {
-    // Forward message to client via SSE
-    const sseData = `data: ${data.toString()}\n\n`;
-    res.write(sseData);
-    // Force flush the response
-    if (res.flush) {
-      res.flush();
+    try {
+      // Parse message to check for error status
+      const messageStr = data.toString();
+      let messageData = null;
+      
+      try {
+        messageData = JSON.parse(messageStr);
+      } catch (parseError) {
+        // Not JSON, forward as-is
+        console.log('Message is not JSON, forwarding as string');
+      }
+      
+      // Check if message indicates an error
+      if (messageData && messageData.status === 'error') {
+        console.error('Error received from analysis server:', messageData);
+        
+        // Close WebSocket connection on error
+        if (wsAnalysis.readyState === WebSocket.OPEN || wsAnalysis.readyState === WebSocket.CONNECTING) {
+          wsAnalysis.close(1000, 'Error received from server');
+        }
+        
+        // Forward error message to client
+        const sseData = `data: ${messageStr}\n\n`;
+        res.write(sseData);
+        if (res.flush) {
+          res.flush();
+        }
+        
+        // End the SSE connection after sending error
+        clearTimeout(connectionTimeout);
+        clearInterval(keepAlive);
+        setTimeout(() => {
+          if (!res.destroyed) {
+            res.end();
+          }
+        }, 100);
+        return;
+      }
+      
+      // Forward normal message to client via SSE
+      const sseData = `data: ${messageStr}\n\n`;
+      res.write(sseData);
+      // Force flush the response
+      if (res.flush) {
+        res.flush();
+      }
+    } catch (error) {
+      console.error('Error processing WebSocket message:', error);
+      // Forward the raw message if processing fails
+      try {
+        const sseData = `data: ${data.toString()}\n\n`;
+        res.write(sseData);
+        if (res.flush) {
+          res.flush();
+        }
+      } catch (writeError) {
+        console.error('Failed to write error message to client:', writeError);
+      }
     }
   });
 
@@ -132,6 +184,14 @@ export default function handler(req, res) {
     console.error('Connection URL:', analysisServerUrl);
     console.error('WebSocket options:', JSON.stringify(wsOptions, null, 2));
     clearTimeout(connectionTimeout);
+    clearInterval(keepAlive);
+    
+    // Close WebSocket if still open
+    if (wsAnalysis.readyState === WebSocket.OPEN || wsAnalysis.readyState === WebSocket.CONNECTING) {
+      wsAnalysis.close(1000, 'Connection error');
+    }
+    
+    // Send error to client and end connection
     res.write(`data: ${JSON.stringify({ 
       type: 'error', 
       status: 'error', 
@@ -139,6 +199,13 @@ export default function handler(req, res) {
       code: error.code,
       details: `The external WebSocket server at ${process.env.NEXT_PUBLIC_PRIVATE_AIML_SOCKET_URL} is not responding. Please check if the server is running and accessible.`
     })}\n\n`);
+    
+    // End the SSE connection after sending error
+    setTimeout(() => {
+      if (!res.destroyed) {
+        res.end();
+      }
+    }, 100);
   });
 
   // Handle client disconnect
