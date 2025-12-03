@@ -18,7 +18,6 @@ import { Button, Row, Col, Form, Card, Alert, Badge } from "react-bootstrap";
 import Select from "react-select";
 import PhoneInput from "react-phone-number-input";
 import { parsePhoneNumber } from "react-phone-number-input";
-import type { E164Number } from "react-phone-number-input";
 import "react-phone-number-input/style.css";
 import {
   FiSave,

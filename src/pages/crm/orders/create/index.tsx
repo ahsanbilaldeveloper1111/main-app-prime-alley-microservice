@@ -164,7 +164,7 @@ const CreateOrder = () => {
     }
   };
 
-  const handleEstimateChange = (estimateId: number | null) => {
+  const handleEstimateChange = async (estimateId: number | null) => {
     if (!sourceDeal || !estimateId) return;
     
     const estimates = sourceDeal.estimates || [];
