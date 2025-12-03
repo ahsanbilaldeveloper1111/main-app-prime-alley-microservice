@@ -22,6 +22,7 @@ import {
   Badge,
   InputGroup,
   Dropdown,
+  Table,
 } from "react-bootstrap";
 import CreatableSelect from "react-select/creatable";
 import Select from "react-select";
@@ -57,6 +58,18 @@ import {
   ArrowUp,
   ArrowDown,
   Download,
+  CheckSquare,
+  Layers,
+  ArrowUpDown,
+  ChevronsLeft,
+  ChevronsRight,
+  ChevronLeft,
+  ChevronRight,
+  Eye,
+  Trash2,
+  MoreVertical,
+  Phone as PhoneIcon,
+  Mail,
 } from "lucide-react";
 import { Column } from "@components/CustomDataTable";
 
@@ -355,6 +368,21 @@ const CrmProspectsManagement = () => {
   const [activeFilter, setActiveFilter] = useState('all');
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [prospectsSearch, setProspectsSearch] = useState('');
+  
+  // Column customization and pagination states
+  const [selectedColumns, setSelectedColumns] = useState<string[]>(() => {
+    const saved = localStorage.getItem('crmDataSelectedColumns');
+    return saved ? JSON.parse(saved) : ['name', 'phone', 'user_extension', 'campaign', 'last_called_at', 'last_call_end_reason', 'disposition', 'scheduled_call_at', 'tags'];
+  });
+  const [pagination, setPagination] = useState({ 
+    currentPage: 1, 
+    rowsPerPage: 15, 
+    sortColumn: '', 
+    sortDirection: 'asc' as 'asc' | 'desc' 
+  });
+  const [dataList, setDataList] = useState<CrmDataItem[]>([]);
+  const [totalRecords, setTotalRecords] = useState(0);
+  const [loading, setLoading] = useState(false);
 
   // Static tags data
   const staticTags = [
@@ -653,78 +681,218 @@ const CrmProspectsManagement = () => {
     setRefreshKey((prev) => prev + 1);
   }, []);
 
-  // Fetch prospects data for GenericListPage
+  // Helper functions for sorting and pagination
+  const handleSort = (column: string) => {
+    const newDirection = pagination.sortColumn === column && pagination.sortDirection === 'asc' ? 'desc' : 'asc';
+    setPagination({ ...pagination, sortColumn: column, sortDirection: newDirection, currentPage: 1 });
+  };
+
+  const sortData = <T extends Record<string, any>>(data: T[], sortColumn: string, sortDirection: 'asc' | 'desc'): T[] => {
+    if (!sortColumn) return data;
+    
+    return [...data].sort((a, b) => {
+      let aVal = a[sortColumn];
+      let bVal = b[sortColumn];
+      
+      if (aVal === undefined) aVal = '';
+      if (bVal === undefined) bVal = '';
+      
+      const aStr = String(aVal).toLowerCase();
+      const bStr = String(bVal).toLowerCase();
+      
+      if (aStr < bStr) return sortDirection === 'asc' ? -1 : 1;
+      if (aStr > bStr) return sortDirection === 'asc' ? 1 : -1;
+      return 0;
+    });
+  };
+
+  const paginateData = <T,>(data: T[], currentPage: number, rowsPerPage: number): T[] => {
+    const startIndex = (currentPage - 1) * rowsPerPage;
+    const endIndex = startIndex + rowsPerPage;
+    return data.slice(startIndex, endIndex);
+  };
+
+  const getTotalPages = (dataLength: number, rowsPerPage: number): number => {
+    return Math.ceil(dataLength / rowsPerPage);
+  };
+
+  const renderSortIcon = (column: string) => {
+    if (pagination.sortColumn !== column) {
+      return <ArrowUpDown size={14} className="ms-1 text-muted" />;
+    }
+    return pagination.sortDirection === 'asc' ? 
+      <ArrowUp size={14} className="ms-1" /> : 
+      <ArrowDown size={14} className="ms-1" />;
+  };
+
+  const renderPaginationControls = () => {
+    const totalPages = getTotalPages(totalRecords, pagination.rowsPerPage);
+    const { currentPage, rowsPerPage } = pagination;
+    const startRow = (currentPage - 1) * rowsPerPage + 1;
+    const endRow = Math.min(currentPage * rowsPerPage, totalRecords);
+
+    return (
+      <div className="d-flex justify-content-between align-items-center mt-3">
+        <div className="d-flex align-items-center gap-2">
+          <span className="text-muted small">Show</span>
+          <Form.Select
+            size="sm"
+            value={rowsPerPage}
+            onChange={(e) => setPagination({ ...pagination, rowsPerPage: Number(e.target.value), currentPage: 1 })}
+            style={{ width: 'auto' }}
+          >
+            <option value={10}>10</option>
+            <option value={15}>15</option>
+            <option value={25}>25</option>
+            <option value={50}>50</option>
+            <option value={100}>100</option>
+          </Form.Select>
+          <span className="text-muted small">entries</span>
+        </div>
+        
+        <div className="text-muted small">
+          Showing {startRow} to {endRow} of {totalRecords} prospects
+        </div>
+
+        <div className="d-flex gap-1">
+          <Button
+            size="sm"
+            variant="outline-secondary"
+            disabled={currentPage === 1}
+            onClick={() => setPagination({ ...pagination, currentPage: 1 })}
+          >
+            <ChevronsLeft size={14} />
+          </Button>
+          <Button
+            size="sm"
+            variant="outline-secondary"
+            disabled={currentPage === 1}
+            onClick={() => setPagination({ ...pagination, currentPage: currentPage - 1 })}
+          >
+            <ChevronLeft size={14} />
+          </Button>
+          
+          {[...Array(totalPages)].map((_, index) => {
+            const pageNum = index + 1;
+            if (
+              pageNum === 1 ||
+              pageNum === totalPages ||
+              (pageNum >= currentPage - 1 && pageNum <= currentPage + 1)
+            ) {
+              return (
+                <Button
+                  key={pageNum}
+                  size="sm"
+                  variant={currentPage === pageNum ? 'primary' : 'outline-secondary'}
+                  onClick={() => setPagination({ ...pagination, currentPage: pageNum })}
+                >
+                  {pageNum}
+                </Button>
+              );
+            } else if (pageNum === currentPage - 2 || pageNum === currentPage + 2) {
+              return <span key={pageNum} className="px-2">...</span>;
+            }
+            return null;
+          })}
+          
+          <Button
+            size="sm"
+            variant="outline-secondary"
+            disabled={currentPage === totalPages}
+            onClick={() => setPagination({ ...pagination, currentPage: currentPage + 1 })}
+          >
+            <ChevronRight size={14} />
+          </Button>
+          <Button
+            size="sm"
+            variant="outline-secondary"
+            disabled={currentPage === totalPages}
+            onClick={() => setPagination({ ...pagination, currentPage: totalPages })}
+          >
+            <ChevronsRight size={14} />
+          </Button>
+        </div>
+      </div>
+    );
+  };
+
+  // Fetch prospects data
   const fetchCrmData = useCallback(
-    async (page = 1, perPage = 15, search = "") => {
-      const params: any = {
-        page,
-        per_page: perPage,
-      };
-      console.log("ZE PARAMS", params);
+    async () => {
+      setLoading(true);
+      try {
+        const params: any = {
+          page: pagination.currentPage,
+          per_page: pagination.rowsPerPage,
+        };
 
-      // Use search from filters if available, otherwise use the search parameter
-      const searchTerm = memoizedFilters.search || search;
-      if (searchTerm) {
-        params.search = searchTerm;
+        const searchTerm = memoizedFilters.search || prospectsSearch;
+        if (searchTerm) {
+          params.search = searchTerm;
+        }
+
+        if (
+          memoizedFilters.campaign_id &&
+          memoizedFilters.campaign_id.length > 0
+        ) {
+          params.campaign_ids = memoizedFilters.campaign_id;
+        }
+
+        if (memoizedFilters.tags && memoizedFilters.tags.length > 0) {
+          params.tags = memoizedFilters.tags;
+        }
+
+        if (memoizedFilters.assignment_status) {
+          params.assignment_status = memoizedFilters.assignment_status;
+        }
+
+        if (
+          memoizedFilters.user_extension &&
+          memoizedFilters.user_extension.length > 0
+        ) {
+          params.user_extensions = memoizedFilters.user_extension;
+        }
+
+        if (
+          memoizedFilters.is_viewed !== undefined &&
+          memoizedFilters.is_viewed !== ""
+        ) {
+          params.is_viewed = memoizedFilters.is_viewed;
+        }
+
+        if (memoizedFilters.start_date) {
+          params.date_from = memoizedFilters.start_date;
+        }
+
+        if (memoizedFilters.end_date) {
+          params.date_to = memoizedFilters.end_date;
+        }
+
+        params.module_slug = ModuleSlug.CRM_DATA_MANAGEMENT;
+
+        const response = await getCrmData(params);
+        setDataList(response.data || []);
+        setTotalRecords(response.pagination.total || 0);
+      } catch (error) {
+        console.error("Failed to fetch CRM data:", error);
+        setDataList([]);
+        setTotalRecords(0);
+      } finally {
+        setLoading(false);
       }
-
-      // Add filter parameters matching the Laravel controller
-      if (
-        memoizedFilters.campaign_id &&
-        memoizedFilters.campaign_id.length > 0
-      ) {
-        params.campaign_ids = memoizedFilters.campaign_id;
-      }
-
-      if (memoizedFilters.tags && memoizedFilters.tags.length > 0) {
-        params.tags = memoizedFilters.tags;
-      }
-
-      if (memoizedFilters.assignment_status) {
-        params.assignment_status = memoizedFilters.assignment_status;
-      }
-
-      if (
-        memoizedFilters.user_extension &&
-        memoizedFilters.user_extension.length > 0
-      ) {
-        params.user_extensions = memoizedFilters.user_extension;
-      }
-
-      if (
-        memoizedFilters.is_viewed !== undefined &&
-        memoizedFilters.is_viewed !== ""
-      ) {
-        params.is_viewed = memoizedFilters.is_viewed;
-      }
-
-      if (memoizedFilters.start_date) {
-        params.date_from = memoizedFilters.start_date;
-      }
-
-      if (memoizedFilters.end_date) {
-        params.date_to = memoizedFilters.end_date;
-      }
-
-      params.module_slug = ModuleSlug.CRM_DATA_MANAGEMENT;
-      console.log("Sending params with module_slug:", params);
-
-      const response = await getCrmData(params);
-      console.log("Prospects Response:", response);
-
-      // Transform to GenericListPage expected format
-      return {
-        dataList: response.data || [],
-        meta: {
-          total: response.pagination.total || 0,
-          current_page: response.pagination.current_page || page,
-          per_page: response.pagination.per_page || perPage,
-          last_page: response.pagination.last_page || 1,
-        },
-      };
     },
-    [memoizedFilters]
+    [memoizedFilters, pagination, prospectsSearch]
   );
+
+  // Load data when filters or pagination changes
+  useEffect(() => {
+    fetchCrmData();
+  }, [fetchCrmData, refreshKey]);
+
+  // Save selected columns to localStorage
+  useEffect(() => {
+    localStorage.setItem('crmDataSelectedColumns', JSON.stringify(selectedColumns));
+  }, [selectedColumns]);
 
   // CSV validation function
   const validateCsvFile = (
@@ -1781,39 +1949,403 @@ const CrmProspectsManagement = () => {
           </Card>
         )}
 
-        {/* Bulk Actions */}
-        {selectedItems.length > 0 && (
-          <div className="d-flex justify-content-end gap-2 mb-3">
-            <Button
-              variant="danger"
-              onClick={() => setShowBulkDeleteModal(true)}
-            >
-              <FiTrash2 className="me-2" />
-              Delete Selected ({selectedItems.length})
-            </Button>
-          </div>
-        )}
+        {/* Bulk Actions and Column Customization */}
+        <div className="d-flex justify-content-end gap-2 mb-3">
+          {/* Bulk Actions Dropdown - Only show when items are selected */}
+          {selectedItems.length > 0 && (
+            <Dropdown>
+              <Dropdown.Toggle variant="outline-primary" size="sm">
+                <CheckSquare size={16} className="me-2" />
+                Bulk Actions ({selectedItems.length})
+              </Dropdown.Toggle>
+              <Dropdown.Menu align="end">
+                <Dropdown.Item 
+                  onClick={() => setShowBulkDeleteModal(true)}
+                  className="d-flex align-items-center text-danger"
+                >
+                  <Trash2 size={14} className="me-2" />
+                  Delete Selected ({selectedItems.length})
+                </Dropdown.Item>
+              </Dropdown.Menu>
+            </Dropdown>
+          )}
 
-       
-        
-        
+          {/* Column Customization */}
+          <Dropdown>
+            <Dropdown.Toggle variant="outline-secondary" size="sm">
+              <Layers size={16} className="me-2" />
+              Customize Table
+            </Dropdown.Toggle>
+            <Dropdown.Menu align="end" style={{ maxHeight: '300px', overflowY: 'auto' }}>
+              {[
+                { key: 'name', label: 'Name' },
+                { key: 'phone', label: 'Phone' },
+                { key: 'user_extension', label: 'Assigned To' },
+                { key: 'campaign', label: 'Campaign' },
+                { key: 'last_called_at', label: 'Last Called' },
+                { key: 'last_call_end_reason', label: 'Last Call Status' },
+                { key: 'disposition', label: 'Disposition' },
+                { key: 'scheduled_call_at', label: 'Next Call Scheduled' },
+                { key: 'tags', label: 'Tags' }
+              ].map((col) => (
+                <Dropdown.Item key={col.key} as="div">
+                  <Form.Check
+                    type="checkbox"
+                    label={col.label}
+                    checked={selectedColumns.includes(col.key)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedColumns([...selectedColumns, col.key]);
+                      } else {
+                        setSelectedColumns(selectedColumns.filter(c => c !== col.key));
+                      }
+                    }}
+                  />
+                </Dropdown.Item>
+              ))}
+              <Dropdown.Divider />
+              <Dropdown.Item onClick={() => setSelectedColumns(['name', 'phone', 'user_extension', 'campaign', 'last_called_at', 'last_call_end_reason', 'disposition', 'scheduled_call_at', 'tags'])}>
+                Select All
+              </Dropdown.Item>
+              <Dropdown.Item onClick={() => setSelectedColumns(['name', 'phone', 'user_extension', 'campaign', 'last_called_at', 'last_call_end_reason', 'disposition', 'scheduled_call_at', 'tags'])}>
+                Reset to Default
+              </Dropdown.Item>
+            </Dropdown.Menu>
+          </Dropdown>
+        </div>
+
+        {/* Prospects Table */}
         {session?.user?.permissions?.includes('list-crm-data-management') && (
-            <GenericListPage
-                  columns={columns}
-                  fetchData={fetchCrmData}
-                  title="Prospects"
-                  searchPlaceholder="Search prospects..."
-                  defaultPageSize={15}
-                  filters={memoizedFilters}
-                  refreshKey={refreshKey}
-                  search={false}
-                  rowSelection={false}
-                  onSelectionChange={handleItemSelection}
-                  clearSelectedRows={clearSelectedRows}
-                  tableStyle="table-style-2"
+          <Card className="border-0 shadow-sm">
+            <Card.Body className="p-0">
+              {loading ? (
+                <div className="text-center py-5">
+                  <Spinner animation="border" variant="primary" />
+                  <p className="mt-3 text-muted">Loading prospects...</p>
+                </div>
+              ) : (
+                <>
+                  <div className="table-responsive">
+                    <Table hover className="mb-0">
+                      <thead className="bg-light">
+                        <tr>
+                          <th style={{ width: '50px' }}>
+                            <Form.Check
+                              type="checkbox"
+                              checked={selectedItems.length > 0 && selectedItems.length === dataList.length}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedItems(dataList.map(item => item.id));
+                                } else {
+                                  setSelectedItems([]);
+                                }
+                              }}
+                            />
+                          </th>
+                          {selectedColumns.includes('name') && (
+                            <th 
+                              style={{ cursor: 'pointer', userSelect: 'none' }}
+                              onClick={() => handleSort('name')}
+                            >
+                              Name {renderSortIcon('name')}
+                            </th>
+                          )}
+                          {selectedColumns.includes('phone') && (
+                            <th 
+                              style={{ cursor: 'pointer', userSelect: 'none' }}
+                              onClick={() => handleSort('phone')}
+                            >
+                              Phone {renderSortIcon('phone')}
+                            </th>
+                          )}
+                          {selectedColumns.includes('user_extension') && (
+                            <th 
+                              style={{ cursor: 'pointer', userSelect: 'none' }}
+                              onClick={() => handleSort('user_extension')}
+                            >
+                              Assigned To {renderSortIcon('user_extension')}
+                            </th>
+                          )}
+                          {selectedColumns.includes('campaign') && (
+                            <th 
+                              style={{ cursor: 'pointer', userSelect: 'none' }}
+                              onClick={() => handleSort('campaign_id')}
+                            >
+                              Campaign {renderSortIcon('campaign_id')}
+                            </th>
+                          )}
+                          {selectedColumns.includes('last_called_at') && (
+                            <th 
+                              style={{ cursor: 'pointer', userSelect: 'none' }}
+                              onClick={() => handleSort('last_called_at')}
+                            >
+                              Last Called {renderSortIcon('last_called_at')}
+                            </th>
+                          )}
+                          {selectedColumns.includes('last_call_end_reason') && (
+                            <th 
+                              style={{ cursor: 'pointer', userSelect: 'none' }}
+                              onClick={() => handleSort('last_call_end_reason')}
+                            >
+                              Last Call Status {renderSortIcon('last_call_end_reason')}
+                            </th>
+                          )}
+                          {selectedColumns.includes('disposition') && (
+                            <th 
+                              style={{ cursor: 'pointer', userSelect: 'none' }}
+                              onClick={() => handleSort('disposition')}
+                            >
+                              Disposition {renderSortIcon('disposition')}
+                            </th>
+                          )}
+                          {selectedColumns.includes('scheduled_call_at') && (
+                            <th 
+                              style={{ cursor: 'pointer', userSelect: 'none' }}
+                              onClick={() => handleSort('scheduled_call_at')}
+                            >
+                              Next Call Scheduled {renderSortIcon('scheduled_call_at')}
+                            </th>
+                          )}
+                          {selectedColumns.includes('tags') && <th>Tags</th>}
+                          <th>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(() => {
+                          const sorted = sortData(dataList, pagination.sortColumn, pagination.sortDirection);
+                          const paginated = paginateData(sorted, pagination.currentPage, pagination.rowsPerPage);
+                          
+                          if (paginated.length === 0) {
+                            return (
+                              <tr>
+                                <td colSpan={selectedColumns.length + 2} className="text-center py-4 text-muted">
+                                  No prospects found matching your criteria
+                                </td>
+                              </tr>
+                            );
+                          }
 
-                />
-                )}
+                          return paginated.map((item: any) => {
+                            const endReason = callEndReasons.find((r) => r.value === ((item as any).last_call_end_reason || "answered")) || callEndReasons[0];
+                            const dispositions = [
+                              { value: "interested", label: "Interested", color: "success" },
+                              { value: "not_interested", label: "Not Interested", color: "danger" },
+                              { value: "callback_requested", label: "Callback Requested", color: "warning" },
+                              { value: "no_answer", label: "No Answer", color: "warning" },
+                              { value: "busy", label: "Busy", color: "info" },
+                              { value: "do_not_call", label: "Do Not Call", color: "danger" },
+                              { value: "wrong_number", label: "Wrong Number", color: "info" },
+                              { value: "follow_up", label: "Follow Up", color: "primary" },
+                            ];
+                            const randomDisposition = dispositions[Math.floor(Math.random() * dispositions.length)];
+
+                            return (
+                              <tr key={item.id}>
+                                <td>
+                                  <Form.Check
+                                    type="checkbox"
+                                    checked={selectedItems.includes(item.id)}
+                                    onChange={(e) => {
+                                      if (e.target.checked) {
+                                        setSelectedItems([...selectedItems, item.id]);
+                                      } else {
+                                        setSelectedItems(selectedItems.filter(id => id !== item.id));
+                                      }
+                                    }}
+                                  />
+                                </td>
+                                {selectedColumns.includes('name') && (
+                                  <td className="fw-semibold">{item.name || 'N/A'}</td>
+                                )}
+                                {selectedColumns.includes('phone') && (
+                                  <td>
+                                    <Badge bg="info" className="bg-opacity-10 text-dark">
+                                      {item.phone || 'N/A'}
+                                    </Badge>
+                                  </td>
+                                )}
+                                {selectedColumns.includes('user_extension') && (
+                                  <td>
+                                    {item.user_extension ? (
+                                      <Badge bg="success" className="bg-opacity-10 text-dark">
+                                        {extensions.find(
+                                          (ext: any) => ext.id.toString() === item.user_extension?.toString()
+                                        )?.display_name || item.user_extension}
+                                      </Badge>
+                                    ) : (
+                                      <Badge bg="secondary" className="bg-opacity-10 text-dark">Unassigned</Badge>
+                                    )}
+                                  </td>
+                                )}
+                                {selectedColumns.includes('campaign') && (
+                                  <td>
+                                    {(item as any).campaign ? (
+                                      <Badge bg="primary" className="bg-opacity-10 text-dark">
+                                        {(item as any).campaign.name}
+                                      </Badge>
+                                    ) : (
+                                      <Badge bg="info" className="bg-opacity-10 text-dark">No Campaign</Badge>
+                                    )}
+                                  </td>
+                                )}
+                                {selectedColumns.includes('last_called_at') && (
+                                  <td>
+                                    {(item as any).last_called_at ? (
+                                      moment((item as any).last_called_at).format("MMM DD, HH:mm")
+                                    ) : (
+                                      '-'
+                                    )}
+                                  </td>
+                                )}
+                                {selectedColumns.includes('last_call_end_reason') && (
+                                  <td>
+                                    {(item as any).last_call_end_reason ? (
+                                      <Badge bg={endReason.color as any} className="bg-opacity-10 text-dark">
+                                        {endReason.label}
+                                      </Badge>
+                                    ) : '-'}
+                                  </td>
+                                )}
+                                {selectedColumns.includes('disposition') && (
+                                  <td>
+                                    {(item as any).disposition ? (
+                                      <Badge bg={randomDisposition.color as any} className="bg-opacity-10 text-dark">
+                                        {randomDisposition.label}
+                                      </Badge>
+                                    ) : '-'}
+                                  </td>
+                                )}
+                                {selectedColumns.includes('scheduled_call_at') && (
+                                  <td>
+                                    {(item as any).scheduled_call_at ? (
+                                      (() => {
+                                        const scheduledAt = (item as any).scheduled_call_at;
+                                        const isOverdue = moment(scheduledAt).isBefore(moment());
+                                        const isNextHour = moment(scheduledAt).isBefore(moment().add(1, "hour"));
+                                        return (
+                                          <Badge 
+                                            bg={isOverdue ? 'danger' : isNextHour ? 'warning' : 'info'} 
+                                            className="bg-opacity-10 text-dark"
+                                          >
+                                            {moment(scheduledAt).format("MMM DD, HH:mm")}
+                                            {isOverdue && <span className="ms-1 fw-bold">(Overdue)</span>}
+                                            {isNextHour && !isOverdue && <span className="ms-1 fw-bold">(Soon)</span>}
+                                          </Badge>
+                                        );
+                                      })()
+                                    ) : (
+                                      <Badge bg="info" className="bg-opacity-10 text-dark">Not scheduled</Badge>
+                                    )}
+                                  </td>
+                                )}
+                                {selectedColumns.includes('tags') && (
+                                  <td>
+                                    <div className="d-flex gap-1 flex-wrap">
+                                      {((item as any).tags || []).map((tag: any, idx: number) => (
+                                        <Badge key={idx} bg="secondary" className="bg-opacity-10 text-dark">
+                                          {tag.name || tag}
+                                        </Badge>
+                                      ))}
+                                    </div>
+                                  </td>
+                                )}
+                                <td>
+                                  <div className="d-flex gap-1">
+                                    {session?.user?.permissions?.includes('view-crm-data-management') && (
+                                      <Button 
+                                        variant="link" 
+                                        size="sm" 
+                                        className="p-1" 
+                                        title="View Details"
+                                        onClick={() => handleViewData(item)}
+                                      >
+                                        <Eye size={16} />
+                                      </Button>
+                                    )}
+                                    {session?.user?.permissions?.includes('call-service-crm-data-management') && (
+                                      <>
+                                        <Button
+                                          variant="link"
+                                          size="sm"
+                                          className="p-1 text-success"
+                                          title="Call Now"
+                                          onClick={() => handleCallClick(item)}
+                                        >
+                                          <PhoneIcon size={16} />
+                                        </Button>
+                                        {(item as any).scheduled_call_at ? (
+                                          <Button
+                                            variant="link"
+                                            size="sm"
+                                            className="p-1 text-warning"
+                                            title="Unschedule Call"
+                                            onClick={() => handleUnscheduleCall(item)}
+                                          >
+                                            <FiX size={16} />
+                                          </Button>
+                                        ) : (
+                                          <Button
+                                            variant="link"
+                                            size="sm"
+                                            className="p-1 text-info"
+                                            title="Schedule Call"
+                                            onClick={() => handleScheduleCall(item)}
+                                          >
+                                            <FiCalendar size={16} />
+                                          </Button>
+                                        )}
+                                      </>
+                                    )}
+                                    <Dropdown className="d-inline">
+                                      <Dropdown.Toggle 
+                                        as={Button}
+                                        variant="link" 
+                                        size="sm" 
+                                        className="p-1"
+                                        title="More Actions"
+                                      >
+                                        <MoreVertical size={16} />
+                                      </Dropdown.Toggle>
+                                      <Dropdown.Menu align="end">
+                                        <Dropdown.Item onClick={() => {
+                                          window.location.href = `/crm/leads/create?crm_data_id=${item.id}`;
+                                        }}>
+                                          <FiTarget size={14} className="me-2" />
+                                          Convert to Lead
+                                        </Dropdown.Item>
+                                        <Dropdown.Item onClick={() => {
+                                          window.location.href = `tel:${item.phone}`;
+                                        }}>
+                                          <PhoneIcon size={14} className="me-2" />
+                                          Call Prospect
+                                        </Dropdown.Item>
+                                        {(item as any).email && (
+                                          <Dropdown.Item onClick={() => {
+                                            window.location.href = `mailto:${(item as any).email}`;
+                                          }}>
+                                            <Mail size={14} className="me-2" />
+                                            Send Email
+                                          </Dropdown.Item>
+                                        )}
+                                      </Dropdown.Menu>
+                                    </Dropdown>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          });
+                        })()}
+                      </tbody>
+                    </Table>
+                  </div>
+                  <div className="p-3">
+                    {renderPaginationControls()}
+                  </div>
+                </>
+              )}
+            </Card.Body>
+          </Card>
+        )}
       </div>
 
       {/* Upload Modal */}

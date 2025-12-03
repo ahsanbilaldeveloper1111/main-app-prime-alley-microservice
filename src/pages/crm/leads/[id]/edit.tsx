@@ -1007,38 +1007,39 @@ const EditLead = () => {
                                   <Col md={12}>
                                     <Form.Group className="mb-3">
                                       <Form.Label>Phone</Form.Label>
-                                      <PhoneInput
-                                        international
-                                        defaultCountry="US"
-                                        value={person.phone_country_code && person.phone 
-                                          ? `${person.phone_country_code}${person.phone}` 
-                                          : person.phone || undefined}
-                                        onChange={(value) => {
-                                          if (value) {
-                                            try {
-                                              // Parse the phone number to extract country code and national number
-                                              const phoneNumber = parsePhoneNumber(value);
-                                              if (phoneNumber) {
-                                                updateContactPerson(index, "phone_country_code", `+${phoneNumber.countryCallingCode}`);
-                                                updateContactPerson(index, "phone", phoneNumber.nationalNumber);
-                                              } else {
-                                                // Fallback: store full number in phone field
+                                      <div className="phone-input-wrapper">
+                                        <PhoneInput
+                                          international
+                                          defaultCountry="US"
+                                          value={person.phone_country_code && person.phone 
+                                            ? `${person.phone_country_code}${person.phone}` 
+                                            : person.phone || undefined}
+                                          onChange={(value) => {
+                                            if (value) {
+                                              try {
+                                                // Parse the phone number to extract country code and national number
+                                                const phoneNumber = parsePhoneNumber(value);
+                                                if (phoneNumber) {
+                                                  updateContactPerson(index, "phone_country_code", `+${phoneNumber.countryCallingCode}`);
+                                                  updateContactPerson(index, "phone", phoneNumber.nationalNumber);
+                                                } else {
+                                                  // Fallback: store full number in phone field
+                                                  updateContactPerson(index, "phone_country_code", "");
+                                                  updateContactPerson(index, "phone", value);
+                                                }
+                                              } catch (error) {
+                                                // If parsing fails, store full number in phone field
                                                 updateContactPerson(index, "phone_country_code", "");
                                                 updateContactPerson(index, "phone", value);
                                               }
-                                            } catch (error) {
-                                              // If parsing fails, store full number in phone field
+                                            } else {
                                               updateContactPerson(index, "phone_country_code", "");
-                                              updateContactPerson(index, "phone", value);
+                                              updateContactPerson(index, "phone", "");
                                             }
-                                          } else {
-                                            updateContactPerson(index, "phone_country_code", "");
-                                            updateContactPerson(index, "phone", "");
-                                          }
-                                        }}
-                                        className="form-control"
-                                        placeholder="Enter phone number"
-                                      />
+                                          }}
+                                          placeholder="Enter phone number"
+                                        />
+                                      </div>
                                     </Form.Group>
                                   </Col>
                                   <Col md={12}>

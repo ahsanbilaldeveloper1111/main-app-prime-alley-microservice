@@ -52,7 +52,6 @@ import {
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
-  CheckSquare,
   CheckCircle,
   XCircle,
   ChevronRight as ChevronRightIcon,
@@ -123,7 +122,6 @@ const StagesManagement = () => {
   const [currentFilters, setCurrentFilters] = useState({search: "", type: "" as string});
   const [selectedTypeFilter, setSelectedTypeFilter] = useState<string>('');
   const [showStagesAnalytics, setShowStagesAnalytics] = useState(false);
-  const [selectedStages, setSelectedStages] = useState<number[]>([]);
   const [selectedStagesColumns, setSelectedStagesColumns] = useState<string[]>(() => {
     const saved = localStorage.getItem('stagesSelectedColumns');
     return saved ? JSON.parse(saved) : ['order', 'stageName', 'category', 'description', 'color'];
@@ -900,28 +898,8 @@ const StagesManagement = () => {
           </Card.Body>
         </Card>
 
-        {/* Bulk Actions and Column Customization */}
+        {/* Column Customization */}
         <div className="d-flex justify-content-end gap-2 mb-3">
-          {selectedStages.length > 0 && (
-            <Dropdown>
-              <Dropdown.Toggle variant="outline-primary" size="sm">
-                <CheckSquare size={16} className="me-2" />
-                Bulk Actions ({selectedStages.length})
-              </Dropdown.Toggle>
-              <Dropdown.Menu align="end">
-                <Dropdown.Item 
-                  onClick={() => {
-                    toast.info(`Bulk delete for ${selectedStages.length} stages - implement bulk delete handler`);
-                  }}
-                  className="d-flex align-items-center text-danger"
-                >
-                  <Trash2 size={14} className="me-2" />
-                  Delete Selected ({selectedStages.length})
-                </Dropdown.Item>
-              </Dropdown.Menu>
-            </Dropdown>
-          )}
-
           <Dropdown>
             <Dropdown.Toggle variant="outline-secondary" size="sm">
               <Layers size={16} className="me-2" />
@@ -979,28 +957,6 @@ const StagesManagement = () => {
               <Table hover className="mb-0">
                 <thead className="bg-light">
                   <tr>
-                    <th style={{ width: '50px' }}>
-                      <Form.Check
-                        type="checkbox"
-                        checked={(() => {
-                          const sorted = sortData(filteredStages, stagesPagination.sortColumn, stagesPagination.sortDirection);
-                          const paginated = paginateData(sorted, stagesPagination.currentPage, stagesPagination.rowsPerPage);
-                          return paginated.length > 0 && paginated.every((stage: StageData) => selectedStages.includes(stage.id));
-                        })()}
-                        onChange={(e) => {
-                          const sorted = sortData(filteredStages, stagesPagination.sortColumn, stagesPagination.sortDirection);
-                          const paginated = paginateData(sorted, stagesPagination.currentPage, stagesPagination.rowsPerPage);
-                          
-                          if (e.target.checked) {
-                            const newIds = paginated.map((stage: StageData) => stage.id).filter((id: number) => !selectedStages.includes(id));
-                            setSelectedStages([...selectedStages, ...newIds]);
-                          } else {
-                            const paginatedIds = paginated.map((stage: StageData) => stage.id);
-                            setSelectedStages(selectedStages.filter(id => !paginatedIds.includes(id)));
-                          }
-                        }}
-                      />
-                    </th>
                     {selectedStagesColumns.includes('order') && (
                       <th 
                         style={{ cursor: 'pointer', userSelect: 'none' }}
@@ -1033,13 +989,13 @@ const StagesManagement = () => {
                 <tbody>
                   {loadingStages ? (
                     <tr>
-                      <td colSpan={selectedStagesColumns.length + 2} className="text-center py-4">
+                      <td colSpan={selectedStagesColumns.length + 1} className="text-center py-4">
                         Loading...
                       </td>
                     </tr>
                   ) : filteredStages.length === 0 ? (
                     <tr>
-                      <td colSpan={selectedStagesColumns.length + 2} className="text-center py-4 text-muted">
+                      <td colSpan={selectedStagesColumns.length + 1} className="text-center py-4 text-muted">
                         No stages found matching your criteria
                       </td>
                     </tr>
@@ -1050,19 +1006,6 @@ const StagesManagement = () => {
                       stagesPagination.rowsPerPage
                     ).map((stage) => (
                       <tr key={stage.id}>
-                        <td>
-                          <Form.Check
-                            type="checkbox"
-                            checked={selectedStages.includes(stage.id)}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setSelectedStages([...selectedStages, stage.id]);
-                              } else {
-                                setSelectedStages(selectedStages.filter(id => id !== stage.id));
-                              }
-                            }}
-                          />
-                        </td>
                         {selectedStagesColumns.includes('order') && (
                           <td className="text-center fw-bold">{stage.sequence}</td>
                         )}

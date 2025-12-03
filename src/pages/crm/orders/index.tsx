@@ -47,7 +47,6 @@ import {
   X,
   Users,
   PlusCircle,
-  CheckSquare,
   Zap,
   Star,
   Clock,
@@ -302,21 +301,14 @@ const CrmOrders = () => {
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [activeFilter, setActiveFilter] = useState('all');
   const [ordersSearch, setOrdersSearch] = useState('');
-  const [selectedOrders, setSelectedOrders] = useState<number[]>([]);
   const [selectedOrdersColumns, setSelectedOrdersColumns] = useState<string[]>(() => {
     const saved = localStorage.getItem('ordersSelectedColumns');
-    return saved ? JSON.parse(saved) : ['orderNumber', 'customer', 'deal', 'stage', 'value', 'approvalStatus', 'fulfillmentStatus', 'orderDate', 'owner'];
+    return saved ? JSON.parse(saved) : ['orderNumber', 'customer', 'deal', 'stage', 'value', 'approvalStatus', 'fulfillmentStatus', 'assignedUser', 'orderDate', 'owner'];
   });
   const [ordersPagination, setOrdersPagination] = useState({ currentPage: 1, rowsPerPage: 15, sortColumn: '', sortDirection: 'asc' as 'asc' | 'desc' });
   const [ordersFilters, setOrdersFilters] = useState({
-    stage: [] as string[],
-    approvalStatus: [] as string[],
-    fulfillmentStatus: [] as string[],
-    paymentStatus: [] as string[],
-    priority: [] as string[],
-    owner: [] as string[],
-    minValue: '',
-    orderDate: ''
+    assignedTo: null as string | null,
+    stage: null as string | null,
   });
 
   // Fetch stages and extensions on component mount
@@ -333,16 +325,21 @@ const CrmOrders = () => {
         const params: any = {
           page,
           per_page: perPage,
-          ...(currentFilters || {}),
         };
 
-        const searchTerm = currentFilters.search || search || ordersSearch;
-        if (searchTerm) {
-          params.search = searchTerm;
+        // Use search from currentFilters if available, otherwise use the search parameter
+        if (currentFilters.search) {
+          params.search = currentFilters.search;
+        } else if (search) {
+          params.search = search;
         }
 
+        // Add filter parameters at top level
         if (currentFilters.stage_id) {
           params.stage_id = currentFilters.stage_id;
+        }
+        if (currentFilters.assigned_to) {
+          params.assigned_to = currentFilters.assigned_to;
         }
         if (currentFilters.is_lost !== undefined) {
           params.is_lost = currentFilters.is_lost;
@@ -366,6 +363,36 @@ const CrmOrders = () => {
     },
     [currentFilters, ordersSearch]
   );
+
+  // Handle activeFilter changes to update currentFilters and stage dropdown
+  useEffect(() => {
+    if (activeFilter === 'all') {
+      setCurrentFilters((prev) => {
+        const newFilters = { ...prev };
+        delete newFilters.stage_id;
+        return newFilters;
+      });
+      // Clear stage dropdown
+      setOrdersFilters(prev => ({
+        ...prev,
+        stage: null
+      }));
+    } else if (activeFilter && stages.length > 0) {
+      // Find stage by id (activeFilter should be stage id as string)
+      const selectedStage = stages.find((s: any) => s.id.toString() === activeFilter);
+      if (selectedStage) {
+        setCurrentFilters((prev) => ({
+          ...prev,
+          stage_id: selectedStage.id.toString(),
+        }));
+        // Auto-fill stage dropdown
+        setOrdersFilters(prev => ({
+          ...prev,
+          stage: selectedStage.id.toString()
+        }));
+      }
+    }
+  }, [activeFilter, stages]);
 
   useEffect(() => {
     fetchOrders(ordersPagination.currentPage, ordersPagination.rowsPerPage, ordersSearch);
@@ -442,7 +469,43 @@ const CrmOrders = () => {
 
   // Handle filter changes
   const handleFiltersChange = useCallback((filters: Record<string, any>) => {
-    setCurrentFilters(filters);
+    setCurrentFilters((prev) => {
+      const newFilters = { ...prev };
+      
+      // Handle stage_id filter (single value)
+      if ('stage_id' in filters) {
+        if (filters.stage_id) {
+          newFilters.stage_id = String(filters.stage_id);
+        } else {
+          delete newFilters.stage_id;
+        }
+      }
+      
+      // Handle assigned_to filter (single value)
+      if ('assigned_to' in filters) {
+        if (filters.assigned_to) {
+          newFilters.assigned_to = String(filters.assigned_to);
+        } else {
+          delete newFilters.assigned_to;
+        }
+      }
+      
+      // Handle search
+      if ('search' in filters) {
+        if (filters.search) {
+          newFilters.search = filters.search;
+        } else {
+          delete newFilters.search;
+        }
+      }
+      
+      // Handle is_lost filter
+      if ('is_lost' in filters) {
+        newFilters.is_lost = filters.is_lost;
+      }
+      
+      return newFilters;
+    });
     setRefreshKey((prev) => prev + 1);
   }, []);
 
@@ -657,8 +720,10 @@ const CrmOrders = () => {
       approvalStatus: order.order_approval_status || 'pending',
       fulfillmentStatus: order.fulfillment_status || 'pending',
       paymentStatus: order.payment_status || 'unpaid',
-      priority: order.order_priority || '',
       orderDate: order.order_date ? new Date(order.order_date).toLocaleDateString() : '',
+      assignedUser: extensions.find((ext: any) => ext?.id == order?.assigned_to || ext?.extension == order?.assigned_to)?.display_name || 
+                    extensions.find((ext: any) => ext?.id == order?.assigned_to || ext?.extension == order?.assigned_to)?.name || 
+                    order.assigned_to || '',
       expectedDeliveryDate: order.expected_delivery_date ? new Date(order.expected_delivery_date).toLocaleDateString() : '',
       actualDeliveryDate: order.actual_delivery_date ? new Date(order.actual_delivery_date).toLocaleDateString() : '',
       owner: extensions.find((ext: any) => ext?.id == order?.assigned_to || ext?.extension == order?.assigned_to)?.display_name || 
@@ -715,55 +780,26 @@ const CrmOrders = () => {
     return { total, delivered, inProgress, pendingApproval, totalValue, stageCounts, statusCounts };
   }, [ordersData, extensions, summaryTiles, totalOrders]);
 
-  // Filter and transform orders data
+  // Transform orders data (no client-side filtering - API handles it)
   const filteredOrders = useMemo(() => {
-    const transformed = ordersData.map(transformOrderData);
-    
-    return transformed.filter(order => {
-      // Quick filters
-      if (activeFilter === 'pending-approval') {
-        if (!order.approvalStatus?.toLowerCase().includes('pending')) return false;
-      } else if (activeFilter === 'in-progress') {
-        if (!order.fulfillmentStatus?.toLowerCase().includes('progress')) return false;
-      } else if (activeFilter === 'delivered') {
-        if (!order.fulfillmentStatus?.toLowerCase().includes('completed') && !order.fulfillmentStatus?.toLowerCase().includes('delivered')) return false;
-      } else if (activeFilter === 'high-priority') {
-        if (order.priority?.toLowerCase() !== 'high' && order.priority?.toLowerCase() !== 'urgent') return false;
-      }
+    return ordersData.map(transformOrderData);
+  }, [ordersData, extensions]);
 
-      // Search filter
-      const matchesSearch = !ordersSearch || !ordersSearch.trim() ||
-        (order.orderNumber && order.orderNumber.toLowerCase().includes(ordersSearch.toLowerCase())) ||
-        (order.customer && order.customer.toLowerCase().includes(ordersSearch.toLowerCase())) ||
-        (order.deal && order.deal.toLowerCase().includes(ordersSearch.toLowerCase()));
-
-      // Advanced filters
-      const matchesStage = ordersFilters.stage.length === 0 || ordersFilters.stage.includes(order.stage);
-      const matchesApprovalStatus = ordersFilters.approvalStatus.length === 0 || ordersFilters.approvalStatus.includes(order.approvalStatus);
-      const matchesFulfillmentStatus = ordersFilters.fulfillmentStatus.length === 0 || ordersFilters.fulfillmentStatus.includes(order.fulfillmentStatus);
-      const matchesPaymentStatus = ordersFilters.paymentStatus.length === 0 || ordersFilters.paymentStatus.includes(order.paymentStatus);
-      const matchesPriority = ordersFilters.priority.length === 0 || ordersFilters.priority.includes(order.priority);
-      const matchesOwner = ordersFilters.owner.length === 0 || ordersFilters.owner.includes(order.owner);
-      const matchesMinValue = !ordersFilters.minValue || parseFloat(String(order.value).replace(/[^0-9.-]/g, '')) >= parseFloat(ordersFilters.minValue);
-      const matchesOrderDate = !ordersFilters.orderDate;
-
-      return matchesSearch && matchesStage && matchesApprovalStatus && 
-        matchesFulfillmentStatus && matchesPaymentStatus && matchesPriority && 
-        matchesOwner && matchesMinValue && matchesOrderDate;
-    });
-  }, [ordersData, activeFilter, ordersSearch, ordersFilters, extensions]);
-
-  // Calculate filter counts
+  // Calculate filter counts (using summary_tiles if available, otherwise from data)
   const filterCounts = useMemo(() => {
     const transformed = ordersData.map(transformOrderData);
-    return {
-      all: transformed.length,
-      pendingApproval: transformed.filter(o => o.approvalStatus?.toLowerCase().includes('pending')).length,
-      inProgress: transformed.filter(o => o.fulfillmentStatus?.toLowerCase().includes('progress')).length,
-      delivered: transformed.filter(o => o.fulfillmentStatus?.toLowerCase().includes('completed') || o.fulfillmentStatus?.toLowerCase().includes('delivered')).length,
-      highPriority: transformed.filter(o => o.priority?.toLowerCase() === 'high' || o.priority?.toLowerCase() === 'urgent').length
+    const counts: Record<string, number> = {
+      all: summaryTiles?.total_orders || totalOrders || transformed.length,
     };
-  }, [ordersData, extensions]);
+    
+    // Add counts for first 5 stages
+    stages.slice(0, 5).forEach((stage: any) => {
+      const stageOrders = transformed.filter(o => o.stage === stage.name || o.rawData?.order_stage_id === stage.id);
+      counts[stage.id] = stageOrders.length;
+    });
+    
+    return counts;
+  }, [ordersData, extensions, stages, summaryTiles, totalOrders]);
 
   // Custom select styles
   const customSelectStyles = {
@@ -936,59 +972,36 @@ const CrmOrders = () => {
               activeColor: '#0d6efd',
               icon: <ShoppingCart size={16} />
             },
-            {
-              id: 'pending-approval',
-              label: 'Pending Approval',
-              count: filterCounts.pendingApproval,
-              color: '#ffc107',
+            ...stages.slice(0, 5).map((stage: any) => ({
+              id: stage.id.toString(),
+              label: stage.name,
+              count: filterCounts[stage.id] || 0,
+              color: stage.color || '#6c757d',
               activeColor: '#0d6efd',
-              icon: <AlertTriangle size={16} />
-            },
-            {
-              id: 'in-progress',
-              label: 'In Progress',
-              count: filterCounts.inProgress,
-              color: '#0dcaf0',
-              activeColor: '#0d6efd',
-              icon: <RefreshCw size={16} />
-            },
-            {
-              id: 'delivered',
-              label: 'Delivered',
-              count: filterCounts.delivered,
-              color: '#198754',
-              activeColor: '#0d6efd',
-              icon: <CheckCircle size={16} />
-            },
-            {
-              id: 'high-priority',
-              label: 'High Priority',
-              count: filterCounts.highPriority,
-              color: '#dc3545',
-              activeColor: '#0d6efd',
-              icon: <Star size={16} />
-            }
+              icon: <Layers size={16} />
+            }))
           ]}
           activeFilter={activeFilter}
-          onFilterChange={(filterId) => setActiveFilter(filterId)}
+          onFilterChange={(filterId) => {
+            setActiveFilter(filterId);
+            setOrdersPagination({ ...ordersPagination, currentPage: 1 });
+          }}
           searchValue={ordersSearch}
           onSearchChange={(value) => setOrdersSearch(value)}
           onSearch={() => {
+            if (ordersSearch.trim()) {
+              handleFiltersChange({ search: ordersSearch.trim() });
+            } else {
+              handleFiltersChange({ search: null });
+            }
             setOrdersPagination({ ...ordersPagination, currentPage: 1 });
-            setRefreshKey(prev => prev + 1);
           }}
           searchPlaceholder="Search orders by number, customer, deal..."
           showAdvancedFilters={showAdvancedFilters}
           onToggleAdvancedFilters={() => setShowAdvancedFilters(!showAdvancedFilters)}
           advancedFilterCount={
-            ordersFilters.stage.length +
-            ordersFilters.approvalStatus.length +
-            ordersFilters.fulfillmentStatus.length +
-            ordersFilters.paymentStatus.length +
-            ordersFilters.priority.length +
-            ordersFilters.owner.length +
-            (ordersFilters.minValue ? 1 : 0) +
-            (ordersFilters.orderDate ? 1 : 0)
+            (ordersFilters.assignedTo !== null ? 1 : 0) +
+            (ordersFilters.stage !== null ? 1 : 0)
           }
         />
 
@@ -997,172 +1010,94 @@ const CrmOrders = () => {
           <Card className="border-0 shadow-sm mb-4">
             <Card.Body>
               <Row className="g-3 align-items-end">
-                <Col md={2}>
-                  <Form.Label className="small fw-bold mb-2">Stage</Form.Label>
+                <Col md={4}>
+                  <Form.Label className="small fw-bold mb-2">Assigned To</Form.Label>
                   <Select
-                    isMulti
-                    options={stages.map(s => ({ value: s.name, label: s.name }))}
-                    value={ordersFilters.stage.map(s => ({ value: s, label: s }))}
-                    onChange={(selected) => {
-                      setOrdersFilters(prev => ({
-                        ...prev,
-                        stage: selected ? selected.map(s => s.value) : []
-                      }));
-                    }}
-                    placeholder="Select stages..."
-                    styles={customSelectStyles}
-                  />
-                </Col>
-                <Col md={2}>
-                  <Form.Label className="small fw-bold mb-2">Approval Status</Form.Label>
-                  <Select
-                    isMulti
-                    options={[
-                      { value: 'pending', label: 'Pending' },
-                      { value: 'approved', label: 'Approved' },
-                      { value: 'rejected', label: 'Rejected' }
-                    ]}
-                    value={ordersFilters.approvalStatus.map(s => ({ value: s, label: s }))}
-                    onChange={(selected) => {
-                      setOrdersFilters(prev => ({
-                        ...prev,
-                        approvalStatus: selected ? selected.map(s => s.value) : []
-                      }));
-                    }}
-                    placeholder="Select status..."
-                    styles={customSelectStyles}
-                  />
-                </Col>
-                <Col md={2}>
-                  <Form.Label className="small fw-bold mb-2">Fulfillment Status</Form.Label>
-                  <Select
-                    isMulti
-                    options={[
-                      { value: 'pending', label: 'Pending' },
-                      { value: 'in progress', label: 'In Progress' },
-                      { value: 'completed', label: 'Completed' }
-                    ]}
-                    value={ordersFilters.fulfillmentStatus.map(s => ({ value: s, label: s }))}
-                    onChange={(selected) => {
-                      setOrdersFilters(prev => ({
-                        ...prev,
-                        fulfillmentStatus: selected ? selected.map(s => s.value) : []
-                      }));
-                    }}
-                    placeholder="Select status..."
-                    styles={customSelectStyles}
-                  />
-                </Col>
-                <Col md={2}>
-                  <Form.Label className="small fw-bold mb-2">Payment Status</Form.Label>
-                  <Select
-                    isMulti
-                    options={[
-                      { value: 'unpaid', label: 'Unpaid' },
-                      { value: 'paid', label: 'Paid' },
-                      { value: 'partial', label: 'Partial' }
-                    ]}
-                    value={ordersFilters.paymentStatus.map(s => ({ value: s, label: s }))}
-                    onChange={(selected) => {
-                      setOrdersFilters(prev => ({
-                        ...prev,
-                        paymentStatus: selected ? selected.map(s => s.value) : []
-                      }));
-                    }}
-                    placeholder="Select status..."
-                    styles={customSelectStyles}
-                  />
-                </Col>
-                <Col md={2}>
-                  <Form.Label className="small fw-bold mb-2">Priority</Form.Label>
-                  <Select
-                    isMulti
-                    options={[
-                      { value: 'high', label: 'High' },
-                      { value: 'medium', label: 'Medium' },
-                      { value: 'low', label: 'Low' }
-                    ]}
-                    value={ordersFilters.priority.map(p => ({ value: p, label: p }))}
-                    onChange={(selected) => {
-                      setOrdersFilters(prev => ({
-                        ...prev,
-                        priority: selected ? selected.map(s => s.value) : []
-                      }));
-                    }}
-                    placeholder="Select priority..."
-                    styles={customSelectStyles}
-                  />
-                </Col>
-                <Col md={2}>
-                  <Form.Label className="small fw-bold mb-2">Owner</Form.Label>
-                  <Select
-                    isMulti
                     options={extensions.map((ext: any) => ({ 
-                      value: ext.display_name || ext.name || ext.id, 
-                      label: ext.display_name || ext.name || ext.id 
+                      value: ext.id || ext.extension, 
+                      label: ext.display_name || ext.name || ext.id || ext.extension
                     }))}
-                    value={ordersFilters.owner.map(o => ({ value: o, label: o }))}
+                    value={ordersFilters.assignedTo ? (() => {
+                      const assignedToId = ordersFilters.assignedTo;
+                      const ext = extensions.find((e: any) => (e.id || e.extension) === assignedToId);
+                      return ext ? { 
+                        value: assignedToId, 
+                        label: ext.display_name || ext.name || assignedToId 
+                      } : { value: assignedToId, label: assignedToId };
+                    })() : null}
                     onChange={(selected) => {
+                      const assignedToValue = selected ? selected.value : null;
                       setOrdersFilters(prev => ({
                         ...prev,
-                        owner: selected ? selected.map(s => s.value) : []
+                        assignedTo: assignedToValue
                       }));
+                      // Update currentFilters for API call
+                      handleFiltersChange({ 
+                        assigned_to: assignedToValue || null 
+                      });
+                      // Reset to all when assigned filter changes
+                      setActiveFilter('all');
                     }}
-                    placeholder="Select owners..."
+                    placeholder="Select user..."
                     styles={customSelectStyles}
+                    isClearable
                   />
                 </Col>
-                <Col md={2}>
-                  <Form.Label className="small fw-bold mb-2">Min Value</Form.Label>
-                  <Form.Control 
-                    type="number" 
-                    size="sm"
-                    placeholder="0"
-                    value={ordersFilters.minValue}
-                    onChange={(e) => setOrdersFilters(prev => ({
-                      ...prev,
-                      minValue: e.target.value
-                    }))}
+                <Col md={4}>
+                  <Form.Label className="small fw-bold mb-2">Stages</Form.Label>
+                  <Select
+                    options={stages.map(s => ({ value: s.id.toString(), label: s.name }))}
+                    value={ordersFilters.stage ? (() => {
+                      const stageId = ordersFilters.stage;
+                      const stage = stages.find((st: any) => st.id.toString() === stageId);
+                      return stage ? { value: stageId, label: stage.name } : { value: stageId, label: stageId };
+                    })() : null}
+                    onChange={(selected) => {
+                      const stageValue = selected ? selected.value : null;
+                      setOrdersFilters(prev => ({
+                        ...prev,
+                        stage: stageValue
+                      }));
+                      // Update currentFilters for API call
+                      handleFiltersChange({ 
+                        stage_id: stageValue || null 
+                      });
+                      // Update activeFilter to match selected stage
+                      if (stageValue) {
+                        setActiveFilter(stageValue);
+                      } else {
+                        setActiveFilter('all');
+                      }
+                    }}
+                    placeholder="Select stage..."
+                    styles={customSelectStyles}
+                    isClearable
                   />
                 </Col>
-                <Col md={2}>
-                  <Form.Label className="small fw-bold mb-2">Order Date</Form.Label>
-                  <Form.Control 
-                    type="date" 
-                    size="sm"
-                    value={ordersFilters.orderDate}
-                    onChange={(e) => setOrdersFilters(prev => ({
-                      ...prev,
-                      orderDate: e.target.value
-                    }))}
-                  />
-                </Col>
-                <Col md={2}>
+                <Col md={4}>
                   <div className="d-flex gap-2">
                     <Button
                       variant="primary"
                       className="flex-grow-1 d-flex align-items-center justify-content-center"
                       onClick={() => {
                         setOrdersPagination({ ...ordersPagination, currentPage: 1 });
+                        setRefreshKey(prev => prev + 1);
                       }}
                     >
-                      Apply
+                      Apply Filters
                     </Button>
                     <Button
                       variant="outline-secondary"
                       className="d-flex align-items-center justify-content-center"
                       onClick={() => {
                         setOrdersFilters({
-                          stage: [],
-                          approvalStatus: [],
-                          fulfillmentStatus: [],
-                          paymentStatus: [],
-                          priority: [],
-                          owner: [],
-                          minValue: '',
-                          orderDate: ''
+                          assignedTo: null,
+                          stage: null,
                         });
+                        setCurrentFilters({});
+                        setActiveFilter('all');
                         setOrdersPagination({ ...ordersPagination, currentPage: 1 });
+                        setRefreshKey(prev => prev + 1);
                       }}
                     >
                       Reset
@@ -1174,32 +1109,8 @@ const CrmOrders = () => {
           </Card>
         )}
 
-        {/* Bulk Actions and Column Customization */}
+        {/* Column Customization */}
         <div className="d-flex justify-content-end gap-2 mb-3">
-          {selectedOrders.length > 0 && (
-            <Dropdown>
-              <Dropdown.Toggle variant="outline-primary" size="sm">
-                <CheckSquare size={16} className="me-2" />
-                Bulk Actions ({selectedOrders.length})
-              </Dropdown.Toggle>
-              <Dropdown.Menu align="end">
-                <Dropdown.Item 
-                  onClick={() => {
-                    if (selectedOrders.length === 1) {
-                      toast.info(`Bulk delete for ${selectedOrders.length} order - implement bulk delete handler`);
-                    } else {
-                      toast.info(`Bulk delete for ${selectedOrders.length} orders - implement bulk delete handler`);
-                    }
-                  }}
-                  className="d-flex align-items-center text-danger"
-                >
-                  <Trash2 size={14} className="me-2" />
-                  Delete Selected ({selectedOrders.length})
-                </Dropdown.Item>
-              </Dropdown.Menu>
-            </Dropdown>
-          )}
-
           <Dropdown>
             <Dropdown.Toggle variant="outline-secondary" size="sm">
               <Layers size={16} className="me-2" />
@@ -1215,7 +1126,7 @@ const CrmOrders = () => {
                 { key: 'approvalStatus', label: 'Approval Status' },
                 { key: 'fulfillmentStatus', label: 'Fulfillment Status' },
                 { key: 'paymentStatus', label: 'Payment Status' },
-                { key: 'priority', label: 'Priority' },
+                { key: 'assignedUser', label: 'Assigned To' },
                 { key: 'orderDate', label: 'Order Date' },
                 { key: 'owner', label: 'Owner' },
                 { key: 'created', label: 'Created' }
@@ -1240,14 +1151,14 @@ const CrmOrders = () => {
               ))}
               <Dropdown.Divider />
               <Dropdown.Item onClick={() => {
-                const allCols = ['orderNumber', 'customer', 'deal', 'stage', 'value', 'approvalStatus', 'fulfillmentStatus', 'paymentStatus', 'priority', 'orderDate', 'owner', 'created'];
+                const allCols = ['orderNumber', 'customer', 'deal', 'stage', 'value', 'approvalStatus', 'fulfillmentStatus', 'paymentStatus', 'assignedUser', 'orderDate', 'owner', 'created'];
                 setSelectedOrdersColumns(allCols);
                 localStorage.setItem('ordersSelectedColumns', JSON.stringify(allCols));
               }}>
                 Select All
               </Dropdown.Item>
               <Dropdown.Item onClick={() => {
-                const defaultCols = ['orderNumber', 'customer', 'deal', 'stage', 'value', 'approvalStatus', 'fulfillmentStatus', 'orderDate', 'owner'];
+                const defaultCols = ['orderNumber', 'customer', 'deal', 'stage', 'value', 'approvalStatus', 'fulfillmentStatus', 'assignedUser', 'orderDate', 'owner'];
                 setSelectedOrdersColumns(defaultCols);
                 localStorage.setItem('ordersSelectedColumns', JSON.stringify(defaultCols));
               }}>
@@ -1264,19 +1175,6 @@ const CrmOrders = () => {
               <Table hover className="mb-0">
                 <thead className="bg-light">
                   <tr>
-                    <th style={{ width: '50px' }}>
-                      <Form.Check
-                        type="checkbox"
-                        checked={filteredOrders.length > 0 && filteredOrders.every(o => selectedOrders.includes(o.id))}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setSelectedOrders(filteredOrders.map(o => o.id));
-                          } else {
-                            setSelectedOrders([]);
-                          }
-                        }}
-                      />
-                    </th>
                     {selectedOrdersColumns.includes('orderNumber') && (
                       <th 
                         style={{ cursor: 'pointer', userSelect: 'none' }}
@@ -1341,12 +1239,12 @@ const CrmOrders = () => {
                         Payment {renderSortIcon('paymentStatus', ordersPagination)}
                       </th>
                     )}
-                    {selectedOrdersColumns.includes('priority') && (
+                    {selectedOrdersColumns.includes('assignedUser') && (
                       <th 
                         style={{ cursor: 'pointer', userSelect: 'none' }}
-                        onClick={() => handleSort('priority', ordersPagination, setOrdersPagination)}
+                        onClick={() => handleSort('assignedUser', ordersPagination, setOrdersPagination)}
                       >
-                        Priority {renderSortIcon('priority', ordersPagination)}
+                        Assigned To {renderSortIcon('assignedUser', ordersPagination)}
                       </th>
                     )}
                     {selectedOrdersColumns.includes('orderDate') && (
@@ -1379,13 +1277,13 @@ const CrmOrders = () => {
                 <tbody>
                   {loading ? (
                     <tr>
-                      <td colSpan={selectedOrdersColumns.length + 2} className="text-center py-4">
+                      <td colSpan={selectedOrdersColumns.length + 1} className="text-center py-4">
                         Loading...
                       </td>
                     </tr>
                   ) : filteredOrders.length === 0 ? (
                     <tr>
-                      <td colSpan={selectedOrdersColumns.length + 2} className="text-center py-4 text-muted">
+                      <td colSpan={selectedOrdersColumns.length + 1} className="text-center py-4 text-muted">
                         No orders found matching your criteria
                       </td>
                     </tr>
@@ -1396,19 +1294,6 @@ const CrmOrders = () => {
                       ordersPagination.rowsPerPage
                     ).map((order) => (
                       <tr key={order.id}>
-                        <td>
-                          <Form.Check
-                            type="checkbox"
-                            checked={selectedOrders.includes(order.id)}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setSelectedOrders([...selectedOrders, order.id]);
-                              } else {
-                                setSelectedOrders(selectedOrders.filter(id => id !== order.id));
-                              }
-                            }}
-                          />
-                        </td>
                         {selectedOrdersColumns.includes('orderNumber') && (
                           <td className="fw-semibold">{order.orderNumber}</td>
                         )}
@@ -1488,21 +1373,8 @@ const CrmOrders = () => {
                             </Badge>
                           </td>
                         )}
-                        {selectedOrdersColumns.includes('priority') && (
-                          <td>
-                            {order.priority && (
-                              <Badge 
-                                bg={
-                                  order.priority?.toLowerCase() === 'urgent' ? 'danger' :
-                                  order.priority?.toLowerCase() === 'high' ? 'warning' :
-                                  order.priority?.toLowerCase() === 'medium' ? 'info' :
-                                  'secondary'
-                                }
-                              >
-                                {order.priority}
-                              </Badge>
-                            )}
-                          </td>
+                        {selectedOrdersColumns.includes('assignedUser') && (
+                          <td>{order.assignedUser || '-'}</td>
                         )}
                         {selectedOrdersColumns.includes('orderDate') && (
                           <td>{order.orderDate || '-'}</td>
@@ -2326,7 +2198,7 @@ const CrmOrders = () => {
                       </div>
                     </div>
                   )}
-                  {viewingOrder.order_priority && (
+                  {viewingOrder.assigned_to && (
                     <div style={{
                       background: '#f8f9fa',
                       padding: '16px',
@@ -2348,18 +2220,11 @@ const CrmOrders = () => {
                         textTransform: 'uppercase',
                         letterSpacing: '0.5px',
                         marginBottom: '6px'
-                      }}>Priority</div>
-                      <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
-                        <Badge 
-                          bg={
-                            viewingOrder.order_priority?.toLowerCase() === 'urgent' ? 'danger' :
-                            viewingOrder.order_priority?.toLowerCase() === 'high' ? 'warning' :
-                            viewingOrder.order_priority?.toLowerCase() === 'medium' ? 'info' :
-                            'secondary'
-                          }
-                        >
-                          {viewingOrder.order_priority}
-                        </Badge>
+                      }}>Assigned To</div>
+                      <div style={{ fontSize: '16px', fontWeight: 600 }}>
+                        {extensions.find((ext: any) => ext?.id == viewingOrder?.assigned_to || ext?.extension == viewingOrder?.assigned_to)?.display_name || 
+                         extensions.find((ext: any) => ext?.id == viewingOrder?.assigned_to || ext?.extension == viewingOrder?.assigned_to)?.name || 
+                         viewingOrder.assigned_to || 'Not assigned'}
                       </div>
                     </div>
                   )}

@@ -151,6 +151,13 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
           url: '/crm/orders'
         },
         {
+          id: 'crm-products',
+          title: HEADER_CONSTANTS.SUBMENU_LABELS.PRODUCTS,
+          icon: <Package size={16} />,
+          permission: PERMISSIONS.VIEW_CRM_LEADS,
+          url: '/crm/products'
+        },
+        {
           id: 'crm-tasks',
           title: HEADER_CONSTANTS.SUBMENU_LABELS.TASKS,
           icon: <BarChart3 size={16} />,

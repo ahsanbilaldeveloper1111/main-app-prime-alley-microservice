@@ -7,6 +7,7 @@ import {
   getStages,
   getLead,
   getCrmProducts,
+  createEstimate,
   CrmProduct,
   StageData,
 } from "@utils/crm";
@@ -14,6 +15,9 @@ import { GetHierarchyData } from "@utils/users";
 import { Button, Row, Col, Form, Card, Badge, Table, Modal } from "react-bootstrap";
 import { CheckCircle, ChevronLeft, ChevronRight, ArrowLeft, Plus, Edit, Trash2, Package } from "lucide-react";
 import Select from 'react-select';
+import PhoneInput from "react-phone-number-input";
+import { parsePhoneNumber } from "react-phone-number-input";
+import "react-phone-number-input/style.css";
 import Link from "next/link";
 import { toast } from "react-toastify";
 import { useRouter } from "next/router";
@@ -22,6 +26,7 @@ import { useSession } from "next-auth/react";
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import { ModuleSlug } from '@utils/Helper';
+import { convertCurrency, formatCurrency } from '@utils/currency';
 
 const CreateDeal = () => {
   const router = useRouter();
@@ -87,6 +92,7 @@ const CreateDeal = () => {
   });
   const [loadingLead, setLoadingLead] = useState(false);
   const [sourceLead, setSourceLead] = useState<any>(null);
+  const [convertingPrice, setConvertingPrice] = useState(false);
 
   useEffect(() => {
     fetchStages();
@@ -136,6 +142,12 @@ const CreateDeal = () => {
                                  contactPersonsArray.find(cp => cp.phone) || 
                                  contactPersonsArray[0] || {};
 
+          // Also check for contact_person_name field in lead data (fallback)
+          const leadDataAny = leadData as any;
+          const contactPersonName = primaryContact.name || 
+                                   leadDataAny.contact_person_name || 
+                                   "";
+
           // Calculate default expected close date (30 days from now)
           const defaultCloseDate = new Date();
           defaultCloseDate.setDate(defaultCloseDate.getDate() + 30);
@@ -150,11 +162,11 @@ const CreateDeal = () => {
             assigned_to: leadData.user_extension ? String(leadData.user_extension) : null,
             expected_close_date: formattedCloseDate,
             company_name: leadData.company_name || "",
-            industry: leadData.industry || "",
-            decision_maker_title: primaryContact.title || "",
-            decision_maker_name: primaryContact.name || "",
-            decision_maker_phone_country_code: primaryContact.phone_country_code || "",
-            decision_maker_phone: primaryContact.phone || "",
+            industry: leadData.industry || leadDataAny.industry || "",
+            decision_maker_title: primaryContact.title || leadDataAny.contact_person_title || "",
+            decision_maker_name: contactPersonName,
+            decision_maker_phone_country_code: primaryContact.phone_country_code || leadDataAny.contact_phone_country_code || "",
+            decision_maker_phone: primaryContact.phone || leadDataAny.contact_phone || "",
             decision_maker_email: primaryContact.email || "",
           }));
         } catch (error) {
@@ -240,8 +252,37 @@ const CreateDeal = () => {
         payload.lead_id = formData.lead_id;
       }
 
-      // Note: Estimation chart is created separately in edit page, not during deal creation
-      await createDeal(payload);
+      // Create deal first
+      const createdDeal = await createDeal(payload);
+      
+      // Create/update estimation chart separately if items exist
+      if (estimationItems.length > 0 && createdDeal?.id) {
+        try {
+          const estimatePayload = {
+            deal_id: Number(createdDeal.id),
+            estimation_chart: estimationItems.map(item => ({
+              product_id: item.product_id,
+              product_service: item.product_service,
+              description: item.description || "",
+              qty: item.qty,
+              unit_price: item.unit_price,
+              original_currency: item.original_currency || formData.currency,
+              original_price: item.original_price || item.unit_price,
+            })),
+            standard_discount_percentage: parseFloat(formData.standard_discount_percentage || "0"),
+            special_discount_percentage: parseFloat(formData.special_discount_percentage || "0"),
+            tax_percentage: parseFloat(formData.tax_percentage || "0"),
+            currency: formData.currency,
+          };
+
+          await createEstimate(estimatePayload);
+        } catch (estimateError: any) {
+          console.error("Failed to create estimate:", estimateError);
+          // Don't fail the whole operation if estimate creation fails
+          toast.warning("Deal created but failed to save estimation chart. You can add it later.");
+        }
+      }
+      
       toast.success("Deal created successfully!");
       router.push("/crm/deals");
     } catch (error: any) {
@@ -419,12 +460,66 @@ const CreateDeal = () => {
                         <Form.Label>Currency <span className="text-danger">*</span></Form.Label>
                         <Form.Select 
                           value={formData.currency}
-                          onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
+                          onChange={async (e) => {
+                            const newCurrency = e.target.value;
+                            setFormData({ ...formData, currency: newCurrency });
+                            
+                            // Convert all existing estimation items to new currency
+                            if (estimationItems.length > 0) {
+                              try {
+                                setConvertingPrice(true);
+                                const convertedItems = await Promise.all(
+                                  estimationItems.map(async (item) => {
+                                    const product = products.find(p => p.id === item.product_id);
+                                    if (product) {
+                                      const productCurrency = product.currency.toUpperCase();
+                                      const oldDealCurrency = formData.currency.toUpperCase();
+                                      const newDealCurrency = newCurrency.toUpperCase();
+                                      
+                                      // If product currency matches new deal currency, use original price
+                                      if (productCurrency === newDealCurrency) {
+                                        return {
+                                          ...item,
+                                          unit_price: parseFloat(product.price) || item.unit_price,
+                                        };
+                                      }
+                                      
+                                      // Convert from old deal currency to new deal currency
+                                      if (oldDealCurrency !== newDealCurrency) {
+                                        const convertedPrice = await convertCurrency(
+                                          item.unit_price,
+                                          oldDealCurrency,
+                                          newDealCurrency
+                                        );
+                                        return {
+                                          ...item,
+                                          unit_price: convertedPrice,
+                                        };
+                                      }
+                                    }
+                                    return item;
+                                  })
+                                );
+                                setEstimationItems(convertedItems);
+                              } catch (error) {
+                                console.error('Failed to convert existing items:', error);
+                                toast.error('Failed to convert prices to new currency');
+                              } finally {
+                                setConvertingPrice(false);
+                              }
+                            }
+                          }}
                           required
                         >
                           <option value="USD">USD</option>
                           <option value="GBP">GBP</option>
                           <option value="EUR">EUR</option>
+                          <option value="PKR">PKR</option>
+                          <option value="INR">INR</option>
+                          <option value="AUD">AUD</option>
+                          <option value="CAD">CAD</option>
+                          <option value="JPY">JPY</option>
+                          <option value="CNY">CNY</option>
                         </Form.Select>
                       </Form.Group>
                     </Col>
@@ -523,27 +618,54 @@ const CreateDeal = () => {
                         />
                       </Form.Group>
                     </Col>
-                    <Col md={3}>
-                      <Form.Group className="mb-3">
-                        <Form.Label>Phone Country Code</Form.Label>
-                        <Form.Control 
-                          type="text" 
-                          value={formData.decision_maker_phone_country_code}
-                          onChange={(e) => setFormData({ ...formData, decision_maker_phone_country_code: e.target.value })}
-                          placeholder="+1"
-                        />
-                      </Form.Group>
-                    </Col>
-                    <Col md={3}>
+                    <Col md={6}>
                       <Form.Group className="mb-3">
                         <Form.Label>Decision Maker Phone <span className="text-danger">*</span></Form.Label>
-                        <Form.Control 
-                          type="tel" 
-                          value={formData.decision_maker_phone}
-                          onChange={(e) => setFormData({ ...formData, decision_maker_phone: e.target.value })}
-                          placeholder="1234567890" 
-                          required 
-                        />
+                        <div className="phone-input-wrapper">
+                          <PhoneInput
+                            international
+                            defaultCountry="US"
+                            value={formData.decision_maker_phone_country_code && formData.decision_maker_phone 
+                              ? `${formData.decision_maker_phone_country_code}${formData.decision_maker_phone}` 
+                              : formData.decision_maker_phone || undefined}
+                            onChange={(value) => {
+                              if (value) {
+                                try {
+                                  // Parse the phone number to extract country code and national number
+                                  const phoneNumber = parsePhoneNumber(value);
+                                  if (phoneNumber) {
+                                    setFormData(prev => ({
+                                      ...prev,
+                                      decision_maker_phone_country_code: `+${phoneNumber.countryCallingCode}`,
+                                      decision_maker_phone: phoneNumber.nationalNumber,
+                                    }));
+                                  } else {
+                                    // Fallback: store full number in phone field
+                                    setFormData(prev => ({
+                                      ...prev,
+                                      decision_maker_phone_country_code: "",
+                                      decision_maker_phone: value,
+                                    }));
+                                  }
+                                } catch (error) {
+                                  // If parsing fails, store full number in phone field
+                                  setFormData(prev => ({
+                                    ...prev,
+                                    decision_maker_phone_country_code: "",
+                                    decision_maker_phone: value,
+                                  }));
+                                }
+                              } else {
+                                setFormData(prev => ({
+                                  ...prev,
+                                  decision_maker_phone_country_code: "",
+                                  decision_maker_phone: "",
+                                }));
+                              }
+                            }}
+                            placeholder="Enter phone number"
+                          />
+                        </div>
                       </Form.Group>
                     </Col>
                   </Row>
@@ -816,14 +938,34 @@ const CreateDeal = () => {
                       <tbody>
                         {estimationItems.map((item, index) => {
                           const subtotal = item.qty * item.unit_price;
+                          const product = products.find(p => p.id === item.product_id);
+                          const showConversionInfo = product && 
+                            product.currency.toUpperCase() !== formData.currency.toUpperCase() &&
+                            item.original_currency &&
+                            item.original_price !== item.unit_price;
+                          
                           return (
                             <tr key={index}>
                               <td>{index + 1}</td>
-                              <td>{item.product_service}</td>
+                              <td>
+                                {item.product_service}
+                                {showConversionInfo && (
+                                  <div className="small text-muted">
+                                    Original: {formatCurrency(item.original_price, item.original_currency)}
+                                  </div>
+                                )}
+                              </td>
                               <td>{item.description || 'N/A'}</td>
                               <td>{item.qty}</td>
-                              <td>{item.unit_price.toLocaleString()} {formData.currency}</td>
-                              <td className="fw-bold">{subtotal.toLocaleString()} {formData.currency}</td>
+                              <td>
+                                {formatCurrency(item.unit_price, formData.currency)}
+                                {showConversionInfo && (
+                                  <div className="small text-success">
+                                    Converted
+                                  </div>
+                                )}
+                              </td>
+                              <td className="fw-bold">{formatCurrency(subtotal, formData.currency)}</td>
                               <td>
                                 <Button
                                   variant="link"
@@ -883,7 +1025,7 @@ const CreateDeal = () => {
                           <tfoot>
                             <tr>
                               <td colSpan={5} className="text-end fw-bold">Subtotal:</td>
-                              <td className="fw-bold">{grandTotal.toFixed(2)} {formData.currency}</td>
+                              <td className="fw-bold">{formatCurrency(grandTotal, formData.currency)}</td>
                               <td></td>
                             </tr>
                             {totalDiscount > 0 && (
@@ -891,20 +1033,20 @@ const CreateDeal = () => {
                                 <td colSpan={5} className="text-end">
                                   Discount ({parseFloat(formData.standard_discount_percentage || "0") + parseFloat(formData.special_discount_percentage || "0")}%):
                                 </td>
-                                <td>-{totalDiscount.toFixed(2)} {formData.currency}</td>
+                                <td>-{formatCurrency(totalDiscount, formData.currency)}</td>
                                 <td></td>
                               </tr>
                             )}
                             {parseFloat(formData.tax_percentage || "0") > 0 && (
                               <tr>
                                 <td colSpan={5} className="text-end fw-bold">Tax ({formData.tax_percentage}%):</td>
-                                <td className="fw-bold">{taxAmount.toFixed(2)} {formData.currency}</td>
+                                <td className="fw-bold">{formatCurrency(taxAmount, formData.currency)}</td>
                                 <td></td>
                               </tr>
                             )}
                             <tr className="table-primary">
                               <td colSpan={5} className="text-end fw-bold">Net Value:</td>
-                              <td className="fw-bold">{netValue.toFixed(2)} {formData.currency}</td>
+                              <td className="fw-bold">{formatCurrency(netValue, formData.currency)}</td>
                               <td></td>
                             </tr>
                           </tfoot>
@@ -973,21 +1115,61 @@ const CreateDeal = () => {
                             value: itemFormData.product_id,
                             label: itemFormData.product_service || products.find(p => p.id === itemFormData.product_id)?.name || ""
                           } : null}
-                          onChange={(selectedOption: any) => {
+                          onChange={async (selectedOption: any) => {
                             const product = products.find(p => p.id === selectedOption?.value);
                             if (product) {
+                              const originalPrice = parseFloat(product.price) || 0;
+                              const productCurrency = product.currency.toUpperCase();
+                              const dealCurrency = formData.currency.toUpperCase();
+                              
+                              // Convert price if currencies differ
+                              let convertedPrice = originalPrice;
+                              if (productCurrency !== dealCurrency) {
+                                try {
+                                  setConvertingPrice(true);
+                                  convertedPrice = await convertCurrency(
+                                    originalPrice,
+                                    productCurrency,
+                                    dealCurrency
+                                  );
+                                } catch (error) {
+                                  console.error('Failed to convert currency:', error);
+                                  toast.error(`Failed to convert ${productCurrency} to ${dealCurrency}`);
+                                  // Keep original price if conversion fails
+                                  convertedPrice = originalPrice;
+                                } finally {
+                                  setConvertingPrice(false);
+                                }
+                              }
+                              
                               setItemFormData({
                                 ...itemFormData,
                                 product_id: product.id,
                                 product_service: product.name,
-                                unit_price: parseFloat(product.price) || 0,
+                                unit_price: convertedPrice,
                               });
                             }
                           }}
-                          options={products.map(product => ({
-                            value: product.id,
-                            label: `${product.name} (${product.sku}) - ${product.currency} ${product.price}`,
-                          }))}
+                          options={products.map(product => {
+                            const productCurrency = product.currency.toUpperCase();
+                            const dealCurrency = formData.currency.toUpperCase();
+                            const originalPrice = parseFloat(product.price) || 0;
+                            
+                            // Show both currencies if they differ
+                            if (productCurrency !== dealCurrency) {
+                              // Calculate converted price synchronously for display (will be recalculated on selection)
+                              // For now, just show original price - conversion happens on selection
+                              return {
+                                value: product.id,
+                                label: `${product.name} (${product.sku}) - ${productCurrency} ${originalPrice.toFixed(2)} → ${dealCurrency} (will convert)`,
+                              };
+                            }
+                            
+                            return {
+                              value: product.id,
+                              label: `${product.name} (${product.sku}) - ${productCurrency} ${originalPrice.toFixed(2)}`,
+                            };
+                          })}
                           placeholder="Select a product"
                           isSearchable
                           isLoading={loadingProducts}
@@ -1022,7 +1204,15 @@ const CreateDeal = () => {
                     </Col>
                     <Col md={6}>
                       <Form.Group>
-                        <Form.Label>Unit Price <span className="text-danger">*</span></Form.Label>
+                        <Form.Label>
+                          Unit Price <span className="text-danger">*</span>
+                          {convertingPrice && (
+                            <span className="ms-2 text-muted small">
+                              <span className="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                              Converting...
+                            </span>
+                          )}
+                        </Form.Label>
                         <Form.Control
                           type="number"
                           min="0"
@@ -1031,7 +1221,27 @@ const CreateDeal = () => {
                           value={itemFormData.unit_price}
                           onChange={(e) => setItemFormData({ ...itemFormData, unit_price: parseFloat(e.target.value) || 0 })}
                           required
+                          disabled={convertingPrice}
                         />
+                        {itemFormData.product_id && (() => {
+                          const selectedProduct = products.find(p => p.id === itemFormData.product_id);
+                          if (selectedProduct) {
+                            const productCurrency = selectedProduct.currency.toUpperCase();
+                            const dealCurrency = formData.currency.toUpperCase();
+                            const originalPrice = parseFloat(selectedProduct.price) || 0;
+                            
+                            if (productCurrency !== dealCurrency && itemFormData.unit_price !== originalPrice) {
+                              return (
+                                <Form.Text className="text-muted d-block">
+                                  Converted from {formatCurrency(originalPrice, productCurrency)} 
+                                  {' → '}
+                                  {formatCurrency(itemFormData.unit_price, dealCurrency)}
+                                </Form.Text>
+                              );
+                            }
+                          }
+                          return null;
+                        })()}
                       </Form.Group>
                     </Col>
                     <Col md={12}>
@@ -1040,7 +1250,7 @@ const CreateDeal = () => {
                           <div className="d-flex justify-content-between align-items-center">
                             <span className="text-muted">Sub Total:</span>
                             <h5 className="mb-0 text-success">
-                              {formData.currency} {(itemFormData.qty * itemFormData.unit_price).toFixed(2)}
+                              {formatCurrency(itemFormData.qty * itemFormData.unit_price, formData.currency)}
                             </h5>
                           </div>
                         </Card.Body>
