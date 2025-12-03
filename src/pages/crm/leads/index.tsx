@@ -1719,6 +1719,7 @@ const CrmLeads = () => {
         onHide={() => setShowConvertModal(false)}
         title="Convert lead to opportunity"
         desc="Please fill in the details below to convert the lead to an opportunity."
+        size="lg"
         formHtml={
           <>
           <Form>
@@ -1822,6 +1823,7 @@ const CrmLeads = () => {
         onHide={() => setShowMarkLostModal(false)}
         title="Mark lead as lost"
         desc="Please fill in the details below to mark the lead as lost."
+        size="lg"
         formHtml={
           <>
           <Form.Group className="mb-3">

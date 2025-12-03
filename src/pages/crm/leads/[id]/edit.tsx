@@ -17,6 +17,10 @@ import {
 import { GetHierarchyData } from "@utils/users";
 import { Button, Row, Col, Form, Card, Badge } from "react-bootstrap";
 import Select from "react-select";
+import PhoneInput from "react-phone-number-input";
+import { parsePhoneNumber } from "react-phone-number-input";
+import type { E164Number } from "react-phone-number-input";
+import "react-phone-number-input/style.css";
 import {
   FiArrowLeft,
   FiDatabase,
@@ -83,6 +87,23 @@ const EditLead = () => {
   const [fetching, setFetching] = useState(true);
   const [isOpportunity, setIsOpportunity] = useState(false);
   const isInitialLoad = useRef(true);
+
+  // Utility function to parse phone number in format "+92 3200654656" and extract country code
+  const parsePhoneNumberFormat = (phone: string): { countryCode: string; phoneNumber: string } => {
+    if (!phone) return { countryCode: "", phoneNumber: "" };
+    
+    // Match pattern: +country_code space rest_of_number
+    const match = phone.match(/^(\+\d{1,4})\s+(.+)$/);
+    if (match) {
+      return {
+        countryCode: match[1], // e.g., "+92"
+        phoneNumber: match[2],  // e.g., "3200654656"
+      };
+    }
+    
+    // If no match, return original phone as phoneNumber
+    return { countryCode: "", phoneNumber: phone };
+  };
 
   // Fetch lead data and populate form
   useEffect(() => {
@@ -983,24 +1004,39 @@ const EditLead = () => {
                                       />
                                     </Form.Group>
                                   </Col>
-                                  <Col md={6}>
-                                    <Form.Group className="mb-3">
-                                      <Form.Label>Phone Country Code</Form.Label>
-                                      <Form.Control
-                                        type="text"
-                                        value={person.phone_country_code}
-                                        onChange={(e) => updateContactPerson(index, "phone_country_code", e.target.value)}
-                                        placeholder="e.g., +1, +44"
-                                      />
-                                    </Form.Group>
-                                  </Col>
-                                  <Col md={6}>
+                                  <Col md={12}>
                                     <Form.Group className="mb-3">
                                       <Form.Label>Phone</Form.Label>
-                                      <Form.Control
-                                        type="tel"
-                                        value={person.phone}
-                                        onChange={(e) => updateContactPerson(index, "phone", e.target.value)}
+                                      <PhoneInput
+                                        international
+                                        defaultCountry="US"
+                                        value={person.phone_country_code && person.phone 
+                                          ? `${person.phone_country_code}${person.phone}` 
+                                          : person.phone || undefined}
+                                        onChange={(value) => {
+                                          if (value) {
+                                            try {
+                                              // Parse the phone number to extract country code and national number
+                                              const phoneNumber = parsePhoneNumber(value);
+                                              if (phoneNumber) {
+                                                updateContactPerson(index, "phone_country_code", `+${phoneNumber.countryCallingCode}`);
+                                                updateContactPerson(index, "phone", phoneNumber.nationalNumber);
+                                              } else {
+                                                // Fallback: store full number in phone field
+                                                updateContactPerson(index, "phone_country_code", "");
+                                                updateContactPerson(index, "phone", value);
+                                              }
+                                            } catch (error) {
+                                              // If parsing fails, store full number in phone field
+                                              updateContactPerson(index, "phone_country_code", "");
+                                              updateContactPerson(index, "phone", value);
+                                            }
+                                          } else {
+                                            updateContactPerson(index, "phone_country_code", "");
+                                            updateContactPerson(index, "phone", "");
+                                          }
+                                        }}
+                                        className="form-control"
                                         placeholder="Enter phone number"
                                       />
                                     </Form.Group>

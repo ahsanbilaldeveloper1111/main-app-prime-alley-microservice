@@ -1226,6 +1226,7 @@ const StagesManagement = () => {
         onHide={() => setShowCreateModal(false)}
         title="Create Stage"
         desc="Please fill in the details below to create a new stage."
+        size="lg"
         formHtml={
          <>
          <Form onSubmit={handleSubmit}>
@@ -1340,6 +1341,7 @@ const StagesManagement = () => {
         onHide={handleCloseUpdateModal}
         title="Update Stage"
         desc="Please update the details below for this stage."
+        size="lg"
         formHtml={
          <>
          <Form onSubmit={handleUpdateStage}>

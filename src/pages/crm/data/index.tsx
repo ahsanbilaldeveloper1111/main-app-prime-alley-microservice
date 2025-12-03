@@ -56,6 +56,7 @@ import {
   UserPlus,
   ArrowUp,
   ArrowDown,
+  Download,
 } from "lucide-react";
 import { Column } from "@components/CustomDataTable";
 
@@ -817,28 +818,21 @@ const CrmProspectsManagement = () => {
         });
       }, 200);
 
-      // Extract campaign IDs from selected options
-      const campaignIds = Array.from(selectedCampaigns).map(
-        (campaign) => campaign.value
-      );
-
       // Extract tag values from selected options
       const tagValues = Array.from(fieldTags).map((tag) => tag.value);
 
       const response = await uploadCrmDataCsv(
         selectedFile,
-        campaignIds,
+        [], // No campaigns selected
         tagValues,
-        assignToCampaignUsers
+        false // No auto-assignment
       );
 
       clearInterval(progressInterval);
       setUploadProgress(100);
 
       setSelectedFile(null);
-      setSelectedCampaigns([]);
       setFieldTags([]);
-      setAssignToCampaignUsers(false);
       setShowUploadModal(false);
       setUploadProgress(0);
 
@@ -1641,7 +1635,7 @@ const CrmProspectsManagement = () => {
      
           {session?.user?.permissions?.includes('add-crm-data-management') && (
             <Button variant="outline-primary" onClick={() => setShowUploadModal(true)}>
-              <FiUpload className="me-2" />
+              <Download size={16} className="me-2" />
               Upload CSV
             </Button>
           )}
@@ -1830,137 +1824,23 @@ const CrmProspectsManagement = () => {
         onHide={() => setShowUploadModal(false)}
         title="Upload Prospects"
         desc="Please fill the details below to upload the prospects."
+        size="lg"
         formHtml={
           <>
-          <div
-            className={`border-2 border-dashed rounded p-4 text-center ${
-              dragActive ? "border-primary bg-light" : "border-secondary"
-            }`}
-            onDragEnter={handleDrag}
-            onDragLeave={handleDrag}
-            onDragOver={handleDrag}
-            onDrop={handleDrop}
-            style={{ minHeight: "200px", display: "flex", alignItems: "center", justifyContent: "center" }}
-          >
-            {selectedFile ? (
-              <div className="d-flex flex-column align-items-center">
-                <FiDatabase
-                  className="text-success mb-3"
-                  style={{ fontSize: "3rem" }}
-                />
-                <p className="mt-2 mb-1">
-                  <strong>{selectedFile.name}</strong>
-                </p>
-                <p className="text-muted small mb-3">
-                  Size: {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
-                </p>
-                <Button
-                  variant="outline-danger"
-                  size="sm"
-                  className="app-button"
-                  onClick={() => setSelectedFile(null)}
-                >
-                  Remove File
-                </Button>
-              </div>
-            ) : (
-              <div className="d-flex flex-column align-items-center">
-                <FiUpload className="text-muted mb-3" style={{ fontSize: "3rem" }} />
-                <p className="mt-2 mb-2">Drag and drop your CSV file here</p>
-                <p className="text-muted small mb-3">or</p>
-                <Button
-                  variant="outline-primary"
-                  size="sm"
-                  className="app-button"
-                  onClick={() => document.getElementById("fileInput")?.click()}
-                >
-                  Browse Files
-                </Button>
-                <input
-                  id="fileInput"
-                  type="file"
-                  accept=".csv"
-                  onChange={handleFileInputChange}
-                  style={{ display: "none" }}
-                />
-              </div>
-            )}
-          </div>
-
-          {uploading && (
-            <div className="mt-3">
-              <div className="d-flex justify-content-between align-items-center mb-2">
-                <span>Uploading...</span>
-                <span>{uploadProgress}%</span>
-              </div>
-              <div className="progress">
-                <div
-                  className="progress-bar"
-                  role="progressbar"
-                  style={{ width: `${uploadProgress}%` }}
-                ></div>
-              </div>
-            </div>
-          )}
-
-          <Form.Group className="mt-3">
-            <Form.Label>Target Campaigns (Optional)</Form.Label>
-            <CreatableSelect
-              isMulti
-              value={selectedCampaigns}
-              onChange={(selected) => setSelectedCampaigns(selected || [])}
-              options={availableCampaigns}
-              placeholder="Choose which campaigns this data belongs to..."
-              styles={{
-                control: (base) => ({
-                  ...base,
-                  borderColor: "#ced4da",
-                  boxShadow: "none",
-                  fontSize: "14px",
-                }),
-              }}
+          <Form.Group className="mb-3">
+            <Form.Label className="fw-semibold">Select CSV File <span className="text-danger">*</span></Form.Label>
+            <Form.Control 
+              type="file" 
+              accept=".csv,.xlsx,.xls" 
+              onChange={handleFileInputChange}
             />
             <Form.Text className="text-muted">
-              <strong>Pro Tip:</strong> Select specific campaigns to categorize
-              your data. This helps with organization and targeted marketing
-              efforts. Data will be automatically distributed among campaign
-              users.
+              Supported formats: CSV, XLSX, XLS
             </Form.Text>
           </Form.Group>
 
-          <Form.Group className="mt-3">
-            <Form.Label>User Assignment Strategy</Form.Label>
-            <div>
-              <Form.Check
-                type="radio"
-                id="assign-campaign-users"
-                name="assignToCampaignUsers"
-                label="Auto-assign to campaign team members"
-                value="true"
-                checked={assignToCampaignUsers === true}
-                onChange={() => setAssignToCampaignUsers(true)}
-                className="mb-2"
-              />
-              <Form.Check
-                type="radio"
-                id="no-assign-campaign-users"
-                name="assignToCampaignUsers"
-                label="Keep unassigned for manual distribution"
-                value="false"
-                checked={assignToCampaignUsers === false}
-                onChange={() => setAssignToCampaignUsers(false)}
-              />
-            </div>
-            <Form.Text className="text-muted">
-              <strong>Auto-assign:</strong> Data will be automatically
-              distributed among users in the selected campaigns.{" "}
-              <strong>Manual:</strong> Data remains unassigned for you to
-              distribute later using the Data Assignment tool.
-            </Form.Text>
-          </Form.Group>
-
-          <Form.Group className="mt-3">
-            <Form.Label>Data Tags (Optional)</Form.Label>
+          <Form.Group className="mb-3">
+            <Form.Label className="fw-semibold">Tags (Optional)</Form.Label>
             <CreatableSelect
               isMulti
               value={fieldTags}
@@ -1977,34 +1857,9 @@ const CrmProspectsManagement = () => {
               }}
             />
             <Form.Text className="text-muted">
-              <strong>Organize:</strong> Add descriptive tags like "hot-lead",
-              "follow-up", or "qualified" to help categorize and filter your
-              data later. You can create new tags by typing them.
+              Add descriptive tags to help categorize and filter your data later. You can create new tags by typing them.
             </Form.Text>
           </Form.Group>
-
-          <Alert variant="info" className="mt-3">
-            <strong>📋 Import Guidelines:</strong>
-            <ul className="mb-0 mt-2">
-              <li>
-                <strong>Headers:</strong> First row must contain column headers
-              </li>
-              <li>
-                <strong>Phone Column:</strong> Include a "phone" column (case
-                insensitive) for contact information
-              </li>
-              <li>
-                <strong>File Size:</strong> Maximum 10MB per file
-              </li>
-              <li>
-                <strong>Formats:</strong> CSV and TXT files supported
-              </li>
-              <li>
-                <strong>Data Quality:</strong> Clean, valid data imports faster
-                and works better
-              </li>
-            </ul>
-          </Alert>
           </>
         }
         submitButtonText="Upload File"
@@ -2025,6 +1880,7 @@ const CrmProspectsManagement = () => {
         onHide={() => setShowViewModal(false)}
         title={`View Prospect #${selectedDataItem?.id}`}
         desc="Please fill the details below to view the prospect."
+        size="lg"
         formHtml={
           <>
            {selectedDataItem && (
@@ -2274,6 +2130,7 @@ const CrmProspectsManagement = () => {
         onHide={handleDataAssignmentModalClose}
         title="Smart Prospect Distribution"
         desc="Please fill the details below to smart prospect distribution."
+        size="lg"
         formHtml={
           <>
           <div className="mb-4">
@@ -2609,6 +2466,7 @@ const CrmProspectsManagement = () => {
         onHide={() => setShowAfterCallModal(false)}
         title="After Call Dialog"
         desc="Please fill the details below to record call outcomes and schedule follow-up actions."
+        size="lg"
         formHtml={
           <>
           <Row>
@@ -2762,6 +2620,7 @@ const CrmProspectsManagement = () => {
         onHide={() => setShowScheduleModal(false)}
         title="Schedule Call"
         desc="Please fill the details below to schedule a call."
+        size="lg"
         formHtml={
           <>
           {selectedEntryForSchedule && (
@@ -2848,6 +2707,7 @@ const CrmProspectsManagement = () => {
         onHide={() => setShowHistoryModal(false)}
         title="Activity History"
         desc="Please fill the details below to view the activity history."
+        size="lg"
         formHtml={
           <>
            <div className="mb-4">
