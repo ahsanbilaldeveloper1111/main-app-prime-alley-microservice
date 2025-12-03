@@ -9,469 +9,195 @@ import {
   Badge,
   ProgressBar,
   Spinner,
-  Form,
-  Modal,
-  Alert,
+  Table,
 } from "react-bootstrap";
 import {
   getCrmDashboard,
   getLeads,
-  getOpportunities,
-  getMeetings,
-  createMeeting,
-  createCampaign,
-  getCampaigns,
+  getDeals,
+  getOrders,
   DashboardData as CrmDashboardData,
+  LeadData,
+  DealData,
+  OrderData,
 } from "@utils/crm";
-import { useSession } from "next-auth/react";
-import { GetHierarchyData } from "@utils/users";
 import {
-  FiUsers,
-  FiTarget,
-  FiCalendar,
-  FiTrendingUp,
-  FiPlus,
-  FiEye,
-  FiX,
-  FiSave,
-  FiXCircle,
-  FiTrash2,
-} from "react-icons/fi";
+  Target,
+  Handshake,
+  ShoppingBag,
+  TrendingUp,
+  Eye,
+} from "lucide-react";
 import Link from "next/link";
 import { toast } from "react-toastify";
 import moment from "moment";
-import Select from "react-select";
+import {
+  PieChart,
+  Pie,
+  Cell,
+  ResponsiveContainer,
+  Tooltip,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Legend,
+} from "recharts";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import PageHeader from "@components/PageHeader";
-import FormModal from "../../partial/FormModal";
-import ConfirmModal from "@pages/partial/ConfirmModal";
-import SuccessfulModal from "@pages/partial/SuccessfulModal";
-import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
-import { ModuleSlug } from '@utils/Helper';
+
+// KPI Card Component
+interface KPICardData {
+  title: string;
+  value: string;
+  change?: string;
+  isPositive?: boolean;
+  icon: React.ReactNode;
+  color: string;
+}
+
+const KPICard: React.FC<KPICardData> = ({ title, value, change, isPositive, icon, color }) => {
+  return (
+    <Card
+      className="h-100"
+      style={{
+        transition: "all 0.2s ease",
+        border: "1px solid #e9ecef",
+      }}
+    >
+      <Card.Body>
+        <div className="d-flex justify-content-between align-items-start mb-3">
+          <div className={`bg-${color} bg-opacity-10 rounded p-3`}>
+            <div className={`text-${color}`}>{icon}</div>
+          </div>
+          {change && (
+            <Badge bg={isPositive ? "success" : "danger"} className="bg-opacity-10">
+              {change}
+            </Badge>
+          )}
+        </div>
+        <h3 className="mb-1">{value}</h3>
+        <p className="text-muted mb-0 small">{title}</p>
+      </Card.Body>
+    </Card>
+  );
+};
+
+// Helper functions for badge colors
+const getDealBadgeColor = (deal: DealData): string => {
+  if (deal.is_lost) return "danger";
+  if (deal.stage?.is_won) return "success";
+  return "secondary";
+};
+
+const getOrderBadgeColor = (order: OrderData): string => {
+  if (order.status === "delivered") return "success";
+  if (order.status === "in_progress") return "info";
+  if (order.status === "approved") return "primary";
+  return "warning";
+};
 
 const CrmDashboard = () => {
-  const { data: session, status } = useSession();
-
-  const [dashboardData, setDashboardData] = useState<CrmDashboardData>(
-    {} as CrmDashboardData
-  );
-  const [recentLeads, setRecentLeads] = useState<any[]>([]);
-  const [recentOpportunities, setRecentOpportunities] = useState<any[]>([]);
-  const [recentMeetings, setRecentMeetings] = useState<any[]>([]);
+  const [dashboardData, setDashboardData] = useState<CrmDashboardData | null>(null);
+  const [recentLeads, setRecentLeads] = useState<LeadData[]>([]);
+  const [recentDeals, setRecentDeals] = useState<DealData[]>([]);
+  const [recentOrders, setRecentOrders] = useState<OrderData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [currentFilters, setCurrentFilters] = useState({ search: "" });
-
-  // Modal states
-  const [showMeetingModal, setShowMeetingModal] = useState(false);
-  const [showCampaignModal, setShowCampaignModal] = useState(false);
-  const [modalLoading, setModalLoading] = useState(false);
-
-  // Meeting form data
-  const [meetingForm, setMeetingForm] = useState({
-    name: "",
-    meeting_date: "",
-    meeting_time: "",
-    status: "scheduled",
-    extensions: [""],
-    lead_id: null as number | null,
-  });
-
-  // Extensions data
-  const [extensions, setExtensions] = useState<any[]>([]);
-  const [extensionsOpportunities, setExtensionsOpportunities] = useState<any[]>([]);
-  const [extensionsLeads, setExtensionsLeads] = useState<any[]>([]);
   
-  const [leads, setLeads] = useState<any[]>([]);
-  const [opportunities, setOpportunities] = useState<any[]>([]);
+  // Chart data states
+  const [monthlyData, setMonthlyData] = useState<any[]>([]);
+  const [dealsByStage, setDealsByStage] = useState<any[]>([]);
+  const [ordersByStage, setOrdersByStage] = useState<any[]>([]);
+  
+  // Totals
+  const [totalLeads, setTotalLeads] = useState(0);
+  const [totalDeals, setTotalDeals] = useState(0);
+  const [totalOrders, setTotalOrders] = useState(0);
+  const [leadToDealPercent, setLeadToDealPercent] = useState(0);
+  const [dealToOrderPercent, setDealToOrderPercent] = useState(0);
 
-  // Campaign form data
-  const [campaignForm, setCampaignForm] = useState({
-    name: "",
-    description: "",
-    start_date: "",
-    end_date: "",
-    status: "active",
-  });
-
-  // Campaign fields management
-  const [campaignFields, setCampaignFields] = useState<any[]>([]);
-  const [newField, setNewField] = useState({
-    field_name: "",
-    field_type: "string",
-    field_options: [] as string[],
-    sort_order: 0,
-  });
-  const [campaignUsers, setCampaignUsers] = useState<readonly any[]>([]);
-
-  const handleFiltersChange = (filters: any) => {
-    setCurrentFilters(filters);
-  };
-
-  // Helper function to determine meeting color based on status and timing
-  const getMeetingColor = (meeting: any) => {
-    const now = new Date();
-    const meetingDateTime = new Date(`${meeting.meeting_date.split('T')[0]}T${meeting.meeting_time}`);
-    const timeDiff = meetingDateTime.getTime() - now.getTime();
-    const hoursDiff = timeDiff / (1000 * 60 * 60);
-
-    // Overdue meetings (past due and not completed)
-    if (meetingDateTime < now && meeting.status !== 'completed') {
-      return {
-        iconBg: 'bg-danger bg-opacity-10',
-        iconColor: 'text-danger',
-        statusColor: 'text-danger'
-      };
-    }
-
-    // Completed meetings
-    if (meeting.status === 'completed') {
-      return {
-        iconBg: 'bg-success bg-opacity-10',
-        iconColor: 'text-success',
-        statusColor: 'text-success'
-      };
-    }
-
-    // Cancelled meetings
-    if (meeting.status === 'cancelled') {
-      return {
-        iconBg: 'bg-secondary bg-opacity-10',
-        iconColor: 'text-secondary',
-        statusColor: 'text-secondary'
-      };
-    }
-
-    // Upcoming meetings (within next 24 hours)
-    if (hoursDiff >= 0 && hoursDiff <= 24) {
-      return {
-        iconBg: 'bg-warning bg-opacity-10',
-        iconColor: 'text-warning',
-        statusColor: 'text-warning'
-      };
-    }
-
-    // Future meetings (more than 24 hours away)
-    if (hoursDiff > 24) {
-      return {
-        iconBg: 'bg-info bg-opacity-10',
-        iconColor: 'text-info',
-        statusColor: 'text-info'
-      };
-    }
-
-    // Default for scheduled meetings
-    return {
-      iconBg: 'bg-primary bg-opacity-10',
-      iconColor: 'text-primary',
-      statusColor: 'text-primary'
-    };
-  };
-
-  // Fetch extensions, leads, and opportunities data
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [hierarchyData,hierarchyDataOpportunities,hierarchyDataLeads, leadsData, opportunitiesData] = await Promise.all([
-          GetHierarchyData(ModuleSlug.CRM_CAMPAIGNS),
-          GetHierarchyData(ModuleSlug.CRM_OPPORTUNITIES),
-          GetHierarchyData(ModuleSlug.CRM_LEADS),
-          getLeads({ per_page: 1000 }),
-          getOpportunities({ per_page: 1000 }),]);
-        
-        setExtensions(hierarchyData?.extensions || []);
-        setExtensionsOpportunities(hierarchyDataOpportunities?.extensions || []);
-        setExtensionsLeads(hierarchyDataLeads?.extensions || []);
-
-        setLeads(leadsData?.data || []);
-        setOpportunities(opportunitiesData?.data || []);
-      } catch (error) {
-        console.error('Failed to fetch data:', error);
-      }
-    };
-
-    fetchData();
-  }, []);
-
-  // Modal handlers
-  const handleCreateMeeting = useCallback(() => {
-    setMeetingForm({
-      name: "",
-      meeting_date: "",
-      meeting_time: "",
-      status: "scheduled",
-      extensions: [""],
-      lead_id: null,
-    });
-    setShowMeetingModal(true);
-  }, []);
-
-  const handleCreateCampaign = useCallback(() => {
-    setCampaignForm({
-      name: "",
-      description: "",
-      start_date: "",
-      end_date: "",
-      status: "active",
-    });
-    setCampaignFields([]);
-    setCampaignUsers([]);
-    setShowCampaignModal(true);
-  }, []);
-
-  // Form submission handlers
-  const handleMeetingSubmit = useCallback(async () => {
-    if (!meetingForm.name.trim()) {
-      toast.error("Meeting name is required");
-      return;
-    }
-
-    if (!meetingForm.lead_id) {
-      toast.error("Please select a lead or opportunity");
-      return;
-    }
-
-    try {
-      setModalLoading(true);
-      await createMeeting({
-        ...meetingForm,
-        name: meetingForm.name.trim(),
-        lead_id: meetingForm.lead_id,
-        extensions: meetingForm.extensions.filter((ext) => ext.trim() !== ""),
-      });
-      toast.success("Meeting created successfully!");
-      setShowMeetingModal(false);
-      fetchRecentData(); // Refresh recent meetings
-    } catch (error: any) {
-      console.error("Failed to create meeting:", error);
-      toast.error(error.message || "Failed to create meeting");
-    } finally {
-      setModalLoading(false);
-    }
-  }, [meetingForm]);
-
-  // Helper function to get today's date in YYYY-MM-DD format
-  const getTodayDate = useCallback(() => {
-    const today = new Date();
-    const year = today.getFullYear();
-    const month = String(today.getMonth() + 1).padStart(2, '0');
-    const day = String(today.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  }, []);
-
-  // Get minimum date for end date (day after start_date if set, otherwise today)
-  const getMinEndDate = useCallback(() => {
-    const today = getTodayDate();
-    if (campaignForm.start_date) {
-      // Calculate the next day after start_date
-      const startDate = new Date(campaignForm.start_date);
-      startDate.setDate(startDate.getDate() + 1);
-      const nextDay = startDate.toISOString().split('T')[0];
-      // Return the later of: next day after start_date, or today
-      return nextDay > today ? nextDay : today;
-    }
-    return today;
-  }, [campaignForm.start_date, getTodayDate]);
-
-  // Handle start date change with validation
-  const handleStartDateChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const newStartDate = e.target.value;
-    const today = getTodayDate();
-    
-    if (newStartDate && newStartDate < today) {
-      toast.error("Start date must be today or a future date");
-      return;
-    }
-    
-    setCampaignForm(prev => {
-      // If new start date is after end date, clear end date
-      if (prev.end_date && newStartDate && newStartDate >= prev.end_date) {
-        return { ...prev, start_date: newStartDate, end_date: "" };
-      }
-      return { ...prev, start_date: newStartDate };
-    });
-  }, [getTodayDate]);
-
-  // Handle end date change with validation
-  const handleEndDateChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const newEndDate = e.target.value;
-    const minEndDate = getMinEndDate();
-    
-    if (newEndDate && newEndDate < minEndDate) {
-      toast.error(`End date must be after ${new Date(campaignForm.start_date || minEndDate).toLocaleDateString()}`);
-      return;
-    }
-    
-    if (campaignForm.start_date && newEndDate && newEndDate <= campaignForm.start_date) {
-      toast.error("End date must be after start date");
-      return;
-    }
-    
-    setCampaignForm(prev => ({ ...prev, end_date: newEndDate }));
-  }, [campaignForm.start_date, getMinEndDate]);
-
-  const handleCampaignSubmit = useCallback(async () => {
-    if (!campaignForm.name.trim()) {
-      toast.error("Campaign name is required");
-      return;
-    }
-
-    // Validate dates
-    const today = getTodayDate();
-    
-    if (campaignForm.start_date && campaignForm.start_date < today) {
-      toast.error("Start date must be today or a future date");
-      return;
-    }
-    
-    if (campaignForm.end_date && campaignForm.end_date < today) {
-      toast.error("End date must be today or a future date");
-      return;
-    }
-    
-    if (campaignForm.start_date && campaignForm.end_date && campaignForm.start_date >= campaignForm.end_date) {
-      toast.error("End date must be after start date");
-      return;
-    }
-
-    try {
-      setModalLoading(true);
-      const campaignData = {
-        ...campaignForm,
-        name: campaignForm.name.trim(),
-        description: campaignForm.description.trim() || null,
-        start_date: campaignForm.start_date || undefined,
-        end_date: campaignForm.end_date || undefined,
-        status: campaignForm.status as 'active' | 'inactive',
-        fields: campaignFields,
-        campaign_users: campaignUsers.map(user => user.value),
-      };
-
-      await createCampaign(campaignData);
-      toast.success("Campaign created successfully!");
-      setShowCampaignModal(false);
-    } catch (error: any) {
-      console.error("Failed to create campaign:", error);
-      toast.error(error.message || "Failed to create campaign");
-    } finally {
-      setModalLoading(false);
-    }
-  }, [campaignForm, campaignFields, campaignUsers, getTodayDate]);
-
-  // Campaign field management functions
-  const handleAddField = useCallback(() => {
-    if (!newField.field_name.trim()) {
-      toast.error("Field name is required");
-      return;
-    }
-
-    const field = {
-      ...newField,
-      field_name: newField.field_name.trim(),
-      sort_order: campaignFields.length,
-    };
-
-    setCampaignFields([...campaignFields, field]);
-    setNewField({
-      field_name: "",
-      field_type: "string",
-      field_options: [],
-      sort_order: 0,
-    });
-  }, [newField, campaignFields]);
-
-  const handleRemoveField = useCallback((index: number) => {
-    setCampaignFields(campaignFields.filter((_, i) => i !== index));
-  }, [campaignFields]);
-
-  const handleFieldTypeChange = useCallback((index: number, fieldType: string) => {
-    const updatedFields = [...campaignFields];
-    updatedFields[index].field_type = fieldType;
-    if (fieldType !== "dropdown") {
-      updatedFields[index].field_options = [];
-    }
-    setCampaignFields(updatedFields);
-  }, [campaignFields]);
-
-  const handleFieldOptionChange = useCallback((index: number, optionIndex: number, value: string) => {
-    const updatedFields = [...campaignFields];
-    if (!updatedFields[index].field_options) {
-      updatedFields[index].field_options = [];
-    }
-    updatedFields[index].field_options[optionIndex] = value;
-    setCampaignFields(updatedFields);
-  }, [campaignFields]);
-
-  const handleAddFieldOption = useCallback((index: number) => {
-    const updatedFields = [...campaignFields];
-    if (!updatedFields[index].field_options) {
-      updatedFields[index].field_options = [];
-    }
-    updatedFields[index].field_options.push("");
-    setCampaignFields(updatedFields);
-  }, [campaignFields]);
-
-  const handleRemoveFieldOption = useCallback((index: number, optionIndex: number) => {
-    const updatedFields = [...campaignFields];
-    updatedFields[index].field_options.splice(optionIndex, 1);
-    setCampaignFields(updatedFields);
-  }, [campaignFields]);
-
-  // Extension management functions
-  const addExtensionField = useCallback(() => {
-    setMeetingForm((prev) => ({
-      ...prev,
-      extensions: [...prev.extensions, ""],
-    }));
-  }, []);
-
-  const removeExtensionField = useCallback((index: number) => {
-    setMeetingForm((prev) => ({
-      ...prev,
-      extensions: prev.extensions.filter((_, i) => i !== index),
-    }));
-  }, []);
-
-  const updateExtension = useCallback((index: number, value: string) => {
-    setMeetingForm((prev) => ({
-      ...prev,
-      extensions: prev.extensions.map((ext, i) => (i === index ? value : ext)),
-    }));
-  }, []);
-
+  // Fetch all dashboard data
   const fetchDashboardData = useCallback(async () => {
     try {
-      const data = await getCrmDashboard();
-      console.log("ZE DASH DATA", data);
-      setDashboardData(data);
-      setLoading(false);
-    } catch (error) {
-      console.error("Failed to fetch dashboard data:", error);
-    }
-  }, []);
+      setLoading(true);
+      setError(null);
 
-  const fetchRecentData = useCallback(async () => {
-    try {
-      const [leadsData, opportunitiesData, meetingsData] = await Promise.all([
+      // Fetch dashboard data and recent items in parallel
+      const [
+        dashboard,
+        leadsResponse,
+        dealsResponse,
+        ordersResponse,
+      ] = await Promise.all([
+        getCrmDashboard().then((res: any) => res.data.data),
         getLeads({ per_page: 5 }),
-        getOpportunities({ per_page: 5 }),
-        getMeetings({per_page: 5}),
+        getDeals({ per_page: 5 }),
+        getOrders({ per_page: 5 }),
       ]);
+      console.log("ZEZEZE", dashboard);
+      setDashboardData(dashboard as CrmDashboardData);
 
-      setRecentLeads(leadsData?.data || []);
-      setRecentOpportunities(opportunitiesData?.data || []);
-      setRecentMeetings(meetingsData?.data || []);
-    } catch (error) {
-      console.error("Failed to fetch recent data:", error);
+      // Set totals from API stats
+      const stats = (dashboard as CrmDashboardData)?.stats;
+      setTotalLeads(stats?.leads?.total || 0);
+      setTotalDeals(stats?.deals?.total || 0);
+      setTotalOrders(stats?.orders?.total || 0);
+
+      // Set conversion percentages from API
+      const conversionStats = (dashboard as CrmDashboardData)?.conversion_stats?.last_30_days;
+      setLeadToDealPercent(conversionStats?.leads_to_deals_percentage || 0);
+      setDealToOrderPercent(conversionStats?.deals_to_orders_percentage || 0);
+
+      // Get recent items
+      console.log("ZEZEZE", leadsResponse);
+      setRecentLeads((leadsResponse?.data as any)?.data?.slice(0, 5) || []);
+      setRecentDeals(dealsResponse?.dataList?.slice(0, 5) || []);
+      setRecentOrders(ordersResponse?.dataList?.slice(0, 5) || []);
+
+      // Process monthly data from API - convert string numbers to numbers
+      const monthlyDataArray = (dashboard as CrmDashboardData)?.monthly_data || [];
+      const processedMonthlyData = monthlyDataArray.map((item: { month: string; month_label: string; leads: number | string; deals: number | string; orders: number | string }) => ({
+        month: item.month_label || item.month,
+        leads: Number(item.leads) || 0,
+        deals: Number(item.deals) || 0,
+        orders: Number(item.orders) || 0,
+      }));
+      setMonthlyData(processedMonthlyData);
+
+      // Process deals by stage from API
+      const dealsDistribution = (dashboard as CrmDashboardData)?.stage_distribution?.deals || [];
+      const dealsByStageData = dealsDistribution.map((item: { stage_name: string; count: number; color: string }) => ({
+        name: item.stage_name,
+        value: item.count,
+        color: item.color || "#0d6efd",
+      }));
+      setDealsByStage(dealsByStageData);
+
+      // Process orders by stage from API
+      const ordersDistribution = (dashboard as CrmDashboardData)?.stage_distribution?.orders || [];
+      const ordersByStageData = ordersDistribution.map((item: { stage_name: string; count: number; color: string }) => ({
+        name: item.stage_name,
+        value: item.count,
+        color: item.color || "#198754",
+      }));
+      setOrdersByStage(ordersByStageData);
+
+      setLoading(false);
+    } catch (error: any) {
+      console.error("Failed to fetch dashboard data:", error);
+      setError(error?.message || "Failed to load dashboard data");
+      setLoading(false);
+      toast.error(error?.message || "Failed to load dashboard data");
     }
   }, []);
 
   useEffect(() => {
     fetchDashboardData();
-    fetchRecentData();
-  }, []); // Only run once on mount
+  }, [fetchDashboardData]);
 
   if (loading) {
     return (
@@ -479,7 +205,7 @@ const CrmDashboard = () => {
         className="d-flex justify-content-center align-items-center"
         style={{ minHeight: "400px" }}
       >
-        <Spinner animation="border" role="status">
+        <Spinner animation="border">
           <span className="visually-hidden">Loading...</span>
         </Spinner>
       </div>
@@ -502,6 +228,46 @@ const CrmDashboard = () => {
     );
   }
 
+  const kpiData: KPICardData[] = [
+    {
+      title: "Total Leads",
+      value: totalLeads.toString(),
+      icon: <Target size={24} />,
+      color: "primary",
+    },
+    {
+      title: "Total Deals",
+      value: totalDeals.toString(),
+      icon: <Handshake size={24} />,
+      color: "success",
+    },
+    {
+      title: "Total Orders",
+      value: totalOrders.toString(),
+      icon: <ShoppingBag size={24} />,
+      color: "info",
+    },
+    {
+      title: "Lead to Deal Conversion",
+      value: `${leadToDealPercent}%`,
+      icon: <TrendingUp size={24} />,
+      color: "warning",
+    },
+    {
+      title: "Deal to Order Conversion",
+      value: `${dealToOrderPercent}%`,
+      icon: <TrendingUp size={24} />,
+      color: "secondary",
+    },
+  ];
+
+  // Calculate max count for progress bars
+  const leadsByStage = dashboardData?.stage_distribution?.leads || [];
+  const maxLeadCount = leadsByStage.reduce(
+    (max, stage) => Math.max(max, stage.count),
+    0
+  ) || 1;
+
   return (
     <React.Fragment>
       <BreadcrumbItem
@@ -510,793 +276,431 @@ const CrmDashboard = () => {
         subTitle="Dashboard"
       />
 
-<PageHeader
-        title="CRM Dashboard"
-       
-        buttons={
-          <>
-
-          {session?.user?.permissions?.includes('add-meeting-crm-opportunities')
-          || session?.user?.permissions?.includes('add-meeting-crm-leads')
-          ? (
-          <Button onClick={handleCreateMeeting} className="btn btn-primary me-2">
-          <FiCalendar className="me-2" />
-          Schedule a Meeting
-        </Button>
-        ) : (
-          <></>
-        )}
-
-{session?.user?.permissions?.includes('add-crm-campaigns') && (
-        <Button
-          onClick={handleCreateCampaign}
-          className="btn btn-primary me-2"
-        >
-          <FiPlus className="me-2" />
-          Create a New Campaign
-        </Button>
-        )}
-
-          </>
-        }
-      />
+      <PageHeader title="CRM Dashboard" />
 
       <div className="container-fluid">
-
-        <PageSummaryGrid
-         cards={[
-          {
-            id: 'total-leads',
-            title: 'Total Leads',
-            value: dashboardData.total_leads || 0,
-            description: 'Total leads in the system',
-          },
-          {
-            id: 'total-opportunities',
-            title: 'Total Opportunities',
-            value: dashboardData.total_opportunities || 0,
-            description: 'Total opportunities in the system',
-          },
-          {
-            id: 'total-meetings',
-            title: 'Total Meetings',
-            value: dashboardData.total_meetings || 0,
-            description: 'Total meetings in the system',
-          },
-          {
-            id: 'meetings-next-24h',
-            title: 'Meetings in Next 24h',
-            value: dashboardData.meetings_next_24h || 0,
-            description: 'Meetings scheduled in the next 24 hours',
-          },
-          {
-            id: 'meetings-last-24h',
-            title: 'Meetings in Last 24h',
-            value: dashboardData.meetings_last_24h || 0,
-            description: 'Meetings that occurred in the last 24 hours',
-          },
-          {
-            id: 'total-campaigns',
-            title: 'Total Campaigns',
-            value: dashboardData.total_campaigns || 0,
-            description: 'Total campaigns in the system',
+        {/* KPI Cards */}
+        <style>{`
+          @media (min-width: 1400px) {
+            .kpi-card-col { flex: 0 0 20% !important; max-width: 20% !important; }
           }
-         ]
-          
-         }
-        />
+          @media (min-width: 1200px) and (max-width: 1399px) {
+            .kpi-card-col { flex: 0 0 25% !important; max-width: 25% !important; }
+          }
+          @media (min-width: 992px) and (max-width: 1199px) {
+            .kpi-card-col { flex: 0 0 33.333% !important; max-width: 33.333% !important; }
+          }
+          @media (min-width: 768px) and (max-width: 991px) {
+            .kpi-card-col { flex: 0 0 50% !important; max-width: 50% !important; }
+          }
+          @media (max-width: 767px) {
+            .kpi-card-col { flex: 0 0 100% !important; max-width: 100% !important; }
+          }
+        `}</style>
+        <Row className="mb-4">
+          {kpiData.map((kpi) => (
+            <Col key={kpi.title} className="mb-3 kpi-card-col">
+              <KPICard {...kpi} />
+            </Col>
+          ))}
+        </Row>
+
+        {/* Charts Row */}
+        <Row className="mb-4">
+          {/* Monthly Bar Chart */}
+          <Col lg={6} className="mb-4">
+            <Card className="border-0 shadow-sm">
+              <Card.Body>
+                <h5 className="mb-4 fw-bold">Leads, Deals & Orders by Month</h5>
+                {monthlyData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={monthlyData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="month" tick={{ fontSize: 12 }} />
+                      <YAxis allowDecimals={false} />
+                      <Tooltip contentStyle={{ borderRadius: "8px" }} />
+                      <Legend />
+                      <Bar dataKey="leads" fill="#0d6efd" radius={[8, 8, 0, 0]} name="Leads" />
+                      <Bar dataKey="deals" fill="#198754" radius={[8, 8, 0, 0]} name="Deals" />
+                      <Bar dataKey="orders" fill="#0dcaf0" radius={[8, 8, 0, 0]} name="Orders" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="text-center text-muted py-5">No data available</div>
+                )}
+                  </Card.Body>
+                </Card>
+          </Col>
+
+          {/* Deals by Stage Pie Chart */}
+          <Col lg={3} className="mb-4">
+                <Card className="border-0 shadow-sm">
+                  <Card.Body>
+                <h5 className="mb-4 fw-bold">Deals by Stage</h5>
+                {dealsByStage.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <PieChart>
+                      <Pie
+                        data={dealsByStage}
+                        cx="50%"
+                        cy="50%"
+                        outerRadius="80%"
+                        dataKey="value"
+                        label={({ name, value }) => `${name}: ${value}`}
+                        labelLine={{ stroke: "#666", strokeWidth: 1 }}
+                      >
+                        {dealsByStage.map((entry) => (
+                          <Cell key={`cell-${entry.name}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="text-center text-muted py-5">No deals data available</div>
+                )}
+              </Card.Body>
+            </Card>
+          </Col>
+
+          {/* Orders by Stage Doughnut Chart */}
+          <Col lg={3} className="mb-4">
+            <Card className="border-0 shadow-sm">
+              <Card.Body>
+                <h5 className="mb-4 fw-bold">Orders by Stage</h5>
+                {ordersByStage.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <PieChart>
+                      <Pie
+                        data={ordersByStage}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius="40%"
+                        outerRadius="80%"
+                        dataKey="value"
+                        label={({ name, value }) => `${name}: ${value}`}
+                        labelLine={{ stroke: "#666", strokeWidth: 1 }}
+                      >
+                        {ordersByStage.map((entry) => (
+                          <Cell key={`cell-${entry.name}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="text-center text-muted py-5">No orders data available</div>
+                )}
+                  </Card.Body>
+                </Card>
+          </Col>
+        </Row>
 
         {/* Leads by Stage */}
-        {dashboardData.leads_by_stage &&
-          dashboardData.leads_by_stage.length > 0 && (
-            <div className="row mb-4">
-              <div className="col-12">
-                <Card className="border-0 shadow-sm">
-                  <Card.Header className="bg-transparent">
-                    <h5 className="mb-0 app-title-heading">Leads by Stage</h5>
-                  </Card.Header>
-                  <Card.Body>
+        {leadsByStage.length > 0 && (
+          <Row className="mb-4">
+            <Col lg={6} className="mb-4">
+              <Card className="border-0 shadow-sm">
+                <Card.Body style={{ minHeight: "344px" }}>
+                  <h5 className="mb-4 fw-bold">Leads by Stage</h5>
+                  {leadsByStage.map((item) => (
+                    <div key={item.stage_id} className="mb-3">
+                      <div className="d-flex justify-content-between align-items-center mb-2">
+                        <span className="fw-semibold">{item.stage_name}</span>
+                        <Badge
+                          bg="primary"
+                          className="bg-opacity-10 text-dark"
+                        >
+                          {item.count}
+                        </Badge>
+                      </div>
+                      <ProgressBar
+                        now={(item.count / maxLeadCount) * 100}
+                        style={{
+                          height: "8px",
+                          backgroundColor: "#e9ecef",
+                        }}
+                        className="rounded"
+                      />
+                    </div>
+                  ))}
+                </Card.Body>
+              </Card>
+            </Col>
 
-                    <PageSummaryGrid
-                      cards={dashboardData.leads_by_stage.map((stage) => ({
-                        id: stage.stage_name,
-                        title: stage.stage_name,
-                        value: stage.count,
-                        description: "Total "+stage.stage_name+" leads in the system",
-                        className: 'col-md-3',
-                      }))}
-                    />
-
-
-
-
-                    
-                  </Card.Body>
-                </Card>
-              </div>
-            </div>
-          )}
-
-        {/* Opportunities by Stage */}
-        {dashboardData.opportunities_by_stage &&
-          dashboardData.opportunities_by_stage.length > 0 && (
-            <div className="row mb-4">
-              <div className="col-12">
-                <Card className="border-0 shadow-sm">
-                  <Card.Header className="bg-transparent">
-                    <h5 className="mb-0 app-title-heading">Opportunities by Stage</h5>
-                  </Card.Header>
-                  <Card.Body>
-
-                    <PageSummaryGrid
-                      cards={dashboardData.opportunities_by_stage.map((stage) => ({
-                        id: `opp-${stage.stage_name}`,
-                        title: stage.stage_name,
-                        value: stage.count,
-                        description: "Total "+stage.stage_name+" opportunities in the system",
-                        className: 'col-md-3',
-                      }))}
-                    />
-
-
-
-
-                    
-                  </Card.Body>
-                </Card>
-              </div>
-            </div>
-          )}
-
-        {/* Recent Data */}
-        <div className="row g-4">
           {/* Recent Leads */}
-          <div className="col-lg-4">
-            <Card className="border-0 shadow-sm h-100">
-              <Card.Header className="bg-transparent d-flex justify-content-between align-items-center">
-                <h5 className="app-title-heading mb-0">Recent Leads</h5>
+            <Col lg={6} className="mb-4">
+              <Card className="border-0 shadow-sm">
+                <Card.Body>
+                  <div className="d-flex justify-content-between align-items-center mb-4">
+                    <h5 className="mb-0 fw-bold">Recent Leads</h5>
                 <Link
                   href="/crm/leads"
-                  className="btn app-button btn-sm btn-primary"
+                      className="btn btn-link btn-sm text-decoration-none"
                 >
-                  View All
+                      View All →
                 </Link>
-              </Card.Header>
-              <Card.Body>
-                
-                {recentLeads.length > 0 ? (
-                  recentLeads.map((lead, index) => (
-                    <div key={index} className="d-flex align-items-center mb-3">
-                      <div className="flex-shrink-0">
-                        <div className="bg-primary bg-opacity-10 rounded-circle p-2">
-                          <FiUsers className="text-primary" size={16} />
                         </div>
-                      </div>
-                      <div className="flex-grow-1 ms-3">
-                        <h6 className="mb-1">{lead.name || "Unnamed Lead"}</h6>
-                        <p className="text-muted mb-1 small">
+                  <div style={{ maxHeight: "400px", overflowY: "auto" }}>
+                    {recentLeads.length > 0 ? (
+                      <Table hover responsive className="mb-0">
+                        <thead
+                          style={{
+                            position: "sticky",
+                            top: 0,
+                            backgroundColor: "#fff",
+                            zIndex: 1,
+                          }}
+                        >
+                          <tr>
+                            <th
+                              style={{
+                                fontSize: "0.85rem",
+                                fontWeight: 600,
+                                borderBottom: "2px solid #dee2e6",
+                              }}
+                            >
+                              Name
+                            </th>
+                            <th
+                              style={{
+                                fontSize: "0.85rem",
+                                fontWeight: 600,
+                                borderBottom: "2px solid #dee2e6",
+                              }}
+                            >
+                              Stage
+                            </th>
+                            <th
+                              style={{
+                                fontSize: "0.85rem",
+                                fontWeight: 600,
+                                borderBottom: "2px solid #dee2e6",
+                              }}
+                            >
+                              Created
+                            </th>
+                            <th
+                              style={{
+                                fontSize: "0.85rem",
+                                fontWeight: 600,
+                                borderBottom: "2px solid #dee2e6",
+                              }}
+                            >
+                              Last Activity
+                            </th>
+                            <th
+                              style={{
+                                fontSize: "0.85rem",
+                                fontWeight: 600,
+                                borderBottom: "2px solid #dee2e6",
+                              }}
+                            >
+                              Action
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {recentLeads.map((lead) => (
+                            <tr key={lead.id}>
+                              <td style={{ fontSize: "0.9rem", fontWeight: 500 }}>
+                                {lead.name || "Unnamed Lead"}
+                              </td>
+                              <td>
+                                <Badge bg="primary" className="bg-opacity-10 text-dark">
                           {lead.stage?.name || "No Stage"}
-                        </p>
-                        <div className="d-flex flex-column small text-muted">
-                          <span>Created: {moment(lead.created_at).format('MMM DD, YYYY')}</span>
-                          <span>Last activity: {moment(lead.updated_at).format('MMM DD, YYYY HH:mm')}</span>
-                        </div>
-                      </div>
+                                </Badge>
+                              </td>
+                              <td style={{ fontSize: "0.85rem", color: "#6c757d" }}>
+                                {moment(lead.created_at).format("MMM DD, YYYY")}
+                              </td>
+                              <td style={{ fontSize: "0.85rem", color: "#6c757d" }}>
+                                {moment(lead.updated_at).format("MMM DD, YYYY")}
+                              </td>
+                              <td>
                       <Link
                         href={`/crm/leads/${lead.id}/edit`}
                         className="btn btn-sm btn-outline-secondary"
                         title="View Details"
                       >
-                        <FiEye size={14} />
+                                  <Eye size={14} />
                       </Link>
-                    </div>
-                  ))
-                ) : (
-                  <p className="text-muted text-center">No recent leads</p>
-                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </Table>
+                    ) : (
+                      <p className="text-muted text-center py-4">No recent leads</p>
+                    )}
+                  </div>
               </Card.Body>
             </Card>
-          </div>
+            </Col>
+          </Row>
+        )}
 
-          {/* Recent Opportunities */}
-          <div className="col-lg-4">
-            <Card className="border-0 shadow-sm h-100">
-              <Card.Header className="bg-transparent d-flex justify-content-between align-items-center">
-                <h5 className="mb-0 app-title-heading">Recent Opportunities</h5>
-                <Link
-                  href="/crm/opportunities"
-                  className="btn app-button btn-sm btn-primary"
-                >
-                  View All
-                </Link>
-              </Card.Header>
+        {/* Recent Deals and Orders */}
+        <Row>
+          {/* Recent Deals */}
+          <Col lg={6} className="mb-4">
+            <Card className="border-0 shadow-sm">
               <Card.Body>
-                {recentOpportunities.length > 0 ? (
-                  recentOpportunities.map((opportunity, index) => (
-                    <div key={index} className="d-flex align-items-center mb-3">
-                      <div className="flex-shrink-0">
-                        <div className="bg-success bg-opacity-10 rounded-circle p-2">
-                          <FiTarget className="text-success" size={16} />
+                <div className="d-flex justify-content-between align-items-center mb-4">
+                  <h5 className="mb-0 fw-bold" style={{ color: "#2c3e50" }}>
+                    Recent Deals
+                  </h5>
+                <Link
+                    href="/crm/deals"
+                    className="btn btn-link btn-sm text-decoration-none"
+                >
+                    View All →
+                </Link>
                         </div>
-                      </div>
-                      <div className="flex-grow-1 ms-3">
-                        <h6 className="mb-1">
-                          {opportunity.name || "Unnamed Opportunity"}
+                <div style={{ maxHeight: "400px", overflowY: "auto" }}>
+                  {recentDeals.length > 0 ? (
+                    recentDeals.map((deal) => (
+                      <div key={deal.id} className="mb-3 d-flex align-items-start gap-2">
+                        <div
+                          style={{
+                            width: "8px",
+                            height: "8px",
+                            borderRadius: "50%",
+                            backgroundColor: "#0d6efd",
+                            marginTop: "6px",
+                            flexShrink: 0,
+                          }}
+                        />
+                        <div className="flex-grow-1">
+                          <h6
+                            className="mb-2"
+                            style={{
+                              fontSize: "0.95rem",
+                              fontWeight: 600,
+                              color: "#2c3e50",
+                            }}
+                          >
+                            {deal.name || "Unnamed Deal"}
                         </h6>
-                        <p className="text-muted mb-1 small">
-                          
-                          {opportunity.stage?.name
-                            ? opportunity.stage?.name
-                            : "No Stage"}
-                        </p>
-                        <div className="d-flex flex-column small text-muted">
-                          <span>Created: {moment(opportunity.created_at).format('MMM DD, YYYY')}</span>
-                          <span>Last activity: {moment(opportunity.updated_at).format('MMM DD, YYYY HH:mm')}</span>
+                          <div className="d-flex flex-wrap align-items-center gap-2 mb-2">
+                            <small className="text-muted">
+                              {moment(deal.created_at).format("MMM DD, YYYY")}
+                            </small>
+                            {deal.grand_total && (
+                              <small className="text-muted">
+                                Value: {deal.grand_total}
+                              </small>
+                            )}
+                            <Badge
+                              bg={getDealBadgeColor(deal)}
+                              style={{
+                                fontSize: "0.7rem",
+                                fontWeight: 500,
+                                padding: "4px 10px",
+                                textTransform: "uppercase",
+                              }}
+                            >
+                              {deal.stage?.name || "No Stage"}
+                            </Badge>
                         </div>
                       </div>
                       <Link
-                        href={`/crm/leads/${opportunity.id}/edit`}
+                          href={`/crm/deals/${deal.id}/edit`}
                         className="btn btn-sm btn-outline-secondary"
                         title="View Details"
                       >
-                        <FiEye size={14} />
+                          <Eye size={14} />
                       </Link>
                     </div>
                   ))
                 ) : (
-                  <p className="text-muted text-center">
-                    No recent opportunities
-                  </p>
+                    <p className="text-muted text-center py-4">No recent deals</p>
                 )}
+          </div>
               </Card.Body>
             </Card>
-          </div>
+          </Col>
 
-          {/* Recent Meetings */}
-          <div className="col-lg-4">
-            <Card className="border-0 shadow-sm h-100">
-              <Card.Header className="bg-transparent d-flex justify-content-between align-items-center">
-                <h5 className="mb-0 app-title-heading">Recent Meetings</h5>
-              </Card.Header>
-              <Card.Body>
-                {recentMeetings.length > 0 ? (
-                  recentMeetings.map((meeting, index) => {
-                    const meetingColors = getMeetingColor(meeting);
-                    return (
-                      <div key={index} className="d-flex align-items-center mb-3">
-                        <div className="flex-shrink-0">
-                          <div className={`${meetingColors.iconBg} rounded-circle p-2`}>
-                            <FiCalendar className={meetingColors.iconColor} size={16} />
-                          </div>
-                        </div>
-                        <div className="flex-grow-1 ms-3">
-                          <h6 className="mb-1">
-                            {meeting?.name || "Untitled Meeting"}
-                          </h6>
-                          <p className="text-muted mb-1 small">
-                            {meeting?.meeting_date && meeting?.meeting_time
-                              ? `${new Date(meeting.meeting_date).toLocaleDateString()} ${meeting.meeting_time}`
-                              : "No Date"}
-                          </p>
-                          <div className="d-flex flex-column small text-muted">
-                            <span className={meetingColors.statusColor}>
-                              Status: {meeting?.status || "Unknown"}
-                            </span>
-                            <span>Created: {moment(meeting?.created_at).format('MMM DD, YYYY HH:mm')}</span>
-                          </div>
-                        </div>
-                        <Link
-                          href={`/crm/leads/${meeting?.lead_id}/edit`}
-                          className="btn btn-sm btn-outline-secondary"
-                          title="View Details"
-                        >
-                          <FiEye size={14} />
-                        </Link>
-                      </div>
-                    );
-                  })
-                ) : (
-                  <p className="text-muted text-center">No recent meetings</p>
-                )}
-              </Card.Body>
-            </Card>
-          </div>
-        </div>
-
-        {/* Quick Actions */}
-        <div className="row mt-4">
-          <div className="col-12">
+          {/* Recent Orders */}
+          <Col lg={6} className="mb-4">
             <Card className="border-0 shadow-sm">
-              <Card.Header className="bg-transparent">
-                <h5 className="mb-0 app-title-heading">Quick Actions</h5>
-              </Card.Header>
               <Card.Body>
-                <div className="row g-3">
-                  <div className="col-md-4">
+                <div className="d-flex justify-content-between align-items-center mb-4">
+                  <h5 className="mb-0 fw-bold" style={{ color: "#2c3e50" }}>
+                    Recent Orders
+                  </h5>
                     <Link
-                      href="/crm/leads/create"
-                      className="btn app-button btn-primary w-100"
+                    href="/crm/orders"
+                    className="btn btn-link btn-sm text-decoration-none"
                     >
-                      <FiPlus className="me-2" />
-                      Create Lead
+                    View All →
                     </Link>
                   </div>
-                  <div className="col-md-4">
-                    <Link
-                      href="/crm/leads/create?type=opportunity"
-                      className="btn app-button btn-success w-100"
-                    >
-                      <FiPlus className="me-2" />
-                      Create Opportunity
-                    </Link>
-                  </div>
-                  <div className="col-md-4">
-                    <Link
-                      href="/crm/stages"
-                      className="btn app-button btn-warning w-100"
-                    >
-                      <FiTrendingUp className="me-2" />
-                      Manage Stages
-                    </Link>
-                  </div>
-                </div>
-              </Card.Body>
-            </Card>
-          </div>
-        </div>
-      </div>
-
-      {/* Meeting Creation Modal */}
-      <FormModal
-        show={showMeetingModal}
-        onHide={() => setShowMeetingModal(false)}
-        title="Schedule a Meeting"
-        desc="Please fill in the details below to schedule a new meeting."
-        formHtml={
-          <>
-            <Form onSubmit={handleMeetingSubmit}>
-              <Row>
-                <Col md={6}>
-                  <Form.Group className="mb-3">
-                    <Form.Label>Meeting Name *</Form.Label>
-                    <Form.Control
-                      type="text"
-                      value={meetingForm.name}
-                      onChange={(e) => setMeetingForm({...meetingForm, name: e.target.value})}
-                      placeholder="Enter meeting name"
-                      required
-                    />
-                  </Form.Group>
-                </Col>
-                <Col md={6}>
-                  <Form.Group className="mb-3">
-                    <Form.Label>Lead/Opportunity *</Form.Label>
-                    <Select
-                      value={meetingForm.lead_id ? {
-                        value: meetingForm.lead_id,
-                        label: [...leads, ...opportunities].find(item => item.id === meetingForm.lead_id)?.name || ""
-                      } : null}
-                      onChange={(selectedOption: any) => 
-                        setMeetingForm({...meetingForm, lead_id: selectedOption?.value || null})
-                      }
-                      options={[
-
-                        ...(session?.user?.permissions?.includes('add-meeting-crm-leads') ? [
-                        ...leads.map((lead: any) => ({
-                          value: lead.id,
-                          label: `${lead.name} (Lead)`,
-                        })),
-                        ] : []),
-
-                        ...(session?.user?.permissions?.includes('add-meeting-crm-opportunities') ? [
-
-                        ...opportunities.map((opp: any) => ({
-                          value: opp.id,
-                          label: `${opp.name} (Opportunity)`,
-                        })),
-                        ] : []),
-                      ]}
-                      placeholder="Select a lead or opportunity"
-                      isClearable
-                      isSearchable
-                      required
-                    />
-                  </Form.Group>
-                </Col>
-              </Row>
-
-              <Row>
-                <Col md={6}>
-                  <Form.Group className="mb-3">
-                    <Form.Label>Meeting Date *</Form.Label>
-                    <Form.Control
-                      type="date"
-                      value={meetingForm.meeting_date ? moment(meetingForm.meeting_date).format("YYYY-MM-DD") : ""}
-                      onChange={(e) => setMeetingForm({...meetingForm, meeting_date: e.target.value})}
-                      required
-                    />
-                  </Form.Group>
-                </Col>
-                <Col md={6}>
-                  <Form.Group className="mb-3">
-                    <Form.Label>Meeting Time *</Form.Label>
-                    <Form.Control
-                      type="time"
-                      value={meetingForm.meeting_time}
-                      onChange={(e) => setMeetingForm({...meetingForm, meeting_time: e.target.value})}
-                      required
-                    />
-                  </Form.Group>
-                </Col>
-              </Row>
-
-              <Form.Group className="mb-3">
-                <Form.Label>Status</Form.Label>
-                <Form.Select
-                  value={meetingForm.status}
-                  onChange={(e) => setMeetingForm({...meetingForm, status: e.target.value})}
-                >
-                  <option value="scheduled">Scheduled</option>
-                  <option value="completed">Completed</option>
-                  <option value="cancelled">Cancelled</option>
-                </Form.Select>
-              </Form.Group>
-
-{meetingForm.lead_id &&  (
-              <Form.Group className="mb-3">
-                <Form.Label>Extensions *</Form.Label>
-
-                {meetingForm.lead_id && leads.find(item => item.id === meetingForm.lead_id) ? (
-                  <div className="mb-2">
-                    {meetingForm.extensions.map((extension, index) => (
-                  <div key={index} className="d-flex gap-2 mb-2">
-                    <Select
-                      value={
-                        extension
-                          ? {
-                              value: extension,
-                              label:
-                                extensionsLeads?.find(
-                                  (ext: any) =>
-                                    ext.id.toString() == extension.toString()
-                                )?.display_name || "",
-                            }
-                          : null
-                      }
-                      onChange={(selectedOption: any) =>
-                        updateExtension(index, selectedOption?.value || "")
-                      }
-                      options={
-                        extensionsLeads?.map((ext: any) => ({
-                          value: ext.id,
-                          label: ext.display_name,
-                        })) || []
-                      }
-                      placeholder="Select Extension"
-                      isClearable
-                      isSearchable
-                      required
-                    />
-                    {meetingForm.extensions.length > 1 && (
-                      <Button
-                        variant="outline-danger"
-                        size="sm"
-                        onClick={() => removeExtensionField(index)}
-                      >
-                        <FiXCircle />
-                      </Button>
-                    )}
-                  </div>
-                ))}
-                  </div>
-                ) : (
-                  <div className="mb-2">
-                    {meetingForm.extensions.map((extension, index) => (
-                  <div key={index} className="d-flex gap-2 mb-2">
-                    <Select
-                      value={
-                        extension
-                          ? {
-                              value: extension,
-                              label:
-                                extensionsOpportunities?.find(
-                                  (ext: any) =>
-                                    ext.id.toString() == extension.toString()
-                                )?.display_name || "",
-                            }
-                          : null
-                      }
-                      onChange={(selectedOption: any) =>
-                        updateExtension(index, selectedOption?.value || "")
-                      }
-                      options={
-                        extensionsOpportunities?.map((ext: any) => ({
-                          value: ext.id,
-                          label: ext.display_name,
-                        })) || []
-                      }
-                      placeholder="Select Extension"
-                      isClearable
-                      isSearchable
-                      required
-                    />
-                    {meetingForm.extensions.length > 1 && (
-                      <Button
-                        variant="outline-danger"
-                        size="sm"
-                        onClick={() => removeExtensionField(index)}
-                      >
-                        <FiXCircle />
-                      </Button>
-                    )}
-                  </div>
-                ))}
-                  </div>
-                )}
-
-                
-                <Button
-                  type="button"
-                  variant="outline-secondary"
-                  size="sm"
-                  onClick={addExtensionField}
-                >
-                  <FiPlus className="me-2" />
-                  Add Extension
-                </Button>
-              </Form.Group>
-                )}
-
-            </Form>
-          </>
-        }
-        submitButtonText="Schedule Meeting"
-        cancelButtonText="Cancel"
-        onSubmit={handleMeetingSubmit}
-        onCancel={() => setShowMeetingModal(false)}
-      />
-
-      {/* Campaign Creation Modal */}
-      <FormModal
-        show={showCampaignModal}
-        onHide={() => {
-          setShowCampaignModal(false);
-          setCampaignUsers([]);
-        }}
-        title="Create a New Campaign"
-        desc="Please fill the details below to create the campaign."
-        formHtml={
-          <>
-            <Row>
-              <Col md={6}>
-                <Form.Group className="mb-3">
-                  <Form.Label>Campaign Name *</Form.Label>
-                  <Form.Control
-                    type="text"
-                    value={campaignForm.name}
-                    onChange={(e) => setCampaignForm({...campaignForm, name: e.target.value})}
-                    placeholder="Enter campaign name"
-                  />
-                </Form.Group>
-              </Col>
-              <Col md={6}>
-                <Form.Group className="mb-3">
-                  <Form.Label>Status</Form.Label>
-                  <Form.Select
-                    value={campaignForm.status}
-                    onChange={(e) => setCampaignForm({...campaignForm, status: e.target.value})}
-                  >
-                    <option value="active">Active</option>
-                    <option value="inactive">Inactive</option>
-                  </Form.Select>
-                </Form.Group>
-              </Col>
-            </Row>
-
-            <Row>
-              <Col md={6}>
-                <Form.Group className="mb-3">
-                  <Form.Label>Start Date</Form.Label>
-                  <Form.Control
-                    type="date"
-                    value={campaignForm.start_date}
-                    onChange={handleStartDateChange}
-                    min={getTodayDate()}
-                  />
-                  <Form.Text className="text-muted">
-                    Must be today or a future date
-                  </Form.Text>
-                </Form.Group>
-              </Col>
-              <Col md={6}>
-                <Form.Group className="mb-3">
-                  <Form.Label>End Date</Form.Label>
-                  <Form.Control
-                    type="date"
-                    value={campaignForm.end_date}
-                    onChange={handleEndDateChange}
-                    min={getMinEndDate()}
-                  />
-                  <Form.Text className="text-muted">
-                    Must be after start date
-                  </Form.Text>
-                </Form.Group>
-              </Col>
-            </Row>
-
-            <Form.Group className="mb-4">
-              <Form.Label>Description</Form.Label>
-              <Form.Control
-                as="textarea"
-                rows={3}
-                value={campaignForm.description}
-                onChange={(e) => setCampaignForm({...campaignForm, description: e.target.value})}
-                placeholder="Enter campaign description (optional)"
-              />
-            </Form.Group>
-
-            <Form.Group className="mb-4">
-              <Form.Label>Campaign Users</Form.Label>
-              <Select
-                isMulti
-                value={campaignUsers}
-                onChange={(selected) => setCampaignUsers(selected || [])}
-                options={extensions.map((extension: { id: string; display_name: string; name: string }) => ({
-                  value: extension.id,
-                  label: extension.display_name || extension.name || extension.id
-                }))}
-                placeholder="Select users for this campaign..."
-                styles={{
-                  control: (base) => ({
-                    ...base,
-                    borderColor: "#ced4da",
-                    boxShadow: "none",
-                    fontSize: "14px",
-                  }),
-                }}
-              />
-              <Form.Text className="text-muted">
-                Select users who will be assigned to this campaign.
-              </Form.Text>
-            </Form.Group>
-
-            {/* Campaign Fields Management */}
-            <div className="border-top pt-3">
-              <div className="d-flex justify-content-between align-items-center mb-3">
-                <h5>Campaign Fields</h5>
-              </div>
-
-              {/* Add New Field Form */}
-              <Card className="mb-3">
-                <Card.Body>
-                  <Row>
-                    <Col md={4}>
-                      <Form.Control
-                        type="text"
-                        placeholder="Field name"
-                        value={newField.field_name}
-                        onChange={(e) => setNewField({...newField, field_name: e.target.value})}
-                      />
-                    </Col>
-                    <Col md={3}>
-                      <Form.Select
-                        value={newField.field_type}
-                        onChange={(e) => setNewField({...newField, field_type: e.target.value})}
-                      >
-                        <option value="string">Text</option>
-                        <option value="text">Long Text</option>
-                        <option value="integer">Number</option>
-                        <option value="date">Date</option>
-                        <option value="email">Email</option>
-                        <option value="dropdown">Dropdown</option>
-                      </Form.Select>
-                    </Col>
-                    <Col md={3}>
-                      <Button variant="success" className="app-button" onClick={handleAddField}>
-                        Add Field
-                      </Button>
-                    </Col>
-                  </Row>
-                </Card.Body>
-              </Card>
-
-              {/* Existing Fields */}
-              {campaignFields.map((field, index) => (
-                <Card key={index} className="mb-2">
-                  <Card.Body>
-                    <Row className="align-items-center">
-                      <Col md={4}>
-                        <Form.Control
-                          type="text"
-                          value={field.field_name}
-                          onChange={(e) => {
-                            const updatedFields = [...campaignFields];
-                            updatedFields[index].field_name = e.target.value;
-                            setCampaignFields(updatedFields);
+                <div style={{ maxHeight: "400px", overflowY: "auto" }}>
+                  {recentOrders.length > 0 ? (
+                    recentOrders.map((order) => (
+                      <div key={order.id} className="mb-3 d-flex align-items-start gap-2">
+                        <div
+                          style={{
+                            width: "8px",
+                            height: "8px",
+                            borderRadius: "50%",
+                            backgroundColor: "#0d6efd",
+                            marginTop: "6px",
+                            flexShrink: 0,
                           }}
                         />
-                      </Col>
-                      <Col md={3}>
-                        <Form.Select
-                          value={field.field_type}
-                          onChange={(e) => handleFieldTypeChange(index, e.target.value)}
-                        >
-                          <option value="string">Text</option>
-                          <option value="text">Long Text</option>
-                          <option value="integer">Number</option>
-                          <option value="date">Date</option>
-                          <option value="email">Email</option>
-                          <option value="dropdown">Dropdown</option>
-                        </Form.Select>
-                      </Col>
-                      
-                      <Col md={1}>
-                        <Button
-                          variant="danger"
-                          className="app-button"
-                          onClick={() => handleRemoveField(index)}
-                        >
-                          <FiTrash2 /> Delete
-                        </Button>
-                      </Col>
-
-                      <Col md={12} className="mt-3">
-                        {field.field_type === "dropdown" && (
-                          <div>
-                            {field.field_options?.map((option: string, optionIndex: number) => (
-                              <div key={optionIndex} className="d-flex mb-3 row align-items-center justify-content-left">
-                                <Col md={5}>
-                                  <Form.Control
-                                    type="text"
-                                    size="sm"
-                                    value={option}
-                                    onChange={(e) => handleFieldOptionChange(index, optionIndex, e.target.value)}
-                                    placeholder="Option value"
-                                  />
-                                </Col>
-                                <Col md={5}>
-                                  <Button
-                                    variant="danger"
-                                    size="sm"
-                                    className="app-button"
-                                    onClick={() => handleRemoveFieldOption(index, optionIndex)}
-                                  >Remove Option</Button>
-                                </Col>
-                              </div>
-                            ))}
-
-                            <Button
-                              variant="primary"
-                              className="app-button"
-                              size="sm"
-                              onClick={() => handleAddFieldOption(index)}
+                        <div className="flex-grow-1">
+                          <h6
+                            className="mb-2"
+                            style={{
+                              fontSize: "0.95rem",
+                              fontWeight: 600,
+                              color: "#2c3e50",
+                            }}
+                          >
+                            {order.order_number} - {order.customer_name}
+                          </h6>
+                          <div className="d-flex flex-wrap align-items-center gap-2 mb-2">
+                            <small className="text-muted">
+                              {moment(order.created_at).format("MMM DD, YYYY")}
+                            </small>
+                            {order.final_amount && (
+                              <small className="text-muted">
+                                Amount: {order.final_amount}
+                              </small>
+                            )}
+                            <Badge
+                              bg={getOrderBadgeColor(order)}
+                              style={{
+                                fontSize: "0.7rem",
+                                fontWeight: 500,
+                                padding: "4px 10px",
+                                textTransform: "uppercase",
+                              }}
                             >
-                              Add Option
-                            </Button>
-                          </div>
-                        )}
+                              {order.stage?.name || order.status || "No Stage"}
+                            </Badge>
+                  </div>
+                        </div>
+                    <Link
+                          href={`/crm/orders/${order.id}/edit`}
+                          className="btn btn-sm btn-outline-secondary"
+                          title="View Details"
+                    >
+                          <Eye size={14} />
+                    </Link>
+                  </div>
+                    ))
+                  ) : (
+                    <p className="text-muted text-center py-4">No recent orders</p>
+                    )}
+                  </div>
+                </Card.Body>
+              </Card>
                       </Col>
                     </Row>
-                  </Card.Body>
-                </Card>
-              ))}
-
-              {campaignFields.length === 0 && (
-                <Alert variant="info">
-                  No fields added yet. Click "Add Field" to create custom fields for this campaign.
-                </Alert>
-              )}
             </div>
-          </>
-        }
-        submitButtonText="Create Campaign"
-        cancelButtonText="Cancel"
-        onSubmit={handleCampaignSubmit}
-        onCancel={() => {
-          setShowCampaignModal(false);
-          setCampaignUsers([]);
-        }}
-      />
     </React.Fragment>
   );
 };

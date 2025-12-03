@@ -123,6 +123,13 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
           url: '/crm/dashboard'
         },
         {
+          id: 'crm-data-management',
+          title: HEADER_CONSTANTS.SUBMENU_LABELS.DATA_MANAGEMENT,
+          icon: <Database size={16} />,
+          permission: PERMISSIONS.VIEW_CRM_DATA_MANAGEMENT,
+          url: '/crm/data'
+        },
+        {
           id: 'crm-leads',
           title: HEADER_CONSTANTS.SUBMENU_LABELS.LEADS,
           icon: <Target size={16} />,
@@ -144,11 +151,11 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
           url: '/crm/orders'
         },
         {
-          id: 'crm-opportunities',
-          title: HEADER_CONSTANTS.SUBMENU_LABELS.OPPORTUNITIES,
-          icon: <TrendingUp size={16} />,
-          permission: PERMISSIONS.VIEW_CRM_OPPORTUNITIES,
-          url: '/crm/opportunities'
+          id: 'crm-tasks',
+          title: HEADER_CONSTANTS.SUBMENU_LABELS.TASKS,
+          icon: <BarChart3 size={16} />,
+          permission: PERMISSIONS.VIEW_CRM_STAGES,
+          url: '/crm/tasks'
         },
         {
           id: 'crm-stages',
@@ -157,20 +164,7 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
           permission: PERMISSIONS.VIEW_CRM_STAGES,
           url: '/crm/stages'
         },
-        {
-          id: 'crm-lost-reasons',
-          title: HEADER_CONSTANTS.SUBMENU_LABELS.LOST_REASONS_CRM,
-          icon: <XCircle size={16} />,
-          permission: PERMISSIONS.VIEW_CRM_LOST_REASONS,
-          url: '/crm/lost-reasons'
-        },
-        {
-          id: 'crm-data-management',
-          title: HEADER_CONSTANTS.SUBMENU_LABELS.DATA_MANAGEMENT,
-          icon: <Database size={16} />,
-          permission: PERMISSIONS.VIEW_CRM_DATA_MANAGEMENT,
-          url: '/crm/data'
-        },
+      
         {
           id: 'crm-campaigns',
           title: HEADER_CONSTANTS.SUBMENU_LABELS.CAMPAIGNS,
