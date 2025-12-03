@@ -23,22 +23,16 @@ const getFirebaseConfig = (): FirebaseConfig => {
     appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || '',
   };
 
-  // Validate required configuration
-  const requiredFields: (keyof FirebaseConfig)[] = [
-    'apiKey',
-    'authDomain',
-    'projectId',
-    'storageBucket',
-    'messagingSenderId',
-    'appId',
-  ];
-
   return config;
 };
 
 // Initialize Firebase app
 let firebaseApp: FirebaseApp | null = null;
 let messaging: Messaging | null = null;
+
+// Global message listener management - ensures only one listener exists
+let messageListenerCallback: ((payload: any) => void) | null = null;
+let isListenerSetup: boolean = false;
 
 export const initializeFirebase = (): FirebaseApp | null => {
   // Return existing app if already initialized
@@ -183,20 +177,44 @@ export const getFCMToken = async (vapidKey: string): Promise<string | null> => {
 };
 
 // Set up continuous listener for foreground messages
+// This uses a singleton pattern to ensure only one listener exists across page navigations
 export const setupOnMessageListener = async (
   callback: (payload: any) => void
 ): Promise<void> => {
   try {
-    const messagingInstance = await getFirebaseMessaging();
-    if (messagingInstance) {
-      // onMessage is a continuous listener - it will call the callback for each message
-      onMessage(messagingInstance, (payload) => {
-        callback(payload);
-      });
+    // Store the callback - this allows updating the callback without replacing the listener
+    messageListenerCallback = callback;
+    
+    // Only set up the listener once - it will persist across page navigations
+    if (isListenerSetup) {
+      console.log('[Firebase] Message listener already set up, callback updated');
+      return;
     }
+
+    const messagingInstance = await getFirebaseMessaging();
+    if (!messagingInstance) {
+      console.error('[Firebase] Messaging instance not available');
+      return;
+    }
+
+    // Set up the listener once - it will call the current callback
+    onMessage(messagingInstance, (payload) => {
+      if (messageListenerCallback) {
+        messageListenerCallback(payload);
+      }
+    });
+    
+    isListenerSetup = true;
+    console.log('[Firebase] Message listener set up successfully');
   } catch (error) {
     console.error('[Firebase] Error setting up message listener:', error);
   }
+};
+
+// Reset listener (useful for testing or cleanup)
+export const resetMessageListener = (): void => {
+  messageListenerCallback = null;
+  isListenerSetup = false;
 };
 
 // Legacy function for backward compatibility (deprecated - only handles one message)
@@ -228,6 +246,7 @@ const firebaseExports = {
   setupOnMessageListener,
   onMessageListener,
   getFirebaseApp,
+  resetMessageListener,
 };
 
 export default firebaseExports;

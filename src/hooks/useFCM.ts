@@ -152,21 +152,21 @@ export const useFCM = (autoRegister: boolean = true, setupListener: boolean = tr
     const setupMessageListener = async () => {
       try {
         await fcmService.setupForegroundMessageListener((payload: NotificationPayload) => {
-          console.log('[FCM] Received foreground message:', payload);
+          //console.log('[FCM] Received foreground message:', payload);
           
           // Handle foreground notification
           const title = payload.notification?.title || 'New Notification';
           const body = payload.notification?.body || '';
 
           // Show toast notification
-          toast.info(body, {
-            position: 'top-right',
-            autoClose: 5000,
-            hideProgressBar: false,
-            closeOnClick: true,
-            pauseOnHover: true,
-            draggable: true,
-          });
+          // toast.info(body, {
+          //   position: 'top-right',
+          //   autoClose: 5000,
+          //   hideProgressBar: false,
+          //   closeOnClick: true,
+          //   pauseOnHover: true,
+          //   draggable: true,
+          // });
 
           // You can also show a browser notification
           if (Notification.permission === 'granted') {
@@ -190,7 +190,7 @@ export const useFCM = (autoRegister: boolean = true, setupListener: boolean = tr
               notificationOptions.badge = payload.notification.badge;
             }
 
-            console.log('[FCM] Showing notification with tag:', uniqueTag, notificationOptions);
+            //console.log('[FCM] Showing notification with tag:', uniqueTag, notificationOptions);
             
             try {
               new Notification(title, notificationOptions);

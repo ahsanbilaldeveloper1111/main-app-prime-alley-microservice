@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useRef } from 'react';
 import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/router';
 import { initializeFirebase } from '@config/firebase';
 import { useFCM } from '@hooks/useFCM';
 import { useNotifications } from '../contexts/NotificationContext';
@@ -22,6 +23,7 @@ export const FirebaseNotificationProvider: React.FC<FirebaseNotificationProvider
   autoRegister = true,
 }) => {
   const { data: session, status } = useSession();
+  const router = useRouter();
   const [isInitialized, setIsInitialized] = useState<boolean>(false);
   const registeredTokenRef = useRef<string | null>(null);
   const attemptedTokenRef = useRef<string | null>(null); // Track attempted tokens (success or failure)
@@ -56,23 +58,60 @@ export const FirebaseNotificationProvider: React.FC<FirebaseNotificationProvider
     }
   }, []);
 
+  // Function to send Firebase config to service worker
+  const sendConfigToServiceWorker = async () => {
+    if (globalThis.window === undefined || !('serviceWorker' in navigator)) {
+      return;
+    }
+
+    try {
+      // Get Firebase config to pass to service worker
+      const firebaseConfig = {
+        apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || '',
+        authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || '',
+        projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || '',
+        storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || '',
+        messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || '',
+        appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || '',
+      };
+
+      // Get service worker registration
+      const registration = await navigator.serviceWorker.ready;
+      
+      // Send config to all active service workers
+      if (registration.active) {
+        registration.active.postMessage({
+          type: 'FIREBASE_CONFIG',
+          config: firebaseConfig,
+        });
+        console.log('[FirebaseNotificationProvider] ✅ Firebase config sent to service worker');
+      }
+
+      // Also send to any waiting or installing workers
+      if (registration.waiting) {
+        registration.waiting.postMessage({
+          type: 'FIREBASE_CONFIG',
+          config: firebaseConfig,
+        });
+      }
+      if (registration.installing) {
+        registration.installing.postMessage({
+          type: 'FIREBASE_CONFIG',
+          config: firebaseConfig,
+        });
+      }
+    } catch (error) {
+      console.error('[FirebaseNotificationProvider] Error sending config to service worker:', error);
+    }
+  };
+
   useEffect(() => {
     // Register service worker for background notifications
     if (globalThis.window !== undefined && 'serviceWorker' in navigator && isInitialized) {
       const registerServiceWorker = async () => {
         try {
-          // Get Firebase config to pass to service worker
-          const firebaseConfig = {
-            apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || '',
-            authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || '',
-            projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || '',
-            storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || '',
-            messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || '',
-            appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || '',
-          };
-
           // Register service worker
-          await navigator.serviceWorker.register('/firebase-messaging-sw.js', {
+          const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', {
             scope: '/',
           });
 
@@ -84,28 +123,71 @@ export const FirebaseNotificationProvider: React.FC<FirebaseNotificationProvider
 
           // Verify pushManager is available and accessible
           if (!activeRegistration || !('pushManager' in activeRegistration) || !activeRegistration.pushManager) {
+            console.warn('[FirebaseNotificationProvider] PushManager not available');
             return;
           }
 
-          // Pass Firebase config to service worker
-          const activeWorker = activeRegistration.active;
-          if (activeWorker) {
-            activeWorker.postMessage({
-              type: 'FIREBASE_CONFIG',
-              config: firebaseConfig,
-            });
-            
-            // Wait a bit for service worker to process the config
-            await new Promise(resolve => setTimeout(resolve, 500));
-          }
-        } catch {
-          // Error registering service worker - silently fail
-          // This can happen if service workers are not supported or blocked
+          // Send Firebase config to service worker
+          await sendConfigToServiceWorker();
+
+          // Listen for service worker updates and re-send config
+          registration.addEventListener('updatefound', () => {
+            console.log('[FirebaseNotificationProvider] Service worker update found, re-sending config');
+            sendConfigToServiceWorker();
+          });
+        } catch (error) {
+          console.error('[FirebaseNotificationProvider] Error registering service worker:', error);
         }
       };
 
       registerServiceWorker();
     }
+  }, [isInitialized]);
+
+  // Re-send config when tab becomes visible (handles background tab scenarios)
+  useEffect(() => {
+    if (globalThis.window === undefined || !isInitialized) {
+      return;
+    }
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        console.log('[FirebaseNotificationProvider] Tab became visible, ensuring service worker has config');
+        sendConfigToServiceWorker();
+        
+        // Listen for messages from service worker about background notifications
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.addEventListener('message', (event) => {
+            if (event.data && event.data.type === 'BACKGROUND_NOTIFICATION') {
+              console.log('[FirebaseNotificationProvider] Received background notification info from service worker');
+              // The notification was already shown by the service worker
+              // We could optionally add it to the context here if needed
+            }
+          });
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    // Also send config periodically to ensure service worker always has it
+    const configInterval = setInterval(() => {
+      sendConfigToServiceWorker();
+    }, 30000); // Every 30 seconds
+
+    // Set up service worker message listener
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('message', (event) => {
+        if (event.data && event.data.type === 'BACKGROUND_NOTIFICATION') {
+          console.log('[FirebaseNotificationProvider] Background notification was shown by service worker');
+        }
+      });
+    }
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      clearInterval(configInterval);
+    };
   }, [isInitialized]);
 
   // Register token after user is authenticated
@@ -155,34 +237,29 @@ export const FirebaseNotificationProvider: React.FC<FirebaseNotificationProvider
   }, [autoRegister, status, session, token, isLoading]);
 
   // Set up notification listener to add to context AND show notifications
-  // Use ref for addNotification to avoid re-setting up listener when it changes
-  const listenerSetupRef = useRef<boolean>(false);
+  // The listener is set up once globally and persists across page navigations
+  // We update the callback whenever addNotification changes to ensure it's always current
   useEffect(() => {
-    if (!isSupported || permission !== 'granted' || listenerSetupRef.current) {
+    if (!isSupported || permission !== 'granted') {
       return;
     }
 
-    // Use setTimeout to ensure this listener is set up AFTER any other useFCM hooks
-    // This ensures our listener (which saves to localStorage) is the active one
-    // Since Firebase's onMessage replaces the previous listener, we want to be last
-    const timeoutId = setTimeout(async () => {
-      if (listenerSetupRef.current) {
-        return; // Already set up
-      }
-      
+    // Set up or update the listener callback
+    // The listener itself persists across navigations, but we update the callback
+    const setupListener = async () => {
       try {
-        console.log('[FirebaseNotificationProvider] Setting up foreground message listener...');
+        console.log('[FirebaseNotificationProvider] Setting up/updating foreground message listener...');
         await fcmService.setupForegroundMessageListener((payload: NotificationPayload) => {
-          console.log('[FirebaseNotificationProvider] Received foreground message:', payload);
-          console.log('[FirebaseNotificationProvider] Calling addNotification...');
+          console.log('========== INCOMING NOTIFICATION ==========');
+          console.log('Notification title:', payload.notification?.title || payload.data?.title);
           
           // Add notification to context (this will save to localStorage)
           // Use ref to get latest addNotification function
           try {
             addNotificationRef.current(payload);
-            console.log('[FirebaseNotificationProvider] addNotification called successfully');
+            console.log('[FirebaseNotificationProvider] ✅ Notification added to context');
           } catch (error) {
-            console.error('[FirebaseNotificationProvider] Error calling addNotification:', error);
+            console.error('[FirebaseNotificationProvider] ❌ Error calling addNotification:', error);
           }
           
           // Also show toast notification
@@ -225,17 +302,32 @@ export const FirebaseNotificationProvider: React.FC<FirebaseNotificationProvider
             }
           }
         });
-        listenerSetupRef.current = true;
-        console.log('[FirebaseNotificationProvider] Listener set up successfully');
+        console.log('[FirebaseNotificationProvider] ✅ Listener callback updated');
       } catch (err) {
         console.error('[FirebaseNotificationProvider] Error setting up listener:', err);
       }
-    }, 500); // Small delay to ensure we're the last one to set up the listener
+    };
+
+    // Small delay to ensure Firebase is initialized
+    const timeoutId = setTimeout(setupListener, 100);
 
     return () => {
       clearTimeout(timeoutId);
     };
-  }, [isSupported, permission]);
+  }, [isSupported, permission, addNotification]);
+
+  // Monitor router events to ensure listener persists across navigation
+  useEffect(() => {
+    const handleRouteChangeComplete = () => {
+      console.log('[FirebaseNotificationProvider] Route change complete - listener should still be active');
+    };
+
+    router.events.on('routeChangeComplete', handleRouteChangeComplete);
+
+    return () => {
+      router.events.off('routeChangeComplete', handleRouteChangeComplete);
+    };
+  }, [router]);
 
   return <>{children}</>;
 };

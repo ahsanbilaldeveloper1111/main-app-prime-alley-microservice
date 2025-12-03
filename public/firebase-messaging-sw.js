@@ -48,49 +48,75 @@ function getMessagingInstance() {
 // Set up background message handler when Firebase is initialized
 function setupBackgroundMessageHandler() {
   if (backgroundMessageHandlerSetup) {
+    console.log('[Service Worker] Background message handler already set up');
     return;
   }
 
   const messaging = getMessagingInstance();
   if (messaging) {
-    messaging.onBackgroundMessage((payload) => {
-      handleBackgroundMessage(payload);
-    });
-    backgroundMessageHandlerSetup = true;
+    try {
+      messaging.onBackgroundMessage((payload) => {
+        console.log('[Service Worker] Background message received:', payload);
+        handleBackgroundMessage(payload);
+      });
+      backgroundMessageHandlerSetup = true;
+      console.log('[Service Worker] ✅ Background message handler set up successfully');
+    } catch (error) {
+      console.error('[Service Worker] Error setting up background message handler:', error);
+      backgroundMessageHandlerSetup = false;
+    }
+  } else {
+    console.warn('[Service Worker] Messaging instance not available for background handler');
   }
 }
 
 // Listen for Firebase config from main thread
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'FIREBASE_CONFIG') {
+    console.log('[Service Worker] Received Firebase config from main thread');
     firebaseConfig = event.data.config;
     if (initializeFirebase()) {
+      console.log('[Service Worker] Firebase initialized, setting up background message handler');
       setupBackgroundMessageHandler();
+    } else {
+      console.error('[Service Worker] Failed to initialize Firebase');
     }
   }
 });
 
 // Try to initialize on service worker activation
-self.addEventListener('activate', () => {
+self.addEventListener('activate', (event) => {
+  console.log('[Service Worker] Service worker activated');
   // If config is already available, initialize
   if (firebaseConfig) {
+    console.log('[Service Worker] Config available, initializing Firebase');
     if (initializeFirebase()) {
       setupBackgroundMessageHandler();
     }
+  } else {
+    console.log('[Service Worker] Waiting for Firebase config from main thread');
   }
+  // Ensure service worker takes control immediately
+  event.waitUntil(self.clients.claim());
 });
 
 function handleBackgroundMessage(payload) {
+  console.log('[Service Worker] ========== BACKGROUND NOTIFICATION ==========');
   console.log('[Service Worker] Received background message:', payload);
+  console.log('[Service Worker] Notification title:', payload.notification?.title || payload.data?.title);
+  console.log('[Service Worker] Notification body:', payload.notification?.body || payload.data?.description);
+  console.log('[Service Worker] Message ID:', payload.messageId);
   
-  const notificationTitle = payload.notification?.title || 'New Notification';
+  const notificationTitle = payload.notification?.title || payload.data?.title || 'New Notification';
   
   // Generate unique tag if not provided to ensure each notification is shown separately
   // Use timestamp + random to ensure uniqueness
   const uniqueTag = payload.data?.tag || `notification-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
   
+  console.log('[Service Worker] Generated unique tag:', uniqueTag);
+  
   const notificationOptions = {
-    body: payload.notification?.body || '',
+    body: payload.notification?.body || payload.data?.description || '',
     image: payload.notification?.image,
     data: payload.data || {},
     tag: uniqueTag,
@@ -101,21 +127,26 @@ function handleBackgroundMessage(payload) {
   // Only include icon if provided in payload (avoid 404 errors)
   if (payload.notification?.icon) {
     notificationOptions.icon = payload.notification.icon;
+    //console.log('[Service Worker] Notification icon:', payload.notification.icon);
   }
 
   // Only include badge if provided in payload (avoid 404 errors)
   if (payload.notification?.badge) {
     notificationOptions.badge = payload.notification.badge;
+    //console.log('[Service Worker] Notification badge:', payload.notification.badge);
   }
 
-  console.log('[Service Worker] Showing notification with tag:', uniqueTag, notificationOptions);
+  console.log('[Service Worker] Notification options:', notificationOptions);
+  console.log('[Service Worker] Showing notification with title:', notificationTitle);
   
   return self.registration.showNotification(notificationTitle, notificationOptions)
     .then(() => {
-      console.log('[Service Worker] Notification shown successfully');
+      console.log('[Service Worker] ✅ Notification shown successfully');
+      console.log('🔔 [Service Worker] ============================================');
     })
     .catch((error) => {
-      console.error('[Service Worker] Error showing notification:', error);
+      console.error('[Service Worker] ❌ Error showing notification:', error);
+      console.log('🔔 [Service Worker] ============================================');
     });
 }
 

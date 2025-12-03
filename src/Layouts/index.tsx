@@ -189,7 +189,7 @@ const Layout = ({ children }: LayoutProps) => {
                   </Badge>
                 )}
               </Dropdown.Toggle>
-              <Dropdown.Menu style={{ width: '350px', maxHeight: '400px', overflowY: 'auto' }}>
+              <Dropdown.Menu style={{ width: '350px', maxHeight: '400px', overflowY: 'auto', overflowX: 'hidden' }}>
                 <div className="d-flex justify-content-between align-items-center px-2 py-2 border-bottom p-0">
                   <h6 className="mb-0 fw-bold">Notifications</h6>
                   {unreadCount > 0 && (
@@ -237,15 +237,20 @@ const Layout = ({ children }: LayoutProps) => {
                       };
 
                       return (
-                        <Dropdown.Item
+                        <div
                         key={notification.id}
                         className={`d-block p-2 border-bottom radius-0 ${!notification.read ? '' : ''}`}
-                        style={{ borderRadius: '0px' }}
+                        style={{ borderRadius: '0px', cursor: notification.url ? 'pointer' : 'default' }}
+                        role={notification.url ? 'button' : undefined}
+                        tabIndex={notification.url ? 0 : undefined}
                         onClick={() => {
-                          if (!notification.read) {
-                            markAsRead(notification.id);
-                          }
                           if (notification.url) {
+                            router.push(notification.url);
+                          }
+                        }}
+                        onKeyDown={(e) => {
+                          if (notification.url && (e.key === 'Enter' || e.key === ' ')) {
+                            e.preventDefault();
                             router.push(notification.url);
                           }
                         }}
@@ -296,9 +301,9 @@ const Layout = ({ children }: LayoutProps) => {
                           </div>
 
                           {/* Block 2: Title, Description, Module, Time */}
-                          <div className="flex-grow-1 min-w-0">
+                          <div className="flex-grow-1 min-w-0" style={{ overflowWrap: 'break-word', wordBreak: 'break-word' }}>
                             <div className="d-flex align-items-center gap-2 mb-1">
-                              <h6 className="mb-0 fw-semibold" style={{ fontSize: '14px', lineHeight: '1.3' }}>
+                              <h6 className="mb-0 fw-semibold" style={{ fontSize: '14px', lineHeight: '1.3', overflowWrap: 'break-word', wordBreak: 'break-word', whiteSpace: 'normal' }}>
                                 {notification.title}
                               </h6>
                               {!notification.read && (
@@ -309,7 +314,7 @@ const Layout = ({ children }: LayoutProps) => {
                               )}
                             </div>
                             {notification.description && (
-                              <p className="mb-1 text-muted" style={{ fontSize: '13px', lineHeight: '1.4', marginBottom: '4px' }}>
+                              <p className="mb-1 text-muted" style={{ fontSize: '13px', lineHeight: '1.4', marginBottom: '4px', overflowWrap: 'break-word', wordBreak: 'break-word', whiteSpace: 'normal' }}>
                                 {notification.description}
                               </p>
                             )}
@@ -328,8 +333,23 @@ const Layout = ({ children }: LayoutProps) => {
                             </div>
                           </div>
 
-                          {/* Block 3: Clear Icon */}
-                          <div className="flex-shrink-0 d-flex align-items-center justify-content-center">
+                          {/* Block 3: Action Buttons */}
+                          <div className="flex-shrink-0 d-flex align-items-center justify-content-center gap-1">
+                            {!notification.read && (
+                              <Button
+                                variant="link"
+                                size="sm"
+                                className="p-0 text-primary d-flex align-items-center justify-content-center"
+                                style={{ minWidth: '20px', height: '20px' }}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  markAsRead(notification.id);
+                                }}
+                                title="Mark as read"
+                              >
+                                <CheckCheck size={14} />
+                              </Button>
+                            )}
                             <Button
                               variant="link"
                               size="sm"
@@ -339,12 +359,13 @@ const Layout = ({ children }: LayoutProps) => {
                                 e.stopPropagation();
                                 clearNotification(notification.id);
                               }}
+                              title="Delete"
                             >
                               <X size={16} />
                             </Button>
                           </div>
                         </div>
-                        </Dropdown.Item>
+                        </div>
                       );
                     })}
                   </>

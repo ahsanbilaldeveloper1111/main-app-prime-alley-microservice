@@ -49,8 +49,12 @@ export default function handler(req, res) {
   // Create WebSocket connection to analysis server
   const analysisServerHost = process.env.NEXT_PUBLIC_PRIVATE_AIML_SOCKET_URL;
    
+  //Old Analysis Server URL
   const analysisServerUrl = `${websocketProtocol}://${analysisServerHost}/ws/analysis/${uuid}/${date}/${localPartyNumber}/${ownerUsername}/${imagicle}/`;
+
+  //New Analysis Server URL
   
+  //ML Gateway Analysis Server URL
   //  const analysisServerUrl = `${websocketProtocol}://${analysisServerHost}/ws/analysis/${uuid}/${date}/${localPartyNumber}/${ownerUsername}/${imagicle}/10000/10001/OUTGOING/`;
   
   console.log('🔗 Connecting to analysis server:', analysisServerUrl);

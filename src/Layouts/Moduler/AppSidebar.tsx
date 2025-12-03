@@ -374,65 +374,8 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
             },
             
 
-        // {
-        //   id: 'accounting',
-        //   title: HEADER_CONSTANTS.MENU_LABELS.INVOICES_BILLING,
-        //   icon: <List size={16} />,
-        //   permission: PERMISSIONS.VIEW_INVOICES_BILLING,
-        //   url: '/accounting/invoices'
-        // },
-        // {
-        //   id: 'accounting-expenses',
-        //   title: HEADER_CONSTANTS.MENU_LABELS.EXPENSES_BILLING,
-        //   icon: <List size={16} />,
-        //   permission: PERMISSIONS.VIEW_EXPENSES_BILLING,
-        //   url: '/accounting/expenses'
-        // },
-        // {
-        //   id: 'accounting-products',
-        //   title: HEADER_CONSTANTS.MENU_LABELS.PRODUCTS_BILLING,
-        //   icon: <List size={16} />,
-        //   permission: PERMISSIONS.VIEW_PRODUCTS_BILLING,
-        //   url: '/accounting/products'
-        // },
-        // {
-        //   id: 'accounting-inventory',
-        //   title: HEADER_CONSTANTS.MENU_LABELS.INVENTORY_BILLING,
-        //   icon: <List size={16} />,
-        //   permission: PERMISSIONS.VIEW_INVENTORY_BILLING,
-        //   url: '/accounting/inventory'
-        // },
-        // {
-        //   id: 'accounting-companies',
-        //   title: HEADER_CONSTANTS.MENU_LABELS.COMPANIES_BILLING,
-        //   icon: <Building size={16} />,
-        //   permission: PERMISSIONS.VIEW_COMPANIES_BILLING,
-        //   url: '/accounting/companies'
-        // },
-        // {
-        //   id: 'accounting-resellers',
-        //   title: HEADER_CONSTANTS.MENU_LABELS.RESSELLERS_BILLING,
-        //   icon: <List size={16} />,
-        //   permission: PERMISSIONS.VIEW_RESSELLERS_BILLING,
-        //   url: '/accounting/resellers'
-        // },
-        // {
-        //   id: 'accounting-locations',
-        //   title: HEADER_CONSTANTS.MENU_LABELS.LOCATIONS_BILLING,
-        //   icon: <MapPin size={16} />,
-        //   permission: PERMISSIONS.VIEW_LOCATIONS_BILLING,
-        //   url: '/accounting/locations'
-        // },
-        // {
-        //   id: 'accounting-suppliers',
-        //   title: HEADER_CONSTANTS.MENU_LABELS.SUPPLIERS_BILLING,
-        //   icon: <List size={16} />,
-        //   permission: PERMISSIONS.VIEW_SUPPLIERS_BILLING,
-        //   url: '/accounting/suppliers'
-        // }
-
       ]
-      //.filter(item => !item.permission || hasPermission(item.permission))
+      .filter(item => !item.permission || hasPermission(item.permission))
     }, 
     
     {

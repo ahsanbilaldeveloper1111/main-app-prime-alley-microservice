@@ -293,13 +293,19 @@ export const formatDateTimeToLocal = (
     let momentObj: moment.Moment;
     
     if (datetime instanceof Date) {
-      momentObj = moment(datetime);
+      momentObj = moment.utc(datetime);
     } else if (inputFormat) {
-      // Parse with specific input format
-      momentObj = moment(datetime, inputFormat);
+      // Parse with specific input format as UTC
+      momentObj = moment.utc(datetime, inputFormat);
     } else {
-      // Auto-detect format
-      momentObj = moment(datetime);
+      // Parse as UTC (server sends UTC times)
+      // Try common UTC formats first
+      momentObj = moment.utc(datetime, 'YYYY-MM-DD HH:mm:ss');
+      
+      // If that fails, try auto-detect but still assume UTC
+      if (!momentObj.isValid()) {
+        momentObj = moment.utc(datetime);
+      }
     }
     
     if (!momentObj.isValid()) {

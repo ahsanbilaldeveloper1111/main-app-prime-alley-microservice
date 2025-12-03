@@ -44,7 +44,7 @@ interface NotificationProviderProps {
 // Helper functions for localStorage
 const saveNotificationsToStorage = (notifications: NotificationItem[]): void => {
   if (globalThis.window === undefined) {
-    console.log('[NotificationContext] Window undefined, skipping save');
+    //console.log('[NotificationContext] Window undefined, skipping save');
     return;
   }
   
@@ -57,16 +57,16 @@ const saveNotificationsToStorage = (notifications: NotificationItem[]): void => 
     const jsonString = JSON.stringify(serialized);
     localStorage.setItem(STORAGE_KEY, jsonString);
     const unreadCount = notifications.filter(n => !n.read).length;
-    console.log('[NotificationContext] Saved', notifications.length, 'notifications to localStorage (', unreadCount, 'unread)');
+    // console.log('[NotificationContext] Saved', notifications.length, 'notifications to localStorage (', unreadCount, 'unread)');
     
     // Verify it was saved correctly
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
       const parsed = JSON.parse(saved);
-      console.log('[NotificationContext] Verified localStorage has', parsed.length, 'notifications');
+      // console.log('[NotificationContext] Verified localStorage has', parsed.length, 'notifications');
     }
   } catch (error) {
-    console.error('[NotificationContext] Failed to save notifications to localStorage:', error);
+    // console.error('[NotificationContext] Failed to save notifications to localStorage:', error);
   }
 };
 
@@ -84,7 +84,7 @@ const loadNotificationsFromStorage = (): NotificationItem[] => {
       timestamp: new Date(notif.timestamp),
     }));
   } catch (error) {
-    console.error('Failed to load notifications from localStorage:', error);
+    // console.error('Failed to load notifications from localStorage:', error);
     return [];
   }
 };
@@ -104,7 +104,16 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
   }, [notifications]);
 
   const addNotification = useCallback((payload: NotificationPayload) => {
-    console.log('[NotificationContext] addNotification called with payload:', payload);
+    // console.log('📬 [NotificationContext] ========== ADDING NOTIFICATION ==========');
+    // console.log('[NotificationContext] addNotification called with payload:', payload);
+    // console.log('[NotificationContext] Payload structure:', {
+    //   messageId: payload.messageId,
+    //   hasNotification: !!payload.notification,
+    //   hasData: !!payload.data,
+    //   notificationTitle: payload.notification?.title,
+    //   notificationBody: payload.notification?.body,
+    //   dataKeys: payload.data ? Object.keys(payload.data) : []
+    // });
     
     // Extract notification ID - check multiple sources for uniqueness
     // Priority: payload.messageId (Firebase's unique ID) > data.notification_id > data.messageId > generated
@@ -113,7 +122,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
       || payload.data?.messageId 
       || `notification-${Date.now()}-${Math.random().toString(36).substring(2, 9)}-${performance.now()}`;
     
-    console.log('[NotificationContext] Using notification ID:', notificationId);
+    // console.log('[NotificationContext] ✅ Using notification ID:', notificationId);
     
     // Get title from data.title (preferred) or notification.title
     const title = payload.data?.title || payload.notification?.title || 'New Notification';
@@ -140,13 +149,25 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
       url: payload.data?.url,
     };
 
-    console.log('[NotificationContext] Created notification object:', notification);
+    // console.log('[NotificationContext] 📋 Created notification object:', notification);
+    // console.log('[NotificationContext] Notification details:', {
+    //   id: notification.id,
+    //   title: notification.title,
+    //   description: notification.description,
+    //   module: notification.module,
+    //   timestamp: notification.timestamp.toISOString(),
+    //   hasUrl: !!notification.url,
+    //   hasIcon: !!notification.icon,
+    //   dataKeys: notification.data ? Object.keys(notification.data) : []
+    // });
 
     setNotifications((prev) => {
       // Check if notification with same ID already exists to prevent duplicates
       const exists = prev.some((n) => n.id === notificationId);
       if (exists) {
-        console.log('[NotificationContext] Notification already exists, skipping:', notificationId, 'Current count:', prev.length, 'Unread:', prev.filter(n => !n.read).length);
+        // console.log('[NotificationContext] ⚠️ Notification already exists, skipping:', notificationId);
+        //console.log('[NotificationContext] Current count:', prev.length, 'Unread:', prev.filter(n => !n.read).length);
+        //console.log('📬 [NotificationContext] ===========================================');
         return prev;
       }
       
@@ -154,8 +175,16 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
       const updated = [notification, ...prev];
       const limited = updated.slice(0, MAX_NOTIFICATIONS);
       const unreadCount = limited.filter(n => !n.read).length;
-      console.log('[NotificationContext] Adding notification. ID:', notificationId, 'Total count:', limited.length, 'Unread count:', unreadCount, 'Previous count:', prev.length);
-      console.log('[NotificationContext] Notification IDs:', limited.map(n => n.id).slice(0, 5));
+      // console.log('[NotificationContext] ✅ Successfully added notification!');
+      // console.log('[NotificationContext] 📊 Stats:', {
+      //   notificationId: notificationId,
+      //   totalCount: limited.length,
+      //   unreadCount: unreadCount,
+      //   previousCount: prev.length,
+      //   wasLimited: updated.length > MAX_NOTIFICATIONS
+      // });
+      // console.log('[NotificationContext] Recent notification IDs:', limited.map(n => n.id).slice(0, 5));
+      // console.log('📬 [NotificationContext] ===========================================');
       return limited;
     });
   }, []);
