@@ -9,7 +9,7 @@ import { ModuleSlug } from "@utils/Helper";
 interface CrmFiltersProps {
   onFiltersChange?: (filters: Record<string, any>) => void;
   onExport?: (exportType: string, filters: Record<string, any>) => void;
-  type?: 'lead' | 'opportunity';
+  type?: any;
 }
 
 export default function CrmFilters({ onFiltersChange, onExport, type }: CrmFiltersProps) {

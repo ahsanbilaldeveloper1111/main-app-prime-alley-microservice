@@ -13,6 +13,12 @@ import {
   getStages,
   deleteDeal,
   getDeal,
+  getDealAttachments,
+  uploadDealAttachment,
+  deleteDealAttachment,
+  downloadDealAttachment,
+  createMeeting,
+  deleteMeeting,
 } from "@utils/crm";
 import { GetHierarchyData } from "@utils/users";
 import {
@@ -25,6 +31,7 @@ import {
   Card,
   Table,
   InputGroup,
+  Modal,
 } from "react-bootstrap";
 import Select from 'react-select';
 import { ModuleSlug } from "@utils/Helper";
@@ -61,6 +68,19 @@ import {
   Activity,
   FileText,
   ShoppingBag,
+  History,
+  GitBranch,
+  MessageSquare,
+  Send,
+  UserCheck,
+  User,
+  Building2,
+  Mail,
+  Phone,
+  Paperclip,
+  Upload,
+  Download as DownloadIcon,
+  AlertCircle,
 } from 'lucide-react';
 import { 
   PieChart, 
@@ -267,6 +287,35 @@ const CrmDeals = () => {
   const [successModalTitle, setSuccessModalTitle] = useState('');
   const [successModalDescription, setSuccessModalDescription] = useState('');
   
+  // View Modal
+  const [showDealViewModal, setShowDealViewModal] = useState(false);
+  const [viewingDeal, setViewingDeal] = useState<any>(null);
+  const [loadingDeal, setLoadingDeal] = useState(false);
+  const [showDealHistoryModal, setShowDealHistoryModal] = useState(false);
+  
+  // Attachments Modal
+  const [showAttachmentModal, setShowAttachmentModal] = useState(false);
+  const [selectedDealForAttachments, setSelectedDealForAttachments] = useState<any>(null);
+  const [attachments, setAttachments] = useState<any[]>([]);
+  const [loadingAttachments, setLoadingAttachments] = useState(false);
+  const [uploadingFile, setUploadingFile] = useState(false);
+  const [fileInputRef, setFileInputRef] = useState<HTMLInputElement | null>(null);
+  
+  // Meeting Modal
+  const [showAddMeetingModal, setShowAddMeetingModal] = useState(false);
+  const [meetingData, setMeetingData] = useState({
+    dealId: null as number | null,
+    dealName: '',
+    meetingName: '',
+    meetingType: 'Online',
+    meetingDate: '',
+    meetingTime: '',
+    meetingOutcome: '',
+    extensions: [] as string[],
+  });
+  const [meetingAttendees, setMeetingAttendees] = useState<readonly any[]>([]);
+  const [loadingMeeting, setLoadingMeeting] = useState(false);
+  
   // UI State
   const [showDealsAnalytics, setShowDealsAnalytics] = useState(false);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
@@ -340,6 +389,75 @@ const CrmDeals = () => {
     fetchDeals(dealsPagination.currentPage, dealsPagination.rowsPerPage, dealsSearch);
   }, [refreshKey, currentFilters, dealsPagination.currentPage, dealsPagination.rowsPerPage, fetchDeals]);
 
+  // Fetch attachments when modal opens
+  useEffect(() => {
+    if (showAttachmentModal && selectedDealForAttachments?.id) {
+      fetchAttachments();
+    } else {
+      setAttachments([]);
+    }
+  }, [showAttachmentModal, selectedDealForAttachments?.id]);
+
+  const fetchAttachments = async () => {
+    if (!selectedDealForAttachments?.id) return;
+    setLoadingAttachments(true);
+    try {
+      const data = await getDealAttachments(selectedDealForAttachments.id);
+      setAttachments(data || []);
+    } catch (error) {
+      console.error("Failed to fetch attachments:", error);
+      setAttachments([]);
+    } finally {
+      setLoadingAttachments(false);
+    }
+  };
+
+  const formatFileSize = (bytes: number): string => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+  };
+
+  const handleFileUpload = async (file: File) => {
+    if (!selectedDealForAttachments?.id) return;
+    
+    setUploadingFile(true);
+    try {
+      await uploadDealAttachment(selectedDealForAttachments.id, file, file.name);
+      await fetchAttachments(); // Refresh attachments list
+      if (fileInputRef) {
+        fileInputRef.value = '';
+      }
+    } catch (error) {
+      console.error("Failed to upload file:", error);
+    } finally {
+      setUploadingFile(false);
+    }
+  };
+
+  const handleDeleteAttachment = async (attachmentId: number) => {
+    if (!selectedDealForAttachments?.id) return;
+    
+    try {
+      await deleteDealAttachment(selectedDealForAttachments.id, attachmentId);
+      await fetchAttachments(); // Refresh attachments list
+    } catch (error) {
+      console.error("Failed to delete attachment:", error);
+    }
+  };
+
+  const handleDownloadAttachment = async (attachmentId: number) => {
+    if (!selectedDealForAttachments?.id) return;
+    
+    try {
+      await downloadDealAttachment(selectedDealForAttachments.id, attachmentId);
+    } catch (error) {
+      console.error("Failed to download attachment:", error);
+    }
+  };
+
   // Handle filter changes
   const handleFiltersChange = useCallback((filters: Record<string, any>) => {
     setCurrentFilters(filters);
@@ -366,10 +484,93 @@ const CrmDeals = () => {
     }
   };
 
+  // Handle view deal
+  const handleViewDeal = useCallback(async (dealId: number) => {
+    try {
+      setLoadingDeal(true);
+      const dealData: any = await getDeal(dealId);
+      setViewingDeal(dealData);
+      setShowDealViewModal(true);
+    } catch (error) {
+      console.error("Failed to fetch deal:", error);
+      toast.error("Failed to load deal details");
+    } finally {
+      setLoadingDeal(false);
+    }
+  }, []);
+
   const handleDeleteDeal = useCallback((dealId: number) => {
     setDealToDelete({ id: dealId });
     setShowDeleteModal(true);
   }, []);
+
+  // Handle meeting creation
+  const handleCreateMeeting = useCallback(async () => {
+    if (!meetingData.dealId || !meetingData.meetingName || !meetingData.meetingDate || !meetingData.meetingTime) return;
+    
+    setLoadingMeeting(true);
+    try {
+      const payload: any = {
+        name: meetingData.meetingName,
+        meeting_type: meetingData.meetingType,
+        meeting_date: meetingData.meetingDate,
+        meeting_time: meetingData.meetingTime,
+        deal_id: String(meetingData.dealId),
+        extensions: meetingAttendees.length > 0 ? meetingAttendees.map((user: any) => user.value) : [(session?.user as any)?.extension || 'admin'],
+      };
+      
+      if (meetingData.meetingOutcome) {
+        payload.meeting_outcome = meetingData.meetingOutcome;
+      }
+      
+      await createMeeting(payload);
+      
+      // Refresh deal data
+      if (viewingDeal?.id === meetingData.dealId) {
+        await handleViewDeal(meetingData.dealId);
+      }
+      
+      // Reset form and close modal
+      setShowAddMeetingModal(false);
+      setMeetingData({
+        dealId: null,
+        dealName: '',
+        meetingName: '',
+        meetingType: 'Online',
+        meetingDate: '',
+        meetingTime: '',
+        meetingOutcome: '',
+        extensions: [],
+      });
+      setMeetingAttendees([]);
+      
+      // Refresh deals list
+      setRefreshKey((oldKey) => oldKey + 1);
+    } catch (error) {
+      console.error("Failed to create meeting:", error);
+    } finally {
+      setLoadingMeeting(false);
+    }
+  }, [meetingData, session, viewingDeal, handleViewDeal]);
+
+  // Handle meeting deletion
+  const handleDeleteMeeting = useCallback(async (meetingId: number) => {
+    if (!window.confirm('Are you sure you want to delete this meeting?')) return;
+    
+    try {
+      await deleteMeeting(meetingId);
+      
+      // Refresh deal data
+      if (viewingDeal?.id) {
+        await handleViewDeal(viewingDeal.id);
+      }
+      
+      // Refresh deals list
+      setRefreshKey((oldKey) => oldKey + 1);
+    } catch (error) {
+      console.error("Failed to delete meeting:", error);
+    }
+  }, [viewingDeal, handleViewDeal]);
 
   const confirmDeleteDeal = useCallback(async () => {
     if (!dealToDelete) return;
@@ -1279,10 +1480,31 @@ const CrmDeals = () => {
                                 variant="link" 
                                 size="sm" 
                                 className="p-1" 
+                                title="View"
+                                onClick={() => handleViewDeal(deal.rawData?.id || deal.id)}
+                              >
+                                <Eye size={16} />
+                              </Button>
+                              <Button 
+                                variant="link" 
+                                size="sm" 
+                                className="p-1" 
                                 title="Edit"
                                 onClick={() => window.location.href = `/crm/deals/${deal.rawData?.id || deal.id}/edit`}
                               >
                                 <Edit size={16} />
+                              </Button>
+                              <Button 
+                                variant="link" 
+                                size="sm" 
+                                className="p-1 text-info" 
+                                title="Manage Attachments"
+                                onClick={() => {
+                                  setSelectedDealForAttachments(deal.rawData || deal);
+                                  setShowAttachmentModal(true);
+                                }}
+                              >
+                                <Paperclip size={16} />
                               </Button>
                                 <Button 
                                   variant="link" 
@@ -1336,6 +1558,1197 @@ const CrmDeals = () => {
         title={successModalTitle}
         description={successModalDescription}
       />
+
+      {/* Deal View Modal */}
+      {viewingDeal && (
+        <Modal show={showDealViewModal} onHide={() => setShowDealViewModal(false)} size="xl" centered>
+          {/* Custom Header */}
+          <div style={{
+            color: 'black',
+            padding: '30px',
+            position: 'relative',
+            borderTopLeftRadius: '8px',
+            borderTopRightRadius: '8px',
+            borderBottom: '1px solid #e5e7eb'
+          }}>
+            <button 
+              onClick={() => setShowDealViewModal(false)}
+              style={{
+                position: 'absolute',
+                top: '20px',
+                right: '20px',
+                background: 'rgba(255,255,255,0.2)',
+                border: 'none',
+                color: 'black',
+                width: '36px',
+                height: '36px',
+                borderRadius: '50%',
+                cursor: 'pointer',
+                transition: 'all 0.3s',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.background = 'rgba(255,255,255,0.3)';
+                e.currentTarget.style.transform = 'rotate(90deg)';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.background = 'rgba(255,255,255,0.2)';
+                e.currentTarget.style.transform = 'rotate(0deg)';
+              }}
+            >
+              <X size={20} />
+            </button>
+            <h3 style={{ margin: 0, fontWeight: 600, fontSize: '24px' }}>
+              {viewingDeal.name}
+            </h3>
+            <p style={{ margin: '8px 0 0 0', opacity: 0.9, fontSize: '14px' }}>
+              Deal Details
+            </p>
+          </div>
+
+          <Modal.Body style={{ padding: '30px' }}>
+            {loadingDeal ? (
+              <div className="text-center py-4">
+                <div className="spinner-border" role="status">
+                  <span className="visually-hidden">Loading...</span>
+                </div>
+              </div>
+            ) : (
+              <>
+                {/* Deal Information Section */}
+                <div style={{
+                  fontSize: '16px',
+                  fontWeight: 600,
+                  color: '#1f2937',
+                  marginBottom: '20px',
+                  paddingBottom: '10px',
+                  borderBottom: '2px solid #f8f9fa',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px'
+                }}>
+                  <Handshake size={18} style={{ color: '#4680ff' }} />
+                  Deal Information
+                </div>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+                  gap: '20px',
+                  marginBottom: '30px'
+                }}>
+                  <div style={{
+                    background: '#f8f9fa',
+                    padding: '16px',
+                    borderRadius: '10px',
+                  }}>
+                    <div style={{
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      color: '#6b7280',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px',
+                      marginBottom: '6px'
+                    }}>Deal Name</div>
+                    <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                      {viewingDeal.name}
+                    </div>
+                  </div>
+                  <div style={{
+                    background: '#f8f9fa',
+                    padding: '16px',
+                    borderRadius: '10px',
+                  }}>
+                    <div style={{
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      color: '#6b7280',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px',
+                      marginBottom: '6px'
+                    }}>Stage</div>
+                    <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                      <Badge 
+                        bg="primary"
+                        style={{
+                          padding: '6px 14px',
+                          borderRadius: '20px',
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          backgroundColor: viewingDeal.stage?.color || '#6c757d'
+                        }}
+                      >
+                        {viewingDeal.stage?.name || 'Not assigned'}
+                      </Badge>
+                    </div>
+                  </div>
+                  <div style={{
+                    background: '#f8f9fa',
+                    padding: '16px',
+                    borderRadius: '10px',
+                  }}>
+                    <div style={{
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      color: '#6b7280',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px',
+                      marginBottom: '6px'
+                    }}>Deal Value</div>
+                    <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                      {viewingDeal.currency || 'USD'} {parseFloat(String(viewingDeal.net_value || viewingDeal.grand_total || 0)).toLocaleString()}
+                    </div>
+                  </div>
+                  <div style={{
+                    background: '#f8f9fa',
+                    padding: '16px',
+                    borderRadius: '10px',
+                  }}>
+                    <div style={{
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      color: '#6b7280',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px',
+                      marginBottom: '6px'
+                    }}>Probability</div>
+                    <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                      {viewingDeal.probability || 0}%
+                    </div>
+                  </div>
+                  <div style={{
+                    background: '#f8f9fa',
+                    padding: '16px',
+                    borderRadius: '10px',
+                  }}>
+                    <div style={{
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      color: '#6b7280',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px',
+                      marginBottom: '6px'
+                    }}>Assigned To</div>
+                    <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                      <User size={14} style={{ color: '#4680ff', marginRight: '6px', display: 'inline' }} />
+                      {extensions.find((ext: any) => ext?.id == viewingDeal?.assigned_to || ext?.extension == viewingDeal?.assigned_to)?.display_name || 
+                       extensions.find((ext: any) => ext?.id == viewingDeal?.assigned_to || ext?.extension == viewingDeal?.assigned_to)?.name || 
+                       viewingDeal.assigned_to || 'Not assigned'}
+                    </div>
+                  </div>
+                  <div style={{
+                    background: '#f8f9fa',
+                    padding: '16px',
+                    borderRadius: '10px',
+                  }}>
+                    <div style={{
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      color: '#6b7280',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px',
+                      marginBottom: '6px'
+                    }}>Created Date</div>
+                    <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                      <Calendar size={14} style={{ color: '#4680ff', marginRight: '6px', display: 'inline' }} />
+                      {viewingDeal.created_at ? new Date(viewingDeal.created_at).toLocaleDateString() : 'N/A'}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Company Information */}
+                {viewingDeal.company_name && (
+                  <>
+                    <div style={{
+                      fontSize: '16px',
+                      fontWeight: 600,
+                      color: '#1f2937',
+                      marginBottom: '20px',
+                      paddingBottom: '10px',
+                      borderBottom: '2px solid #f8f9fa',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px'
+                    }}>
+                      <Building2 size={18} style={{ color: '#4680ff' }} />
+                      Company Information
+                    </div>
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+                      gap: '20px',
+                      marginBottom: '30px'
+                    }}>
+                      <div style={{
+                        background: '#f8f9fa',
+                        padding: '16px',
+                        borderRadius: '10px',
+                      }}>
+                        <div style={{
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          color: '#6b7280',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.5px',
+                          marginBottom: '6px'
+                        }}>Company Name</div>
+                        <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                          <Building2 size={14} style={{ color: '#4680ff', marginRight: '6px', display: 'inline' }} />
+                          {viewingDeal.company_name}
+                        </div>
+                      </div>
+                      {viewingDeal.industry && (
+                        <div style={{
+                          background: '#f8f9fa',
+                          padding: '16px',
+                          borderRadius: '10px',
+                        }}>
+                          <div style={{
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            color: '#6b7280',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.5px',
+                            marginBottom: '6px'
+                          }}>Industry</div>
+                          <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                            {viewingDeal.industry}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
+
+                {/* Meetings Timeline */}
+                {viewingDeal.meetings && Array.isArray(viewingDeal.meetings) && viewingDeal.meetings.length > 0 && (
+                  <>
+                    <div style={{
+                      fontSize: '16px',
+                      fontWeight: 600,
+                      color: '#1f2937',
+                      marginBottom: '20px',
+                      paddingBottom: '10px',
+                      borderBottom: '2px solid #f8f9fa',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: '10px'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <Users size={18} style={{ color: '#4680ff' }} />
+                        Meetings ({viewingDeal.meetings.length})
+                      </div>
+                      <Button
+                        variant="outline-primary"
+                        size="sm"
+                        onClick={() => {
+                          setMeetingData({
+                            dealId: viewingDeal.id,
+                            dealName: viewingDeal.name,
+                            meetingName: '',
+                            meetingType: 'Online',
+                            meetingDate: '',
+                            meetingTime: '',
+                            meetingOutcome: '',
+                            extensions: [],
+                          });
+                          setMeetingAttendees([]);
+                          setShowAddMeetingModal(true);
+                        }}
+                      >
+                        <Plus size={14} className="me-1" />
+                        Schedule Meeting
+                      </Button>
+                    </div>
+                    <div style={{ position: 'relative', paddingLeft: '30px', marginBottom: '30px' }}>
+                      <div style={{
+                        content: '',
+                        position: 'absolute',
+                        left: '8px',
+                        top: 0,
+                        bottom: 0,
+                        width: '2px',
+                        background: '#e5e7eb'
+                      }} />
+                      {viewingDeal.meetings.map((meeting: any, idx: number) => (
+                        <div key={meeting.id || idx} style={{ position: 'relative', paddingBottom: '20px' }}>
+                          <div style={{
+                            content: '',
+                            position: 'absolute',
+                            left: '-26px',
+                            top: '4px',
+                            width: '12px',
+                            height: '12px',
+                            borderRadius: '50%',
+                            background: meeting.meeting_outcome === 'Completed - Successful' ? '#10b981' : 
+                                       meeting.meeting_outcome === 'Cancelled' ? '#dc3545' : '#4680ff',
+                            border: '3px solid white',
+                            boxShadow: '0 0 0 2px #e5e7eb'
+                          }} />
+                          <div style={{
+                            background: '#f8f9fa',
+                            padding: '12px 16px',
+                            borderRadius: '8px',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'flex-start'
+                          }}>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontSize: '14px', color: '#1f2937', marginBottom: '4px', fontWeight: 600 }}>
+                                {meeting.name}
+                              </div>
+                              <div style={{ fontSize: '12px', color: '#6b7280', fontWeight: 600, marginBottom: '4px' }}>
+                                {meeting.meeting_date ? new Date(meeting.meeting_date).toLocaleDateString() : 'N/A'} {meeting.meeting_time || ''} - {meeting.meeting_type}
+                              </div>
+                              {meeting.meeting_outcome && (
+                                <div style={{ fontSize: '14px', color: '#1f2937', marginBottom: '4px', fontWeight: 500 }}>
+                                  <Badge bg={
+                                    meeting.meeting_outcome === 'Completed - Successful' ? 'success' : 
+                                    meeting.meeting_outcome === 'Completed - Needs Follow-up' ? 'info' : 
+                                    meeting.meeting_outcome === 'Cancelled' ? 'danger' : 
+                                    meeting.meeting_outcome === 'Rescheduled' ? 'warning' : 
+                                    'secondary'
+                                  }>
+                                    {meeting.meeting_outcome}
+                                  </Badge>
+                                </div>
+                              )}
+                            </div>
+                            <Button
+                              variant="link"
+                              size="sm"
+                              className="p-1 text-danger"
+                              title="Delete"
+                              onClick={() => handleDeleteMeeting(meeting.id)}
+                            >
+                              <Trash2 size={16} />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+
+                {/* Add Meeting Button if no meetings exist */}
+                {(!viewingDeal.meetings || viewingDeal.meetings.length === 0) && (
+                  <div style={{
+                    marginBottom: '30px',
+                    padding: '20px',
+                    background: '#f8f9fa',
+                    borderRadius: '10px',
+                    textAlign: 'center'
+                  }}>
+                    <Users size={32} style={{ color: '#9ca3af', marginBottom: '12px' }} />
+                    <div style={{ fontSize: '14px', color: '#6b7280', marginBottom: '16px' }}>
+                      No meetings scheduled yet
+                    </div>
+                    <Button
+                      variant="outline-primary"
+                      onClick={() => {
+                        setMeetingData({
+                          dealId: viewingDeal.id,
+                          dealName: viewingDeal.name,
+                          meetingName: '',
+                          meetingType: 'Online',
+                          meetingDate: '',
+                          meetingTime: '',
+                          meetingOutcome: '',
+                          extensions: [],
+                        });
+                        setShowAddMeetingModal(true);
+                      }}
+                    >
+                      <Plus size={14} className="me-1" />
+                      Schedule Meeting
+                    </Button>
+                  </div>
+                )}
+
+                {/* Action Buttons */}
+                <div style={{
+                  display: 'flex',
+                  gap: '12px',
+                  flexWrap: 'wrap',
+                  paddingTop: '20px',
+                  borderTop: '1px solid #e5e7eb'
+                }}>
+                  {session?.user?.permissions?.includes('edit-crm-deals') && (
+                    <Button
+                      variant="primary"
+                      style={{
+                        padding: '10px 20px',
+                        borderRadius: '8px',
+                        fontWeight: 500,
+                        fontSize: '14px',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        background: '#4680ff',
+                        border: 'none'
+                      }}
+                      onClick={() => {
+                        setShowDealViewModal(false);
+                        window.location.href = `/crm/deals/${viewingDeal.id}/edit`;
+                      }}
+                    >
+                      <Edit size={16} />
+                      Edit Deal
+                    </Button>
+                  )}
+                  <Button
+                    variant="outline-primary"
+                    style={{
+                      padding: '10px 20px',
+                      borderRadius: '8px',
+                      fontWeight: 500,
+                      fontSize: '14px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      background: 'white',
+                      color: '#4680ff',
+                      border: '2px solid #4680ff'
+                    }}
+                    onClick={() => {
+                      setShowDealHistoryModal(true);
+                    }}
+                  >
+                    <History size={16} />
+                    View History
+                  </Button>
+                  <Button
+                    variant="outline-secondary"
+                    style={{
+                      padding: '10px 20px',
+                      borderRadius: '8px',
+                      fontWeight: 500,
+                      fontSize: '14px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      background: 'white',
+                      color: '#6b7280',
+                      border: '2px solid #e5e7eb'
+                    }}
+                    onClick={() => setShowDealViewModal(false)}
+                  >
+                    Close
+                  </Button>
+                </div>
+              </>
+            )}
+          </Modal.Body>
+        </Modal>
+      )}
+
+      {/* Deal History Modal */}
+      {viewingDeal && (
+        <Modal 
+          show={showDealHistoryModal} 
+          onHide={() => {
+            setShowDealHistoryModal(false);
+          }} 
+          size="xl" 
+          centered
+        >
+          {/* Custom Header */}
+          <div style={{
+            borderBottom: '1px solid #ccc',
+            color: 'black',
+            padding: '30px',
+            position: 'relative',
+          }}>
+            <button 
+              onClick={() => {
+                setShowDealHistoryModal(false);
+              }}
+              style={{
+                position: 'absolute',
+                top: '20px',
+                right: '20px',
+                background: 'rgba(255,255,255,0.2)',
+                border: 'none',
+                color: 'black',
+                width: '36px',
+                height: '36px',
+                borderRadius: '50%',
+                cursor: 'pointer',
+                transition: 'all 0.3s',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.background = 'rgba(255,255,255,0.3)';
+                e.currentTarget.style.transform = 'rotate(90deg)';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.background = 'rgba(255,255,255,0.2)';
+                e.currentTarget.style.transform = 'rotate(0deg)';
+              }}
+            >
+              <X size={20} />
+            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+              <div style={{
+                width: '50px',
+                height: '50px',
+                background: 'rgba(255,255,255,0.2)',
+                borderRadius: '12px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                <History size={28} />
+              </div>
+              <div>
+                <h3 style={{ margin: 0, fontWeight: 600, fontSize: '24px' }}>
+                  Complete Deal History
+                </h3>
+                <p style={{ margin: '8px 0 0 0', opacity: 0.9, fontSize: '14px' }}>
+                  {viewingDeal.name} - All Activities & Changes
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <Modal.Body style={{ padding: '30px', maxHeight: '70vh', overflowY: 'auto' }}>
+            {/* Deal Summary Card */}
+            <Card className="border-0 shadow-sm mb-4" style={{ background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)' }}>
+              <Card.Body>
+                <Row>
+                  <Col md={3}>
+                    <div style={{ fontSize: '12px', color: '#6c757d', marginBottom: '4px' }}>Deal Name</div>
+                    <div style={{ fontSize: '16px', fontWeight: 600 }}>{viewingDeal.name}</div>
+                  </Col>
+                  <Col md={3}>
+                    <div style={{ fontSize: '12px', color: '#6c757d', marginBottom: '4px' }}>Current Value</div>
+                    <div style={{ fontSize: '16px', fontWeight: 600, color: '#198754' }}>
+                      {viewingDeal.currency || 'USD'} {parseFloat(String(viewingDeal.net_value || viewingDeal.grand_total || 0)).toLocaleString()}
+                    </div>
+                  </Col>
+                  <Col md={3}>
+                    <div style={{ fontSize: '12px', color: '#6c757d', marginBottom: '4px' }}>Current Stage</div>
+                    <Badge bg="primary" style={{ fontSize: '13px', padding: '6px 12px', backgroundColor: viewingDeal.stage?.color || '#6c757d' }}>
+                      {viewingDeal.stage?.name || 'Not assigned'}
+                    </Badge>
+                  </Col>
+                  <Col md={3}>
+                    <div style={{ fontSize: '12px', color: '#6c757d', marginBottom: '4px' }}>Owner</div>
+                    <div style={{ fontSize: '16px', fontWeight: 600 }}>
+                      {extensions.find((ext: any) => ext?.id == viewingDeal?.assigned_to || ext?.extension == viewingDeal?.assigned_to)?.display_name || 
+                       extensions.find((ext: any) => ext?.id == viewingDeal?.assigned_to || ext?.extension == viewingDeal?.assigned_to)?.name || 
+                       viewingDeal.assigned_to || 'Not assigned'}
+                    </div>
+                  </Col>
+                </Row>
+              </Card.Body>
+            </Card>
+
+            {/* Timeline */}
+            {viewingDeal.histories && Array.isArray(viewingDeal.histories) && viewingDeal.histories.length > 0 ? (
+              <div style={{ position: 'relative' }}>
+                {/* Vertical Timeline Line */}
+                <div style={{
+                  position: 'absolute',
+                  left: '25px',
+                  top: '0',
+                  bottom: '0',
+                  width: '2px',
+                  background: 'linear-gradient(180deg, #667eea 0%, #764ba2 100%)',
+                  opacity: 0.3
+                }} />
+                
+                {viewingDeal.histories.map((history: any, index: number) => {
+                  // Transform history data to history format
+                  const getCategoryAndIcon = (event: string, changes: any) => {
+                    if (event === 'created') {
+                      return { category: 'Creation', icon: <Plus size={16} />, color: '#198754' };
+                    }
+                    if (changes && Object.keys(changes).length > 0) {
+                      const changeKeys = Object.keys(changes);
+                      if (changeKeys.some(k => k.includes('stage'))) {
+                        return { category: 'Stage Change', icon: <GitBranch size={16} />, color: '#0d6efd' };
+                      }
+                      if (changeKeys.some(k => k.includes('grand_total') || k.includes('net_value') || k.includes('discount') || k.includes('value') || k.includes('amount') || k.includes('price'))) {
+                        return { category: 'Financial', icon: <DollarSign size={16} />, color: '#198754' };
+                      }
+                      if (changeKeys.some(k => k.includes('assigned') || k.includes('owner') || k.includes('user_extension'))) {
+                        return { category: 'Assignment', icon: <UserCheck size={16} />, color: '#20c997' };
+                      }
+                      if (changeKeys.some(k => k.includes('contract') || k.includes('quotation'))) {
+                        return { category: 'Document', icon: <Send size={16} />, color: '#fd7e14' };
+                      }
+                      if (changeKeys.some(k => k.includes('probability') || k.includes('negotiation'))) {
+                        return { category: 'Update', icon: <FileText size={16} />, color: '#6c757d' };
+                      }
+                    }
+                    return { category: 'Update', icon: <FileText size={16} />, color: '#6c757d' };
+                  };
+
+                  const { category, icon, color } = getCategoryAndIcon(history.event, history.changes);
+                  const performedBy = extensions.find((ext: any) => ext?.id == history?.user_extension || ext?.extension == history?.user_extension)?.display_name || 
+                                     extensions.find((ext: any) => ext?.id == history?.user_extension || ext?.extension == history?.user_extension)?.name || 
+                                     history.user_extension || 'System';
+                  const timestamp = new Date(history.created_at).toLocaleString();
+                  
+                  // Build metadata from changes
+                  const metadata: Record<string, any> = {};
+                  if (history.changes && Object.keys(history.changes).length > 0) {
+                    Object.entries(history.changes).forEach(([key, change]: [string, any]) => {
+                      if (change.old !== undefined && change.new !== undefined) {
+                        metadata[key] = `${change.old} → ${change.new}`;
+                      } else if (change.new !== undefined) {
+                        metadata[key] = change.new;
+                      }
+                    });
+                  }
+
+                  return (
+                    <div 
+                      key={history.id || index} 
+                      style={{
+                        position: 'relative',
+                        paddingLeft: '60px',
+                        paddingBottom: '30px',
+                        opacity: 0,
+                        animation: `slideIn 0.4s ease forwards ${index * 0.05}s`
+                      }}
+                    >
+                      {/* Timeline Node */}
+                      <div style={{
+                        position: 'absolute',
+                        left: '16px',
+                        top: '0',
+                        width: '20px',
+                        height: '20px',
+                        borderRadius: '50%',
+                        background: 'white',
+                        border: `3px solid ${color}`,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        zIndex: 1,
+                        boxShadow: `0 0 0 4px ${color}20`
+                      }} />
+                      
+                      {/* Activity Card */}
+                      <Card 
+                        className="border-0 shadow-sm"
+                        style={{
+                          transition: 'all 0.3s',
+                          cursor: 'pointer'
+                        }}
+                        onMouseOver={(e) => {
+                          e.currentTarget.style.transform = 'translateX(5px)';
+                          e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
+                        }}
+                        onMouseOut={(e) => {
+                          e.currentTarget.style.transform = 'translateX(0)';
+                          e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
+                        }}
+                      >
+                        <Card.Body style={{ padding: '16px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1 }}>
+                              <div style={{
+                                width: '36px',
+                                height: '36px',
+                                borderRadius: '8px',
+                                background: `${color}15`,
+                                color: color,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
+                              }}>
+                                {icon}
+                              </div>
+                              <div style={{ flex: 1 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                                  <span style={{ fontSize: '14px', fontWeight: 600, color: '#1f2937' }}>
+                                    {history.event === 'created' ? 'Created' : history.event === 'updated' ? 'Updated' : history.event}
+                                  </span>
+                                  <div
+                                    style={{
+                                      display: "inline-block",
+                                      backgroundColor: color,
+                                      color: "#fff",
+                                      fontSize: "11px",
+                                      padding: "3px 8px",
+                                      fontWeight: 500,
+                                      borderRadius: "0.375rem",
+                                      lineHeight: 1,
+                                      textAlign: "center",
+                                      whiteSpace: "nowrap",
+                                      verticalAlign: "baseline",
+                                    }}
+                                  >
+                                    {category}
+                                  </div>
+                                </div>
+                                <div style={{ fontSize: '13px', color: '#6b7280', marginBottom: '4px' }}>
+                                  {history.description || 'Record updated'}
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '12px', color: '#9ca3af' }}>
+                                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                    <Clock size={12} />
+                                    {timestamp}
+                                  </span>
+                                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                    <User size={12} />
+                                    {performedBy}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          {/* Metadata Tags */}
+                          {Object.keys(metadata).length > 0 && (
+                            <div style={{ 
+                              marginTop: '12px', 
+                              paddingTop: '12px', 
+                              borderTop: '1px solid #f3f4f6',
+                              display: 'flex',
+                              flexWrap: 'wrap',
+                              gap: '8px'
+                            }}>
+                              {Object.entries(metadata).map(([key, value]) => (
+                                <span 
+                                  key={key}
+                                  style={{
+                                    fontSize: '11px',
+                                    padding: '4px 8px',
+                                    background: '#f9fafb',
+                                    border: '1px solid #e5e7eb',
+                                    borderRadius: '4px',
+                                    color: '#4b5563'
+                                  }}
+                                >
+                                  <strong>{key}:</strong> {String(value)}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </Card.Body>
+                      </Card>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div style={{ textAlign: 'center', padding: '40px', color: '#6b7280' }}>
+                <History size={48} style={{ opacity: 0.3, marginBottom: '16px' }} />
+                <p>No history available for this deal</p>
+              </div>
+            )}
+
+            {/* Animation Keyframes */}
+            <style>{`
+              @keyframes slideIn {
+                from {
+                  opacity: 0;
+                  transform: translateX(-20px);
+                }
+                to {
+                  opacity: 1;
+                  transform: translateX(0);
+                }
+              }
+            `}</style>
+          </Modal.Body>
+
+          <Modal.Footer style={{ background: '#f9fafb', borderTop: '1px solid #e5e7eb', padding: '20px 30px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
+              <div style={{ fontSize: '13px', color: '#6b7280' }}>
+                <strong>{viewingDeal.histories?.length || 0}</strong> activities recorded
+              </div>
+              <Button
+                variant="outline-secondary"
+                onClick={() => {
+                  setShowDealHistoryModal(false);
+                }}
+                style={{
+                  padding: '10px 24px',
+                  borderRadius: '8px',
+                  fontWeight: 500,
+                  fontSize: '14px'
+                }}
+              >
+                Close
+              </Button>
+            </div>
+          </Modal.Footer>
+        </Modal>
+      )}
+
+      {/* Manage Attachments Modal */}
+      {selectedDealForAttachments && (
+        <Modal 
+          show={showAttachmentModal} 
+          onHide={() => {
+            setShowAttachmentModal(false);
+            setSelectedDealForAttachments(null);
+          }} 
+          size="lg" 
+          centered
+        >
+          <Modal.Header closeButton className="border-0 pb-0">
+            <Modal.Title className="d-flex align-items-center gap-2">
+              <div 
+                className="rounded-circle d-flex align-items-center justify-content-center" 
+                style={{ width: '40px', height: '40px', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}
+              >
+                <Paperclip size={20} color="white" />
+              </div>
+              <div>
+                <div style={{ fontSize: '20px', fontWeight: 600 }}>Manage Attachments</div>
+                <div style={{ fontSize: '13px', color: '#6c757d', fontWeight: 'normal' }}>
+                  {selectedDealForAttachments.name}
+                </div>
+              </div>
+            </Modal.Title>
+          </Modal.Header>
+
+          <Modal.Body className="p-4">
+            {/* Upload Section */}
+            <div className="mb-4 p-4 border rounded" style={{ background: '#f8f9fa' }}>
+              <div className="d-flex align-items-center justify-content-between mb-3">
+                <div>
+                  <h6 className="mb-1 fw-bold">Upload New Attachments</h6>
+                  <small className="text-muted">Supported formats: PDF, CSV, Excel, or Image (Max 5MB)</small>
+                </div>
+              </div>
+              <div className="d-flex gap-2">
+                <Form.Control
+                  ref={(input) => setFileInputRef(input as HTMLInputElement)}
+                  type="file"
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                    const files = e.target.files;
+                    if (files && files.length > 0) {
+                      const file = files[0];
+                      handleFileUpload(file);
+                    }
+                  }}
+                  accept=".pdf,.csv,.xls,.xlsx,.xlsm,.png,.jpg,.jpeg,.gif,.webp"
+                  style={{ flex: 1 }}
+                  disabled={uploadingFile}
+                />
+                <Button 
+                  variant="primary" 
+                  className="d-flex align-items-center gap-2"
+                  disabled={uploadingFile}
+                >
+                  {uploadingFile ? (
+                    <>
+                      <div className="spinner-border spinner-border-sm" role="status" />
+                      Uploading...
+                    </>
+                  ) : (
+                    <>
+                      <Upload size={16} />
+                      Upload
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+
+            {/* Attachments List */}
+            <div>
+              <h6 className="mb-3 fw-bold d-flex align-items-center gap-2">
+                <FileText size={18} />
+                Attached Files ({attachments.length})
+              </h6>
+              
+              {loadingAttachments ? (
+                <div className="text-center py-5">
+                  <div className="spinner-border text-primary" role="status">
+                    <span className="visually-hidden">Loading...</span>
+                  </div>
+                </div>
+              ) : attachments.length === 0 ? (
+                <div className="text-center py-5 text-muted">
+                  <Paperclip size={48} className="mb-3 opacity-25" />
+                  <div>No attachments yet</div>
+                  <small>Upload files using the form above</small>
+                </div>
+              ) : (
+                <div className="d-flex flex-column gap-2">
+                  {attachments.map((attachment: any) => (
+                    <Card key={attachment.id} className="border shadow-sm">
+                      <Card.Body className="p-3">
+                        <div className="d-flex align-items-center justify-content-between">
+                          <div className="d-flex align-items-center gap-3 flex-grow-1">
+                            {/* File Icon */}
+                            <div 
+                              className="rounded d-flex align-items-center justify-content-center"
+                              style={{ 
+                                width: '45px', 
+                                height: '45px', 
+                                background: attachment.mime_type?.includes('pdf') ? '#dc3545' : 
+                                           attachment.mime_type?.includes('csv') || attachment.mime_type?.includes('excel') || attachment.mime_type?.includes('spreadsheet') ? '#198754' : 
+                                           attachment.mime_type?.includes('image') ? '#0d6efd' : '#6c757d',
+                                color: 'white'
+                              }}
+                            >
+                              <FileText size={22} />
+                            </div>
+                            
+                            {/* File Info */}
+                            <div className="flex-grow-1">
+                              <div className="fw-semibold" style={{ fontSize: '14px' }}>{attachment.name}</div>
+                              <div style={{ fontSize: '12px', color: '#6c757d' }}>
+                                {formatFileSize(attachment.file_size)} • {attachment.created_at ? new Date(attachment.created_at).toLocaleDateString() : 'N/A'}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Actions */}
+                          <div className="d-flex gap-1">
+                            <Button 
+                              variant="link" 
+                              size="sm" 
+                              className="p-2 text-primary" 
+                              title="Download"
+                              onClick={() => handleDownloadAttachment(attachment.id)}
+                            >
+                              <DownloadIcon size={18} />
+                            </Button>
+                            <Button 
+                              variant="link" 
+                              size="sm" 
+                              className="p-2 text-danger" 
+                              title="Delete"
+                              onClick={() => {
+                                if (window.confirm(`Are you sure you want to delete "${attachment.name}"?`)) {
+                                  handleDeleteAttachment(attachment.id);
+                                }
+                              }}
+                            >
+                              <Trash2 size={18} />
+                            </Button>
+                          </div>
+                        </div>
+                      </Card.Body>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </div>
+          </Modal.Body>
+
+          <Modal.Footer className="border-0">
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setShowAttachmentModal(false);
+                setSelectedDealForAttachments(null);
+              }}
+            >
+              Close
+            </Button>
+          </Modal.Footer>
+        </Modal>
+      )}
+
+      {/* Add Meeting Modal */}
+      <Modal 
+        show={showAddMeetingModal} 
+        onHide={() => {
+          setShowAddMeetingModal(false);
+          setMeetingData({
+            dealId: null,
+            dealName: '',
+            meetingName: '',
+            meetingType: 'Online',
+            meetingDate: '',
+            meetingTime: '',
+            meetingOutcome: '',
+            extensions: [],
+          });
+          setMeetingAttendees([]);
+        }} 
+        size="lg" 
+        centered
+      >
+        <Modal.Header closeButton style={{ color: 'black', borderBottom: '1px solid #ccc' }}>
+          <Modal.Title className="d-flex align-items-center">
+            <Users size={24} className="me-2" />
+            Schedule Meeting
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body className="p-4">
+          {meetingData.dealName && (
+            <div className="alert alert-info mb-4 d-flex align-items-center">
+              <User size={20} className="me-2" />
+              <span><strong>Deal:</strong> {meetingData.dealName}</span>
+            </div>
+          )}
+
+          <Form>
+            <Row>
+              <Col md={12}>
+                <Form.Group className="mb-3">
+                  <Form.Label className="fw-semibold small">Meeting Name <span className="text-danger">*</span></Form.Label>
+                  <Form.Control 
+                    type="text"
+                    value={meetingData.meetingName}
+                    onChange={(e) => setMeetingData({ ...meetingData, meetingName: e.target.value })}
+                    placeholder="Enter meeting name or title..."
+                    required
+                  />
+                </Form.Group>
+              </Col>
+            </Row>
+
+            <Row>
+              <Col md={12}>
+                <Form.Group className="mb-3">
+                  <Form.Label className="fw-semibold small">Meeting Type <span className="text-danger">*</span></Form.Label>
+                  <Select
+                    value={{ value: meetingData.meetingType, label: meetingData.meetingType }}
+                    onChange={(option) => setMeetingData({ ...meetingData, meetingType: option?.value || 'Online' })}
+                    options={[
+                      { value: 'Online', label: 'Online' },
+                      { value: 'In-Person', label: 'In-Person' },
+                      { value: 'Phone Call', label: 'Phone Call' },
+                      { value: 'Video Call', label: 'Video Call' }
+                    ]}
+                    styles={customSelectStyles}
+                    placeholder="Select meeting type..."
+                  />
+                </Form.Group>
+              </Col>
+            </Row>
+
+            <Row>
+              <Col md={6}>
+                <Form.Group className="mb-3">
+                  <Form.Label className="fw-semibold small">Meeting Date <span className="text-danger">*</span></Form.Label>
+                  <Form.Control 
+                    type="date"
+                    value={meetingData.meetingDate}
+                    onChange={(e) => setMeetingData({ ...meetingData, meetingDate: e.target.value })}
+                    min={new Date().toISOString().split('T')[0]}
+                    required
+                  />
+                </Form.Group>
+              </Col>
+              <Col md={6}>
+                <Form.Group className="mb-3">
+                  <Form.Label className="fw-semibold small">Meeting Time <span className="text-danger">*</span></Form.Label>
+                  <Form.Control 
+                    type="time"
+                    value={meetingData.meetingTime}
+                    onChange={(e) => setMeetingData({ ...meetingData, meetingTime: e.target.value })}
+                    required
+                  />
+                </Form.Group>
+              </Col>
+            </Row>
+
+            <Row>
+              <Col md={12}>
+                <Form.Group className="mb-3">
+                  <Form.Label className="fw-semibold small">Meeting Outcome</Form.Label>
+                  <Select
+                    value={meetingData.meetingOutcome ? { value: meetingData.meetingOutcome, label: meetingData.meetingOutcome } : null}
+                    onChange={(option) => setMeetingData({ ...meetingData, meetingOutcome: option?.value || '' })}
+                    options={[
+                      { value: 'Scheduled', label: 'Scheduled' },
+                      { value: 'Completed - Successful', label: 'Completed - Successful' },
+                      { value: 'Completed - Needs Follow-up', label: 'Completed - Needs Follow-up' },
+                      { value: 'Cancelled', label: 'Cancelled' },
+                      { value: 'No Show', label: 'No Show' },
+                      { value: 'Rescheduled', label: 'Rescheduled' }
+                    ]}
+                    styles={customSelectStyles}
+                    placeholder="Select meeting outcome..."
+                    isClearable
+                  />
+                </Form.Group>
+              </Col>
+            </Row>
+
+            <Row>
+              <Col md={12}>
+                <Form.Group className="mb-3">
+                  <Form.Label className="fw-semibold small">Attendees</Form.Label>
+                  <Select
+                    isMulti
+                    value={meetingAttendees}
+                    onChange={(selected) => setMeetingAttendees(selected || [])}
+                    options={extensions.map((extension: { id: string; display_name: string; name: string }) => ({
+                      value: extension.id,
+                      label: extension.display_name || extension.name || extension.id
+                    }))}
+                    placeholder="Select attendees for this meeting..."
+                    styles={customSelectStyles}
+                  />
+                  <Form.Text className="text-muted">
+                    Select users who will attend this meeting.
+                  </Form.Text>
+                </Form.Group>
+              </Col>
+            </Row>
+
+            <div className="alert alert-info mb-0 d-flex align-items-center">
+              <AlertCircle size={18} className="me-2" />
+              <small>Schedule meetings to track important interactions with your deals.</small>
+            </div>
+          </Form>
+        </Modal.Body>
+        <Modal.Footer className="border-top bg-light">
+          <Button 
+            variant="outline-secondary" 
+            onClick={() => {
+              setShowAddMeetingModal(false);
+              setMeetingData({
+                dealId: null,
+                dealName: '',
+                meetingName: '',
+                meetingType: 'Online',
+                meetingDate: '',
+                meetingTime: '',
+                meetingOutcome: '',
+                extensions: [],
+              });
+              setMeetingAttendees([]);
+            }}
+          >
+            <X size={16} className="me-1" />
+            Cancel
+          </Button>
+          <Button 
+            variant="primary"
+            disabled={
+              !meetingData.meetingName || 
+              !meetingData.meetingType || 
+              !meetingData.meetingDate || 
+              !meetingData.meetingTime ||
+              loadingMeeting
+            }
+            onClick={handleCreateMeeting}
+          >
+            {loadingMeeting ? (
+              <>
+                <div className="spinner-border spinner-border-sm me-1" role="status" />
+                Scheduling...
+              </>
+            ) : (
+              <>
+                <Calendar size={16} className="me-1" />
+                Schedule Meeting
+              </>
+            )}
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
     </React.Fragment>
   );
 };

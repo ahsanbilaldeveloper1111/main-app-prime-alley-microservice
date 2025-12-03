@@ -1638,30 +1638,7 @@ const CrmProspectsManagement = () => {
             <FiDatabase size={16} className="me-2" />
             {showProspectsAnalytics ? 'Hide Analytics' : 'Show Analytics'}
           </Button>
-          {session?.user?.permissions?.includes('view-history-crm-data-management') && (
-            <Button
-              variant="outline-secondary"
-              onClick={() => setShowHistoryModal(true)}
-            >
-              <FiClock className="me-2" />
-              Activity History
-            </Button>
-          )}
-          {session?.user?.permissions?.includes('data-assignment-crm-data-management') && (
-            <Button variant="outline-success" onClick={handleDataAssignment}>
-              <FiUsers className="me-2" />
-              Data Assignment
-            </Button>
-          )}
-          {session?.user?.permissions?.includes('call-service-crm-data-management') && (
-            <Button
-              variant="outline-info"
-              onClick={() => setShowAfterCallModal(true)}
-            >
-              <FiPhone className="me-2" />
-              After Call
-            </Button>
-          )}
+     
           {session?.user?.permissions?.includes('add-crm-data-management') && (
             <Button variant="outline-primary" onClick={() => setShowUploadModal(true)}>
               <FiUpload className="me-2" />

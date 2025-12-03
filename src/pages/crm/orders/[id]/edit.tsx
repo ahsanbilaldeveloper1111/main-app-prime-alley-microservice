@@ -237,8 +237,6 @@ const EditOrder = () => {
           mainTitle="CRM"
           mainLink="/crm/dashboard"
           subTitle="Orders"
-          subLink="/crm/orders"
-          currentTitle="Edit Order"
         />
         <div className="text-center py-5">
           <p>Loading order data...</p>
@@ -255,8 +253,6 @@ const EditOrder = () => {
         mainTitle="CRM"
         mainLink="/crm/dashboard"
         subTitle="Orders"
-        subLink="/crm/orders"
-        currentTitle="Edit Order"
       />
       <div>
         <div className="d-flex justify-content-between align-items-center mb-4">

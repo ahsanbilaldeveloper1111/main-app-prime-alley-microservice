@@ -84,6 +84,7 @@ MENU_COLORS: {
 
   // Submenu Labels
   SUBMENU_LABELS: {
+    TASKS: 'Tasks',
     // Control Hub
     USER_DIRECTORY: 'User Directory',
     RANKS: 'Ranks',

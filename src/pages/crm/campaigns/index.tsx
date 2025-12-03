@@ -8,7 +8,6 @@ import React, {
 } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
-import GenericListPage from "@components/GenericListPage";
 import {
   getCampaigns,
   deleteCampaign,
@@ -16,17 +15,18 @@ import {
   updateCampaign,
   getCampaign,
 } from "@utils/crm";
-import { Column } from "@components/CustomDataTable";
 import {
   Button,
   Modal,
   Row,
   Col,
   Badge,
-  Dropdown,
   Form,
   Card,
   Alert,
+  Table,
+  Dropdown,
+  InputGroup,
 } from "react-bootstrap";
 import {
   FiEdit,
@@ -34,36 +34,252 @@ import {
   FiEye,
   FiPlus,
   FiCalendar,
-  FiSettings,
-  FiX,
-  FiSave,
 } from "react-icons/fi";
-import Link from "next/link";
+import {
+  X,
+  FileText,
+  Megaphone,
+  Users,
+  Search,
+  Filter,
+  BarChart3,
+  TrendingUp,
+  AlertCircle,
+  Target,
+  CheckSquare,
+  Layers,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  ArrowUp,
+  ArrowDown,
+  ArrowUpDown,
+  Edit,
+  Eye,
+  Trash2,
+  Calendar,
+  User,
+} from 'lucide-react';
 import { toast } from "react-toastify";
-import CampaignFilters from "@components/filters/CampaignFilters";
 import Select from "react-select";
 import { GetHierarchyData } from "@utils/users";
-import DatatableActionButton from "@components/DatatableActionButton";
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
+import {
+  PieChart,
+  Pie,
+  Cell,
+  ResponsiveContainer,
+  Tooltip,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Legend
+} from 'recharts';
 
 import FormModal from "@pages/partial/FormModal";
-import '@assets/scss/common.scss';
-import SuccessfulModal from '@pages/partial/SuccessfulModal'
-import PageHeader from "@components/PageHeader";
 import ConfirmModal from "@pages/partial/ConfirmModal";
-import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
 import { ModuleSlug } from "@utils/Helper";
 import { useSession } from "next-auth/react";
+import DatatableActionButton from "@components/DatatableActionButton";
+import { Column } from "@components/CustomDataTable";
 
+// KPI Card Component
+interface KPICardData {
+  title: string;
+  value: string;
+  change?: string;
+  isPositive?: boolean;
+  icon: React.ReactNode;
+  color: string;
+  onClick?: () => void;
+}
+
+const KPICard: React.FC<KPICardData> = ({ title, value, change, isPositive, icon, color, onClick }) => {
+  return (
+    <Card 
+      className={onClick ? 'h-100' : ''} 
+      style={{ 
+        cursor: onClick ? 'pointer' : 'default',
+        transition: 'all 0.2s ease',
+        border: '1px solid #e9ecef'
+      }}
+      onClick={onClick}
+      onMouseEnter={(e) => {
+        if (onClick) {
+          e.currentTarget.style.transform = 'translateY(-4px)';
+          e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)';
+        }
+      }}
+      onMouseLeave={(e) => {
+        if (onClick) {
+          e.currentTarget.style.transform = 'translateY(0)';
+          e.currentTarget.style.boxShadow = 'none';
+        }
+      }}
+    >
+      <Card.Body>
+        <div className="d-flex justify-content-between align-items-start mb-3">
+          <div className={`bg-${color} bg-opacity-10 rounded p-3`}>
+            <div className={`text-${color}`}>{icon}</div>
+          </div>
+          {change && (
+            <Badge bg={isPositive ? 'success' : 'danger'} className="bg-opacity-10">
+              {isPositive ? <ArrowUp size={12} /> : <ArrowDown size={12} />}
+              {change}
+            </Badge>
+          )}
+        </div>
+        <h3 className="mb-1">{value}</h3>
+        <p className="text-muted mb-0 small">{title}</p>
+      </Card.Body>
+    </Card>
+  );
+};
+
+// Filter Bar Component
+interface FilterBarProps {
+  quickFilters: { id: string; label: string; count: number; variant?: string; color?: string; activeColor?: string; icon?: React.ReactNode }[];
+  activeFilter: string;
+  onFilterChange: (filterId: string) => void;
+  searchValue: string;
+  onSearchChange: (value: string) => void;
+  onSearch: () => void;
+  searchPlaceholder?: string;
+  showAdvancedFilters: boolean;
+  onToggleAdvancedFilters: () => void;
+  advancedFilterCount?: number;
+}
+
+const FilterBar: React.FC<FilterBarProps> = ({
+  quickFilters,
+  activeFilter,
+  onFilterChange,
+  searchValue,
+  onSearchChange,
+  onSearch,
+  searchPlaceholder = "Search...",
+  showAdvancedFilters,
+  onToggleAdvancedFilters,
+  advancedFilterCount = 0
+}) => {
+  return (
+    <Card className="border-0 shadow-sm mb-3">
+      <Card.Body className="p-3">
+        <div className="d-flex flex-column flex-lg-row justify-content-between align-items-stretch align-items-lg-center gap-3">
+          <div className="d-flex gap-2 flex-wrap align-items-center flex-grow-1">
+            {quickFilters.map(filter => {
+              const isActive = activeFilter === filter.id;
+              const hasCustomColor = filter.color || filter.activeColor;
+              const buttonStyle: React.CSSProperties = {};
+              if (hasCustomColor) {
+                if (isActive) {
+                  const bgColor = filter.activeColor || filter.color;
+                  buttonStyle.background = '#fff';
+                  buttonStyle.borderColor = bgColor;
+                  buttonStyle.color = bgColor;
+                } else {
+                  buttonStyle.background = '#fff';
+                  buttonStyle.borderColor = filter.color;
+                  buttonStyle.color = filter.color;
+                  buttonStyle.opacity = '0.7';
+                }
+              }
+
+              return (
+                <Button
+                  key={filter.id}
+                  variant={hasCustomColor ? undefined : (isActive ? (filter.variant || 'primary') : 'outline-secondary')}
+                  onClick={() => onFilterChange(filter.id)}
+                  className="d-flex align-items-center gap-2"
+                  style={hasCustomColor ? buttonStyle : undefined}
+                >
+                  {filter.icon && <span className="d-flex align-items-center">{filter.icon}</span>}
+                  {filter.label}
+                  <Badge
+                    bg={isActive ? 'light' : 'light'}
+                    text={isActive ? 'dark' : 'dark'}
+                    className="ms-2"
+                  >
+                    {filter.count}
+                  </Badge>
+                </Button>
+              );
+            })}
+          </div>
+
+          <div className="d-flex flex-column flex-sm-row gap-2 align-items-stretch align-items-sm-center flex-shrink-0">
+            <InputGroup style={{ width: '300px', minWidth: '200px' }} className="flex-shrink-0">
+              <Form.Control
+                style={{ height: '41px' }}
+                type="text"
+                placeholder={searchPlaceholder}
+                value={searchValue}
+                onChange={(e) => onSearchChange(e.target.value)}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter') {
+                    onSearch();
+                  }
+                }}
+              />
+              <Button 
+                variant="outline-secondary"
+                onClick={onSearch}
+              >
+                <Search size={16} />
+              </Button>
+            </InputGroup>
+            <Button 
+              variant={showAdvancedFilters ? 'primary' : 'outline-secondary'}
+              onClick={onToggleAdvancedFilters}
+              className="d-flex align-items-center flex-shrink-0"
+            >
+              <Filter size={16} className="me-2" />
+              Filters
+              {advancedFilterCount > 0 && (
+                <Badge bg="light" text="dark" className="ms-2">
+                  {advancedFilterCount}
+                </Badge>
+              )}
+            </Button>
+          </div>
+        </div>
+      </Card.Body>
+    </Card>
+  );
+};
 
 const CrmCampaigns = () => {
 
-  const { data:session, status } = useSession();
+  const { data:session } = useSession();
 
 
   const [refreshKey, setRefreshKey] = useState(0);
   const [currentFilters, setCurrentFilters] = useState<Record<string, any>>({});
+  const [campaignsData, setCampaignsData] = useState<any[]>([]);
+  const [totalCampaigns, setTotalCampaigns] = useState(0);
+
+  // UI State
+  const [showCampaignsAnalytics, setShowCampaignsAnalytics] = useState(false);
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const [activeFilter, setActiveFilter] = useState('all');
+  const [campaignsSearch, setCampaignsSearch] = useState('');
+  const [selectedCampaigns, setSelectedCampaigns] = useState<number[]>([]);
+  const [selectedCampaignsColumns, setSelectedCampaignsColumns] = useState<string[]>(() => {
+    const saved = localStorage.getItem('campaignsSelectedColumns');
+    return saved ? JSON.parse(saved) : ['name', 'status', 'dateRange', 'campaignUsers', 'created'];
+  });
+  const [campaignsPagination, setCampaignsPagination] = useState({ currentPage: 1, rowsPerPage: 10, sortColumn: '', sortDirection: 'asc' as 'asc' | 'desc' });
+  const [campaignFilters, setCampaignFilters] = useState({
+    status: [] as string[],
+    owner: [] as string[],
+    tags: [] as string[],
+    priority: [] as string[],
+    dateRange: { start: '', end: '' }
+  });
 
   // Modal states
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -72,6 +288,8 @@ const CrmCampaigns = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedCampaign, setSelectedCampaign] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [confirmAction, setConfirmAction] = useState<any>(null);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
 
   // Form data
   const [formData, setFormData] = useState({
@@ -133,6 +351,182 @@ const CrmCampaigns = () => {
     return `${displayedNames.join(", ")} +${remainingCount} more`;
   };
 
+  // Save column selection to localStorage
+  useEffect(() => {
+    localStorage.setItem('campaignsSelectedColumns', JSON.stringify(selectedCampaignsColumns));
+  }, [selectedCampaignsColumns]);
+
+  // Custom styles for React Select
+  const customSelectStyles = {
+    control: (provided: any, state: any) => ({
+      ...provided,
+      minHeight: '38px',
+      fontSize: '0.875rem',
+      borderColor: state.isFocused ? '#86b7fe' : '#dee2e6',
+      boxShadow: state.isFocused ? '0 0 0 0.2rem rgba(13, 110, 253, 0.25)' : 'none',
+      '&:hover': {
+        borderColor: '#86b7fe'
+      }
+    }),
+    multiValue: (provided: any) => ({
+      ...provided,
+      backgroundColor: '#0d6efd',
+      color: 'white',
+      fontSize: '0.813rem'
+    }),
+    multiValueLabel: (provided: any) => ({
+      ...provided,
+      color: 'white',
+      padding: '2px 6px'
+    }),
+    multiValueRemove: (provided: any) => ({
+      ...provided,
+      color: 'white',
+      '&:hover': {
+        backgroundColor: '#0b5ed7',
+        color: 'white'
+      }
+    }),
+    menu: (provided: any) => ({
+      ...provided,
+      fontSize: '0.875rem'
+    })
+  };
+
+  // Sorting & Pagination Helper Functions
+  const sortData = <T extends Record<string, any>>(data: T[], sortColumn: string, sortDirection: 'asc' | 'desc'): T[] => {
+    if (!sortColumn) return data;
+    
+    return [...data].sort((a, b) => {
+      let aVal = a[sortColumn];
+      let bVal = b[sortColumn];
+      
+      if (aVal === undefined) aVal = '';
+      if (bVal === undefined) bVal = '';
+      
+      const aStr = String(aVal).toLowerCase();
+      const bStr = String(bVal).toLowerCase();
+      
+      if (aStr < bStr) return sortDirection === 'asc' ? -1 : 1;
+      if (aStr > bStr) return sortDirection === 'asc' ? 1 : -1;
+      return 0;
+    });
+  };
+
+  const paginateData = <T,>(data: T[], currentPage: number, rowsPerPage: number): T[] => {
+    const startIndex = (currentPage - 1) * rowsPerPage;
+    const endIndex = startIndex + rowsPerPage;
+    return data.slice(startIndex, endIndex);
+  };
+
+  const getTotalPages = (dataLength: number, rowsPerPage: number): number => {
+    return Math.ceil(dataLength / rowsPerPage);
+  };
+
+  const renderPaginationControls = (
+    dataLength: number,
+    paginationState: any,
+    setPaginationState: (state: any) => void,
+    label: string
+  ) => {
+    const totalPages = getTotalPages(dataLength, paginationState.rowsPerPage);
+    const { currentPage, rowsPerPage } = paginationState;
+    const startRow = (currentPage - 1) * rowsPerPage + 1;
+    const endRow = Math.min(currentPage * rowsPerPage, dataLength);
+
+    return (
+      <div className="d-flex justify-content-between align-items-center mt-3">
+        <div className="d-flex align-items-center gap-2">
+          <span className="text-muted small">Show</span>
+          <Form.Select
+            size="sm"
+            value={rowsPerPage}
+            onChange={(e) => setPaginationState({ ...paginationState, rowsPerPage: Number(e.target.value), currentPage: 1 })}
+            style={{ width: 'auto' }}
+          >
+            <option value={10}>10</option>
+            <option value={25}>25</option>
+            <option value={50}>50</option>
+            <option value={100}>100</option>
+          </Form.Select>
+          <span className="text-muted small">entries</span>
+        </div>
+        
+        <div className="text-muted small">
+          Showing {startRow} to {endRow} of {dataLength} {label}
+        </div>
+
+        <div className="d-flex gap-1">
+          <Button
+            size="sm"
+            variant="outline-secondary"
+            disabled={currentPage === 1}
+            onClick={() => setPaginationState({ ...paginationState, currentPage: 1 })}
+          >
+            <ChevronsLeft size={14} />
+          </Button>
+          <Button
+            size="sm"
+            variant="outline-secondary"
+            disabled={currentPage === 1}
+            onClick={() => setPaginationState({ ...paginationState, currentPage: currentPage - 1 })}
+          >
+            <ChevronLeft size={14} />
+          </Button>
+          
+          {[...Array(totalPages)].map((_, index) => {
+            const pageNum = index + 1;
+            if (
+              pageNum === 1 ||
+              pageNum === totalPages ||
+              (pageNum >= currentPage - 1 && pageNum <= currentPage + 1)
+            ) {
+              return (
+                <Button
+                  key={pageNum}
+                  size="sm"
+                  variant={currentPage === pageNum ? 'primary' : 'outline-secondary'}
+                  onClick={() => setPaginationState({ ...paginationState, currentPage: pageNum })}
+                >
+                  {pageNum}
+                </Button>
+              );
+            } else if (pageNum === currentPage - 2 || pageNum === currentPage + 2) {
+              return <span key={pageNum} className="px-2">...</span>;
+            }
+            return null;
+          })}
+          
+          <Button
+            size="sm"
+            variant="outline-secondary"
+            disabled={currentPage === totalPages}
+            onClick={() => setPaginationState({ ...paginationState, currentPage: currentPage + 1 })}
+          >
+            <ChevronRight size={14} />
+          </Button>
+          <Button
+            size="sm"
+            variant="outline-secondary"
+            disabled={currentPage === totalPages}
+            onClick={() => setPaginationState({ ...paginationState, currentPage: totalPages })}
+          >
+            <ChevronsRight size={14} />
+          </Button>
+        </div>
+      </div>
+    );
+  };
+
+  const renderSortIcon = (column: string, paginationState: any) => {
+    if (paginationState.sortColumn !== column) {
+      return <ArrowUpDown size={14} className="ms-1 text-muted" />;
+    }
+    return paginationState.sortDirection === 'asc' ? 
+      <ArrowUp size={14} className="ms-1" /> : 
+      <ArrowDown size={14} className="ms-1" />;
+  };
+
   // Handle filter changes
   const handleFiltersChange = useCallback((filters: Record<string, any>) => {
     setCurrentFilters(filters);
@@ -141,18 +535,47 @@ const CrmCampaigns = () => {
 
   const memoizedFilters = useMemo(() => currentFilters, [currentFilters]);
 
-  const fetchCampaigns = useCallback(
-    async (page = 1, perPage = 15, search = "") => {
-      return await getCampaigns({
-        page,
-        per_page: perPage,
-        search,
-        filters: memoizedFilters,
-        module_slug: ModuleSlug.CRM_CAMPAIGNS,
-      });
-    },
-    [memoizedFilters]
-  );
+  // Fetch campaigns data
+  useEffect(() => {
+    const loadCampaigns = async () => {
+      try {
+        setLoading(true);
+        const response = await getCampaigns({
+          page: campaignsPagination.currentPage,
+          per_page: campaignsPagination.rowsPerPage,
+          search: campaignsSearch,
+          filters: {
+            ...memoizedFilters,
+            status: campaignFilters.status,
+            dateRange: campaignFilters.dateRange,
+          },
+          module_slug: ModuleSlug.CRM_CAMPAIGNS,
+        });
+        
+        if (response && response.data) {
+          setCampaignsData(response.data);
+          setTotalCampaigns(response.total || response.data.length);
+        }
+      } catch (error) {
+        console.error("Failed to fetch campaigns:", error);
+        toast.error("Failed to load campaigns");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (session?.user?.permissions?.includes('list-crm-campaigns')) {
+      loadCampaigns();
+    }
+  }, [refreshKey, campaignsPagination, campaignsSearch, memoizedFilters, campaignFilters, session]);
+
+  // Calculate filter counts
+  const filterCounts = useMemo(() => {
+    const all = campaignsData.length;
+    const active = campaignsData.filter(c => c.status === 'active').length;
+    const inactive = campaignsData.filter(c => c.status === 'inactive').length;
+    return { all, active, inactive };
+  }, [campaignsData]);
 
   // Modal handlers
   const handleCreateCampaign = useCallback(() => {
@@ -591,53 +1014,556 @@ const CrmCampaigns = () => {
         subTitle="Campaigns"
       />
 
-      <PageHeader
-        title="Campaigns"
-        showSearch={session?.user?.permissions?.includes('list-crm-campaigns')}
-        searchPlaceholder="Search campaigns..."
-        searchValue={currentFilters.search || ""}
-        onSearchChange={(value) => handleFiltersChange({...currentFilters, search: value})}
-        
-        buttons={
-          <>
-          
+      {/* Header */}
+      <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4">
+        <div className="mb-3 mb-md-0">
+          <h2 className="mb-1 fw-bold">Campaigns Management</h2>
+          <p className="text-muted mb-0">Create and manage marketing campaigns</p>
+        </div>
+        <div className="d-flex flex-wrap gap-2">
           {session?.user?.permissions?.includes('list-crm-campaigns') && (
-          <CampaignFilters onFiltersChange={handleFiltersChange} />
+            <Button 
+              variant={showCampaignsAnalytics ? "primary" : "outline-secondary"}
+              onClick={() => setShowCampaignsAnalytics(!showCampaignsAnalytics)}
+            >
+              <BarChart3 size={16} className="me-2" />
+              {showCampaignsAnalytics ? 'Hide Analytics' : 'Show Analytics'}
+            </Button>
           )}
-          
           {session?.user?.permissions?.includes('add-crm-campaigns') && (
-            <Button onClick={handleCreateCampaign} className="btn btn-primary">
-            <FiPlus className="me-2" />
-            New Campaign
-          </Button>
+            <Button 
+              variant="primary"
+              onClick={handleCreateCampaign}
+            >
+              <FiPlus size={16} className="me-2" />
+              New Campaign
+            </Button>
           )}
-          </>
-        }
-      />
+        </div>
+      </div>
 
+      {/* Analytics Section - Collapsible */}
+      {showCampaignsAnalytics && session?.user?.permissions?.includes('list-crm-campaigns') && (
+        <>
+          {/* KPI Cards */}
+          <Row className="mb-4">
+            <Col lg={3} md={6} className="mb-3">
+              <KPICard 
+                title="Total Campaigns"
+                value={totalCampaigns.toString()}
+                icon={<Megaphone size={24} />}
+                color="primary"
+              />
+            </Col>
+            <Col lg={3} md={6} className="mb-3">
+              <KPICard 
+                title="Active Campaigns"
+                value={filterCounts.active.toString()}
+                icon={<TrendingUp size={24} />}
+                color="success"
+              />
+            </Col>
+            <Col lg={3} md={6} className="mb-3">
+              <KPICard 
+                title="Inactive Campaigns"
+                value={filterCounts.inactive.toString()}
+                icon={<AlertCircle size={24} />}
+                color="warning"
+              />
+            </Col>
+            <Col lg={3} md={6} className="mb-3">
+              <KPICard 
+                title="Total Users"
+                value={extensions.length.toString()}
+                icon={<Users size={24} />}
+                color="info"
+              />
+            </Col>
+          </Row>
 
+          {/* Analytics Charts */}
+          <Row className="mb-4">
+            <Col md={4} className="mb-3">
+              <Card className="border-0 shadow-sm h-100">
+                <Card.Body>
+                  <h6 className="fw-bold mb-3">Campaign Status Distribution</h6>
+                  <ResponsiveContainer width="100%" height={250}>
+                    <PieChart>
+                      <Pie
+                        data={[
+                          { name: 'Active', value: filterCounts.active, color: '#198754' },
+                          { name: 'Inactive', value: filterCounts.inactive, color: '#dc3545' },
+                        ]}
+                        cx="50%"
+                        cy="50%"
+                        labelLine={false}
+                        label={({ name, percent }: any) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                        outerRadius={80}
+                        fill="#8884d8"
+                        dataKey="value"
+                      >
+                        {[
+                          { name: 'Active', value: filterCounts.active, color: '#198754' },
+                          { name: 'Inactive', value: filterCounts.inactive, color: '#dc3545' },
+                        ].map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </Card.Body>
+              </Card>
+            </Col>
+          </Row>
+        </>
+      )}
 
-        {/* Campaigns List */}
-        {session?.user?.permissions?.includes('list-crm-campaigns') && (
-        <GenericListPage
-                  columns={columns}
-                  fetchData={fetchCampaigns}
-                  title="Campaigns"
-                  searchPlaceholder="Search campaigns..."
-                  defaultPageSize={15}
-                  filters={memoizedFilters}
-                  refreshKey={refreshKey}
-                  search={false}
-                  tableStyle="table-style-2"
+      {/* Filter Bar */}
+      {session?.user?.permissions?.includes('list-crm-campaigns') && (
+        <FilterBar
+          quickFilters={[
+            { id: 'all', label: 'All Campaigns', count: filterCounts.all, color: '#6c757d', activeColor: '#0d6efd', icon: <Megaphone size={16} /> },
+            { id: 'active', label: 'Active', count: filterCounts.active, color: '#198754', activeColor: '#0d6efd', icon: <TrendingUp size={16} /> },
+            { id: 'inactive', label: 'Inactive', count: filterCounts.inactive, color: '#dc3545', activeColor: '#0d6efd', icon: <AlertCircle size={16} /> },
+          ]}
+          activeFilter={activeFilter}
+          onFilterChange={(filterId) => {
+            setActiveFilter(filterId);
+            setCampaignsPagination({ ...campaignsPagination, currentPage: 1 });
+          }}
+          searchValue={campaignsSearch}
+          onSearchChange={(value) => setCampaignsSearch(value)}
+          onSearch={() => {
+            setCampaignsPagination({ ...campaignsPagination, currentPage: 1 });
+            setRefreshKey(prev => prev + 1);
+          }}
+          searchPlaceholder="Search campaigns by name, description..."
+          showAdvancedFilters={showAdvancedFilters}
+          onToggleAdvancedFilters={() => setShowAdvancedFilters(!showAdvancedFilters)}
+          advancedFilterCount={
+            campaignFilters.status.length +
+            (campaignFilters.dateRange.start || campaignFilters.dateRange.end ? 1 : 0)
+          }
+        />
+      )}
+
+      {/* Advanced Filters */}
+      {showAdvancedFilters && session?.user?.permissions?.includes('list-crm-campaigns') && (
+        <Card className="border-0 shadow-sm mb-4">
+          <Card.Body>
+            <Row className="g-3 align-items-end">
+              <Col md={3}>
+                <Form.Label className="small fw-bold mb-2">Status</Form.Label>
+                <Select
+                  isMulti
+                  options={[
+                    { value: 'active', label: 'Active' },
+                    { value: 'inactive', label: 'Inactive' },
+                  ]}
+                  value={campaignFilters.status.map(s => ({ value: s, label: s }))}
+                  onChange={(selected) => {
+                    setCampaignFilters(prev => ({
+                      ...prev,
+                      status: selected ? selected.map(s => s.value) : []
+                    }));
+                  }}
+                  placeholder="Select status..."
+                  styles={customSelectStyles}
                 />
-                )}
+              </Col>
+              <Col md={3}>
+                <Form.Label className="small fw-bold mb-2">Start Date</Form.Label>
+                <Form.Control
+                  type="date"
+                  value={campaignFilters.dateRange.start}
+                  onChange={(e) => setCampaignFilters(prev => ({
+                    ...prev,
+                    dateRange: { ...prev.dateRange, start: e.target.value }
+                  }))}
+                />
+              </Col>
+              <Col md={3}>
+                <Form.Label className="small fw-bold mb-2">End Date</Form.Label>
+                <Form.Control
+                  type="date"
+                  value={campaignFilters.dateRange.end}
+                  onChange={(e) => setCampaignFilters(prev => ({
+                    ...prev,
+                    dateRange: { ...prev.dateRange, end: e.target.value }
+                  }))}
+                />
+              </Col>
+              <Col md={3}>
+                <div className="d-flex gap-2">
+                  <Button 
+                    variant="primary" 
+                    className="flex-grow-1"
+                    onClick={() => {
+                      setCampaignsPagination({ ...campaignsPagination, currentPage: 1 });
+                      setRefreshKey(prev => prev + 1);
+                    }}
+                  >
+                    Apply
+                  </Button>
+                  <Button 
+                    variant="outline-secondary" 
+                    onClick={() => {
+                      setCampaignFilters({
+                        status: [],
+                        owner: [],
+                        tags: [],
+                        priority: [],
+                        dateRange: { start: '', end: '' }
+                      });
+                    }}
+                  >
+                    Reset
+                  </Button>
+                </div>
+              </Col>
+            </Row>
+          </Card.Body>
+        </Card>
+      )}
+
+      {/* Bulk Actions and Column Customization */}
+      {session?.user?.permissions?.includes('list-crm-campaigns') && (
+        <div className="d-flex justify-content-end gap-2 mb-3">
+          {selectedCampaigns.length > 0 && (
+            <Dropdown>
+              <Dropdown.Toggle variant="outline-primary" size="sm">
+                <CheckSquare size={16} className="me-2" />
+                Bulk Actions ({selectedCampaigns.length})
+              </Dropdown.Toggle>
+              <Dropdown.Menu align="end">
+                <Dropdown.Item 
+                  onClick={() => {
+                    setConfirmAction({
+                      type: 'delete',
+                      data: { 
+                        itemType: 'Campaigns', 
+                        name: `${selectedCampaigns.length} selected campaigns`,
+                        count: selectedCampaigns.length
+                      }
+                    });
+                    setShowConfirmDialog(true);
+                  }}
+                  className="d-flex align-items-center text-danger"
+                >
+                  <Trash2 size={14} className="me-2" />
+                  Delete Selected ({selectedCampaigns.length})
+                </Dropdown.Item>
+              </Dropdown.Menu>
+            </Dropdown>
+          )}
+
+          <Dropdown>
+            <Dropdown.Toggle variant="outline-secondary" size="sm">
+              <Layers size={16} className="me-2" />
+              Customize Table
+            </Dropdown.Toggle>
+            <Dropdown.Menu align="end" style={{ maxHeight: '300px', overflowY: 'auto' }}>
+              {[
+                { key: 'name', label: 'Campaign Name' },
+                { key: 'status', label: 'Status' },
+                { key: 'dateRange', label: 'Date Range' },
+                { key: 'campaignUsers', label: 'Campaign Users' },
+                { key: 'created', label: 'Created' }
+              ].map((col) => (
+                <Dropdown.Item key={col.key} as="div">
+                  <Form.Check
+                    type="checkbox"
+                    label={col.label}
+                    checked={selectedCampaignsColumns.includes(col.key)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedCampaignsColumns([...selectedCampaignsColumns, col.key]);
+                      } else {
+                        setSelectedCampaignsColumns(selectedCampaignsColumns.filter(c => c !== col.key));
+                      }
+                    }}
+                  />
+                </Dropdown.Item>
+              ))}
+              <Dropdown.Divider />
+              <Dropdown.Item onClick={() => setSelectedCampaignsColumns(['name', 'status', 'dateRange', 'campaignUsers', 'created'])}>
+                Select All
+              </Dropdown.Item>
+              <Dropdown.Item onClick={() => {
+                setSelectedCampaignsColumns(['name', 'status', 'dateRange', 'campaignUsers', 'created']);
+              }}>
+                Reset to Default
+              </Dropdown.Item>
+            </Dropdown.Menu>
+          </Dropdown>
+        </div>
+      )}
+
+      {/* Campaigns Table */}
+      {session?.user?.permissions?.includes('list-crm-campaigns') && (
+        <Card className="border-0 shadow-sm">
+          <Card.Body className="p-0">
+            <div className="table-responsive">
+              <Table hover className="mb-0">
+                <thead className="bg-light">
+                  <tr>
+                    <th style={{ width: '50px' }}>
+                      <Form.Check 
+                        type="checkbox"
+                        checked={(() => {
+                          let filteredCampaigns = campaignsData.filter(campaign => {
+                            if (activeFilter === 'active') return campaign.status === 'active';
+                            if (activeFilter === 'inactive') return campaign.status === 'inactive';
+                            
+                            const searchLower = campaignsSearch.toLowerCase();
+                            const matchesSearch = !campaignsSearch || 
+                              campaign.name?.toLowerCase().includes(searchLower) ||
+                              campaign.description?.toLowerCase().includes(searchLower);
+                            
+                            if (campaignFilters.status.length > 0 && !campaignFilters.status.includes(campaign.status)) return false;
+                            
+                            return matchesSearch;
+                          });
+                          
+                          const sorted = sortData(filteredCampaigns, campaignsPagination.sortColumn, campaignsPagination.sortDirection);
+                          const paginated = paginateData(sorted, campaignsPagination.currentPage, campaignsPagination.rowsPerPage);
+                          return paginated.length > 0 && paginated.every((campaign: any) => selectedCampaigns.includes(campaign.id));
+                        })()}
+                        onChange={(e) => {
+                          let filteredCampaigns = campaignsData.filter(campaign => {
+                            if (activeFilter === 'active') return campaign.status === 'active';
+                            if (activeFilter === 'inactive') return campaign.status === 'inactive';
+                            
+                            const searchLower = campaignsSearch.toLowerCase();
+                            const matchesSearch = !campaignsSearch || 
+                              campaign.name?.toLowerCase().includes(searchLower) ||
+                              campaign.description?.toLowerCase().includes(searchLower);
+                            
+                            if (campaignFilters.status.length > 0 && !campaignFilters.status.includes(campaign.status)) return false;
+                            
+                            return matchesSearch;
+                          });
+                          
+                          const sorted = sortData(filteredCampaigns, campaignsPagination.sortColumn, campaignsPagination.sortDirection);
+                          const paginated = paginateData(sorted, campaignsPagination.currentPage, campaignsPagination.rowsPerPage);
+                          
+                          if (e.target.checked) {
+                            const newIds = paginated.map((campaign: any) => campaign.id).filter((id: number) => !selectedCampaigns.includes(id));
+                            setSelectedCampaigns([...selectedCampaigns, ...newIds]);
+                          } else {
+                            const paginatedIds = paginated.map((campaign: any) => campaign.id);
+                            setSelectedCampaigns(selectedCampaigns.filter(id => !paginatedIds.includes(id)));
+                          }
+                        }}
+                      />
+                    </th>
+                    {selectedCampaignsColumns.includes('name') && (
+                      <th 
+                        style={{ cursor: 'pointer' }}
+                        onClick={() => {
+                          const newDirection = campaignsPagination.sortColumn === 'name' && campaignsPagination.sortDirection === 'asc' ? 'desc' : 'asc';
+                          setCampaignsPagination({ ...campaignsPagination, sortColumn: 'name', sortDirection: newDirection, currentPage: 1 });
+                        }}
+                      >
+                        Campaign Name {renderSortIcon('name', campaignsPagination)}
+                      </th>
+                    )}
+                    {selectedCampaignsColumns.includes('status') && (
+                      <th 
+                        style={{ cursor: 'pointer' }}
+                        onClick={() => {
+                          const newDirection = campaignsPagination.sortColumn === 'status' && campaignsPagination.sortDirection === 'asc' ? 'desc' : 'asc';
+                          setCampaignsPagination({ ...campaignsPagination, sortColumn: 'status', sortDirection: newDirection, currentPage: 1 });
+                        }}
+                      >
+                        Status {renderSortIcon('status', campaignsPagination)}
+                      </th>
+                    )}
+                    {selectedCampaignsColumns.includes('dateRange') && (
+                      <th 
+                        style={{ cursor: 'pointer' }}
+                        onClick={() => {
+                          const newDirection = campaignsPagination.sortColumn === 'start_date' && campaignsPagination.sortDirection === 'asc' ? 'desc' : 'asc';
+                          setCampaignsPagination({ ...campaignsPagination, sortColumn: 'start_date', sortDirection: newDirection, currentPage: 1 });
+                        }}
+                      >
+                        Date Range {renderSortIcon('start_date', campaignsPagination)}
+                      </th>
+                    )}
+                    {selectedCampaignsColumns.includes('campaignUsers') && <th>Campaign Users</th>}
+                    {selectedCampaignsColumns.includes('created') && (
+                      <th 
+                        style={{ cursor: 'pointer' }}
+                        onClick={() => {
+                          const newDirection = campaignsPagination.sortColumn === 'created_at' && campaignsPagination.sortDirection === 'asc' ? 'desc' : 'asc';
+                          setCampaignsPagination({ ...campaignsPagination, sortColumn: 'created_at', sortDirection: newDirection, currentPage: 1 });
+                        }}
+                      >
+                        Created {renderSortIcon('created_at', campaignsPagination)}
+                      </th>
+                    )}
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(() => {
+                    let filteredCampaigns = campaignsData.filter(campaign => {
+                      if (activeFilter === 'active') return campaign.status === 'active';
+                      if (activeFilter === 'inactive') return campaign.status === 'inactive';
+                      
+                      const searchLower = campaignsSearch.toLowerCase();
+                      const matchesSearch = !campaignsSearch || 
+                        campaign.name?.toLowerCase().includes(searchLower) ||
+                        campaign.description?.toLowerCase().includes(searchLower);
+                      
+                      if (campaignFilters.status.length > 0 && !campaignFilters.status.includes(campaign.status)) return false;
+                      
+                      return matchesSearch;
+                    });
+                    
+                    const sorted = sortData(filteredCampaigns, campaignsPagination.sortColumn, campaignsPagination.sortDirection);
+                    const paginated = paginateData(sorted, campaignsPagination.currentPage, campaignsPagination.rowsPerPage);
+                    
+                    if (filteredCampaigns.length === 0) {
+                      return (
+                        <tr>
+                          <td colSpan={selectedCampaignsColumns.length + 2} className="text-center py-4 text-muted">
+                            No campaigns found matching your criteria
+                          </td>
+                        </tr>
+                      );
+                    }
+                    
+                    return paginated.map((campaign) => (
+                      <tr key={campaign.id}>
+                        <td>
+                          <Form.Check 
+                            type="checkbox"
+                            checked={selectedCampaigns.includes(campaign.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedCampaigns([...selectedCampaigns, campaign.id]);
+                              } else {
+                                setSelectedCampaigns(selectedCampaigns.filter(id => id !== campaign.id));
+                              }
+                            }}
+                          />
+                        </td>
+                        {selectedCampaignsColumns.includes('name') && (
+                          <td>
+                            <div>
+                              <div className="fw-semibold">{campaign.name || "Unnamed Campaign"}</div>
+                              <div className="small text-muted mt-1">{campaign.description || "No Description"}</div>
+                            </div>
+                          </td>
+                        )}
+                        {selectedCampaignsColumns.includes('status') && (
+                          <td>
+                            <Badge 
+                              bg={campaign.status === 'active' ? 'success' : 'secondary'}
+                              className="bg-opacity-10 text-dark"
+                            >
+                              {campaign.status?.charAt(0).toUpperCase() + campaign.status?.slice(1) || 'Inactive'}
+                            </Badge>
+                          </td>
+                        )}
+                        {selectedCampaignsColumns.includes('dateRange') && (
+                          <td>
+                            <div>
+                              <div className="fw-semibold small">
+                                {campaign.start_date ? new Date(campaign.start_date).toLocaleDateString() : 'No start date'}
+                              </div>
+                              <small className="text-muted">
+                                to {campaign.end_date ? new Date(campaign.end_date).toLocaleDateString() : 'No end date'}
+                              </small>
+                            </div>
+                          </td>
+                        )}
+                        {selectedCampaignsColumns.includes('campaignUsers') && (
+                          <td>
+                            <span className="text-muted small">
+                              {getUserNames(campaign.user_extensions || [])}
+                            </span>
+                          </td>
+                        )}
+                        {selectedCampaignsColumns.includes('created') && (
+                          <td>
+                            <small className="text-muted">
+                              {campaign.created_at ? new Date(campaign.created_at).toLocaleDateString() : 'Unknown'}
+                            </small>
+                          </td>
+                        )}
+                        <td>
+                          <div className="d-flex gap-1">
+                            {session?.user?.permissions?.includes('view-crm-campaigns') && (
+                              <Button 
+                                variant="link" 
+                                size="sm" 
+                                className="p-1"
+                                onClick={() => handleViewCampaign(campaign)}
+                                title="View Details"
+                              >
+                                <Eye size={16} />
+                              </Button>
+                            )}
+                            {session?.user?.permissions?.includes('edit-crm-campaigns') && (
+                              <Button 
+                                variant="link" 
+                                size="sm" 
+                                className="p-1 text-primary"
+                                onClick={() => handleEditCampaign(campaign)}
+                                title="Edit Campaign"
+                              >
+                                <Edit size={16} />
+                              </Button>
+                            )}
+                            {session?.user?.permissions?.includes('delete-crm-campaigns') && (
+                              <Button 
+                                variant="link" 
+                                size="sm" 
+                                className="p-1 text-danger"
+                                onClick={() => handleDeleteCampaign(campaign)}
+                                title="Delete Campaign"
+                              >
+                                <Trash2 size={16} />
+                              </Button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ));
+                  })()}
+                </tbody>
+              </Table>
+            </div>
+
+            <div className="p-3">
+              {(() => {
+                let filteredCampaigns = campaignsData.filter(campaign => {
+                  if (activeFilter === 'active') return campaign.status === 'active';
+                  if (activeFilter === 'inactive') return campaign.status === 'inactive';
+                  
+                  const searchLower = campaignsSearch.toLowerCase();
+                  const matchesSearch = !campaignsSearch || 
+                    campaign.name?.toLowerCase().includes(searchLower) ||
+                    campaign.description?.toLowerCase().includes(searchLower);
+                  
+                  if (campaignFilters.status.length > 0 && !campaignFilters.status.includes(campaign.status)) return false;
+                  
+                  return matchesSearch;
+                });
+                
+                return renderPaginationControls(filteredCampaigns.length, campaignsPagination, setCampaignsPagination, 'campaigns');
+              })()}
+            </div>
+          </Card.Body>
+        </Card>
+      )}
 
       {/* Create/Edit Campaign Modal */}
-     
-
-
-      <FormModal
-         show={showCreateModal || showEditModal} 
+      <Modal 
+        show={showCreateModal || showEditModal} 
         onHide={() => {
           setShowCreateModal(false);
           setShowEditModal(false);
@@ -650,11 +1576,15 @@ const CrmCampaigns = () => {
             sort_order: 0,
           });
         }}
-        title= {showEditModal ? `Edit Campaign: ${selectedCampaign?.name}` : "Create New Campaign"}
-        desc={showEditModal ? "Please update the details below to modify the campaign." : "Please fill the details below to create the campaign."}
-        formHtml={
-          <>
-           <Row>
+        size="lg"
+        centered
+      >
+        <Modal.Header closeButton>
+          <Modal.Title>{showEditModal ? `Edit Campaign: ${selectedCampaign?.name}` : 'Add New Campaign'}</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <Form>
+            <Row>
             <Col md={6}>
               <Form.Group className="mb-3">
                 <Form.Label>Campaign Name *</Form.Label>
@@ -881,108 +1811,362 @@ const CrmCampaigns = () => {
               </Alert>
             )}
           </div>
-          </>
-        }
-        submitButtonText={showEditModal ? "Update Campaign" : "Create Campaign"}
-        cancelButtonText="Cancel"
-        onSubmit={() => handleFormSubmit()}
-        onCancel={() => {
-          setShowCreateModal(false);
-          setShowEditModal(false);
-          setSelectedCampaign(null);
-          setCampaignUsers([]);
-          setNewField({
-            field_name: "",
-            field_type: "string",
-            field_options: [],
-            sort_order: 0,
-          });
-        }}
-      />
+          </Form>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button 
+            variant="outline-secondary" 
+            onClick={() => {
+              setShowCreateModal(false);
+              setShowEditModal(false);
+              setSelectedCampaign(null);
+              setCampaignUsers([]);
+              setNewField({
+                field_name: "",
+                field_type: "string",
+                field_options: [],
+                sort_order: 0,
+              });
+            }}
+          >
+            Cancel
+          </Button>
+          <Button 
+            variant="primary"
+            onClick={() => handleFormSubmit()}
+            disabled={loading}
+          >
+            {loading ? 'Saving...' : (showEditModal ? 'Update Campaign' : 'Create Campaign')}
+          </Button>
+        </Modal.Footer>
+      </Modal>
 
       {/* View Campaign Modal */}
-      
-
-
-      <FormModal
-        show={showViewModal}
-        onHide={() => {
+      {selectedCampaign && (
+        <Modal show={showViewModal} onHide={() => {
           setShowViewModal(false);
           setSelectedCampaign(null);
-        }}
-        title={`View Campaign: ${selectedCampaign?.name}`}
-        desc="Please find the details for the campaign."
-        formHtml={
-          <>
-           {selectedCampaign && (
-            <div>
-              <Row className="mb-3">
-                <Col md={6}>
-                  <strong>Status:</strong> 
-                  <span className ={`status-badge text-uppercase ${selectedCampaign.status === "active" ? "success" : "secondary"}`}>
-                    {selectedCampaign.status}
-                  </span>
-                </Col>
-                <Col md={6}>
-                  <strong>Created:</strong> 
-                  <span className="ms-2">
-                    {new Date(selectedCampaign.created_at).toLocaleDateString()}
-                  </span>
-                </Col>
-              </Row>
-              
-              <Row className="mb-3">
-                <Col md={6}>
-                  <strong>Start Date:</strong> 
-                  <span className="ms-2">
-                    {selectedCampaign.start_date ? new Date(selectedCampaign.start_date).toLocaleDateString() : "Not set"}
-                  </span>
-                </Col>
-                <Col md={6}>
-                  <strong>End Date:</strong> 
-                  <span className="ms-2">
-                    {selectedCampaign.end_date ? new Date(selectedCampaign.end_date).toLocaleDateString() : "Not set"}
-                  </span>
-                </Col>
-              </Row>
+        }} size="xl" centered>
+          {/* Custom Header */}
+          <div style={{
+            color: 'black',
+            padding: '30px',
+            position: 'relative',
+            borderTopLeftRadius: '8px',
+            borderTopRightRadius: '8px',
+            borderBottom: '1px solid #e5e7eb'
+          }}>
+            <button 
+              onClick={() => {
+                setShowViewModal(false);
+                setSelectedCampaign(null);
+              }}
+              style={{
+                position: 'absolute',
+                top: '20px',
+                right: '20px',
+                background: 'rgba(255,255,255,0.2)',
+                border: 'none',
+                color: 'black',
+                width: '36px',
+                height: '36px',
+                borderRadius: '50%',
+                cursor: 'pointer',
+                transition: 'all 0.3s',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.background = 'rgba(255,255,255,0.3)';
+                e.currentTarget.style.transform = 'rotate(90deg)';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.background = 'rgba(255,255,255,0.2)';
+                e.currentTarget.style.transform = 'rotate(0deg)';
+              }}
+            >
+              <X size={20} />
+            </button>
+            <h3 style={{ margin: 0, fontWeight: 600, fontSize: '24px' }}>
+              {selectedCampaign.name}
+            </h3>
+            <p style={{ margin: '8px 0 0 0', opacity: 0.9, fontSize: '14px' }}>
+              Campaign Details
+            </p>
+          </div>
 
-              {selectedCampaign.description && (
-                <div className="mb-3">
-                  <strong>Description:</strong>
-                  <p className="mt-2">{selectedCampaign.description}</p>
+          <Modal.Body style={{ padding: '30px' }}>
+            {loading ? (
+              <div className="text-center py-4">
+                <div className="spinner-border" role="status">
+                  <span className="visually-hidden">Loading...</span>
                 </div>
-              )}
-
-              {selectedCampaign.options && Object.keys(selectedCampaign.options).length > 0 && (
-                <div className="mb-3">
-                  <strong>Options:</strong>
-                  <pre className="mt-2 bg-light p-2 rounded" style={{fontSize: '0.9em'}}>
-                    {JSON.stringify(selectedCampaign.options, null, 2)}
-                  </pre>
+              </div>
+            ) : (
+              <>
+                {/* Campaign Information Section */}
+                <div style={{
+                  fontSize: '16px',
+                  fontWeight: 600,
+                  color: '#1f2937',
+                  marginBottom: '20px',
+                  paddingBottom: '10px',
+                  borderBottom: '2px solid #f8f9fa',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px'
+                }}>
+                  <Megaphone size={18} style={{ color: '#4680ff' }} />
+                  Campaign Information
                 </div>
-              )}
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+                  gap: '20px',
+                  marginBottom: '30px'
+                }}>
+                  <div style={{
+                    background: '#f8f9fa',
+                    padding: '16px',
+                    borderRadius: '10px',
+                    transition: 'all 0.3s'
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.background = '#e5e7eb';
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.background = '#f8f9fa';
+                    e.currentTarget.style.transform = 'translateY(0)';
+                  }}>
+                    <div style={{
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      color: '#6b7280',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px',
+                      marginBottom: '6px'
+                    }}>Campaign Name</div>
+                    <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                      {selectedCampaign.name}
+                    </div>
+                  </div>
+                  <div style={{
+                    background: '#f8f9fa',
+                    padding: '16px',
+                    borderRadius: '10px',
+                    transition: 'all 0.3s'
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.background = '#e5e7eb';
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.background = '#f8f9fa';
+                    e.currentTarget.style.transform = 'translateY(0)';
+                  }}>
+                    <div style={{
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      color: '#6b7280',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px',
+                      marginBottom: '6px'
+                    }}>Status</div>
+                    <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                      <Badge 
+                        bg={selectedCampaign.status === 'active' ? 'success' : 'secondary'}
+                        style={{
+                          padding: '6px 14px',
+                          borderRadius: '20px',
+                          fontSize: '12px',
+                          fontWeight: 600
+                        }}
+                      >
+                        {selectedCampaign.status?.charAt(0).toUpperCase() + selectedCampaign.status?.slice(1) || 'Inactive'}
+                      </Badge>
+                    </div>
+                  </div>
+                  {selectedCampaign.description && (
+                    <div style={{
+                      background: '#f8f9fa',
+                      padding: '16px',
+                      borderRadius: '10px',
+                      transition: 'all 0.3s',
+                      gridColumn: 'span 2'
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.background = '#e5e7eb';
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.background = '#f8f9fa';
+                      e.currentTarget.style.transform = 'translateY(0)';
+                    }}>
+                      <div style={{
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        color: '#6b7280',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px',
+                        marginBottom: '6px'
+                      }}>Description</div>
+                      <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                        {selectedCampaign.description}
+                      </div>
+                    </div>
+                  )}
+                </div>
 
-              {selectedCampaign.user_extensions && selectedCampaign.user_extensions.length > 0 && (
-                <div className="mb-3">
-                  <strong>Campaign Users ({selectedCampaign.user_extensions.length}):</strong>
-                  <div className="mt-2">
-                    {selectedCampaign.user_extensions.map((ue: any, index: number) => {
-                      const extension = extensions.find(ext => ext.id == ue.user_extension);
-                      const userName = extension?.display_name || extension?.name || `Extension ${ue.user_extension}`;
-                      return (
-                        <span key={index} className="status-badge info me-1 mb-1">
-                          {userName}
-                        </span>
-                      );
-                    })}
+                {/* Date Information Section */}
+                <div style={{
+                  fontSize: '16px',
+                  fontWeight: 600,
+                  color: '#1f2937',
+                  marginBottom: '20px',
+                  paddingBottom: '10px',
+                  borderBottom: '2px solid #f8f9fa',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px'
+                }}>
+                  <Calendar size={18} style={{ color: '#4680ff' }} />
+                  Date Information
+                </div>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+                  gap: '20px',
+                  marginBottom: '30px'
+                }}>
+                  <div style={{
+                    background: '#f8f9fa',
+                    padding: '16px',
+                    borderRadius: '10px',
+                    transition: 'all 0.3s'
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.background = '#e5e7eb';
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.background = '#f8f9fa';
+                    e.currentTarget.style.transform = 'translateY(0)';
+                  }}>
+                    <div style={{
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      color: '#6b7280',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px',
+                      marginBottom: '6px'
+                    }}>Date Range</div>
+                    <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                      {selectedCampaign.start_date && selectedCampaign.end_date 
+                        ? `${new Date(selectedCampaign.start_date).toLocaleDateString()} - ${new Date(selectedCampaign.end_date).toLocaleDateString()}`
+                        : selectedCampaign.start_date 
+                          ? `Starts: ${new Date(selectedCampaign.start_date).toLocaleDateString()}`
+                          : 'Not set'}
+                    </div>
+                  </div>
+                  <div style={{
+                    background: '#f8f9fa',
+                    padding: '16px',
+                    borderRadius: '10px',
+                    transition: 'all 0.3s'
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.background = '#e5e7eb';
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.background = '#f8f9fa';
+                    e.currentTarget.style.transform = 'translateY(0)';
+                  }}>
+                    <div style={{
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      color: '#6b7280',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px',
+                      marginBottom: '6px'
+                    }}>Created Date</div>
+                    <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                      {selectedCampaign.created_at ? new Date(selectedCampaign.created_at).toLocaleDateString() : 'N/A'}
+                    </div>
                   </div>
                 </div>
-              )}
 
-              <div className="border-top pt-3">
-                <h4 className="mb-3 app-heading">Campaign Fields ({selectedCampaign.fields?.length || 0})</h4>
+
+                {/* Campaign Users */}
+                {selectedCampaign.user_extensions && selectedCampaign.user_extensions.length > 0 && (
+                  <>
+                    <div style={{
+                      fontSize: '16px',
+                      fontWeight: 600,
+                      color: '#1f2937',
+                      marginBottom: '20px',
+                      paddingBottom: '10px',
+                      borderBottom: '2px solid #f8f9fa',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px'
+                    }}>
+                      <Users size={18} style={{ color: '#4680ff' }} />
+                      Campaign Users ({selectedCampaign.user_extensions.length})
+                    </div>
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                      gap: '12px',
+                      marginBottom: '30px'
+                    }}>
+                      {selectedCampaign.user_extensions.map((ue: any, index: number) => {
+                        const extension = extensions.find(ext => ext.id == ue.user_extension);
+                        const userName = extension?.display_name || extension?.name || `Extension ${ue.user_extension}`;
+                        return (
+                          <div key={index} style={{
+                            background: '#f8f9fa',
+                            padding: '12px',
+                            borderRadius: '8px',
+                            fontSize: '14px',
+                            fontWeight: 500,
+                            transition: 'all 0.3s'
+                          }}
+                          onMouseOver={(e) => {
+                            e.currentTarget.style.background = '#e5e7eb';
+                            e.currentTarget.style.transform = 'translateY(-2px)';
+                          }}
+                          onMouseOut={(e) => {
+                            e.currentTarget.style.background = '#f8f9fa';
+                            e.currentTarget.style.transform = 'translateY(0)';
+                          }}>
+                            {userName}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
+
+                {/* Campaign Fields */}
+                <div style={{
+                  fontSize: '16px',
+                  fontWeight: 600,
+                  color: '#1f2937',
+                  marginBottom: '20px',
+                  paddingBottom: '10px',
+                  borderBottom: '2px solid #f8f9fa',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px'
+                }}>
+                  <FileText size={18} style={{ color: '#4680ff' }} />
+                  Campaign Fields ({selectedCampaign.fields?.length || 0})
+                </div>
                 {selectedCampaign.fields && selectedCampaign.fields.length > 0 ? (
-                  <div className="table-responsive">
+                  <div className="table-responsive mb-4">
                     <table className="table table-bordered">
                       <thead>
                         <tr>
@@ -996,19 +2180,19 @@ const CrmCampaigns = () => {
                           <tr key={index}>
                             <td>{field.field_name}</td>
                             <td>
-                              <span className="status-badge primary text-capitalize">{getFieldTypeText(field.field_type)}</span>
+                              <Badge bg="primary" className="text-capitalize">{getFieldTypeText(field.field_type)}</Badge>
                             </td>
                             <td>
                               {field.field_type === "dropdown" && field.field_options ? (
                                 <div>
                                   {field.field_options.map((option: string, optIndex: number) => (
-                                    <span key={optIndex} className="status-badge info me-1">
+                                    <Badge key={optIndex} bg="info" className="me-1">
                                       {option}
-                                    </span>
+                                    </Badge>
                                   ))}
                                 </div>
                               ) : (
-                                <span className="status-badge info">N/A</span>
+                                <span className="text-muted">N/A</span>
                               )}
                             </td>
                           </tr>
@@ -1017,24 +2201,57 @@ const CrmCampaigns = () => {
                     </table>
                   </div>
                 ) : (
-                  <Alert variant="info">No custom fields defined for this campaign.</Alert>
+                  <Alert variant="info" className="mb-4">No custom fields defined for this campaign.</Alert>
                 )}
-              </div>
-            </div>
-          )}
-          </>
-        }
-        submitButtonText="Edit Campaign"
-        cancelButtonText="Close"
-        onSubmit={() => {
-          setShowViewModal(false);
-          handleEditCampaign(selectedCampaign);
-        }}
-        onCancel={() => {
-          setShowViewModal(false);
-          setSelectedCampaign(null);
-        }}
-      />
+
+                {/* Action Buttons */}
+                <div style={{
+                  display: 'flex',
+                  gap: '12px',
+                  justifyContent: 'flex-end',
+                  paddingTop: '20px',
+                  borderTop: '1px solid #e5e7eb'
+                }}>
+                  <Button 
+                    variant="outline-secondary"
+                    onClick={() => {
+                      setShowViewModal(false);
+                      setSelectedCampaign(null);
+                    }}
+                    style={{
+                      borderRadius: '8px',
+                      padding: '10px 24px',
+                      fontWeight: 500
+                    }}
+                  >
+                    Close
+                  </Button>
+                  {session?.user?.permissions?.includes('edit-crm-campaigns') && (
+                    <Button 
+                      variant="primary"
+                      onClick={() => {
+                        setShowViewModal(false);
+                        handleEditCampaign(selectedCampaign);
+                      }}
+                      style={{
+                        borderRadius: '8px',
+                        padding: '10px 24px',
+                        fontWeight: 500,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px'
+                      }}
+                    >
+                      <Edit size={16} />
+                      Edit Campaign
+                    </Button>
+                  )}
+                </div>
+              </>
+            )}
+          </Modal.Body>
+        </Modal>
+      )}
 
 
 
@@ -1073,8 +2290,8 @@ const CrmCampaigns = () => {
       <ConfirmModal
         show={showDeleteModal}
         onHide={() => setShowDeleteModal(false)}
-          title="Delete Campaign"
-          description={`Are you sure you want to delete the campaign ${selectedCampaign?.name}?`}
+        title="Delete Campaign"
+        description={`Are you sure you want to delete the campaign ${selectedCampaign?.name}?`}
         onConfirm={confirmDeleteCampaign}
         targetName={selectedCampaign?.name}
         confirmButtonText="Delete"
@@ -1082,6 +2299,42 @@ const CrmCampaigns = () => {
         requireTextConfirmation={true}
         requiredConfirmationText="delete"
       />
+
+      {/* Bulk Delete Confirmation */}
+      {confirmAction && confirmAction.type === 'delete' && (
+        <ConfirmModal
+          show={showConfirmDialog}
+          onHide={() => {
+            setShowConfirmDialog(false);
+            setConfirmAction(null);
+          }}
+          title={`Delete ${confirmAction.data.itemType}`}
+          description={`Are you sure you want to delete ${confirmAction.data.name}?`}
+          onConfirm={async () => {
+            try {
+              setLoading(true);
+              for (const id of selectedCampaigns) {
+                await deleteCampaign(id);
+              }
+              setSelectedCampaigns([]);
+              setShowConfirmDialog(false);
+              setConfirmAction(null);
+              toast.success(`${selectedCampaigns.length} campaign(s) deleted successfully!`);
+              setRefreshKey((prev) => prev + 1);
+            } catch (error) {
+              console.error("Failed to delete campaigns:", error);
+              toast.error("Failed to delete campaigns");
+            } finally {
+              setLoading(false);
+            }
+          }}
+          targetName={confirmAction.data.name}
+          confirmButtonText="Delete"
+          confirmButtonVariant="danger"
+          requireTextConfirmation={true}
+          requiredConfirmationText="delete"
+        />
+      )}
 
 
 

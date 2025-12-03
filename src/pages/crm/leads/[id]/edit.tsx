@@ -240,7 +240,7 @@ const EditLead = () => {
     }
   }, [formData.type]);
 
-  const fetchStages = async (type: "lead" | "opportunity") => {
+  const fetchStages = async (type: any) => {
     try {
       const stagesData = await getStages(type);
       setStages(stagesData || []);

@@ -100,6 +100,7 @@ export default function handler(req, res) {
     console.log('Connected to analysis server');
     clearTimeout(connectionTimeout);
     res.write(`data: ${JSON.stringify({ type: 'connection', status: 'connected', message: 'Connected to analysis server',step: 'Connected to server' })}\n\n`);
+    res.write(`data: ${JSON.stringify({ type: 'connection', status: 'connected', message: 'Connected to analysis server',step: 'Connected to server' })}\n\n`);
     
     // Send command to start analysis
     const analysisCommand = {

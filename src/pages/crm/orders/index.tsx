@@ -10,8 +10,13 @@ import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import {
   getOrders,
+  getOrder,
   getStages,
   deleteOrder,
+  getOrderAttachments,
+  uploadOrderAttachment,
+  deleteOrderAttachment,
+  downloadOrderAttachment,
 } from "@utils/crm";
 import { GetHierarchyData } from "@utils/users";
 import {
@@ -24,6 +29,7 @@ import {
   Card,
   Table,
   InputGroup,
+  Modal,
 } from "react-bootstrap";
 import Select from 'react-select';
 import { ModuleSlug } from "@utils/Helper";
@@ -62,6 +68,16 @@ import {
   ShoppingCart,
   AlertTriangle,
   RefreshCw,
+  History,
+  Mail,
+  Phone,
+  Building2,
+  Package,
+  Link2,
+  User,
+  Paperclip,
+  Upload,
+  Download as DownloadIcon,
 } from 'lucide-react';
 import { 
   PieChart, 
@@ -268,6 +284,19 @@ const CrmOrders = () => {
   const [successModalTitle, setSuccessModalTitle] = useState('');
   const [successModalDescription, setSuccessModalDescription] = useState('');
   
+  // View Modal
+  const [showOrderViewModal, setShowOrderViewModal] = useState(false);
+  const [viewingOrder, setViewingOrder] = useState<any>(null);
+  const [loadingOrder, setLoadingOrder] = useState(false);
+  
+  // Attachments Modal
+  const [showAttachmentModal, setShowAttachmentModal] = useState(false);
+  const [selectedOrderForAttachments, setSelectedOrderForAttachments] = useState<any>(null);
+  const [attachments, setAttachments] = useState<any[]>([]);
+  const [loadingAttachments, setLoadingAttachments] = useState(false);
+  const [uploadingFile, setUploadingFile] = useState(false);
+  const [fileInputRef, setFileInputRef] = useState<HTMLInputElement | null>(null);
+  
   // UI State
   const [showOrdersAnalytics, setShowOrdersAnalytics] = useState(false);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
@@ -342,6 +371,75 @@ const CrmOrders = () => {
     fetchOrders(ordersPagination.currentPage, ordersPagination.rowsPerPage, ordersSearch);
   }, [refreshKey, currentFilters, ordersPagination.currentPage, ordersPagination.rowsPerPage, fetchOrders]);
 
+  // Fetch attachments when modal opens
+  useEffect(() => {
+    if (showAttachmentModal && selectedOrderForAttachments?.id) {
+      fetchAttachments();
+    } else {
+      setAttachments([]);
+    }
+  }, [showAttachmentModal, selectedOrderForAttachments?.id]);
+
+  const fetchAttachments = async () => {
+    if (!selectedOrderForAttachments?.id) return;
+    setLoadingAttachments(true);
+    try {
+      const data = await getOrderAttachments(selectedOrderForAttachments.id);
+      setAttachments(data || []);
+    } catch (error) {
+      console.error("Failed to fetch attachments:", error);
+      setAttachments([]);
+    } finally {
+      setLoadingAttachments(false);
+    }
+  };
+
+  const formatFileSize = (bytes: number): string => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+  };
+
+  const handleFileUpload = async (file: File) => {
+    if (!selectedOrderForAttachments?.id) return;
+    
+    setUploadingFile(true);
+    try {
+      await uploadOrderAttachment(selectedOrderForAttachments.id, file, file.name);
+      await fetchAttachments(); // Refresh attachments list
+      if (fileInputRef) {
+        fileInputRef.value = '';
+      }
+    } catch (error) {
+      console.error("Failed to upload file:", error);
+    } finally {
+      setUploadingFile(false);
+    }
+  };
+
+  const handleDeleteAttachment = async (attachmentId: number) => {
+    if (!selectedOrderForAttachments?.id) return;
+    
+    try {
+      await deleteOrderAttachment(selectedOrderForAttachments.id, attachmentId);
+      await fetchAttachments(); // Refresh attachments list
+    } catch (error) {
+      console.error("Failed to delete attachment:", error);
+    }
+  };
+
+  const handleDownloadAttachment = async (attachmentId: number) => {
+    if (!selectedOrderForAttachments?.id) return;
+    
+    try {
+      await downloadOrderAttachment(selectedOrderForAttachments.id, attachmentId);
+    } catch (error) {
+      console.error("Failed to download attachment:", error);
+    }
+  };
+
   // Handle filter changes
   const handleFiltersChange = useCallback((filters: Record<string, any>) => {
     setCurrentFilters(filters);
@@ -367,6 +465,20 @@ const CrmOrders = () => {
       console.error("Failed to fetch extensions:", error);
     }
   };
+
+  const handleViewOrder = useCallback(async (orderId: number) => {
+    setLoadingOrder(true);
+    try {
+      const orderData: any = await getOrder(orderId);
+      setViewingOrder(orderData);
+      setShowOrderViewModal(true);
+    } catch (error) {
+      console.error("Failed to fetch order:", error);
+      toast.error("Failed to load order details");
+    } finally {
+      setLoadingOrder(false);
+    }
+  }, []);
 
   const handleDeleteOrder = useCallback((orderId: number) => {
     setOrderToDelete({ id: orderId });
@@ -1407,10 +1519,31 @@ const CrmOrders = () => {
                                 variant="link" 
                                 size="sm" 
                                 className="p-1" 
+                                title="View"
+                                onClick={() => handleViewOrder(order.rawData?.id || order.id)}
+                              >
+                                <Eye size={16} />
+                              </Button>
+                              <Button 
+                                variant="link" 
+                                size="sm" 
+                                className="p-1" 
                                 title="Edit"
                                 onClick={() => window.location.href = `/crm/orders/${order.rawData?.id || order.id}/edit`}
                               >
                                 <Edit size={16} />
+                              </Button>
+                              <Button 
+                                variant="link" 
+                                size="sm" 
+                                className="p-1 text-info" 
+                                title="Manage Attachments"
+                                onClick={() => {
+                                  setSelectedOrderForAttachments(order.rawData || order);
+                                  setShowAttachmentModal(true);
+                                }}
+                              >
+                                <Paperclip size={16} />
                               </Button>
                               <Button 
                                 variant="link" 
@@ -1455,6 +1588,1147 @@ const CrmOrders = () => {
         title={successModalTitle}
         description={successModalDescription}
       />
+
+      {/* Order View Modal */}
+      {viewingOrder && (
+        <Modal show={showOrderViewModal} onHide={() => setShowOrderViewModal(false)} size="xl" centered>
+          {/* Custom Header */}
+          <div style={{
+            color: 'black',
+            padding: '30px',
+            position: 'relative',
+            borderTopLeftRadius: '8px',
+            borderTopRightRadius: '8px',
+            borderBottom: '1px solid #e5e7eb'
+          }}>
+            <button 
+              onClick={() => setShowOrderViewModal(false)}
+              style={{
+                position: 'absolute',
+                top: '20px',
+                right: '20px',
+                background: 'rgba(255,255,255,0.2)',
+                border: 'none',
+                color: 'black',
+                width: '36px',
+                height: '36px',
+                borderRadius: '50%',
+                cursor: 'pointer',
+                transition: 'all 0.3s',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.background = 'rgba(255,255,255,0.3)';
+                e.currentTarget.style.transform = 'rotate(90deg)';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.background = 'rgba(255,255,255,0.2)';
+                e.currentTarget.style.transform = 'rotate(0deg)';
+              }}
+            >
+              <X size={20} />
+            </button>
+            <h3 style={{ margin: 0, fontWeight: 600, fontSize: '24px' }}>
+              {viewingOrder.order_number || `Order #${viewingOrder.id}`}
+            </h3>
+            <p style={{ margin: '8px 0 0 0', opacity: 0.9, fontSize: '14px' }}>
+              Order Details
+            </p>
+          </div>
+
+          <Modal.Body style={{ padding: '30px' }}>
+            {loadingOrder ? (
+              <div className="text-center py-4">
+                <div className="spinner-border" role="status">
+                  <span className="visually-hidden">Loading...</span>
+                </div>
+              </div>
+            ) : (
+              <>
+                {/* Order Information Section */}
+                <div style={{
+                  fontSize: '16px',
+                  fontWeight: 600,
+                  color: '#1f2937',
+                  marginBottom: '20px',
+                  paddingBottom: '10px',
+                  borderBottom: '2px solid #f8f9fa',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px'
+                }}>
+                  <ShoppingBag size={18} style={{ color: '#4680ff' }} />
+                  Order Information
+                </div>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+                  gap: '20px',
+                  marginBottom: '30px'
+                }}>
+                  <div style={{
+                    background: '#f8f9fa',
+                    padding: '16px',
+                    borderRadius: '10px',
+                    transition: 'all 0.3s'
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.background = '#e5e7eb';
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.background = '#f8f9fa';
+                    e.currentTarget.style.transform = 'translateY(0)';
+                  }}>
+                    <div style={{
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      color: '#6b7280',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px',
+                      marginBottom: '6px'
+                    }}>Order Number</div>
+                    <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                      {viewingOrder.order_number || `ORD-${viewingOrder.id}`}
+                    </div>
+                  </div>
+                  <div style={{
+                    background: '#f8f9fa',
+                    padding: '16px',
+                    borderRadius: '10px',
+                    transition: 'all 0.3s'
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.background = '#e5e7eb';
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.background = '#f8f9fa';
+                    e.currentTarget.style.transform = 'translateY(0)';
+                  }}>
+                    <div style={{
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      color: '#6b7280',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px',
+                      marginBottom: '6px'
+                    }}>Stage</div>
+                    <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                      <Badge 
+                        bg="secondary"
+                        style={{
+                          padding: '6px 14px',
+                          borderRadius: '20px',
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          backgroundColor: viewingOrder.stage?.color || '#6c757d'
+                        }}
+                      >
+                        {viewingOrder.stage?.name || 'Not assigned'}
+                      </Badge>
+                    </div>
+                  </div>
+                  <div style={{
+                    background: '#f8f9fa',
+                    padding: '16px',
+                    borderRadius: '10px',
+                    transition: 'all 0.3s'
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.background = '#e5e7eb';
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.background = '#f8f9fa';
+                    e.currentTarget.style.transform = 'translateY(0)';
+                  }}>
+                    <div style={{
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      color: '#6b7280',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px',
+                      marginBottom: '6px'
+                    }}>Status</div>
+                    <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                      <Badge 
+                        bg={
+                          viewingOrder.status?.toLowerCase() === 'completed' ? 'success' :
+                          viewingOrder.status?.toLowerCase() === 'pending' ? 'warning' :
+                          'secondary'
+                        }
+                        style={{
+                          padding: '6px 14px',
+                          borderRadius: '20px',
+                          fontSize: '12px',
+                          fontWeight: 600
+                        }}
+                      >
+                        {viewingOrder.status || 'N/A'}
+                      </Badge>
+                    </div>
+                  </div>
+                  <div style={{
+                    background: '#f8f9fa',
+                    padding: '16px',
+                    borderRadius: '10px',
+                    transition: 'all 0.3s'
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.background = '#e5e7eb';
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.background = '#f8f9fa';
+                    e.currentTarget.style.transform = 'translateY(0)';
+                  }}>
+                    <div style={{
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      color: '#6b7280',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px',
+                      marginBottom: '6px'
+                    }}>Final Amount</div>
+                    <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                      {viewingOrder.currency || 'USD'} {parseFloat(viewingOrder.final_amount || viewingOrder.total_amount || '0').toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </div>
+                  </div>
+                  <div style={{
+                    background: '#f8f9fa',
+                    padding: '16px',
+                    borderRadius: '10px',
+                    transition: 'all 0.3s'
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.background = '#e5e7eb';
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.background = '#f8f9fa';
+                    e.currentTarget.style.transform = 'translateY(0)';
+                  }}>
+                    <div style={{
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      color: '#6b7280',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px',
+                      marginBottom: '6px'
+                    }}>Order Date</div>
+                    <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                      {viewingOrder.order_date ? new Date(viewingOrder.order_date).toLocaleDateString() : 'N/A'}
+                    </div>
+                  </div>
+                  <div style={{
+                    background: '#f8f9fa',
+                    padding: '16px',
+                    borderRadius: '10px',
+                    transition: 'all 0.3s'
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.background = '#e5e7eb';
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.background = '#f8f9fa';
+                    e.currentTarget.style.transform = 'translateY(0)';
+                  }}>
+                    <div style={{
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      color: '#6b7280',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px',
+                      marginBottom: '6px'
+                    }}>Expected Delivery</div>
+                    <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                      {viewingOrder.expected_delivery_date ? new Date(viewingOrder.expected_delivery_date).toLocaleDateString() : 'N/A'}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Customer Information */}
+                <div style={{
+                  fontSize: '16px',
+                  fontWeight: 600,
+                  color: '#1f2937',
+                  marginBottom: '20px',
+                  paddingBottom: '10px',
+                  borderBottom: '2px solid #f8f9fa',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px'
+                }}>
+                  <User size={18} style={{ color: '#4680ff' }} />
+                  Customer Information
+                </div>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+                  gap: '20px',
+                  marginBottom: '30px'
+                }}>
+                  <div style={{
+                    background: '#f8f9fa',
+                    padding: '16px',
+                    borderRadius: '10px',
+                    transition: 'all 0.3s'
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.background = '#e5e7eb';
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.background = '#f8f9fa';
+                    e.currentTarget.style.transform = 'translateY(0)';
+                  }}>
+                    <div style={{
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      color: '#6b7280',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px',
+                      marginBottom: '6px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px'
+                    }}>
+                      <User size={14} />
+                      Customer Name
+                    </div>
+                    <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                      {viewingOrder.customer_name || 'N/A'}
+                    </div>
+                  </div>
+                  {viewingOrder.customer_email && (
+                    <div style={{
+                      background: '#f8f9fa',
+                      padding: '16px',
+                      borderRadius: '10px',
+                      transition: 'all 0.3s'
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.background = '#e5e7eb';
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.background = '#f8f9fa';
+                      e.currentTarget.style.transform = 'translateY(0)';
+                    }}>
+                      <div style={{
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        color: '#6b7280',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px',
+                        marginBottom: '6px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}>
+                        <Mail size={14} />
+                        Email
+                      </div>
+                      <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                        {viewingOrder.customer_email}
+                      </div>
+                    </div>
+                  )}
+                  {viewingOrder.customer_phone && (
+                    <div style={{
+                      background: '#f8f9fa',
+                      padding: '16px',
+                      borderRadius: '10px',
+                      transition: 'all 0.3s'
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.background = '#e5e7eb';
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.background = '#f8f9fa';
+                      e.currentTarget.style.transform = 'translateY(0)';
+                    }}>
+                      <div style={{
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        color: '#6b7280',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px',
+                        marginBottom: '6px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}>
+                        <Phone size={14} />
+                        Phone
+                      </div>
+                      <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                        {viewingOrder.customer_phone}
+                      </div>
+                    </div>
+                  )}
+                  {viewingOrder.customer_address && (
+                    <div style={{
+                      background: '#f8f9fa',
+                      padding: '16px',
+                      borderRadius: '10px',
+                      transition: 'all 0.3s'
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.background = '#e5e7eb';
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.background = '#f8f9fa';
+                      e.currentTarget.style.transform = 'translateY(0)';
+                    }}>
+                      <div style={{
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        color: '#6b7280',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px',
+                        marginBottom: '6px'
+                      }}>Address</div>
+                      <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                        {viewingOrder.customer_address}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Linked Deal */}
+                {viewingOrder.deal && (
+                  <>
+                    <div style={{
+                      fontSize: '16px',
+                      fontWeight: 600,
+                      color: '#1f2937',
+                      marginBottom: '20px',
+                      paddingBottom: '10px',
+                      borderBottom: '2px solid #f8f9fa',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px'
+                    }}>
+                      <Link2 size={18} style={{ color: '#4680ff' }} />
+                      Linked Deal
+                    </div>
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+                      gap: '20px',
+                      marginBottom: '30px'
+                    }}>
+                      <div style={{
+                        background: '#f8f9fa',
+                        padding: '16px',
+                        borderRadius: '10px',
+                        transition: 'all 0.3s'
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.background = '#e5e7eb';
+                        e.currentTarget.style.transform = 'translateY(-2px)';
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.background = '#f8f9fa';
+                        e.currentTarget.style.transform = 'translateY(0)';
+                      }}>
+                        <div style={{
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          color: '#6b7280',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.5px',
+                          marginBottom: '6px'
+                        }}>Deal Name</div>
+                        <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                          {viewingOrder.deal.name || 'N/A'}
+                        </div>
+                      </div>
+                      {viewingOrder.deal.company_name && (
+                        <div style={{
+                          background: '#f8f9fa',
+                          padding: '16px',
+                          borderRadius: '10px',
+                          transition: 'all 0.3s'
+                        }}
+                        onMouseOver={(e) => {
+                          e.currentTarget.style.background = '#e5e7eb';
+                          e.currentTarget.style.transform = 'translateY(-2px)';
+                        }}
+                        onMouseOut={(e) => {
+                          e.currentTarget.style.background = '#f8f9fa';
+                          e.currentTarget.style.transform = 'translateY(0)';
+                        }}>
+                          <div style={{
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            color: '#6b7280',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.5px',
+                            marginBottom: '6px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px'
+                          }}>
+                            <Building2 size={14} />
+                            Company
+                          </div>
+                          <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                            {viewingOrder.deal.company_name}
+                          </div>
+                        </div>
+                      )}
+                      {viewingOrder.deal_id && (
+                        <div style={{
+                          background: '#f8f9fa',
+                          padding: '16px',
+                          borderRadius: '10px',
+                          transition: 'all 0.3s'
+                        }}
+                        onMouseOver={(e) => {
+                          e.currentTarget.style.background = '#e5e7eb';
+                          e.currentTarget.style.transform = 'translateY(-2px)';
+                        }}
+                        onMouseOut={(e) => {
+                          e.currentTarget.style.background = '#f8f9fa';
+                          e.currentTarget.style.transform = 'translateY(0)';
+                        }}>
+                          <div style={{
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            color: '#6b7280',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.5px',
+                            marginBottom: '6px'
+                          }}>Actions</div>
+                          <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                            <Link href={`/crm/deals/${viewingOrder.deal_id}/edit`} className="text-decoration-none">
+                              <Button variant="link" size="sm" className="p-0">
+                                View Deal <Eye size={14} className="ms-1" />
+                              </Button>
+                            </Link>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
+
+                {/* Order Items/Products */}
+                {viewingOrder.items && Array.isArray(viewingOrder.items) && viewingOrder.items.length > 0 && (
+                  <>
+                    <div style={{
+                      fontSize: '16px',
+                      fontWeight: 600,
+                      color: '#1f2937',
+                      marginBottom: '20px',
+                      paddingBottom: '10px',
+                      borderBottom: '2px solid #f8f9fa',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px'
+                    }}>
+                      <Package size={18} style={{ color: '#4680ff' }} />
+                      Order Items ({viewingOrder.items.length})
+                    </div>
+                    <div style={{ marginBottom: '30px' }}>
+                      <Table hover responsive>
+                        <thead style={{ background: '#f8f9fa' }}>
+                          <tr>
+                            <th>#</th>
+                            <th>Product Name</th>
+                            <th>SKU</th>
+                            <th>Quantity</th>
+                            <th>Unit Price</th>
+                            <th>Total Price</th>
+                            {viewingOrder.items.some((item: any) => item.description) && <th>Description</th>}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {viewingOrder.items.map((item: any, index: number) => (
+                            <tr key={item.id || index}>
+                              <td>{index + 1}</td>
+                              <td className="fw-semibold">{item.product_name || item.product?.name || 'N/A'}</td>
+                              <td>{item.product?.sku || 'N/A'}</td>
+                              <td>{item.quantity || '0'}</td>
+                              <td>{viewingOrder.currency || 'USD'} {parseFloat(item.unit_price || '0').toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                              <td className="fw-semibold">{viewingOrder.currency || 'USD'} {parseFloat(item.total_price || '0').toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                              {viewingOrder.items.some((i: any) => i.description) && (
+                                <td style={{ maxWidth: '200px' }}>{item.description || '-'}</td>
+                              )}
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot style={{ background: '#f8f9fa', fontWeight: 600 }}>
+                          <tr>
+                            <td colSpan={viewingOrder.items.some((item: any) => item.description) ? 5 : 4} className="text-end">Subtotal:</td>
+                            <td>{viewingOrder.currency || 'USD'} {parseFloat(viewingOrder.total_amount || '0').toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                            {viewingOrder.items.some((item: any) => item.description) && <td></td>}
+                          </tr>
+                          {viewingOrder.discount_amount && parseFloat(viewingOrder.discount_amount) > 0 && (
+                            <tr>
+                              <td colSpan={viewingOrder.items.some((item: any) => item.description) ? 5 : 4} className="text-end">Discount:</td>
+                              <td>- {viewingOrder.currency || 'USD'} {parseFloat(viewingOrder.discount_amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                              {viewingOrder.items.some((item: any) => item.description) && <td></td>}
+                            </tr>
+                          )}
+                          {viewingOrder.tax_amount && parseFloat(viewingOrder.tax_amount) > 0 && (
+                            <tr>
+                              <td colSpan={viewingOrder.items.some((item: any) => item.description) ? 5 : 4} className="text-end">Tax:</td>
+                              <td>{viewingOrder.currency || 'USD'} {parseFloat(viewingOrder.tax_amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                              {viewingOrder.items.some((item: any) => item.description) && <td></td>}
+                            </tr>
+                          )}
+                          <tr style={{ fontSize: '16px' }}>
+                            <td colSpan={viewingOrder.items.some((item: any) => item.description) ? 5 : 4} className="text-end">Total:</td>
+                            <td>{viewingOrder.currency || 'USD'} {parseFloat(viewingOrder.final_amount || viewingOrder.total_amount || '0').toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                            {viewingOrder.items.some((item: any) => item.description) && <td></td>}
+                          </tr>
+                        </tfoot>
+                      </Table>
+                    </div>
+                  </>
+                )}
+
+                {/* Additional Order Details */}
+                <div style={{
+                  fontSize: '16px',
+                  fontWeight: 600,
+                  color: '#1f2937',
+                  marginBottom: '20px',
+                  paddingBottom: '10px',
+                  borderBottom: '2px solid #f8f9fa',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px'
+                }}>
+                  <FileText size={18} style={{ color: '#4680ff' }} />
+                  Additional Information
+                </div>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+                  gap: '20px',
+                  marginBottom: '30px'
+                }}>
+                  {viewingOrder.order_approval_status && (
+                    <div style={{
+                      background: '#f8f9fa',
+                      padding: '16px',
+                      borderRadius: '10px',
+                      transition: 'all 0.3s'
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.background = '#e5e7eb';
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.background = '#f8f9fa';
+                      e.currentTarget.style.transform = 'translateY(0)';
+                    }}>
+                      <div style={{
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        color: '#6b7280',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px',
+                        marginBottom: '6px'
+                      }}>Approval Status</div>
+                      <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                        <Badge 
+                          bg={
+                            viewingOrder.order_approval_status?.toLowerCase() === 'approved' ? 'success' :
+                            viewingOrder.order_approval_status?.toLowerCase() === 'rejected' ? 'danger' :
+                            'warning'
+                          }
+                        >
+                          {viewingOrder.order_approval_status}
+                        </Badge>
+                      </div>
+                    </div>
+                  )}
+                  {viewingOrder.fulfillment_status && (
+                    <div style={{
+                      background: '#f8f9fa',
+                      padding: '16px',
+                      borderRadius: '10px',
+                      transition: 'all 0.3s'
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.background = '#e5e7eb';
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.background = '#f8f9fa';
+                      e.currentTarget.style.transform = 'translateY(0)';
+                    }}>
+                      <div style={{
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        color: '#6b7280',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px',
+                        marginBottom: '6px'
+                      }}>Fulfillment Status</div>
+                      <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                        <Badge 
+                          bg={
+                            viewingOrder.fulfillment_status?.toLowerCase().includes('completed') || viewingOrder.fulfillment_status?.toLowerCase().includes('delivered') ? 'success' :
+                            viewingOrder.fulfillment_status?.toLowerCase().includes('progress') ? 'primary' :
+                            'secondary'
+                          }
+                        >
+                          {viewingOrder.fulfillment_status}
+                        </Badge>
+                      </div>
+                    </div>
+                  )}
+                  {viewingOrder.payment_status && (
+                    <div style={{
+                      background: '#f8f9fa',
+                      padding: '16px',
+                      borderRadius: '10px',
+                      transition: 'all 0.3s'
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.background = '#e5e7eb';
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.background = '#f8f9fa';
+                      e.currentTarget.style.transform = 'translateY(0)';
+                    }}>
+                      <div style={{
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        color: '#6b7280',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px',
+                        marginBottom: '6px'
+                      }}>Payment Status</div>
+                      <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                        <Badge 
+                          bg={
+                            viewingOrder.payment_status?.toLowerCase() === 'paid' ? 'success' :
+                            viewingOrder.payment_status?.toLowerCase() === 'partial' ? 'warning' :
+                            'danger'
+                          }
+                        >
+                          {viewingOrder.payment_status}
+                        </Badge>
+                      </div>
+                    </div>
+                  )}
+                  {viewingOrder.order_priority && (
+                    <div style={{
+                      background: '#f8f9fa',
+                      padding: '16px',
+                      borderRadius: '10px',
+                      transition: 'all 0.3s'
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.background = '#e5e7eb';
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.background = '#f8f9fa';
+                      e.currentTarget.style.transform = 'translateY(0)';
+                    }}>
+                      <div style={{
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        color: '#6b7280',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px',
+                        marginBottom: '6px'
+                      }}>Priority</div>
+                      <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                        <Badge 
+                          bg={
+                            viewingOrder.order_priority?.toLowerCase() === 'urgent' ? 'danger' :
+                            viewingOrder.order_priority?.toLowerCase() === 'high' ? 'warning' :
+                            viewingOrder.order_priority?.toLowerCase() === 'medium' ? 'info' :
+                            'secondary'
+                          }
+                        >
+                          {viewingOrder.order_priority}
+                        </Badge>
+                      </div>
+                    </div>
+                  )}
+                  {viewingOrder.contract_length && (
+                    <div style={{
+                      background: '#f8f9fa',
+                      padding: '16px',
+                      borderRadius: '10px',
+                      transition: 'all 0.3s'
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.background = '#e5e7eb';
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.background = '#f8f9fa';
+                      e.currentTarget.style.transform = 'translateY(0)';
+                    }}>
+                      <div style={{
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        color: '#6b7280',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px',
+                        marginBottom: '6px'
+                      }}>Contract Length</div>
+                      <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                        {viewingOrder.contract_length}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Notes */}
+                {viewingOrder.notes && (
+                  <>
+                    <div style={{
+                      fontSize: '16px',
+                      fontWeight: 600,
+                      color: '#1f2937',
+                      marginBottom: '20px',
+                      paddingBottom: '10px',
+                      borderBottom: '2px solid #f8f9fa',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px'
+                    }}>
+                      <FileText size={18} style={{ color: '#4680ff' }} />
+                      Notes
+                    </div>
+                    <div style={{
+                      background: '#f8f9fa',
+                      padding: '16px',
+                      borderRadius: '10px',
+                      marginBottom: '30px',
+                      fontSize: '14px',
+                      color: '#1f2937',
+                      whiteSpace: 'pre-wrap'
+                    }}>
+                      {viewingOrder.notes}
+                    </div>
+                  </>
+                )}
+
+                {/* History */}
+                {viewingOrder.histories && Array.isArray(viewingOrder.histories) && viewingOrder.histories.length > 0 && (
+                  <>
+                    <div style={{
+                      fontSize: '16px',
+                      fontWeight: 600,
+                      color: '#1f2937',
+                      marginBottom: '20px',
+                      paddingBottom: '10px',
+                      borderBottom: '2px solid #f8f9fa',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px'
+                    }}>
+                      <History size={18} style={{ color: '#4680ff' }} />
+                      Activity History ({viewingOrder.histories.length})
+                    </div>
+                    <div style={{ position: 'relative', paddingLeft: '30px', marginBottom: '30px' }}>
+                      <div style={{
+                        content: '',
+                        position: 'absolute',
+                        left: '8px',
+                        top: 0,
+                        bottom: 0,
+                        width: '2px',
+                        background: '#e5e7eb'
+                      }} />
+                      {viewingOrder.histories.map((history: any, idx: number) => (
+                        <div key={history.id || idx} style={{ position: 'relative', paddingBottom: '20px' }}>
+                          <div style={{
+                            content: '',
+                            position: 'absolute',
+                            left: '-26px',
+                            top: '4px',
+                            width: '12px',
+                            height: '12px',
+                            borderRadius: '50%',
+                            background: history.event === 'created' ? '#10b981' : '#4680ff',
+                            border: '3px solid white',
+                            boxShadow: '0 0 0 2px #e5e7eb'
+                          }} />
+                          <div style={{
+                            background: '#f8f9fa',
+                            padding: '12px 16px',
+                            borderRadius: '8px'
+                          }}>
+                            <div style={{ fontSize: '12px', color: '#6b7280', fontWeight: 600, marginBottom: '4px' }}>
+                              {new Date(history.created_at).toLocaleString()}
+                            </div>
+                            <div style={{ fontSize: '14px', color: '#1f2937', marginBottom: '4px', fontWeight: 500 }}>
+                              {history.event === 'created' ? 'Created' : history.event === 'updated' ? 'Updated' : history.event}
+                            </div>
+                            {history.description && (
+                              <div style={{ fontSize: '13px', color: '#6b7280', marginBottom: '8px' }}>
+                                {history.description}
+                              </div>
+                            )}
+                            {history.changes && Object.keys(history.changes).length > 0 && (
+                              <div style={{ fontSize: '12px', color: '#6b7280' }}>
+                                {Object.entries(history.changes).map(([key, change]: [string, any]) => (
+                                  <div key={key} style={{ marginTop: '4px' }}>
+                                    <strong>{key}:</strong> {change.old ? `${change.old} → ` : ''}{change.new || 'N/A'}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+
+                {/* Action Buttons */}
+                <div style={{
+                  display: 'flex',
+                  gap: '12px',
+                  flexWrap: 'wrap',
+                  paddingTop: '20px',
+                  borderTop: '1px solid #e5e7eb'
+                }}>
+                  {session?.user?.permissions?.includes('edit-crm-orders') && (
+                    <Button
+                      variant="primary"
+                      style={{
+                        padding: '10px 20px',
+                        borderRadius: '8px',
+                        fontWeight: 500,
+                        fontSize: '14px',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        background: '#4680ff',
+                        border: 'none'
+                      }}
+                      onClick={() => {
+                        setShowOrderViewModal(false);
+                        window.location.href = `/crm/orders/${viewingOrder.id}/edit`;
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.background = '#3b6ce5';
+                        e.currentTarget.style.transform = 'translateY(-2px)';
+                        e.currentTarget.style.boxShadow = '0 4px 12px rgba(70, 128, 255, 0.4)';
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.background = '#4680ff';
+                        e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.boxShadow = 'none';
+                      }}
+                    >
+                      <Edit size={16} />
+                      Edit Order
+                    </Button>
+                  )}
+                  <Button
+                    variant="outline-secondary"
+                    style={{
+                      padding: '10px 20px',
+                      borderRadius: '8px',
+                      fontWeight: 500,
+                      fontSize: '14px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '8px'
+                    }}
+                    onClick={() => setShowOrderViewModal(false)}
+                  >
+                    Close
+                  </Button>
+                </div>
+              </>
+            )}
+          </Modal.Body>
+        </Modal>
+      )}
+
+      {/* Manage Attachments Modal */}
+      {selectedOrderForAttachments && (
+        <Modal 
+          show={showAttachmentModal} 
+          onHide={() => {
+            setShowAttachmentModal(false);
+            setSelectedOrderForAttachments(null);
+          }} 
+          size="lg" 
+          centered
+        >
+          <Modal.Header closeButton className="border-0 pb-0">
+            <Modal.Title className="d-flex align-items-center gap-2">
+              <div 
+                className="rounded-circle d-flex align-items-center justify-content-center" 
+                style={{ width: '40px', height: '40px', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}
+              >
+                <Paperclip size={20} color="white" />
+              </div>
+              <div>
+                <div style={{ fontSize: '20px', fontWeight: 600 }}>Manage Attachments</div>
+                <div style={{ fontSize: '13px', color: '#6c757d', fontWeight: 'normal' }}>
+                  {selectedOrderForAttachments.order_number || selectedOrderForAttachments.name || `Order #${selectedOrderForAttachments.id}`}
+                </div>
+              </div>
+            </Modal.Title>
+          </Modal.Header>
+
+          <Modal.Body className="p-4">
+            {/* Upload Section */}
+            <div className="mb-4 p-4 border rounded" style={{ background: '#f8f9fa' }}>
+              <div className="d-flex align-items-center justify-content-between mb-3">
+                <div>
+                  <h6 className="mb-1 fw-bold">Upload New Attachments</h6>
+                  <small className="text-muted">Supported formats: PDF, CSV, Excel, or Image (Max 5MB)</small>
+                </div>
+              </div>
+              <div className="d-flex gap-2">
+                <Form.Control
+                  ref={(input) => setFileInputRef(input as HTMLInputElement)}
+                  type="file"
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                    const files = e.target.files;
+                    if (files && files.length > 0) {
+                      const file = files[0];
+                      handleFileUpload(file);
+                    }
+                  }}
+                  accept=".pdf,.csv,.xls,.xlsx,.xlsm,.png,.jpg,.jpeg,.gif,.webp"
+                  style={{ flex: 1 }}
+                  disabled={uploadingFile}
+                />
+                <Button 
+                  variant="primary" 
+                  className="d-flex align-items-center gap-2"
+                  disabled={uploadingFile}
+                >
+                  {uploadingFile ? (
+                    <>
+                      <div className="spinner-border spinner-border-sm" role="status" />
+                      Uploading...
+                    </>
+                  ) : (
+                    <>
+                      <Upload size={16} />
+                      Upload
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+
+            {/* Attachments List */}
+            <div>
+              <h6 className="mb-3 fw-bold d-flex align-items-center gap-2">
+                <FileText size={18} />
+                Attached Files ({attachments.length})
+              </h6>
+              
+              {loadingAttachments ? (
+                <div className="text-center py-5">
+                  <div className="spinner-border text-primary" role="status">
+                    <span className="visually-hidden">Loading...</span>
+                  </div>
+                </div>
+              ) : attachments.length === 0 ? (
+                <div className="text-center py-5 text-muted">
+                  <Paperclip size={48} className="mb-3 opacity-25" />
+                  <div>No attachments yet</div>
+                  <small>Upload files using the form above</small>
+                </div>
+              ) : (
+                <div className="d-flex flex-column gap-2">
+                  {attachments.map((attachment: any) => (
+                    <Card key={attachment.id} className="border shadow-sm">
+                      <Card.Body className="p-3">
+                        <div className="d-flex align-items-center justify-content-between">
+                          <div className="d-flex align-items-center gap-3 flex-grow-1">
+                            {/* File Icon */}
+                            <div 
+                              className="rounded d-flex align-items-center justify-content-center"
+                              style={{ 
+                                width: '45px', 
+                                height: '45px', 
+                                background: attachment.mime_type?.includes('pdf') ? '#dc3545' : 
+                                           attachment.mime_type?.includes('csv') || attachment.mime_type?.includes('excel') || attachment.mime_type?.includes('spreadsheet') ? '#198754' : 
+                                           attachment.mime_type?.includes('image') ? '#0d6efd' : '#6c757d',
+                                color: 'white'
+                              }}
+                            >
+                              <FileText size={22} />
+                            </div>
+                            
+                            {/* File Info */}
+                            <div className="flex-grow-1">
+                              <div className="fw-semibold" style={{ fontSize: '14px' }}>{attachment.name}</div>
+                              <div style={{ fontSize: '12px', color: '#6c757d' }}>
+                                {formatFileSize(attachment.file_size)} • {attachment.created_at ? new Date(attachment.created_at).toLocaleDateString() : 'N/A'}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Actions */}
+                          <div className="d-flex gap-1">
+                            <Button 
+                              variant="link" 
+                              size="sm" 
+                              className="p-2 text-primary" 
+                              title="Download"
+                              onClick={() => handleDownloadAttachment(attachment.id)}
+                            >
+                              <DownloadIcon size={18} />
+                            </Button>
+                            <Button 
+                              variant="link" 
+                              size="sm" 
+                              className="p-2 text-danger" 
+                              title="Delete"
+                              onClick={() => {
+                                if (window.confirm(`Are you sure you want to delete "${attachment.name}"?`)) {
+                                  handleDeleteAttachment(attachment.id);
+                                }
+                              }}
+                            >
+                              <Trash2 size={18} />
+                            </Button>
+                          </div>
+                        </div>
+                      </Card.Body>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </div>
+          </Modal.Body>
+
+          <Modal.Footer className="border-0">
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setShowAttachmentModal(false);
+                setSelectedOrderForAttachments(null);
+              }}
+            >
+              Close
+            </Button>
+          </Modal.Footer>
+        </Modal>
+      )}
     </React.Fragment>
   );
 };

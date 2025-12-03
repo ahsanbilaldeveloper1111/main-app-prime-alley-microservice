@@ -35,7 +35,7 @@ export interface StageData {
   active: boolean;
   created_at: string;
   updated_at: string;
-  type: 'lead' | 'opportunity';
+  type: 'lead' | 'lost_reason' | 'deal' | 'order';
 }
 
 export interface LostReasonData {
@@ -51,16 +51,17 @@ export interface LostReasonData {
 
 
 export interface MeetingData {
-  id: number;
+  id?: number;
   name: string;
-  title: string;
+  meeting_type: string;
   meeting_date: string;
   meeting_time: string;
-  lead_id: number;
-  status: string;
-  created_at: string;
-  updated_at: string;
-  extensions?: string[];
+  meeting_outcome?: string;
+  lead_id?: string | number;
+  deal_id?: string | number;
+  extensions: string[];
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface LeadData {
@@ -114,25 +115,60 @@ export interface PaginationParams extends Record<string, any> {
 
 // CRM Dashboard Data
 export interface DashboardData {
-  total_leads: number;
-  total_opportunities: number;
-  total_meetings: number;
-  total_campaigns: number;
-  meetings_next_24h: number;
-  meetings_last_24h: number;
-  leads_by_stage: Array<{
-    stage_name: string;
-    count: number;
-    color: string;
+  stats: {
+    leads: {
+      total: number;
+      active: number;
+      lost: number;
+      this_month: number;
+    };
+    deals: {
+      total: number;
+      active: number;
+      lost: number;
+      this_month: number;
+    };
+    orders: {
+      total: number;
+      this_month: number;
+    };
+  };
+  monthly_data: Array<{
+    month: string;
+    month_label: string;
+    leads: number | string;
+    deals: number | string;
+    orders: number | string;
   }>;
-  opportunities_by_stage: Array<{
-    stage_name: string;
-    count: number;
-    color: string;
-  }>;
-  recent_leads: LeadData[];
-  recent_opportunities: OpportunityData[];
-  recent_meetings: MeetingData[];
+  stage_distribution: {
+    leads: Array<{
+      stage_id: number;
+      stage_name: string;
+      color: string;
+      count: number;
+    }>;
+    deals: Array<{
+      stage_id: number;
+      stage_name: string;
+      color: string;
+      count: number;
+    }>;
+    orders: Array<{
+      stage_id: number;
+      stage_name: string;
+      color: string;
+      count: number;
+    }>;
+  };
+  conversion_stats: {
+    last_30_days: {
+      leads: number;
+      deals: number;
+      leads_to_deals_percentage: number;
+      orders: number;
+      deals_to_orders_percentage: number;
+    };
+  };
 }
 
 // Helper function to extract data from controlhub response
@@ -159,74 +195,10 @@ function extractData<T>(response: any): T {
 }
 
 // CRM Dashboard - construct from available APIs
-export const getCrmDashboard = async (): Promise<DashboardData> => {
+export const getCrmDashboard = async () => {
   try {
-    // Get data from available APIs
-    const [leads, opportunities, meetings, stages, campaigns] = await Promise.all([
-      getLeads({ per_page: 1000 }),
-      getOpportunities({ per_page: 1000 }),
-      getMeetings().then(meetings => meetings.data),
-      getStages(), // Get all stages for dashboard
-      getCampaigns({ per_page: 1000 })
-    ]);
-    console.log("ZE MEETINGS", meetings);
-    
-    // Calculate dashboard data
-    const totalLeads = leads?.total || 0;
-    const totalOpportunities = opportunities?.total || 0;
-    const totalMeetings = meetings?.length || 0;
-    const totalCampaigns = campaigns?.total || 0;
-    
-    // Calculate meetings in next 24h and last 24h
-    const now = new Date();
-    const next24h = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-    const last24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-    
-    const meetingsNext24h = meetings.filter((meeting: MeetingData) => {
-      // meeting_date is already a full ISO date string, combine with meeting_time
-      const meetingDateTime = new Date(`${meeting.meeting_date.split('T')[0]}T${meeting.meeting_time}`);
-      return meetingDateTime >= now && meetingDateTime <= next24h;
-    }).length;
-    
-    const meetingsLast24h = meetings.filter((meeting: MeetingData) => {
-      // meeting_date is already a full ISO date string, combine with meeting_time
-      const meetingDateTime = new Date(`${meeting.meeting_date.split('T')[0]}T${meeting.meeting_time}`);
-      return meetingDateTime >= last24h && meetingDateTime <= now;
-    }).length;
-    
-    // Group leads by stage (only actual leads, not opportunities)
-    const leadsByStage = stages.filter(stage => stage.type === 'lead').map((stage: StageData) => ({
-      stage_name: stage.name,
-      count: leads.data.filter((lead: LeadData) => lead.stage_id == stage.id && lead.type === 'lead').length,
-      color: stage.color
-    }));
-    
-    // Group opportunities by stage (only opportunities, not leads)
-    const opportunitiesByStage = stages.filter(stage => stage.type === 'opportunity').map((stage: StageData) => ({
-      stage_name: stage.name,
-      count: opportunities.data.filter((opportunity: OpportunityData) => opportunity.stage_id == stage.id && opportunity.type === 'opportunity').length,
-      color: stage.color
-    }));
-    
-    
-    // Get recent data
-    const recentLeads = leads.data.slice(0, 5);
-    const recentOpportunities = opportunities.data.slice(0, 5);
-    const recentMeetings = meetings.slice(0, 5);
-    
-    return {
-      total_leads: totalLeads,
-      total_opportunities: totalOpportunities,
-      total_meetings: totalMeetings,
-      total_campaigns: totalCampaigns,
-      meetings_next_24h: meetingsNext24h,
-      meetings_last_24h: meetingsLast24h,
-      leads_by_stage: leadsByStage,
-      opportunities_by_stage: opportunitiesByStage,
-      recent_leads: recentLeads,
-      recent_opportunities: recentOpportunities,
-      recent_meetings: recentMeetings
-    };
+    const response = await axiosInstance.get("/crm/dashboard");
+    return extractData(response);
   } catch (error: any) {
     toast.error(error?.message || "Failed to fetch dashboard data");
     throw error;
@@ -407,7 +379,7 @@ export const getAssigneeComments = async (leadId: number): Promise<any[]> => {
 };
 
 // Stage Management
-export const getStages = async (type?: 'lead' | 'opportunity' | 'deal' | 'order'): Promise<StageData[]> => {
+export const getStages = async (type?: 'lead' | 'lost_reason' | 'deal' | 'order'): Promise<StageData[]> => {
   try {
     console.log("getStages: Making API call to /crm/stages");
     const params = type ? { type } : {};
@@ -538,49 +510,12 @@ export const getMeetings = async (
   }
 };
 
-export const createMeeting = async (
-  data: Partial<MeetingData>
-): Promise<MeetingData> => {
-  try {
-    const response = await axiosInstance.post("/crm/create-meeting", data);
-    return extractData<MeetingData>(response.data);
-  } catch (error: any) {
-    toast.error(error?.message || "Failed to create meeting");
-    throw error;
-  }
-};
-
 export const getMeeting = async (id: number): Promise<MeetingData> => {
   try {
     const response = await axiosInstance.get(`/crm/meetings/${id}`);
     return extractData<MeetingData>(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to fetch meeting");
-    throw error;
-  }
-};
-
-export const updateMeeting = async (
-  id: number,
-  data: Partial<MeetingData>
-): Promise<MeetingData> => {
-  try {
-    const response = await axiosInstance.put(`/crm/update-meeting`, {
-      ...data,
-      id,
-    });
-    return extractData<MeetingData>(response.data);
-  } catch (error: any) {
-    toast.error(error?.message || "Failed to update meeting");
-    throw error;
-  }
-};
-
-export const deleteMeeting = async (id: number): Promise<void> => {
-  try {
-    await axiosInstance.delete(`/crm/meetings/${id}`);
-  } catch (error: any) {
-    toast.error(error?.message || "Failed to delete meeting");
     throw error;
   }
 };
@@ -1047,6 +982,7 @@ export interface CampaignField {
   field_name: string;
   field_type: 'string' | 'text' | 'integer' | 'date' | 'email' | 'dropdown';
   field_options?: string[];
+  options?: Array<string | { value?: string; label?: string }>;
   sort_order?: number;
 }
 
@@ -1390,6 +1326,13 @@ export interface DealData {
   decision_maker_name: string;
   decision_maker_phone_country_code: string;
   decision_maker_phone: string;
+  decision_maker_email?: string;
+  main_decision_maker?: {
+    name?: string;
+    phone_country_code?: string;
+    phone?: string;
+    email?: string;
+  };
   deal_type: string;
   contract_length: string;
   contract_length_custom: string | null;
@@ -1416,6 +1359,9 @@ export interface DealData {
   lost_reason_id: number | null;
   lost_feedback: string | null;
   currency: string;
+  tax_percentage?: string | number;
+  standard_discount_percentage?: string | number;
+  special_discount_percentage?: string | number;
   deleted_at: string | null;
   created_by: string | null;
   stage?: StageData;
@@ -1447,6 +1393,15 @@ export interface DealData {
   }>;
   meetings?: any[];
   orders?: any[];
+  attachments?: Array<{
+    id: number;
+    file_path: string;
+    [key: string]: any;
+  }>;
+  histories?: Array<{
+    id: number;
+    [key: string]: any;
+  }>;
 }
 
 export const getDeals = async (
@@ -1762,3 +1717,489 @@ export const updateOrder = async (
     throw error;
   }
 };
+
+// Attachment interfaces
+export interface AttachmentData {
+  id: number;
+  deal_id?: string;
+  order_id?: string;
+  name: string;
+  file_path: string;
+  file_name: string;
+  mime_type: string;
+  file_size: number;
+  created_at: string;
+  updated_at: string;
+}
+
+// Deal Attachments API
+export const getDealAttachments = async (dealId: number): Promise<AttachmentData[]> => {
+  try {
+    const response = await axiosInstance.get(`/crm/deals/${dealId}/attachments`);
+    const responseData: any = response.data?.data;
+    return Array.isArray(responseData?.data) ? responseData.data : (Array.isArray(responseData) ? responseData : []);
+  } catch (error: any) {
+    toast.error(error?.response?.data?.message || error?.message || "Failed to fetch attachments");
+    throw error;
+  }
+};
+
+export const uploadDealAttachment = async (
+  dealId: number,
+  file: File,
+  name: string
+): Promise<AttachmentData> => {
+  try {
+    // Validate file size (5MB max)
+    const maxSize = 5 * 1024 * 1024; // 5MB in bytes
+    if (file.size > maxSize) {
+      throw new Error("File size exceeds 5MB limit");
+    }
+
+    // Validate file type
+    const allowedTypes = [
+      'application/pdf',
+      'text/csv',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'image/jpeg',
+      'image/jpg',
+      'image/png',
+      'image/gif',
+      'image/webp'
+    ];
+    
+    if (!allowedTypes.includes(file.type)) {
+      throw new Error("Invalid file type. Allowed types: PDF, CSV, Excel, or Image");
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('name', name);
+
+    const response = await axiosInstance.post(`/crm/deals/${dealId}/attachments`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    
+    const responseData: any = response.data?.data;
+    toast.success("Attachment uploaded successfully");
+    return responseData?.data || responseData || response.data;
+  } catch (error: any) {
+    const errorMessage = error?.response?.data?.message || error?.message || "Failed to upload attachment";
+    toast.error(errorMessage);
+    throw error;
+  }
+};
+
+export const deleteDealAttachment = async (dealId: number, attachmentId: number): Promise<void> => {
+  try {
+    await axiosInstance.delete(`/crm/deals/${dealId}/attachments/${attachmentId}`);
+    toast.success("Attachment deleted successfully");
+  } catch (error: any) {
+    toast.error(error?.response?.data?.message || error?.message || "Failed to delete attachment");
+    throw error;
+  }
+};
+
+export const downloadDealAttachment = async (dealId: number, attachmentId: number): Promise<void> => {
+  try {
+    const response = await axiosInstance.get(`/crm/deals/${dealId}/attachments/${attachmentId}/download`, {
+      responseType: "blob",
+      headers: {
+        Accept: "blob",
+      },
+    });
+    
+    // Check if response is valid
+    if (!response.data || response.data.size === 0) {
+      throw new Error('Empty file response received');
+    }
+    
+    // Extract filename from content-disposition header if available
+    let filename = `deal-attachment-${attachmentId}`;
+    const contentDisposition = response.headers['content-disposition'];
+    if (contentDisposition) {
+      const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+      if (filenameMatch && filenameMatch[1]) {
+        filename = filenameMatch[1].replace(/['"]/g, '');
+      }
+    }
+    
+    // response.data is already a blob when responseType is "blob"
+    const blob = response.data;
+    
+    // Verify blob type (optional check, as we support multiple file types)
+    if (!blob.type) {
+      console.warn('No blob type detected');
+    }
+    
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.style.display = 'none';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+    
+    toast.success('Attachment downloaded successfully');
+  } catch (error: any) {
+    console.error('Attachment download error:', error);
+    toast.error(error?.message || "Failed to download attachment");
+    throw error;
+  }
+};
+
+// Order Attachments API
+export const getOrderAttachments = async (orderId: number): Promise<AttachmentData[]> => {
+  try {
+    const response = await axiosInstance.get(`/crm/orders/${orderId}/attachments`);
+    const responseData: any = response.data?.data;
+    return Array.isArray(responseData?.data) ? responseData.data : (Array.isArray(responseData) ? responseData : []);
+  } catch (error: any) {
+    toast.error(error?.response?.data?.message || error?.message || "Failed to fetch attachments");
+    throw error;
+  }
+};
+
+export const uploadOrderAttachment = async (
+  orderId: number,
+  file: File,
+  name: string
+): Promise<AttachmentData> => {
+  try {
+    // Validate file size (5MB max)
+    const maxSize = 5 * 1024 * 1024; // 5MB in bytes
+    if (file.size > maxSize) {
+      throw new Error("File size exceeds 5MB limit");
+    }
+
+    // Validate file type
+    const allowedTypes = [
+      'application/pdf',
+      'text/csv',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'image/jpeg',
+      'image/jpg',
+      'image/png',
+      'image/gif',
+      'image/webp'
+    ];
+    
+    if (!allowedTypes.includes(file.type)) {
+      throw new Error("Invalid file type. Allowed types: PDF, CSV, Excel, or Image");
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('name', name);
+
+    const response = await axiosInstance.post(`/crm/orders/${orderId}/attachments`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    
+    const responseData: any = response.data?.data;
+    toast.success("Attachment uploaded successfully");
+    return responseData?.data || responseData || response.data;
+  } catch (error: any) {
+    const errorMessage = error?.response?.data?.message || error?.message || "Failed to upload attachment";
+    toast.error(errorMessage);
+    throw error;
+  }
+};
+
+export const deleteOrderAttachment = async (orderId: number, attachmentId: number): Promise<void> => {
+  try {
+    await axiosInstance.delete(`/crm/orders/${orderId}/attachments/${attachmentId}`);
+    toast.success("Attachment deleted successfully");
+  } catch (error: any) {
+    toast.error(error?.response?.data?.message || error?.message || "Failed to delete attachment");
+    throw error;
+  }
+};
+
+export const downloadOrderAttachment = async (orderId: number, attachmentId: number): Promise<void> => {
+  try {
+    const response = await axiosInstance.get(`/crm/orders/${orderId}/attachments/${attachmentId}/download`, {
+      responseType: "blob",
+      headers: {
+        Accept: "blob",
+      },
+    });
+    
+    // Check if response is valid
+    if (!response.data || response.data.size === 0) {
+      throw new Error('Empty file response received');
+    }
+    
+    // Extract filename from content-disposition header if available
+    let filename = `order-attachment-${attachmentId}`;
+    const contentDisposition = response.headers['content-disposition'];
+    if (contentDisposition) {
+      const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+      if (filenameMatch && filenameMatch[1]) {
+        filename = filenameMatch[1].replace(/['"]/g, '');
+      }
+    }
+    
+    // response.data is already a blob when responseType is "blob"
+    const blob = response.data;
+    
+    // Verify blob type (optional check, as we support multiple file types)
+    if (!blob.type) {
+      console.warn('No blob type detected');
+    }
+    
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.style.display = 'none';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+    
+    toast.success('Attachment downloaded successfully');
+  } catch (error: any) {
+    console.error('Attachment download error:', error);
+    toast.error(error?.message || "Failed to download attachment");
+    throw error;
+  }
+};
+
+// Follow-up interfaces
+export interface FollowUpData {
+  id?: number;
+  lead_id: number;
+  follow_up_date: string;
+  follow_up_status: string;
+  communication_channel: string;
+  communication_channel_other?: string;
+  notes: string;
+  user_extension: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+// Lead Follow-ups API
+export const createLeadFollowUp = async (leadId: number, data: {
+  follow_up_date: string;
+  follow_up_status: string;
+  communication_channel: string;
+  communication_channel_other?: string;
+  notes: string;
+  user_extension: string;
+}): Promise<FollowUpData> => {
+  try {
+    const response = await axiosInstance.post(`/crm/leads/${leadId}/follow-ups`, data);
+    const responseData: any = response.data?.data;
+    toast.success("Follow-up created successfully");
+    return responseData?.data || responseData || response.data;
+  } catch (error: any) {
+    toast.error(error?.response?.data?.message || error?.message || "Failed to create follow-up");
+    throw error;
+  }
+};
+
+export const deleteLeadFollowUp = async (leadId: number, followUpId: number): Promise<void> => {
+  try {
+    await axiosInstance.delete(`/crm/leads/${leadId}/follow-ups/${followUpId}`);
+    toast.success("Follow-up deleted successfully");
+  } catch (error: any) {
+    toast.error(error?.response?.data?.message || error?.message || "Failed to delete follow-up");
+    throw error;
+  }
+};
+
+// Meetings API
+export const createMeeting = async (data: {
+  name: string;
+  meeting_type: string;
+  meeting_date: string;
+  meeting_time: string;
+  meeting_outcome?: string;
+  lead_id?: string;
+  deal_id?: string;
+  extensions: string[];
+}): Promise<MeetingData> => {
+  try {
+    const response = await axiosInstance.post(`/crm/create-meeting`, data);
+    const responseData: any = response.data?.data;
+    toast.success("Meeting created successfully");
+    return responseData?.data || responseData || response.data;
+  } catch (error: any) {
+    toast.error(error?.response?.data?.message || error?.message || "Failed to create meeting");
+    throw error;
+  }
+};
+
+export const updateMeeting = async (meetingId: number, data: {
+  name?: string;
+  meeting_type?: string;
+  meeting_date?: string;
+  meeting_time?: string;
+  meeting_outcome?: string;
+  extensions?: string[];
+  id?: number;
+}): Promise<MeetingData> => {
+  try {
+    data.id = meetingId;
+    const response = await axiosInstance.put(`/crm/update-meeting`, data);
+    const responseData: any = response.data?.data;
+    toast.success("Meeting updated successfully");
+    return responseData?.data || responseData || response.data;
+  } catch (error: any) {
+    toast.error(error?.response?.data?.message || error?.message || "Failed to update meeting");
+    throw error;
+  }
+};
+
+export const deleteMeeting = async (meetingId: number): Promise<void> => {
+  try {
+    await axiosInstance.delete(`/crm/meetings/${meetingId}`);
+    toast.success("Meeting deleted successfully");
+  } catch (error: any) {
+    toast.error(error?.response?.data?.message || error?.message || "Failed to delete meeting");
+    throw error;
+  }
+};
+
+// Task interfaces
+export interface TaskData {
+  id?: number;
+  name: string;
+  user_extension: string;
+  created_by: string;
+  urgency: 'low' | 'med' | 'high';
+  phone?: string;
+  email?: string;
+  company_name?: string;
+  due_date: string;
+  notes?: TaskNote[];
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface TaskNote {
+  id?: number;
+  note: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+// Tasks API
+export const getTasks = async (params: PaginationParams = {}): Promise<PaginationWrapper<TaskData>> => {
+  try {
+    const response = await axiosInstance.get("/crm/tasks", { params });
+    return extractData<PaginationWrapper<TaskData>>(response.data);
+  } catch (error: any) {
+    toast.error(error?.response?.data?.message || error?.message || "Failed to fetch tasks");
+    throw error;
+  }
+};
+
+export const getTask = async (taskId: number): Promise<TaskData> => {
+  try {
+    const response = await axiosInstance.get(`/crm/tasks/${taskId}`);
+    return extractData<TaskData>(response.data);
+  } catch (error: any) {
+    toast.error(error?.response?.data?.message || error?.message || "Failed to fetch task");
+    throw error;
+  }
+};
+
+export const createTask = async (data: {
+  name: string;
+  user_extension: string;
+  created_by: string;
+  urgency: 'low' | 'med' | 'high';
+  phone?: string;
+  email?: string;
+  company_name?: string;
+  due_date: string;
+  notes?: Array<{ note: string }>;
+}): Promise<TaskData> => {
+  try {
+    const response = await axiosInstance.post("/crm/tasks", data);
+    const responseData: any = response.data?.data;
+    toast.success("Task created successfully");
+    return responseData?.data || responseData || response.data;
+  } catch (error: any) {
+    toast.error(error?.response?.data?.message || error?.message || "Failed to create task");
+    throw error;
+  }
+};
+
+export const updateTask = async (taskId: number, data: {
+  name?: string;
+  user_extension?: string;
+  created_by?: string;
+  urgency?: 'low' | 'med' | 'high';
+  phone?: string;
+  email?: string;
+  company_name?: string;
+  due_date?: string;
+}): Promise<TaskData> => {
+  try {
+    const response = await axiosInstance.put(`/crm/tasks/${taskId}`, data);
+    const responseData: any = response.data?.data;
+    toast.success("Task updated successfully");
+    return responseData?.data || responseData || response.data;
+  } catch (error: any) {
+    toast.error(error?.response?.data?.message || error?.message || "Failed to update task");
+    throw error;
+  }
+};
+
+export const deleteTask = async (taskId: number): Promise<void> => {
+  try {
+    await axiosInstance.delete(`/crm/tasks/${taskId}`);
+    toast.success("Task deleted successfully");
+  } catch (error: any) {
+    toast.error(error?.response?.data?.message || error?.message || "Failed to delete task");
+    throw error;
+  }
+};
+
+// Task Notes API
+export const createTaskNote = async (taskId: number, data: { note: string }): Promise<TaskNote> => {
+  try {
+    const response = await axiosInstance.post(`/crm/tasks/${taskId}/notes`, data);
+    const responseData: any = response.data?.data;
+    toast.success("Note added successfully");
+    return responseData?.data || responseData || response.data;
+  } catch (error: any) {
+    toast.error(error?.response?.data?.message || error?.message || "Failed to create note");
+    throw error;
+  }
+};
+
+export const updateTaskNote = async (taskId: number, noteId: number, data: { note: string }): Promise<TaskNote> => {
+  try {
+    const response = await axiosInstance.put(`/crm/tasks/${taskId}/notes/${noteId}`, data);
+    const responseData: any = response.data?.data;
+    toast.success("Note updated successfully");
+    return responseData?.data || responseData || response.data;
+  } catch (error: any) {
+    toast.error(error?.response?.data?.message || error?.message || "Failed to update note");
+    throw error;
+  }
+};
+
+export const deleteTaskNote = async (taskId: number, noteId: number): Promise<void> => {
+  try {
+    await axiosInstance.delete(`/crm/tasks/${taskId}/notes/${noteId}`);
+    toast.success("Note deleted successfully");
+  } catch (error: any) {
+    toast.error(error?.response?.data?.message || error?.message || "Failed to delete note");
+    throw error;
+  }
+};
+
