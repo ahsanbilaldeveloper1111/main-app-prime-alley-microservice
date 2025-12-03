@@ -136,10 +136,11 @@ MENU_COLORS: {
     // CRM
     CRM_DASHBOARD: 'Dashboard',
     LEADS: 'Leads',
+    DEALS: 'Deals',
     OPPORTUNITIES: 'Opportunities',
     STAGES: 'Stages',
     LOST_REASONS_CRM: 'Lost Reasons',
-    DATA_MANAGEMENT: 'Data Management',
+    DATA_MANAGEMENT: 'Prospects',
     CAMPAIGNS: 'Campaigns',
     
     // Call Recordings

@@ -130,6 +130,20 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
           url: '/crm/leads'
         },
         {
+          id: 'crm-deals',
+          title: HEADER_CONSTANTS.SUBMENU_LABELS.DEALS,
+          icon: <Target size={16} />,
+          permission: PERMISSIONS.VIEW_CRM_LEADS,
+          url: '/crm/deals'
+        },
+        {
+          id: 'crm-orders',
+          title: HEADER_CONSTANTS.SUBMENU_LABELS.ORDERS,
+          icon: <Target size={16} />,
+          permission: PERMISSIONS.VIEW_CRM_LEADS,
+          url: '/crm/orders'
+        },
+        {
           id: 'crm-opportunities',
           title: HEADER_CONSTANTS.SUBMENU_LABELS.OPPORTUNITIES,
           icon: <TrendingUp size={16} />,
