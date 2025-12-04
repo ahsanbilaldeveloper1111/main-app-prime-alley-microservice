@@ -81,6 +81,7 @@
     "react-icons": "^5.5.0",
     "react-id-swiper": "^4.0.0",
     "react-masonry-css": "^1.0.16",
+    "react-phone-number-input": "^3.4.14",
     "react-redux": "^9.2.0",
     "react-select": "^5.10.1",
     "react-simple-star-rating": "^5.1.7",
