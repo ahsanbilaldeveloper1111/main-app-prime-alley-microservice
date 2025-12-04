@@ -385,7 +385,7 @@ const CrmLeads = () => {
         setLoading(false);
       }
     },
-    [currentFilters, leadsSearch] // Add currentFilters and leadsSearch as dependencies
+    [currentFilters] // Only currentFilters as dependency
   );
 
   // Handle activeFilter changes to update currentFilters and stage dropdown

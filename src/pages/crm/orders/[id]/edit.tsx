@@ -12,6 +12,9 @@ import {
 } from "@utils/crm";
 import { Button, Row, Col, Form, Card, Badge, Table, Modal } from "react-bootstrap";
 import Select from "react-select";
+import PhoneInput from "react-phone-number-input";
+import { parsePhoneNumber } from "react-phone-number-input";
+import "react-phone-number-input/style.css";
 import { CheckCircle, ChevronLeft, ChevronRight, ArrowLeft, Plus, Edit, Trash2, Package } from "lucide-react";
 import Link from "next/link";
 import { toast } from "react-toastify";
@@ -61,6 +64,7 @@ const EditOrder = () => {
     customer_name: "",
     customer_email: "",
     customer_phone: "",
+    customer_phone_country_code: "",
     customer_address: "",
     order_date: new Date().toISOString().split('T')[0],
     expected_delivery_date: "",
@@ -92,6 +96,34 @@ const EditOrder = () => {
           return dateString.split('T')[0];
         };
 
+        // Parse phone number to extract country code and national number
+        const parsePhoneNumberFormat = (phone: string): { countryCode: string; phoneNumber: string } => {
+          if (!phone) return { countryCode: "", phoneNumber: "" };
+          
+          // Try to parse as international format
+          try {
+            const phoneNumber = parsePhoneNumber(phone);
+            if (phoneNumber) {
+              return {
+                countryCode: `+${phoneNumber.countryCallingCode}`,
+                phoneNumber: phoneNumber.nationalNumber,
+              };
+            }
+          } catch (error) {
+            // If parsing fails, try to match pattern: +country_code space rest_of_number
+            const match = phone.match(/^(\+\d{1,4})\s+(.+)$/);
+            if (match) {
+              return {
+                countryCode: match[1], // e.g., "+92"
+                phoneNumber: match[2],  // e.g., "3200654656"
+              };
+            }
+          }
+          
+          // If no match, return original phone as phoneNumber
+          return { countryCode: "", phoneNumber: phone };
+        };
+
         // Transform items from API format
         const transformedItems: OrderItem[] = (order.items || []).map((item: any) => ({
           id: item.id,
@@ -112,10 +144,14 @@ const EditOrder = () => {
         const taxPercentage = grandTotal > 0 ? ((taxAmount / (grandTotal - discountAmount)) * 100).toFixed(2) : "0";
         const discountPercentage = grandTotal > 0 ? ((discountAmount / grandTotal) * 100).toFixed(2) : "0";
 
+        // Parse phone number from order
+        const parsedPhone = parsePhoneNumberFormat(order.customer_phone || "");
+
         setFormData({
           customer_name: order.customer_name || "",
           customer_email: order.customer_email || "",
-          customer_phone: order.customer_phone || "",
+          customer_phone: parsedPhone.phoneNumber,
+          customer_phone_country_code: parsedPhone.countryCode,
           customer_address: order.customer_address || "",
           order_date: formatDate(order.order_date),
           expected_delivery_date: formatDate(order.expected_delivery_date),
@@ -197,10 +233,15 @@ const EditOrder = () => {
     setLoading(true);
     try {
       const totals = calculateTotals();
+      // Format phone number for submission
+      const formattedPhone = formData.customer_phone_country_code && formData.customer_phone
+        ? `${formData.customer_phone_country_code} ${formData.customer_phone}`
+        : formData.customer_phone;
+      
       const payload: any = {
         customer_name: formData.customer_name,
         customer_email: formData.customer_email,
-        customer_phone: formData.customer_phone,
+        customer_phone: formattedPhone,
         customer_address: formData.customer_address || "",
         order_date: formData.order_date,
         expected_delivery_date: formData.expected_delivery_date || "",
@@ -353,13 +394,51 @@ const EditOrder = () => {
                     <Col md={6}>
                       <Form.Group className="mb-3">
                         <Form.Label>Customer Phone <span className="text-danger">*</span></Form.Label>
-                        <Form.Control 
-                          type="tel" 
-                          value={formData.customer_phone}
-                          onChange={(e) => setFormData({ ...formData, customer_phone: e.target.value })}
-                          placeholder="Enter phone number" 
-                          required 
-                        />
+                        <div className="phone-input-wrapper">
+                          <PhoneInput
+                            international
+                            defaultCountry="US"
+                            value={formData.customer_phone_country_code && formData.customer_phone 
+                              ? `${formData.customer_phone_country_code}${formData.customer_phone}` 
+                              : formData.customer_phone || undefined}
+                            onChange={(value) => {
+                              if (value) {
+                                try {
+                                  // Parse the phone number to extract country code and national number
+                                  const phoneNumber = parsePhoneNumber(value);
+                                  if (phoneNumber) {
+                                    setFormData({
+                                      ...formData,
+                                      customer_phone_country_code: `+${phoneNumber.countryCallingCode}`,
+                                      customer_phone: phoneNumber.nationalNumber,
+                                    });
+                                  } else {
+                                    // Fallback: store full number in phone field
+                                    setFormData({
+                                      ...formData,
+                                      customer_phone_country_code: "",
+                                      customer_phone: value,
+                                    });
+                                  }
+                                } catch (error) {
+                                  // If parsing fails, store full number in phone field
+                                  setFormData({
+                                    ...formData,
+                                    customer_phone_country_code: "",
+                                    customer_phone: value,
+                                  });
+                                }
+                              } else {
+                                setFormData({
+                                  ...formData,
+                                  customer_phone_country_code: "",
+                                  customer_phone: "",
+                                });
+                              }
+                            }}
+                            placeholder="Enter phone number"
+                          />
+                        </div>
                       </Form.Group>
                     </Col>
                     <Col md={6}>

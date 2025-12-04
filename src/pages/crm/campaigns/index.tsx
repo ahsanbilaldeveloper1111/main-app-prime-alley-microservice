@@ -548,7 +548,7 @@ const CrmCampaigns = () => {
         const response = await getCampaigns({
           page: campaignsPagination.currentPage,
           per_page: campaignsPagination.rowsPerPage,
-          search: campaignsSearch,
+          search: memoizedFilters.search || undefined,
           filters: {
             ...memoizedFilters,
             status: combinedStatus,
@@ -573,7 +573,7 @@ const CrmCampaigns = () => {
     if (session?.user?.permissions?.includes('list-crm-campaigns')) {
       loadCampaigns();
     }
-  }, [refreshKey, campaignsPagination, campaignsSearch, memoizedFilters, campaignFilters, activeFilter, session]);
+  }, [refreshKey, campaignsPagination, memoizedFilters, campaignFilters, activeFilter, session]);
 
   // Modal handlers
   const handleCreateCampaign = useCallback(() => {
@@ -1145,6 +1145,7 @@ const CrmCampaigns = () => {
           searchValue={campaignsSearch}
           onSearchChange={(value) => setCampaignsSearch(value)}
           onSearch={() => {
+            handleFiltersChange({ ...currentFilters, search: campaignsSearch });
             setCampaignsPagination({ ...campaignsPagination, currentPage: 1 });
             setRefreshKey(prev => prev + 1);
           }}

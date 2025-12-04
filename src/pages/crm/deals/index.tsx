@@ -333,7 +333,7 @@ const CrmDeals = () => {
 
   // Fetch deals when filters or search change
   const fetchDeals = useCallback(
-    async (page = 1, perPage = 15, search = "") => {
+    async (page = 1, perPage = 15) => {
       setLoading(true);
       try {
         const params: any = {
@@ -341,11 +341,9 @@ const CrmDeals = () => {
           per_page: perPage,
         };
 
-        // Use search from currentFilters if available, otherwise use the search parameter
+        // Use search from currentFilters if available
         if (currentFilters.search) {
           params.search = currentFilters.search;
-        } else if (search) {
-          params.search = search;
         }
 
         // Add filter parameters at top level
@@ -427,7 +425,7 @@ const CrmDeals = () => {
   }, [activeFilter, stages]);
 
   useEffect(() => {
-    fetchDeals(dealsPagination.currentPage, dealsPagination.rowsPerPage, dealsSearch);
+    fetchDeals(dealsPagination.currentPage, dealsPagination.rowsPerPage);
   }, [refreshKey, currentFilters, dealsPagination.currentPage, dealsPagination.rowsPerPage, fetchDeals]);
 
   // Fetch attachments when modal opens

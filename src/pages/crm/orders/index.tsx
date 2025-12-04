@@ -314,7 +314,7 @@ const CrmOrders = () => {
 
   // Fetch orders when filters or search change
   const fetchOrders = useCallback(
-    async (page = 1, perPage = 15, search = "") => {
+    async (page = 1, perPage = 15) => {
       setLoading(true);
       try {
         const params: any = {
@@ -322,11 +322,9 @@ const CrmOrders = () => {
           per_page: perPage,
         };
 
-        // Use search from currentFilters if available, otherwise use the search parameter
+        // Use search from currentFilters if available
         if (currentFilters.search) {
           params.search = currentFilters.search;
-        } else if (search) {
-          params.search = search;
         }
 
         // Add filter parameters at top level
@@ -359,7 +357,7 @@ const CrmOrders = () => {
         setLoading(false);
       }
     },
-    [currentFilters, ordersSearch]
+    [currentFilters]
   );
 
   // Handle activeFilter changes to update currentFilters and stage dropdown
@@ -408,7 +406,7 @@ const CrmOrders = () => {
   }, [activeFilter, stages]);
 
   useEffect(() => {
-    fetchOrders(ordersPagination.currentPage, ordersPagination.rowsPerPage, ordersSearch);
+    fetchOrders(ordersPagination.currentPage, ordersPagination.rowsPerPage);
   }, [refreshKey, currentFilters, ordersPagination.currentPage, ordersPagination.rowsPerPage, fetchOrders]);
 
   // Fetch attachments when modal opens
@@ -2095,61 +2093,77 @@ const CrmOrders = () => {
                       <Package size={18} style={{ color: '#4680ff' }} />
                       Order Items ({viewingOrder.items.length})
                     </div>
-                    <div style={{ marginBottom: '30px' }}>
-                      <Table hover responsive>
-                        <thead style={{ background: '#f8f9fa' }}>
-                          <tr>
-                            <th>#</th>
-                            <th>Product Name</th>
-                            <th>SKU</th>
-                            <th>Quantity</th>
-                            <th>Unit Price</th>
-                            <th>Total Price</th>
-                            {viewingOrder.items.some((item: any) => item.description) && <th>Description</th>}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {viewingOrder.items.map((item: any, index: number) => (
-                            <tr key={item.id || index}>
-                              <td>{index + 1}</td>
-                              <td className="fw-semibold">{item.product_name || item.product?.name || 'N/A'}</td>
-                              <td>{item.product?.sku || 'N/A'}</td>
-                              <td>{item.quantity || '0'}</td>
-                              <td>{viewingOrder.currency || 'USD'} {parseFloat(item.unit_price || '0').toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                              <td className="fw-semibold">{viewingOrder.currency || 'USD'} {parseFloat(item.total_price || '0').toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                              {viewingOrder.items.some((i: any) => i.description) && (
-                                <td style={{ maxWidth: '200px' }}>{item.description || '-'}</td>
-                              )}
-                            </tr>
-                          ))}
-                        </tbody>
-                        <tfoot style={{ background: '#f8f9fa', fontWeight: 600 }}>
-                          <tr>
-                            <td colSpan={viewingOrder.items.some((item: any) => item.description) ? 5 : 4} className="text-end">Subtotal:</td>
-                            <td>{viewingOrder.currency || 'USD'} {parseFloat(viewingOrder.total_amount || '0').toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                            {viewingOrder.items.some((item: any) => item.description) && <td></td>}
-                          </tr>
-                          {viewingOrder.discount_amount && parseFloat(viewingOrder.discount_amount) > 0 && (
+                    <div style={{ marginBottom: '30px', width: '100%', overflowX: 'auto' }}>
+                      <div className="table-responsive custom-table-order" style={{ width: '100%' }}>
+                        <Table hover style={{ width: '100%', marginBottom: 0, tableLayout: 'auto' }}>
+                          <thead style={{ background: '#f8f9fa' }}>
                             <tr>
-                              <td colSpan={viewingOrder.items.some((item: any) => item.description) ? 5 : 4} className="text-end">Discount:</td>
-                              <td>- {viewingOrder.currency || 'USD'} {parseFloat(viewingOrder.discount_amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                              {viewingOrder.items.some((item: any) => item.description) && <td></td>}
+                              <th>#</th>
+                              <th>Product Name</th>
+                              <th>SKU</th>
+                              <th>Quantity</th>
+                              {viewingOrder.items.some((item: any) => item.description) && <th>Description</th>}
+                              <th>Unit Price</th>
+                              <th style={{
+                                  maxWidth: '100px',
+                                  minWidth: 'unset',
+                                }}>Total Price</th>
                             </tr>
-                          )}
-                          {viewingOrder.tax_amount && parseFloat(viewingOrder.tax_amount) > 0 && (
+                          </thead>
+                          <tbody>
+                            {viewingOrder.items.map((item: any, index: number) => (
+                              <tr key={item.id || index}>
+                                <td>{index + 1}</td>
+                                <td className="fw-semibold">{item.product_name || item.product?.name || 'N/A'}</td>
+                                <td>{item.product?.sku || 'N/A'}</td>
+                                <td>{item.quantity || '0'}</td>
+                                {viewingOrder.items.some((i: any) => i.description) && (
+                                  <td style={{ maxWidth: '200px' }}>{item.description || '-'}</td>
+                                )}
+                                <td>{viewingOrder.currency || 'USD'} {parseFloat(item.unit_price || '0').toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                                <td style={{
+                                  maxWidth: '100px',
+                                  minWidth: 'unset',
+                                }} className="fw-semibold">{viewingOrder.currency || 'USD'} {parseFloat(item.total_price || '0').toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                          <tfoot style={{ background: '#f8f9fa', fontWeight: 600 }}>
                             <tr>
-                              <td colSpan={viewingOrder.items.some((item: any) => item.description) ? 5 : 4} className="text-end">Tax:</td>
-                              <td>{viewingOrder.currency || 'USD'} {parseFloat(viewingOrder.tax_amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                              {viewingOrder.items.some((item: any) => item.description) && <td></td>}
+                              <td colSpan={viewingOrder.items.some((item: any) => item.description) ? 6 : 5} className="text-end">Subtotal:</td>
+                              <td style={{
+                                  maxWidth: '100px',
+                                  minWidth: 'unset',
+                                }}>{viewingOrder.currency || 'USD'} {parseFloat(viewingOrder.total_amount || '0').toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                             </tr>
-                          )}
-                          <tr style={{ fontSize: '16px' }}>
-                            <td colSpan={viewingOrder.items.some((item: any) => item.description) ? 5 : 4} className="text-end">Total:</td>
-                            <td>{viewingOrder.currency || 'USD'} {parseFloat(viewingOrder.final_amount || viewingOrder.total_amount || '0').toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                            {viewingOrder.items.some((item: any) => item.description) && <td></td>}
-                          </tr>
-                        </tfoot>
-                      </Table>
+                            {viewingOrder.discount_amount && parseFloat(viewingOrder.discount_amount) > 0 && (
+                              <tr>
+                                <td colSpan={viewingOrder.items.some((item: any) => item.description) ? 6 : 5} className="text-end">Discount:</td>
+                                <td style={{
+                                  maxWidth: '100px',
+                                  minWidth: 'unset',
+                                }}>- {viewingOrder.currency || 'USD'} {parseFloat(viewingOrder.discount_amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                              </tr>
+                            )}
+                            {viewingOrder.tax_amount && parseFloat(viewingOrder.tax_amount) > 0 && (
+                              <tr>
+                                <td colSpan={viewingOrder.items.some((item: any) => item.description) ? 6 : 5} className="text-end">Tax:</td>
+                                <td style={{
+                                  maxWidth: '100px',
+                                  minWidth: 'unset',
+                                }}>{viewingOrder.currency || 'USD'} {parseFloat(viewingOrder.tax_amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                              </tr>
+                            )}
+                            <tr style={{ fontSize: '16px' }}>
+                              <td colSpan={viewingOrder.items.some((item: any) => item.description) ? 6 : 5} className="text-end">Total:</td>
+                              <td style={{
+                                  maxWidth: '100px',
+                                  minWidth: 'unset',
+                                }}>{viewingOrder.currency || 'USD'} {parseFloat(viewingOrder.final_amount || viewingOrder.total_amount || '0').toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                            </tr>
+                          </tfoot>
+                        </Table>
+                      </div>
                     </div>
                   </>
                 )}

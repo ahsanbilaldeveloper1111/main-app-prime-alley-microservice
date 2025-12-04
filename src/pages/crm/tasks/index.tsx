@@ -88,6 +88,7 @@ import { useSession } from "next-auth/react";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
+import ConfirmModal from "@pages/partial/ConfirmModal";
 
 // KPI Card Component
 interface KPICardData {
@@ -231,7 +232,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
                 <FiSearch size={16} />
               </Button>
             </InputGroup>
-            <Button 
+            {/* <Button 
               variant={showAdvancedFilters ? 'primary' : 'outline-secondary'}
               onClick={onToggleAdvancedFilters}
               className="d-flex align-items-center flex-shrink-0"
@@ -243,7 +244,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
                   {advancedFilterCount}
                 </Badge>
               )}
-            </Button>
+            </Button> */}
           </div>
         </div>
       </Card.Body>
@@ -264,6 +265,7 @@ const CrmTasks = () => {
   });
   const [search, setSearch] = useState('');
   const [activeFilter, setActiveFilter] = useState('all');
+  const [currentFilters, setCurrentFilters] = useState<Record<string, any>>({});
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [selectedTasks, setSelectedTasks] = useState<number[]>([]);
@@ -293,6 +295,10 @@ const CrmTasks = () => {
   const [noteText, setNoteText] = useState('');
   const [taskToDelete, setTaskToDelete] = useState<{ id: number } | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [noteToDelete, setNoteToDelete] = useState<{ taskId: number; noteId: number } | null>(null);
+  const [showDeleteNoteModal, setShowDeleteNoteModal] = useState(false);
+  const [formNoteToDelete, setFormNoteToDelete] = useState<number | null>(null);
+  const [showDeleteFormNoteModal, setShowDeleteFormNoteModal] = useState(false);
 
   // Fetch extensions
   useEffect(() => {
@@ -317,8 +323,8 @@ const CrmTasks = () => {
       };
 
       // Add search param
-      if (search) {
-        params.search = search;
+      if (currentFilters.search) {
+        params.search = currentFilters.search;
       }
 
       // Add urgency filter
@@ -340,7 +346,7 @@ const CrmTasks = () => {
     } finally {
       setLoading(false);
     }
-  }, [pagination.currentPage, pagination.rowsPerPage, search, activeFilter]);
+  }, [pagination.currentPage, pagination.rowsPerPage, currentFilters, activeFilter]);
 
   useEffect(() => {
     fetchTasks();
@@ -399,68 +405,88 @@ const CrmTasks = () => {
     label: string
   ) => {
     const totalPages = getTotalPages(dataLength, paginationState.rowsPerPage);
-    const start = (paginationState.currentPage - 1) * paginationState.rowsPerPage + 1;
-    const end = Math.min(paginationState.currentPage * paginationState.rowsPerPage, dataLength);
+    const { currentPage, rowsPerPage } = paginationState;
+    const startRow = (currentPage - 1) * rowsPerPage + 1;
+    const endRow = Math.min(currentPage * rowsPerPage, dataLength);
 
     return (
-      <div className="d-flex flex-column flex-md-row justify-content-between align-items-center gap-3">
+      <div className="d-flex justify-content-between align-items-center mt-3">
         <div className="d-flex align-items-center gap-2">
-          <span className="text-muted small">
-            Showing {start} to {end} of {dataLength} {label}
-          </span>
+          <span className="text-muted small">Show</span>
           <Form.Select
             size="sm"
+            value={rowsPerPage}
+            onChange={(e) => setPaginationState({ ...paginationState, rowsPerPage: Number(e.target.value), currentPage: 1 })}
             style={{ width: 'auto' }}
-            value={paginationState.rowsPerPage}
-            onChange={(e) => {
-              setPaginationState({
-                ...paginationState,
-                rowsPerPage: Number(e.target.value),
-                currentPage: 1,
-              });
-            }}
           >
-            <option value={10}>10 per page</option>
-            <option value={25}>25 per page</option>
-            <option value={50}>50 per page</option>
-            <option value={100}>100 per page</option>
+            <option value={10}>10</option>
+            <option value={25}>25</option>
+            <option value={50}>50</option>
+            <option value={100}>100</option>
           </Form.Select>
+          <span className="text-muted small">entries</span>
         </div>
-        <div className="d-flex align-items-center gap-1">
+        
+        <div className="text-muted small">
+          Showing {startRow} to {endRow} of {dataLength} {label}
+        </div>
+
+        <div className="d-flex gap-1">
           <Button
-            variant="outline-secondary"
             size="sm"
-            disabled={paginationState.currentPage === 1}
+            variant="outline-secondary"
+            disabled={currentPage === 1}
             onClick={() => setPaginationState({ ...paginationState, currentPage: 1 })}
           >
-            <ChevronsLeft size={16} />
+            <ChevronsLeft size={14} />
           </Button>
           <Button
-            variant="outline-secondary"
             size="sm"
-            disabled={paginationState.currentPage === 1}
-            onClick={() => setPaginationState({ ...paginationState, currentPage: paginationState.currentPage - 1 })}
+            variant="outline-secondary"
+            disabled={currentPage === 1}
+            onClick={() => setPaginationState({ ...paginationState, currentPage: currentPage - 1 })}
           >
-            <ChevronLeft size={16} />
+            <ChevronLeft size={14} />
           </Button>
-          <span className="px-3">
-            Page {paginationState.currentPage} of {totalPages}
-          </span>
+          
+          {[...Array(totalPages)].map((_, index) => {
+            const pageNum = index + 1;
+            if (
+              pageNum === 1 ||
+              pageNum === totalPages ||
+              (pageNum >= currentPage - 1 && pageNum <= currentPage + 1)
+            ) {
+              return (
+                <Button
+                  key={pageNum}
+                  size="sm"
+                  variant={currentPage === pageNum ? 'primary' : 'outline-secondary'}
+                  onClick={() => setPaginationState({ ...paginationState, currentPage: pageNum })}
+                >
+                  {pageNum}
+                </Button>
+              );
+            } else if (pageNum === currentPage - 2 || pageNum === currentPage + 2) {
+              return <span key={pageNum} className="px-2">...</span>;
+            }
+            return null;
+          })}
+          
           <Button
-            variant="outline-secondary"
             size="sm"
-            disabled={paginationState.currentPage === totalPages}
-            onClick={() => setPaginationState({ ...paginationState, currentPage: paginationState.currentPage + 1 })}
+            variant="outline-secondary"
+            disabled={currentPage === totalPages}
+            onClick={() => setPaginationState({ ...paginationState, currentPage: currentPage + 1 })}
           >
-            <ChevronRight size={16} />
+            <ChevronRight size={14} />
           </Button>
           <Button
-            variant="outline-secondary"
             size="sm"
-            disabled={paginationState.currentPage === totalPages}
+            variant="outline-secondary"
+            disabled={currentPage === totalPages}
             onClick={() => setPaginationState({ ...paginationState, currentPage: totalPages })}
           >
-            <ChevronsRight size={16} />
+            <ChevronsRight size={14} />
           </Button>
         </div>
       </div>
@@ -604,17 +630,25 @@ const CrmTasks = () => {
     }
   }, [noteText, editingNote, viewingTask, showTaskModal, fetchTask]);
 
-  // Handle delete note
-  const handleDeleteNote = useCallback(async (noteId: number) => {
+  // Handle delete note - show confirmation modal
+  const handleDeleteNote = useCallback((noteId: number) => {
     if (!viewingTask?.id) return;
-    if (!confirm('Are you sure you want to delete this note?')) return;
+    setNoteToDelete({ taskId: viewingTask.id, noteId });
+    setShowDeleteNoteModal(true);
+  }, [viewingTask]);
+
+  // Confirm delete note
+  const confirmDeleteNote = useCallback(async () => {
+    if (!noteToDelete) return;
     try {
-      await deleteTaskNote(viewingTask.id, noteId);
-      fetchTask(viewingTask.id);
+      await deleteTaskNote(noteToDelete.taskId, noteToDelete.noteId);
+      setShowDeleteNoteModal(false);
+      setNoteToDelete(null);
+      fetchTask(noteToDelete.taskId);
     } catch (error) {
       console.error('Failed to delete note:', error);
     }
-  }, [viewingTask, fetchTask]);
+  }, [noteToDelete, fetchTask]);
 
   // Filter tasks - now handled server-side, but keep for display purposes
   const filteredTasks = useMemo(() => {
@@ -655,12 +689,35 @@ const CrmTasks = () => {
 
   // Extension options for select
   const extensionOptions = useMemo(() => {
-    console.log("ZEZEZE", extensions);
     return extensions.map(ext => ({
-      value: ext.id,
-      label: ext.display_name || ext.name || ext.id,
+      value: ext.id || ext.extension,
+      label: ext.display_name || ext.name || ext.id || ext.extension,
     }));
   }, [extensions]);
+
+  // Helper function to find matching extension option
+  const findMatchingExtension = useCallback((userExtension: string) => {
+    if (!userExtension || extensionOptions.length === 0) return null;
+    
+    // First try direct value match
+    let match = extensionOptions.find(o => String(o.value) === String(userExtension));
+    if (match) return match;
+    
+    // Then try matching by extension object properties
+    const ext = extensions.find(e => 
+      String(e.id) === String(userExtension) || 
+      String(e.extension) === String(userExtension)
+    );
+    
+    if (ext) {
+      match = extensionOptions.find(o => 
+        String(o.value) === String(ext.id) || 
+        String(o.value) === String(ext.extension)
+      );
+    }
+    
+    return match || null;
+  }, [extensionOptions, extensions]);
 
   return (
     <React.Fragment>
@@ -850,6 +907,7 @@ const CrmTasks = () => {
                   setSearch(value);
                 }}
                 onSearch={() => {
+                  setCurrentFilters({ ...currentFilters, search: search });
                   setPagination((prev) => ({ ...prev, currentPage: 1 }));
                 }}
                 searchPlaceholder="Search tasks by name, company, email, phone..."
@@ -939,7 +997,7 @@ const CrmTasks = () => {
                   ) : (
                     <>
                       <div className="table-responsive">
-                        <Table hover className="mb-0" style={{ width: '100%', margin: 0, tableLayout: 'auto' }}>
+                        <Table hover className="mb-0 w-100" style={{ width: '100%', margin: 0 }}>
                           <thead className="bg-light">
                             <tr>
                               <th style={{ width: '50px' }}>
@@ -1089,7 +1147,7 @@ const CrmTasks = () => {
                                             setTaskFormData({
                                               name: task.name,
                                               user_extension: task.user_extension,
-                                              created_by: task.created_by,
+                                              created_by: task.created_by || (session?.user as any)?.extension || 'admin',
                                               urgency: task.urgency,
                                               phone: task.phone || '',
                                               email: task.email || '',
@@ -1097,7 +1155,7 @@ const CrmTasks = () => {
                                               due_date: task.due_date,
                                               notes: task.notes?.map(n => ({ note: n.note })) || [],
                                             });
-                                            setSelectedUserExtension(extensionOptions.find(o => o.value === task.user_extension) || null);
+                                            setSelectedUserExtension(findMatchingExtension(task.user_extension));
                                             setShowTaskModal(true);
                                           }}
                                         >
@@ -1246,11 +1304,11 @@ const CrmTasks = () => {
               </Col>
 
               <Col md={6}>
-                <Form.Group>
+                <Form.Group onClick={() => console.log(taskFormData.due_date)}>
                   <Form.Label>Due Date <span className="text-danger">*</span></Form.Label>
                   <Form.Control
                     type="date"
-                    value={taskFormData.due_date}
+                    value={taskFormData.due_date ?  new Date(taskFormData.due_date)?.toISOString()?.split('T')[0] : new Date().toISOString().split('T')[0]}
                     onChange={(e) => setTaskFormData({ ...taskFormData, due_date: e.target.value })}
                     min={new Date().toISOString().split('T')[0]}
                     required
@@ -1258,7 +1316,7 @@ const CrmTasks = () => {
                 </Form.Group>
               </Col>
 
-              <Col md={12}>
+              {/* <Col md={12}>
                 <Form.Group>
                   <div className="d-flex justify-content-between align-items-center mb-2">
                     <Form.Label className="mb-0">Notes</Form.Label>
@@ -1305,10 +1363,8 @@ const CrmTasks = () => {
                                   className="p-1 text-danger"
                                   type="button"
                                   onClick={() => {
-                                    setTaskFormData({
-                                      ...taskFormData,
-                                      notes: taskFormData.notes.filter((_, i) => i !== index),
-                                    });
+                                    setFormNoteToDelete(index);
+                                    setShowDeleteFormNoteModal(true);
                                   }}
                                 >
                                   <Trash2 size={14} />
@@ -1326,7 +1382,7 @@ const CrmTasks = () => {
                     </div>
                   )}
                 </Form.Group>
-              </Col>
+              </Col> */}
             </Row>
           </Modal.Body>
           <Modal.Footer className="border-top">
@@ -1649,7 +1705,7 @@ const CrmTasks = () => {
                 setTaskFormData({
                   name: viewingTask.name,
                   user_extension: viewingTask.user_extension,
-                  created_by: viewingTask.created_by,
+                  created_by: viewingTask.created_by || (session?.user as any)?.extension || 'admin',
                   urgency: viewingTask.urgency,
                   phone: viewingTask.phone || '',
                   email: viewingTask.email || '',
@@ -1657,7 +1713,7 @@ const CrmTasks = () => {
                   due_date: viewingTask.due_date,
                   notes: viewingTask.notes?.map(n => ({ note: n.note })) || [],
                 });
-                setSelectedUserExtension(extensionOptions.find(o => o.value === viewingTask.user_extension) || null);
+                setSelectedUserExtension(findMatchingExtension(viewingTask.user_extension));
                 setShowTaskModal(true);
               }
             }}
@@ -1708,29 +1764,74 @@ const CrmTasks = () => {
         </Modal.Footer>
       </Modal>
 
-      {/* Delete Confirmation Modal */}
-      <Modal show={showDeleteModal} onHide={() => {
-        setShowDeleteModal(false);
-        setTaskToDelete(null);
-      }} centered>
-        <Modal.Header closeButton>
-          <Modal.Title>Confirm Delete</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          Are you sure you want to delete this task? This action cannot be undone.
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="outline-secondary" onClick={() => {
-            setShowDeleteModal(false);
-            setTaskToDelete(null);
-          }}>
-            Cancel
-          </Button>
-          <Button variant="danger" onClick={handleDeleteTask}>
-            Delete
-          </Button>
-        </Modal.Footer>
-      </Modal>
+      {/* Delete Task Confirmation Modal */}
+      <ConfirmModal
+        show={showDeleteModal}
+        onHide={() => {
+          setShowDeleteModal(false);
+          setTaskToDelete(null);
+        }}
+        title="Delete Task"
+        description="Are you sure you want to delete this task?"
+        onConfirm={handleDeleteTask}
+        targetName=""
+        confirmButtonText="Delete"
+        confirmButtonVariant="danger"
+        cancelButtonVariant="secondary"
+        onCancel={() => {
+          setShowDeleteModal(false);
+          setTaskToDelete(null);
+        }}
+      />
+
+      {/* Delete Note Confirmation Modal */}
+      <ConfirmModal
+        show={showDeleteNoteModal}
+        onHide={() => {
+          setShowDeleteNoteModal(false);
+          setNoteToDelete(null);
+        }}
+        title="Delete Note"
+        description="Are you sure you want to delete this note?"
+        onConfirm={confirmDeleteNote}
+        targetName=""
+        confirmButtonText="Delete"
+        confirmButtonVariant="danger"
+        cancelButtonVariant="secondary"
+        onCancel={() => {
+          setShowDeleteNoteModal(false);
+          setNoteToDelete(null);
+        }}
+      />
+
+      {/* Delete Form Note Confirmation Modal */}
+      <ConfirmModal
+        show={showDeleteFormNoteModal}
+        onHide={() => {
+          setShowDeleteFormNoteModal(false);
+          setFormNoteToDelete(null);
+        }}
+        title="Delete Note"
+        description="Are you sure you want to delete this note?"
+        onConfirm={() => {
+          if (formNoteToDelete !== null) {
+            setTaskFormData({
+              ...taskFormData,
+              notes: taskFormData.notes.filter((_, i) => i !== formNoteToDelete),
+            });
+          }
+          setShowDeleteFormNoteModal(false);
+          setFormNoteToDelete(null);
+        }}
+        targetName=""
+        confirmButtonText="Delete"
+        confirmButtonVariant="danger"
+        cancelButtonVariant="secondary"
+        onCancel={() => {
+          setShowDeleteFormNoteModal(false);
+          setFormNoteToDelete(null);
+        }}
+      />
     </React.Fragment>
   );
 };

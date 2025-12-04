@@ -13,6 +13,9 @@ import {
 } from "@utils/crm";
 import { Button, Row, Col, Form, Card, Badge, Table, Modal } from "react-bootstrap";
 import Select from "react-select";
+import PhoneInput from "react-phone-number-input";
+import { parsePhoneNumber } from "react-phone-number-input";
+import "react-phone-number-input/style.css";
 import { CheckCircle, ChevronLeft, ChevronRight, ArrowLeft, Plus, Edit, Trash2, Package } from "lucide-react";
 import Link from "next/link";
 import { toast } from "react-toastify";
@@ -61,6 +64,7 @@ const CreateOrder = () => {
     customer_name: "",
     customer_email: "",
     customer_phone: "",
+    customer_phone_country_code: "",
     customer_address: "",
     order_date: new Date().toISOString().split('T')[0],
     expected_delivery_date: "",
@@ -96,13 +100,49 @@ const CreateOrder = () => {
           }
 
           // Auto-fill form data from deal
+          // Prefer main_decision_maker if available, otherwise use direct fields
+          const decisionMaker = dealData.main_decision_maker || {
+            name: dealData.decision_maker_name,
+            phone_country_code: dealData.decision_maker_phone_country_code,
+            phone: dealData.decision_maker_phone,
+            email: dealData.decision_maker_email,
+          };
+
+          // Parse phone number for PhoneInput component
+          let phoneCountryCode = decisionMaker.phone_country_code || "";
+          let phoneNumber = decisionMaker.phone || "";
+          
+          // If we have both, combine them and try to parse
+          if (phoneCountryCode && phoneNumber) {
+            try {
+              const fullPhone = `${phoneCountryCode}${phoneNumber}`;
+              const parsed = parsePhoneNumber(fullPhone);
+              if (parsed) {
+                phoneCountryCode = `+${parsed.countryCallingCode}`;
+                phoneNumber = parsed.nationalNumber;
+              }
+            } catch (error) {
+              // Keep original values if parsing fails
+            }
+          } else if (phoneNumber && !phoneCountryCode) {
+            // Try to parse if we only have phone number
+            try {
+              const parsed = parsePhoneNumber(phoneNumber);
+              if (parsed) {
+                phoneCountryCode = `+${parsed.countryCallingCode}`;
+                phoneNumber = parsed.nationalNumber;
+              }
+            } catch (error) {
+              // Keep original value if parsing fails
+            }
+          }
+
           setFormData(prev => ({
             ...prev,
-            customer_name: dealData.decision_maker_name || dealData.company_name || "",
-            customer_email: "",
-            customer_phone: dealData.decision_maker_phone_country_code && dealData.decision_maker_phone 
-              ? `${dealData.decision_maker_phone_country_code} ${dealData.decision_maker_phone}`
-              : dealData.decision_maker_phone || "",
+            customer_name: decisionMaker.name || dealData.company_name || "",
+            customer_email: decisionMaker.email || "",
+            customer_phone: phoneNumber,
+            customer_phone_country_code: phoneCountryCode,
             customer_address: "",
             currency: dealData.currency || "USD",
             tax_percentage: latestEstimate?.tax_percentage || "0",
@@ -280,10 +320,15 @@ const CreateOrder = () => {
     setLoading(true);
     try {
       const totals = calculateTotals();
+      // Format phone number for submission
+      const formattedPhone = formData.customer_phone_country_code && formData.customer_phone
+        ? `${formData.customer_phone_country_code} ${formData.customer_phone}`
+        : formData.customer_phone;
+      
       const payload: any = {
         customer_name: formData.customer_name,
         customer_email: formData.customer_email,
-        customer_phone: formData.customer_phone,
+        customer_phone: formattedPhone,
         customer_address: formData.customer_address || "",
         order_date: formData.order_date,
         expected_delivery_date: formData.expected_delivery_date || "",
@@ -469,13 +514,51 @@ const CreateOrder = () => {
                     <Col md={6}>
                       <Form.Group className="mb-3">
                         <Form.Label>Customer Phone <span className="text-danger">*</span></Form.Label>
-                        <Form.Control 
-                          type="tel" 
-                          value={formData.customer_phone}
-                          onChange={(e) => setFormData({ ...formData, customer_phone: e.target.value })}
-                          placeholder="Enter phone number" 
-                          required 
-                        />
+                        <div className="phone-input-wrapper">
+                          <PhoneInput
+                            international
+                            defaultCountry="US"
+                            value={formData.customer_phone_country_code && formData.customer_phone 
+                              ? `${formData.customer_phone_country_code}${formData.customer_phone}` 
+                              : formData.customer_phone || undefined}
+                            onChange={(value) => {
+                              if (value) {
+                                try {
+                                  // Parse the phone number to extract country code and national number
+                                  const phoneNumber = parsePhoneNumber(value);
+                                  if (phoneNumber) {
+                                    setFormData({
+                                      ...formData,
+                                      customer_phone_country_code: `+${phoneNumber.countryCallingCode}`,
+                                      customer_phone: phoneNumber.nationalNumber,
+                                    });
+                                  } else {
+                                    // Fallback: store full number in phone field
+                                    setFormData({
+                                      ...formData,
+                                      customer_phone_country_code: "",
+                                      customer_phone: value,
+                                    });
+                                  }
+                                } catch (error) {
+                                  // If parsing fails, store full number in phone field
+                                  setFormData({
+                                    ...formData,
+                                    customer_phone_country_code: "",
+                                    customer_phone: value,
+                                  });
+                                }
+                              } else {
+                                setFormData({
+                                  ...formData,
+                                  customer_phone_country_code: "",
+                                  customer_phone: "",
+                                });
+                              }
+                            }}
+                            placeholder="Enter phone number"
+                          />
+                        </div>
                       </Form.Group>
                     </Col>
                     <Col md={6}>

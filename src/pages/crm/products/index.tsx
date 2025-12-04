@@ -44,6 +44,7 @@ import {
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
+  CheckCircle,
 } from "lucide-react";
 import { toast } from "react-toastify";
 import "@assets/scss/common.scss";
@@ -230,6 +231,7 @@ const ProductsPage = () => {
   const [viewingProduct, setViewingProduct] = useState<ProductDisplayData | null>(null);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [activeFilter, setActiveFilter] = useState("all");
+  const [currentFilters, setCurrentFilters] = useState<Record<string, any>>({});
 
   // Custom select styles
   const customSelectStyles = {
@@ -445,8 +447,8 @@ const ProductsPage = () => {
         per_page: productsPagination.rowsPerPage,
       };
 
-      if (productsSearch) {
-        params.search = productsSearch;
+      if (currentFilters.search) {
+        params.search = currentFilters.search;
       }
 
       // Active filter (active/inactive)
@@ -479,7 +481,7 @@ const ProductsPage = () => {
 
   useEffect(() => {
     fetchProducts();
-  }, [productsPagination.currentPage, productsPagination.rowsPerPage, productsSearch, activeFilter, productsFilters]);
+  }, [productsPagination.currentPage, productsPagination.rowsPerPage, currentFilters, activeFilter, productsFilters]);
 
   // Convert products to display data (no filtering - done by API)
   const displayProducts = useMemo(() => {
@@ -509,14 +511,23 @@ const ProductsPage = () => {
       {
         id: "all",
         label: "All Products",
+        color: "#6c757d",
+        activeColor: "#0d6efd",
+        icon: <Package size={16} />,
       },
       {
         id: "active",
         label: "Active",
+        color: "#198754",
+        activeColor: "#0d6efd",
+        icon: <CheckCircle size={16} />,
       },
       {
         id: "inactive",
         label: "Inactive",
+        color: "#6c757d",
+        activeColor: "#0d6efd",
+        icon: <X size={16} />,
       },
     ];
   }, []);
@@ -1356,6 +1367,7 @@ const ProductsPage = () => {
           searchValue={productsSearch}
           onSearchChange={(value) => setProductsSearch(value)}
           onSearch={() => {
+            setCurrentFilters({ ...currentFilters, search: productsSearch });
             setProductsPagination({ ...productsPagination, currentPage: 1 });
           }}
           searchPlaceholder="Search by product name or SKU..."
@@ -1422,7 +1434,7 @@ const ProductsPage = () => {
                 </Col>
                 <Col md={2}>
                   <div className="d-flex gap-2">
-                    <Button
+                    {/* <Button
                       variant="primary"
                       className="flex-grow-1 d-flex align-items-center justify-content-center"
                       onClick={() => {
@@ -1431,7 +1443,7 @@ const ProductsPage = () => {
                       }}
                     >
                       Apply
-                    </Button>
+                    </Button> */}
                     <Button
                       variant="outline-secondary"
                       className="d-flex align-items-center justify-content-center"

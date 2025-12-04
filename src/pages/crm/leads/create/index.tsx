@@ -196,12 +196,26 @@ const CreateLead = () => {
           const phoneCountryCode = parsedPhone.countryCode || crmDataRecord.data?.phone_country_code || "";
           const phoneNumber = parsedPhone.phoneNumber || phone;
 
+          // Extract source from CRM data
+          const source =
+            crmDataRecord.data?.source ||
+            crmDataRecord.data?.lead_source ||
+            crmDataRecord.data?.source_type ||
+            "File Upload";
+
+          // Extract user_extension from CRM data
+          const userExtension = crmDataRecord.user_extension 
+            ? String(crmDataRecord.user_extension) 
+            : null;
+
           // Pre-fill basic form fields
           setFormData((prev) => ({
             ...prev,
             crm_data_id: crmDataId,
             campaign_id: Number(crmDataRecord.campaign_id) || undefined,
             name: prospectName,
+            user_extension: userExtension || prev.user_extension,
+            source: source || prev.source,
             description:
               crmDataRecord.data?.description ||
               crmDataRecord.data?.notes ||
@@ -527,6 +541,124 @@ const CreateLead = () => {
       // Fallback to basic campaign from list
       const basicCampaign = campaigns.find((c) => c.id === campaignId);
       setSelectedCampaign(basicCampaign || null);
+    }
+  };
+
+  const handleCrmDataChange = async (selectedOption: any) => {
+    const crmDataId = selectedOption?.value;
+
+    if (!crmDataId) {
+      setSelectedCrmData(null);
+      setFormData((prev) => ({
+        ...prev,
+        crm_data_id: undefined,
+      }));
+      return;
+    }
+
+    try {
+      const crmDataRecord = await getCrmDataById(crmDataId);
+      setSelectedCrmData(crmDataRecord);
+
+      // Extract prospect name for lead name
+      const prospectName =
+        crmDataRecord.data?.name ||
+        crmDataRecord.data?.full_name ||
+        crmDataRecord.data?.first_name ||
+        crmDataRecord.name ||
+        crmDataRecord.phone ||
+        "";
+
+      // Extract contact person name
+      const contactPersonName =
+        crmDataRecord.data?.contact_person_name ||
+        crmDataRecord.data?.contact_name ||
+        crmDataRecord.data?.name ||
+        crmDataRecord.data?.full_name ||
+        crmDataRecord.data?.first_name ||
+        crmDataRecord.name ||
+        "";
+
+      // Extract email
+      const email =
+        crmDataRecord.data?.email ||
+        crmDataRecord.data?.contact_email ||
+        crmDataRecord.data?.email_address ||
+        "";
+
+      // Extract phone
+      const phone = crmDataRecord.phone || crmDataRecord.data?.phone || "";
+      
+      // Parse phone number to extract country code if in format "+92 3200654656"
+      const parsedPhone = parsePhoneNumberFormat(phone);
+      const phoneCountryCode = parsedPhone.countryCode || crmDataRecord.data?.phone_country_code || "";
+      const phoneNumber = parsedPhone.phoneNumber || phone;
+
+      // Extract source from CRM data
+      const source =
+        crmDataRecord.data?.source ||
+        crmDataRecord.data?.lead_source ||
+        crmDataRecord.data?.source_type ||
+        "";
+
+      // Extract user_extension from CRM data
+      const userExtension = crmDataRecord.user_extension 
+        ? String(crmDataRecord.user_extension) 
+        : null;
+
+      // Pre-fill form fields
+      setFormData((prev) => ({
+        ...prev,
+        crm_data_id: crmDataId,
+        campaign_id: Number(crmDataRecord.campaign_id) || prev.campaign_id,
+        name: prospectName || prev.name,
+        user_extension: userExtension || prev.user_extension,
+        source: source || prev.source,
+        description:
+          crmDataRecord.data?.description ||
+          crmDataRecord.data?.notes ||
+          crmDataRecord.data?.comments ||
+          prev.description,
+        company_name:
+          crmDataRecord.data?.company_name ||
+          crmDataRecord.data?.company ||
+          prev.company_name,
+        company_contact:
+          crmDataRecord.data?.company_contact ||
+          crmDataRecord.data?.contact ||
+          phone ||
+          prev.company_contact,
+        company_description:
+          crmDataRecord.data?.company_description ||
+          crmDataRecord.data?.company_notes ||
+          prev.company_description,
+        // Pre-fill contact person fields
+        contact_person_name: contactPersonName || prev.contact_person_name,
+        contact_phone: phoneNumber || prev.contact_phone,
+        contact_phone_country_code: phoneCountryCode || prev.contact_phone_country_code,
+        // Add contact person to contact_persons array if we have name, phone, or email
+        contact_persons: contactPersonName || phone || email
+          ? [
+              {
+                title: crmDataRecord.data?.contact_person_title || "",
+                name: contactPersonName,
+                phone_country_code: phoneCountryCode,
+                phone: phoneNumber,
+                email: email,
+              },
+            ]
+          : prev.contact_persons,
+      }));
+
+      // Auto-select campaign if available
+      if (crmDataRecord.campaign_id) {
+        await handleCampaignChange({
+          value: crmDataRecord.campaign_id,
+        });
+      }
+    } catch (error) {
+      console.error("Failed to fetch CRM data record:", error);
+      toast.error("Failed to load CRM data");
     }
   };
 
@@ -890,9 +1022,7 @@ const CreateLead = () => {
                                         }
                                       : null
                                   }
-                                  onChange={(selectedOption: any) => {
-                                    handleInputChange("crm_data_id", selectedOption?.value || undefined);
-                                  }}
+                                  onChange={handleCrmDataChange}
                                   options={crmData.map((data) => ({
                                     value: data.id,
                                     label: `#${data.id} - ${data.phone || "No Phone"}`,
