@@ -98,6 +98,98 @@ interface Stage {
   updated_at: string;
 }
 
+// Filter Bar Component
+interface FilterBarProps {
+  quickFilters: { id: string; label: string; count: number; variant?: string; color?: string; activeColor?: string; icon?: React.ReactNode }[];
+  activeFilter: string;
+  onFilterChange: (filterId: string) => void;
+  searchValue: string;
+  onSearchChange: (value: string) => void;
+  onSearch: () => void;
+  searchPlaceholder?: string;
+  showAdvancedFilters: boolean;
+  onToggleAdvancedFilters: () => void;
+  advancedFilterCount?: number;
+}
+
+const FilterBar: React.FC<FilterBarProps> = ({
+  quickFilters,
+  activeFilter,
+  onFilterChange,
+  searchValue,
+  onSearchChange,
+  onSearch,
+  searchPlaceholder = "Search...",
+  showAdvancedFilters,
+  onToggleAdvancedFilters,
+  advancedFilterCount = 0
+}) => {
+  return (
+    <Card className="border-0 shadow-sm mb-3">
+      <Card.Body className="p-3">
+        <div className="d-flex flex-column flex-lg-row justify-content-between align-items-stretch align-items-lg-center gap-3">
+          <div className="d-flex gap-2 flex-wrap align-items-center flex-grow-1">
+            {quickFilters.map(filter => {
+              const isActive = activeFilter === filter.id;
+              const hasCustomColor = filter.color || filter.activeColor;
+              const buttonStyle: React.CSSProperties = {};
+              if (hasCustomColor) {
+                if (isActive) {
+                  const bgColor = filter.activeColor || filter.color;
+                  buttonStyle.background = '#fff';
+                  buttonStyle.borderColor = bgColor;
+                  buttonStyle.color = bgColor;
+                } else {
+                  buttonStyle.background = '#fff';
+                  buttonStyle.borderColor = filter.color;
+                  buttonStyle.color = filter.color;
+                  buttonStyle.opacity = '0.7';
+                }
+              }
+
+              return (
+                <Button
+                  key={filter.id}
+                  variant={hasCustomColor ? undefined : (isActive ? (filter.variant || 'primary') : 'outline-secondary')}
+                  onClick={() => onFilterChange(filter.id)}
+                  className="d-flex align-items-center gap-2"
+                  style={hasCustomColor ? buttonStyle : undefined}
+                >
+                  {filter.icon && <span className="d-flex align-items-center">{filter.icon}</span>}
+                  {filter.label}
+                </Button>
+              );
+            })}
+          </div>
+
+          <div className="d-flex flex-column flex-sm-row gap-2 align-items-stretch align-items-sm-center flex-shrink-0">
+            <InputGroup style={{ width: '300px', minWidth: '200px' }} className="flex-shrink-0">
+              <Form.Control
+                style={{ height: '41px' }}
+                type="text"
+                placeholder={searchPlaceholder}
+                value={searchValue}
+                onChange={(e) => onSearchChange(e.target.value)}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter') {
+                    onSearch();
+                  }
+                }}
+              />
+              <Button 
+                variant="outline-secondary"
+                onClick={onSearch}
+              >
+                <Search size={16} />
+              </Button>
+            </InputGroup>
+          </div>
+        </div>
+      </Card.Body>
+    </Card>
+  );
+};
+
 const StagesManagement = () => {
   const { data: session } = useSession();
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -121,8 +213,10 @@ const StagesManagement = () => {
   });
 
   const [currentFilters, setCurrentFilters] = useState({search: "", type: "" as string});
+  const [stagesSearch, setStagesSearch] = useState("");
   const [selectedTypeFilter, setSelectedTypeFilter] = useState<string>('');
   const [activeFilter, setActiveFilter] = useState<string>('all');
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [showStagesAnalytics, setShowStagesAnalytics] = useState(false);
   const [selectedStagesColumns, setSelectedStagesColumns] = useState<string[]>(() => {
     const saved = localStorage.getItem('stagesSelectedColumns');
@@ -155,13 +249,15 @@ const StagesManagement = () => {
 
   useEffect(() => {
     const includeArchived = activeFilter === 'deleted';
-    fetchStages(selectedTypeFilter || undefined, includeArchived);
-  }, [fetchStages, refreshKey, selectedTypeFilter, activeFilter]);
+    const typeFilter = activeFilter === 'all' || activeFilter === 'deleted' ? undefined : activeFilter;
+    setSelectedTypeFilter(typeFilter || '');
+    fetchStages(typeFilter as 'lead' | 'deal' | 'order' | 'lost_reason' | undefined, includeArchived);
+  }, [fetchStages, refreshKey, activeFilter]);
 
   const fetchStagesForTable = useCallback(
-    async (page = 1, perPage = 15, search = "") => {
+    async (page = 1, perPage = 15) => {
       try {
-        const searchTerm = currentFilters.search || search;
+        const searchTerm = currentFilters.search;
         
         // Only filter by search on frontend, type is already filtered by API
         let filteredStages = stagesData.filter((stage) => {
@@ -716,6 +812,20 @@ const StagesManagement = () => {
     return colorMap[type] || 'secondary';
   };
 
+  // Calculate filter counts
+  const filterCounts = useMemo(() => {
+    const allStages = stagesData;
+    const counts: Record<string, number> = {
+      all: allStages.length,
+      lead: allStages.filter(s => s.type === 'lead').length,
+      deal: allStages.filter(s => s.type === 'deal').length,
+      order: allStages.filter(s => s.type === 'order').length,
+      lost_reason: allStages.filter(s => s.type === 'lost_reason').length,
+      deleted: 0, // Will be calculated when include_archived is true
+    };
+    return counts;
+  }, [stagesData]);
+
   return (
     <React.Fragment>
       <style dangerouslySetInnerHTML={{__html: `
@@ -769,12 +879,12 @@ const StagesManagement = () => {
               <BarChart3 size={16} className="me-2" />
               {showStagesAnalytics ? 'Hide Analytics' : 'Show Analytics'}
             </Button>
-          {session?.user?.permissions?.includes('add-crm-stages') && (
-          <Button variant="primary" onClick={() => setShowCreateModal(true)}>
+            {session?.user?.permissions?.includes('add-crm-stages') && (
+              <Button variant="primary" onClick={() => setShowCreateModal(true)}>
                 <Plus size={16} className="me-2" />
                 Add Custom Stage
-          </Button>
-          )}
+              </Button>
+            )}
           </div>
         </div>
 
@@ -852,114 +962,78 @@ const StagesManagement = () => {
         )}
 
         {/* Filter Bar */}
-        <Card className="border-0 shadow-sm mb-3">
-          <Card.Body className="p-3">
-            <div className="d-flex flex-column flex-lg-row justify-content-between align-items-stretch align-items-lg-center gap-3">
-              <div className="d-flex gap-2 flex-wrap align-items-center flex-grow-1">
-                <Button
-                  variant={activeFilter === 'all' && !selectedTypeFilter ? 'primary' : 'outline-secondary'}
-                  onClick={() => {
-                    setActiveFilter('all');
-                    setSelectedTypeFilter('');
-                    setStagesPagination({ ...stagesPagination, currentPage: 1 });
-                  }}
-                  className="d-flex align-items-center gap-2"
-                >
-                  All Types
-                </Button>
-                <Button
-                  variant={activeFilter === 'all' && selectedTypeFilter === 'lead' ? 'primary' : 'outline-secondary'}
-                  onClick={() => {
-                    setActiveFilter('all');
-                    setSelectedTypeFilter('lead');
-                    setStagesPagination({ ...stagesPagination, currentPage: 1 });
-                  }}
-                  className="d-flex align-items-center gap-2"
-                >
-                  Lead
-                </Button>
-                <Button
-                  variant={activeFilter === 'all' && selectedTypeFilter === 'deal' ? 'primary' : 'outline-secondary'}
-                  onClick={() => {
-                    setActiveFilter('all');
-                    setSelectedTypeFilter('deal');
-                    setStagesPagination({ ...stagesPagination, currentPage: 1 });
-                  }}
-                  className="d-flex align-items-center gap-2"
-                >
-                  Deal
-                </Button>
-                <Button
-                  variant={activeFilter === 'all' && selectedTypeFilter === 'order' ? 'primary' : 'outline-secondary'}
-                  onClick={() => {
-                    setActiveFilter('all');
-                    setSelectedTypeFilter('order');
-                    setStagesPagination({ ...stagesPagination, currentPage: 1 });
-                  }}
-                  className="d-flex align-items-center gap-2"
-                >
-                  Order
-                </Button>
-                <Button
-                  variant={activeFilter === 'all' && selectedTypeFilter === 'lost_reason' ? 'primary' : 'outline-secondary'}
-                  onClick={() => {
-                    setActiveFilter('all');
-                    setSelectedTypeFilter('lost_reason');
-                    setStagesPagination({ ...stagesPagination, currentPage: 1 });
-                  }}
-                  className="d-flex align-items-center gap-2"
-                >
-                  Lost Reason
-                </Button>
-                <Button
-                  variant={activeFilter === 'deleted' ? 'primary' : 'outline-secondary'}
-                  onClick={() => {
-                    setActiveFilter('deleted');
-                    setSelectedTypeFilter('');
-                    setStagesPagination({ ...stagesPagination, currentPage: 1 });
-                  }}
-                  className="d-flex align-items-center gap-2"
-                  style={activeFilter === 'deleted' ? { 
-                    background: '#fff',
-                    borderColor: '#dc3545',
-                    color: '#dc3545'
-                  } : {
-                    background: '#fff',
-                    borderColor: '#dc3545',
-                    color: '#dc3545',
-                    opacity: '0.7'
-                  }}
-                >
-                  <Trash2 size={16} />
-                  Deleted
-                </Button>
-              </div>
-
-              <div className="d-flex flex-column flex-sm-row gap-2 align-items-stretch align-items-sm-center flex-shrink-0">
-                <InputGroup style={{ width: '300px', minWidth: '200px' }} className="flex-shrink-0">
-                  <Form.Control
-                    style={{ height: '41px' }}
-                    type="text"
-                    placeholder="Search stages..."
-                    value={currentFilters.search || ""}
-                    onChange={(e) => handleFiltersChange({...currentFilters, search: e.target.value})}
-                    onKeyPress={(e) => {
-                      if (e.key === 'Enter') {
-                        setRefreshKey(prev => prev + 1);
-                      }
-                    }}
-                  />
-                  <Button 
-                    variant="outline-secondary"
-                    onClick={() => setRefreshKey(prev => prev + 1)}
-                  >
-                    <Search size={16} />
-                  </Button>
-                </InputGroup>
-              </div>
-            </div>
-          </Card.Body>
-        </Card>
+        <FilterBar
+          quickFilters={[
+            {
+              id: 'all',
+              label: 'All Types',
+              count: filterCounts.all,
+              color: '#6c757d',
+              activeColor: '#0d6efd',
+              icon: <Layers size={16} />
+            },
+            {
+              id: 'lead',
+              label: 'Lead',
+              count: filterCounts.lead,
+              color: '#0d6efd',
+              activeColor: '#0d6efd',
+              icon: <Target size={16} />
+            },
+            {
+              id: 'deal',
+              label: 'Deal',
+              count: filterCounts.deal,
+              color: '#ffc107',
+              activeColor: '#0d6efd',
+              icon: <TrendingUp size={16} />
+            },
+            {
+              id: 'order',
+              label: 'Order',
+              count: filterCounts.order,
+              color: '#20c997',
+              activeColor: '#0d6efd',
+              icon: <Layers size={16} />
+            },
+            {
+              id: 'lost_reason',
+              label: 'Lost Reason',
+              count: filterCounts.lost_reason,
+              color: '#dc3545',
+              activeColor: '#0d6efd',
+              icon: <XCircle size={16} />
+            },
+            {
+              id: 'deleted',
+              label: 'Deleted',
+              count: filterCounts.deleted || 0,
+              color: '#dc3545',
+              activeColor: '#dc3545',
+              icon: <Trash2 size={16} />
+            }
+          ]}
+          activeFilter={activeFilter}
+          onFilterChange={(filterId) => {
+            setActiveFilter(filterId);
+            setStagesPagination({ ...stagesPagination, currentPage: 1 });
+          }}
+          searchValue={stagesSearch}
+          onSearchChange={(value) => setStagesSearch(value)}
+          onSearch={() => {
+            if (stagesSearch.trim()) {
+              handleFiltersChange({...currentFilters, search: stagesSearch.trim()});
+            } else {
+              handleFiltersChange({...currentFilters, search: null});
+            }
+            setStagesPagination({ ...stagesPagination, currentPage: 1 });
+            setRefreshKey(prev => prev + 1);
+          }}
+          searchPlaceholder="Search stages..."
+          showAdvancedFilters={showAdvancedFilters}
+          onToggleAdvancedFilters={() => setShowAdvancedFilters(!showAdvancedFilters)}
+          advancedFilterCount={0}
+        />
 
         {/* Column Customization */}
         <div className="d-flex justify-content-end gap-2 mb-3">
@@ -1020,20 +1094,22 @@ const StagesManagement = () => {
               <Table hover className="mb-0" style={{ width: '100%', margin: 0, tableLayout: 'auto' }}>
                 <thead className="bg-light">
                   <tr>
-                    {selectedStagesColumns.includes('order') && (
-                      <th 
-                        style={{ cursor: 'pointer', userSelect: 'none' }}
-                        onClick={() => handleSort('sequence', stagesPagination, setStagesPagination)}
-                      >
-                        Order {renderSortIcon('sequence', stagesPagination)}
-                      </th>
-                    )}
+                
                     {selectedStagesColumns.includes('stageName') && (
                       <th 
                         style={{ cursor: 'pointer', userSelect: 'none' }}
                         onClick={() => handleSort('name', stagesPagination, setStagesPagination)}
                       >
                         Stage Name {renderSortIcon('name', stagesPagination)}
+                      </th>
+                    )}
+                        {selectedStagesColumns.includes('order') && (
+                      <th 
+                        style={{ cursor: 'pointer', userSelect: 'none', width: '20px', minWidth: '20px' }}
+                        className="text-center"
+                        onClick={() => handleSort('sequence', stagesPagination, setStagesPagination)}
+                      >
+                        Order {renderSortIcon('sequence', stagesPagination)}
                       </th>
                     )}
                     {selectedStagesColumns.includes('category') && (
@@ -1069,9 +1145,7 @@ const StagesManagement = () => {
                       stagesPagination.rowsPerPage
                     ).map((stage) => (
                       <tr key={stage.id}>
-                        {selectedStagesColumns.includes('order') && (
-                          <td className="text-center fw-bold">{stage.sequence}</td>
-                        )}
+                      
                         {selectedStagesColumns.includes('stageName') && (
                           <td>
                             <div className="d-flex align-items-center gap-2">
@@ -1086,6 +1160,9 @@ const StagesManagement = () => {
                               <span className="fw-semibold">{stage.name}</span>
                             </div>
                           </td>
+                        )}
+                          {selectedStagesColumns.includes('order') && (
+                          <td className="text-center fw-bold" style={{ width: '20px', minWidth: '20px' }}>{stage.sequence}</td>
                         )}
                         {selectedStagesColumns.includes('category') && (
                           <td>

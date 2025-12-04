@@ -851,9 +851,8 @@ const CrmProspectsManagement = () => {
           per_page: pagination.rowsPerPage,
         };
 
-        const searchTerm = memoizedFilters.search || prospectsSearch;
-        if (searchTerm) {
-          params.search = searchTerm;
+        if (memoizedFilters.search) {
+          params.search = memoizedFilters.search;
         }
 
         if (
@@ -935,7 +934,7 @@ const CrmProspectsManagement = () => {
         }
       }
     },
-    [memoizedFilters, pagination, prospectsSearch]
+    [memoizedFilters, pagination]
   );
 
   // Load data when filters or pagination changes

@@ -473,7 +473,7 @@ const EditDeal = () => {
                         </Form.Select>
                       </Form.Group>
                     </Col>
-                    <Col md={6}>
+                    {/* <Col md={6}>
                       <Form.Group className="mb-3">
                         <Form.Label>Probability</Form.Label>
                         <div className="d-flex align-items-center gap-2">
@@ -486,7 +486,7 @@ const EditDeal = () => {
                         </div>
                         <Form.Text className="text-muted">Likelihood of closing this deal</Form.Text>
                       </Form.Group>
-                    </Col>
+                    </Col> */}
                     <Col md={6}>
                       <Form.Group className="mb-3">
                         <Form.Label>Currency <span className="text-danger">*</span></Form.Label>
@@ -846,7 +846,7 @@ const EditDeal = () => {
                   <Card.Body>
                     <h5 className="fw-bold mb-4 text-warning">NEGOTIATION PROGRESS</h5>
                     <Row>
-                      <Col md={12}>
+                      {/* <Col md={12}>
                         <Form.Group className="mb-3">
                           <Form.Label>Negotiation Progress</Form.Label>
                           <div className="d-flex align-items-center gap-2">
@@ -859,7 +859,7 @@ const EditDeal = () => {
                           </div>
                           <Form.Text className="text-muted">Visual indicator of negotiation progress</Form.Text>
                         </Form.Group>
-                      </Col>
+                      </Col> */}
                       <Col md={4}>
                         <Form.Group className="mb-3">
                           <Form.Label>Quotation Sent</Form.Label>
@@ -895,7 +895,7 @@ const EditDeal = () => {
                 </Card>
 
                 {/* Attachments */}
-                <Card className="mb-3 border-0 bg-light">
+                {/* <Card className="mb-3 border-0 bg-light">
                   <Card.Body>
                     <h5 className="fw-bold mb-4 text-info">ATTACHMENTS</h5>
                     {attachments.length > 0 ? (
@@ -922,7 +922,7 @@ const EditDeal = () => {
                       </div>
                     )}
                   </Card.Body>
-                </Card>
+                </Card> */}
 
                 {/* Revision History */}
                 {histories.length > 0 && (
