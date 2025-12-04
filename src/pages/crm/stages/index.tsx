@@ -3,7 +3,7 @@ import React, { ReactElement, useState, useCallback, useMemo, useEffect } from "
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericListPage from "@components/GenericListPage";
-import { getStages, createStage, deleteStage, updateStage, StageData } from "@utils/crm";
+import { getStages, createStage, deleteStage, restoreStage, updateStage, StageData } from "@utils/crm";
 import { Column } from "@components/CustomDataTable";
 import {
   Button,
@@ -57,6 +57,7 @@ import {
   ChevronRight as ChevronRightIcon,
   Search,
   Filter,
+  RotateCcw,
 } from 'lucide-react';
 import { 
   PieChart, 
@@ -121,6 +122,7 @@ const StagesManagement = () => {
 
   const [currentFilters, setCurrentFilters] = useState({search: "", type: "" as string});
   const [selectedTypeFilter, setSelectedTypeFilter] = useState<string>('');
+  const [activeFilter, setActiveFilter] = useState<string>('all');
   const [showStagesAnalytics, setShowStagesAnalytics] = useState(false);
   const [selectedStagesColumns, setSelectedStagesColumns] = useState<string[]>(() => {
     const saved = localStorage.getItem('stagesSelectedColumns');
@@ -136,11 +138,12 @@ const StagesManagement = () => {
 
 
 
-  const fetchStages = useCallback(async (type?: string) => {
+  const fetchStages = useCallback(async (type?: string, includeArchived?: boolean) => {
     setLoadingStages(true);
     try {
       const stageType = type ? (type as 'lead' | 'deal' | 'order' | 'lost_reason') : undefined;
-      const allStages = await getStages(stageType);
+      const params = includeArchived ? { include_archived: true } : undefined;
+      const allStages = await getStages(stageType, params);
       setStagesData(allStages);
     } catch (error) {
       console.error("Failed to fetch stages:", error);
@@ -151,8 +154,9 @@ const StagesManagement = () => {
   }, []);
 
   useEffect(() => {
-    fetchStages(selectedTypeFilter || undefined);
-  }, [fetchStages, refreshKey, selectedTypeFilter]);
+    const includeArchived = activeFilter === 'deleted';
+    fetchStages(selectedTypeFilter || undefined, includeArchived);
+  }, [fetchStages, refreshKey, selectedTypeFilter, activeFilter]);
 
   const fetchStagesForTable = useCallback(
     async (page = 1, perPage = 15, search = "") => {
@@ -294,6 +298,23 @@ const StagesManagement = () => {
       console.error("Delete stage error:", error);
     }
   };
+
+  // Restore Stage Handler
+  const handleRestoreStage = useCallback(async (stageId: number) => {
+    if (!window.confirm('Are you sure you want to restore this stage?')) return;
+
+    try {
+      await restoreStage(stageId);
+      toast.success("Stage restored successfully!");
+      setShowSuccessfulModal(true);
+      setSuccessModalTitle("Stage Restored");
+      setSuccessModalDescription("Stage has been restored successfully");
+      setRefreshKey((oldKey) => oldKey + 1);
+    } catch (error) {
+      console.error("Failed to restore stage:", error);
+      toast.error("Failed to restore stage");
+    }
+  }, []);
 
   const handleInputChange = (field: string, value: any) => {
     setFormData(prev => ({
@@ -697,6 +718,36 @@ const StagesManagement = () => {
 
   return (
     <React.Fragment>
+      <style dangerouslySetInnerHTML={{__html: `
+        .stages-table-wrapper {
+          width: 100%;
+          overflow: hidden;
+        }
+        .stages-table-wrapper .table-responsive {
+          width: 100%;
+          overflow-x: auto;
+          overflow-y: visible;
+          -webkit-overflow-scrolling: touch;
+        }
+        .stages-table-wrapper .table-responsive table {
+          width: 100%;
+          table-layout: auto;
+          margin-bottom: 0;
+        }
+        .stages-table-wrapper .table-responsive table th,
+        .stages-table-wrapper .table-responsive table td {
+          padding: 12px 16px;
+          vertical-align: middle;
+        }
+        .stages-table-wrapper .table-responsive table td:last-child,
+        .stages-table-wrapper .table-responsive table th:last-child {
+          max-width: none;
+        }
+        .stages-table-wrapper .table-responsive table td[style*="width"],
+        .stages-table-wrapper .table-responsive table th[style*="width"] {
+          max-width: none;
+        }
+      `}} />
       <BreadcrumbItem
         mainTitle="CRM"
         mainLink="/crm/dashboard"
@@ -806,69 +857,81 @@ const StagesManagement = () => {
             <div className="d-flex flex-column flex-lg-row justify-content-between align-items-stretch align-items-lg-center gap-3">
               <div className="d-flex gap-2 flex-wrap align-items-center flex-grow-1">
                 <Button
-                  variant={!selectedTypeFilter ? 'primary' : 'outline-secondary'}
+                  variant={activeFilter === 'all' && !selectedTypeFilter ? 'primary' : 'outline-secondary'}
                   onClick={() => {
+                    setActiveFilter('all');
                     setSelectedTypeFilter('');
                     setStagesPagination({ ...stagesPagination, currentPage: 1 });
                   }}
                   className="d-flex align-items-center gap-2"
                 >
                   All Types
-                  <Badge bg="light" text="dark" className="ms-2">
-                    {filteredStages.length}
-                  </Badge>
                 </Button>
                 <Button
-                  variant={selectedTypeFilter === 'lead' ? 'primary' : 'outline-secondary'}
+                  variant={activeFilter === 'all' && selectedTypeFilter === 'lead' ? 'primary' : 'outline-secondary'}
                   onClick={() => {
+                    setActiveFilter('all');
                     setSelectedTypeFilter('lead');
                     setStagesPagination({ ...stagesPagination, currentPage: 1 });
                   }}
                   className="d-flex align-items-center gap-2"
                 >
                   Lead
-                  <Badge bg="light" text="dark" className="ms-2">
-                    {analyticsData.byType.lead}
-                  </Badge>
                 </Button>
                 <Button
-                  variant={selectedTypeFilter === 'deal' ? 'primary' : 'outline-secondary'}
+                  variant={activeFilter === 'all' && selectedTypeFilter === 'deal' ? 'primary' : 'outline-secondary'}
                   onClick={() => {
+                    setActiveFilter('all');
                     setSelectedTypeFilter('deal');
                     setStagesPagination({ ...stagesPagination, currentPage: 1 });
                   }}
                   className="d-flex align-items-center gap-2"
                 >
                   Deal
-                  <Badge bg="light" text="dark" className="ms-2">
-                    {analyticsData.byType.deal}
-                  </Badge>
                 </Button>
                 <Button
-                  variant={selectedTypeFilter === 'order' ? 'primary' : 'outline-secondary'}
+                  variant={activeFilter === 'all' && selectedTypeFilter === 'order' ? 'primary' : 'outline-secondary'}
                   onClick={() => {
+                    setActiveFilter('all');
                     setSelectedTypeFilter('order');
                     setStagesPagination({ ...stagesPagination, currentPage: 1 });
                   }}
                   className="d-flex align-items-center gap-2"
                 >
                   Order
-                  <Badge bg="light" text="dark" className="ms-2">
-                    {analyticsData.byType.order}
-                  </Badge>
                 </Button>
                 <Button
-                  variant={selectedTypeFilter === 'lost_reason' ? 'primary' : 'outline-secondary'}
+                  variant={activeFilter === 'all' && selectedTypeFilter === 'lost_reason' ? 'primary' : 'outline-secondary'}
                   onClick={() => {
+                    setActiveFilter('all');
                     setSelectedTypeFilter('lost_reason');
                     setStagesPagination({ ...stagesPagination, currentPage: 1 });
                   }}
                   className="d-flex align-items-center gap-2"
                 >
                   Lost Reason
-                  <Badge bg="light" text="dark" className="ms-2">
-                    {analyticsData.byType.lost_reason}
-                  </Badge>
+                </Button>
+                <Button
+                  variant={activeFilter === 'deleted' ? 'primary' : 'outline-secondary'}
+                  onClick={() => {
+                    setActiveFilter('deleted');
+                    setSelectedTypeFilter('');
+                    setStagesPagination({ ...stagesPagination, currentPage: 1 });
+                  }}
+                  className="d-flex align-items-center gap-2"
+                  style={activeFilter === 'deleted' ? { 
+                    background: '#fff',
+                    borderColor: '#dc3545',
+                    color: '#dc3545'
+                  } : {
+                    background: '#fff',
+                    borderColor: '#dc3545',
+                    color: '#dc3545',
+                    opacity: '0.7'
+                  }}
+                >
+                  <Trash2 size={16} />
+                  Deleted
                 </Button>
               </div>
 
@@ -951,10 +1014,10 @@ const StagesManagement = () => {
         </div>
 
         {/* Stages Table */}
-        <Card className="border-0 shadow-sm mb-4">
-          <Card.Body className="p-0">
+        <Card className="border-0 shadow-sm stages-table-wrapper mb-4" style={{ width: '100%' }}>
+          <Card.Body className="p-0" style={{ width: '100%' }}>
             <div className="table-responsive">
-              <Table hover className="mb-0">
+              <Table hover className="mb-0" style={{ width: '100%', margin: 0, tableLayout: 'auto' }}>
                 <thead className="bg-light">
                   <tr>
                     {selectedStagesColumns.includes('order') && (
@@ -983,7 +1046,7 @@ const StagesManagement = () => {
                     )}
                     {selectedStagesColumns.includes('description') && <th>Description</th>}
                     {selectedStagesColumns.includes('color') && <th>Color</th>}
-                    <th>Actions</th>
+                    <th style={{ width: '120px', minWidth: '120px' }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1041,58 +1104,86 @@ const StagesManagement = () => {
                             </Badge>
                           </td>
                         )}
-                        <td>
+                        <td style={{ width: '120px', minWidth: '120px' }}>
                           <div className="d-flex gap-1">
-                            <Button 
-                              variant="link" 
-                              size="sm" 
-                              className="p-1" 
-                              title="View"
-                              onClick={() => {
-                                setViewingStage(stage);
-                                setShowViewModal(true);
-                              }}
-                            >
-                              <Eye size={16} />
-                            </Button>
-                            {session?.user?.permissions?.includes('edit-crm-stages') && (
-                              <Button 
-                                variant="link" 
-                                size="sm" 
-                                className="p-1" 
-                                title="Edit Stage"
-                                onClick={() => {
-                                  setStageToUpdate(stage);
-                                  setFormData({
-                                    name: stage.name,
-                                    sequence: stage.sequence,
-                                    is_won: stage.is_won,
-                                    fold: stage.fold,
-                                    color: stage.color,
-                                    description: stage.description || "",
-                                    is_default: stage.is_default,
-                                    active: stage.active,
-                                    type: stage.type,
-                                  });
-                                  setShowUpdateModal(true);
-                                }}
-                              >
-                                <Edit size={16} />
-                              </Button>
-                            )}
-                            {session?.user?.permissions?.includes('delete-crm-stages') && (
-                              <Button 
-                                variant="link" 
-                                size="sm" 
-                                className="p-1 text-danger" 
-                                title="Delete Stage"
-                                onClick={() => {
-                                  setStageToDelete(stage);
-                                  setShowDeleteModal(true);
-                                }}
-                              >
-                                <Trash2 size={16} />
-                              </Button>
+                            {activeFilter === 'deleted' ? (
+                              <>
+                                <Button 
+                                  variant="link" 
+                                  size="sm" 
+                                  className="p-1" 
+                                  title="View"
+                                  onClick={() => {
+                                    setViewingStage(stage);
+                                    setShowViewModal(true);
+                                  }}
+                                >
+                                  <Eye size={16} />
+                                </Button>
+                                <Button 
+                                  variant="link" 
+                                  size="sm" 
+                                  className="p-1 text-success" 
+                                  title="Restore"
+                                  onClick={() => handleRestoreStage(stage.id)}
+                                >
+                                  <RotateCcw size={16} />
+                                </Button>
+                              </>
+                            ) : (
+                              <>
+                                <Button 
+                                  variant="link" 
+                                  size="sm" 
+                                  className="p-1" 
+                                  title="View"
+                                  onClick={() => {
+                                    setViewingStage(stage);
+                                    setShowViewModal(true);
+                                  }}
+                                >
+                                  <Eye size={16} />
+                                </Button>
+                                {session?.user?.permissions?.includes('edit-crm-stages') && (
+                                  <Button 
+                                    variant="link" 
+                                    size="sm" 
+                                    className="p-1" 
+                                    title="Edit Stage"
+                                    onClick={() => {
+                                      setStageToUpdate(stage);
+                                      setFormData({
+                                        name: stage.name,
+                                        sequence: stage.sequence,
+                                        is_won: stage.is_won,
+                                        fold: stage.fold,
+                                        color: stage.color,
+                                        description: stage.description || "",
+                                        is_default: stage.is_default,
+                                        active: stage.active,
+                                        type: stage.type,
+                                      });
+                                      setShowUpdateModal(true);
+                                    }}
+                                  >
+                                    <Edit size={16} />
+                                  </Button>
+                                )}
+                                {session?.user?.permissions?.includes('delete-crm-stages') && (
+                                  <Button 
+                                    variant="link" 
+                                    size="sm" 
+                                    className="p-1 text-danger" 
+                                    title="Delete Stage"
+                                    onClick={() => {
+                                      setStageToDelete(stage);
+                                      setShowDeleteModal(true);
+                                    }}
+                                  >
+                                    <Trash2 size={16} />
+                                  </Button>
+                                )}
+                              </>
                             )}
                           </div>
                         </td>
@@ -1108,59 +1199,10 @@ const StagesManagement = () => {
           </Card.Body>
         </Card>
 
-        {/* Stage Flow Visualization */}
-        {filteredStages.length > 0 && (
-          <Card className="border-0 shadow-sm">
-            <Card.Body>
-              <h5 className="mb-4 fw-bold">Pipeline Flow Visualization</h5>
-              <div className="d-flex align-items-center justify-content-between flex-wrap gap-2">
-                {sortData(filteredStages, 'sequence', 'asc').map((stage, index) => (
-                  <React.Fragment key={stage.id}>
-                    <div className="text-center" style={{ minWidth: '100px' }}>
-                      <div 
-                        className="rounded-circle d-flex align-items-center justify-content-center mx-auto mb-2" 
-                        style={{ 
-                          width: '60px', 
-                          height: '60px', 
-                          backgroundColor: stage.color,
-                          color: 'white',
-                          fontWeight: 'bold'
-                        }}
-                      >
-                        {stage.sequence}
-                      </div>
-                      <small className="fw-semibold d-block">{stage.name}</small>
-                      <small className="text-muted">{getTypeDisplayName(stage.type)}</small>
-                    </div>
-                    {index < filteredStages.length - 1 && (
-                      <ChevronRightIcon size={24} className="text-muted" />
-                    )}
-                  </React.Fragment>
-                ))}
-              </div>
-            </Card.Body>
-          </Card>
-        )}
+       
       </div>
 
-      {/* Create Stage Modal */}
-      {/* <Modal show={showCreateModal} onHide={() => setShowCreateModal(false)} size="lg">
-        <Modal.Header closeButton>
-          <Modal.Title>Create New Stage</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={() => setShowCreateModal(false)}>
-            Cancel
-          </Button>
-          <Button type="submit" variant="primary" onClick={handleSubmit}>
-            <FiSave className="me-2" />
-            Create Stage
-          </Button>
-        </Modal.Footer>
-      </Modal> */}
+    
 
 
 

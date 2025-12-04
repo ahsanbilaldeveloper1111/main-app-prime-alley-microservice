@@ -100,6 +100,25 @@ const getOrderBadgeColor = (order: OrderData): string => {
   return "warning";
 };
 
+// Chart color palette - 15 colors for handling large datasets
+const CHART_COLORS = [
+  "#ffc107", // Yellow
+  "#0dcaf0", // Cyan
+  "#6c757d", // Gray
+  "#198754", // Green
+  "#dc3545", // Red
+  "#0d6efd", // Blue
+  "#6610f2", // Purple
+  "#e83e8c", // Pink
+  "#fd7e14", // Orange
+  "#20c997", // Teal
+  "#ff6b6b", // Coral Red
+  "#4ecdc4", // Turquoise
+  "#95e1d3", // Mint
+  "#f38181", // Salmon
+  "#aa96da", // Lavender
+];
+
 const CrmDashboard = () => {
   const [dashboardData, setDashboardData] = useState<CrmDashboardData | null>(null);
   const [recentLeads, setRecentLeads] = useState<LeadData[]>([]);
@@ -170,19 +189,19 @@ const CrmDashboard = () => {
 
       // Process deals by stage from API
       const dealsDistribution = (dashboard as CrmDashboardData)?.stage_distribution?.deals || [];
-      const dealsByStageData = dealsDistribution.map((item: { stage_name: string; count: number; color: string }) => ({
+      const dealsByStageData = dealsDistribution.map((item: { stage_name: string; count: number; color: string }, index: number) => ({
         name: item.stage_name,
         value: item.count,
-        color: item.color || "#0d6efd",
+        color: item.color || CHART_COLORS[index % CHART_COLORS.length],
       }));
       setDealsByStage(dealsByStageData);
 
       // Process orders by stage from API
       const ordersDistribution = (dashboard as CrmDashboardData)?.stage_distribution?.orders || [];
-      const ordersByStageData = ordersDistribution.map((item: { stage_name: string; count: number; color: string }) => ({
+      const ordersByStageData = ordersDistribution.map((item: { stage_name: string; count: number; color: string }, index: number) => ({
         name: item.stage_name,
         value: item.count,
-        color: item.color || "#198754",
+        color: item.color || CHART_COLORS[index % CHART_COLORS.length],
       }));
       setOrdersByStage(ordersByStageData);
 
@@ -296,6 +315,40 @@ const CrmDashboard = () => {
           @media (max-width: 767px) {
             .kpi-card-col { flex: 0 0 100% !important; max-width: 100% !important; }
           }
+          .dashboard-table-wrapper {
+            width: 100%;
+            overflow: hidden;
+          }
+          .dashboard-table-wrapper .table-responsive {
+            width: 100%;
+            overflow-x: auto;
+            overflow-y: visible;
+            -webkit-overflow-scrolling: touch;
+          }
+          .dashboard-table-wrapper .table-responsive table {
+            width: 100%;
+            max-width: 100%;
+            table-layout: auto;
+            margin-bottom: 0;
+          }
+          .dashboard-table-wrapper .table-responsive table thead th {
+            white-space: normal;
+            word-wrap: break-word;
+            vertical-align: middle;
+            padding: 12px 16px;
+          }
+          .dashboard-table-wrapper .table-responsive table tbody td {
+            padding: 12px 16px;
+            vertical-align: middle;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+          }
+          .dashboard-table-wrapper .table-responsive table thead th:last-child,
+          .dashboard-table-wrapper .table-responsive table tbody td:last-child {
+            min-width: 60px !important;
+            max-width: 80px !important;
+            width: 60px !important;
+          }
         `}</style>
         <Row className="mb-4">
           {kpiData.map((kpi) => (
@@ -308,21 +361,48 @@ const CrmDashboard = () => {
         {/* Charts Row */}
         <Row className="mb-4">
           {/* Monthly Bar Chart */}
-          <Col lg={6} className="mb-4">
-            <Card className="border-0 shadow-sm">
+          <Col lg={6} className="mb-4 d-flex">
+            <Card className="border-0 shadow-sm h-100 w-100">
               <Card.Body>
                 <h5 className="mb-4 fw-bold">Leads, Deals & Orders by Month</h5>
                 {monthlyData.length > 0 ? (
                   <ResponsiveContainer width="100%" height={300}>
-                    <BarChart data={monthlyData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="month" tick={{ fontSize: 12 }} />
-                      <YAxis allowDecimals={false} />
-                      <Tooltip contentStyle={{ borderRadius: "8px" }} />
-                      <Legend />
-                      <Bar dataKey="leads" fill="#0d6efd" radius={[8, 8, 0, 0]} name="Leads" />
-                      <Bar dataKey="deals" fill="#198754" radius={[8, 8, 0, 0]} name="Deals" />
-                      <Bar dataKey="orders" fill="#0dcaf0" radius={[8, 8, 0, 0]} name="Orders" />
+                    <BarChart 
+                      data={monthlyData}
+                      margin={{ top: 10, right: 10, left: 0, bottom: 5 }}
+                      barCategoryGap="15%"
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
+                      <XAxis 
+                        dataKey="month" 
+                        tick={{ fontSize: 11, fill: "#6c757d" }}
+                        axisLine={false}
+                        tickLine={false}
+                      />
+                      <YAxis 
+                        allowDecimals={false}
+                        tick={{ fontSize: 11, fill: "#6c757d" }}
+                        axisLine={false}
+                        tickLine={false}
+                        width={40}
+                      />
+                      <Tooltip 
+                        contentStyle={{ 
+                          borderRadius: "8px",
+                          border: "1px solid #e9ecef",
+                          boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
+                          backgroundColor: "#fff",
+                          padding: "8px 12px"
+                        }}
+                      />
+                      <Legend 
+                        wrapperStyle={{ paddingTop: "15px", fontSize: "12px" }}
+                        iconType="rect"
+                        iconSize={12}
+                      />
+                      <Bar dataKey="leads" fill={CHART_COLORS[0]} radius={[4, 4, 0, 0]} name="Leads" />
+                      <Bar dataKey="deals" fill={CHART_COLORS[3]} radius={[4, 4, 0, 0]} name="Deals" />
+                      <Bar dataKey="orders" fill={CHART_COLORS[1]} radius={[4, 4, 0, 0]} name="Orders" />
                     </BarChart>
                   </ResponsiveContainer>
                 ) : (
@@ -333,8 +413,8 @@ const CrmDashboard = () => {
           </Col>
 
           {/* Deals by Stage Pie Chart */}
-          <Col lg={3} className="mb-4">
-                <Card className="border-0 shadow-sm">
+          <Col lg={3} className="mb-4 d-flex">
+                <Card className="border-0 shadow-sm h-100 w-100">
                   <Card.Body>
                 <h5 className="mb-4 fw-bold">Deals by Stage</h5>
                 {dealsByStage.length > 0 ? (
@@ -346,14 +426,28 @@ const CrmDashboard = () => {
                         cy="50%"
                         outerRadius="80%"
                         dataKey="value"
-                        label={({ name, value }) => `${name}: ${value}`}
-                        labelLine={{ stroke: "#666", strokeWidth: 1 }}
+                        label={false}
                       >
                         {dealsByStage.map((entry) => (
                           <Cell key={`cell-${entry.name}`} fill={entry.color} />
                         ))}
                       </Pie>
-                      <Tooltip />
+                      <Tooltip 
+                        contentStyle={{ 
+                          borderRadius: "8px",
+                          border: "1px solid #e9ecef",
+                          boxShadow: "0 2px 8px rgba(0,0,0,0.1)"
+                        }}
+                        formatter={(value: any, name: any) => [
+                          `${value} deals`,
+                          name
+                        ]}
+                      />
+                      <Legend 
+                        verticalAlign="bottom" 
+                        height={36}
+                        formatter={(value) => value}
+                      />
                     </PieChart>
                   </ResponsiveContainer>
                 ) : (
@@ -364,8 +458,8 @@ const CrmDashboard = () => {
           </Col>
 
           {/* Orders by Stage Doughnut Chart */}
-          <Col lg={3} className="mb-4">
-            <Card className="border-0 shadow-sm">
+          <Col lg={3} className="mb-4 d-flex">
+            <Card className="border-0 shadow-sm h-100 w-100">
               <Card.Body>
                 <h5 className="mb-4 fw-bold">Orders by Stage</h5>
                 {ordersByStage.length > 0 ? (
@@ -378,14 +472,28 @@ const CrmDashboard = () => {
                         innerRadius="40%"
                         outerRadius="80%"
                         dataKey="value"
-                        label={({ name, value }) => `${name}: ${value}`}
-                        labelLine={{ stroke: "#666", strokeWidth: 1 }}
+                        label={false}
                       >
                         {ordersByStage.map((entry) => (
                           <Cell key={`cell-${entry.name}`} fill={entry.color} />
                         ))}
                       </Pie>
-                      <Tooltip />
+                      <Tooltip 
+                        contentStyle={{ 
+                          borderRadius: "8px",
+                          border: "1px solid #e9ecef",
+                          boxShadow: "0 2px 8px rgba(0,0,0,0.1)"
+                        }}
+                        formatter={(value: any, name: any) => [
+                          `${value} orders`,
+                          name
+                        ]}
+                      />
+                      <Legend 
+                        verticalAlign="bottom" 
+                        height={36}
+                        formatter={(value) => value}
+                      />
                     </PieChart>
                   </ResponsiveContainer>
                 ) : (
@@ -399,9 +507,9 @@ const CrmDashboard = () => {
         {/* Leads by Stage */}
         {leadsByStage.length > 0 && (
           <Row className="mb-4">
-            <Col lg={6} className="mb-4">
-              <Card className="border-0 shadow-sm">
-                <Card.Body style={{ minHeight: "344px" }}>
+            <Col lg={6} className="mb-4 d-flex">
+              <Card className="border-0 shadow-sm h-100 w-100">
+                <Card.Body>
                   <h5 className="mb-4 fw-bold">Leads by Stage</h5>
                   {leadsByStage.map((item) => (
                     <div key={item.stage_id} className="mb-3">
@@ -429,9 +537,9 @@ const CrmDashboard = () => {
             </Col>
 
           {/* Recent Leads */}
-            <Col lg={6} className="mb-4">
-              <Card className="border-0 shadow-sm">
-                <Card.Body>
+            <Col lg={6} className="mb-4 d-flex">
+              <Card className="border-0 shadow-sm h-100 w-100">
+                <Card.Body className="d-flex flex-column">
                   <div className="d-flex justify-content-between align-items-center mb-4">
                     <h5 className="mb-0 fw-bold">Recent Leads</h5>
                 <Link
@@ -441,95 +549,104 @@ const CrmDashboard = () => {
                       View All →
                 </Link>
                         </div>
-                  <div style={{ maxHeight: "400px", overflowY: "auto" }}>
+                  <div className="dashboard-table-wrapper flex-grow-1" style={{ maxHeight: "400px", overflowY: "auto" }}>
                     {recentLeads.length > 0 ? (
-                      <Table hover responsive className="mb-0">
-                        <thead
-                          style={{
-                            position: "sticky",
-                            top: 0,
-                            backgroundColor: "#fff",
-                            zIndex: 1,
-                          }}
-                        >
-                          <tr>
-                            <th
-                              style={{
-                                fontSize: "0.85rem",
-                                fontWeight: 600,
-                                borderBottom: "2px solid #dee2e6",
-                              }}
-                            >
-                              Name
-                            </th>
-                            <th
-                              style={{
-                                fontSize: "0.85rem",
-                                fontWeight: 600,
-                                borderBottom: "2px solid #dee2e6",
-                              }}
-                            >
-                              Stage
-                            </th>
-                            <th
-                              style={{
-                                fontSize: "0.85rem",
-                                fontWeight: 600,
-                                borderBottom: "2px solid #dee2e6",
-                              }}
-                            >
-                              Created
-                            </th>
-                            <th
-                              style={{
-                                fontSize: "0.85rem",
-                                fontWeight: 600,
-                                borderBottom: "2px solid #dee2e6",
-                              }}
-                            >
-                              Last Activity
-                            </th>
-                            <th
-                              style={{
-                                fontSize: "0.85rem",
-                                fontWeight: 600,
-                                borderBottom: "2px solid #dee2e6",
-                              }}
-                            >
-                              Action
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {recentLeads.map((lead) => (
-                            <tr key={lead.id}>
-                              <td style={{ fontSize: "0.9rem", fontWeight: 500 }}>
-                                {lead.name || "Unnamed Lead"}
-                              </td>
-                              <td>
-                                <Badge bg="primary" className="bg-opacity-10 text-dark">
-                          {lead.stage?.name || "No Stage"}
-                                </Badge>
-                              </td>
-                              <td style={{ fontSize: "0.85rem", color: "#6c757d" }}>
-                                {moment(lead.created_at).format("MMM DD, YYYY")}
-                              </td>
-                              <td style={{ fontSize: "0.85rem", color: "#6c757d" }}>
-                                {moment(lead.updated_at).format("MMM DD, YYYY")}
-                              </td>
-                              <td>
-                      <Link
-                        href={`/crm/leads/${lead.id}/edit`}
-                        className="btn btn-sm btn-outline-secondary"
-                        title="View Details"
-                      >
-                                  <Eye size={14} />
-                      </Link>
-                              </td>
+                      <div className="table-responsive">
+                        <Table hover className="mb-0">
+                          <thead
+                            style={{
+                              position: "sticky",
+                              top: 0,
+                              backgroundColor: "#fff",
+                              zIndex: 1,
+                            }}
+                          >
+                            <tr>
+                              <th
+                                style={{
+                                  fontSize: "0.85rem",
+                                  fontWeight: 600,
+                                  borderBottom: "2px solid #dee2e6",
+                                  minWidth: "120px",
+                                }}
+                              >
+                                Name
+                              </th>
+                              <th
+                                style={{
+                                  fontSize: "0.85rem",
+                                  fontWeight: 600,
+                                  borderBottom: "2px solid #dee2e6",
+                                  minWidth: "80px",
+                                }}
+                              >
+                                Stage
+                              </th>
+                              <th
+                                style={{
+                                  fontSize: "0.85rem",
+                                  fontWeight: 600,
+                                  borderBottom: "2px solid #dee2e6",
+                                  minWidth: "100px",
+                                }}
+                              >
+                                Created
+                              </th>
+                              <th
+                                style={{
+                                  fontSize: "0.85rem",
+                                  fontWeight: 600,
+                                  borderBottom: "2px solid #dee2e6",
+                                  minWidth: "100px",
+                                }}
+                              >
+                                Last Activity
+                              </th>
+                              <th
+                                style={{
+                                  fontSize: "0.85rem",
+                                  fontWeight: 600,
+                                  borderBottom: "2px solid #dee2e6",
+                                  minWidth: "60px",
+                                  maxWidth: "80px",
+                                  width: "60px",
+                                }}
+                              >
+                                Action
+                              </th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </Table>
+                          </thead>
+                          <tbody>
+                            {recentLeads.map((lead) => (
+                              <tr key={lead.id}>
+                                <td style={{ fontSize: "0.9rem", fontWeight: 500, whiteSpace: "normal", wordWrap: "break-word" }}>
+                                  {lead.name || "Unnamed Lead"}
+                                </td>
+                                <td style={{ whiteSpace: "nowrap" }}>
+                                  <Badge bg="primary" className="bg-opacity-10 text-dark">
+                            {lead.stage?.name || "No Stage"}
+                                  </Badge>
+                                </td>
+                                <td style={{ fontSize: "0.85rem", color: "#6c757d", whiteSpace: "nowrap" }}>
+                                  {moment(lead.created_at).format("MMM DD, YYYY")}
+                                </td>
+                                <td style={{ fontSize: "0.85rem", color: "#6c757d", whiteSpace: "nowrap" }}>
+                                  {moment(lead.updated_at).format("MMM DD, YYYY")}
+                                </td>
+                                <td style={{ whiteSpace: "nowrap", textAlign: "center", minWidth: "60px", maxWidth: "80px", width: "60px" }}>
+                        <Link
+                          href={`/crm/leads/${lead.id}/edit`}
+                          className="btn btn-sm btn-outline-secondary"
+                          title="View Details"
+                        >
+                                    <Eye size={14} />
+                        </Link>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </Table>
+                      </div>
                     ) : (
                       <p className="text-muted text-center py-4">No recent leads</p>
                     )}
@@ -543,9 +660,9 @@ const CrmDashboard = () => {
         {/* Recent Deals and Orders */}
         <Row>
           {/* Recent Deals */}
-          <Col lg={6} className="mb-4">
-            <Card className="border-0 shadow-sm">
-              <Card.Body>
+          <Col lg={6} className="mb-4 d-flex">
+            <Card className="border-0 shadow-sm h-100 w-100">
+              <Card.Body className="d-flex flex-column">
                 <div className="d-flex justify-content-between align-items-center mb-4">
                   <h5 className="mb-0 fw-bold" style={{ color: "#2c3e50" }}>
                     Recent Deals
@@ -557,7 +674,7 @@ const CrmDashboard = () => {
                     View All →
                 </Link>
                         </div>
-                <div style={{ maxHeight: "400px", overflowY: "auto" }}>
+                <div className="flex-grow-1" style={{ maxHeight: "400px", overflowY: "auto" }}>
                   {recentDeals.length > 0 ? (
                     recentDeals.map((deal) => (
                       <div key={deal.id} className="mb-3 d-flex align-items-start gap-2">
@@ -622,9 +739,9 @@ const CrmDashboard = () => {
           </Col>
 
           {/* Recent Orders */}
-          <Col lg={6} className="mb-4">
-            <Card className="border-0 shadow-sm">
-              <Card.Body>
+          <Col lg={6} className="mb-4 d-flex">
+            <Card className="border-0 shadow-sm h-100 w-100">
+              <Card.Body className="d-flex flex-column">
                 <div className="d-flex justify-content-between align-items-center mb-4">
                   <h5 className="mb-0 fw-bold" style={{ color: "#2c3e50" }}>
                     Recent Orders
@@ -636,7 +753,7 @@ const CrmDashboard = () => {
                     View All →
                     </Link>
                   </div>
-                <div style={{ maxHeight: "400px", overflowY: "auto" }}>
+                <div className="flex-grow-1" style={{ maxHeight: "400px", overflowY: "auto" }}>
                   {recentOrders.length > 0 ? (
                     recentOrders.map((order) => (
                       <div key={order.id} className="mb-3 d-flex align-items-start gap-2">

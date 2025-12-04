@@ -5,11 +5,11 @@ import React, {
   useEffect,
   useCallback,
   useMemo,
+  useRef,
 } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericListPage from "@components/GenericListPage";
-import CrmDataFilters from "@components/filters/CrmDataFilters";
 import {
   Button,
   Card,
@@ -70,6 +70,11 @@ import {
   MoreVertical,
   Phone as PhoneIcon,
   Mail,
+  X,
+  User,
+  History,
+  FileText,
+  Target,
 } from "lucide-react";
 import { Column } from "@components/CustomDataTable";
 
@@ -87,6 +92,7 @@ import {
   unscheduleCall,
   getCrmDataHistory,
   CrmDataItem,
+  CrmDataMetrics,
 } from "@utils/crm";
 import { GetHierarchyData } from "@utils/users";
 
@@ -153,7 +159,7 @@ const KPICard: React.FC<KPICardData> = ({ title, value, change, isPositive, icon
 
 // Filter Bar Component (from crm-new.tsx design)
 interface FilterBarProps {
-  quickFilters: { id: string; label: string; count: number; variant?: string; color?: string; activeColor?: string; icon?: React.ReactNode }[];
+  quickFilters: { id: string; label: string; variant?: string; color?: string; activeColor?: string; icon?: React.ReactNode }[];
   activeFilter: string;
   onFilterChange: (filterId: string) => void;
   searchValue: string;
@@ -213,13 +219,6 @@ const FilterBar: React.FC<FilterBarProps> = ({
                 >
                   {filter.icon && <span className="d-flex align-items-center">{filter.icon}</span>}
                   {filter.label}
-                  <Badge
-                    bg={isActive ? 'light' : 'light'}
-                    text={isActive ? 'dark' : 'dark'}
-                    className="ms-2"
-                  >
-                    {filter.count}
-                  </Badge>
                 </Button>
               );
             })}
@@ -271,6 +270,7 @@ const CrmProspectsManagement = () => {
   const { data: session } = useSession();
   const [refreshKey, setRefreshKey] = useState(0);
   const [currentFilters, setCurrentFilters] = useState<Record<string, any>>({});
+  const requestIdRef = useRef(0);
   const [uploading, setUploading] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [dragActive, setDragActive] = useState(false);
@@ -353,21 +353,16 @@ const CrmProspectsManagement = () => {
 
   // History modal state
   const [showHistoryModal, setShowHistoryModal] = useState(false);
-  const [dashboardStats, setDashboardStats] = useState({
-    callsInNextHour: 0,
-    callsInNext24Hours: 0,
-    overdueCalls: 0,
-    assignedEntries: 0,
-    unassignedEntries: 0,
-    total_scheduled:0,
-    not_scheduled:0,
-    total_records:0
-  });
+  
   const [showProspectsAnalytics, setShowProspectsAnalytics] = useState(false);
   const [showAllProspectStats, setShowAllProspectStats] = useState(false);
   const [activeFilter, setActiveFilter] = useState('all');
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [prospectsSearch, setProspectsSearch] = useState('');
+  const [prospectsFilters, setProspectsFilters] = useState({
+    assignedTo: null as string | null,
+    campaigns: null as string[] | null,
+  });
   
   // Column customization and pagination states
   const [selectedColumns, setSelectedColumns] = useState<string[]>(() => {
@@ -383,6 +378,14 @@ const CrmProspectsManagement = () => {
   const [dataList, setDataList] = useState<CrmDataItem[]>([]);
   const [totalRecords, setTotalRecords] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [metrics, setMetrics] = useState<CrmDataMetrics >({
+    assigned_records: 0,
+    unassigned_records: 0,
+    scheduled_records: 0,
+    not_scheduled_records: 0,
+    scheduled_next_hour_records: 0,
+    scheduled_next_24_hours_records: 0,
+  });
 
   // Static tags data
   const staticTags = [
@@ -542,43 +545,47 @@ const CrmProspectsManagement = () => {
     [fetchCampaignsByIds]
   );
 
-  // Calculate dashboard statistics using real data
-  const calculateDashboardStats = useCallback(async () => {
-    try {
-      // Extract campaign IDs and tags from current filters
-      const campaignIds = currentFilters.campaign_id
-        ? currentFilters.campaign_id.map((id: string) => parseInt(id))
-        : [];
-      const tags = currentFilters.tags || [];
-
-      // Get real counts from API with current filters
-      const counts = await getCrmDataCounts(campaignIds, tags);
-
-      return {
-        callsInNextHour: counts.scheduled_calls?.next_hour || 0,
-        callsInNext24Hours: counts.scheduled_calls?.next_24_hours || 0,
-        overdueCalls: counts.scheduled_calls?.overdue || 0,
-        assignedEntries: counts.summary.assigned_records,
-        unassignedEntries: counts.summary.unassigned_records,
-        total_scheduled: counts.scheduled_calls?.total_scheduled || 0,
-        not_scheduled: counts.scheduled_calls?.not_scheduled || 0,
-        total_records: counts.summary.total_records || 0,
-      };
-    } catch (error) {
-      console.error("Failed to get dashboard stats:", error);
-      // Fallback to static data
-      return {
-        callsInNextHour: 0,
-        callsInNext24Hours: 0,
-        overdueCalls: 0,
-        assignedEntries: 0,
-        unassignedEntries: 0,
-        total_scheduled: 0,
-        not_scheduled: 0,
-        total_records: 0,
-      };
-    }
-  }, [currentFilters]);
+  // Custom select styles
+  const customSelectStyles = {
+    control: (provided: any, state: any) => ({
+      ...provided,
+      minHeight: '45px',
+      fontSize: '0.875rem',
+      borderColor: state.isFocused ? '#86b7fe' : '#dee2e6',
+      boxShadow: state.isFocused ? '0 0 0 0.2rem rgba(13, 110, 253, 0.25)' : 'none',
+      '&:hover': {
+        borderColor: '#86b7fe'
+      }
+    }),
+    multiValue: (provided: any) => ({
+      ...provided,
+      backgroundColor: '#0d6efd',
+      color: 'white',
+      fontSize: '0.813rem'
+    }),
+    multiValueLabel: (provided: any) => ({
+      ...provided,
+      color: 'white',
+      padding: '2px 6px'
+    }),
+    multiValueRemove: (provided: any) => ({
+      ...provided,
+      color: 'white',
+      '&:hover': {
+        backgroundColor: '#0b5ed7',
+        color: 'white'
+      }
+    }),
+    placeholder: (provided: any) => ({
+      ...provided,
+      color: '#6c757d',
+      fontSize: '0.875rem'
+    }),
+    singleValue: (provided: any) => ({
+      ...provided,
+      fontSize: '0.875rem'
+    })
+  };
 
   const memoizedFilters = useMemo(() => currentFilters, [currentFilters]);
 
@@ -601,19 +608,6 @@ const CrmProspectsManagement = () => {
     const extensionData = extensions.find((ext) => ext.id === extension);
     return extensionData?.display_name || extensionData?.name || extension;
   }
-  
-  // Load dashboard stats
-  useEffect(() => {
-    const loadDashboardStats = async () => {
-      try {
-        const stats = await calculateDashboardStats();
-        setDashboardStats(stats);
-      } catch (error) {
-        console.error("Failed to load dashboard stats:", error);
-      }
-    };
-    loadDashboardStats();
-  }, [calculateDashboardStats, refreshKey, currentFilters]);
 
   // Load history data when modal is opened
   useEffect(() => {
@@ -680,6 +674,33 @@ const CrmProspectsManagement = () => {
     setCurrentFilters(filters);
     setRefreshKey((prev) => prev + 1);
   }, []);
+
+  // Handle activeFilter changes to update currentFilters
+  useEffect(() => {
+    if (activeFilter === 'all') {
+      setCurrentFilters((prev) => {
+        const newFilters = { ...prev };
+        delete newFilters.has_scheduled_calls;
+        delete newFilters.has_tickets;
+        return newFilters;
+      });
+    } else if (activeFilter === 'scheduled') {
+      setCurrentFilters((prev) => {
+        const newFilters = { ...prev };
+        delete newFilters.has_tickets;
+        newFilters.has_scheduled_calls = true;
+        return newFilters;
+      });
+    } else if (activeFilter === 'has_leads') {
+      setCurrentFilters((prev) => {
+        const newFilters = { ...prev };
+        delete newFilters.has_scheduled_calls;
+        newFilters.has_tickets = true;
+        return newFilters;
+      });
+    }
+    // Don't reset pagination here - it's already reset in onFilterChange
+  }, [activeFilter]);
 
   // Helper functions for sorting and pagination
   const handleSort = (column: string) => {
@@ -819,6 +840,10 @@ const CrmProspectsManagement = () => {
   // Fetch prospects data
   const fetchCrmData = useCallback(
     async () => {
+      // Increment request ID to track the latest request
+      requestIdRef.current += 1;
+      const currentRequestId = requestIdRef.current;
+
       setLoading(true);
       try {
         const params: any = {
@@ -868,17 +893,46 @@ const CrmProspectsManagement = () => {
           params.date_to = memoizedFilters.end_date;
         }
 
+        if (memoizedFilters.has_scheduled_calls !== undefined) {
+          params.has_scheduled_calls = memoizedFilters.has_scheduled_calls;
+        }
+
+        if (memoizedFilters.has_tickets !== undefined) {
+          params.has_tickets = memoizedFilters.has_tickets;
+        }
+
         params.module_slug = ModuleSlug.CRM_DATA_MANAGEMENT;
 
         const response = await getCrmData(params);
+        
+        // Only update state if this is still the latest request
+        if (currentRequestId !== requestIdRef.current) {
+          return;
+        }
+        
         setDataList(response.data || []);
         setTotalRecords(response.pagination.total || 0);
-      } catch (error) {
+        setMetrics(response.metrics || {
+          assigned_records: 0,
+          unassigned_records: 0,
+          scheduled_records: 0,
+          not_scheduled_records: 0,
+          scheduled_next_hour_records: 0,
+          scheduled_next_24_hours_records: 0,
+        });
+      } catch (error: any) {
+        // Only handle error if this is still the latest request
+        if (currentRequestId !== requestIdRef.current) {
+          return;
+        }
         console.error("Failed to fetch CRM data:", error);
         setDataList([]);
         setTotalRecords(0);
       } finally {
-        setLoading(false);
+        // Only set loading to false if this is still the current request
+        if (currentRequestId === requestIdRef.current) {
+          setLoading(false);
+        }
       }
     },
     [memoizedFilters, pagination, prospectsSearch]
@@ -989,7 +1043,7 @@ const CrmProspectsManagement = () => {
       // Extract tag values from selected options
       const tagValues = Array.from(fieldTags).map((tag) => tag.value);
 
-      const response = await uploadCrmDataCsv(
+      const response: any = await uploadCrmDataCsv(
         selectedFile,
         [], // No campaigns selected
         tagValues,
@@ -998,6 +1052,38 @@ const CrmProspectsManagement = () => {
 
       clearInterval(progressInterval);
       setUploadProgress(100);
+
+      // Parse response
+      const responseData = response?.data || {};
+      const processedCount = responseData.processed_count || 0;
+      const validationFailures = responseData.validation_failures || 0;
+      const errors = responseData.errors || [];
+      const message = responseData.message || "Upload completed";
+
+      // Show error messages for validation failures
+      if (errors.length > 0) {
+        errors.forEach((error: string) => {
+          toast.error(error);
+        });
+      }
+
+      // Show success message
+      if (processedCount > 0) {
+        let successMessage = `Successfully processed ${processedCount} record${processedCount !== 1 ? 's' : ''}`;
+        
+        if (validationFailures > 0) {
+          successMessage += ` with ${validationFailures} validation failure${validationFailures !== 1 ? 's' : ''}`;
+        }
+        
+        setSuccessModalTitle("Upload Successful");
+        setSuccessModalDescription(successMessage);
+        setShowSuccessfulModal(true);
+      } else if (validationFailures > 0) {
+        // All records failed validation
+        toast.error(`Upload failed: All ${validationFailures} record${validationFailures !== 1 ? 's' : ''} failed validation`);
+      } else {
+        toast.error("Upload completed but no records were processed");
+      }
 
       setSelectedFile(null);
       setFieldTags([]);
@@ -1008,6 +1094,9 @@ const CrmProspectsManagement = () => {
       setRefreshKey((prev) => prev + 1);
     } catch (error: any) {
       console.error("Upload error:", error);
+      const errorMessage = error?.response?.data?.message || error?.message || "Failed to upload file. Please try again.";
+      toast.error(errorMessage);
+      setUploadProgress(0);
     } finally {
       setUploading(false);
     }
@@ -1657,29 +1746,6 @@ const CrmProspectsManagement = () => {
             </Button>
             )}
             
-            {session?.user?.permissions?.includes('call-service-crm-data-management') && (
-              props.scheduled_call_at ? (
-                <Button
-                  variant="warning"
-                  size="sm"
-                  className="app-button"
-                  onClick={() => handleUnscheduleCall(props)}
-                  title="Unschedule Call"
-                >
-                  <FiX size={14} />
-                </Button>
-              ) : (
-                <Button
-                  variant="info"
-                  className="app-button"
-                  size="sm"
-                  onClick={() => handleScheduleCall(props)}
-                  title="Schedule Call"
-                >
-                  <FiCalendar size={14} />
-                </Button>
-              )
-            )}
  <Dropdown>
             <Dropdown.Toggle
               variant="outline-secondary"
@@ -1690,6 +1756,22 @@ const CrmProspectsManagement = () => {
               <FiMoreVertical size={14} />
             </Dropdown.Toggle>
             <Dropdown.Menu>
+              {session?.user?.permissions?.includes('call-service-crm-data-management') && (
+                <>
+                  {props.scheduled_call_at ? (
+                    <Dropdown.Item onClick={() => handleUnscheduleCall(props)}>
+                      <FiX size={14} className="me-2" />
+                      Unschedule Call
+                    </Dropdown.Item>
+                  ) : (
+                    <Dropdown.Item onClick={() => handleScheduleCall(props)}>
+                      <FiCalendar size={14} className="me-2" />
+                      Schedule Call
+                    </Dropdown.Item>
+                  )}
+                  <Dropdown.Divider />
+                </>
+              )}
               <Dropdown.Item
                 onClick={() => {
                   window.location.href = `/crm/leads/create?crm_data_id=${props.id}`;
@@ -1761,7 +1843,35 @@ const CrmProspectsManagement = () => {
 
   return (
     <React.Fragment>
-      <style jsx>{`
+      <style dangerouslySetInnerHTML={{__html: `
+        .prospects-table-wrapper {
+          width: 100%;
+          overflow: hidden;
+        }
+        .prospects-table-wrapper .table-responsive {
+          width: 100%;
+          overflow-x: auto;
+          overflow-y: visible;
+          -webkit-overflow-scrolling: touch;
+        }
+        .prospects-table-wrapper .table-responsive table {
+          width: 100%;
+          table-layout: auto;
+          margin-bottom: 0;
+        }
+        .prospects-table-wrapper .table-responsive table th,
+        .prospects-table-wrapper .table-responsive table td {
+          padding: 12px 16px;
+          vertical-align: middle;
+        }
+        .prospects-table-wrapper .table-responsive table td:last-child,
+        .prospects-table-wrapper .table-responsive table th:last-child {
+          max-width: none;
+        }
+        .prospects-table-wrapper .table-responsive table td[style*="width"],
+        .prospects-table-wrapper .table-responsive table th[style*="width"] {
+          max-width: none;
+        }
         .timeline-line {
           position: relative;
           height: 2px;
@@ -1780,7 +1890,7 @@ const CrmProspectsManagement = () => {
         .timeline-item:last-child .timeline-line {
           display: none;
         }
-      `}</style>
+      `}} />
       <BreadcrumbItem
         mainTitle="CRM"
         mainLink="/crm/dashboard"
@@ -1819,7 +1929,7 @@ const CrmProspectsManagement = () => {
               <Col xl={3} lg={4} md={6} className="mb-3">
                 <KPICard 
                   title="Total Records"
-                  value={dashboardStats.total_records}
+                  value={totalRecords}
                   icon={<Users size={24} />}
                   color="primary"
                 />
@@ -1827,7 +1937,7 @@ const CrmProspectsManagement = () => {
               <Col xl={3} lg={4} md={6} className="mb-3">
                 <KPICard 
                   title="Scheduled"
-                  value={dashboardStats.total_scheduled}
+                  value={metrics.scheduled_records}
                   icon={<Calendar size={24} />}
                   color="success"
                 />
@@ -1835,7 +1945,7 @@ const CrmProspectsManagement = () => {
               <Col xl={3} lg={4} md={6} className="mb-3">
                 <KPICard 
                   title="Not Scheduled"
-                  value={dashboardStats.not_scheduled}
+                  value={metrics.not_scheduled_records}
                   icon={<XCircle size={24} />}
                   color="secondary"
                 />
@@ -1843,7 +1953,7 @@ const CrmProspectsManagement = () => {
               <Col xl={3} lg={4} md={6} className="mb-3">
                 <KPICard 
                   title="Next Hour"
-                  value={dashboardStats.callsInNextHour}
+                  value={metrics.scheduled_next_hour_records}
                   icon={<ClockIcon size={24} />}
                   color="info"
                 />
@@ -1853,23 +1963,16 @@ const CrmProspectsManagement = () => {
                   <Col xl={3} lg={4} md={6} className="mb-3">
                     <KPICard 
                       title="Next 24h"
-                      value={dashboardStats.callsInNext24Hours}
+                      value={metrics.scheduled_next_24_hours_records}
                       icon={<Calendar size={24} />}
                       color="warning"
                     />
                   </Col>
-                  <Col xl={3} lg={4} md={6} className="mb-3">
-                    <KPICard 
-                      title="Overdue Calls"
-                      value={dashboardStats.overdueCalls}
-                      icon={<AlertCircleIcon size={24} />}
-                      color="danger"
-                    />
-                  </Col>
+                 
                   <Col xl={3} lg={4} md={6} className="mb-3">
                     <KPICard 
                       title="Assigned Entries"
-                      value={dashboardStats.assignedEntries}
+                      value={metrics.assigned_records}
                       icon={<UserPlus size={24} />}
                       color="primary"
                     />
@@ -1877,7 +1980,7 @@ const CrmProspectsManagement = () => {
                   <Col xl={3} lg={4} md={6} className="mb-3">
                     <KPICard 
                       title="Unassigned Entries"
-                      value={dashboardStats.unassignedEntries}
+                      value={metrics.unassigned_records}
                       icon={<AlertCircleIcon size={24} />}
                       color="warning"
                     />
@@ -1914,29 +2017,27 @@ const CrmProspectsManagement = () => {
         {session?.user?.permissions?.includes('list-crm-data-management') && (
           <FilterBar
             quickFilters={[
-              { id: 'all', label: 'All Prospects', count: dashboardStats.total_records, color: '#6c757d', activeColor: '#0d6efd', icon: <Users size={16} /> },
-              { id: 'assigned', label: 'Assigned', count: dashboardStats.assignedEntries, color: '#0dcaf0', activeColor: '#0dcaf0', icon: <UserPlus size={16} /> },
-              { id: 'unassigned', label: 'Unassigned', count: dashboardStats.unassignedEntries, color: '#fd7e14', activeColor: '#fd7e14', icon: <FiUser size={16} /> },
-              { id: 'scheduled', label: 'Scheduled', count: dashboardStats.total_scheduled, color: '#20c997', activeColor: '#20c997', icon: <FiCalendar size={16} /> },
-              { id: 'overdue', label: 'Overdue', count: dashboardStats.overdueCalls, color: '#dc3545', activeColor: '#dc3545', icon: <FiAlertCircle size={16} /> },
+              { id: 'all', label: 'All Prospects', color: '#6c757d', activeColor: '#0d6efd', icon: <Users size={16} /> },
+              { id: 'scheduled', label: 'Scheduled', color: '#20c997', activeColor: '#20c997', icon: <FiCalendar size={16} /> },
+              { id: 'has_leads', label: 'Has Leads', color: '#0dcaf0', activeColor: '#0dcaf0', icon: <FiTarget size={16} /> },
             ]}
             activeFilter={activeFilter}
-            onFilterChange={(filterId) => setActiveFilter(filterId)}
+            onFilterChange={(filterId) => {
+              setActiveFilter(filterId);
+              setPagination((prev) => ({ ...prev, currentPage: 1 }));
+            }}
             searchValue={prospectsSearch}
             onSearchChange={(value) => {
               setProspectsSearch(value);
-              handleFiltersChange({...currentFilters, search: value});
             }}
             onSearch={() => handleFiltersChange({...currentFilters, search: prospectsSearch})}
             searchPlaceholder="Search prospects by name, phone, email..."
             showAdvancedFilters={showAdvancedFilters}
             onToggleAdvancedFilters={() => setShowAdvancedFilters(!showAdvancedFilters)}
-            advancedFilterCount={Object.keys(currentFilters).filter(key => {
-              const val = currentFilters[key];
-              if (Array.isArray(val)) return val.length > 0;
-              if (typeof val === 'object' && val !== null) return (val as any).start || (val as any).end;
-              return val;
-            }).length}
+            advancedFilterCount={
+              (prospectsFilters.assignedTo !== null ? 1 : 0) +
+              (prospectsFilters.campaigns !== null && prospectsFilters.campaigns.length > 0 ? 1 : 0)
+            }
           />
         )}
 
@@ -1944,7 +2045,88 @@ const CrmProspectsManagement = () => {
         {showAdvancedFilters && session?.user?.permissions?.includes('list-crm-data-management') && (
           <Card className="border-0 shadow-sm mb-4">
             <Card.Body>
-              <CrmDataFilters onFiltersChange={handleFiltersChange} />
+              <Row className="g-3 align-items-end">
+                <Col md={4}>
+                  <Form.Label className="small fw-bold mb-2">Assigned To</Form.Label>
+                  <Select
+                    options={extensions.map((ext: any) => ({ 
+                      value: ext.id || ext.extension, 
+                      label: ext.display_name || ext.name || ext.id || ext.extension
+                    }))}
+                    value={prospectsFilters.assignedTo ? (() => {
+                      const assignedToId = prospectsFilters.assignedTo;
+                      const ext = extensions.find((e: any) => (e.id || e.extension) === assignedToId);
+                      return ext ? { 
+                        value: assignedToId, 
+                        label: ext.display_name || ext.name || assignedToId 
+                      } : { value: assignedToId, label: assignedToId };
+                    })() : null}
+                    onChange={(selected) => {
+                      const assignedToValue = selected ? selected.value : null;
+                      setProspectsFilters(prev => ({
+                        ...prev,
+                        assignedTo: assignedToValue
+                      }));
+                      // Update currentFilters for API call
+                      handleFiltersChange({ 
+                        user_extension: assignedToValue ? [assignedToValue] : null 
+                      });
+                      // Reset to all when assigned filter changes
+                      setActiveFilter('all');
+                    }}
+                    placeholder="Select user..."
+                    styles={customSelectStyles}
+                    isClearable
+                  />
+                </Col>
+                <Col md={4}>
+                  <Form.Label className="small fw-bold mb-2">Campaigns</Form.Label>
+                  <Select
+                    isMulti
+                    options={availableCampaigns.map(c => ({ value: c.value, label: c.label }))}
+                    value={prospectsFilters.campaigns ? prospectsFilters.campaigns.map((campaignId: string) => {
+                      const campaign = availableCampaigns.find((c: any) => c.value === campaignId);
+                      return campaign ? { value: campaignId, label: campaign.label } : { value: campaignId, label: campaignId };
+                    }) : null}
+                    onChange={(selected) => {
+                      const campaignValues = selected ? selected.map((s: any) => s.value) : null;
+                      setProspectsFilters(prev => ({
+                        ...prev,
+                        campaigns: campaignValues
+                      }));
+                      // Update currentFilters for API call
+                      handleFiltersChange({ 
+                        campaign_id: campaignValues || null 
+                      });
+                      // Reset to all when campaign filter changes
+                      setActiveFilter('all');
+                    }}
+                    placeholder="Select campaigns..."
+                    styles={customSelectStyles}
+                    isClearable
+                  />
+                </Col>
+                <Col md={4}>
+                  <div className="d-flex gap-2">
+                    <Button
+                      variant="outline-secondary"
+                      className="d-flex align-items-center justify-content-center"
+                      onClick={() => {
+                        setProspectsFilters({
+                          assignedTo: null,
+                          campaigns: null,
+                        });
+                        setCurrentFilters({});
+                        setActiveFilter('all');
+                        setPagination((prev) => ({ ...prev, currentPage: 1 }));
+                        setRefreshKey(prev => prev + 1);
+                      }}
+                    >
+                      Reset
+                    </Button>
+                  </div>
+                </Col>
+              </Row>
             </Card.Body>
           </Card>
         )}
@@ -2016,8 +2198,8 @@ const CrmProspectsManagement = () => {
 
         {/* Prospects Table */}
         {session?.user?.permissions?.includes('list-crm-data-management') && (
-          <Card className="border-0 shadow-sm">
-            <Card.Body className="p-0">
+          <Card className="border-0 shadow-sm prospects-table-wrapper" style={{ width: '100%' }}>
+            <Card.Body className="p-0" style={{ width: '100%' }}>
               {loading ? (
                 <div className="text-center py-5">
                   <Spinner animation="border" variant="primary" />
@@ -2026,10 +2208,10 @@ const CrmProspectsManagement = () => {
               ) : (
                 <>
                   <div className="table-responsive">
-                    <Table hover className="mb-0">
+                    <Table hover className="mb-0" style={{ width: '100%', margin: 0, tableLayout: 'auto' }}>
                       <thead className="bg-light">
                         <tr>
-                          <th style={{ width: '50px' }}>
+                          <th style={{ width: '20px', minWidth: "unset", paddingRight:"2px" }}>
                             <Form.Check
                               type="checkbox"
                               checked={selectedItems.length > 0 && selectedItems.length === dataList.length}
@@ -2107,15 +2289,14 @@ const CrmProspectsManagement = () => {
                             </th>
                           )}
                           {selectedColumns.includes('tags') && <th>Tags</th>}
-                          <th>Actions</th>
+                          <th style={{ width: '120px', minWidth: '120px' }}>Actions</th>
                         </tr>
                       </thead>
                       <tbody>
                         {(() => {
                           const sorted = sortData(dataList, pagination.sortColumn, pagination.sortDirection);
-                          const paginated = paginateData(sorted, pagination.currentPage, pagination.rowsPerPage);
                           
-                          if (paginated.length === 0) {
+                          if (sorted.length === 0) {
                             return (
                               <tr>
                                 <td colSpan={selectedColumns.length + 2} className="text-center py-4 text-muted">
@@ -2125,7 +2306,7 @@ const CrmProspectsManagement = () => {
                             );
                           }
 
-                          return paginated.map((item: any) => {
+                          return sorted.map((item: any) => {
                             const endReason = callEndReasons.find((r) => r.value === ((item as any).last_call_end_reason || "answered")) || callEndReasons[0];
                             const dispositions = [
                               { value: "interested", label: "Interested", color: "success" },
@@ -2141,7 +2322,7 @@ const CrmProspectsManagement = () => {
 
                             return (
                               <tr key={item.id}>
-                                <td>
+                                <td style={{ width: '20px', minWidth: "unset"  ,paddingRight:"2px" }}>
                                   <Form.Check
                                     type="checkbox"
                                     checked={selectedItems.includes(item.id)}
@@ -2249,7 +2430,7 @@ const CrmProspectsManagement = () => {
                                     </div>
                                   </td>
                                 )}
-                                <td>
+                                <td style={{ width: '120px', minWidth: '120px' }}>
                                   <div className="d-flex gap-1">
                                     {session?.user?.permissions?.includes('view-crm-data-management') && (
                                       <Button 
@@ -2263,38 +2444,15 @@ const CrmProspectsManagement = () => {
                                       </Button>
                                     )}
                                     {session?.user?.permissions?.includes('call-service-crm-data-management') && (
-                                      <>
-                                        <Button
-                                          variant="link"
-                                          size="sm"
-                                          className="p-1 text-success"
-                                          title="Call Now"
-                                          onClick={() => handleCallClick(item)}
-                                        >
-                                          <PhoneIcon size={16} />
-                                        </Button>
-                                        {(item as any).scheduled_call_at ? (
-                                          <Button
-                                            variant="link"
-                                            size="sm"
-                                            className="p-1 text-warning"
-                                            title="Unschedule Call"
-                                            onClick={() => handleUnscheduleCall(item)}
-                                          >
-                                            <FiX size={16} />
-                                          </Button>
-                                        ) : (
-                                          <Button
-                                            variant="link"
-                                            size="sm"
-                                            className="p-1 text-info"
-                                            title="Schedule Call"
-                                            onClick={() => handleScheduleCall(item)}
-                                          >
-                                            <FiCalendar size={16} />
-                                          </Button>
-                                        )}
-                                      </>
+                                      <Button
+                                        variant="link"
+                                        size="sm"
+                                        className="p-1 text-success"
+                                        title="Call Now"
+                                        onClick={() => handleCallClick(item)}
+                                      >
+                                        <PhoneIcon size={16} />
+                                      </Button>
                                     )}
                                     <Dropdown className="d-inline">
                                       <Dropdown.Toggle 
@@ -2307,6 +2465,22 @@ const CrmProspectsManagement = () => {
                                         <MoreVertical size={16} />
                                       </Dropdown.Toggle>
                                       <Dropdown.Menu align="end">
+                                        {session?.user?.permissions?.includes('call-service-crm-data-management') && (
+                                          <>
+                                            {(item as any).scheduled_call_at ? (
+                                              <Dropdown.Item onClick={() => handleUnscheduleCall(item)}>
+                                                <FiX size={14} className="me-2" />
+                                                Unschedule Call
+                                              </Dropdown.Item>
+                                            ) : (
+                                              <Dropdown.Item onClick={() => handleScheduleCall(item)}>
+                                                <FiCalendar size={14} className="me-2" />
+                                                Schedule Call
+                                              </Dropdown.Item>
+                                            )}
+                                            <Dropdown.Divider />
+                                          </>
+                                        )}
                                         <Dropdown.Item onClick={() => {
                                           window.location.href = `/crm/leads/create?crm_data_id=${item.id}`;
                                         }}>
@@ -2349,56 +2523,82 @@ const CrmProspectsManagement = () => {
       </div>
 
       {/* Upload Modal */}
-      
+      <Modal show={showUploadModal} onHide={() => setShowUploadModal(false)} size="lg" centered>
+        <Modal.Header closeButton className="border-bottom bg-light">
+          <Modal.Title>Upload CSV - Import Prospects</Modal.Title>
+        </Modal.Header>
+        <Modal.Body className="p-4">
+          <div className="alert alert-info mb-4">
+            <AlertCircleIcon size={18} className="me-2" />
+            <strong>📋 Import Guidelines:</strong>
+            <ul className="mb-0 mt-2">
+              <li>
+                <strong>Headers:</strong> First row must contain column headers
+              </li>
+              <li>
+                <strong>Name Column:</strong> Include a "name" column (case insensitive) for first name and last name, or use separate "first name" and "last name" columns
+              </li>
+              <li>
+                <strong>Phone Column:</strong> Include a "phone" column (case insensitive) for contact information
+              </li>
+              <li>
+                <strong>File Size:</strong> Maximum 10MB per file
+              </li>
+              <li>
+                <strong>Formats:</strong> CSV files supported
+              </li>
+              <li>
+                <strong>Data Quality:</strong> Clean, valid data imports faster and works better
+              </li>
+            </ul>
+          </div>
+          <Form>
+            <Form.Group className="mb-3">
+              <Form.Label className="fw-semibold">Select CSV File <span className="text-danger">*</span></Form.Label>
+              <Form.Control 
+                type="file" 
+                accept=".csv" 
+                onChange={handleFileInputChange}
+              />
+              <Form.Text className="text-muted">
+                Supported formats: CSV
+              </Form.Text>
+            </Form.Group>
 
-      <FormModal
-        show={showUploadModal}
-        onHide={() => setShowUploadModal(false)}
-        title="Upload Prospects"
-        desc="Please fill the details below to upload the prospects."
-        size="lg"
-        formHtml={
-          <>
-          <Form.Group className="mb-3">
-            <Form.Label className="fw-semibold">Select CSV File <span className="text-danger">*</span></Form.Label>
-            <Form.Control 
-              type="file" 
-              accept=".csv,.xlsx,.xls" 
-              onChange={handleFileInputChange}
-            />
-            <Form.Text className="text-muted">
-              Supported formats: CSV, XLSX, XLS
-            </Form.Text>
-          </Form.Group>
-
-          <Form.Group className="mb-3">
-            <Form.Label className="fw-semibold">Tags (Optional)</Form.Label>
-            <CreatableSelect
-              isMulti
-              value={fieldTags}
-              onChange={(selected) => setFieldTags(selected || [])}
-              options={availableTags}
-              placeholder="Add tags to organize and filter this data..."
-              styles={{
-                control: (base) => ({
-                  ...base,
-                  borderColor: "#ced4da",
-                  boxShadow: "none",
-                  fontSize: "14px",
-                }),
-              }}
-            />
-            <Form.Text className="text-muted">
-              Add descriptive tags to help categorize and filter your data later. You can create new tags by typing them.
-            </Form.Text>
-          </Form.Group>
-          </>
-        }
-        submitButtonText="Upload File"
-        cancelButtonText="Cancel"
-        onSubmit={() => handleUpload()}
-        onCancel={() => setShowUploadModal(false)}
-      />
+            <Form.Group className="mb-3">
+              <Form.Label className="fw-semibold">Tags (Optional)</Form.Label>
+              <CreatableSelect
+                isMulti
+                value={fieldTags}
+                onChange={(selected) => setFieldTags(selected || [])}
+                options={availableTags}
+                placeholder="Add tags to organize and filter this data..."
+                styles={{
+                  control: (base) => ({
+                    ...base,
+                    borderColor: "#ced4da",
+                    boxShadow: "none",
+                    fontSize: "14px",
+                  }),
+                }}
+              />
+              <Form.Text className="text-muted">
+                Add descriptive tags to help categorize and filter your data later. You can create new tags by typing them.
+              </Form.Text>
+            </Form.Group>
+            <div className="alert alert-warning">
+              <small><strong>Note:</strong> The data will be uploaded even if some fields remain empty.</small>
+            </div>
+          </Form>
+        </Modal.Body>
+        <Modal.Footer className="border-top">
+          <Button variant="secondary" onClick={() => setShowUploadModal(false)}>Cancel</Button>
+          <Button variant="primary" onClick={() => handleUpload()}>
+            <Download size={16} className="me-2" />
+            Upload & Import
+          </Button>
+        </Modal.Footer>
+      </Modal>
 
 
 
@@ -2406,206 +2606,467 @@ const CrmProspectsManagement = () => {
 
 
       {/* View Data Modal */}
-     
-      <FormModal
-        show={showViewModal}
-        onHide={() => setShowViewModal(false)}
-        title={`View Prospect #${selectedDataItem?.id}`}
-        desc="Please fill the details below to view the prospect."
-        size="lg"
-        formHtml={
-          <>
-           {selectedDataItem && (
-            <div>
-              <Row>
-                <Col className="mb-3" md={6}>
-                  <strong>Name:</strong> {selectedDataItem.name || "N/A"}
-                </Col>
-                <Col className="mb-3" md={6}>
-                  <strong>Phone:</strong> {selectedDataItem.phone || "N/A"}
-                </Col>
-                <Col className="mb-3" md={6}>
-                  <strong>Assigned To:</strong>{" "}
+      {selectedDataItem && (
+        <Modal show={showViewModal} onHide={() => setShowViewModal(false)} size="xl" centered>
+          {/* Custom Header */}
+          <div style={{
+            color: 'black',
+            padding: '30px',
+            position: 'relative',
+            borderTopLeftRadius: '8px',
+            borderTopRightRadius: '8px',
+            borderBottom: '1px solid #e5e7eb'
+          }}>
+            <button 
+              onClick={() => setShowViewModal(false)}
+              style={{
+                position: 'absolute',
+                top: '20px',
+                right: '20px',
+                background: 'rgba(255,255,255,0.2)',
+                border: 'none',
+                color: 'black',
+                width: '36px',
+                height: '36px',
+                borderRadius: '50%',
+                cursor: 'pointer',
+                transition: 'all 0.3s',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.background = 'rgba(255,255,255,0.3)';
+                e.currentTarget.style.transform = 'rotate(90deg)';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.background = 'rgba(255,255,255,0.2)';
+                e.currentTarget.style.transform = 'rotate(0deg)';
+              }}
+            >
+              <X size={20} />
+            </button>
+            <h3 style={{ margin: 0, fontWeight: 600, fontSize: '24px' }}>
+              {selectedDataItem.name || `Prospect #${selectedDataItem.id}`}
+            </h3>
+            <p style={{ margin: '8px 0 0 0', opacity: 0.9, fontSize: '14px' }}>
+              Prospect Details
+            </p>
+          </div>
+
+          <Modal.Body style={{ padding: '30px' }}>
+            {/* Prospect Information Section */}
+            <div style={{
+              fontSize: '16px',
+              fontWeight: 600,
+              color: '#1f2937',
+              marginBottom: '20px',
+              paddingBottom: '10px',
+              borderBottom: '2px solid #f8f9fa',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px'
+            }}>
+              <Target size={18} style={{ color: '#4680ff' }} />
+              Prospect Information
+            </div>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+              gap: '20px',
+              marginBottom: '30px'
+            }}>
+              <div style={{
+                background: '#f8f9fa',
+                padding: '16px',
+                borderRadius: '10px',
+                transition: 'all 0.3s'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.background = '#e5e7eb';
+                e.currentTarget.style.transform = 'translateY(-2px)';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.background = '#f8f9fa';
+                e.currentTarget.style.transform = 'translateY(0)';
+              }}>
+                <div style={{
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  color: '#6b7280',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px',
+                  marginBottom: '6px'
+                }}>Name</div>
+                <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                  {selectedDataItem.name || 'N/A'}
+                </div>
+              </div>
+              <div style={{
+                background: '#f8f9fa',
+                padding: '16px',
+                borderRadius: '10px',
+                transition: 'all 0.3s'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.background = '#e5e7eb';
+                e.currentTarget.style.transform = 'translateY(-2px)';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.background = '#f8f9fa';
+                e.currentTarget.style.transform = 'translateY(0)';
+              }}>
+                <div style={{
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  color: '#6b7280',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px',
+                  marginBottom: '6px'
+                }}>Phone</div>
+                <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                  <PhoneIcon size={14} style={{ color: '#4680ff', marginRight: '6px', display: 'inline' }} />
+                  {selectedDataItem.phone || 'N/A'}
+                </div>
+              </div>
+              <div style={{
+                background: '#f8f9fa',
+                padding: '16px',
+                borderRadius: '10px',
+                transition: 'all 0.3s'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.background = '#e5e7eb';
+                e.currentTarget.style.transform = 'translateY(-2px)';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.background = '#f8f9fa';
+                e.currentTarget.style.transform = 'translateY(0)';
+              }}>
+                <div style={{
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  color: '#6b7280',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px',
+                  marginBottom: '6px'
+                }}>Status</div>
+                <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                  <Badge bg={selectedDataItem.is_viewed ? 'success' : 'primary'}>
+                    {selectedDataItem.is_viewed ? 'Viewed' : 'New'}
+                  </Badge>
+                </div>
+              </div>
+              <div style={{
+                background: '#f8f9fa',
+                padding: '16px',
+                borderRadius: '10px',
+                transition: 'all 0.3s'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.background = '#e5e7eb';
+                e.currentTarget.style.transform = 'translateY(-2px)';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.background = '#f8f9fa';
+                e.currentTarget.style.transform = 'translateY(0)';
+              }}>
+                <div style={{
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  color: '#6b7280',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px',
+                  marginBottom: '6px'
+                }}>Assigned To</div>
+                <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                  <User size={14} style={{ color: '#4680ff', marginRight: '6px', display: 'inline' }} />
                   {selectedDataItem.user_extension
                     ? extensions.find(
                         (extension: any) =>
                           extension.id.toString() ===
                           selectedDataItem.user_extension?.toString()
                       )?.display_name || selectedDataItem.user_extension
-                    : "Unassigned"}
-                </Col>
-                <Col className="mb-3" md={6}>
-                  <strong>Status:</strong>{" "}
-                  {selectedDataItem.is_viewed ? "Viewed" : "New"}
-                </Col>
-                <Col className="mb-3" md={6}>
-                  <strong>Campaign:</strong>{" "}
+                    : 'Unassigned'}
+                </div>
+              </div>
+              <div style={{
+                background: '#f8f9fa',
+                padding: '16px',
+                borderRadius: '10px',
+                transition: 'all 0.3s'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.background = '#e5e7eb';
+                e.currentTarget.style.transform = 'translateY(-2px)';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.background = '#f8f9fa';
+                e.currentTarget.style.transform = 'translateY(0)';
+              }}>
+                <div style={{
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  color: '#6b7280',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px',
+                  marginBottom: '6px'
+                }}>Campaign</div>
+                <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
                   {availableCampaigns.find(
                     (c) => c.value === selectedDataItem.campaign_id?.toString()
-                  )?.label || "No Campaign"}
-                </Col>
-                <Col className="mb-3" md={6}>
-                  <strong>Last Call Status:</strong>{" "}
-                  <Badge bg="success" className="small">
-                    Answered
-                  </Badge>
-                </Col>
-                <Col className="mb-3" md={6}>
-                  <strong>Disposition:</strong>{" "}
-                  <Badge bg="primary" className="small">
-                    {getCallHistory(selectedDataItem.id)[0]
-                      ?.disposition?.replace("_", " ")
-                      .replace(/\b\w/g, (l) => l.toUpperCase()) || "Interested"}
-                  </Badge>
-                </Col>
-                <Col className="mb-3" md={6}>
-                  <strong>Last Called:</strong>{" "}
-                  {getCallHistory(selectedDataItem.id)[0]?.calledAt
-                    ? moment(
-                        getCallHistory(selectedDataItem.id)[0].calledAt
-                      ).format("MMM DD, YYYY HH:mm")
-                    : moment("2024-01-15T10:30:00Z").format(
-                        "MMM DD, YYYY HH:mm"
-                      )}
-                </Col>
-                <Col className="mb-3" md={6}>
-                  <strong>Next Call Scheduled:</strong>{" "}
-                  <span className="text-success">
-                    {moment()
-                      .add(Math.floor(Math.random() * 7) + 1, "days")
-                      .format("MMM DD, YYYY HH:mm")}
-                  </span>
-                </Col>
-              </Row>
-
-              {/* Custom Data Fields Section */}
-              {selectedDataItem.data && Object.keys(selectedDataItem.data).length > 0 && (
-                <div className="mt-4">
-                  <h6 className="mb-3">Custom Data Fields</h6>
-                  <Row>
-                    {Object.entries(selectedDataItem.data).map(([key, value]) => (
-                      <Col className="mb-3" md={6} key={key}>
-                        <strong>{key.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())}:</strong>{" "}
-                        <span className="text-muted">
-                          {value !== null && value !== undefined 
-                            ? (typeof value === 'object' 
-                                ? JSON.stringify(value) 
-                                : String(value))
-                            : "N/A"}
-                        </span>
-                      </Col>
-                    ))}
-                  </Row>
+                  )?.label || 'No Campaign'}
                 </div>
-              )}
+              </div>
+              <div style={{
+                background: '#f8f9fa',
+                padding: '16px',
+                borderRadius: '10px',
+                transition: 'all 0.3s'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.background = '#e5e7eb';
+                e.currentTarget.style.transform = 'translateY(-2px)';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.background = '#f8f9fa';
+                e.currentTarget.style.transform = 'translateY(0)';
+              }}>
+                <div style={{
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  color: '#6b7280',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px',
+                  marginBottom: '6px'
+                }}>Created Date</div>
+                <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                  <Calendar size={14} style={{ color: '#4680ff', marginRight: '6px', display: 'inline' }} />
+                  {selectedDataItem.created_at ? moment(selectedDataItem.created_at).format("MMM DD, YYYY") : 'N/A'}
+                </div>
+              </div>
+            </div>
 
-              {/* Call History Section */}
-              <div className="mt-4">
-                <h6 className="mb-3">Call History</h6>
-                <div className="table-responsive">
-                  <table className="table table-sm">
-                    <thead>
-                      <tr>
-                        <th>Date & Time</th>
-                        <th>Duration</th>
-                        <th>End Reason</th>
-                        <th>Disposition</th>
-                        <th>Recording</th>
-                        <th>Comment</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {getCallHistory(selectedDataItem.id).map((call) => {
-                        const endReason = callEndReasons.find(
-                          (r) => r.value === call.endReason
-                        );
-                        const dispositionColors = {
-                          interested: "success",
-                          not_interested: "danger",
-                          callback_requested: "warning",
-                          no_answer: "secondary",
-                          busy: "info",
-                          do_not_call: "dark",
-                          wrong_number: "light",
-                          follow_up: "primary",
-                        };
-                        return (
-                          <tr key={call.id}>
-                            <td>
-                              <div className="d-flex align-items-center">
-                                <FiClock className="me-1" size={12} />
-                                <span className="small">
-                                  {moment(call.calledAt).format(
-                                    "MMM DD, HH:mm"
-                                  )}
-                                </span>
-                              </div>
-                            </td>
-                            <td>
-                              <span className="small">{call.duration}</span>
-                            </td>
-                            <td>
-                              <Badge
-                                bg={(endReason?.color as any) || "secondary"}
-                                className="small"
-                              >
+            {/* Custom Data Fields Section */}
+            {selectedDataItem.data && Object.keys(selectedDataItem.data).length > 0 && (
+              <>
+                <div style={{
+                  fontSize: '16px',
+                  fontWeight: 600,
+                  color: '#1f2937',
+                  marginBottom: '20px',
+                  paddingBottom: '10px',
+                  borderBottom: '2px solid #f8f9fa',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px'
+                }}>
+                  <FileText size={18} style={{ color: '#4680ff' }} />
+                  Custom Data Fields
+                </div>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+                  gap: '20px',
+                  marginBottom: '30px'
+                }}>
+                  {Object.entries(selectedDataItem.data).map(([key, value]) => (
+                    <div key={key} style={{
+                      background: '#f8f9fa',
+                      padding: '16px',
+                      borderRadius: '10px',
+                      transition: 'all 0.3s'
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.background = '#e5e7eb';
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.background = '#f8f9fa';
+                      e.currentTarget.style.transform = 'translateY(0)';
+                    }}>
+                      <div style={{
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        color: '#6b7280',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px',
+                        marginBottom: '6px'
+                      }}>{key.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())}</div>
+                      <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                        {value !== null && value !== undefined 
+                          ? (typeof value === 'object' 
+                              ? JSON.stringify(value) 
+                              : String(value))
+                          : 'N/A'}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+
+            {/* Call History Timeline */}
+            {getCallHistory(selectedDataItem.id).length > 0 && (
+              <>
+                <div style={{
+                  fontSize: '16px',
+                  fontWeight: 600,
+                  color: '#1f2937',
+                  marginBottom: '20px',
+                  paddingBottom: '10px',
+                  borderBottom: '2px solid #f8f9fa',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px'
+                }}>
+                  <History size={18} style={{ color: '#4680ff' }} />
+                  Call History ({getCallHistory(selectedDataItem.id).length})
+                </div>
+                <div style={{ position: 'relative', paddingLeft: '30px', marginBottom: '30px' }}>
+                  <div style={{
+                    content: '',
+                    position: 'absolute',
+                    left: '8px',
+                    top: 0,
+                    bottom: 0,
+                    width: '2px',
+                    background: '#e5e7eb'
+                  }} />
+                  {getCallHistory(selectedDataItem.id).map((call, idx) => {
+                    const endReason = callEndReasons.find(
+                      (r) => r.value === call.endReason
+                    );
+                    const dispositionColors: Record<string, string> = {
+                      interested: 'success',
+                      not_interested: 'danger',
+                      callback_requested: 'warning',
+                      no_answer: 'secondary',
+                      busy: 'info',
+                      do_not_call: 'dark',
+                      wrong_number: 'light',
+                      follow_up: 'primary',
+                    };
+                    const dispositionColor = dispositionColors[call.disposition] || 'primary';
+                    const endReasonColor = endReason?.color || 'secondary';
+                    
+                    return (
+                      <div key={call.id || idx} style={{ position: 'relative', paddingBottom: '20px' }}>
+                        <div style={{
+                          content: '',
+                          position: 'absolute',
+                          left: '-26px',
+                          top: '4px',
+                          width: '12px',
+                          height: '12px',
+                          borderRadius: '50%',
+                          background: endReasonColor === 'success' ? '#10b981' : '#4680ff',
+                          border: '3px solid white',
+                          boxShadow: '0 0 0 2px #e5e7eb'
+                        }} />
+                        <div style={{
+                          background: '#f8f9fa',
+                          padding: '12px 16px',
+                          borderRadius: '8px',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'flex-start'
+                        }}>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: '12px', color: '#6b7280', fontWeight: 600, marginBottom: '4px' }}>
+                              {moment(call.calledAt).format("MMM DD, YYYY HH:mm")} - Duration: {call.duration}
+                            </div>
+                            <div style={{ fontSize: '14px', color: '#1f2937', marginBottom: '8px', fontWeight: 500 }}>
+                              <Badge bg={endReasonColor as any} className="me-2">
                                 {endReason?.label || call.endReason}
                               </Badge>
-                            </td>
-                            <td>
-                              <Badge
-                                bg={
-                                  (dispositionColors[
-                                    call.disposition as keyof typeof dispositionColors
-                                  ] as any) || "primary"
-                                }
-                                className="small"
-                              >
+                              <Badge bg={dispositionColor as any}>
                                 {call.disposition
                                   ?.replace("_", " ")
                                   .replace(/\b\w/g, (l) => l.toUpperCase())}
                               </Badge>
-                            </td>
-                            <td>
-                              <Button
-                                variant="outline-primary"
-                                size="sm"
-                                onClick={() =>
-                                  handlePlayRecording(call.recordingUrl)
-                                }
-                                title="Play Recording"
-                              >
-                                <FiPlay size={12} />
-                              </Button>
-                            </td>
-                            <td>
-                              <div
-                                className="small text-muted"
-                                style={{
-                                  maxWidth: "200px",
-                                  whiteSpace: "wrap",
-                                }}
-                              >
+                            </div>
+                            {call.comment && (
+                              <div style={{ fontSize: '13px', color: '#6b7280', marginTop: '8px' }}>
                                 {call.comment}
                               </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+                            )}
+                          </div>
+                          {call.recordingUrl && (
+                            <Button
+                              variant="link"
+                              size="sm"
+                              className="p-1"
+                              title="Play Recording"
+                              onClick={() => handlePlayRecording(call.recordingUrl)}
+                            >
+                              <FiPlay size={16} />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+
+            {/* No Call History Message */}
+            {getCallHistory(selectedDataItem.id).length === 0 && (
+              <div style={{
+                marginBottom: '30px',
+                padding: '20px',
+                background: '#f8f9fa',
+                borderRadius: '10px',
+                textAlign: 'center'
+              }}>
+                <History size={32} style={{ color: '#9ca3af', marginBottom: '12px' }} />
+                <div style={{ fontSize: '14px', color: '#6b7280' }}>
+                  No call history available for this prospect
                 </div>
               </div>
+            )}
+
+            {/* Action Buttons */}
+            <div style={{
+              display: 'flex',
+              gap: '12px',
+              flexWrap: 'wrap',
+              paddingTop: '20px',
+              borderTop: '1px solid #e5e7eb'
+            }}>
+              <Button
+                variant="outline-secondary"
+                style={{
+                  padding: '10px 20px',
+                  borderRadius: '8px',
+                  fontWeight: 500,
+                  fontSize: '14px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  background: 'white',
+                  color: '#6b7280',
+                  border: '2px solid #e5e7eb'
+                }}
+                onClick={() => setShowViewModal(false)}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.borderColor = '#4680ff';
+                  e.currentTarget.style.color = '#4680ff';
+                  e.currentTarget.style.background = '#f0f4ff';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.borderColor = '#e5e7eb';
+                  e.currentTarget.style.color = '#6b7280';
+                  e.currentTarget.style.background = 'white';
+                }}
+              >
+                Close
+              </Button>
             </div>
-          )}
-          </>
-        }
-        submitButtonText="Close"
-        cancelButtonText="Cancel"
-        onSubmit={() => setShowViewModal(false)}
-        onCancel={() => setShowViewModal(false)}
-      
-      />
+          </Modal.Body>
+        </Modal>
+      )}
 
 
 
