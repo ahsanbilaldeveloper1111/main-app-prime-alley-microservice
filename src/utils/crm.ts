@@ -1596,7 +1596,7 @@ export const getDeal = async (id: number): Promise<DealData> => {
 
 export const createDeal = async (
   data: Partial<DealData>
-): Promise<DealData> => {
+): Promise<{data: DealData}> => {
   try {
     const response = await axiosInstance.post("/crm/create-deal", data);
     const responseData: any = response.data?.data;

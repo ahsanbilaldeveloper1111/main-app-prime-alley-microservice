@@ -302,6 +302,10 @@ const CrmOrders = () => {
   const [dealAttachments, setDealAttachments] = useState<any[]>([]);
   const [loadingAttachments, setLoadingAttachments] = useState(false);
   const [uploadingFile, setUploadingFile] = useState(false);
+  
+  // Delete Attachment Modal
+  const [showDeleteAttachmentModal, setShowDeleteAttachmentModal] = useState(false);
+  const [attachmentToDelete, setAttachmentToDelete] = useState<{ id: number; name: string } | null>(null);
   const [fileInputRef, setFileInputRef] = useState<HTMLInputElement | null>(null);
   
   // Mark Order Lost Modal
@@ -512,16 +516,26 @@ const CrmOrders = () => {
     }
   };
 
-  const handleDeleteAttachment = async (attachmentId: number) => {
+  const handleDeleteAttachment = useCallback(async (attachmentId: number) => {
     if (!selectedOrderForAttachments?.id) return;
     
     try {
       await deleteOrderAttachment(selectedOrderForAttachments.id, attachmentId);
       await fetchAttachments(); // Refresh attachments list
+      toast.success("Attachment deleted successfully!");
     } catch (error) {
       console.error("Failed to delete attachment:", error);
+      toast.error("Failed to delete attachment");
     }
-  };
+  }, [selectedOrderForAttachments?.id]);
+
+  const confirmDeleteAttachment = useCallback(async () => {
+    if (!attachmentToDelete) return;
+    
+    await handleDeleteAttachment(attachmentToDelete.id);
+    setShowDeleteAttachmentModal(false);
+    setAttachmentToDelete(null);
+  }, [attachmentToDelete, handleDeleteAttachment]);
 
   const handleDownloadAttachment = async (attachmentId: number) => {
     if (!selectedOrderForAttachments?.id) return;
@@ -1527,12 +1541,6 @@ const CrmOrders = () => {
                           <td>
                             <div>
                               <div className="fw-medium">{order.deal || 'No Deal'}</div>
-                              {order.dealId && (
-                                <Link href={`/crm/deals/${order.dealId}/edit`} className="text-decoration-none small">
-                                  <Eye size={12} className="me-1" />
-                                  View Deal
-                                </Link>
-                              )}
                             </div>
                           </td>
                         )}
@@ -1667,26 +1675,28 @@ const CrmOrders = () => {
                                 >
                                   <Trash2 size={16} />
                                 </Button>
-                                <Dropdown className="d-inline">
-                                  <Dropdown.Toggle 
-                                    as={Button}
-                                    variant="link" 
-                                    size="sm" 
-                                    className="p-1"
-                                    title="More Actions"
-                                  >
-                                    <MoreVertical size={16} />
-                                  </Dropdown.Toggle>
-                                  <Dropdown.Menu align="end">
-                                      <Dropdown.Item 
-                                        className="text-danger"
-                                        onClick={() => handleMarkLost(order.rawData || order)}
-                                      >
-                                        <X size={14} className="me-2" />
-                                        Lost
-                                      </Dropdown.Item>
-                                  </Dropdown.Menu>
-                                </Dropdown>
+                                {activeFilter !== 'lost' && (
+                                  <Dropdown className="d-inline">
+                                    <Dropdown.Toggle 
+                                      as={Button}
+                                      variant="link" 
+                                      size="sm" 
+                                      className="p-1"
+                                      title="More Actions"
+                                    >
+                                      <MoreVertical size={16} />
+                                    </Dropdown.Toggle>
+                                    <Dropdown.Menu align="end">
+                                        <Dropdown.Item 
+                                          className="text-danger"
+                                          onClick={() => handleMarkLost(order.rawData || order)}
+                                        >
+                                          <X size={14} className="me-2" />
+                                          Lost
+                                        </Dropdown.Item>
+                                    </Dropdown.Menu>
+                                  </Dropdown>
+                                )}
                               </>
                             )}
                           </div>
@@ -1721,6 +1731,18 @@ const CrmOrders = () => {
         onHide={() => setShowSuccessfulModal(false)}
         title={successModalTitle}
         description={successModalDescription}
+      />
+
+      {/* Delete Attachment Modal */}
+      <DeleteConfirmationModal
+        show={showDeleteAttachmentModal}
+        onHide={() => {
+          setShowDeleteAttachmentModal(false);
+          setAttachmentToDelete(null);
+        }}
+        onConfirm={confirmDeleteAttachment}
+        itemName={attachmentToDelete?.name}
+        itemType="attachment"
       />
 
       {/* Mark Order Lost Modal */}
@@ -3765,9 +3787,8 @@ const CrmOrders = () => {
                               className="p-2 text-danger" 
                               title="Delete"
                               onClick={() => {
-                                if (window.confirm(`Are you sure you want to delete "${attachment.name}"?`)) {
-                                  handleDeleteAttachment(attachment.id);
-                                }
+                                setAttachmentToDelete({ id: attachment.id, name: attachment.name });
+                                setShowDeleteAttachmentModal(true);
                               }}
                             >
                               <Trash2 size={18} />
