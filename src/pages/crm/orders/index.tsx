@@ -18,6 +18,11 @@ import {
   uploadOrderAttachment,
   deleteOrderAttachment,
   downloadOrderAttachment,
+  markOrderLost,
+  getDeal,
+  getLead,
+  getDealAttachments,
+  downloadDealAttachment,
 } from "@utils/crm";
 import { GetHierarchyData } from "@utils/users";
 import {
@@ -79,6 +84,7 @@ import {
   Upload,
   Download as DownloadIcon,
   RotateCcw,
+  AlertCircle,
 } from 'lucide-react';
 import { 
   PieChart, 
@@ -97,8 +103,9 @@ import { toast } from "react-toastify";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
-import ConfirmModal from "@pages/partial/ConfirmModal";
 import SuccessfulModal from "@pages/partial/SuccessfulModal";
+import FormModal from "../../partial/FormModal";
+import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import { useSession } from "next-auth/react";
 
 // KPI Card Component
@@ -263,6 +270,7 @@ const CrmOrders = () => {
   const { data: session } = useSession();
 
   const [stages, setStages] = useState<any[]>([]);
+  const [lostReasons, setLostReasons] = useState<any[]>([]);
   const [extensions, setExtensions] = useState<any[]>([]);
   const [refreshKey, setRefreshKey] = useState(0);
   const [currentFilters, setCurrentFilters] = useState<Record<string, any>>({});
@@ -282,14 +290,25 @@ const CrmOrders = () => {
   const [showOrderViewModal, setShowOrderViewModal] = useState(false);
   const [viewingOrder, setViewingOrder] = useState<any>(null);
   const [loadingOrder, setLoadingOrder] = useState(false);
+  const [relatedDeal, setRelatedDeal] = useState<any>(null);
+  const [relatedLead, setRelatedLead] = useState<any>(null);
+  const [loadingDeal, setLoadingDeal] = useState(false);
+  const [loadingLead, setLoadingLead] = useState(false);
   
   // Attachments Modal
   const [showAttachmentModal, setShowAttachmentModal] = useState(false);
   const [selectedOrderForAttachments, setSelectedOrderForAttachments] = useState<any>(null);
   const [attachments, setAttachments] = useState<any[]>([]);
+  const [dealAttachments, setDealAttachments] = useState<any[]>([]);
   const [loadingAttachments, setLoadingAttachments] = useState(false);
   const [uploadingFile, setUploadingFile] = useState(false);
   const [fileInputRef, setFileInputRef] = useState<HTMLInputElement | null>(null);
+  
+  // Mark Order Lost Modal
+  const [showMarkLostModal, setShowMarkLostModal] = useState(false);
+  const [orderToMarkLost, setOrderToMarkLost] = useState<any>(null);
+  const [lostReasonId, setLostReasonId] = useState<number | null>(null);
+  const [lostFeedback, setLostFeedback] = useState("");
   
   // UI State
   const [showOrdersAnalytics, setShowOrdersAnalytics] = useState(false);
@@ -309,6 +328,7 @@ const CrmOrders = () => {
   // Fetch stages and extensions on component mount
   useEffect(() => {
     fetchStages();
+    fetchLostReasons();
     fetchExtensions(ModuleSlug.CRM_LEADS);
   }, []);
 
@@ -336,6 +356,9 @@ const CrmOrders = () => {
         }
         if (currentFilters.is_lost !== undefined) {
           params.is_lost = currentFilters.is_lost;
+        }
+        if (currentFilters.include_lost !== undefined) {
+          params.include_lost = currentFilters.include_lost;
         }
         if (currentFilters.include_archived !== undefined) {
           params.include_archived = currentFilters.include_archived;
@@ -367,6 +390,20 @@ const CrmOrders = () => {
         const newFilters = { ...prev };
         delete newFilters.stage_id;
         delete newFilters.include_archived;
+        delete newFilters.include_lost;
+        return newFilters;
+      });
+      // Clear stage dropdown
+      setOrdersFilters(prev => ({
+        ...prev,
+        stage: null
+      }));
+    } else if (activeFilter === 'lost') {
+      setCurrentFilters((prev) => {
+        const newFilters = { ...prev };
+        delete newFilters.stage_id;
+        delete newFilters.include_archived;
+        newFilters.include_lost = true;
         return newFilters;
       });
       // Clear stage dropdown
@@ -378,6 +415,7 @@ const CrmOrders = () => {
       setCurrentFilters((prev) => {
         const newFilters = { ...prev };
         delete newFilters.stage_id;
+        delete newFilters.include_lost;
         newFilters.include_archived = true;
         return newFilters;
       });
@@ -393,6 +431,7 @@ const CrmOrders = () => {
         setCurrentFilters((prev) => {
           const newFilters = { ...prev };
           delete newFilters.include_archived;
+          delete newFilters.include_lost;
           newFilters.stage_id = selectedStage.id.toString();
           return newFilters;
         });
@@ -415,6 +454,7 @@ const CrmOrders = () => {
       fetchAttachments();
     } else {
       setAttachments([]);
+      setDealAttachments([]);
     }
   }, [showAttachmentModal, selectedOrderForAttachments?.id]);
 
@@ -422,11 +462,26 @@ const CrmOrders = () => {
     if (!selectedOrderForAttachments?.id) return;
     setLoadingAttachments(true);
     try {
-      const data = await getOrderAttachments(selectedOrderForAttachments.id);
-      setAttachments(data || []);
+      // Fetch order attachments
+      const orderData = await getOrderAttachments(selectedOrderForAttachments.id);
+      setAttachments(orderData || []);
+      
+      // Fetch deal attachments if deal_id exists
+      if (selectedOrderForAttachments.deal_id) {
+        try {
+          const dealData = await getDealAttachments(Number(selectedOrderForAttachments.deal_id));
+          setDealAttachments(dealData || []);
+        } catch (error) {
+          console.error("Failed to fetch deal attachments:", error);
+          setDealAttachments([]);
+        }
+      } else {
+        setDealAttachments([]);
+      }
     } catch (error) {
       console.error("Failed to fetch attachments:", error);
       setAttachments([]);
+      setDealAttachments([]);
     } finally {
       setLoadingAttachments(false);
     }
@@ -478,6 +533,16 @@ const CrmOrders = () => {
     }
   };
 
+  const handleDownloadDealAttachment = async (attachmentId: number) => {
+    if (!selectedOrderForAttachments?.deal_id) return;
+    
+    try {
+      await downloadDealAttachment(Number(selectedOrderForAttachments.deal_id), attachmentId);
+    } catch (error) {
+      console.error("Failed to download deal attachment:", error);
+    }
+  };
+
   // Handle filter changes
   const handleFiltersChange = useCallback((filters: Record<string, any>) => {
     setCurrentFilters((prev) => {
@@ -515,6 +580,15 @@ const CrmOrders = () => {
         newFilters.is_lost = filters.is_lost;
       }
       
+      // Handle include_lost filter
+      if ('include_lost' in filters) {
+        if (filters.include_lost) {
+          newFilters.include_lost = true;
+        } else {
+          delete newFilters.include_lost;
+        }
+      }
+      
       // Handle include_archived filter
       if ('include_archived' in filters) {
         if (filters.include_archived) {
@@ -538,6 +612,15 @@ const CrmOrders = () => {
     }
   };
 
+  const fetchLostReasons = async () => {
+    try {
+      const lostReasonsData = await (getStages as any)('lost_reason');
+      setLostReasons(lostReasonsData || []);
+    } catch (error) {
+      console.error("Failed to fetch lost reasons:", error);
+    }
+  };
+
   const fetchExtensions = async (moduleSlug: string = ModuleSlug.CRM_LEADS) => {
     try {
       const hierarchyData = await GetHierarchyData(moduleSlug);
@@ -551,20 +634,60 @@ const CrmOrders = () => {
 
   const handleViewOrder = useCallback(async (orderId: number) => {
     setLoadingOrder(true);
+    setLoadingDeal(true);
+    setLoadingLead(true);
+    setRelatedDeal(null);
+    setRelatedLead(null);
     try {
       const orderData: any = await getOrder(orderId);
       setViewingOrder(orderData);
+      
+      // Fetch deal information if deal_id exists
+      if (orderData.deal_id) {
+        try {
+          const dealData: any = await getDeal(Number(orderData.deal_id));
+          setRelatedDeal(dealData);
+          
+          // Fetch lead information if ticket_id exists (ticket_id contains the lead_id)
+          if (dealData.ticket_id) {
+            try {
+              const leadData: any = await getLead(Number(dealData.ticket_id));
+              
+              // Parse contact_persons if it's a string
+              if (leadData.contact_persons && typeof leadData.contact_persons === 'string') {
+                try {
+                  leadData.contact_persons = JSON.parse(leadData.contact_persons);
+                } catch (e) {
+                  console.error("Failed to parse contact_persons:", e);
+                  leadData.contact_persons = [];
+                }
+              }
+              
+              setRelatedLead(leadData);
+            } catch (error) {
+              console.error("Failed to fetch lead:", error);
+              // Don't show error toast as lead is optional
+            }
+          }
+        } catch (error) {
+          console.error("Failed to fetch deal:", error);
+          // Don't show error toast as deal is optional
+        }
+      }
+      
       setShowOrderViewModal(true);
     } catch (error) {
       console.error("Failed to fetch order:", error);
       toast.error("Failed to load order details");
     } finally {
       setLoadingOrder(false);
+      setLoadingDeal(false);
+      setLoadingLead(false);
     }
   }, []);
 
-  const handleDeleteOrder = useCallback((orderId: number) => {
-    setOrderToDelete({ id: orderId });
+  const handleDeleteOrder = useCallback((orderId: number, orderNumber?: string) => {
+    setOrderToDelete({ id: orderId, orderNumber });
     setShowDeleteModal(true);
   }, []);
 
@@ -600,6 +723,34 @@ const CrmOrders = () => {
       toast.error("Failed to restore order");
     }
   }, []);
+
+  // Mark Order Lost Modal
+  const handleMarkLost = useCallback((order: any) => {
+    setOrderToMarkLost(order);
+    setShowMarkLostModal(true);
+  }, []);
+
+  const handleMarkLostSubmit = useCallback(async () => {
+    if (!orderToMarkLost || !lostReasonId || !lostFeedback.trim()) return;
+
+    try {
+      await markOrderLost(orderToMarkLost.id, {
+        lost_reason_id: lostReasonId,
+        lost_feedback: lostFeedback,
+      });
+      setShowMarkLostModal(false);
+      setOrderToMarkLost(null);
+      setLostReasonId(null);
+      setLostFeedback("");
+      toast.success("Order marked as lost!");
+      setShowSuccessfulModal(true);
+      setSuccessModalTitle("Order Marked as Lost");
+      setSuccessModalDescription("Order has been marked as lost successfully");
+      setRefreshKey((oldKey) => oldKey + 1);
+    } catch (error) {
+      console.error("Failed to mark order as lost:", error);
+    }
+  }, [orderToMarkLost, lostReasonId, lostFeedback]);
 
   // Helper functions
   const handleSort = (column: string, paginationState: any, setPaginationState: (state: any) => void) => {
@@ -827,6 +978,7 @@ const CrmOrders = () => {
     const transformed = ordersData.map(transformOrderData);
     const counts: Record<string, number> = {
       all: summaryTiles?.total_orders || totalOrders || transformed.length,
+      lost: summaryTiles?.lost_orders || transformed.filter(o => o.rawData?.is_lost).length,
       deleted: summaryTiles?.deleted_orders || 0,
     };
     
@@ -1040,6 +1192,14 @@ const CrmOrders = () => {
               activeColor: '#0d6efd',
               icon: <Layers size={16} />
             })),
+            {
+              id: 'lost',
+              label: 'Lost',
+              count: filterCounts.lost || 0,
+              color: '#fd7e14',
+              activeColor: '#fd7e14',
+              icon: <X size={16} />
+            },
             {
               id: 'deleted',
               label: 'Deleted',
@@ -1503,10 +1663,30 @@ const CrmOrders = () => {
                                   size="sm" 
                                   className="p-1 text-danger" 
                                   title="Delete"
-                                  onClick={() => handleDeleteOrder(order.rawData?.id || order.id)}
+                                  onClick={() => handleDeleteOrder(order.rawData?.id || order.id, order.orderNumber)}
                                 >
                                   <Trash2 size={16} />
                                 </Button>
+                                <Dropdown className="d-inline">
+                                  <Dropdown.Toggle 
+                                    as={Button}
+                                    variant="link" 
+                                    size="sm" 
+                                    className="p-1"
+                                    title="More Actions"
+                                  >
+                                    <MoreVertical size={16} />
+                                  </Dropdown.Toggle>
+                                  <Dropdown.Menu align="end">
+                                      <Dropdown.Item 
+                                        className="text-danger"
+                                        onClick={() => handleMarkLost(order.rawData || order)}
+                                      >
+                                        <X size={14} className="me-2" />
+                                        Lost
+                                      </Dropdown.Item>
+                                  </Dropdown.Menu>
+                                </Dropdown>
                               </>
                             )}
                           </div>
@@ -1524,17 +1704,16 @@ const CrmOrders = () => {
         </Card>
       </div>
 
-      <ConfirmModal
+      {/* Delete Order Modal */}
+      <DeleteConfirmationModal
         show={showDeleteModal}
-        onHide={() => setShowDeleteModal(false)}
-        title="Delete Order"
-        description="Are you sure you want to delete this order?"
-        onConfirm={() => confirmDeleteOrder()}
-        targetName=""
-        confirmButtonText="Delete"
-        confirmButtonVariant="danger"
-        cancelButtonVariant="secondary"
-        onCancel={() => setShowDeleteModal(false)}
+        onHide={() => {
+          setShowDeleteModal(false);
+          setOrderToDelete(null);
+        }}
+        onConfirm={confirmDeleteOrder}
+        itemName={orderToDelete?.orderNumber}
+        itemType="order"
       />
 
       <SuccessfulModal
@@ -1542,6 +1721,52 @@ const CrmOrders = () => {
         onHide={() => setShowSuccessfulModal(false)}
         title={successModalTitle}
         description={successModalDescription}
+      />
+
+      {/* Mark Order Lost Modal */}
+      <FormModal
+        show={showMarkLostModal}
+        onHide={() => setShowMarkLostModal(false)}
+        title="Mark order as lost"
+        desc="Please fill in the details below to mark the order as lost."
+        size="lg"
+        formHtml={
+          <>
+          <Form.Group className="mb-3">
+            <Form.Label>Lost Reason *</Form.Label>
+            <Form.Select
+              value={lostReasonId || ""}
+              onChange={(e) =>
+                setLostReasonId(e.target.value ? Number(e.target.value) : null)
+              }
+              required
+            >
+              <option value="">Select a reason</option>
+              {lostReasons.map((reason) => (
+                <option key={reason.id} value={reason.id}>
+                  {reason.name}
+                </option>
+              ))}
+            </Form.Select>
+          </Form.Group>
+          <Form.Group>
+            <Form.Label>Additional Feedback *</Form.Label>
+            <Form.Control
+              as="textarea"
+              rows={3}
+              value={lostFeedback}
+              onChange={(e) => setLostFeedback(e.target.value)}
+              placeholder="Please provide additional feedback about why this order was lost..."
+              required
+            />
+          </Form.Group>
+          </>
+        }
+        onSubmit={handleMarkLostSubmit}
+        onCancel={() => setShowMarkLostModal(false)}
+        submitButtonText="Mark Lost Reason"
+        cancelButtonText="Cancel"
+        isSubmitDisabled={!lostReasonId || !lostFeedback.trim()}
       />
 
       {/* Order View Modal */}
@@ -1957,8 +2182,8 @@ const CrmOrders = () => {
                   )}
                 </div>
 
-                {/* Linked Deal */}
-                {viewingOrder.deal && (
+                {/* Deal Information */}
+                {relatedDeal && (
                   <>
                     <div style={{
                       fontSize: '16px',
@@ -1972,7 +2197,7 @@ const CrmOrders = () => {
                       gap: '10px'
                     }}>
                       <Link2 size={18} style={{ color: '#4680ff' }} />
-                      Linked Deal
+                      Deal Information
                     </div>
                     <div style={{
                       display: 'grid',
@@ -2003,44 +2228,10 @@ const CrmOrders = () => {
                           marginBottom: '6px'
                         }}>Deal Name</div>
                         <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
-                          {viewingOrder.deal.name || 'N/A'}
+                          {relatedDeal.name || 'N/A'}
                         </div>
                       </div>
-                      {viewingOrder.deal.company_name && (
-                        <div style={{
-                          background: '#f8f9fa',
-                          padding: '16px',
-                          borderRadius: '10px',
-                          transition: 'all 0.3s'
-                        }}
-                        onMouseOver={(e) => {
-                          e.currentTarget.style.background = '#e5e7eb';
-                          e.currentTarget.style.transform = 'translateY(-2px)';
-                        }}
-                        onMouseOut={(e) => {
-                          e.currentTarget.style.background = '#f8f9fa';
-                          e.currentTarget.style.transform = 'translateY(0)';
-                        }}>
-                          <div style={{
-                            fontSize: '12px',
-                            fontWeight: 600,
-                            color: '#6b7280',
-                            textTransform: 'uppercase',
-                            letterSpacing: '0.5px',
-                            marginBottom: '6px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px'
-                          }}>
-                            <Building2 size={14} />
-                            Company
-                          </div>
-                          <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
-                            {viewingOrder.deal.company_name}
-                          </div>
-                        </div>
-                      )}
-                      {viewingOrder.deal_id && (
+                      {relatedDeal.stage && (
                         <div style={{
                           background: '#f8f9fa',
                           padding: '16px',
@@ -2062,17 +2253,927 @@ const CrmOrders = () => {
                             textTransform: 'uppercase',
                             letterSpacing: '0.5px',
                             marginBottom: '6px'
-                          }}>Actions</div>
+                          }}>Stage</div>
                           <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
-                            <Link href={`/crm/deals/${viewingOrder.deal_id}/edit`} className="text-decoration-none">
-                              <Button variant="link" size="sm" className="p-0">
-                                View Deal <Eye size={14} className="ms-1" />
-                              </Button>
-                            </Link>
+                            <Badge 
+                              bg="primary"
+                              style={{
+                                padding: '6px 14px',
+                                borderRadius: '20px',
+                                fontSize: '12px',
+                                fontWeight: 600,
+                                backgroundColor: relatedDeal.stage?.color || '#6c757d'
+                              }}
+                            >
+                              {relatedDeal.stage?.name || 'Not assigned'}
+                            </Badge>
+                          </div>
+                        </div>
+                      )}
+                      {relatedDeal.net_value && (
+                        <div style={{
+                          background: '#f8f9fa',
+                          padding: '16px',
+                          borderRadius: '10px',
+                          transition: 'all 0.3s'
+                        }}
+                        onMouseOver={(e) => {
+                          e.currentTarget.style.background = '#e5e7eb';
+                          e.currentTarget.style.transform = 'translateY(-2px)';
+                        }}
+                        onMouseOut={(e) => {
+                          e.currentTarget.style.background = '#f8f9fa';
+                          e.currentTarget.style.transform = 'translateY(0)';
+                        }}>
+                          <div style={{
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            color: '#6b7280',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.5px',
+                            marginBottom: '6px'
+                          }}>Deal Value</div>
+                          <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                            {relatedDeal.currency || 'USD'} {parseFloat(String(relatedDeal.net_value || relatedDeal.grand_total || 0)).toLocaleString()}
+                          </div>
+                        </div>
+                      )}
+                      {relatedDeal.assigned_to && (
+                        <div style={{
+                          background: '#f8f9fa',
+                          padding: '16px',
+                          borderRadius: '10px',
+                          transition: 'all 0.3s'
+                        }}
+                        onMouseOver={(e) => {
+                          e.currentTarget.style.background = '#e5e7eb';
+                          e.currentTarget.style.transform = 'translateY(-2px)';
+                        }}
+                        onMouseOut={(e) => {
+                          e.currentTarget.style.background = '#f8f9fa';
+                          e.currentTarget.style.transform = 'translateY(0)';
+                        }}>
+                          <div style={{
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            color: '#6b7280',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.5px',
+                            marginBottom: '6px'
+                          }}>Assigned To</div>
+                          <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                            <User size={14} style={{ color: '#4680ff', marginRight: '6px', display: 'inline' }} />
+                            {extensions.find((ext: any) => ext?.id == relatedDeal?.assigned_to || ext?.extension == relatedDeal?.assigned_to)?.display_name || 
+                             extensions.find((ext: any) => ext?.id == relatedDeal?.assigned_to || ext?.extension == relatedDeal?.assigned_to)?.name || 
+                             relatedDeal.assigned_to || 'Not assigned'}
+                          </div>
+                        </div>
+                      )}
+                      {relatedDeal.created_at && (
+                        <div style={{
+                          background: '#f8f9fa',
+                          padding: '16px',
+                          borderRadius: '10px',
+                          transition: 'all 0.3s'
+                        }}
+                        onMouseOver={(e) => {
+                          e.currentTarget.style.background = '#e5e7eb';
+                          e.currentTarget.style.transform = 'translateY(-2px)';
+                        }}
+                        onMouseOut={(e) => {
+                          e.currentTarget.style.background = '#f8f9fa';
+                          e.currentTarget.style.transform = 'translateY(0)';
+                        }}>
+                          <div style={{
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            color: '#6b7280',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.5px',
+                            marginBottom: '6px'
+                          }}>Created Date</div>
+                          <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                            <Calendar size={14} style={{ color: '#4680ff', marginRight: '6px', display: 'inline' }} />
+                            {relatedDeal.created_at ? new Date(relatedDeal.created_at).toLocaleDateString() : 'N/A'}
+                          </div>
+                        </div>
+                      )}
+                     
+                    </div>
+
+                    {/* Deal Company Information */}
+                    {relatedDeal.company_name && (
+                      <>
+                        <div style={{
+                          fontSize: '16px',
+                          fontWeight: 600,
+                          color: '#1f2937',
+                          marginBottom: '20px',
+                          paddingBottom: '10px',
+                          borderBottom: '2px solid #f8f9fa',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '10px'
+                        }}>
+                          <Building2 size={18} style={{ color: '#4680ff' }} />
+                          Deal Company Information
+                        </div>
+                        <div style={{
+                          display: 'grid',
+                          gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+                          gap: '20px',
+                          marginBottom: '30px'
+                        }}>
+                          <div style={{
+                            background: '#f8f9fa',
+                            padding: '16px',
+                            borderRadius: '10px',
+                            transition: 'all 0.3s'
+                          }}
+                          onMouseOver={(e) => {
+                            e.currentTarget.style.background = '#e5e7eb';
+                            e.currentTarget.style.transform = 'translateY(-2px)';
+                          }}
+                          onMouseOut={(e) => {
+                            e.currentTarget.style.background = '#f8f9fa';
+                            e.currentTarget.style.transform = 'translateY(0)';
+                          }}>
+                            <div style={{
+                              fontSize: '12px',
+                              fontWeight: 600,
+                              color: '#6b7280',
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.5px',
+                              marginBottom: '6px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '6px'
+                            }}>
+                              <Building2 size={14} />
+                              Company Name
+                            </div>
+                            <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                              {relatedDeal.company_name}
+                            </div>
+                          </div>
+                          {relatedDeal.industry && (
+                            <div style={{
+                              background: '#f8f9fa',
+                              padding: '16px',
+                              borderRadius: '10px',
+                              transition: 'all 0.3s'
+                            }}
+                            onMouseOver={(e) => {
+                              e.currentTarget.style.background = '#e5e7eb';
+                              e.currentTarget.style.transform = 'translateY(-2px)';
+                            }}
+                            onMouseOut={(e) => {
+                              e.currentTarget.style.background = '#f8f9fa';
+                              e.currentTarget.style.transform = 'translateY(0)';
+                            }}>
+                              <div style={{
+                                fontSize: '12px',
+                                fontWeight: 600,
+                                color: '#6b7280',
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.5px',
+                                marginBottom: '6px'
+                              }}>Industry</div>
+                              <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                                {relatedDeal.industry}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </>
+                )}
+
+                {/* Lead Information */}
+                {relatedLead && (
+                  <>
+                    <div style={{
+                      fontSize: '16px',
+                      fontWeight: 600,
+                      color: '#1f2937',
+                      marginBottom: '20px',
+                      paddingBottom: '10px',
+                      borderBottom: '2px solid #f8f9fa',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px'
+                    }}>
+                      <Target size={18} style={{ color: '#4680ff' }} />
+                      Lead Information
+                    </div>
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+                      gap: '20px',
+                      marginBottom: '30px'
+                    }}>
+                      <div style={{
+                        background: '#f8f9fa',
+                        padding: '16px',
+                        borderRadius: '10px',
+                        transition: 'all 0.3s'
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.background = '#e5e7eb';
+                        e.currentTarget.style.transform = 'translateY(-2px)';
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.background = '#f8f9fa';
+                        e.currentTarget.style.transform = 'translateY(0)';
+                      }}>
+                        <div style={{
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          color: '#6b7280',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.5px',
+                          marginBottom: '6px'
+                        }}>Lead Name</div>
+                        <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                          {relatedLead.name}
+                        </div>
+                      </div>
+                      {relatedLead.stage && (
+                        <div style={{
+                          background: '#f8f9fa',
+                          padding: '16px',
+                          borderRadius: '10px',
+                          transition: 'all 0.3s'
+                        }}
+                        onMouseOver={(e) => {
+                          e.currentTarget.style.background = '#e5e7eb';
+                          e.currentTarget.style.transform = 'translateY(-2px)';
+                        }}
+                        onMouseOut={(e) => {
+                          e.currentTarget.style.background = '#f8f9fa';
+                          e.currentTarget.style.transform = 'translateY(0)';
+                        }}>
+                          <div style={{
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            color: '#6b7280',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.5px',
+                            marginBottom: '6px'
+                          }}>Stage</div>
+                          <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                            <Badge 
+                              bg="primary"
+                              style={{
+                                padding: '6px 14px',
+                                borderRadius: '20px',
+                                fontSize: '12px',
+                                fontWeight: 600,
+                                backgroundColor: relatedLead.stage?.color || '#6c757d'
+                              }}
+                            >
+                              {relatedLead.stage?.name || 'Not assigned'}
+                            </Badge>
+                          </div>
+                        </div>
+                      )}
+                      {relatedLead.lead_potential && (
+                        <div style={{
+                          background: '#f8f9fa',
+                          padding: '16px',
+                          borderRadius: '10px',
+                          transition: 'all 0.3s'
+                        }}
+                        onMouseOver={(e) => {
+                          e.currentTarget.style.background = '#e5e7eb';
+                          e.currentTarget.style.transform = 'translateY(-2px)';
+                        }}
+                        onMouseOut={(e) => {
+                          e.currentTarget.style.background = '#f8f9fa';
+                          e.currentTarget.style.transform = 'translateY(0)';
+                        }}>
+                          <div style={{
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            color: '#6b7280',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.5px',
+                            marginBottom: '6px'
+                          }}>Lead Potential</div>
+                          <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                            <Badge 
+                              bg={relatedLead.lead_potential === 'Hot' ? 'danger' : relatedLead.lead_potential === 'Warm' ? 'warning' : 'secondary'}
+                              style={{
+                                padding: '6px 14px',
+                                borderRadius: '20px',
+                                fontSize: '12px',
+                                fontWeight: 600
+                              }}
+                            >
+                              {relatedLead.lead_potential || 'N/A'}
+                            </Badge>
+                          </div>
+                        </div>
+                      )}
+                      {relatedLead.status && (
+                        <div style={{
+                          background: '#f8f9fa',
+                          padding: '16px',
+                          borderRadius: '10px',
+                          transition: 'all 0.3s'
+                        }}
+                        onMouseOver={(e) => {
+                          e.currentTarget.style.background = '#e5e7eb';
+                          e.currentTarget.style.transform = 'translateY(-2px)';
+                        }}
+                        onMouseOut={(e) => {
+                          e.currentTarget.style.background = '#f8f9fa';
+                          e.currentTarget.style.transform = 'translateY(0)';
+                        }}>
+                          <div style={{
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            color: '#6b7280',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.5px',
+                            marginBottom: '6px'
+                          }}>Status</div>
+                          <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                            <Badge bg={relatedLead.is_lost ? 'danger' : relatedLead.status === 'new' ? 'primary' : 'success'}>
+                              {relatedLead.is_lost ? 'Lost' : relatedLead.status || 'N/A'}
+                            </Badge>
+                          </div>
+                        </div>
+                      )}
+                      {relatedLead.user_extension && (
+                        <div style={{
+                          background: '#f8f9fa',
+                          padding: '16px',
+                          borderRadius: '10px',
+                          transition: 'all 0.3s'
+                        }}
+                        onMouseOver={(e) => {
+                          e.currentTarget.style.background = '#e5e7eb';
+                          e.currentTarget.style.transform = 'translateY(-2px)';
+                        }}
+                        onMouseOut={(e) => {
+                          e.currentTarget.style.background = '#f8f9fa';
+                          e.currentTarget.style.transform = 'translateY(0)';
+                        }}>
+                          <div style={{
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            color: '#6b7280',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.5px',
+                            marginBottom: '6px'
+                          }}>Assigned To</div>
+                          <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                            <User size={14} style={{ color: '#4680ff', marginRight: '6px', display: 'inline' }} />
+                            {extensions.find((ext: any) => ext?.id == relatedLead?.user_extension || ext?.extension == relatedLead?.user_extension)?.display_name || 
+                             extensions.find((ext: any) => ext?.id == relatedLead?.user_extension || ext?.extension == relatedLead?.user_extension)?.name || 
+                             relatedLead.user_extension || 'Not assigned'}
+                          </div>
+                        </div>
+                      )}
+                      {relatedLead.created_at && (
+                        <div style={{
+                          background: '#f8f9fa',
+                          padding: '16px',
+                          borderRadius: '10px',
+                          transition: 'all 0.3s'
+                        }}
+                        onMouseOver={(e) => {
+                          e.currentTarget.style.background = '#e5e7eb';
+                          e.currentTarget.style.transform = 'translateY(-2px)';
+                        }}
+                        onMouseOut={(e) => {
+                          e.currentTarget.style.background = '#f8f9fa';
+                          e.currentTarget.style.transform = 'translateY(0)';
+                        }}>
+                          <div style={{
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            color: '#6b7280',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.5px',
+                            marginBottom: '6px'
+                          }}>Created Date</div>
+                          <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                            <Calendar size={14} style={{ color: '#4680ff', marginRight: '6px', display: 'inline' }} />
+                            {relatedLead.created_at ? new Date(relatedLead.created_at).toLocaleDateString() : 'N/A'}
                           </div>
                         </div>
                       )}
                     </div>
+
+                    {/* Lead Company Information */}
+                    {relatedLead.company_name && (
+                      <>
+                        <div style={{
+                          fontSize: '16px',
+                          fontWeight: 600,
+                          color: '#1f2937',
+                          marginBottom: '20px',
+                          paddingBottom: '10px',
+                          borderBottom: '2px solid #f8f9fa',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '10px'
+                        }}>
+                          <Building2 size={18} style={{ color: '#4680ff' }} />
+                          Lead Company Information
+                        </div>
+                        <div style={{
+                          display: 'grid',
+                          gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+                          gap: '20px',
+                          marginBottom: '30px'
+                        }}>
+                          <div style={{
+                            background: '#f8f9fa',
+                            padding: '16px',
+                            borderRadius: '10px',
+                            transition: 'all 0.3s'
+                          }}
+                          onMouseOver={(e) => {
+                            e.currentTarget.style.background = '#e5e7eb';
+                            e.currentTarget.style.transform = 'translateY(-2px)';
+                          }}
+                          onMouseOut={(e) => {
+                            e.currentTarget.style.background = '#f8f9fa';
+                            e.currentTarget.style.transform = 'translateY(0)';
+                          }}>
+                            <div style={{
+                              fontSize: '12px',
+                              fontWeight: 600,
+                              color: '#6b7280',
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.5px',
+                              marginBottom: '6px'
+                            }}>Company Name</div>
+                            <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                              <Building2 size={14} style={{ color: '#4680ff', marginRight: '6px', display: 'inline' }} />
+                              {relatedLead.company_name}
+                            </div>
+                          </div>
+                          {relatedLead.industry && (
+                            <div style={{
+                              background: '#f8f9fa',
+                              padding: '16px',
+                              borderRadius: '10px',
+                              transition: 'all 0.3s'
+                            }}
+                            onMouseOver={(e) => {
+                              e.currentTarget.style.background = '#e5e7eb';
+                              e.currentTarget.style.transform = 'translateY(-2px)';
+                            }}
+                            onMouseOut={(e) => {
+                              e.currentTarget.style.background = '#f8f9fa';
+                              e.currentTarget.style.transform = 'translateY(0)';
+                            }}>
+                              <div style={{
+                                fontSize: '12px',
+                                fontWeight: 600,
+                                color: '#6b7280',
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.5px',
+                                marginBottom: '6px'
+                              }}>Industry</div>
+                              <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                                {relatedLead.industry}
+                              </div>
+                            </div>
+                          )}
+                          {relatedLead.business_type && (
+                            <div style={{
+                              background: '#f8f9fa',
+                              padding: '16px',
+                              borderRadius: '10px',
+                              transition: 'all 0.3s'
+                            }}
+                            onMouseOver={(e) => {
+                              e.currentTarget.style.background = '#e5e7eb';
+                              e.currentTarget.style.transform = 'translateY(-2px)';
+                            }}
+                            onMouseOut={(e) => {
+                              e.currentTarget.style.background = '#f8f9fa';
+                              e.currentTarget.style.transform = 'translateY(0)';
+                            }}>
+                              <div style={{
+                                fontSize: '12px',
+                                fontWeight: 600,
+                                color: '#6b7280',
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.5px',
+                                marginBottom: '6px'
+                              }}>Business Type</div>
+                              <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                                {relatedLead.business_type}
+                              </div>
+                            </div>
+                          )}
+                          {relatedLead.company_size && (
+                            <div style={{
+                              background: '#f8f9fa',
+                              padding: '16px',
+                              borderRadius: '10px',
+                              transition: 'all 0.3s'
+                            }}
+                            onMouseOver={(e) => {
+                              e.currentTarget.style.background = '#e5e7eb';
+                              e.currentTarget.style.transform = 'translateY(-2px)';
+                            }}
+                            onMouseOut={(e) => {
+                              e.currentTarget.style.background = '#f8f9fa';
+                              e.currentTarget.style.transform = 'translateY(0)';
+                            }}>
+                              <div style={{
+                                fontSize: '12px',
+                                fontWeight: 600,
+                                color: '#6b7280',
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.5px',
+                                marginBottom: '6px'
+                              }}>Company Size</div>
+                              <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                                {relatedLead.company_size}
+                              </div>
+                            </div>
+                          )}
+                          {(relatedLead.company_city || relatedLead.company_country) && (
+                            <div style={{
+                              background: '#f8f9fa',
+                              padding: '16px',
+                              borderRadius: '10px',
+                              transition: 'all 0.3s'
+                            }}
+                            onMouseOver={(e) => {
+                              e.currentTarget.style.background = '#e5e7eb';
+                              e.currentTarget.style.transform = 'translateY(-2px)';
+                            }}
+                            onMouseOut={(e) => {
+                              e.currentTarget.style.background = '#f8f9fa';
+                              e.currentTarget.style.transform = 'translateY(0)';
+                            }}>
+                              <div style={{
+                                fontSize: '12px',
+                                fontWeight: 600,
+                                color: '#6b7280',
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.5px',
+                                marginBottom: '6px'
+                              }}>Location</div>
+                              <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                                {[relatedLead.company_city, relatedLead.company_country].filter(Boolean).join(', ') || 'N/A'}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </>
+                    )}
+
+                    {/* Campaign Information */}
+                    {relatedLead.campaign && (
+                      <>
+                        <div style={{
+                          fontSize: '16px',
+                          fontWeight: 600,
+                          color: '#1f2937',
+                          marginBottom: '20px',
+                          paddingBottom: '10px',
+                          borderBottom: '2px solid #f8f9fa',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '10px'
+                        }}>
+                          <FileText size={18} style={{ color: '#4680ff' }} />
+                          Campaign Information
+                        </div>
+                        <div style={{
+                          display: 'grid',
+                          gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+                          gap: '20px',
+                          marginBottom: '30px'
+                        }}>
+                          <div style={{
+                            background: '#f8f9fa',
+                            padding: '16px',
+                            borderRadius: '10px',
+                            transition: 'all 0.3s'
+                          }}
+                          onMouseOver={(e) => {
+                            e.currentTarget.style.background = '#e5e7eb';
+                            e.currentTarget.style.transform = 'translateY(-2px)';
+                          }}
+                          onMouseOut={(e) => {
+                            e.currentTarget.style.background = '#f8f9fa';
+                            e.currentTarget.style.transform = 'translateY(0)';
+                          }}>
+                            <div style={{
+                              fontSize: '12px',
+                              fontWeight: 600,
+                              color: '#6b7280',
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.5px',
+                              marginBottom: '6px'
+                            }}>Campaign Name</div>
+                            <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                              {relatedLead.campaign.name}
+                            </div>
+                          </div>
+                          {relatedLead.campaign_field_values && Object.keys(relatedLead.campaign_field_values).length > 0 && (
+                            Object.entries(relatedLead.campaign_field_values).map(([key, value]: [string, any]) => (
+                              <div key={key} style={{
+                                background: '#f8f9fa',
+                                padding: '16px',
+                                borderRadius: '10px',
+                                transition: 'all 0.3s'
+                              }}
+                              onMouseOver={(e) => {
+                                e.currentTarget.style.background = '#e5e7eb';
+                                e.currentTarget.style.transform = 'translateY(-2px)';
+                              }}
+                              onMouseOut={(e) => {
+                                e.currentTarget.style.background = '#f8f9fa';
+                                e.currentTarget.style.transform = 'translateY(0)';
+                              }}>
+                                <div style={{
+                                  fontSize: '12px',
+                                  fontWeight: 600,
+                                  color: '#6b7280',
+                                  textTransform: 'uppercase',
+                                  letterSpacing: '0.5px',
+                                  marginBottom: '6px'
+                                }}>{key}</div>
+                                <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                                  {String(value)}
+                                </div>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      </>
+                    )}
+
+                    {/* Prospect Information */}
+                    {relatedLead.crm_data && (
+                      <>
+                        <div style={{
+                          fontSize: '16px',
+                          fontWeight: 600,
+                          color: '#1f2937',
+                          marginBottom: '20px',
+                          paddingBottom: '10px',
+                          borderBottom: '2px solid #f8f9fa',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '10px'
+                        }}>
+                          <FileText size={18} style={{ color: '#4680ff' }} />
+                          Prospect Information
+                        </div>
+                        <div style={{
+                          display: 'grid',
+                          gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+                          gap: '20px',
+                          marginBottom: '30px'
+                        }}>
+                          {relatedLead.crm_data.id && (
+                            <div style={{
+                              background: '#f8f9fa',
+                              padding: '16px',
+                              borderRadius: '10px',
+                              transition: 'all 0.3s'
+                            }}
+                            onMouseOver={(e) => {
+                              e.currentTarget.style.background = '#e5e7eb';
+                              e.currentTarget.style.transform = 'translateY(-2px)';
+                            }}
+                            onMouseOut={(e) => {
+                              e.currentTarget.style.background = '#f8f9fa';
+                              e.currentTarget.style.transform = 'translateY(0)';
+                            }}>
+                              <div style={{
+                                fontSize: '12px',
+                                fontWeight: 600,
+                                color: '#6b7280',
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.5px',
+                                marginBottom: '6px'
+                              }}>CRM Data ID</div>
+                              <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                                #{relatedLead.crm_data.id}
+                              </div>
+                            </div>
+                          )}
+                          <div style={{
+                            background: '#f8f9fa',
+                            padding: '16px',
+                            borderRadius: '10px',
+                            transition: 'all 0.3s'
+                          }}
+                          onMouseOver={(e) => {
+                            e.currentTarget.style.background = '#e5e7eb';
+                            e.currentTarget.style.transform = 'translateY(-2px)';
+                          }}
+                          onMouseOut={(e) => {
+                            e.currentTarget.style.background = '#f8f9fa';
+                            e.currentTarget.style.transform = 'translateY(0)';
+                          }}>
+                            <div style={{
+                              fontSize: '12px',
+                              fontWeight: 600,
+                              color: '#6b7280',
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.5px',
+                              marginBottom: '6px'
+                            }}>Name</div>
+                            <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                              {relatedLead.crm_data.name || (relatedLead.crm_data.data && relatedLead.crm_data.data.name) || 'N/A'}
+                            </div>
+                          </div>
+                          <div style={{
+                            background: '#f8f9fa',
+                            padding: '16px',
+                            borderRadius: '10px',
+                            transition: 'all 0.3s'
+                          }}
+                          onMouseOver={(e) => {
+                            e.currentTarget.style.background = '#e5e7eb';
+                            e.currentTarget.style.transform = 'translateY(-2px)';
+                          }}
+                          onMouseOut={(e) => {
+                            e.currentTarget.style.background = '#f8f9fa';
+                            e.currentTarget.style.transform = 'translateY(0)';
+                          }}>
+                            <div style={{
+                              fontSize: '12px',
+                              fontWeight: 600,
+                              color: '#6b7280',
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.5px',
+                              marginBottom: '6px'
+                            }}>Phone</div>
+                            <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                              <Phone size={14} style={{ color: '#4680ff', marginRight: '6px', display: 'inline' }} />
+                              {relatedLead.crm_data.phone || (relatedLead.crm_data.data && relatedLead.crm_data.data.phone) || 'N/A'}
+                            </div>
+                          </div>
+                          {relatedLead.crm_data.source_file && (
+                            <div style={{
+                              background: '#f8f9fa',
+                              padding: '16px',
+                              borderRadius: '10px',
+                              transition: 'all 0.3s'
+                            }}
+                            onMouseOver={(e) => {
+                              e.currentTarget.style.background = '#e5e7eb';
+                              e.currentTarget.style.transform = 'translateY(-2px)';
+                            }}
+                            onMouseOut={(e) => {
+                              e.currentTarget.style.background = '#f8f9fa';
+                              e.currentTarget.style.transform = 'translateY(0)';
+                            }}>
+                              <div style={{
+                                fontSize: '12px',
+                                fontWeight: 600,
+                                color: '#6b7280',
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.5px',
+                                marginBottom: '6px'
+                              }}>Source File</div>
+                              <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                                {relatedLead.crm_data.source_file}
+                              </div>
+                            </div>
+                          )}
+                          {relatedLead.crm_data.uploaded_by && (
+                            <div style={{
+                              background: '#f8f9fa',
+                              padding: '16px',
+                              borderRadius: '10px',
+                              transition: 'all 0.3s'
+                            }}
+                            onMouseOver={(e) => {
+                              e.currentTarget.style.background = '#e5e7eb';
+                              e.currentTarget.style.transform = 'translateY(-2px)';
+                            }}
+                            onMouseOut={(e) => {
+                              e.currentTarget.style.background = '#f8f9fa';
+                              e.currentTarget.style.transform = 'translateY(0)';
+                            }}>
+                              <div style={{
+                                fontSize: '12px',
+                                fontWeight: 600,
+                                color: '#6b7280',
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.5px',
+                                marginBottom: '6px'
+                              }}>Uploaded By</div>
+                              <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                                <User size={14} style={{ color: '#4680ff', marginRight: '6px', display: 'inline' }} />
+                                {relatedLead.crm_data.uploaded_by}
+                              </div>
+                            </div>
+                          )}
+                          {relatedLead.crm_data.created_at && (
+                            <div style={{
+                              background: '#f8f9fa',
+                              padding: '16px',
+                              borderRadius: '10px',
+                              transition: 'all 0.3s'
+                            }}
+                            onMouseOver={(e) => {
+                              e.currentTarget.style.background = '#e5e7eb';
+                              e.currentTarget.style.transform = 'translateY(-2px)';
+                            }}
+                            onMouseOut={(e) => {
+                              e.currentTarget.style.background = '#f8f9fa';
+                              e.currentTarget.style.transform = 'translateY(0)';
+                            }}>
+                              <div style={{
+                                fontSize: '12px',
+                                fontWeight: 600,
+                                color: '#6b7280',
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.5px',
+                                marginBottom: '6px'
+                              }}>Created At</div>
+                              <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                                <Calendar size={14} style={{ color: '#4680ff', marginRight: '6px', display: 'inline' }} />
+                                {new Date(relatedLead.crm_data.created_at).toLocaleDateString()}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        
+                        {/* Prospect Fields */}
+                        {relatedLead.crm_data.data && typeof relatedLead.crm_data.data === 'object' && Object.keys(relatedLead.crm_data.data).length > 0 && (
+                          <>
+                            <div style={{
+                              fontSize: '16px',
+                              fontWeight: 600,
+                              color: '#1f2937',
+                              marginBottom: '20px',
+                              paddingBottom: '10px',
+                              borderBottom: '2px solid #f8f9fa',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '10px'
+                            }}>
+                              <FileText size={18} style={{ color: '#4680ff' }} />
+                              Prospect Fields
+                            </div>
+                            <div style={{
+                              display: 'grid',
+                              gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+                              gap: '20px',
+                              marginBottom: '30px'
+                            }}>
+                              {Object.entries(relatedLead.crm_data.data)
+                                .filter(([key]) => {
+                                  // Show all fields, but if name/phone are already shown from crm_data directly, 
+                                  // only show them from data if they're not in crm_data
+                                  const keyLower = key.toLowerCase();
+                                  if (keyLower === 'name' && relatedLead.crm_data.name) return false;
+                                  if (keyLower === 'phone' && relatedLead.crm_data.phone) return false;
+                                  return true;
+                                })
+                                .map(([key, value]: [string, any]) => (
+                                <div key={key} style={{
+                                  background: '#f8f9fa',
+                                  padding: '16px',
+                                  borderRadius: '10px',
+                                  transition: 'all 0.3s'
+                                }}
+                                onMouseOver={(e) => {
+                                  e.currentTarget.style.background = '#e5e7eb';
+                                  e.currentTarget.style.transform = 'translateY(-2px)';
+                                }}
+                                onMouseOut={(e) => {
+                                  e.currentTarget.style.background = '#f8f9fa';
+                                  e.currentTarget.style.transform = 'translateY(0)';
+                                }}>
+                                  <div style={{
+                                    fontSize: '12px',
+                                    fontWeight: 600,
+                                    color: '#6b7280',
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '0.5px',
+                                    marginBottom: '6px'
+                                  }}>{key.replace(/_/g, ' ')}</div>
+                                  <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                                    {String(value || 'N/A')}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </>
+                        )}
+                      </>
+                    )}
                   </>
                 )}
 
@@ -2118,7 +3219,7 @@ const CrmOrders = () => {
                                 <td>{item.product?.sku || 'N/A'}</td>
                                 <td>{item.quantity || '0'}</td>
                                 {viewingOrder.items.some((i: any) => i.description) && (
-                                  <td style={{ maxWidth: '200px' }}>{item.description || '-'}</td>
+                                  <td style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.description || '-'}</td>
                                 )}
                                 <td>{viewingOrder.currency || 'USD'} {parseFloat(item.unit_price || '0').toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                                 <td style={{
@@ -2598,9 +3699,10 @@ const CrmOrders = () => {
 
             {/* Attachments List */}
             <div>
+              {/* Order Attachments Section */}
               <h6 className="mb-3 fw-bold d-flex align-items-center gap-2">
                 <FileText size={18} />
-                Attached Files ({attachments.length})
+                Order Attachments ({attachments.length})
               </h6>
               
               {loadingAttachments ? (
@@ -2610,13 +3712,13 @@ const CrmOrders = () => {
                   </div>
                 </div>
               ) : attachments.length === 0 ? (
-                <div className="text-center py-5 text-muted">
+                <div className="text-center py-4 text-muted">
                   <Paperclip size={48} className="mb-3 opacity-25" />
-                  <div>No attachments yet</div>
+                  <div>No order attachments yet</div>
                   <small>Upload files using the form above</small>
                 </div>
               ) : (
-                <div className="d-flex flex-column gap-2">
+                <div className="d-flex flex-column gap-2 mb-4">
                   {attachments.map((attachment: any) => (
                     <Card key={attachment.id} className="border shadow-sm">
                       <Card.Body className="p-3">
@@ -2676,6 +3778,78 @@ const CrmOrders = () => {
                     </Card>
                   ))}
                 </div>
+              )}
+
+              {/* Deal Attachments Section */}
+              {selectedOrderForAttachments?.deal_id && (
+                <>
+                  <h6 className="mb-3 fw-bold d-flex align-items-center gap-2 mt-4">
+                    <FileText size={18} />
+                    Deal Attachments ({dealAttachments.length})
+                    <Badge bg="secondary" className="ms-2" style={{ fontSize: '11px' }}>Read-only</Badge>
+                  </h6>
+                  
+                  {loadingAttachments ? (
+                    <div className="text-center py-5">
+                      <div className="spinner-border text-primary" role="status">
+                        <span className="visually-hidden">Loading...</span>
+                      </div>
+                    </div>
+                  ) : dealAttachments.length === 0 ? (
+                    <div className="text-center py-4 text-muted">
+                      <Paperclip size={48} className="mb-3 opacity-25" />
+                      <div>No deal attachments</div>
+                    </div>
+                  ) : (
+                    <div className="d-flex flex-column gap-2">
+                      {dealAttachments.map((attachment: any) => (
+                        <Card key={`deal-${attachment.id}`} className="border shadow-sm" style={{ opacity: 0.9 }}>
+                          <Card.Body className="p-3">
+                            <div className="d-flex align-items-center justify-content-between">
+                              <div className="d-flex align-items-center gap-3 flex-grow-1">
+                                {/* File Icon */}
+                                <div 
+                                  className="rounded d-flex align-items-center justify-content-center"
+                                  style={{ 
+                                    width: '45px', 
+                                    height: '45px', 
+                                    background: attachment.mime_type?.includes('pdf') ? '#dc3545' : 
+                                               attachment.mime_type?.includes('csv') || attachment.mime_type?.includes('excel') || attachment.mime_type?.includes('spreadsheet') ? '#198754' : 
+                                               attachment.mime_type?.includes('image') ? '#0d6efd' : '#6c757d',
+                                    color: 'white'
+                                  }}
+                                >
+                                  <FileText size={22} />
+                                </div>
+                                
+                                {/* File Info */}
+                                <div className="flex-grow-1">
+                                  <div className="fw-semibold" style={{ fontSize: '14px' }}>{attachment.name}</div>
+                                  <div style={{ fontSize: '12px', color: '#6c757d' }}>
+                                    {formatFileSize(attachment.file_size)} • {attachment.created_at ? new Date(attachment.created_at).toLocaleDateString() : 'N/A'}
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Actions - Download only */}
+                              <div className="d-flex gap-1">
+                                <Button 
+                                  variant="link" 
+                                  size="sm" 
+                                  className="p-2 text-primary" 
+                                  title="Download"
+                                  onClick={() => handleDownloadDealAttachment(attachment.id)}
+                                >
+                                  <DownloadIcon size={18} />
+                                </Button>
+                              </div>
+                            </div>
+                          </Card.Body>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </Modal.Body>

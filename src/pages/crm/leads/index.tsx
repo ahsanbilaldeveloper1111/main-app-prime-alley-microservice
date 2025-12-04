@@ -92,8 +92,8 @@ import { toast } from "react-toastify";
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import FormModal from "../../partial/FormModal";
-import ConfirmModal from "@pages/partial/ConfirmModal";
 import SuccessfulModal from "@pages/partial/SuccessfulModal";
+import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import { useSession } from "next-auth/react";
 
 // KPI Card Component
@@ -349,6 +349,9 @@ const CrmLeads = () => {
       if (currentFilters.is_lost !== undefined) {
         params.is_lost = currentFilters.is_lost;
       }
+      if (currentFilters.include_lost !== undefined) {
+        params.include_lost = currentFilters.include_lost;
+      }
       if (currentFilters.include_archived !== undefined) {
         params.include_archived = currentFilters.include_archived;
       }
@@ -395,6 +398,20 @@ const CrmLeads = () => {
         const newFilters = { ...prev };
         delete newFilters.stage_id;
         delete newFilters.include_archived;
+        delete newFilters.include_lost;
+        return newFilters;
+      });
+      // Clear stage dropdown
+      setLeadsFilters(prev => ({
+        ...prev,
+        stage: null
+      }));
+    } else if (activeFilter === 'lost') {
+      setCurrentFilters((prev) => {
+        const newFilters = { ...prev };
+        delete newFilters.stage_id;
+        delete newFilters.include_archived;
+        newFilters.include_lost = true;
         return newFilters;
       });
       // Clear stage dropdown
@@ -406,6 +423,7 @@ const CrmLeads = () => {
       setCurrentFilters((prev) => {
         const newFilters = { ...prev };
         delete newFilters.stage_id;
+        delete newFilters.include_lost;
         newFilters.include_archived = true;
         return newFilters;
       });
@@ -421,6 +439,7 @@ const CrmLeads = () => {
         setCurrentFilters((prev) => {
           const newFilters = { ...prev };
           delete newFilters.include_archived;
+          delete newFilters.include_lost;
           newFilters.stage_id = selectedStage.id.toString();
           return newFilters;
         });
@@ -472,6 +491,15 @@ const CrmLeads = () => {
       // Handle is_lost filter
       if ('is_lost' in filters) {
         newFilters.is_lost = filters.is_lost;
+      }
+      
+      // Handle include_lost filter
+      if ('include_lost' in filters) {
+        if (filters.include_lost) {
+          newFilters.include_lost = true;
+        } else {
+          delete newFilters.include_lost;
+        }
       }
       
       // Handle include_archived filter
@@ -709,8 +737,16 @@ const CrmLeads = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [leadToDelete, setLeadToDelete] = useState<any>(null);
 
-  const handleDeleteLead = useCallback((leadId: number) => {
-    setLeadToDelete({ id: leadId });
+  // Delete Follow-up Modal
+  const [showDeleteFollowUpModal, setShowDeleteFollowUpModal] = useState(false);
+  const [followUpToDelete, setFollowUpToDelete] = useState<{ leadId: number; followUpId: number; leadName?: string } | null>(null);
+
+  // Delete Meeting Modal
+  const [showDeleteMeetingModal, setShowDeleteMeetingModal] = useState(false);
+  const [meetingToDelete, setMeetingToDelete] = useState<{ meetingId: number; meetingName?: string } | null>(null);
+
+  const handleDeleteLead = useCallback((leadId: number, leadName?: string) => {
+    setLeadToDelete({ id: leadId, name: leadName });
     setShowDeleteModal(true);
   }, []);
 
@@ -803,7 +839,7 @@ const CrmLeads = () => {
   const [successModalDescription, setSuccessModalDescription] = useState('');
 
   const handleMarkLostSubmit = useCallback(async () => {
-    if (!leadToMarkLost || !lostReasonId) return;
+    if (!leadToMarkLost || !lostReasonId || !lostFeedback.trim()) return;
 
     try {
       await markLeadLost(leadToMarkLost.id, {
@@ -900,23 +936,33 @@ const CrmLeads = () => {
   }, [followupData, session, viewingLead, handleViewLead]);
 
   // Handle follow-up deletion
-  const handleDeleteFollowUp = useCallback(async (leadId: number, followUpId: number) => {
-    if (!window.confirm('Are you sure you want to delete this follow-up?')) return;
+  const handleDeleteFollowUp = useCallback((leadId: number, followUpId: number, leadName?: string) => {
+    setFollowUpToDelete({ leadId, followUpId, leadName });
+    setShowDeleteFollowUpModal(true);
+  }, []);
+
+  const confirmDeleteFollowUp = useCallback(async () => {
+    if (!followUpToDelete) return;
     
     try {
-      await deleteLeadFollowUp(leadId, followUpId);
+      await deleteLeadFollowUp(followUpToDelete.leadId, followUpToDelete.followUpId);
       
       // Refresh lead data
-      if (viewingLead?.id === leadId) {
-        await handleViewLead(leadId);
+      if (viewingLead?.id === followUpToDelete.leadId) {
+        await handleViewLead(followUpToDelete.leadId);
       }
       
       // Refresh leads list
       setRefreshKey((oldKey) => oldKey + 1);
+      
+      setShowDeleteFollowUpModal(false);
+      setFollowUpToDelete(null);
+      toast.success("Follow-up deleted successfully!");
     } catch (error) {
       console.error("Failed to delete follow-up:", error);
+      toast.error("Failed to delete follow-up");
     }
-  }, [viewingLead, handleViewLead]);
+  }, [followUpToDelete, viewingLead, handleViewLead]);
 
   // Handle meeting creation
   const handleCreateMeeting = useCallback(async () => {
@@ -968,11 +1014,16 @@ const CrmLeads = () => {
   }, [meetingData, session, viewingLead, handleViewLead]);
 
   // Handle meeting deletion
-  const handleDeleteMeeting = useCallback(async (meetingId: number) => {
-    if (!window.confirm('Are you sure you want to delete this meeting?')) return;
+  const handleDeleteMeeting = useCallback((meetingId: number, meetingName?: string) => {
+    setMeetingToDelete({ meetingId, meetingName });
+    setShowDeleteMeetingModal(true);
+  }, []);
+
+  const confirmDeleteMeeting = useCallback(async () => {
+    if (!meetingToDelete) return;
     
     try {
-      await deleteMeeting(meetingId);
+      await deleteMeeting(meetingToDelete.meetingId);
       
       // Refresh lead data
       if (viewingLead?.id) {
@@ -981,10 +1032,15 @@ const CrmLeads = () => {
       
       // Refresh leads list
       setRefreshKey((oldKey) => oldKey + 1);
+      
+      setShowDeleteMeetingModal(false);
+      setMeetingToDelete(null);
+      toast.success("Meeting deleted successfully!");
     } catch (error) {
       console.error("Failed to delete meeting:", error);
+      toast.error("Failed to delete meeting");
     }
-  }, [viewingLead, handleViewLead]);
+  }, [meetingToDelete, viewingLead, handleViewLead]);
 
   // Calculate analytics data
   const analyticsData = useMemo(() => {
@@ -1060,6 +1116,7 @@ const CrmLeads = () => {
     const transformed = leadsData.map(transformLeadData);
     const counts: Record<string, number> = {
       all: summaryTiles?.total_leads || totalLeads || transformed.length,
+      lost: summaryTiles?.lost_leads || transformed.filter(l => l.isLost).length,
       deleted: summaryTiles?.deleted_leads || 0,
     };
     
@@ -1291,6 +1348,14 @@ const CrmLeads = () => {
               activeColor: '#0d6efd',
               icon: <Layers size={16} />
             })),
+            {
+              id: 'lost',
+              label: 'Lost',
+              count: filterCounts.lost || 0,
+              color: '#fd7e14',
+              activeColor: '#fd7e14',
+              icon: <X size={16} />
+            },
             {
               id: 'deleted',
               label: 'Deleted',
@@ -1703,10 +1768,7 @@ const CrmLeads = () => {
                                     size="sm" 
                                     className="p-1 text-danger" 
                                     title="Delete"
-                                    onClick={() => {
-                                      setLeadToDelete({ id: lead.rawData?.id || lead.id });
-                                      setShowDeleteModal(true);
-                                    }}
+                                    onClick={() => handleDeleteLead(lead.rawData?.id || lead.id, lead.name)}
                                   >
                                     <Trash2 size={16} />
                                   </Button>
@@ -1750,17 +1812,40 @@ const CrmLeads = () => {
         </Card>
       </div>
 
-      <ConfirmModal
+      {/* Delete Lead Modal */}
+      <DeleteConfirmationModal
         show={showDeleteModal}
-        onHide={() => setShowDeleteModal(false)}
-        title="Delete Lead"
-        description="Are you sure you want to delete this lead?"
-        onConfirm={() => confirmDeleteLead()}
-        targetName=""
-        confirmButtonText="Delete"
-        confirmButtonVariant="danger"
-        cancelButtonVariant="secondary"
-        onCancel={() => setShowDeleteModal(false)}
+        onHide={() => {
+          setShowDeleteModal(false);
+          setLeadToDelete(null);
+        }}
+        onConfirm={confirmDeleteLead}
+        itemName={leadToDelete?.name}
+        itemType="lead"
+      />
+
+      {/* Delete Follow-up Modal */}
+      <DeleteConfirmationModal
+        show={showDeleteFollowUpModal}
+        onHide={() => {
+          setShowDeleteFollowUpModal(false);
+          setFollowUpToDelete(null);
+        }}
+        onConfirm={confirmDeleteFollowUp}
+        itemName={followUpToDelete?.leadName ? `follow-up for ${followUpToDelete.leadName}` : "this follow-up"}
+        itemType="follow-up"
+      />
+
+      {/* Delete Meeting Modal */}
+      <DeleteConfirmationModal
+        show={showDeleteMeetingModal}
+        onHide={() => {
+          setShowDeleteMeetingModal(false);
+          setMeetingToDelete(null);
+        }}
+        onConfirm={confirmDeleteMeeting}
+        itemName={meetingToDelete?.meetingName}
+        itemType="meeting"
       />
 
       {/* Convert Lead Modal */}
@@ -1894,13 +1979,14 @@ const CrmLeads = () => {
             </Form.Select>
           </Form.Group>
           <Form.Group>
-            <Form.Label>Additional Feedback</Form.Label>
+            <Form.Label>Additional Feedback *</Form.Label>
             <Form.Control
               as="textarea"
               rows={3}
               value={lostFeedback}
               onChange={(e) => setLostFeedback(e.target.value)}
               placeholder="Please provide additional feedback about why this lead was lost..."
+              required
             />
           </Form.Group>
           </>
@@ -1909,6 +1995,7 @@ const CrmLeads = () => {
         onCancel={() => setShowMarkLostModal(false)}
         submitButtonText="Mark Lost Reason"
         cancelButtonText="Cancel"
+        isSubmitDisabled={!lostReasonId || !lostFeedback.trim()}
       />
 
 
@@ -2491,6 +2578,261 @@ const CrmLeads = () => {
                   </>
                 )}
 
+                {/* Prospect Information */}
+                {viewingLead.crm_data && (
+                  <>
+                    <div style={{
+                      fontSize: '16px',
+                      fontWeight: 600,
+                      color: '#1f2937',
+                      marginBottom: '20px',
+                      paddingBottom: '10px',
+                      borderBottom: '2px solid #f8f9fa',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px'
+                    }}>
+                      <FileText size={18} style={{ color: '#4680ff' }} />
+                      Prospect Information
+                    </div>
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+                      gap: '20px',
+                      marginBottom: '30px'
+                    }}>
+                      {viewingLead.crm_data.id && (
+                        <div style={{
+                          background: '#f8f9fa',
+                          padding: '16px',
+                          borderRadius: '10px',
+                          transition: 'all 0.3s'
+                        }}
+                        onMouseOver={(e) => {
+                          e.currentTarget.style.background = '#e5e7eb';
+                          e.currentTarget.style.transform = 'translateY(-2px)';
+                        }}
+                        onMouseOut={(e) => {
+                          e.currentTarget.style.background = '#f8f9fa';
+                          e.currentTarget.style.transform = 'translateY(0)';
+                        }}>
+                          <div style={{
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            color: '#6b7280',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.5px',
+                            marginBottom: '6px'
+                          }}>CRM Data ID</div>
+                          <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                            #{viewingLead.crm_data.id}
+                          </div>
+                        </div>
+                      )}
+                      {(viewingLead.crm_data.name || (viewingLead.crm_data.data && viewingLead.crm_data.data.name)) && (
+                        <div style={{
+                          background: '#f8f9fa',
+                          padding: '16px',
+                          borderRadius: '10px',
+                          transition: 'all 0.3s'
+                        }}
+                        onMouseOver={(e) => {
+                          e.currentTarget.style.background = '#e5e7eb';
+                          e.currentTarget.style.transform = 'translateY(-2px)';
+                        }}
+                        onMouseOut={(e) => {
+                          e.currentTarget.style.background = '#f8f9fa';
+                          e.currentTarget.style.transform = 'translateY(0)';
+                        }}>
+                          <div style={{
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            color: '#6b7280',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.5px',
+                            marginBottom: '6px'
+                          }}>Name</div>
+                          <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                            {viewingLead.crm_data.name || (viewingLead.crm_data.data && viewingLead.crm_data.data.name) || 'N/A'}
+                          </div>
+                        </div>
+                      )}
+                      {(viewingLead.crm_data.phone || (viewingLead.crm_data.data && viewingLead.crm_data.data.phone)) && (
+                        <div style={{
+                          background: '#f8f9fa',
+                          padding: '16px',
+                          borderRadius: '10px',
+                          transition: 'all 0.3s'
+                        }}
+                        onMouseOver={(e) => {
+                          e.currentTarget.style.background = '#e5e7eb';
+                          e.currentTarget.style.transform = 'translateY(-2px)';
+                        }}
+                        onMouseOut={(e) => {
+                          e.currentTarget.style.background = '#f8f9fa';
+                          e.currentTarget.style.transform = 'translateY(0)';
+                        }}>
+                          <div style={{
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            color: '#6b7280',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.5px',
+                            marginBottom: '6px'
+                          }}>Phone</div>
+                          <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                            <Phone size={14} style={{ color: '#4680ff', marginRight: '6px', display: 'inline' }} />
+                            {viewingLead.crm_data.phone || (viewingLead.crm_data.data && viewingLead.crm_data.data.phone) || 'N/A'}
+                          </div>
+                        </div>
+                      )}
+                      {viewingLead.crm_data.source_file && (
+                        <div style={{
+                          background: '#f8f9fa',
+                          padding: '16px',
+                          borderRadius: '10px',
+                          transition: 'all 0.3s'
+                        }}
+                        onMouseOver={(e) => {
+                          e.currentTarget.style.background = '#e5e7eb';
+                          e.currentTarget.style.transform = 'translateY(-2px)';
+                        }}
+                        onMouseOut={(e) => {
+                          e.currentTarget.style.background = '#f8f9fa';
+                          e.currentTarget.style.transform = 'translateY(0)';
+                        }}>
+                          <div style={{
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            color: '#6b7280',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.5px',
+                            marginBottom: '6px'
+                          }}>Source File</div>
+                          <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                            {viewingLead.crm_data.source_file}
+                          </div>
+                        </div>
+                      )}
+                      {viewingLead.crm_data.uploaded_by && (
+                        <div style={{
+                          background: '#f8f9fa',
+                          padding: '16px',
+                          borderRadius: '10px',
+                          transition: 'all 0.3s'
+                        }}
+                        onMouseOver={(e) => {
+                          e.currentTarget.style.background = '#e5e7eb';
+                          e.currentTarget.style.transform = 'translateY(-2px)';
+                        }}
+                        onMouseOut={(e) => {
+                          e.currentTarget.style.background = '#f8f9fa';
+                          e.currentTarget.style.transform = 'translateY(0)';
+                        }}>
+                          <div style={{
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            color: '#6b7280',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.5px',
+                            marginBottom: '6px'
+                          }}>Uploaded By</div>
+                          <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                            <User size={14} style={{ color: '#4680ff', marginRight: '6px', display: 'inline' }} />
+                            {viewingLead.crm_data.uploaded_by}
+                          </div>
+                        </div>
+                      )}
+                      {viewingLead.crm_data.created_at && (
+                        <div style={{
+                          background: '#f8f9fa',
+                          padding: '16px',
+                          borderRadius: '10px',
+                          transition: 'all 0.3s'
+                        }}
+                        onMouseOver={(e) => {
+                          e.currentTarget.style.background = '#e5e7eb';
+                          e.currentTarget.style.transform = 'translateY(-2px)';
+                        }}
+                        onMouseOut={(e) => {
+                          e.currentTarget.style.background = '#f8f9fa';
+                          e.currentTarget.style.transform = 'translateY(0)';
+                        }}>
+                          <div style={{
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            color: '#6b7280',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.5px',
+                            marginBottom: '6px'
+                          }}>Created At</div>
+                          <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                            <Calendar size={14} style={{ color: '#4680ff', marginRight: '6px', display: 'inline' }} />
+                            {new Date(viewingLead.crm_data.created_at).toLocaleDateString()}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Prospect Fields */}
+                    {viewingLead.crm_data.data && typeof viewingLead.crm_data.data === 'object' && Object.keys(viewingLead.crm_data.data).length > 0 && (
+                      <>
+                        <div style={{
+                          fontSize: '16px',
+                          fontWeight: 600,
+                          color: '#1f2937',
+                          marginBottom: '20px',
+                          paddingBottom: '10px',
+                          borderBottom: '2px solid #f8f9fa',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '10px'
+                        }}>
+                          <FileText size={18} style={{ color: '#4680ff' }} />
+                          Prospect Fields
+                        </div>
+                        <div style={{
+                          display: 'grid',
+                          gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+                          gap: '20px',
+                          marginBottom: '30px'
+                        }}>
+                          {Object.entries(viewingLead.crm_data.data)
+                            .filter(([key]) => key.toLowerCase() !== 'name' && key.toLowerCase() !== 'phone')
+                            .map(([key, value]: [string, any]) => (
+                            <div key={key} style={{
+                              background: '#f8f9fa',
+                              padding: '16px',
+                              borderRadius: '10px',
+                              transition: 'all 0.3s'
+                            }}
+                            onMouseOver={(e) => {
+                              e.currentTarget.style.background = '#e5e7eb';
+                              e.currentTarget.style.transform = 'translateY(-2px)';
+                            }}
+                            onMouseOut={(e) => {
+                              e.currentTarget.style.background = '#f8f9fa';
+                              e.currentTarget.style.transform = 'translateY(0)';
+                            }}>
+                              <div style={{
+                                fontSize: '12px',
+                                fontWeight: 600,
+                                color: '#6b7280',
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.5px',
+                                marginBottom: '6px'
+                              }}>{key}</div>
+                              <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                                {String(value || 'N/A')}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </>
+                )}
+
                 {/* Lost Reason */}
                 {viewingLead.is_lost && viewingLead.lost_reason && (
                   <div style={{
@@ -2515,77 +2857,7 @@ const CrmLeads = () => {
                 )}
 
                 {/* Audit Trail / History */}
-                {viewingLead.audit_trail && Array.isArray(viewingLead.audit_trail) && viewingLead.audit_trail.length > 0 && (
-                  <>
-                    <div style={{
-                      fontSize: '16px',
-                      fontWeight: 600,
-                      color: '#1f2937',
-                      marginBottom: '20px',
-                      paddingBottom: '10px',
-                      borderBottom: '2px solid #f8f9fa',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '10px'
-                    }}>
-                      <History size={18} style={{ color: '#4680ff' }} />
-                      Activity History ({viewingLead.audit_trail.length})
-                    </div>
-                    <div style={{ position: 'relative', paddingLeft: '30px', marginBottom: '30px' }}>
-                      <div style={{
-                        content: '',
-                        position: 'absolute',
-                        left: '8px',
-                        top: 0,
-                        bottom: 0,
-                        width: '2px',
-                        background: '#e5e7eb'
-                      }} />
-                      {viewingLead.audit_trail.map((audit: any, idx: number) => (
-                        <div key={audit.id || idx} style={{ position: 'relative', paddingBottom: '20px' }}>
-                          <div style={{
-                            content: '',
-                            position: 'absolute',
-                            left: '-26px',
-                            top: '4px',
-                            width: '12px',
-                            height: '12px',
-                            borderRadius: '50%',
-                            background: audit.event === 'created' ? '#10b981' : '#4680ff',
-                            border: '3px solid white',
-                            boxShadow: '0 0 0 2px #e5e7eb'
-                          }} />
-                          <div style={{
-                            background: '#f8f9fa',
-                            padding: '12px 16px',
-                            borderRadius: '8px'
-                          }}>
-                            <div style={{ fontSize: '12px', color: '#6b7280', fontWeight: 600, marginBottom: '4px' }}>
-                              {audit.created_at_human || new Date(audit.created_at).toLocaleString()}
-                            </div>
-                            <div style={{ fontSize: '14px', color: '#1f2937', marginBottom: '4px', fontWeight: 500 }}>
-                              {audit.event === 'created' ? 'Created' : audit.event === 'updated' ? 'Updated' : audit.event}
-                            </div>
-                            {audit.description && (
-                              <div style={{ fontSize: '13px', color: '#6b7280', marginBottom: '8px' }}>
-                                {audit.description}
-                              </div>
-                            )}
-                            {audit.changes && Object.keys(audit.changes).length > 0 && (
-                              <div style={{ fontSize: '12px', color: '#6b7280' }}>
-                                {Object.entries(audit.changes).map(([key, change]: [string, any]) => (
-                                  <div key={key} style={{ marginTop: '4px' }}>
-                                    <strong>{key}:</strong> {change.old ? `${change.old} → ` : ''}{change.new || 'N/A'}
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </>
-                )}
+              
 
                 {/* Description */}
                 {viewingLead.description && (
@@ -2710,7 +2982,7 @@ const CrmLeads = () => {
                               size="sm"
                               className="p-1 text-danger"
                               title="Delete"
-                              onClick={() => handleDeleteFollowUp(viewingLead.id, followUp.id)}
+                              onClick={() => handleDeleteFollowUp(viewingLead.id, followUp.id, viewingLead.name)}
                             >
                               <Trash2 size={16} />
                             </Button>
@@ -2856,7 +3128,7 @@ const CrmLeads = () => {
                               size="sm"
                               className="p-1 text-danger"
                               title="Delete"
-                              onClick={() => handleDeleteMeeting(meeting.id)}
+                              onClick={() => handleDeleteMeeting(meeting.id, meeting.name)}
                             >
                               <Trash2 size={16} />
                             </Button>
