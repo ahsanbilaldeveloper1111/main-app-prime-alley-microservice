@@ -39,7 +39,6 @@ import {
   FileText,
   Building2,
   Calendar,
-  AlertCircle,
   ChevronLeft,
   ChevronRight,
   ChevronsLeft,
@@ -48,6 +47,7 @@ import {
 } from "lucide-react";
 import { toast } from "react-toastify";
 import "@assets/scss/common.scss";
+import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 
 // Filter Bar Component
 interface FilterBarProps {
@@ -226,7 +226,6 @@ const ProductsPage = () => {
   });
   const [deletingProduct, setDeletingProduct] = useState<ProductDisplayData | null>(null);
   const [showProductDeleteModal, setShowProductDeleteModal] = useState(false);
-  const [productDeleteConfirmText, setProductDeleteConfirmText] = useState("");
   const [showProductViewModal, setShowProductViewModal] = useState(false);
   const [viewingProduct, setViewingProduct] = useState<ProductDisplayData | null>(null);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
@@ -619,7 +618,6 @@ const ProductsPage = () => {
       await deleteProduct(deletingProduct.id);
       setShowProductDeleteModal(false);
       setDeletingProduct(null);
-      setProductDeleteConfirmText("");
       // Refresh products after delete
       await fetchProducts();
     } catch (error: any) {
@@ -837,59 +835,16 @@ const ProductsPage = () => {
         </Modal>
 
         {/* Delete Confirmation Modal */}
-        <Modal
+        <DeleteConfirmationModal
           show={showProductDeleteModal}
           onHide={() => {
             setShowProductDeleteModal(false);
             setDeletingProduct(null);
-            setProductDeleteConfirmText("");
           }}
-          centered
-        >
-          <Modal.Header closeButton className="border-bottom">
-            <Modal.Title>Confirm Deletion</Modal.Title>
-          </Modal.Header>
-          <Modal.Body className="p-4">
-            <div className="text-center">
-              <AlertCircle size={48} className="text-danger mb-3" />
-              <p className="mb-0">
-                Are you sure you want to delete <strong>{deletingProduct?.productName}</strong>?
-              </p>
-              <p className="text-muted small mb-3">This action cannot be undone.</p>
-              <div className="text-center mt-4">
-                <Form.Label className="fw-semibold">
-                  Type <span className="text-danger fw-bold">DELETE</span> to confirm
-                </Form.Label>
-                <Form.Control
-                  type="text"
-                  placeholder="Type DELETE"
-                  value={productDeleteConfirmText}
-                  onChange={(e) => setProductDeleteConfirmText(e.target.value)}
-                  autoFocus
-                />
-              </div>
-            </div>
-          </Modal.Body>
-          <Modal.Footer className="border-top">
-            <Button
-              variant="secondary"
-              onClick={() => {
-                setShowProductDeleteModal(false);
-                setDeletingProduct(null);
-                setProductDeleteConfirmText("");
-              }}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="danger"
-              disabled={productDeleteConfirmText !== "DELETE"}
-              onClick={handleDeleteProduct}
-            >
-              Delete Product
-            </Button>
-          </Modal.Footer>
-        </Modal>
+          onConfirm={handleDeleteProduct}
+          itemName={deletingProduct?.productName}
+          itemType="product"
+        />
 
         {/* Product View Modal */}
         {viewingProduct && (

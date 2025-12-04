@@ -58,6 +58,7 @@ import {
   Search,
   Filter,
   RotateCcw,
+  AlertCircle,
 } from 'lucide-react';
 import { 
   PieChart, 
@@ -76,8 +77,8 @@ import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import PageHeader from "@components/PageHeader";
 import FormModal from "../../partial/FormModal";
-import ConfirmModal from "@pages/partial/ConfirmModal";
 import SuccessfulModal from "@pages/partial/SuccessfulModal";
+import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
 import DatatableActionButton from "@components/DatatableActionButton";
 import { useSession } from "next-auth/react";
@@ -1488,17 +1489,15 @@ const StagesManagement = () => {
       />
 
       {/* Delete Confirmation Modal */}
-      <ConfirmModal
+      <DeleteConfirmationModal
         show={showDeleteModal}
-        onHide={() => setShowDeleteModal(false)}
-        title="Delete Stage"
-        description="Are you sure you want to delete this stage?"
-        targetName={stageToDelete?.name || ""}
+        onHide={() => {
+          setShowDeleteModal(false);
+          setStageToDelete(null);
+        }}
         onConfirm={handleDeleteStage}
-        confirmButtonText="Delete"
-        confirmButtonVariant="danger"
-        requireTextConfirmation={true}
-        requiredConfirmationText="delete"
+        itemName={stageToDelete?.name}
+        itemType="stage"
       />
 
       {/* Stage View Modal */}

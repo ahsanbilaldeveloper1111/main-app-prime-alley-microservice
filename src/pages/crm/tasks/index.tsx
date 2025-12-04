@@ -88,7 +88,7 @@ import { useSession } from "next-auth/react";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
-import ConfirmModal from "@pages/partial/ConfirmModal";
+import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 
 // KPI Card Component
 interface KPICardData {
@@ -293,7 +293,7 @@ const CrmTasks = () => {
   const [showNoteModal, setShowNoteModal] = useState(false);
   const [editingNote, setEditingNote] = useState<TaskNote | null>(null);
   const [noteText, setNoteText] = useState('');
-  const [taskToDelete, setTaskToDelete] = useState<{ id: number } | null>(null);
+  const [taskToDelete, setTaskToDelete] = useState<{ id: number; name?: string } | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [noteToDelete, setNoteToDelete] = useState<{ taskId: number; noteId: number } | null>(null);
   const [showDeleteNoteModal, setShowDeleteNoteModal] = useState(false);
@@ -1167,7 +1167,7 @@ const CrmTasks = () => {
                                           className="p-1 text-danger"
                                           title="Delete Task"
                                           onClick={() => {
-                                            setTaskToDelete({ id: task.id! });
+                                            setTaskToDelete({ id: task.id!, name: task.name });
                                             setShowDeleteModal(true);
                                           }}
                                         >
@@ -1308,7 +1308,9 @@ const CrmTasks = () => {
                   <Form.Label>Due Date <span className="text-danger">*</span></Form.Label>
                   <Form.Control
                     type="date"
-                    value={taskFormData.due_date ?  new Date(taskFormData.due_date)?.toISOString()?.split('T')[0] : new Date().toISOString().split('T')[0]}
+                    value={taskFormData.due_date ?  new Date(taskFormData.due_date)?.toISOString()?.split('T')[0] : 
+                      ''
+                    }
                     onChange={(e) => setTaskFormData({ ...taskFormData, due_date: e.target.value })}
                     min={new Date().toISOString().split('T')[0]}
                     required
@@ -1765,54 +1767,36 @@ const CrmTasks = () => {
       </Modal>
 
       {/* Delete Task Confirmation Modal */}
-      <ConfirmModal
+      <DeleteConfirmationModal
         show={showDeleteModal}
         onHide={() => {
           setShowDeleteModal(false);
           setTaskToDelete(null);
         }}
-        title="Delete Task"
-        description="Are you sure you want to delete this task?"
         onConfirm={handleDeleteTask}
-        targetName=""
-        confirmButtonText="Delete"
-        confirmButtonVariant="danger"
-        cancelButtonVariant="secondary"
-        onCancel={() => {
-          setShowDeleteModal(false);
-          setTaskToDelete(null);
-        }}
+        itemName={taskToDelete?.name}
+        itemType="task"
       />
 
       {/* Delete Note Confirmation Modal */}
-      <ConfirmModal
+      <DeleteConfirmationModal
         show={showDeleteNoteModal}
         onHide={() => {
           setShowDeleteNoteModal(false);
           setNoteToDelete(null);
         }}
-        title="Delete Note"
-        description="Are you sure you want to delete this note?"
         onConfirm={confirmDeleteNote}
-        targetName=""
-        confirmButtonText="Delete"
-        confirmButtonVariant="danger"
-        cancelButtonVariant="secondary"
-        onCancel={() => {
-          setShowDeleteNoteModal(false);
-          setNoteToDelete(null);
-        }}
+        itemName="this note"
+        itemType="note"
       />
 
       {/* Delete Form Note Confirmation Modal */}
-      <ConfirmModal
+      <DeleteConfirmationModal
         show={showDeleteFormNoteModal}
         onHide={() => {
           setShowDeleteFormNoteModal(false);
           setFormNoteToDelete(null);
         }}
-        title="Delete Note"
-        description="Are you sure you want to delete this note?"
         onConfirm={() => {
           if (formNoteToDelete !== null) {
             setTaskFormData({
@@ -1823,14 +1807,8 @@ const CrmTasks = () => {
           setShowDeleteFormNoteModal(false);
           setFormNoteToDelete(null);
         }}
-        targetName=""
-        confirmButtonText="Delete"
-        confirmButtonVariant="danger"
-        cancelButtonVariant="secondary"
-        onCancel={() => {
-          setShowDeleteFormNoteModal(false);
-          setFormNoteToDelete(null);
-        }}
+        itemName="this note"
+        itemType="note"
       />
     </React.Fragment>
   );

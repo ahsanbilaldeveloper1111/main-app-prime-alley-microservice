@@ -300,6 +300,36 @@ export const markLeadLost = async (
     throw error;
   }
 };
+export const markDealLost = async (
+  id: number,
+  data: { lost_reason_id: number; lost_feedback?: string }
+): Promise<LeadData> => {
+  try {
+    const response = await axiosInstance.post(`/crm/mark-deal-lost`, {
+      deal_id: id,
+      ...data,
+    });
+    return extractData<LeadData>(response.data);
+  } catch (error: any) {
+    toast.error(error?.message || "Failed to mark deal as lost");
+    throw error;
+  }
+};
+export const markOrderLost = async (
+  id: number,
+  data: { lost_reason_id: number; lost_feedback?: string }
+): Promise<LeadData> => {
+  try {
+    const response = await axiosInstance.post(`/crm/mark-order-lost`, {
+      order_id: id,
+      ...data,
+    });
+    return extractData<LeadData>(response.data);
+  } catch (error: any) {
+    toast.error(error?.message || "Failed to mark order as lost");
+    throw error;
+  }
+};
 
 export const getLeadsByStage = async (
   stageId: number,

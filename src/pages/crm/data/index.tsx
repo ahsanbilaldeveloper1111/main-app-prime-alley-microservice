@@ -98,6 +98,7 @@ import { GetHierarchyData } from "@utils/users";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
+import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import FormModal from "../../partial/FormModal";
 import SuccessfulModal from "@pages/partial/SuccessfulModal";
 import { ModuleSlug } from "@utils/Helper";
@@ -3074,17 +3075,18 @@ const CrmProspectsManagement = () => {
 
 
       {/* Delete Confirmation Modal */}
-      <Modal show={showDeleteModal} onHide={() => setShowDeleteModal(false)}>
-        <Modal.Header closeButton>
-          <Modal.Title className="d-flex align-items-center">
-            <FiTrash2 className="me-2" />
-            Delete Prospect
-          </Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <p>Are you sure you want to delete this prospect entry?</p>
-          {itemToDelete && (
-            <div className="alert alert-warning">
+      <DeleteConfirmationModal
+        show={showDeleteModal}
+        onHide={() => {
+          setShowDeleteModal(false);
+          setItemToDelete(null);
+        }}
+        onConfirm={confirmDelete}
+        itemName={itemToDelete ? `prospect entry #${itemToDelete.id}` : undefined}
+        itemType="prospect entry"
+        additionalInfo={
+          itemToDelete ? (
+            <div className="alert alert-warning mb-3">
               <strong>Entry ID:</strong> #{itemToDelete.id}
               <br />
               <strong>Phone:</strong> {itemToDelete.phone || "N/A"}
@@ -3101,20 +3103,9 @@ const CrmProspectsManagement = () => {
               <strong>Created:</strong>{" "}
               {moment(itemToDelete.created_at).format("MMM DD, YYYY HH:mm")}
             </div>
-          )}
-          <p className="text-danger">
-            <strong>This action cannot be undone.</strong>
-          </p>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={() => setShowDeleteModal(false)}>
-            Cancel
-          </Button>
-          <Button variant="danger" onClick={confirmDelete}>
-            Delete Entry
-          </Button>
-        </Modal.Footer>
-      </Modal>
+          ) : undefined
+        }
+      />
 
       {/* Data Assignment Success Modal */}
       <FormModal

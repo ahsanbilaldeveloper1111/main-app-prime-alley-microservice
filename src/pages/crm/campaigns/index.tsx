@@ -81,7 +81,7 @@ import {
 } from 'recharts';
 
 import FormModal from "@pages/partial/FormModal";
-import ConfirmModal from "@pages/partial/ConfirmModal";
+import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import { ModuleSlug } from "@utils/Helper";
 import { useSession } from "next-auth/react";
 import DatatableActionButton from "@components/DatatableActionButton";
@@ -1452,7 +1452,7 @@ const CrmCampaigns = () => {
             sort_order: 0,
           });
         }}
-        size="lg"
+        size="xl"
         centered
       >
         <Modal.Header closeButton>
@@ -2163,17 +2163,20 @@ const CrmCampaigns = () => {
       </Modal> */}
 
 
-      <ConfirmModal
+      {/* Delete Campaign Modal */}
+      <DeleteConfirmationModal
         show={showDeleteModal}
-        onHide={() => setShowDeleteModal(false)}
-        title="Delete Campaign"
-        description={`Are you sure you want to delete the campaign ${selectedCampaign?.name}?`}
+        onHide={() => {
+          setShowDeleteModal(false);
+          setSelectedCampaign(null);
+        }}
         onConfirm={confirmDeleteCampaign}
-        targetName={selectedCampaign?.name}
-        confirmButtonText="Delete"
-        confirmButtonVariant="danger"
-        requireTextConfirmation={true}
-        requiredConfirmationText="delete"
+        itemName={selectedCampaign?.name}
+        itemType="campaign"
+        loading={loading}
+        additionalInfo={
+          <p className="text-muted small mb-0">This action will also delete all associated campaign fields.</p>
+        }
       />
 
 
