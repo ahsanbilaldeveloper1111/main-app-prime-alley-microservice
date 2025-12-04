@@ -66,7 +66,13 @@ const EditLead = () => {
     lead_potential: "",
     other_information: {} as Record<string, any>,
     campaign_field_values: {} as Record<string, any>,
-    contact_persons: [] as Array<{
+    contact_persons: [{
+      title: "",
+      name: "",
+      phone_country_code: "",
+      phone: "",
+      email: "",
+    }] as Array<{
       title: string;
       name: string;
       phone_country_code: string;
@@ -201,7 +207,16 @@ const EditLead = () => {
           lead_potential: leadDataAny.lead_potential || "",
           other_information: otherInformation,
           campaign_field_values: leadDataAny.campaign_field_values || {},
-          contact_persons: contactPersonsArray,
+          // Ensure at least one contact person exists
+          contact_persons: contactPersonsArray.length > 0 
+            ? contactPersonsArray 
+            : [{
+                title: "",
+                name: "",
+                phone_country_code: "",
+                phone: "",
+                email: "",
+              }],
         });
 
         // Fetch stages for the lead type
@@ -320,10 +335,16 @@ const EditLead = () => {
   };
 
   const removeContactPerson = (index: number) => {
-    setFormData((prev) => ({
-      ...prev,
-      contact_persons: prev.contact_persons.filter((_, i) => i !== index),
-    }));
+    setFormData((prev) => {
+      // Prevent deleting the last contact person
+      if (prev.contact_persons.length <= 1) {
+        return prev;
+      }
+      return {
+        ...prev,
+        contact_persons: prev.contact_persons.filter((_, i) => i !== index),
+      };
+    });
   };
 
   const updateContactPerson = (index: number, field: string, value: string) => {
@@ -422,6 +443,12 @@ const EditLead = () => {
     
     if (!formData.name) {
       toast.error("Please enter lead name");
+      return;
+    }
+    
+    // Validate at least one contact person exists
+    if (!formData.contact_persons || formData.contact_persons.length === 0) {
+      toast.error("Please add at least one contact person");
       return;
     }
     
@@ -961,7 +988,17 @@ const EditLead = () => {
                     {formStep === 2 && (
                       <Card className="border-0 bg-light">
                         <Card.Body>
-                          <h5 className="fw-bold mb-4 text-warning">CONTACT PERSONS</h5>
+                          <div className="d-flex justify-content-between align-items-center mb-4">
+                            <h5 className="fw-bold mb-0 text-warning">CONTACT PERSONS</h5>
+                            <Button
+                              variant="outline-primary"
+                              size="sm"
+                              onClick={addContactPerson}
+                            >
+                              <FiPlus className="me-1" size={14} />
+                              Add Contact Person
+                            </Button>
+                          </div>
                           {formData.contact_persons.map((person, index) => (
                             <Card key={`contact-person-${index}-${person.name || index}`} className="mb-3 border">
                               <Card.Body>
@@ -971,6 +1008,7 @@ const EditLead = () => {
                                     variant="outline-danger"
                                     size="sm"
                                     onClick={() => removeContactPerson(index)}
+                                    disabled={formData.contact_persons.length <= 1}
                                   >
                                     <X size={16} />
                                   </Button>
@@ -1056,14 +1094,6 @@ const EditLead = () => {
                               </Card.Body>
                             </Card>
                           ))}
-                          <Button
-                            variant="outline-primary"
-                            onClick={addContactPerson}
-                            className="w-100"
-                          >
-                            <FiPlus className="me-2" />
-                            Add Contact Person
-                          </Button>
                         </Card.Body>
                       </Card>
                     )}
