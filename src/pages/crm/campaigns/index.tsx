@@ -46,7 +46,6 @@ import {
   TrendingUp,
   AlertCircle,
   Target,
-  CheckSquare,
   Layers,
   ChevronLeft,
   ChevronRight,
@@ -267,7 +266,6 @@ const CrmCampaigns = () => {
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [activeFilter, setActiveFilter] = useState('all');
   const [campaignsSearch, setCampaignsSearch] = useState('');
-  const [selectedCampaigns, setSelectedCampaigns] = useState<number[]>([]);
   const [selectedCampaignsColumns, setSelectedCampaignsColumns] = useState<string[]>(() => {
     const saved = localStorage.getItem('campaignsSelectedColumns');
     return saved ? JSON.parse(saved) : ['name', 'status', 'dateRange', 'campaignUsers', 'created'];
@@ -1227,37 +1225,9 @@ const CrmCampaigns = () => {
         </Card>
       )}
 
-      {/* Bulk Actions and Column Customization */}
+      {/* Column Customization */}
       {session?.user?.permissions?.includes('list-crm-campaigns') && (
         <div className="d-flex justify-content-end gap-2 mb-3">
-          {selectedCampaigns.length > 0 && (
-            <Dropdown>
-              <Dropdown.Toggle variant="outline-primary" size="sm">
-                <CheckSquare size={16} className="me-2" />
-                Bulk Actions ({selectedCampaigns.length})
-              </Dropdown.Toggle>
-              <Dropdown.Menu align="end">
-                <Dropdown.Item 
-                  onClick={() => {
-                    setConfirmAction({
-                      type: 'delete',
-                      data: { 
-                        itemType: 'Campaigns', 
-                        name: `${selectedCampaigns.length} selected campaigns`,
-                        count: selectedCampaigns.length
-                      }
-                    });
-                    setShowConfirmDialog(true);
-                  }}
-                  className="d-flex align-items-center text-danger"
-                >
-                  <Trash2 size={14} className="me-2" />
-                  Delete Selected ({selectedCampaigns.length})
-                </Dropdown.Item>
-              </Dropdown.Menu>
-            </Dropdown>
-          )}
-
           <Dropdown>
             <Dropdown.Toggle variant="outline-secondary" size="sm">
               <Layers size={16} className="me-2" />
@@ -1308,56 +1278,6 @@ const CrmCampaigns = () => {
               <Table hover className="mb-0">
                 <thead className="bg-light">
                   <tr>
-                    <th style={{ width: '50px' }}>
-                      <Form.Check 
-                        type="checkbox"
-                        checked={(() => {
-                          let filteredCampaigns = campaignsData.filter(campaign => {
-                            if (activeFilter === 'active') return campaign.status === 'active';
-                            if (activeFilter === 'inactive') return campaign.status === 'inactive';
-                            
-                            const searchLower = campaignsSearch.toLowerCase();
-                            const matchesSearch = !campaignsSearch || 
-                              campaign.name?.toLowerCase().includes(searchLower) ||
-                              campaign.description?.toLowerCase().includes(searchLower);
-                            
-                            if (campaignFilters.status.length > 0 && !campaignFilters.status.includes(campaign.status)) return false;
-                            
-                            return matchesSearch;
-                          });
-                          
-                          const sorted = sortData(filteredCampaigns, campaignsPagination.sortColumn, campaignsPagination.sortDirection);
-                          const paginated = paginateData(sorted, campaignsPagination.currentPage, campaignsPagination.rowsPerPage);
-                          return paginated.length > 0 && paginated.every((campaign: any) => selectedCampaigns.includes(campaign.id));
-                        })()}
-                        onChange={(e) => {
-                          let filteredCampaigns = campaignsData.filter(campaign => {
-                            if (activeFilter === 'active') return campaign.status === 'active';
-                            if (activeFilter === 'inactive') return campaign.status === 'inactive';
-                            
-                            const searchLower = campaignsSearch.toLowerCase();
-                            const matchesSearch = !campaignsSearch || 
-                              campaign.name?.toLowerCase().includes(searchLower) ||
-                              campaign.description?.toLowerCase().includes(searchLower);
-                            
-                            if (campaignFilters.status.length > 0 && !campaignFilters.status.includes(campaign.status)) return false;
-                            
-                            return matchesSearch;
-                          });
-                          
-                          const sorted = sortData(filteredCampaigns, campaignsPagination.sortColumn, campaignsPagination.sortDirection);
-                          const paginated = paginateData(sorted, campaignsPagination.currentPage, campaignsPagination.rowsPerPage);
-                          
-                          if (e.target.checked) {
-                            const newIds = paginated.map((campaign: any) => campaign.id).filter((id: number) => !selectedCampaigns.includes(id));
-                            setSelectedCampaigns([...selectedCampaigns, ...newIds]);
-                          } else {
-                            const paginatedIds = paginated.map((campaign: any) => campaign.id);
-                            setSelectedCampaigns(selectedCampaigns.filter(id => !paginatedIds.includes(id)));
-                          }
-                        }}
-                      />
-                    </th>
                     {selectedCampaignsColumns.includes('name') && (
                       <th 
                         style={{ cursor: 'pointer' }}
@@ -1428,7 +1348,7 @@ const CrmCampaigns = () => {
                     if (filteredCampaigns.length === 0) {
                       return (
                         <tr>
-                          <td colSpan={selectedCampaignsColumns.length + 2} className="text-center py-4 text-muted">
+                          <td colSpan={selectedCampaignsColumns.length + 1} className="text-center py-4 text-muted">
                             No campaigns found matching your criteria
                           </td>
                         </tr>
@@ -1437,19 +1357,6 @@ const CrmCampaigns = () => {
                     
                     return paginated.map((campaign) => (
                       <tr key={campaign.id}>
-                        <td>
-                          <Form.Check 
-                            type="checkbox"
-                            checked={selectedCampaigns.includes(campaign.id)}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setSelectedCampaigns([...selectedCampaigns, campaign.id]);
-                              } else {
-                                setSelectedCampaigns(selectedCampaigns.filter(id => id !== campaign.id));
-                              }
-                            }}
-                          />
-                        </td>
                         {selectedCampaignsColumns.includes('name') && (
                           <td>
                             <div>
@@ -2300,41 +2207,6 @@ const CrmCampaigns = () => {
         requiredConfirmationText="delete"
       />
 
-      {/* Bulk Delete Confirmation */}
-      {confirmAction && confirmAction.type === 'delete' && (
-        <ConfirmModal
-          show={showConfirmDialog}
-          onHide={() => {
-            setShowConfirmDialog(false);
-            setConfirmAction(null);
-          }}
-          title={`Delete ${confirmAction.data.itemType}`}
-          description={`Are you sure you want to delete ${confirmAction.data.name}?`}
-          onConfirm={async () => {
-            try {
-              setLoading(true);
-              for (const id of selectedCampaigns) {
-                await deleteCampaign(id);
-              }
-              setSelectedCampaigns([]);
-              setShowConfirmDialog(false);
-              setConfirmAction(null);
-              toast.success(`${selectedCampaigns.length} campaign(s) deleted successfully!`);
-              setRefreshKey((prev) => prev + 1);
-            } catch (error) {
-              console.error("Failed to delete campaigns:", error);
-              toast.error("Failed to delete campaigns");
-            } finally {
-              setLoading(false);
-            }
-          }}
-          targetName={confirmAction.data.name}
-          confirmButtonText="Delete"
-          confirmButtonVariant="danger"
-          requireTextConfirmation={true}
-          requiredConfirmationText="delete"
-        />
-      )}
 
 
 

@@ -354,6 +354,7 @@ const LostReasonsManagement = () => {
         desc="Please fill in the details below to create a new lost reason."
         submitButtonText="Create Lost Reason"
         cancelButtonText="Cancel"
+        size="lg"
         onSubmit={() => { 
           const mockEvent = { preventDefault: () => {} } as React.FormEvent;
           handleCreateSubmit(mockEvent); 
@@ -413,6 +414,7 @@ const LostReasonsManagement = () => {
         desc="Please update the details below for this lost reason."
         submitButtonText="Update Lost Reason"
         cancelButtonText="Cancel"
+        size="lg"
         onSubmit={() => { 
           const mockEvent = { preventDefault: () => {} } as React.FormEvent;
           handleUpdateReason(mockEvent); 

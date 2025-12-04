@@ -49,10 +49,6 @@ import {
   MoreVertical,
   X,
   Users,
-  PlusCircle,
-  CheckSquare,
-  Zap,
-  Star,
   Clock,
   Search,
   Filter,
@@ -71,11 +67,8 @@ import {
   User,
   History,
   FileText,
-  Hash,
   GitBranch,
   DollarSign,
-  MessageSquare,
-  Send,
   UserCheck,
   AlertCircle,
 } from 'lucide-react';
@@ -284,7 +277,6 @@ const CrmLeads = () => {
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [activeFilter, setActiveFilter] = useState('all');
   const [leadsSearch, setLeadsSearch] = useState('');
-  const [selectedLeads, setSelectedLeads] = useState<number[]>([]);
   const [showLeadViewModal, setShowLeadViewModal] = useState(false);
   const [viewingLead, setViewingLead] = useState<any>(null);
   const [loadingLead, setLoadingLead] = useState(false);
@@ -324,15 +316,8 @@ const CrmLeads = () => {
   });
   const [leadsPagination, setLeadsPagination] = useState({ currentPage: 1, rowsPerPage: 10, sortColumn: '', sortDirection: 'asc' as 'asc' | 'desc' });
   const [leadsFilters, setLeadsFilters] = useState({
-    assignedTo: [] as string[],
-    industry: [] as string[],
-    stage: [] as string[],
-    source: [] as string[],
-    potential: [] as string[],
-    campaign: [] as string[],
-    dateRange: [] as string[],
-    dateRangeCustomStart: '',
-    dateRangeCustomEnd: ''
+    assignedTo: null as string | null,
+    stage: null as string | null,
   });
 
   // Fetch stages and extensions on component mount
@@ -350,18 +335,21 @@ const CrmLeads = () => {
       const params: any = {
         page,
         per_page: perPage,
-        ...(currentFilters || {}),
       };
 
-      // Use search from filters if available, otherwise use the search parameter
-        const searchTerm = currentFilters.search || search || leadsSearch;
-      if (searchTerm) {
-        params.search = searchTerm;
+      // Use search from currentFilters if available, otherwise use the search parameter
+      if (currentFilters.search) {
+        params.search = currentFilters.search;
+      } else if (search) {
+        params.search = search;
       }
 
       // Add filter parameters at top level
       if (currentFilters.stage_id) {
         params.stage_id = currentFilters.stage_id;
+      }
+      if (currentFilters.assigned_to) {
+        params.assigned_to = currentFilters.assigned_to;
       }
       if (currentFilters.is_lost !== undefined) {
         params.is_lost = currentFilters.is_lost;
@@ -402,13 +390,79 @@ const CrmLeads = () => {
     [currentFilters, leadsSearch] // Add currentFilters and leadsSearch as dependencies
   );
 
+  // Handle activeFilter changes to update currentFilters and stage dropdown
+  useEffect(() => {
+    if (activeFilter === 'all') {
+      setCurrentFilters((prev) => {
+        const newFilters = { ...prev };
+        delete newFilters.stage_id;
+        return newFilters;
+      });
+      // Clear stage dropdown
+      setLeadsFilters(prev => ({
+        ...prev,
+        stage: null
+      }));
+    } else if (activeFilter && stages.length > 0) {
+      // Find stage by id (activeFilter should be stage id as string)
+      const selectedStage = stages.find((s: any) => s.id.toString() === activeFilter);
+      if (selectedStage) {
+        setCurrentFilters((prev) => ({
+          ...prev,
+          stage_id: selectedStage.id.toString(),
+        }));
+        // Auto-fill stage dropdown
+        setLeadsFilters(prev => ({
+          ...prev,
+          stage: selectedStage.id.toString()
+        }));
+      }
+    }
+  }, [activeFilter, stages]);
+
   useEffect(() => {
     fetchLeads(leadsPagination.currentPage, leadsPagination.rowsPerPage, leadsSearch);
   }, [refreshKey, currentFilters, leadsPagination.currentPage, leadsPagination.rowsPerPage, fetchLeads]);
 
   // Handle filter changes
   const handleFiltersChange = useCallback((filters: Record<string, any>) => {
-    setCurrentFilters(filters);
+    setCurrentFilters((prev) => {
+      const newFilters = { ...prev };
+      
+      // Handle stage_id filter (single value)
+      if ('stage_id' in filters) {
+        if (filters.stage_id) {
+          newFilters.stage_id = String(filters.stage_id);
+        } else {
+          delete newFilters.stage_id;
+        }
+      }
+      
+      // Handle assigned_to filter (single value)
+      if ('assigned_to' in filters) {
+        if (filters.assigned_to) {
+          newFilters.assigned_to = String(filters.assigned_to);
+        } else {
+          delete newFilters.assigned_to;
+        }
+      }
+      
+      // Handle search
+      if ('search' in filters) {
+        if (filters.search) {
+          newFilters.search = filters.search;
+        } else {
+          delete newFilters.search;
+        }
+      }
+      
+      // Handle is_lost filter
+      if ('is_lost' in filters) {
+        newFilters.is_lost = filters.is_lost;
+      }
+      
+      return newFilters;
+    });
     setRefreshKey((prev) => prev + 1);
   }, []);
 
@@ -958,73 +1012,26 @@ const CrmLeads = () => {
     })
   };
 
-  // Filter and transform leads data
+  // Transform leads data (no client-side filtering - API handles it)
   const filteredLeads = useMemo(() => {
-    const transformed = leadsData.map(transformLeadData);
-    
-    return transformed.filter(lead => {
-      // Quick filters
-      if (activeFilter === 'new') {
-        if (lead.stage !== 'New' && !lead.stage?.toLowerCase().includes('new')) return false;
-      } else if (activeFilter === 'qualified') {
-        if (lead.stage !== 'Qualified' && !lead.stage?.toLowerCase().includes('qualified')) return false;
-      } else if (activeFilter === 'hot') {
-        if (lead.leadPotential !== 'Hot') return false;
-      } else if (activeFilter === 'high-score') {
-        // Removed high-score filter
-        return false;
-      } else if (activeFilter === 'follow-up') {
-        if (!lead.followUps || lead.followUps.length === 0) return false;
-        // Check for scheduled or pending follow-ups
-        const hasScheduled = lead.followUps.some((f: any) => {
-          const status = f.follow_up_status || f.status;
-          return status === 'Scheduled' || status === 'Pending' || status === 'scheduled' || status === 'pending';
-        });
-        if (!hasScheduled) return false;
-      } else if (activeFilter === 'lost') {
-        if (!lead.isLost) return false;
-      }
+    return leadsData.map(transformLeadData);
+  }, [leadsData, extensions]);
 
-      // Search filter
-      const matchesSearch = !leadsSearch || !leadsSearch.trim() ||
-        (lead.name && lead.name.toLowerCase().includes(leadsSearch.toLowerCase())) ||
-        (lead.company && lead.company.toLowerCase().includes(leadsSearch.toLowerCase())) ||
-        (lead.email && lead.email.toLowerCase().includes(leadsSearch.toLowerCase()));
-
-      // Advanced filters
-      const matchesAssignedTo = leadsFilters.assignedTo.length === 0 || leadsFilters.assignedTo.includes(lead.assignedUser);
-      const matchesIndustry = leadsFilters.industry.length === 0 || leadsFilters.industry.includes(lead.industry);
-      const matchesStage = leadsFilters.stage.length === 0 || leadsFilters.stage.includes(lead.stage);
-      const matchesSource = leadsFilters.source.length === 0 || leadsFilters.source.includes(lead.source);
-      const matchesPotential = leadsFilters.potential.length === 0 || leadsFilters.potential.includes(lead.leadPotential);
-      const matchesCampaign = leadsFilters.campaign.length === 0;
-      const matchesDateRange = leadsFilters.dateRange.length === 0;
-
-      return matchesSearch && matchesAssignedTo && matchesIndustry && matchesStage && 
-        matchesSource && matchesPotential && matchesCampaign && 
-        matchesDateRange;
-    });
-  }, [leadsData, activeFilter, leadsSearch, leadsFilters, extensions]);
-
-  // Calculate filter counts
+  // Calculate filter counts (using summary_tiles if available, otherwise from data)
   const filterCounts = useMemo(() => {
     const transformed = leadsData.map(transformLeadData);
-    return {
-      all: transformed.length,
-      new: transformed.filter(l => l.stage === 'New' || l.stage?.toLowerCase().includes('new')).length,
-      qualified: transformed.filter(l => l.stage === 'Qualified' || l.stage?.toLowerCase().includes('qualified')).length,
-      hot: transformed.filter(l => l.leadPotential === 'Hot').length,
-      // Removed highScore filter count
-      followUp: transformed.filter(l => {
-        if (!l.followUps || l.followUps.length === 0) return false;
-        return l.followUps.some((f: any) => {
-          const status = f.follow_up_status || f.status;
-          return status === 'Scheduled' || status === 'Pending' || status === 'scheduled' || status === 'pending';
-        });
-      }).length,
-      lost: transformed.filter(l => l.isLost).length
+    const counts: Record<string, number> = {
+      all: summaryTiles?.total_leads || totalLeads || transformed.length,
     };
-  }, [leadsData, extensions]);
+    
+    // Add counts for first 5 stages
+    stages.slice(0, 5).forEach((stage: any) => {
+      const stageLeads = transformed.filter(l => l.stage === stage.name || l.rawData?.stage_id === stage.id);
+      counts[stage.id] = stageLeads.length;
+    });
+    
+    return counts;
+  }, [leadsData, extensions, stages, summaryTiles, totalLeads]);
 
   if (!session?.user?.permissions?.includes('list-crm-leads')) {
     return null;
@@ -1164,66 +1171,36 @@ const CrmLeads = () => {
               activeColor: '#0d6efd',
               icon: <Users size={16} />
             },
-            {
-              id: 'new',
-              label: 'New',
-              count: filterCounts.new,
-              color: '#dc3545',
+            ...stages.slice(0, 5).map((stage: any) => ({
+              id: stage.id.toString(),
+              label: stage.name,
+              count: filterCounts[stage.id] || 0,
+              color: stage.color || '#6c757d',
               activeColor: '#0d6efd',
-              icon: <PlusCircle size={16} />
-            },
-            {
-              id: 'qualified',
-              label: 'Qualified',
-              count: filterCounts.qualified,
-              color: '#0d6efd',
-              activeColor: '#0d6efd',
-              icon: <CheckSquare size={16} />
-            },
-            {
-              id: 'hot',
-              label: 'Hot Leads',
-              count: filterCounts.hot,
-              color: '#fd7e14',
-              activeColor: '#0d6efd',
-              icon: <Zap size={16} />
-            },
-            {
-              id: 'follow-up',
-              label: 'Follow-up Due',
-              count: filterCounts.followUp,
-              color: '#ffc107',
-              activeColor: '#0d6efd',
-              icon: <Clock size={16} />
-            },
-            {
-              id: 'lost',
-              label: 'Lost',
-              count: filterCounts.lost,
-              color: '#dc3545',
-              activeColor: '#0d6efd',
-              icon: <X size={16} />
-            }
+              icon: <Layers size={16} />
+            }))
           ]}
           activeFilter={activeFilter}
-          onFilterChange={(filterId) => setActiveFilter(filterId)}
+          onFilterChange={(filterId) => {
+            setActiveFilter(filterId);
+            setLeadsPagination({ ...leadsPagination, currentPage: 1 });
+          }}
           searchValue={leadsSearch}
           onSearchChange={(value) => setLeadsSearch(value)}
           onSearch={() => {
+            if (leadsSearch.trim()) {
+              handleFiltersChange({ search: leadsSearch.trim() });
+            } else {
+              handleFiltersChange({ search: null });
+            }
             setLeadsPagination({ ...leadsPagination, currentPage: 1 });
-            setRefreshKey(prev => prev + 1);
           }}
           searchPlaceholder="Search leads by name, company, email..."
           showAdvancedFilters={showAdvancedFilters}
           onToggleAdvancedFilters={() => setShowAdvancedFilters(!showAdvancedFilters)}
           advancedFilterCount={
-            leadsFilters.assignedTo.length +
-            leadsFilters.industry.length +
-            leadsFilters.stage.length +
-            leadsFilters.source.length +
-            leadsFilters.potential.length +
-            leadsFilters.campaign.length +
-            leadsFilters.dateRange.length
+            (leadsFilters.assignedTo !== null ? 1 : 0) +
+            (leadsFilters.stage !== null ? 1 : 0)
           }
         />
 
@@ -1232,120 +1209,94 @@ const CrmLeads = () => {
           <Card className="border-0 shadow-sm mb-4">
             <Card.Body>
               <Row className="g-3 align-items-end">
-                <Col md={2}>
+                <Col md={4}>
                   <Form.Label className="small fw-bold mb-2">Assigned To</Form.Label>
                   <Select
-                    isMulti
                     options={extensions.map((ext: any) => ({ 
-                      value: ext.display_name || ext.name || ext.id, 
-                      label: ext.display_name || ext.name || ext.id 
+                      value: ext.id || ext.extension, 
+                      label: ext.display_name || ext.name || ext.id || ext.extension
                     }))}
-                    value={leadsFilters.assignedTo.map(u => ({ value: u, label: u }))}
+                    value={leadsFilters.assignedTo ? (() => {
+                      const assignedToId = leadsFilters.assignedTo;
+                      const ext = extensions.find((e: any) => (e.id || e.extension) === assignedToId);
+                      return ext ? { 
+                        value: assignedToId, 
+                        label: ext.display_name || ext.name || assignedToId 
+                      } : { value: assignedToId, label: assignedToId };
+                    })() : null}
                     onChange={(selected) => {
+                      const assignedToValue = selected ? selected.value : null;
                       setLeadsFilters(prev => ({
                         ...prev,
-                        assignedTo: selected ? selected.map(s => s.value) : []
+                        assignedTo: assignedToValue
                       }));
+                      // Update currentFilters for API call
+                      handleFiltersChange({ 
+                        assigned_to: assignedToValue || null 
+                      });
+                      // Reset to all when assigned filter changes
+                      setActiveFilter('all');
                     }}
-                    placeholder="Select users..."
+                    placeholder="Select user..."
                     styles={customSelectStyles}
+                    isClearable
                   />
                 </Col>
-                <Col md={2}>
-                  <Form.Label className="small fw-bold mb-2">Industry</Form.Label>
-                  <Select
-                    isMulti
-                    options={Array.from(new Set(leadsData.map(l => l.industry).filter(Boolean))).map(i => ({ value: i, label: i }))}
-                    value={leadsFilters.industry.map(i => ({ value: i, label: i }))}
-                    onChange={(selected) => {
-                      setLeadsFilters(prev => ({
-                        ...prev,
-                        industry: selected ? selected.map(s => s.value) : []
-                      }));
-                    }}
-                    placeholder="Select industries..."
-                    styles={customSelectStyles}
-                  />
-                </Col>
-                <Col md={2}>
+                <Col md={4}>
                   <Form.Label className="small fw-bold mb-2">Stages</Form.Label>
                   <Select
-                    isMulti
-                    options={stages.map(s => ({ value: s.name, label: s.name }))}
-                    value={leadsFilters.stage.map(s => ({ value: s, label: s }))}
+                    options={stages.map(s => ({ value: s.id.toString(), label: s.name }))}
+                    value={leadsFilters.stage ? (() => {
+                      const stageId = leadsFilters.stage;
+                      const stage = stages.find((st: any) => st.id.toString() === stageId);
+                      return stage ? { value: stageId, label: stage.name } : { value: stageId, label: stageId };
+                    })() : null}
                     onChange={(selected) => {
+                      const stageValue = selected ? selected.value : null;
                       setLeadsFilters(prev => ({
                         ...prev,
-                        stage: selected ? selected.map(s => s.value) : []
+                        stage: stageValue
                       }));
+                      // Update currentFilters for API call
+                      handleFiltersChange({ 
+                        stage_id: stageValue || null 
+                      });
+                      // Update activeFilter to match selected stage
+                      if (stageValue) {
+                        setActiveFilter(stageValue);
+                      } else {
+                        setActiveFilter('all');
+                      }
                     }}
-                    placeholder="Select stages..."
+                    placeholder="Select stage..."
                     styles={customSelectStyles}
+                    isClearable
                   />
                 </Col>
-                <Col md={2}>
-                  <Form.Label className="small fw-bold mb-2">Source</Form.Label>
-                  <Select
-                    isMulti
-                    options={Array.from(new Set(leadsData.map(l => l.source).filter(Boolean))).map(s => ({ value: s, label: s }))}
-                    value={leadsFilters.source.map(s => ({ value: s, label: s }))}
-                    onChange={(selected) => {
-                      setLeadsFilters(prev => ({
-                        ...prev,
-                        source: selected ? selected.map(s => s.value) : []
-                      }));
-                    }}
-                    placeholder="Select sources..."
-                    styles={customSelectStyles}
-                  />
-                </Col>
-                <Col md={2}>
-                  <Form.Label className="small fw-bold mb-2">Lead Potential</Form.Label>
-                  <Select
-                    isMulti
-                    options={[
-                      { value: 'Hot', label: 'Hot' },
-                      { value: 'Warm', label: 'Warm' },
-                      { value: 'Cold', label: 'Cold' }
-                    ]}
-                    value={leadsFilters.potential.map(p => ({ value: p, label: p }))}
-                    onChange={(selected) => {
-                      setLeadsFilters(prev => ({
-                        ...prev,
-                        potential: selected ? selected.map(s => s.value) : []
-                      }));
-                    }}
-                    placeholder="Select potential..."
-                    styles={customSelectStyles}
-                  />
-                </Col>
-                <Col md={2}>
+                <Col md={4}>
                   <div className="d-flex gap-2">
                     <Button
                       variant="primary"
                       className="flex-grow-1 d-flex align-items-center justify-content-center"
                       onClick={() => {
                         setLeadsPagination({ ...leadsPagination, currentPage: 1 });
+                        setRefreshKey(prev => prev + 1);
                       }}
                     >
-                      Apply
+                      Apply Filters
                     </Button>
                     <Button
                       variant="outline-secondary"
                       className="d-flex align-items-center justify-content-center"
                       onClick={() => {
                         setLeadsFilters({
-                          assignedTo: [],
-                          industry: [],
-                          stage: [],
-                          source: [],
-                          potential: [],
-                          campaign: [],
-                          dateRange: [],
-                          dateRangeCustomStart: '',
-                          dateRangeCustomEnd: ''
+                          assignedTo: null,
+                          stage: null,
                         });
+                        setCurrentFilters({});
+                        setActiveFilter('all');
                         setLeadsPagination({ ...leadsPagination, currentPage: 1 });
+                        setRefreshKey(prev => prev + 1);
                       }}
                     >
                       Reset
@@ -1357,36 +1308,8 @@ const CrmLeads = () => {
           </Card>
         )}
 
-        {/* Bulk Actions and Column Customization */}
+        {/* Column Customization */}
         <div className="d-flex justify-content-end gap-2 mb-3">
-          {selectedLeads.length > 0 && (
-            <Dropdown>
-              <Dropdown.Toggle variant="outline-primary" size="sm">
-                <CheckSquare size={16} className="me-2" />
-                Bulk Actions ({selectedLeads.length})
-              </Dropdown.Toggle>
-              <Dropdown.Menu align="end">
-                <Dropdown.Item 
-                  onClick={() => {
-                    // For bulk delete, we'll need to handle multiple IDs
-                    // For now, just show the delete modal - you may want to enhance this
-                    if (selectedLeads.length === 1) {
-                      setLeadToDelete({ id: selectedLeads[0] });
-                      setShowDeleteModal(true);
-                    } else {
-                      // Handle bulk delete - you may want to create a separate handler
-                      toast.info(`Bulk delete for ${selectedLeads.length} leads - implement bulk delete handler`);
-                    }
-                  }}
-                  className="d-flex align-items-center text-danger"
-                >
-                  <Trash2 size={14} className="me-2" />
-                  Delete Selected ({selectedLeads.length})
-                </Dropdown.Item>
-              </Dropdown.Menu>
-            </Dropdown>
-          )}
-
           <Dropdown>
             <Dropdown.Toggle variant="outline-secondary" size="sm">
               <Layers size={16} className="me-2" />
@@ -1448,19 +1371,6 @@ const CrmLeads = () => {
               <Table hover className="mb-0">
                 <thead className="bg-light">
                   <tr>
-                    <th style={{ width: '50px' }}>
-                      <Form.Check
-                        type="checkbox"
-                        checked={filteredLeads.length > 0 && filteredLeads.every(l => selectedLeads.includes(l.id))}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setSelectedLeads(filteredLeads.map(l => l.id));
-                          } else {
-                            setSelectedLeads([]);
-                          }
-                        }}
-                      />
-                    </th>
                     {selectedLeadsColumns.includes('name') && (
                       <th 
                         style={{ cursor: 'pointer', userSelect: 'none' }}
@@ -1534,32 +1444,19 @@ const CrmLeads = () => {
                 <tbody>
                   {loading ? (
                     <tr>
-                      <td colSpan={selectedLeadsColumns.length + 2} className="text-center py-4">
+                      <td colSpan={selectedLeadsColumns.length + 1} className="text-center py-4">
                         Loading...
                       </td>
                     </tr>
                   ) : filteredLeads.length === 0 ? (
                     <tr>
-                      <td colSpan={selectedLeadsColumns.length + 2} className="text-center py-4 text-muted">
+                      <td colSpan={selectedLeadsColumns.length + 1} className="text-center py-4 text-muted">
                         No leads found matching your criteria
                       </td>
                     </tr>
                   ) : (
                     sortData(filteredLeads, leadsPagination.sortColumn, leadsPagination.sortDirection).map((lead) => (
                       <tr key={lead.id}>
-                        <td>
-                          <Form.Check
-                            type="checkbox"
-                            checked={selectedLeads.includes(lead.id)}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setSelectedLeads([...selectedLeads, lead.id]);
-                              } else {
-                                setSelectedLeads(selectedLeads.filter(id => id !== lead.id));
-                              }
-                            }}
-                          />
-                        </td>
                         {selectedLeadsColumns.includes('name') && (
                           <td className="fw-semibold">{lead.name}</td>
                         )}
@@ -1719,6 +1616,7 @@ const CrmLeads = () => {
         onHide={() => setShowConvertModal(false)}
         title="Convert lead to opportunity"
         desc="Please fill in the details below to convert the lead to an opportunity."
+        size="lg"
         formHtml={
           <>
           <Form>
@@ -1822,6 +1720,7 @@ const CrmLeads = () => {
         onHide={() => setShowMarkLostModal(false)}
         title="Mark lead as lost"
         desc="Please fill in the details below to mark the lead as lost."
+        size="lg"
         formHtml={
           <>
           <Form.Group className="mb-3">

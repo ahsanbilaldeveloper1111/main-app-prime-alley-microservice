@@ -295,6 +295,7 @@ export const routePermissions: RoutePermission[] = [
             { path: '/opportunities/create',permissions: [PERMISSIONS.CREATE_CRM_OPPORTUNITIES]},
             { path: '/stages',permissions: [PERMISSIONS.VIEW_CRM_STAGES]},
             { path: '/tasks',permissions: [PERMISSIONS.VIEW_CRM_STAGES]},
+            { path: '/products',permissions: [PERMISSIONS.VIEW_CRM_STAGES]},
         ]
     },
     

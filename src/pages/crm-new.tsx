@@ -70,7 +70,9 @@ import {
   Info,
   Paperclip,
   Upload,
-  Download as DownloadIcon
+  MapPin,
+  Download as DownloadIcon,
+  SlidersHorizontal
 } from 'lucide-react';
 import { 
   PieChart, 
@@ -83,7 +85,11 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-  Legend
+  Legend,
+  LineChart,
+  Line,
+  Area,
+  AreaChart
 } from 'recharts';
 import "@assets/scss/ticketsnew.scss";
 // Types
@@ -773,6 +779,7 @@ const CRMPortal = () => {
   const [campaignsPagination, setCampaignsPagination] = useState({ currentPage: 1, rowsPerPage: 10, sortColumn: '', sortDirection: 'asc' as 'asc' | 'desc' });
   const [tasksPagination, setTasksPagination] = useState({ currentPage: 1, rowsPerPage: 10, sortColumn: '', sortDirection: 'asc' as 'asc' | 'desc' });
   const [stagesPagination, setStagesPagination] = useState({ currentPage: 1, rowsPerPage: 10, sortColumn: '', sortDirection: 'asc' as 'asc' | 'desc' });
+  const [productsPagination, setProductsPagination] = useState({ currentPage: 1, rowsPerPage: 10, sortColumn: '', sortDirection: 'asc' as 'asc' | 'desc' });
 
   // Search States for all pages
   const [prospectsSearch, setProspectsSearch] = useState('');
@@ -782,6 +789,7 @@ const CRMPortal = () => {
   const [campaignsSearch, setCampaignsSearch] = useState('');
   const [tasksSearch, setTasksSearch] = useState('');
   const [stagesSearch, setStagesSearch] = useState('');
+  const [productsSearch, setProductsSearch] = useState('');
 
   // Advanced Filters State
   const [prospectsFilters, setProspectsFilters] = useState({
@@ -838,6 +846,51 @@ const CRMPortal = () => {
     urgency: [] as string[],
     assignedTo: [] as string[]
   });
+
+  const [productsFilters, setProductsFilters] = useState({
+    category: [] as string[],
+    brand: [] as string[],
+    status: [] as string[],
+    priceMin: '',
+    priceMax: ''
+  });
+
+  // Products States
+  const [showProductModal, setShowProductModal] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<any>(null);
+  const [selectedProducts, setSelectedProducts] = useState<number[]>([]);
+  const [selectedProductsColumns, setSelectedProductsColumns] = useState<string[]>(() => {
+    const saved = localStorage.getItem('productsSelectedColumns');
+    return saved ? JSON.parse(saved) : ['productName', 'sku', 'price', 'category', 'brand', 'status'];
+  });
+  const [productFormData, setProductFormData] = useState({
+    productName: '',
+    sku: '',
+    price: '',
+    currency: 'USD',
+    category: '',
+    brand: '',
+    isActive: true,
+    description: ''
+  });
+  const [deletingProduct, setDeletingProduct] = useState<any>(null);
+  const [showProductDeleteModal, setShowProductDeleteModal] = useState(false);
+  const [productDeleteConfirmText, setProductDeleteConfirmText] = useState('');
+  const [showProductViewModal, setShowProductViewModal] = useState(false);
+  const [viewingProduct, setViewingProduct] = useState<any>(null);
+
+  // Reports Page States
+  const [selectedReportModule, setSelectedReportModule] = useState('leads');
+  const [selectedDateRange, setSelectedDateRange] = useState('last-30-days');
+  const [customDateFrom, setCustomDateFrom] = useState('');
+  const [customDateTo, setCustomDateTo] = useState('');
+  const [selectedReportStages, setSelectedReportStages] = useState<string[]>([]);
+  const [selectedReportUsers, setSelectedReportUsers] = useState<string[]>([]);
+  const [selectedReportStatus, setSelectedReportStatus] = useState<string[]>([]);
+  const [selectedReportPriority, setSelectedReportPriority] = useState<string[]>([]);
+  const [selectedReportCategories, setSelectedReportCategories] = useState<string[]>([]);
+  const [reportGroupBy, setReportGroupBy] = useState('date');
+  const [reportChartType, setReportChartType] = useState('line');
 
   // View/Edit/Delete Modals
   const [showLeadViewModal, setShowLeadViewModal] = useState(false);
@@ -1499,7 +1552,7 @@ const CRMPortal = () => {
             data={orderApprovalData}
             cx="50%"
             cy="50%"
-            outerRadius="55%"
+            outerRadius="100%"
             dataKey="value"
             // label={({ name, value }) => `${name}: ${value}`}
             // labelLine={{ stroke: '#666', strokeWidth: 1 }}
@@ -1526,8 +1579,8 @@ const CRMPortal = () => {
             data={orderFulfillmentData}
             cx="50%"
             cy="50%"
-            innerRadius="35%"
-            outerRadius="55%"
+            innerRadius="60%"
+            outerRadius="100%"
             dataKey="value"
             // label={({ name, value }) => `${name}: ${value}`}
             // labelLine={{ stroke: '#666', strokeWidth: 1 }}
@@ -1556,7 +1609,7 @@ const CRMPortal = () => {
   {/* Leads by Stage */}
   <Col lg={6} className="mb-4">
     <Card className="border-0 shadow-sm">
-      <Card.Body style={{minHeight: '344px'}}>
+      <Card.Body style={{minHeight: '337px'}}>
         <h5 className="mb-4 fw-bold">Leads by Stage</h5>
         {leadsByStage.map((item, index) => (
           <div key={index} className="mb-3">
@@ -1623,7 +1676,7 @@ const CRMPortal = () => {
             <Card className="border-0 shadow-sm">
               <Card.Body>
                 <div className="d-flex justify-content-between align-items-center mb-4">
-                  <h5 className="mb-0 fw-bold" style={{ color: '#2c3e50' }}>Recent Opportunities</h5>
+                  <h5 className="mb-0 fw-bold" style={{ color: '#2c3e50' }}>Recent Deals</h5>
                   <Button variant="link" size="sm" className="text-decoration-none" onClick={() => setActiveScreen('deals')}>
                     View All →
                   </Button>
@@ -17484,109 +17537,443 @@ const CRMPortal = () => {
 
       // Sample timeline data for the selected record
       const timelineData = [
-        { date: '2025-11-29 14:20', action: 'Stage Changed', description: `Moved to ${selectedActivityRecord.stage}`, user: selectedActivityRecord.agent, icon: <ArrowRight size={16} />, color: 'primary' },
-        { date: '2025-11-28 10:15', action: 'Call Made', description: 'Initial discovery call completed', user: selectedActivityRecord.agent, icon: <Phone size={16} />, color: 'info' },
-        { date: '2025-11-27 16:30', action: 'Email Sent', description: 'Follow-up email sent', user: selectedActivityRecord.agent, icon: <Mail size={16} />, color: 'secondary' },
-        { date: '2025-11-26 09:00', action: 'Meeting Scheduled', description: 'Demo meeting scheduled', user: selectedActivityRecord.agent, icon: <Calendar size={16} />, color: 'warning' },
-        { date: '2025-11-25 14:45', action: 'Note Added', description: 'Requirements documented', user: selectedActivityRecord.agent, icon: <FileText size={16} />, color: 'secondary' },
-        { date: '2025-11-24 11:20', action: 'Record Created', description: `${selectedActivityRecord.type} record created`, user: 'System', icon: <PlusCircle size={16} />, color: 'success' },
+        { date: 'Today', time: '10:35 AM', action: 'Callback scheduled for tomorrow at 4 PM.', user: selectedActivityRecord.agent, icon: <Phone size={20} />, iconBg: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', iconColor: '#fff', actionType: 'call' },
+        { date: 'Today', time: '10:30 AM', action: 'Call completed (Interested). Sent catalog.', user: selectedActivityRecord.agent, icon: <FileText size={20} />, iconBg: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)', iconColor: '#fff', actionType: 'document' },
+        { date: 'Yesterday', time: '4:15 PM', action: `Stage updated: Prospect → ${selectedActivityRecord.stage}.`, user: selectedActivityRecord.agent, icon: <ArrowRight size={20} />, iconBg: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)', iconColor: '#fff', actionType: 'stage' },
+        { date: 'Yesterday', time: '3:40 PM', action: 'Note added: "Customer wants details."', user: selectedActivityRecord.agent, icon: <FileText size={20} />, iconBg: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)', iconColor: '#fff', actionType: 'note' },
+        { date: 'Dec 1, 2025', time: '2:20 PM', action: 'Email sent with product brochure.', user: selectedActivityRecord.agent, icon: <Mail size={20} />, iconBg: 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)', iconColor: '#fff', actionType: 'email' },
+        { date: 'Nov 30, 2025', time: '11:15 AM', action: `${selectedActivityRecord.type} record created.`, user: 'System', icon: <PlusCircle size={20} />, iconBg: 'linear-gradient(135deg, #30cfd0 0%, #330867 100%)', iconColor: '#fff', actionType: 'create' },
       ];
 
+      // Determine stage progress
+      const stages = [
+        { name: 'Prospect', icon: <Users size={20} />, color: '#9c27b0' },
+        { name: 'Lead', icon: <Target size={20} />, color: '#2196f3' },
+        { name: 'Deal', icon: <TrendingUp size={20} />, color: '#ff9800' },
+        { name: 'Order', icon: <ShoppingCart size={20} />, color: '#4caf50' }
+      ];
+      const currentStageIndex = stages.findIndex(s => s.name === selectedActivityRecord.stage);
+
       return (
-        <Modal show={showActivityTimelineModal} onHide={() => setShowActivityTimelineModal(false)} size="lg">
-          <Modal.Header closeButton className="border-0 pb-0">
-            <Modal.Title className="fw-bold">Activity Timeline</Modal.Title>
-          </Modal.Header>
-          <Modal.Body>
-            {/* Record Header */}
-            <Card className="border-0 shadow-sm mb-4" style={{ backgroundColor: '#f8f9fa' }}>
-              <Card.Body>
-                <Row>
-                  <Col md={6}>
-                    <div className="mb-2">
-                      <small className="text-muted d-block mb-1">Customer</small>
-                      <h6 className="mb-0 fw-bold">{selectedActivityRecord.customer}</h6>
-                    </div>
-                    <div className="mb-2">
-                      <small className="text-muted d-block mb-1">Type</small>
-                      <Badge bg="primary">{selectedActivityRecord.type}</Badge>
-                    </div>
-                  </Col>
-                  <Col md={6}>
-                    <div className="mb-2">
-                      <small className="text-muted d-block mb-1">Campaign</small>
-                      <div className="fw-semibold">{selectedActivityRecord.campaign}</div>
-                    </div>
-                    <div className="mb-2">
-                      <small className="text-muted d-block mb-1">Current Stage</small>
-                      <Badge bg="success">{selectedActivityRecord.stage}</Badge>
-                    </div>
-                  </Col>
-                </Row>
-              </Card.Body>
-            </Card>
-
-            {/* Timeline */}
-            <div className="position-relative">
-              {/* Vertical line */}
-              <div 
-                style={{
-                  position: 'absolute',
-                  left: '19px',
-                  top: '0',
-                  bottom: '0',
-                  width: '2px',
-                  backgroundColor: '#e0e0e0'
-                }}
-              />
-
-              {timelineData.map((item, index) => (
-                <div key={index} className="d-flex gap-3 mb-4 position-relative">
-                  {/* Timeline Icon */}
-                  <div 
-                    className={`rounded-circle d-flex align-items-center justify-content-center bg-${item.color} text-white position-relative`}
-                    style={{ 
-                      width: '40px', 
-                      height: '40px', 
-                      minWidth: '40px',
-                      zIndex: 1
-                    }}
-                  >
-                    {item.icon}
+        <Modal show={showActivityTimelineModal} onHide={() => setShowActivityTimelineModal(false)} size="xl" centered>
+          {/* Enhanced Header with Gradient */}
+          <Modal.Header closeButton style={{  color: '#000', padding: '24px 32px', borderBottom: '1px solid #ccc' }}>
+            <div className="w-100">
+              <div className="d-flex align-items-center justify-content-between">
+                <div>
+                  <Modal.Title className="fw-bold fs-3 mb-1">{selectedActivityRecord.customer}</Modal.Title>
+                  <div className="d-flex align-items-center gap-3 mt-2" style={{ fontSize: '14px', opacity: 0.95 }}>
+                    <span className="d-flex align-items-center gap-1">
+                      <Tag size={16} />
+                      {selectedActivityRecord.campaign}
+                    </span>
+                    <span>•</span>
+                    <span className="d-flex align-items-center gap-1">
+                      <Users size={16} />
+                      Assigned to {selectedActivityRecord.agent}
+                    </span>
                   </div>
-                  
-                  {/* Timeline Card */}
-                  <Card className="flex-grow-1 border-0 shadow-sm">
-                    <Card.Body className="p-3">
-                      <div className="d-flex justify-content-between align-items-start mb-2">
-                        <div>
-                          <h6 className="mb-1 fw-semibold">{item.action}</h6>
-                          <p className="mb-1 text-dark">{item.description}</p>
-                        </div>
-                        <Badge bg={item.color} className="bg-opacity-50">
-                          {item.action.split(' ')[0]}
-                        </Badge>
-                      </div>
-                      <div className="d-flex justify-content-between align-items-center text-muted small">
-                        <span>
-                          <Users size={14} className="me-1" />
-                          {item.user}
-                        </span>
-                        <span>
-                          <Clock size={14} className="me-1" />
-                          {item.date}
-                        </span>
-                      </div>
-                    </Card.Body>
-                  </Card>
                 </div>
-              ))}
+                {/* <div className="text-end">
+                  <Badge bg="light" text="dark" className="px-3 py-2" style={{ fontSize: '13px', fontWeight: 600 }}>
+                    {selectedActivityRecord.type}
+                  </Badge>
+                </div> */}
+              </div>
             </div>
+          </Modal.Header>
+          
+          <Modal.Body style={{ backgroundColor: '#f8f9fc', padding: '32px' }}>
+            <Row className="g-4">
+              {/* Left Column - Stage Progress & Activity Timeline */}
+              <Col lg={8}>
+                {/* Enhanced Stage Progress with Better Highlighting */}
+                <Card className="border-0 mb-4" style={{ boxShadow: '0 4px 20px rgba(0,0,0,0.08)', borderRadius: '16px', overflow: 'hidden' }}>
+                  <Card.Body className="p-4" style={{ background: 'linear-gradient(to bottom, #ffffff 0%, #f8f9fc 100%)' }}>
+                    <div className="d-flex align-items-center justify-content-between mb-4">
+                      <h5 className="fw-bold mb-0 d-flex align-items-center gap-2">
+                        <TrendingUp size={22} className="text-primary" />
+                        Stage Progress
+                      </h5>
+                      <Badge bg="primary" className="px-3 py-2">
+                        {currentStageIndex + 1} of {stages.length}
+                      </Badge>
+                    </div>
+                    
+                    <div className="position-relative" style={{ padding: '32px 0' }}>
+                      {/* Background Progress Bar */}
+                      <div 
+                        style={{
+                          position: 'absolute',
+                          top: '50%',
+                          left: '10%',
+                          right: '10%',
+                          height: '4px',
+                          backgroundColor: '#e3e8ef',
+                          borderRadius: '4px',
+                          transform: 'translateY(-50%)',
+                          zIndex: 0
+                        }}
+                      />
+                      {/* Filled Progress Bar */}
+                      <div 
+                        style={{
+                          position: 'absolute',
+                          top: '50%',
+                          left: '10%',
+                          width: currentStageIndex > 0 ? `${(currentStageIndex / (stages.length - 1)) * 80}%` : '0%',
+                          height: '4px',
+                          background: 'linear-gradient(90deg, #667eea 0%, #764ba2 100%)',
+                          borderRadius: '4px',
+                          transform: 'translateY(-50%)',
+                          zIndex: 0,
+                          transition: 'width 0.5s ease',
+                          boxShadow: '0 2px 8px rgba(102, 126, 234, 0.4)'
+                        }}
+                      />
+                      
+                      {/* Stage Items */}
+                      <div className="d-flex justify-content-between align-items-center position-relative" style={{ zIndex: 1 }}>
+                        {stages.map((stage, idx) => {
+                          const isCompleted = idx < currentStageIndex;
+                          const isCurrent = idx === currentStageIndex;
+                          const isUpcoming = idx > currentStageIndex;
+                          
+                          return (
+                            <div 
+                              key={stage.name} 
+                              className="d-flex flex-column align-items-center"
+                              style={{ flex: 1 }}
+                            >
+                              {/* Stage Circle */}
+                              <div 
+                                className="rounded-circle d-flex align-items-center justify-content-center mb-2 position-relative"
+                                style={{ 
+                                  width: isCurrent ? '64px' : '52px', 
+                                  height: isCurrent ? '64px' : '52px',
+                                  background: isCurrent 
+                                    ? `linear-gradient(135deg, ${stage.color} 0%, ${stage.color}dd 100%)`
+                                    : isCompleted 
+                                      ? stage.color 
+                                      : '#e3e8ef',
+                                  color: (isCurrent || isCompleted) ? '#fff' : '#9ca3af',
+                                  transition: 'all 0.3s ease',
+                                  boxShadow: isCurrent 
+                                    ? `0 8px 24px ${stage.color}66` 
+                                    : isCompleted 
+                                      ? `0 4px 12px ${stage.color}44`
+                                      : 'none',
+                                  transform: isCurrent ? 'scale(1.05)' : 'scale(1)',
+                                  border: isCurrent ? `4px solid ${stage.color}33` : 'none'
+                                }}
+                              >
+                                {isCompleted && !isCurrent ? (
+                                  <Check size={24} strokeWidth={3} />
+                                ) : (
+                                  stage.icon
+                                )}
+                                
+                                {/* Pulse Animation for Current Stage */}
+                                {isCurrent && (
+                                  <>
+                                    <div 
+                                      className="position-absolute rounded-circle"
+                                      style={{
+                                        width: '100%',
+                                        height: '100%',
+                                        background: stage.color,
+                                        opacity: 0.3,
+                                        animation: 'pulse 2s ease-in-out infinite'
+                                      }}
+                                    />
+                                    <style>{`
+                                      @keyframes pulse {
+                                        0%, 100% { transform: scale(1); opacity: 0.3; }
+                                        50% { transform: scale(1.2); opacity: 0; }
+                                      }
+                                    `}</style>
+                                  </>
+                                )}
+                              </div>
+                              
+                              {/* Stage Label */}
+                              <span 
+                                className="fw-semibold text-center"
+                                style={{ 
+                                  fontSize: isCurrent ? '15px' : '13px',
+                                  color: isCurrent ? stage.color : isCompleted ? '#374151' : '#9ca3af',
+                                  transition: 'all 0.3s ease',
+                                  fontWeight: isCurrent ? 700 : 600
+                                }}
+                              >
+                                {stage.name}
+                              </span>
+                              
+                              {/* Current Stage Badge */}
+                              {isCurrent && (
+                                <Badge 
+                                  className="mt-1"
+                                  style={{ 
+                                    backgroundColor: `${stage.color}22`,
+                                    color: stage.color,
+                                    fontSize: '11px',
+                                    padding: '4px 10px',
+                                    fontWeight: 600
+                                  }}
+                                >
+                                  CURRENT
+                                </Badge>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </Card.Body>
+                </Card>
+
+                {/* Enhanced Activity Timeline */}
+                <Card className="border-0" style={{ boxShadow: '0 4px 20px rgba(0,0,0,0.08)', borderRadius: '16px' }}>
+                  <Card.Body className="p-4">
+                    <h5 className="fw-bold mb-4 d-flex align-items-center gap-2">
+                      <Clock size={22} className="text-primary" />
+                      Activity Timeline
+                    </h5>
+                    <div className="position-relative" style={{ paddingLeft: '56px' }}>
+                      {/* Gradient Timeline Line */}
+                      <div 
+                        style={{
+                          position: 'absolute',
+                          left: '30px',
+                          top: '0',
+                          bottom: '20px',
+                          width: '3px',
+                          background: 'linear-gradient(180deg, #667eea 0%, #764ba2 100%)',
+                          borderRadius: '3px',
+                          opacity: 0.2
+                        }}
+                      />
+
+                      {timelineData.map((item, index) => (
+                        <div 
+                          key={index} 
+                          className="position-relative mb-4 pb-3"
+                          style={{
+                            transition: 'transform 0.2s ease',
+                            cursor: 'pointer'
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.transform = 'translateX(4px)'}
+                          onMouseLeave={(e) => e.currentTarget.style.transform = 'translateX(0)'}
+                        >
+                          {/* Enhanced Timeline Icon */}
+                          <div 
+                            className="rounded-circle d-flex align-items-center justify-content-center position-absolute"
+                            style={{ 
+                              width: '60px', 
+                              height: '60px',
+                              left: '-56px',
+                              top: '0',
+                              background: item.iconBg,
+                              border: '4px solid #fff',
+                              boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
+                              transition: 'all 0.3s ease',
+                              color:'#fff'
+                            }}
+                          >
+                            {item.icon}
+                          </div>
+                          
+                          {/* Timeline Content Card */}
+                          <Card 
+                            className="border-0"
+                            style={{ 
+                              backgroundColor: '#fff',
+                              borderLeft: '3px solid #667eea22',
+                              boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+                              transition: 'all 0.2s ease'
+                            }}
+                          >
+                            <Card.Body className="p-3">
+                              <div className="d-flex align-items-center justify-content-between mb-2">
+                                <div className="d-flex align-items-center gap-2">
+                                  <Badge 
+                                    bg="light" 
+                                    text="dark" 
+                                    className="d-flex align-items-center gap-1"
+                                    style={{ fontSize: '12px', fontWeight: 600 }}
+                                  >
+                                    <Calendar size={12} />
+                                    {item.date}
+                                  </Badge>
+                                  <Badge 
+                                    bg="light" 
+                                    text="muted"
+                                    style={{ fontSize: '12px', fontWeight: 500 }}
+                                  >
+                                    <Clock size={12} className="me-1" />
+                                    {item.time}
+                                  </Badge>
+                                </div>
+                                <Badge 
+                                  bg="light" 
+                                  text="muted"
+                                  className="d-flex align-items-center gap-1"
+                                  style={{ fontSize: '11px' }}
+                                >
+                                  <Users size={11} />
+                                  {item.user}
+                                </Badge>
+                              </div>
+                              <p 
+                                className="mb-0 fw-medium text-dark" 
+                                style={{ fontSize: '15px', lineHeight: '1.6' }}
+                              >
+                                {item.action}
+                              </p>
+                            </Card.Body>
+                          </Card>
+                        </div>
+                      ))}
+                    </div>
+                  </Card.Body>
+                </Card>
+              </Col>
+
+              {/* Right Column - Enhanced Info Cards */}
+              <Col lg={4}>
+                {/* Next Action with Icon */}
+                <Card className="border-0 mb-3" style={{ boxShadow: '0 4px 20px rgba(0,0,0,0.08)', borderRadius: '16px', overflow: 'hidden' }}>
+                  <div style={{ height: '4px', background: 'linear-gradient(90deg, #f093fb 0%, #f5576c 100%)' }} />
+                  <Card.Body className="p-4">
+                    <h6 className="fw-bold mb-3 d-flex align-items-center gap-2">
+                      <div 
+                        className="rounded-circle d-flex align-items-center justify-content-center"
+                        style={{ width: '32px', height: '32px', background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)' }}
+                      >
+                        <Phone size={16} color="#fff" />
+                      </div>
+                      Next Action
+                    </h6>
+                    <div className="mb-3">
+                      <small className="text-muted d-block mb-1" style={{ fontSize: '12px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Callback</small>
+                      <div className="text-dark fw-semibold" style={{ fontSize: '15px' }}>Tomorrow 4 PM</div>
+                    </div>
+                    <div>
+                      <small className="text-muted d-block mb-2" style={{ fontSize: '12px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Status</small>
+                      <Badge 
+                        style={{ 
+                          fontSize: '13px', 
+                          padding: '8px 16px',
+                         
+                          border: 'none',
+                          fontWeight: 600
+                        }}
+                      >
+                        Pending
+                      </Badge>
+                    </div>
+                  </Card.Body>
+                </Card>
+
+                {/* Customer Info */}
+                <Card className="border-0 mb-3" style={{ boxShadow: '0 4px 20px rgba(0,0,0,0.08)', borderRadius: '16px', overflow: 'hidden' }}>
+                  <div style={{ height: '4px', background: 'linear-gradient(90deg, #4facfe 0%, #00f2fe 100%)' }} />
+                  <Card.Body className="p-4">
+                    <h6 className="fw-bold mb-3 d-flex align-items-center gap-2">
+                      <div 
+                        className="rounded-circle d-flex align-items-center justify-content-center"
+                        style={{ width: '32px', height: '32px', background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)' }}
+                      >
+                        <Users size={16} color="#fff" />
+                      </div>
+                      Customer Info
+                    </h6>
+                    <div className="mb-3">
+                      <small className="text-muted d-block mb-1" style={{ fontSize: '12px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Name</small>
+                      <div className="text-dark fw-semibold" style={{ fontSize: '15px' }}>{selectedActivityRecord.customer}</div>
+                    </div>
+                    <div className="mb-3">
+                      <small className="text-muted d-block mb-1" style={{ fontSize: '12px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Phone</small>
+                      <div className="text-dark fw-medium d-flex align-items-center gap-2" style={{ fontSize: '14px' }}>
+                        <Phone size={14} className="text-primary" />
+                        +91 98765 43210
+                      </div>
+                    </div>
+                    <div className="mb-3">
+                      <small className="text-muted d-block mb-1" style={{ fontSize: '12px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>City</small>
+                      <div className="text-dark fw-medium d-flex align-items-center gap-2" style={{ fontSize: '14px' }}>
+                        <MapPin size={14} className="text-primary" />
+                        Mumbai
+                      </div>
+                    </div>
+                    <div>
+                      <small className="text-muted d-block mb-1" style={{ fontSize: '12px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Last Updated</small>
+                      <div className="text-dark fw-medium" style={{ fontSize: '14px' }}>Today</div>
+                    </div>
+                  </Card.Body>
+                </Card>
+
+                {/* Agent Info */}
+                <Card className="border-0" style={{ boxShadow: '0 4px 20px rgba(0,0,0,0.08)', borderRadius: '16px', overflow: 'hidden' }}>
+                  <div style={{ height: '4px', background: 'linear-gradient(90deg, #43e97b 0%, #38f9d7 100%)' }} />
+                  <Card.Body className="p-4">
+                    <h6 className="fw-bold mb-3 d-flex align-items-center gap-2">
+                      <div 
+                        className="rounded-circle d-flex align-items-center justify-content-center"
+                        style={{ width: '32px', height: '32px', background: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)' }}
+                      >
+                        <Users size={16} color="#fff" />
+                      </div>
+                      Agent Info
+                    </h6>
+                    <div className="d-flex align-items-center gap-3">
+                      <div 
+                        className="rounded-circle d-flex align-items-center justify-content-center fw-bold text-white"
+                        style={{ 
+                          width: '48px', 
+                          height: '48px',
+                          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                          fontSize: '18px'
+                        }}
+                      >
+                        {selectedActivityRecord.agent.charAt(0)}
+                      </div>
+                      <div>
+                        <div className="text-dark fw-semibold" style={{ fontSize: '15px' }}>{selectedActivityRecord.agent}</div>
+                        <small className="text-muted">Sales Representative</small>
+                      </div>
+                    </div>
+                  </Card.Body>
+                </Card>
+              </Col>
+            </Row>
           </Modal.Body>
-          <Modal.Footer className="border-0">
-            <Button variant="secondary" onClick={() => setShowActivityTimelineModal(false)}>
-              Close
-            </Button>
+          
+          <Modal.Footer className="border-0" style={{ backgroundColor: '#f8f9fc', padding: '20px 32px' }}>
+            <div className="d-flex gap-2 w-100 justify-content-end">
+              <Button 
+                variant="outline-secondary" 
+                onClick={() => setShowActivityTimelineModal(false)}
+                style={{ paddingLeft: '24px', paddingRight: '24px', borderRadius: '8px', fontWeight: 600 }}
+              >
+                Close
+              </Button>
+              <Button 
+                onClick={() => setShowActivityTimelineModal(false)}
+                style={{ 
+                  paddingLeft: '24px', 
+                  paddingRight: '24px',
+                  borderRadius: '8px',
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  border: 'none',
+                  fontWeight: 600,
+                  boxShadow: '0 4px 12px rgba(102, 126, 234, 0.4)'
+                }}
+              >
+                <TrendingUp size={18} className="me-2" />
+                Change Stage
+              </Button>
+            </div>
           </Modal.Footer>
         </Modal>
       );
@@ -17900,7 +18287,646 @@ const CRMPortal = () => {
   };
 
   // Reports Screen
-  const renderReports = () => {
+  // NEW COMPREHENSIVE REPORTING COMPONENT
+  const renderReportsNew = () => {
+    // Report modules configuration
+    const reportModules = [
+      { id: 'leads', label: 'Leads Reports', icon: <Target size={18} />, color: '#0d6efd' },
+      { id: 'deals', label: 'Deals Reports', icon: <Handshake size={18} />, color: '#198754' },
+      { id: 'orders', label: 'Orders Reports', icon: <ShoppingBag size={18} />, color: '#ffc107' },
+      { id: 'activities', label: 'Activity Reports', icon: <Activity size={18} />, color: '#dc3545' },
+      { id: 'prospects', label: 'Prospects Reports', icon: <Users size={18} />, color: '#6f42c1' },
+      // { id: 'campaigns', label: 'Campaign Reports', icon: <Megaphone size={18} />, color: '#fd7e14' },
+      // { id: 'products', label: 'Products Reports', icon: <Package size={18} />, color: '#20c997' },
+      // { id: 'overall', label: 'Overall Performance', icon: <BarChart3 size={18} />, color: '#0dcaf0' }
+    ];
+
+    // Dynamic filter options based on selected module
+    const getFilterOptions = () => {
+      switch (selectedReportModule) {
+        case 'leads':
+          return {
+            stages: ['New', 'Contacted', 'Qualified', 'Negotiation', 'Won', 'Lost'],
+            users: ['Sarah Williams', 'John Doe', 'Jane Smith', 'Mike Johnson', 'Tom Brown'],
+            status: ['Active', 'Inactive', 'Converted'],
+            priority: ['Hot', 'Warm', 'Cold'],
+            metrics: ['Total Leads', 'Conversion Rate', 'Lead Score', 'Response Time', 'Follow-ups']
+          };
+        case 'deals':
+          return {
+            stages: ['Proposal', 'Negotiation', 'Closed Won', 'Closed Lost'],
+            users: ['Sarah Williams', 'John Doe', 'Jane Smith', 'Mike Johnson'],
+            status: ['Active', 'Closed', 'On Hold'],
+            priority: ['High', 'Medium', 'Low'],
+            metrics: ['Total Deals', 'Deal Value', 'Win Rate', 'Avg Deal Size', 'Sales Cycle']
+          };
+        case 'orders':
+          return {
+            stages: ['Pending', 'Processing', 'Shipped', 'Delivered', 'Cancelled'],
+            users: ['Sarah Williams', 'John Doe', 'Jane Smith'],
+            status: ['Pending', 'Completed', 'Cancelled'],
+            priority: ['Urgent', 'Normal', 'Low'],
+            metrics: ['Total Orders', 'Revenue', 'Avg Order Value', 'Fulfillment Time']
+          };
+        case 'activities':
+          return {
+            categories: ['Call', 'Email', 'Meeting', 'Task', 'Follow-up', 'Note'],
+            users: ['Sarah Williams', 'John Doe', 'Jane Smith', 'Mike Johnson', 'Tom Brown'],
+            status: ['Completed', 'Pending', 'Overdue'],
+            priority: ['High', 'Medium', 'Low'],
+            metrics: ['Total Activities', 'Completion Rate', 'Avg Response Time', 'Activities per Lead']
+          };
+        case 'prospects':
+          return {
+            stages: ['New', 'Contacted', 'Qualified', 'Unqualified'],
+            users: ['Sarah Williams', 'John Doe', 'Jane Smith', 'Mike Johnson', 'Tom Brown'],
+            status: ['Active', 'Inactive'],
+            priority: ['Hot', 'Warm', 'Cold'],
+            metrics: ['Total Prospects', 'Qualification Rate', 'Contact Rate', 'Lead Conversion']
+          };
+        case 'campaigns':
+          return {
+            stages: ['Planning', 'Active', 'Paused', 'Completed'],
+            users: ['Sarah Williams', 'John Doe', 'Jane Smith'],
+            status: ['Active', 'Inactive', 'Completed'],
+            priority: ['High', 'Medium', 'Low'],
+            metrics: ['Total Campaigns', 'ROI', 'Lead Generation', 'Conversion Rate', 'Cost per Lead']
+          };
+        // case 'products':
+        //   return {
+        //     categories: ['Electronics', 'Clothing', 'Footwear', 'Accessories', 'Home & Garden', 'Sports'],
+        //     users: ['All Users'],
+        //     status: ['Active', 'Inactive'],
+        //     priority: ['Featured', 'Regular'],
+        //     metrics: ['Total Products', 'Sales Volume', 'Revenue', 'Top Sellers', 'Inventory']
+        //   };
+        // case 'overall':
+        //   return {
+        //     stages: ['All Stages'],
+        //     users: ['All Users', 'Sarah Williams', 'John Doe', 'Jane Smith', 'Mike Johnson', 'Tom Brown'],
+        //     status: ['All Status'],
+        //     priority: ['All Priorities'],
+        //     metrics: ['Revenue', 'Conversions', 'Pipeline Value', 'Win Rate', 'Growth Rate']
+        //   };
+        default:
+          return {
+            stages: [],
+            users: [],
+            status: [],
+            priority: [],
+            metrics: []
+          };
+      }
+    };
+
+    const filterOptions = getFilterOptions();
+
+    // Sample report data (would be dynamically generated based on filters)
+    const getReportData = () => {
+      // This would fetch real data based on selected filters
+      return {
+        summary: {
+          totalRecords: 156,
+          //growthRate: 23.5,
+          avgValue: 14800,
+          completionRate: 67.8
+        },
+        chartData: [
+          { date: '2025-11-01', value: 12, label: 'Nov 1' },
+          { date: '2025-11-08', value: 18, label: 'Nov 8' },
+          { date: '2025-11-15', value: 15, label: 'Nov 15' },
+          { date: '2025-11-22', value: 24, label: 'Nov 22' },
+          { date: '2025-11-29', value: 28, label: 'Nov 29' },
+          { date: '2025-12-03', value: 32, label: 'Dec 3' }
+        ],
+        tableData: [
+          { id: 1, name: 'John Doe', stage: 'Qualified', value: 25000, date: '2025-11-15', status: 'Active' },
+          { id: 2, name: 'Jane Smith', stage: 'Negotiation', value: 18000, date: '2025-11-18', status: 'Active' },
+          { id: 3, name: 'Bob Wilson', stage: 'New', value: 12000, date: '2025-11-20', status: 'Active' },
+          { id: 4, name: 'Alice Brown', stage: 'Won', value: 32000, date: '2025-11-25', status: 'Closed' },
+          { id: 5, name: 'Charlie Davis', stage: 'Contacted', value: 15000, date: '2025-11-28', status: 'Active' }
+        ]
+      };
+    };
+
+    const reportData = getReportData();
+
+    return (
+      <div>
+        {/* Header */}
+        <div className="mb-4">
+          <h2 className="mb-2 fw-bold">Advanced CRM Reports</h2>
+          <p className="text-muted mb-0">Generate comprehensive reports with dynamic filters and real-time insights</p>
+        </div>
+
+        {/* Report Module Selection */}
+        <Card className="border-0 shadow-sm mb-4">
+          <Card.Body className="p-4">
+            <div className="d-flex align-items-center gap-2 mb-3">
+              <BarChart3 size={20} className="text-primary" />
+              <h5 className="mb-0 fw-bold">Select Report Module</h5>
+            </div>
+            <Row className="g-3">
+              {reportModules.map((module) => (
+                // <Col lg={3} md={4} sm={6} key={module.id}>
+                <Col lg={2} md={4} sm={6} xs={12} className="custom-col" key={module.id}>
+                  
+                  <div
+                    onClick={() => {
+                      setSelectedReportModule(module.id);
+                      setSelectedReportStages([]);
+                      setSelectedReportUsers([]);
+                      setSelectedReportStatus([]);
+                      setSelectedReportPriority([]);
+                      setSelectedReportCategories([]);
+                    }}
+                    style={{
+                      padding: '16px',
+                      borderRadius: '12px',
+                      border: selectedReportModule === module.id ? `2px solid ${module.color}` : '2px solid #e5e7eb',
+                      background: selectedReportModule === module.id ? `${module.color}15` : 'white',
+                      cursor: 'pointer',
+                      transition: 'all 0.3s',
+                      height: '100%'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (selectedReportModule !== module.id) {
+                        e.currentTarget.style.borderColor = module.color;
+                        e.currentTarget.style.transform = 'translateY(-2px)';
+                        e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (selectedReportModule !== module.id) {
+                        e.currentTarget.style.borderColor = '#e5e7eb';
+                        e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.boxShadow = 'none';
+                      }
+                    }}
+                  >
+                    <div className="d-flex align-items-center gap-3">
+                      <div style={{
+                        width: '48px',
+                        height: '48px',
+                        borderRadius: '10px',
+                        background: module.color,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: 'white'
+                      }}>
+                        {module.icon}
+                      </div>
+                      <div>
+                        <div style={{ 
+                          fontWeight: 600, 
+                          fontSize: '14px',
+                          color: selectedReportModule === module.id ? module.color : '#1f2937'
+                        }}>
+                          {module.label}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </Col>
+              ))}
+            </Row>
+          </Card.Body>
+        </Card>
+
+        {/* Filters Section */}
+        <Card className="border-0 shadow-sm mb-4">
+          <Card.Body className="p-4">
+            <div className="d-flex align-items-center gap-2 mb-3">
+              <SlidersHorizontal size={20} className="text-primary" />
+              <h5 className="mb-0 fw-bold">Report Filters</h5>
+            </div>
+
+            {/* Date Range Filter */}
+            <Row className="g-3 mb-3">
+              <Col md={12}>
+                <Form.Label className="fw-semibold small text-muted">DATE RANGE</Form.Label>
+                <div className="d-flex gap-2 flex-wrap">
+                  {[
+                    { id: 'today', label: 'Today' },
+                    { id: 'yesterday', label: 'Yesterday' },
+                    { id: 'last-7-days', label: 'Last 7 Days' },
+                    { id: 'last-30-days', label: 'Last 30 Days' },
+                    { id: 'this-month', label: 'This Month' },
+                    { id: 'last-month', label: 'Last Month' },
+                    { id: 'this-quarter', label: 'This Quarter' },
+                    { id: 'this-year', label: 'This Year' },
+                    { id: 'custom', label: 'Custom Range' }
+                  ].map((range) => (
+                    <Button
+                      key={range.id}
+                      size="sm"
+                      variant={selectedDateRange === range.id ? 'primary' : 'outline-secondary'}
+                      onClick={() => setSelectedDateRange(range.id)}
+                      className="d-flex align-items-center gap-1"
+                    >
+                      <Calendar size={14} />
+                      {range.label}
+                    </Button>
+                  ))}
+                </div>
+              </Col>
+              
+              {selectedDateRange === 'custom' && (
+                <>
+                  <Col md={6}>
+                    <Form.Label className="fw-semibold small">From Date</Form.Label>
+                    <Form.Control
+                      type="date"
+                      value={customDateFrom}
+                      onChange={(e) => setCustomDateFrom(e.target.value)}
+                    />
+                  </Col>
+                  <Col md={6}>
+                    <Form.Label className="fw-semibold small">To Date</Form.Label>
+                    <Form.Control
+                      type="date"
+                      value={customDateTo}
+                      onChange={(e) => setCustomDateTo(e.target.value)}
+                    />
+                  </Col>
+                </>
+              )}
+            </Row>
+
+            {/* Dynamic Filters Based on Module */}
+            <Row className="g-3">
+              {filterOptions.stages && filterOptions.stages.length > 0 && (
+                <Col md={3}>
+                  <Form.Label className="fw-semibold small text-muted">STAGES</Form.Label>
+                  <Select
+                    isMulti
+                    options={filterOptions.stages.map(s => ({ value: s, label: s }))}
+                    value={selectedReportStages.map(s => ({ value: s, label: s }))}
+                    onChange={(selected) => setSelectedReportStages(selected.map((s: any) => s.value))}
+                    placeholder="All Stages"
+                    styles={customSelectStyles}
+                  />
+                </Col>
+              )}
+
+              {filterOptions.users && filterOptions.users.length > 0 && (
+                <Col md={3}>
+                  <Form.Label className="fw-semibold small text-muted">ASSIGNED TO</Form.Label>
+                  <Select
+                    isMulti
+                    options={filterOptions.users.map(u => ({ value: u, label: u }))}
+                    value={selectedReportUsers.map(u => ({ value: u, label: u }))}
+                    onChange={(selected) => setSelectedReportUsers(selected.map((u: any) => u.value))}
+                    placeholder="All Users"
+                    styles={customSelectStyles}
+                  />
+                </Col>
+              )}
+
+              {filterOptions.status && filterOptions.status.length > 0 && (
+                <Col md={3}>
+                  <Form.Label className="fw-semibold small text-muted">STATUS</Form.Label>
+                  <Select
+                    isMulti
+                    options={filterOptions.status.map(s => ({ value: s, label: s }))}
+                    value={selectedReportStatus.map(s => ({ value: s, label: s }))}
+                    onChange={(selected) => setSelectedReportStatus(selected.map((s: any) => s.value))}
+                    placeholder="All Status"
+                    styles={customSelectStyles}
+                  />
+                </Col>
+              )}
+
+              {filterOptions.priority && filterOptions.priority.length > 0 && (
+                <Col md={3}>
+                  <Form.Label className="fw-semibold small text-muted">PRIORITY</Form.Label>
+                  <Select
+                    isMulti
+                    options={filterOptions.priority.map(p => ({ value: p, label: p }))}
+                    value={selectedReportPriority.map(p => ({ value: p, label: p }))}
+                    onChange={(selected) => setSelectedReportPriority(selected.map((p: any) => p.value))}
+                    placeholder="All Priorities"
+                    styles={customSelectStyles}
+                  />
+                </Col>
+              )}
+
+              {filterOptions.categories && filterOptions.categories.length > 0 && (
+                <Col md={3}>
+                  <Form.Label className="fw-semibold small text-muted">CATEGORIES</Form.Label>
+                  <Select
+                    isMulti
+                    options={filterOptions.categories.map(c => ({ value: c, label: c }))}
+                    value={selectedReportCategories.map(c => ({ value: c, label: c }))}
+                    onChange={(selected) => setSelectedReportCategories(selected.map((c: any) => c.value))}
+                    placeholder="All Categories"
+                    styles={customSelectStyles}
+                  />
+                </Col>
+              )}
+            </Row>
+
+            <div className="d-flex gap-2 mt-3">
+              <Button variant="primary" className="d-flex align-items-center gap-2">
+                <Filter size={16} />
+                Generate Report
+              </Button>
+              <Button variant="outline-secondary" className="d-flex align-items-center gap-2">
+                <RefreshCw size={16} />
+                Reset Filters
+              </Button>
+              <Button variant="outline-success" className="d-flex align-items-center gap-2 ms-auto">
+                <Download size={16} />
+                Export to Excel
+              </Button>
+              {/* <Button variant="outline-info" className="d-flex align-items-center gap-2">
+                <Download size={16} />
+                Export to PDF
+              </Button> */}
+            </div>
+          </Card.Body>
+        </Card>
+
+        {/* Summary Cards */}
+       
+
+{/* Detailed Data Table */}
+<Card className="border-0 shadow-sm">
+          <Card.Body className="p-0">
+            <div className="p-4 border-bottom">
+              <div className="d-flex justify-content-between align-items-center">
+                <h5 className="mb-0 fw-bold">Detailed Report Data</h5>
+                <div className="d-flex gap-2">
+                  <InputGroup size="sm" style={{ width: '250px' }}>
+                    <InputGroup.Text>
+                      <Search size={16} />
+                    </InputGroup.Text>
+                    <Form.Control placeholder="Search in results..." />
+                  </InputGroup>
+                  {/* <Button size="sm" variant="outline-secondary">
+                    <Filter size={16} />
+                  </Button> */}
+                </div>
+              </div>
+            </div>
+            
+            <div className="table-responsive">
+              <Table hover className="mb-0">
+                <thead className="bg-light">
+                  <tr>
+                    <th>
+                      <Form.Check type="checkbox" />
+                    </th>
+                    <th>Name</th>
+                    <th>Stage</th>
+                    <th>Value</th>
+                    <th>Date</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {reportData.tableData.map((row) => (
+                    <tr key={row.id}>
+                      <td>
+                        <Form.Check type="checkbox" />
+                      </td>
+                      <td className="fw-semibold">{row.name}</td>
+                      <td>
+                        <Badge bg="primary" className="bg-opacity-10 text-dark">
+                          {row.stage}
+                        </Badge>
+                      </td>
+                      <td className="fw-semibold text-success">${row.value.toLocaleString()}</td>
+                      <td className="text-muted">{row.date}</td>
+                      <td>
+                        <Badge bg={row.status === 'Active' ? 'success' : 'secondary'}>
+                          {row.status}
+                        </Badge>
+                      </td>
+                      <td>
+                        <div className="d-flex gap-1">
+                          <Button variant="link" size="sm" className="p-1" title="View">
+                            <Eye size={16} />
+                          </Button>
+                          {/* <Button variant="link" size="sm" className="p-1" title="Details">
+                            <Info size={16} />
+                          </Button> */}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </Table>
+            </div>
+
+            <div className="p-3 border-top">
+              <div className="d-flex justify-content-between align-items-center">
+                <div className="text-muted small">
+                  Showing {reportData.tableData.length} of {reportData.summary.totalRecords} records
+                </div>
+                <div className="d-flex gap-2">
+                  <Button size="sm" variant="outline-secondary">
+                    <ChevronLeft size={16} />
+                  </Button>
+                  <Button size="sm" variant="primary">1</Button>
+                  <Button size="sm" variant="outline-secondary">2</Button>
+                  <Button size="sm" variant="outline-secondary">3</Button>
+                  <Button size="sm" variant="outline-secondary">
+                    <ChevronRight size={16} />
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </Card.Body>
+        </Card>
+        {/* Chart and Visualization Options */}
+        <Card className="border-0 shadow-sm mb-4">
+          <Card.Body className="p-4">
+            <div className="d-flex justify-content-between align-items-center mb-3">
+              <h5 className="mb-0 fw-bold">Data Visualization</h5>
+              <div className="d-flex gap-2">
+                <Form.Select 
+                  size="sm" 
+                  style={{ width: 'auto' }}
+                  value={reportGroupBy}
+                  onChange={(e) => setReportGroupBy(e.target.value)}
+                >
+                  <option value="date">Group by Date</option>
+                  <option value="user">Group by User</option>
+                  <option value="stage">Group by Stage</option>
+                  <option value="status">Group by Status</option>
+                </Form.Select>
+                <Form.Select 
+                  size="sm" 
+                  style={{ width: 'auto' }}
+                  value={reportChartType}
+                  onChange={(e) => setReportChartType(e.target.value)}
+                >
+                  <option value="line">Line Chart</option>
+                  <option value="bar">Bar Chart</option>
+                  <option value="area">Area Chart</option>
+                  <option value="pie">Pie Chart</option>
+                </Form.Select>
+              </div>
+            </div>
+            
+            <ResponsiveContainer width="100%" height={350}>
+              <LineChart data={reportData.chartData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                <XAxis 
+                  dataKey="label" 
+                  stroke="#6b7280"
+                  style={{ fontSize: '12px' }}
+                />
+                <YAxis 
+                  stroke="#6b7280"
+                  style={{ fontSize: '12px' }}
+                />
+                <Tooltip 
+                  contentStyle={{
+                    background: 'white',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '8px',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                  }}
+                />
+                <Legend />
+                <Line 
+                  type="monotone" 
+                  dataKey="value" 
+                  stroke="#0d6efd" 
+                  strokeWidth={3}
+                  dot={{ fill: '#0d6efd', r: 5 }}
+                  activeDot={{ r: 7 }}
+                  name={`${reportModules.find(m => m.id === selectedReportModule)?.label || 'Records'}`}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </Card.Body>
+        </Card>
+
+        
+
+        {/* Insights and Recommendations */}
+        <Row className="mt-4">
+          <Col lg={6} className="mb-3">
+            <Card className="border-0 shadow-sm h-100">
+              <Card.Body className="p-4">
+                <div className="d-flex align-items-center gap-2 mb-3">
+                  <Zap size={20} className="text-warning" />
+                  <h5 className="mb-0 fw-bold">Key Insights</h5>
+                </div>
+                <div className="d-flex flex-column gap-3">
+                  <div className="d-flex gap-3">
+                    <div style={{
+                      width: '8px',
+                      height: '8px',
+                      borderRadius: '50%',
+                      background: '#0d6efd',
+                      marginTop: '6px',
+                      flexShrink: 0
+                    }} />
+                    <div>
+                      <p className="mb-1 fw-semibold">Peak Performance Period</p>
+                      <p className="text-muted small mb-0">Highest activity recorded between Nov 22 - Dec 3 with 28% increase</p>
+                    </div>
+                  </div>
+                  <div className="d-flex gap-3">
+                    <div style={{
+                      width: '8px',
+                      height: '8px',
+                      borderRadius: '50%',
+                      background: '#198754',
+                      marginTop: '6px',
+                      flexShrink: 0
+                    }} />
+                    <div>
+                      <p className="mb-1 fw-semibold">Top Performer</p>
+                      <p className="text-muted small mb-0">Sarah Williams leads with 34% of total conversions this period</p>
+                    </div>
+                  </div>
+                  <div className="d-flex gap-3">
+                    <div style={{
+                      width: '8px',
+                      height: '8px',
+                      borderRadius: '50%',
+                      background: '#ffc107',
+                      marginTop: '6px',
+                      flexShrink: 0
+                    }} />
+                    <div>
+                      <p className="mb-1 fw-semibold">Conversion Trend</p>
+                      <p className="text-muted small mb-0">Average deal size increased by 12.3% compared to previous period</p>
+                    </div>
+                  </div>
+                </div>
+              </Card.Body>
+            </Card>
+          </Col>
+
+          <Col lg={6} className="mb-3">
+            <Card className="border-0 shadow-sm h-100">
+              <Card.Body className="p-4">
+                <div className="d-flex align-items-center gap-2 mb-3">
+                  <Target size={20} className="text-danger" />
+                  <h5 className="mb-0 fw-bold">Recommendations</h5>
+                </div>
+                <div className="d-flex flex-column gap-3">
+                  <div className="d-flex gap-3">
+                    <div style={{
+                      width: '8px',
+                      height: '8px',
+                      borderRadius: '50%',
+                      background: '#dc3545',
+                      marginTop: '6px',
+                      flexShrink: 0
+                    }} />
+                    <div>
+                      <p className="mb-1 fw-semibold">Focus on High-Value Leads</p>
+                      <p className="text-muted small mb-0">15 leads with potential value over $20K require immediate attention</p>
+                    </div>
+                  </div>
+                  <div className="d-flex gap-3">
+                    <div style={{
+                      width: '8px',
+                      height: '8px',
+                      borderRadius: '50%',
+                      background: '#0dcaf0',
+                      marginTop: '6px',
+                      flexShrink: 0
+                    }} />
+                    <div>
+                      <p className="mb-1 fw-semibold">Follow-up Optimization</p>
+                      <p className="text-muted small mb-0">Average response time can be reduced by 30% with automated workflows</p>
+                    </div>
+                  </div>
+                  <div className="d-flex gap-3">
+                    <div style={{
+                      width: '8px',
+                      height: '8px',
+                      borderRadius: '50%',
+                      background: '#6f42c1',
+                      marginTop: '6px',
+                      flexShrink: 0
+                    }} />
+                    <div>
+                      <p className="mb-1 fw-semibold">Team Training</p>
+                      <p className="text-muted small mb-0">Consider sharing best practices from top performers with the team</p>
+                    </div>
+                  </div>
+                </div>
+              </Card.Body>
+            </Card>
+          </Col>
+        </Row>
+      </div>
+    );
+  };
+
+  // OLD REPORTS COMPONENT (COMMENTED OUT)
+  const renderReportsOld = () => {
     const conversionFunnelData = [
       { name: 'Prospects', value: 241, percentage: 100 },
       { name: 'Leads', value: 58, percentage: 24 },
@@ -18169,6 +19195,1003 @@ const CRMPortal = () => {
     );
   };
 
+  // Products Page Render Function
+  const renderProducts = () => {
+    // Sample products data
+    const productsData = [
+      { id: 1, productName: 'Premium T-Shirt', sku: 'TSH-001', price: 29.99, currency: 'USD', category: 'Clothing', brand: 'FashionBrand', status: 'Active', description: 'High-quality cotton t-shirt with premium finish', created: '2025-01-15' },
+      { id: 2, productName: 'Wireless Headphones', sku: 'HP-001', price: 89.99, currency: 'USD', category: 'Electronics', brand: 'TechCorp', status: 'Active', description: 'Noise-cancelling wireless headphones with 30hr battery', created: '2025-01-10' },
+      { id: 3, productName: 'Running Shoes', sku: 'SHOE-001', price: 79.99, currency: 'USD', category: 'Footwear', brand: 'SportsBrand', status: 'Active', description: 'Lightweight running shoes for maximum comfort', created: '2025-01-08' },
+      { id: 4, productName: 'Smart Watch', sku: 'WATCH-001', price: 199.99, currency: 'USD', category: 'Electronics', brand: 'TechCorp', status: 'Active', description: 'Feature-rich smartwatch with health tracking', created: '2025-01-05' },
+      { id: 5, productName: 'Denim Jeans', sku: 'JEAN-001', price: 49.99, currency: 'USD', category: 'Clothing', brand: 'FashionBrand', status: 'Inactive', description: 'Classic fit denim jeans in multiple washes', created: '2025-01-03' },
+      { id: 6, productName: 'Laptop Bag', sku: 'BAG-001', price: 39.99, currency: 'USD', category: 'Accessories', brand: 'TravelGear', status: 'Active', description: 'Durable laptop bag with multiple compartments', created: '2024-12-28' },
+    ];
+
+    // Filter logic
+    const filteredProducts = productsData.filter(product => {
+      const matchesSearch = !productsSearch || 
+        product.productName.toLowerCase().includes(productsSearch.toLowerCase()) ||
+        product.sku.toLowerCase().includes(productsSearch.toLowerCase()) ||
+        product.brand.toLowerCase().includes(productsSearch.toLowerCase());
+      
+      const matchesCategory = productsFilters.category.length === 0 || productsFilters.category.includes(product.category);
+      const matchesBrand = productsFilters.brand.length === 0 || productsFilters.brand.includes(product.brand);
+      const matchesStatus = productsFilters.status.length === 0 || productsFilters.status.includes(product.status);
+      
+      return matchesSearch && matchesCategory && matchesBrand && matchesStatus;
+    });
+
+    // Available columns
+    const availableColumns = [
+      { key: 'productName', label: 'Product Name' },
+      { key: 'sku', label: 'SKU' },
+      { key: 'price', label: 'Price' },
+      { key: 'currency', label: 'Currency' },
+      { key: 'category', label: 'Category' },
+      { key: 'brand', label: 'Brand' },
+      { key: 'status', label: 'Status' },
+      { key: 'description', label: 'Description' },
+      { key: 'created', label: 'Created Date' }
+    ];
+
+    // Quick filters for products
+    const productQuickFilters = [
+      { id: 'all', label: 'All Products', count: productsData.length },
+      { id: 'active', label: 'Active', count: productsData.filter(p => p.status === 'Active').length },
+      { id: 'inactive', label: 'Inactive', count: productsData.filter(p => p.status === 'Inactive').length }
+    ];
+
+    const handleOpenProductModal = (product?: any) => {
+      if (product) {
+        setEditingProduct(product);
+        setProductFormData({
+          productName: product.productName,
+          sku: product.sku,
+          price: product.price.toString(),
+          currency: product.currency,
+          category: product.category,
+          brand: product.brand,
+          isActive: product.status === 'Active',
+          description: product.description
+        });
+      } else {
+        setEditingProduct(null);
+        setProductFormData({
+          productName: '',
+          sku: '',
+          price: '',
+          currency: 'USD',
+          category: '',
+          brand: '',
+          isActive: true,
+          description: ''
+        });
+      }
+      setShowProductModal(true);
+    };
+
+    const handleProductSubmit = (e: React.FormEvent) => {
+      e.preventDefault();
+      console.log(editingProduct ? 'Updating product:' : 'Creating product:', productFormData);
+      setShowProductModal(false);
+    };
+
+    return (
+      <div>
+        {/* Product Form Modal */}
+        <Modal show={showProductModal} onHide={() => setShowProductModal(false)} size="lg" centered>
+          <Modal.Header closeButton className="border-0 pb-0">
+            <Modal.Title className="fw-bold">{editingProduct ? 'Edit Product' : 'Add New Product'}</Modal.Title>
+          </Modal.Header>
+          <Modal.Body>
+            <Form onSubmit={handleProductSubmit}>
+              <Row>
+                <Col md={6}>
+                  <Form.Group className="mb-3">
+                    <Form.Label className="fw-semibold">Product Name <span className="text-danger">*</span></Form.Label>
+                    <Form.Control
+                      type="text"
+                      value={productFormData.productName}
+                      onChange={(e) => setProductFormData({ ...productFormData, productName: e.target.value })}
+                      placeholder="Enter product name"
+                      required
+                    />
+                    <Form.Text className="text-muted">Enter a clear, descriptive name for your product</Form.Text>
+                  </Form.Group>
+                </Col>
+                <Col md={6}>
+                  <Form.Group className="mb-3">
+                    <Form.Label className="fw-semibold">SKU <span className="text-danger">*</span></Form.Label>
+                    <Form.Control
+                      type="text"
+                      value={productFormData.sku}
+                      onChange={(e) => setProductFormData({ ...productFormData, sku: e.target.value })}
+                      placeholder="Enter SKU"
+                      required
+                    />
+                    <Form.Text className="text-muted">Unique product identifier (e.g., PROD-001)</Form.Text>
+                  </Form.Group>
+                </Col>
+              </Row>
+
+              <Row>
+                <Col md={6}>
+                  <Form.Group className="mb-3">
+                    <Form.Label className="fw-semibold">Price <span className="text-danger">*</span></Form.Label>
+                    <Form.Control
+                      type="number"
+                      step="0.01"
+                      value={productFormData.price}
+                      onChange={(e) => setProductFormData({ ...productFormData, price: e.target.value })}
+                      placeholder="0.00"
+                      required
+                    />
+                    <Form.Text className="text-muted">Enter the base price (supports up to 2 decimal places)</Form.Text>
+                  </Form.Group>
+                </Col>
+                <Col md={6}>
+                  <Form.Group className="mb-3">
+                    <Form.Label className="fw-semibold">Currency</Form.Label>
+                    <Form.Select
+                      value={productFormData.currency}
+                      onChange={(e) => setProductFormData({ ...productFormData, currency: e.target.value })}
+                    >
+                      <option value="USD">USD</option>
+                      <option value="EUR">EUR</option>
+                      <option value="GBP">GBP</option>
+                      <option value="INR">INR</option>
+                      <option value="AUD">AUD</option>
+                    </Form.Select>
+                    <Form.Text className="text-muted">Select the currency for this product</Form.Text>
+                  </Form.Group>
+                </Col>
+              </Row>
+
+              <Row>
+                <Col md={6}>
+                  <Form.Group className="mb-3">
+                    <Form.Label className="fw-semibold">Category</Form.Label>
+                    <Form.Select
+                      value={productFormData.category}
+                      onChange={(e) => setProductFormData({ ...productFormData, category: e.target.value })}
+                    >
+                      <option value="">Select category</option>
+                      <option value="Electronics">Electronics</option>
+                      <option value="Clothing">Clothing</option>
+                      <option value="Footwear">Footwear</option>
+                      <option value="Accessories">Accessories</option>
+                      <option value="Home & Garden">Home & Garden</option>
+                      <option value="Sports">Sports</option>
+                    </Form.Select>
+                    <Form.Text className="text-muted">Choose the product category for better organization</Form.Text>
+                  </Form.Group>
+                </Col>
+                <Col md={6}>
+                  <Form.Group className="mb-3">
+                    <Form.Label className="fw-semibold">Brand</Form.Label>
+                    <Form.Control
+                      type="text"
+                      value={productFormData.brand}
+                      onChange={(e) => setProductFormData({ ...productFormData, brand: e.target.value })}
+                      placeholder="Enter brand name"
+                    />
+                    <Form.Text className="text-muted">Enter the brand or manufacturer name</Form.Text>
+                  </Form.Group>
+                </Col>
+              </Row>
+
+              <Form.Group className="mb-3">
+                <Form.Label className="fw-semibold">Description</Form.Label>
+                <Form.Control
+                  as="textarea"
+                  rows={3}
+                  value={productFormData.description}
+                  onChange={(e) => setProductFormData({ ...productFormData, description: e.target.value })}
+                  placeholder="Enter product description"
+                />
+                <Form.Text className="text-muted">Provide detailed information about features, specifications, and benefits</Form.Text>
+              </Form.Group>
+
+              <Form.Group className="mb-3">
+                <Form.Check
+                  type="switch"
+                  id="product-active-switch"
+                  label="Product Active"
+                  checked={productFormData.isActive}
+                  onChange={(e) => setProductFormData({ ...productFormData, isActive: e.target.checked })}
+                />
+                <Form.Text className="text-muted">Toggle to make this product visible or hidden in your catalog</Form.Text>
+              </Form.Group>
+
+              <div className="d-flex justify-content-end gap-2 mt-4">
+                <Button variant="secondary" onClick={() => setShowProductModal(false)}>
+                  Cancel
+                </Button>
+                <Button variant="primary" type="submit">
+                  {editingProduct ? 'Update Product' : 'Add Product'}
+                </Button>
+              </div>
+            </Form>
+          </Modal.Body>
+        </Modal>
+
+        {/* Delete Confirmation Modal */}
+        <Modal 
+          show={showProductDeleteModal} 
+          onHide={() => {
+            setShowProductDeleteModal(false);
+            setDeletingProduct(null);
+            setProductDeleteConfirmText('');
+          }} 
+          centered
+        >
+          <Modal.Header closeButton className="border-bottom">
+            <Modal.Title>Confirm Deletion</Modal.Title>
+          </Modal.Header>
+          <Modal.Body className="p-4">
+            <div className="text-center">
+              <AlertCircle size={48} className="text-danger mb-3" />
+              <p className="mb-0">Are you sure you want to delete <strong>{deletingProduct?.productName}</strong>?</p>
+              <p className="text-muted small mb-3">This action cannot be undone.</p>
+              <div className="text-center mt-4">
+                <Form.Label className="fw-semibold">Type <span className="text-danger fw-bold">DELETE</span> to confirm</Form.Label>
+                <Form.Control 
+                  type="text" 
+                  placeholder="Type DELETE"
+                  value={productDeleteConfirmText}
+                  onChange={(e) => setProductDeleteConfirmText(e.target.value)}
+                  autoFocus
+                />
+              </div>
+            </div>
+          </Modal.Body>
+          <Modal.Footer className="border-top">
+            <Button 
+              variant="secondary" 
+              onClick={() => {
+                setShowProductDeleteModal(false);
+                setDeletingProduct(null);
+                setProductDeleteConfirmText('');
+              }}
+            >
+              Cancel
+            </Button>
+            <Button 
+              variant="danger"
+              disabled={productDeleteConfirmText !== 'DELETE'}
+              onClick={() => {
+                console.log('Deleting product:', deletingProduct?.id);
+                setShowProductDeleteModal(false);
+                setDeletingProduct(null);
+                setProductDeleteConfirmText('');
+              }}
+            >
+              Delete Product
+            </Button>
+          </Modal.Footer>
+        </Modal>
+
+        {/* Product View Modal */}
+        {viewingProduct && (
+          <Modal show={showProductViewModal} onHide={() => setShowProductViewModal(false)} size="xl" centered>
+            {/* Custom Header with Gradient */}
+            <div style={{
+              color: 'black',
+              padding: '30px',
+              position: 'relative',
+              borderTopLeftRadius: '8px',
+              borderTopRightRadius: '8px',
+              borderBottom: '1px solid #e5e7eb'
+            }}>
+              <button 
+                onClick={() => setShowProductViewModal(false)}
+                style={{
+                  position: 'absolute',
+                  top: '20px',
+                  right: '20px',
+                  background: 'rgba(255,255,255,0.2)',
+                  border: 'none',
+                  color: 'black',
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '50%',
+                  cursor: 'pointer',
+                  transition: 'all 0.3s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.background = 'rgba(255,255,255,0.3)';
+                  e.currentTarget.style.transform = 'rotate(90deg)';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.background = 'rgba(255,255,255,0.2)';
+                  e.currentTarget.style.transform = 'rotate(0deg)';
+                }}
+              >
+                <X size={20} />
+              </button>
+              <h3 style={{ margin: 0, fontWeight: 600, fontSize: '24px' }}>
+                {viewingProduct.productName}
+              </h3>
+              <p style={{ margin: '8px 0 0 0', opacity: 0.9, fontSize: '14px' }}>
+                Product Details
+              </p>
+            </div>
+
+            <Modal.Body style={{ padding: '30px' }}>
+              {/* Basic Information Section */}
+              <div style={{
+                fontSize: '16px',
+                fontWeight: 600,
+                color: '#1f2937',
+                marginBottom: '20px',
+                paddingBottom: '10px',
+                borderBottom: '2px solid #f8f9fa',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px'
+              }}>
+                <Package size={18} style={{ color: '#4680ff' }} />
+                Basic Information
+              </div>
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+                gap: '20px',
+                marginBottom: '30px'
+              }}>
+                <div style={{
+                  background: '#f8f9fa',
+                  padding: '16px',
+                  borderRadius: '10px',
+                  transition: 'all 0.3s'
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.background = '#e5e7eb';
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.background = '#f8f9fa';
+                  e.currentTarget.style.transform = 'translateY(0)';
+                }}>
+                  <div style={{
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    color: '#6b7280',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px',
+                    marginBottom: '6px'
+                  }}>Product Name</div>
+                  <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                    {viewingProduct.productName}
+                  </div>
+                </div>
+                <div style={{
+                  background: '#f8f9fa',
+                  padding: '16px',
+                  borderRadius: '10px',
+                  transition: 'all 0.3s'
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.background = '#e5e7eb';
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.background = '#f8f9fa';
+                  e.currentTarget.style.transform = 'translateY(0)';
+                }}>
+                  <div style={{
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    color: '#6b7280',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px',
+                    marginBottom: '6px'
+                  }}>SKU</div>
+                  <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                    <Badge bg="light" text="dark" className="font-monospace" style={{ padding: '6px 14px', fontSize: '13px' }}>
+                      {viewingProduct.sku}
+                    </Badge>
+                  </div>
+                </div>
+                <div style={{
+                  background: '#f8f9fa',
+                  padding: '16px',
+                  borderRadius: '10px',
+                  transition: 'all 0.3s'
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.background = '#e5e7eb';
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.background = '#f8f9fa';
+                  e.currentTarget.style.transform = 'translateY(0)';
+                }}>
+                  <div style={{
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    color: '#6b7280',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px',
+                    marginBottom: '6px'
+                  }}>Price</div>
+                  <div style={{ fontSize: '20px', color: '#10b981', fontWeight: 700 }}>
+                    ${viewingProduct.price.toFixed(2)}
+                  </div>
+                </div>
+                <div style={{
+                  background: '#f8f9fa',
+                  padding: '16px',
+                  borderRadius: '10px',
+                  transition: 'all 0.3s'
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.background = '#e5e7eb';
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.background = '#f8f9fa';
+                  e.currentTarget.style.transform = 'translateY(0)';
+                }}>
+                  <div style={{
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    color: '#6b7280',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px',
+                    marginBottom: '6px'
+                  }}>Currency</div>
+                  <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                    {viewingProduct.currency}
+                  </div>
+                </div>
+                <div style={{
+                  background: '#f8f9fa',
+                  padding: '16px',
+                  borderRadius: '10px',
+                  transition: 'all 0.3s'
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.background = '#e5e7eb';
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.background = '#f8f9fa';
+                  e.currentTarget.style.transform = 'translateY(0)';
+                }}>
+                  <div style={{
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    color: '#6b7280',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px',
+                    marginBottom: '6px'
+                  }}>Status</div>
+                  <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                    <Badge 
+                      bg={viewingProduct.status === 'Active' ? 'success' : 'secondary'}
+                      style={{
+                        padding: '6px 14px',
+                        borderRadius: '20px',
+                        fontSize: '12px',
+                        fontWeight: 600
+                      }}
+                    >
+                      {viewingProduct.status}
+                    </Badge>
+                  </div>
+                </div>
+                <div style={{
+                  background: '#f8f9fa',
+                  padding: '16px',
+                  borderRadius: '10px',
+                  transition: 'all 0.3s'
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.background = '#e5e7eb';
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.background = '#f8f9fa';
+                  e.currentTarget.style.transform = 'translateY(0)';
+                }}>
+                  <div style={{
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    color: '#6b7280',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px',
+                    marginBottom: '6px'
+                  }}>Created Date</div>
+                  <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                    <Calendar size={14} style={{ color: '#4680ff', marginRight: '6px' }} />
+                    {viewingProduct.created}
+                  </div>
+                </div>
+              </div>
+
+              {/* Product Details Section */}
+              <div style={{
+                fontSize: '16px',
+                fontWeight: 600,
+                color: '#1f2937',
+                marginBottom: '20px',
+                paddingBottom: '10px',
+                borderBottom: '2px solid #f8f9fa',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px'
+              }}>
+                <Tag size={18} style={{ color: '#4680ff' }} />
+                Product Details
+              </div>
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+                gap: '20px',
+                marginBottom: '30px'
+              }}>
+                <div style={{
+                  background: '#f8f9fa',
+                  padding: '16px',
+                  borderRadius: '10px',
+                  transition: 'all 0.3s'
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.background = '#e5e7eb';
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.background = '#f8f9fa';
+                  e.currentTarget.style.transform = 'translateY(0)';
+                }}>
+                  <div style={{
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    color: '#6b7280',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px',
+                    marginBottom: '6px'
+                  }}>Category</div>
+                  <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                    <Badge bg="info" className="bg-opacity-10 text-dark" style={{ padding: '6px 14px', fontSize: '13px' }}>
+                      {viewingProduct.category}
+                    </Badge>
+                  </div>
+                </div>
+                <div style={{
+                  background: '#f8f9fa',
+                  padding: '16px',
+                  borderRadius: '10px',
+                  transition: 'all 0.3s'
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.background = '#e5e7eb';
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.background = '#f8f9fa';
+                  e.currentTarget.style.transform = 'translateY(0)';
+                }}>
+                  <div style={{
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    color: '#6b7280',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px',
+                    marginBottom: '6px'
+                  }}>Brand</div>
+                  <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                    <Building2 size={14} style={{ color: '#4680ff', marginRight: '6px' }} />
+                    {viewingProduct.brand}
+                  </div>
+                </div>
+              </div>
+
+              {/* Description Section */}
+              <div style={{
+                fontSize: '16px',
+                fontWeight: 600,
+                color: '#1f2937',
+                marginBottom: '20px',
+                paddingBottom: '10px',
+                borderBottom: '2px solid #f8f9fa',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px'
+              }}>
+                <FileText size={18} style={{ color: '#4680ff' }} />
+                Description
+              </div>
+              <div style={{
+                background: '#f8f9fa',
+                padding: '20px',
+                borderRadius: '10px',
+                marginBottom: '30px'
+              }}>
+                <p style={{ margin: 0, fontSize: '15px', color: '#4b5563', lineHeight: '1.6' }}>
+                  {viewingProduct.description}
+                </p>
+              </div>
+            </Modal.Body>
+
+            <Modal.Footer style={{ borderTop: '1px solid #e5e7eb', padding: '20px 30px' }}>
+              <Button 
+                variant="outline-primary" 
+                onClick={() => {
+                  setShowProductViewModal(false);
+                  handleOpenProductModal(viewingProduct);
+                }}
+                className="d-flex align-items-center gap-2"
+              >
+                <Edit size={16} />
+                Edit Product
+              </Button>
+              <Button 
+                variant="secondary" 
+                onClick={() => setShowProductViewModal(false)}
+              >
+                Close
+              </Button>
+            </Modal.Footer>
+          </Modal>
+        )}
+
+        {/* Page Header */}
+        <div className="d-flex justify-content-between align-items-center mb-4">
+          <div>
+            <h3 className="fw-bold mb-1">Products</h3>
+            <p className="text-muted mb-0">Manage your product catalog</p>
+          </div>
+          <Button 
+            variant="primary" 
+            onClick={() => handleOpenProductModal()}
+            className="d-flex align-items-center gap-2"
+          >
+            <PlusCircle size={18} />
+            Add Product
+          </Button>
+        </div>
+
+        {/* Filter Bar */}
+        <FilterBar
+          quickFilters={[]}
+          activeFilter={activeFilter}
+          onFilterChange={(filterId) => setActiveFilter(filterId)}
+          searchValue={productsSearch}
+          onSearchChange={(value) => setProductsSearch(value)}
+          onSearch={() => console.log('Searching products:', productsSearch)}
+          searchPlaceholder="Search by product name, SKU, or brand..."
+          showAdvancedFilters={showAdvancedFilters}
+          onToggleAdvancedFilters={() => setShowAdvancedFilters(!showAdvancedFilters)}
+          advancedFilterCount={
+            productsFilters.category.length +
+            productsFilters.brand.length +
+            productsFilters.status.length
+          }
+        />
+
+        {/* Advanced Filters */}
+        {showAdvancedFilters && (
+          <Card className="border-0 shadow-sm mb-4">
+            <Card.Body>
+              <Row className="g-3 align-items-end">
+                <Col md={2}>
+                  <Form.Label className="small fw-bold mb-2">Category</Form.Label>
+                  <Select
+                    isMulti
+                    options={[
+                      { value: 'Electronics', label: 'Electronics' },
+                      { value: 'Clothing', label: 'Clothing' },
+                      { value: 'Footwear', label: 'Footwear' },
+                      { value: 'Accessories', label: 'Accessories' },
+                      { value: 'Home & Garden', label: 'Home & Garden' },
+                      { value: 'Sports', label: 'Sports' }
+                    ]}
+                    value={productsFilters.category.map(c => ({ value: c, label: c }))}
+                    onChange={(selected) => {
+                      setProductsFilters(prev => ({
+                        ...prev,
+                        category: selected ? selected.map(s => s.value) : []
+                      }));
+                    }}
+                    placeholder="Select categories..."
+                    styles={customSelectStyles}
+                  />
+                </Col>
+                <Col md={2}>
+                  <Form.Label className="small fw-bold mb-2">Brand</Form.Label>
+                  <Select
+                    isMulti
+                    options={[
+                      { value: 'FashionBrand', label: 'FashionBrand' },
+                      { value: 'TechCorp', label: 'TechCorp' },
+                      { value: 'SportsBrand', label: 'SportsBrand' },
+                      { value: 'TravelGear', label: 'TravelGear' }
+                    ]}
+                    value={productsFilters.brand.map(b => ({ value: b, label: b }))}
+                    onChange={(selected) => {
+                      setProductsFilters(prev => ({
+                        ...prev,
+                        brand: selected ? selected.map(s => s.value) : []
+                      }));
+                    }}
+                    placeholder="Select brands..."
+                    styles={customSelectStyles}
+                  />
+                </Col>
+                <Col md={2}>
+                  <Form.Label className="small fw-bold mb-2">Status</Form.Label>
+                  <Select
+                    isMulti
+                    options={[
+                      { value: 'Active', label: 'Active' },
+                      { value: 'Inactive', label: 'Inactive' }
+                    ]}
+                    value={productsFilters.status.map(s => ({ value: s, label: s }))}
+                    onChange={(selected) => {
+                      setProductsFilters(prev => ({
+                        ...prev,
+                        status: selected ? selected.map(s => s.value) : []
+                      }));
+                    }}
+                    placeholder="Select status..."
+                    styles={customSelectStyles}
+                  />
+                </Col>
+                <Col md={2}>
+                  <div className="d-flex gap-2">
+                    <Button
+                      variant="primary"
+                      className="flex-grow-1 d-flex align-items-center justify-content-center"
+                      onClick={() => {
+                        setProductsPagination({ ...productsPagination, currentPage: 1 });
+                      }}
+                    >
+                      Apply
+                    </Button>
+                    <Button
+                      variant="outline-secondary"
+                      className="d-flex align-items-center justify-content-center"
+                      onClick={() => {
+                        setProductsFilters({ category: [], brand: [], status: [], priceMin: '', priceMax: '' });
+                        setProductsPagination({ ...productsPagination, currentPage: 1 });
+                      }}
+                    >
+                      Reset
+                    </Button>
+                  </div>
+                </Col>
+              </Row>
+            </Card.Body>
+          </Card>
+        )}
+
+        {/* Bulk Actions and Column Customization */}
+        <div className="d-flex justify-content-end gap-2 mb-3">
+          {selectedProducts.length > 0 && (
+            <Dropdown>
+              <Dropdown.Toggle variant="outline-primary" size="sm">
+                <CheckSquare size={16} className="me-2" />
+                Bulk Actions ({selectedProducts.length})
+              </Dropdown.Toggle>
+              <Dropdown.Menu align="end">
+                <Dropdown.Item onClick={() => console.log('Bulk activate')}>
+                  <Check size={14} className="me-2" />
+                  Activate Selected
+                </Dropdown.Item>
+                <Dropdown.Item onClick={() => console.log('Bulk deactivate')}>
+                  <X size={14} className="me-2" />
+                  Deactivate Selected
+                </Dropdown.Item>
+                <Dropdown.Divider />
+                <Dropdown.Item className="text-danger" onClick={() => {
+                  if (window.confirm(`Delete ${selectedProducts.length} selected products?`)) {
+                    console.log('Deleting products:', selectedProducts);
+                    setSelectedProducts([]);
+                  }
+                }}>
+                  <Trash2 size={14} className="me-2" />
+                  Delete Selected ({selectedProducts.length})
+                </Dropdown.Item>
+              </Dropdown.Menu>
+            </Dropdown>
+          )}
+
+          <Dropdown>
+            <Dropdown.Toggle variant="outline-secondary" size="sm">
+              <Layers size={16} className="me-2" />
+              Customize Table
+            </Dropdown.Toggle>
+            <Dropdown.Menu align="end" style={{ maxHeight: '300px', overflowY: 'auto' }}>
+              {availableColumns.map((col) => (
+                <Dropdown.Item key={col.key} as="div">
+                  <Form.Check
+                    type="checkbox"
+                    label={col.label}
+                    checked={selectedProductsColumns.includes(col.key)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedProductsColumns([...selectedProductsColumns, col.key]);
+                      } else {
+                        setSelectedProductsColumns(selectedProductsColumns.filter(c => c !== col.key));
+                      }
+                    }}
+                  />
+                </Dropdown.Item>
+              ))}
+              <Dropdown.Divider />
+              <Dropdown.Item onClick={() => setSelectedProductsColumns(['productName', 'sku', 'price', 'currency', 'category', 'brand', 'status', 'description', 'created'])}>
+                Select All
+              </Dropdown.Item>
+              <Dropdown.Item onClick={() => setSelectedProductsColumns(['productName', 'sku', 'price', 'category', 'brand', 'status'])}>
+                Reset to Default
+              </Dropdown.Item>
+            </Dropdown.Menu>
+          </Dropdown>
+        </div>
+
+        {/* Products Table */}
+        <Card className="border-0 shadow-sm">
+          <Card.Body className="p-0">
+
+            <div className="table-responsive">
+              <Table hover className="mb-0">
+                <thead className="bg-light">
+                  <tr>
+                    <th style={{ width: '50px' }}>
+                      <Form.Check 
+                        type="checkbox"
+                        checked={selectedProducts.length === filteredProducts.length && filteredProducts.length > 0}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedProducts(filteredProducts.map(p => p.id));
+                          } else {
+                            setSelectedProducts([]);
+                          }
+                        }}
+                      />
+                    </th>
+                    {selectedProductsColumns.includes('productName') && <th>Product Name</th>}
+                    {selectedProductsColumns.includes('sku') && <th>SKU</th>}
+                    {selectedProductsColumns.includes('price') && <th>Price</th>}
+                    {selectedProductsColumns.includes('currency') && <th>Currency</th>}
+                    {selectedProductsColumns.includes('category') && <th>Category</th>}
+                    {selectedProductsColumns.includes('brand') && <th>Brand</th>}
+                    {selectedProductsColumns.includes('status') && <th>Status</th>}
+                    {selectedProductsColumns.includes('description') && <th>Description</th>}
+                    {selectedProductsColumns.includes('created') && <th>Created</th>}
+                    <th style={{ width: '120px' }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(() => {
+                    const sorted = sortData(filteredProducts, productsPagination.sortColumn, productsPagination.sortDirection);
+                    const paginated = paginateData(sorted, productsPagination.currentPage, productsPagination.rowsPerPage);
+                    
+                    if (filteredProducts.length === 0) {
+                      return (
+                        <tr>
+                          <td colSpan={selectedProductsColumns.length + 2} className="text-center py-4 text-muted">
+                            No products found matching your criteria
+                          </td>
+                        </tr>
+                      );
+                    }
+                    
+                    return paginated.map((product) => (
+                      <tr key={product.id}>
+                        <td>
+                          <Form.Check 
+                            type="checkbox"
+                            checked={selectedProducts.includes(product.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedProducts([...selectedProducts, product.id]);
+                              } else {
+                                setSelectedProducts(selectedProducts.filter(id => id !== product.id));
+                              }
+                            }}
+                          />
+                        </td>
+                        {selectedProductsColumns.includes('productName') && (
+                          <td className="fw-semibold">{product.productName}</td>
+                        )}
+                        {selectedProductsColumns.includes('sku') && (
+                          <td>
+                            <Badge bg="light" text="dark" className="font-monospace">
+                              {product.sku}
+                            </Badge>
+                          </td>
+                        )}
+                        {selectedProductsColumns.includes('price') && (
+                          <td className="fw-semibold text-success">
+                            ${product.price.toFixed(2)}
+                          </td>
+                        )}
+                        {selectedProductsColumns.includes('currency') && (
+                          <td>{product.currency}</td>
+                        )}
+                        {selectedProductsColumns.includes('category') && (
+                          <td>
+                            <Badge bg="info" className="bg-opacity-10 text-dark">
+                              {product.category}
+                            </Badge>
+                          </td>
+                        )}
+                        {selectedProductsColumns.includes('brand') && (
+                          <td>{product.brand}</td>
+                        )}
+                        {selectedProductsColumns.includes('status') && (
+                          <td>
+                            <Badge bg={product.status === 'Active' ? 'success' : 'secondary'}>
+                              {product.status}
+                            </Badge>
+                          </td>
+                        )}
+                        {selectedProductsColumns.includes('description') && (
+                          <td className="text-muted small" style={{ maxWidth: '200px' }}>
+                            {product.description}
+                          </td>
+                        )}
+                        {selectedProductsColumns.includes('created') && (
+                          <td className="text-muted">{product.created}</td>
+                        )}
+                        <td>
+                          <div className="d-flex gap-1">
+                            <Button 
+                              variant="link" 
+                              size="sm" 
+                              className="p-1" 
+                              title="View"
+                              onClick={() => {
+                                setViewingProduct(product);
+                                setShowProductViewModal(true);
+                              }}
+                            >
+                              <Eye size={16} />
+                            </Button>
+                            <Button 
+                              variant="link" 
+                              size="sm" 
+                              className="p-1" 
+                              title="Edit"
+                              onClick={() => handleOpenProductModal(product)}
+                            >
+                              <Edit size={16} />
+                            </Button>
+                            <Button 
+                              variant="link" 
+                              size="sm" 
+                              className="p-1 text-danger" 
+                              title="Delete"
+                              onClick={() => {
+                                setDeletingProduct(product);
+                                setShowProductDeleteModal(true);
+                              }}
+                            >
+                              <Trash2 size={16} />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ));
+                  })()}
+                </tbody>
+              </Table>
+            </div>
+            <div className="p-3">
+              {renderPaginationControls(filteredProducts.length, productsPagination, setProductsPagination, 'products')}
+            </div>
+          </Card.Body>
+        </Card>
+      </div>
+    );
+  };
+
   const renderContent = () => {
     switch (activeScreen) {
       case 'dashboard': return renderDashboard();
@@ -18179,8 +20202,10 @@ const CRMPortal = () => {
       case 'campaigns': return renderCampaigns();
       case 'tasks': return renderTasks();
       case 'stages': return renderStages();
+      case 'products': return renderProducts();
       case 'activities': return renderActivityTrackerUpdated(); // Use renderActivityTrackerNew() or renderActivities() for old versions
-      case 'reports': return renderReports();
+      case 'reports': return renderReportsNew(); // NEW: Comprehensive reporting with dynamic filters
+      // case 'reports': return renderReportsOld(); // OLD: Basic static reports (commented out)
       default: return renderDashboard();
     }
   };

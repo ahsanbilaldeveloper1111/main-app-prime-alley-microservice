@@ -1557,6 +1557,53 @@ export const getCrmProducts = async (params: PaginationParams = {}): Promise<Pag
   }
 };
 
+export interface CreateProductPayload {
+  name: string;
+  description: string;
+  sku: string;
+  price: number;
+  category: string;
+  brand: string;
+  active: boolean;
+  currency: string;
+}
+
+export interface UpdateProductPayload extends CreateProductPayload {
+  id: number;
+}
+
+export const createProduct = async (data: CreateProductPayload): Promise<CrmProduct> => {
+  try {
+    const response = await axiosInstance.post("/crm/create-product", data);
+    toast.success("Product created successfully");
+    return extractData<CrmProduct>(response.data);
+  } catch (error: any) {
+    toast.error(error?.response?.data?.message || error?.message || "Failed to create product");
+    throw error;
+  }
+};
+
+export const updateProduct = async (data: UpdateProductPayload): Promise<CrmProduct> => {
+  try {
+    const response = await axiosInstance.post("/crm/update-product", data);
+    toast.success("Product updated successfully");
+    return extractData<CrmProduct>(response.data);
+  } catch (error: any) {
+    toast.error(error?.response?.data?.message || error?.message || "Failed to update product");
+    throw error;
+  }
+};
+
+export const deleteProduct = async (productId: number): Promise<void> => {
+  try {
+    await axiosInstance.delete(`/crm/products/${productId}/delete`);
+    toast.success("Product deleted successfully");
+  } catch (error: any) {
+    toast.error(error?.response?.data?.message || error?.message || "Failed to delete product");
+    throw error;
+  }
+};
+
 // Order Management
 export interface OrderData {
   id: number;

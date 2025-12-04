@@ -49,7 +49,6 @@ import {
   X,
   Users,
   PlusCircle,
-  CheckSquare,
   Zap,
   Star,
   Clock,
@@ -321,20 +320,14 @@ const CrmDeals = () => {
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [activeFilter, setActiveFilter] = useState('all');
   const [dealsSearch, setDealsSearch] = useState('');
-  const [selectedDeals, setSelectedDeals] = useState<number[]>([]);
   const [selectedDealsColumns, setSelectedDealsColumns] = useState<string[]>(() => {
     const saved = localStorage.getItem('dealsSelectedColumns');
-    return saved ? JSON.parse(saved) : ['name', 'company', 'stage', 'dealType', 'value', 'probability', 'closeDate', 'owner'];
+    return saved ? JSON.parse(saved) : ['name', 'company', 'stage', 'dealType', 'value', 'assignedUser', 'closeDate', 'owner'];
   });
   const [dealsPagination, setDealsPagination] = useState({ currentPage: 1, rowsPerPage: 15, sortColumn: '', sortDirection: 'asc' as 'asc' | 'desc' });
   const [dealsFilters, setDealsFilters] = useState({
-    stage: [] as string[],
-    dealType: [] as string[],
-    owner: [] as string[],
-    industry: [] as string[],
-    riskLevel: [] as string[],
-    minValue: '',
-    closeDate: ''
+    assignedTo: null as string | null,
+    stage: null as string | null,
   });
 
   // Fetch stages and extensions on component mount
@@ -351,16 +344,21 @@ const CrmDeals = () => {
         const params: any = {
           page,
           per_page: perPage,
-          ...(currentFilters || {}),
         };
 
-        const searchTerm = currentFilters.search || search || dealsSearch;
-        if (searchTerm) {
-          params.search = searchTerm;
+        // Use search from currentFilters if available, otherwise use the search parameter
+        if (currentFilters.search) {
+          params.search = currentFilters.search;
+        } else if (search) {
+          params.search = search;
         }
 
+        // Add filter parameters at top level
         if (currentFilters.stage_id) {
           params.stage_id = currentFilters.stage_id;
+        }
+        if (currentFilters.assigned_to) {
+          params.assigned_to = currentFilters.assigned_to;
         }
         if (currentFilters.is_lost !== undefined) {
           params.is_lost = currentFilters.is_lost;
@@ -384,6 +382,36 @@ const CrmDeals = () => {
     },
     [currentFilters, dealsSearch]
   );
+
+  // Handle activeFilter changes to update currentFilters and stage dropdown
+  useEffect(() => {
+    if (activeFilter === 'all') {
+      setCurrentFilters((prev) => {
+        const newFilters = { ...prev };
+        delete newFilters.stage_id;
+        return newFilters;
+      });
+      // Clear stage dropdown
+      setDealsFilters(prev => ({
+        ...prev,
+        stage: null
+      }));
+    } else if (activeFilter && stages.length > 0) {
+      // Find stage by id (activeFilter should be stage id as string)
+      const selectedStage = stages.find((s: any) => s.id.toString() === activeFilter);
+      if (selectedStage) {
+        setCurrentFilters((prev) => ({
+          ...prev,
+          stage_id: selectedStage.id.toString(),
+        }));
+        // Auto-fill stage dropdown
+        setDealsFilters(prev => ({
+          ...prev,
+          stage: selectedStage.id.toString()
+        }));
+      }
+    }
+  }, [activeFilter, stages]);
 
   useEffect(() => {
     fetchDeals(dealsPagination.currentPage, dealsPagination.rowsPerPage, dealsSearch);
@@ -460,7 +488,43 @@ const CrmDeals = () => {
 
   // Handle filter changes
   const handleFiltersChange = useCallback((filters: Record<string, any>) => {
-    setCurrentFilters(filters);
+    setCurrentFilters((prev) => {
+      const newFilters = { ...prev };
+      
+      // Handle stage_id filter (single value)
+      if ('stage_id' in filters) {
+        if (filters.stage_id) {
+          newFilters.stage_id = String(filters.stage_id);
+        } else {
+          delete newFilters.stage_id;
+        }
+      }
+      
+      // Handle assigned_to filter (single value)
+      if ('assigned_to' in filters) {
+        if (filters.assigned_to) {
+          newFilters.assigned_to = String(filters.assigned_to);
+        } else {
+          delete newFilters.assigned_to;
+        }
+      }
+      
+      // Handle search
+      if ('search' in filters) {
+        if (filters.search) {
+          newFilters.search = filters.search;
+        } else {
+          delete newFilters.search;
+        }
+      }
+      
+      // Handle is_lost filter
+      if ('is_lost' in filters) {
+        newFilters.is_lost = filters.is_lost;
+      }
+      
+      return newFilters;
+    });
     setRefreshKey((prev) => prev + 1);
   }, []);
 
@@ -743,6 +807,9 @@ const CrmDeals = () => {
       owner: extensions.find((ext: any) => ext?.id == deal?.assigned_to || ext?.extension == deal?.assigned_to)?.display_name || 
               extensions.find((ext: any) => ext?.id == deal?.assigned_to || ext?.extension == deal?.assigned_to)?.name || 
               deal.assigned_to || '',
+      assignedUser: extensions.find((ext: any) => ext?.id == deal?.assigned_to || ext?.extension == deal?.assigned_to)?.display_name || 
+                    extensions.find((ext: any) => ext?.id == deal?.assigned_to || ext?.extension == deal?.assigned_to)?.name || 
+                    deal.assigned_to || '',
       created: deal.created_at ? new Date(deal.created_at).toLocaleDateString() : '',
       riskLevel: deal.risk_level || '',
       negotiationBar: deal.negotiation_bar || 0,
@@ -784,72 +851,26 @@ const CrmDeals = () => {
     return { total, won, inNegotiation, totalValue, stageCounts, dealTypeCounts };
   }, [dealsData, extensions, summaryTiles, totalDeals]);
 
-  // Filter and transform deals data
+  // Transform deals data (no client-side filtering - API handles it)
   const filteredDeals = useMemo(() => {
-    const transformed = dealsData.map(transformDealData);
-    
-    return transformed.filter(deal => {
-      // Quick filters
-      if (activeFilter === 'negotiation') {
-        if (!deal.stage?.toLowerCase().includes('negotiation')) return false;
-      } else if (activeFilter === 'proposal') {
-        if (!deal.stage?.toLowerCase().includes('proposal')) return false;
-      } else if (activeFilter === 'high-value') {
-        const value = parseFloat(String(deal.value).replace(/[^0-9.-]/g, '')) || 0;
-        if (value <= 50000) return false;
-      } else if (activeFilter === 'closing-soon') {
-        const closeDate = deal.rawData?.expected_close_date;
-        if (!closeDate) return false;
-        const currentMonth = new Date().getMonth();
-        const currentYear = new Date().getFullYear();
-        const dealCloseDate = new Date(closeDate);
-        if (dealCloseDate.getMonth() !== currentMonth || dealCloseDate.getFullYear() !== currentYear) return false;
-      } else if (activeFilter === 'won') {
-        if (!deal.stage?.toLowerCase().includes('won') && !deal.rawData?.stage?.is_won) return false;
-      }
+    return dealsData.map(transformDealData);
+  }, [dealsData, extensions]);
 
-      // Search filter
-      const matchesSearch = !dealsSearch || !dealsSearch.trim() ||
-        (deal.name && deal.name.toLowerCase().includes(dealsSearch.toLowerCase())) ||
-        (deal.company && deal.company.toLowerCase().includes(dealsSearch.toLowerCase()));
-
-      // Advanced filters
-      const matchesStage = dealsFilters.stage.length === 0 || dealsFilters.stage.includes(deal.stage);
-      const matchesDealType = dealsFilters.dealType.length === 0 || dealsFilters.dealType.includes(deal.dealType);
-      const matchesOwner = dealsFilters.owner.length === 0 || dealsFilters.owner.includes(deal.owner);
-      const matchesIndustry = dealsFilters.industry.length === 0 || dealsFilters.industry.includes(deal.industry);
-      const matchesRiskLevel = dealsFilters.riskLevel.length === 0 || dealsFilters.riskLevel.includes(deal.riskLevel);
-      const matchesMinValue = !dealsFilters.minValue || parseFloat(String(deal.value).replace(/[^0-9.-]/g, '')) >= parseFloat(dealsFilters.minValue);
-      const matchesCloseDate = !dealsFilters.closeDate;
-
-      return matchesSearch && matchesStage && matchesDealType && 
-        matchesOwner && matchesIndustry && matchesRiskLevel && 
-        matchesMinValue && matchesCloseDate;
-    });
-  }, [dealsData, activeFilter, dealsSearch, dealsFilters, extensions]);
-
-  // Calculate filter counts
+  // Calculate filter counts (using summary_tiles if available, otherwise from data)
   const filterCounts = useMemo(() => {
     const transformed = dealsData.map(transformDealData);
-    return {
-      all: transformed.length,
-      negotiation: transformed.filter(d => d.stage?.toLowerCase().includes('negotiation')).length,
-      proposal: transformed.filter(d => d.stage?.toLowerCase().includes('proposal')).length,
-      highValue: transformed.filter(d => {
-        const value = parseFloat(String(d.value).replace(/[^0-9.-]/g, '')) || 0;
-        return value > 50000;
-      }).length,
-      closingSoon: transformed.filter(d => {
-        const closeDate = d.rawData?.expected_close_date;
-        if (!closeDate) return false;
-        const currentMonth = new Date().getMonth();
-        const currentYear = new Date().getFullYear();
-        const dealCloseDate = new Date(closeDate);
-        return dealCloseDate.getMonth() === currentMonth && dealCloseDate.getFullYear() === currentYear;
-      }).length,
-      won: transformed.filter(d => d.stage?.toLowerCase().includes('won') || d.rawData?.stage?.is_won).length
+    const counts: Record<string, number> = {
+      all: summaryTiles?.total_deals || totalDeals || transformed.length,
     };
-  }, [dealsData, extensions]);
+    
+    // Add counts for first 5 stages
+    stages.slice(0, 5).forEach((stage: any) => {
+      const stageDeals = transformed.filter(d => d.stage === stage.name || d.rawData?.stage_id === stage.id);
+      counts[stage.id] = stageDeals.length;
+    });
+    
+    return counts;
+  }, [dealsData, extensions, stages, summaryTiles, totalDeals]);
 
   // Custom select styles
   const customSelectStyles = {
@@ -1022,66 +1043,36 @@ const CrmDeals = () => {
               activeColor: '#0d6efd',
               icon: <Users size={16} />
             },
-            {
-              id: 'negotiation',
-              label: 'Negotiation',
-              count: filterCounts.negotiation,
-              color: '#0dcaf0',
+            ...stages.slice(0, 5).map((stage: any) => ({
+              id: stage.id.toString(),
+              label: stage.name,
+              count: filterCounts[stage.id] || 0,
+              color: stage.color || '#6c757d',
               activeColor: '#0d6efd',
-              icon: <DollarSign size={16} />
-            },
-            {
-              id: 'proposal',
-              label: 'Proposal',
-              count: filterCounts.proposal,
-              color: '#0d6efd',
-              activeColor: '#0d6efd',
-              icon: <FileText size={16} />
-            },
-            {
-              id: 'high-value',
-              label: 'High Value (>£50k)',
-              count: filterCounts.highValue,
-              color: '#198754',
-              activeColor: '#0d6efd',
-              icon: <Star size={16} />
-            },
-            {
-              id: 'closing-soon',
-              label: 'Closing This Month',
-              count: filterCounts.closingSoon,
-              color: '#ffc107',
-              activeColor: '#0d6efd',
-              icon: <Calendar size={16} />
-            },
-            {
-              id: 'won',
-              label: 'Won',
-              count: filterCounts.won,
-              color: '#198754',
-              activeColor: '#0d6efd',
-              icon: <CheckCircle size={16} />
-            }
+              icon: <Layers size={16} />
+            }))
           ]}
           activeFilter={activeFilter}
-          onFilterChange={(filterId) => setActiveFilter(filterId)}
+          onFilterChange={(filterId) => {
+            setActiveFilter(filterId);
+            setDealsPagination({ ...dealsPagination, currentPage: 1 });
+          }}
           searchValue={dealsSearch}
           onSearchChange={(value) => setDealsSearch(value)}
           onSearch={() => {
+            if (dealsSearch.trim()) {
+              handleFiltersChange({ search: dealsSearch.trim() });
+            } else {
+              handleFiltersChange({ search: null });
+            }
             setDealsPagination({ ...dealsPagination, currentPage: 1 });
-            setRefreshKey(prev => prev + 1);
           }}
           searchPlaceholder="Search deals by name, company..."
           showAdvancedFilters={showAdvancedFilters}
           onToggleAdvancedFilters={() => setShowAdvancedFilters(!showAdvancedFilters)}
           advancedFilterCount={
-            dealsFilters.stage.length +
-            dealsFilters.dealType.length +
-            dealsFilters.owner.length +
-            dealsFilters.industry.length +
-            dealsFilters.riskLevel.length +
-            (dealsFilters.minValue ? 1 : 0) +
-            (dealsFilters.closeDate ? 1 : 0)
+            (dealsFilters.assignedTo !== null ? 1 : 0) +
+            (dealsFilters.stage !== null ? 1 : 0)
           }
         />
 
@@ -1090,112 +1081,94 @@ const CrmDeals = () => {
           <Card className="border-0 shadow-sm mb-4">
             <Card.Body>
               <Row className="g-3 align-items-end">
-                <Col md={2}>
-                  <Form.Label className="small fw-bold mb-2">Stage</Form.Label>
+                <Col md={4}>
+                  <Form.Label className="small fw-bold mb-2">Assigned To</Form.Label>
                   <Select
-                    isMulti
-                    options={stages.map(s => ({ value: s.name, label: s.name }))}
-                    value={dealsFilters.stage.map(s => ({ value: s, label: s }))}
-                    onChange={(selected) => {
-                      setDealsFilters(prev => ({
-                        ...prev,
-                        stage: selected ? selected.map(s => s.value) : []
-                      }));
-                    }}
-                    placeholder="Select stages..."
-                    styles={customSelectStyles}
-                  />
-                </Col>
-                <Col md={2}>
-                  <Form.Label className="small fw-bold mb-2">Deal Type</Form.Label>
-                  <Select
-                    isMulti
-                    options={[
-                      { value: 'new_sale', label: 'New Sale' },
-                      { value: 'renewal', label: 'Renewal' },
-                      { value: 'migration', label: 'Migration' },
-                      { value: 'upsell', label: 'Upsell' }
-                    ]}
-                    value={dealsFilters.dealType.map(t => ({ value: t, label: t }))}
-                    onChange={(selected) => {
-                      setDealsFilters(prev => ({
-                        ...prev,
-                        dealType: selected ? selected.map(s => s.value) : []
-                      }));
-                    }}
-                    placeholder="Select types..."
-                    styles={customSelectStyles}
-                  />
-                </Col>
-                <Col md={2}>
-                  <Form.Label className="small fw-bold mb-2">Owner</Form.Label>
-                  <Select
-                    isMulti
                     options={extensions.map((ext: any) => ({ 
-                      value: ext.display_name || ext.name || ext.id, 
-                      label: ext.display_name || ext.name || ext.id 
+                      value: ext.id || ext.extension, 
+                      label: ext.display_name || ext.name || ext.id || ext.extension
                     }))}
-                    value={dealsFilters.owner.map(o => ({ value: o, label: o }))}
+                    value={dealsFilters.assignedTo ? (() => {
+                      const assignedToId = dealsFilters.assignedTo;
+                      const ext = extensions.find((e: any) => (e.id || e.extension) === assignedToId);
+                      return ext ? { 
+                        value: assignedToId, 
+                        label: ext.display_name || ext.name || assignedToId 
+                      } : { value: assignedToId, label: assignedToId };
+                    })() : null}
                     onChange={(selected) => {
+                      const assignedToValue = selected ? selected.value : null;
                       setDealsFilters(prev => ({
                         ...prev,
-                        owner: selected ? selected.map(s => s.value) : []
+                        assignedTo: assignedToValue
                       }));
+                      // Update currentFilters for API call
+                      handleFiltersChange({ 
+                        assigned_to: assignedToValue || null 
+                      });
+                      // Reset to all when assigned filter changes
+                      setActiveFilter('all');
                     }}
-                    placeholder="Select owners..."
+                    placeholder="Select user..."
                     styles={customSelectStyles}
+                    isClearable
                   />
                 </Col>
-                <Col md={2}>
-                  <Form.Label className="small fw-bold mb-2">Min Value</Form.Label>
-                  <Form.Control 
-                    type="number" 
-                    size="sm"
-                    placeholder="0"
-                    value={dealsFilters.minValue}
-                    onChange={(e) => setDealsFilters(prev => ({
-                      ...prev,
-                      minValue: e.target.value
-                    }))}
+                <Col md={4}>
+                  <Form.Label className="small fw-bold mb-2">Stages</Form.Label>
+                  <Select
+                    options={stages.map(s => ({ value: s.id.toString(), label: s.name }))}
+                    value={dealsFilters.stage ? (() => {
+                      const stageId = dealsFilters.stage;
+                      const stage = stages.find((st: any) => st.id.toString() === stageId);
+                      return stage ? { value: stageId, label: stage.name } : { value: stageId, label: stageId };
+                    })() : null}
+                    onChange={(selected) => {
+                      const stageValue = selected ? selected.value : null;
+                      setDealsFilters(prev => ({
+                        ...prev,
+                        stage: stageValue
+                      }));
+                      // Update currentFilters for API call
+                      handleFiltersChange({ 
+                        stage_id: stageValue || null 
+                      });
+                      // Update activeFilter to match selected stage
+                      if (stageValue) {
+                        setActiveFilter(stageValue);
+                      } else {
+                        setActiveFilter('all');
+                      }
+                    }}
+                    placeholder="Select stage..."
+                    styles={customSelectStyles}
+                    isClearable
                   />
                 </Col>
-                <Col md={2}>
-                  <Form.Label className="small fw-bold mb-2">Close Date</Form.Label>
-                  <Form.Control 
-                    type="date" 
-                    size="sm"
-                    value={dealsFilters.closeDate}
-                    onChange={(e) => setDealsFilters(prev => ({
-                      ...prev,
-                      closeDate: e.target.value
-                    }))}
-                  />
-                </Col>
-                <Col md={2}>
+                <Col md={4}>
                   <div className="d-flex gap-2">
                     <Button
                       variant="primary"
                       className="flex-grow-1 d-flex align-items-center justify-content-center"
                       onClick={() => {
                         setDealsPagination({ ...dealsPagination, currentPage: 1 });
+                        setRefreshKey(prev => prev + 1);
                       }}
                     >
-                      Apply
+                      Apply Filters
                     </Button>
                     <Button
                       variant="outline-secondary"
                       className="d-flex align-items-center justify-content-center"
                       onClick={() => {
                         setDealsFilters({
-                          stage: [],
-                          dealType: [],
-                          owner: [],
-                          industry: [],
-                          riskLevel: [],
-                          minValue: '',
-                          closeDate: ''
+                          assignedTo: null,
+                          stage: null,
                         });
+                        setCurrentFilters({});
+                        setActiveFilter('all');
                         setDealsPagination({ ...dealsPagination, currentPage: 1 });
+                        setRefreshKey(prev => prev + 1);
                       }}
                     >
                       Reset
@@ -1207,32 +1180,8 @@ const CrmDeals = () => {
           </Card>
         )}
 
-        {/* Bulk Actions and Column Customization */}
+        {/* Column Customization */}
         <div className="d-flex justify-content-end gap-2 mb-3">
-          {selectedDeals.length > 0 && (
-            <Dropdown>
-              <Dropdown.Toggle variant="outline-primary" size="sm">
-                <CheckSquare size={16} className="me-2" />
-                Bulk Actions ({selectedDeals.length})
-              </Dropdown.Toggle>
-              <Dropdown.Menu align="end">
-                <Dropdown.Item 
-                  onClick={() => {
-                    if (selectedDeals.length === 1) {
-                      toast.info(`Bulk delete for ${selectedDeals.length} deal - implement bulk delete handler`);
-                    } else {
-                      toast.info(`Bulk delete for ${selectedDeals.length} deals - implement bulk delete handler`);
-                    }
-                  }}
-                  className="d-flex align-items-center text-danger"
-                >
-                  <Trash2 size={14} className="me-2" />
-                  Delete Selected ({selectedDeals.length})
-                </Dropdown.Item>
-              </Dropdown.Menu>
-            </Dropdown>
-          )}
-
           <Dropdown>
             <Dropdown.Toggle variant="outline-secondary" size="sm">
               <Layers size={16} className="me-2" />
@@ -1247,7 +1196,7 @@ const CrmDeals = () => {
                 { key: 'dealType', label: 'Deal Type' },
                 { key: 'owner', label: 'Owner' },
                 { key: 'industry', label: 'Industry' },
-                { key: 'probability', label: 'Probability' },
+                { key: 'assignedUser', label: 'Assigned To' },
                 { key: 'closeDate', label: 'Close Date' },
                 { key: 'created', label: 'Created' }
               ].map((col) => (
@@ -1271,14 +1220,14 @@ const CrmDeals = () => {
               ))}
               <Dropdown.Divider />
               <Dropdown.Item onClick={() => {
-                const allCols = ['name', 'company', 'value', 'stage', 'dealType', 'owner', 'industry', 'probability', 'closeDate', 'created'];
+                const allCols = ['name', 'company', 'value', 'stage', 'dealType', 'owner', 'industry', 'assignedUser', 'closeDate', 'created'];
                 setSelectedDealsColumns(allCols);
                 localStorage.setItem('dealsSelectedColumns', JSON.stringify(allCols));
               }}>
                 Select All
               </Dropdown.Item>
               <Dropdown.Item onClick={() => {
-                const defaultCols = ['name', 'company', 'value', 'stage', 'dealType', 'owner', 'industry', 'probability', 'closeDate', 'created'];
+                const defaultCols = ['name', 'company', 'stage', 'dealType', 'value', 'assignedUser', 'closeDate', 'owner'];
                 setSelectedDealsColumns(defaultCols);
                 localStorage.setItem('dealsSelectedColumns', JSON.stringify(defaultCols));
               }}>
@@ -1295,19 +1244,6 @@ const CrmDeals = () => {
               <Table hover className="mb-0">
                 <thead className="bg-light">
                   <tr>
-                    <th style={{ width: '50px' }}>
-                      <Form.Check
-                        type="checkbox"
-                        checked={filteredDeals.length > 0 && filteredDeals.every(d => selectedDeals.includes(d.id))}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setSelectedDeals(filteredDeals.map(d => d.id));
-                          } else {
-                            setSelectedDeals([]);
-                          }
-                        }}
-                      />
-                    </th>
                     {selectedDealsColumns.includes('name') && (
                       <th 
                         style={{ cursor: 'pointer', userSelect: 'none' }}
@@ -1348,14 +1284,6 @@ const CrmDeals = () => {
                         Value {renderSortIcon('value', dealsPagination)}
                       </th>
                     )}
-                    {selectedDealsColumns.includes('probability') && (
-                      <th 
-                        style={{ cursor: 'pointer', userSelect: 'none' }}
-                        onClick={() => handleSort('probability', dealsPagination, setDealsPagination)}
-                      >
-                        Probability {renderSortIcon('probability', dealsPagination)}
-                      </th>
-                    )}
                     {selectedDealsColumns.includes('closeDate') && (
                       <th 
                         style={{ cursor: 'pointer', userSelect: 'none' }}
@@ -1372,6 +1300,14 @@ const CrmDeals = () => {
                         Owner {renderSortIcon('owner', dealsPagination)}
                       </th>
                     )}
+                    {selectedDealsColumns.includes('assignedUser') && (
+                      <th 
+                        style={{ cursor: 'pointer', userSelect: 'none' }}
+                        onClick={() => handleSort('assignedUser', dealsPagination, setDealsPagination)}
+                      >
+                        Assigned To {renderSortIcon('assignedUser', dealsPagination)}
+                      </th>
+                    )}
                     {selectedDealsColumns.includes('created') && (
                       <th 
                         style={{ cursor: 'pointer', userSelect: 'none' }}
@@ -1386,13 +1322,13 @@ const CrmDeals = () => {
                 <tbody>
                   {loading ? (
                     <tr>
-                      <td colSpan={selectedDealsColumns.length + 2} className="text-center py-4">
+                      <td colSpan={selectedDealsColumns.length + 1} className="text-center py-4">
                         Loading...
                       </td>
                     </tr>
                   ) : filteredDeals.length === 0 ? (
                     <tr>
-                      <td colSpan={selectedDealsColumns.length + 2} className="text-center py-4 text-muted">
+                      <td colSpan={selectedDealsColumns.length + 1} className="text-center py-4 text-muted">
                         No deals found matching your criteria
                       </td>
                     </tr>
@@ -1403,19 +1339,6 @@ const CrmDeals = () => {
                       dealsPagination.rowsPerPage
                     ).map((deal) => (
                       <tr key={deal.id}>
-                        <td>
-                          <Form.Check
-                            type="checkbox"
-                            checked={selectedDeals.includes(deal.id)}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setSelectedDeals([...selectedDeals, deal.id]);
-                              } else {
-                                setSelectedDeals(selectedDeals.filter(id => id !== deal.id));
-                              }
-                            }}
-                          />
-                        </td>
                         {selectedDealsColumns.includes('name') && (
                           <td className="fw-semibold">{deal.name}</td>
                         )}
@@ -1451,25 +1374,14 @@ const CrmDeals = () => {
                         {selectedDealsColumns.includes('value') && (
                           <td className="fw-semibold">{deal.currency} {parseFloat(String(deal.value)).toLocaleString()}</td>
                         )}
-                        {selectedDealsColumns.includes('probability') && (
-                          <td>
-                            <div className="d-flex align-items-center gap-2">
-                              <div className="progress" style={{ width: '60px', height: '8px' }}>
-                                <div 
-                                  className="progress-bar" 
-                                  role="progressbar" 
-                                  style={{ width: `${deal.probability}%` }}
-                                />
-                              </div>
-                              <small>{deal.probability}%</small>
-                            </div>
-                          </td>
-                        )}
                         {selectedDealsColumns.includes('closeDate') && (
                           <td>{deal.closeDate || '-'}</td>
                         )}
                         {selectedDealsColumns.includes('owner') && (
                           <td>{deal.owner || '-'}</td>
+                        )}
+                        {selectedDealsColumns.includes('assignedUser') && (
+                          <td>{deal.assignedUser || '-'}</td>
                         )}
                         {selectedDealsColumns.includes('created') && (
                           <td>{deal.created || '-'}</td>

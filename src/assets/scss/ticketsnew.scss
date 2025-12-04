@@ -98,4 +98,18 @@ input#includeAssignedRecords {
   .custom-radio label:hover::before {
     border-color: #0d6efd !important;
   }
+  #product-active-switch {
+    border-radius: 2em !important;
+  }
+  @media (min-width: 992px) { /* lg and up */
+    .custom-col {
+      flex: 0 0 20%;
+      max-width: 20%;
+    }
+  }
+  
+//   .five-col {
+//     flex: 0 0 20%;   /* 5 items in a row */
+//     max-width: 20%;
+//   }
   
