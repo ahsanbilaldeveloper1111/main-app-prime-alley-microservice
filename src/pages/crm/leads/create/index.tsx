@@ -70,7 +70,13 @@ const CreateLead = () => {
     lead_potential: "",
     other_information: {} as Record<string, any>,
     campaign_field_values: {} as Record<string, any>,
-    contact_persons: [] as Array<{
+    contact_persons: [{
+      title: "",
+      name: "",
+      phone_country_code: "",
+      phone: "",
+      email: "",
+    }] as Array<{
       title: string;
       name: string;
       phone_country_code: string;
@@ -239,6 +245,7 @@ const CreateLead = () => {
             contact_phone: phoneNumber,
             contact_phone_country_code: phoneCountryCode,
             // Add contact person to contact_persons array if we have name, phone, or email
+            // Otherwise ensure at least one empty contact person exists
             contact_persons: contactPersonName || phone || email
               ? [
                   {
@@ -249,7 +256,15 @@ const CreateLead = () => {
                     email: email,
                   },
                 ]
-              : prev.contact_persons,
+              : prev.contact_persons.length > 0 
+                ? prev.contact_persons 
+                : [{
+                    title: "",
+                    name: "",
+                    phone_country_code: "",
+                    phone: "",
+                    email: "",
+                  }],
           }));
         } catch (error) {
           console.error("Failed to fetch CRM data record:", error);
@@ -406,10 +421,16 @@ const CreateLead = () => {
   };
 
   const removeContactPerson = (index: number) => {
-    setFormData((prev) => ({
-      ...prev,
-      contact_persons: prev.contact_persons.filter((_, i) => i !== index),
-    }));
+    setFormData((prev) => {
+      // Prevent deleting the last contact person
+      if (prev.contact_persons.length <= 1) {
+        return prev;
+      }
+      return {
+        ...prev,
+        contact_persons: prev.contact_persons.filter((_, i) => i !== index),
+      };
+    });
   };
 
   const updateContactPerson = (index: number, field: string, value: string) => {
@@ -432,6 +453,12 @@ const CreateLead = () => {
     
     if (!formData.name) {
       toast.error("Please enter lead name");
+      return;
+    }
+    
+    // Validate at least one contact person exists
+    if (!formData.contact_persons || formData.contact_persons.length === 0) {
+      toast.error("Please add at least one contact person");
       return;
     }
     
@@ -637,6 +664,7 @@ const CreateLead = () => {
         contact_phone: phoneNumber || prev.contact_phone,
         contact_phone_country_code: phoneCountryCode || prev.contact_phone_country_code,
         // Add contact person to contact_persons array if we have name, phone, or email
+        // Otherwise ensure at least one empty contact person exists
         contact_persons: contactPersonName || phone || email
           ? [
               {
@@ -647,7 +675,15 @@ const CreateLead = () => {
                 email: email,
               },
             ]
-          : prev.contact_persons,
+          : prev.contact_persons.length > 0 
+            ? prev.contact_persons 
+            : [{
+                title: "",
+                name: "",
+                phone_country_code: "",
+                phone: "",
+                email: "",
+              }],
       }));
 
       // Auto-select campaign if available
@@ -1149,7 +1185,17 @@ const CreateLead = () => {
                     {formStep === 2 && (
                       <Card className="border-0 bg-light">
                         <Card.Body>
-                          <h5 className="fw-bold mb-4 text-warning">CONTACT PERSONS</h5>
+                          <div className="d-flex justify-content-between align-items-center mb-4">
+                            <h5 className="fw-bold mb-0 text-warning">CONTACT PERSONS</h5>
+                            <Button
+                              variant="outline-primary"
+                              size="sm"
+                              onClick={addContactPerson}
+                            >
+                              <FiPlus className="me-1" size={14} />
+                              Add Contact Person
+                            </Button>
+                          </div>
                           {formData.contact_persons.map((person, index) => (
                             <Card key={index} className="mb-3 border">
                               <Card.Body>
@@ -1159,6 +1205,7 @@ const CreateLead = () => {
                                     variant="outline-danger"
                                     size="sm"
                                     onClick={() => removeContactPerson(index)}
+                                    disabled={formData.contact_persons.length <= 1}
                                   >
                                     <X size={16} />
                                   </Button>
@@ -1244,14 +1291,6 @@ const CreateLead = () => {
                               </Card.Body>
                             </Card>
                           ))}
-                          <Button
-                            variant="outline-primary"
-                            onClick={addContactPerson}
-                            className="w-100"
-                          >
-                            <FiPlus className="me-2" />
-                            Add Contact Person
-                          </Button>
                         </Card.Body>
                       </Card>
                     )}
