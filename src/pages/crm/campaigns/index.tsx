@@ -14,6 +14,7 @@ import {
   createCampaign,
   updateCampaign,
   getCampaign,
+  CampaignMetrics,
 } from "@utils/crm";
 import {
   Button,
@@ -141,7 +142,7 @@ const KPICard: React.FC<KPICardData> = ({ title, value, change, isPositive, icon
 
 // Filter Bar Component
 interface FilterBarProps {
-  quickFilters: { id: string; label: string; count: number; variant?: string; color?: string; activeColor?: string; icon?: React.ReactNode }[];
+  quickFilters: { id: string; label: string; variant?: string; color?: string; activeColor?: string; icon?: React.ReactNode }[];
   activeFilter: string;
   onFilterChange: (filterId: string) => void;
   searchValue: string;
@@ -198,13 +199,6 @@ const FilterBar: React.FC<FilterBarProps> = ({
                 >
                   {filter.icon && <span className="d-flex align-items-center">{filter.icon}</span>}
                   {filter.label}
-                  <Badge
-                    bg={isActive ? 'light' : 'light'}
-                    text={isActive ? 'dark' : 'dark'}
-                    className="ms-2"
-                  >
-                    {filter.count}
-                  </Badge>
                 </Button>
               );
             })}
@@ -231,7 +225,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
                 <Search size={16} />
               </Button>
             </InputGroup>
-            <Button 
+            {/* <Button 
               variant={showAdvancedFilters ? 'primary' : 'outline-secondary'}
               onClick={onToggleAdvancedFilters}
               className="d-flex align-items-center flex-shrink-0"
@@ -243,7 +237,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
                   {advancedFilterCount}
                 </Badge>
               )}
-            </Button>
+            </Button> */}
           </div>
         </div>
       </Card.Body>
@@ -259,6 +253,10 @@ const CrmCampaigns = () => {
   const [refreshKey, setRefreshKey] = useState(0);
   const [currentFilters, setCurrentFilters] = useState<Record<string, any>>({});
   const [campaignsData, setCampaignsData] = useState<any[]>([]);
+  const [metrics, setMetrics] = useState<CampaignMetrics>({
+    active_campaigns: 0,
+    inactive_campaigns: 0,
+  });
   const [totalCampaigns, setTotalCampaigns] = useState(0);
 
   // UI State
@@ -273,10 +271,6 @@ const CrmCampaigns = () => {
   const [campaignsPagination, setCampaignsPagination] = useState({ currentPage: 1, rowsPerPage: 10, sortColumn: '', sortDirection: 'asc' as 'asc' | 'desc' });
   const [campaignFilters, setCampaignFilters] = useState({
     status: [] as string[],
-    owner: [] as string[],
-    tags: [] as string[],
-    priority: [] as string[],
-    dateRange: { start: '', end: '' }
   });
 
   // Modal states
@@ -538,20 +532,34 @@ const CrmCampaigns = () => {
     const loadCampaigns = async () => {
       try {
         setLoading(true);
+        
+        // Build status filter from activeFilter
+        let statusFilter: string[] = [];
+        if (activeFilter === 'active') {
+          statusFilter = ['active'];
+        } else if (activeFilter === 'inactive') {
+          statusFilter = ['inactive'];
+        }
+        // If activeFilter is 'all', statusFilter remains empty array
+        
+        // Combine with advanced filter status if any
+        const combinedStatus = campaignFilters.status.length > 0 ? campaignFilters.status : statusFilter;
+        
         const response = await getCampaigns({
           page: campaignsPagination.currentPage,
           per_page: campaignsPagination.rowsPerPage,
           search: campaignsSearch,
           filters: {
             ...memoizedFilters,
-            status: campaignFilters.status,
-            dateRange: campaignFilters.dateRange,
+            status: combinedStatus,
           },
           module_slug: ModuleSlug.CRM_CAMPAIGNS,
         });
         
         if (response && response.data) {
           setCampaignsData(response.data);
+          console.log("ZEZEZE", response)
+          setMetrics(response.metrics);
           setTotalCampaigns(response.total || response.data.length);
         }
       } catch (error) {
@@ -565,15 +573,7 @@ const CrmCampaigns = () => {
     if (session?.user?.permissions?.includes('list-crm-campaigns')) {
       loadCampaigns();
     }
-  }, [refreshKey, campaignsPagination, campaignsSearch, memoizedFilters, campaignFilters, session]);
-
-  // Calculate filter counts
-  const filterCounts = useMemo(() => {
-    const all = campaignsData.length;
-    const active = campaignsData.filter(c => c.status === 'active').length;
-    const inactive = campaignsData.filter(c => c.status === 'inactive').length;
-    return { all, active, inactive };
-  }, [campaignsData]);
+  }, [refreshKey, campaignsPagination, campaignsSearch, memoizedFilters, campaignFilters, activeFilter, session]);
 
   // Modal handlers
   const handleCreateCampaign = useCallback(() => {
@@ -709,7 +709,8 @@ const CrmCampaigns = () => {
     const newStartDate = e.target.value;
     const today = getTodayDate();
     
-    if (newStartDate && newStartDate < today) {
+    // Only validate future date requirement when creating a new campaign
+    if (!showEditModal && newStartDate && newStartDate < today) {
       toast.error("Start date must be today or a future date");
       return;
     }
@@ -721,25 +722,27 @@ const CrmCampaigns = () => {
       }
       return { ...prev, start_date: newStartDate };
     });
-  }, [getTodayDate]);
+  }, [getTodayDate, showEditModal]);
 
   // Handle end date change with validation
   const handleEndDateChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const newEndDate = e.target.value;
     const minEndDate = getMinEndDate();
     
-    if (newEndDate && newEndDate < minEndDate) {
+    // Only validate minimum date requirement when creating a new campaign
+    if (!showEditModal && newEndDate && newEndDate < minEndDate) {
       toast.error(`End date must be after ${new Date(formData.start_date || minEndDate).toLocaleDateString()}`);
       return;
     }
     
+    // Always validate that end date is after start date
     if (formData.start_date && newEndDate && newEndDate <= formData.start_date) {
       toast.error("End date must be after start date");
       return;
     }
     
     setFormData(prev => ({ ...prev, end_date: newEndDate }));
-  }, [formData.start_date, getMinEndDate]);
+  }, [formData.start_date, getMinEndDate, showEditModal]);
 
   // Form submission handlers
   const handleFormSubmit = useCallback(async () => {
@@ -751,16 +754,22 @@ const CrmCampaigns = () => {
     // Validate dates
     const today = getTodayDate();
     
-    if (formData.start_date && formData.start_date < today) {
-      toast.error("Start date must be today or a future date");
-      return;
+    // Only validate that dates are in the future when creating a NEW campaign
+    // When editing, allow existing past dates but validate date relationships
+    if (!showEditModal) {
+      // Creating new campaign - dates must be in the future
+      if (formData.start_date && formData.start_date < today) {
+        toast.error("Start date must be today or a future date");
+        return;
+      }
+      
+      if (formData.end_date && formData.end_date < today) {
+        toast.error("End date must be today or a future date");
+        return;
+      }
     }
     
-    if (formData.end_date && formData.end_date < today) {
-      toast.error("End date must be today or a future date");
-      return;
-    }
-    
+    // Always validate date relationships
     if (formData.start_date && formData.end_date && formData.start_date >= formData.end_date) {
       toast.error("End date must be after start date");
       return;
@@ -1006,6 +1015,42 @@ const CrmCampaigns = () => {
 
   return (
     <React.Fragment>
+      <style dangerouslySetInnerHTML={{__html: `
+        .campaigns-table-wrapper {
+          width: 100%;
+          overflow: hidden;
+        }
+        .campaigns-table-wrapper .table-responsive {
+          width: 100%;
+          overflow-x: auto;
+          overflow-y: visible;
+          -webkit-overflow-scrolling: touch;
+        }
+        .campaigns-table-wrapper .table-responsive table {
+          width: 100%;
+          table-layout: auto;
+          margin-bottom: 0;
+        }
+        .campaigns-table-wrapper .table-responsive table th,
+        .campaigns-table-wrapper .table-responsive table td {
+          padding: 12px 16px;
+          vertical-align: middle;
+        }
+        .campaigns-table-wrapper .table-responsive table td:last-child,
+        .campaigns-table-wrapper .table-responsive table th:last-child {
+          max-width: none;
+        }
+        .campaigns-table-wrapper .table-responsive table td[style*="width"],
+        .campaigns-table-wrapper .table-responsive table th[style*="width"] {
+          max-width: none;
+        }
+        .campaigns-table-wrapper .table-responsive table td.description-cell {
+          max-width: 300px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+      `}} />
       <BreadcrumbItem
         mainTitle="CRM"
         mainLink="/crm/dashboard"
@@ -1056,7 +1101,7 @@ const CrmCampaigns = () => {
             <Col lg={3} md={6} className="mb-3">
               <KPICard 
                 title="Active Campaigns"
-                value={filterCounts.active.toString()}
+                value={metrics.active_campaigns.toString()}
                 icon={<TrendingUp size={24} />}
                 color="success"
               />
@@ -1064,7 +1109,7 @@ const CrmCampaigns = () => {
             <Col lg={3} md={6} className="mb-3">
               <KPICard 
                 title="Inactive Campaigns"
-                value={filterCounts.inactive.toString()}
+                value={metrics.inactive_campaigns.toString()}
                 icon={<AlertCircle size={24} />}
                 color="warning"
               />
@@ -1079,41 +1124,7 @@ const CrmCampaigns = () => {
             </Col>
           </Row>
 
-          {/* Analytics Charts */}
-          <Row className="mb-4">
-            <Col md={4} className="mb-3">
-              <Card className="border-0 shadow-sm h-100">
-                <Card.Body>
-                  <h6 className="fw-bold mb-3">Campaign Status Distribution</h6>
-                  <ResponsiveContainer width="100%" height={250}>
-                    <PieChart>
-                      <Pie
-                        data={[
-                          { name: 'Active', value: filterCounts.active, color: '#198754' },
-                          { name: 'Inactive', value: filterCounts.inactive, color: '#dc3545' },
-                        ]}
-                        cx="50%"
-                        cy="50%"
-                        labelLine={false}
-                        label={({ name, percent }: any) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                        outerRadius={80}
-                        fill="#8884d8"
-                        dataKey="value"
-                      >
-                        {[
-                          { name: 'Active', value: filterCounts.active, color: '#198754' },
-                          { name: 'Inactive', value: filterCounts.inactive, color: '#dc3545' },
-                        ].map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </Card.Body>
-              </Card>
-            </Col>
-          </Row>
+    
         </>
       )}
 
@@ -1121,14 +1132,15 @@ const CrmCampaigns = () => {
       {session?.user?.permissions?.includes('list-crm-campaigns') && (
         <FilterBar
           quickFilters={[
-            { id: 'all', label: 'All Campaigns', count: filterCounts.all, color: '#6c757d', activeColor: '#0d6efd', icon: <Megaphone size={16} /> },
-            { id: 'active', label: 'Active', count: filterCounts.active, color: '#198754', activeColor: '#0d6efd', icon: <TrendingUp size={16} /> },
-            { id: 'inactive', label: 'Inactive', count: filterCounts.inactive, color: '#dc3545', activeColor: '#0d6efd', icon: <AlertCircle size={16} /> },
+            { id: 'all', label: 'All Campaigns', color: '#6c757d', activeColor: '#0d6efd', icon: <Megaphone size={16} /> },
+            { id: 'active', label: 'Active', color: '#198754', activeColor: '#0d6efd', icon: <TrendingUp size={16} /> },
+            { id: 'inactive', label: 'Inactive', color: '#dc3545', activeColor: '#0d6efd', icon: <AlertCircle size={16} /> },
           ]}
           activeFilter={activeFilter}
           onFilterChange={(filterId) => {
             setActiveFilter(filterId);
             setCampaignsPagination({ ...campaignsPagination, currentPage: 1 });
+            setRefreshKey(prev => prev + 1);
           }}
           searchValue={campaignsSearch}
           onSearchChange={(value) => setCampaignsSearch(value)}
@@ -1139,10 +1151,7 @@ const CrmCampaigns = () => {
           searchPlaceholder="Search campaigns by name, description..."
           showAdvancedFilters={showAdvancedFilters}
           onToggleAdvancedFilters={() => setShowAdvancedFilters(!showAdvancedFilters)}
-          advancedFilterCount={
-            campaignFilters.status.length +
-            (campaignFilters.dateRange.start || campaignFilters.dateRange.end ? 1 : 0)
-          }
+          advancedFilterCount={campaignFilters.status.length}
         />
       )}
 
@@ -1151,7 +1160,7 @@ const CrmCampaigns = () => {
         <Card className="border-0 shadow-sm mb-4">
           <Card.Body>
             <Row className="g-3 align-items-end">
-              <Col md={3}>
+              <Col md={4}>
                 <Form.Label className="small fw-bold mb-2">Status</Form.Label>
                 <Select
                   isMulti
@@ -1159,61 +1168,37 @@ const CrmCampaigns = () => {
                     { value: 'active', label: 'Active' },
                     { value: 'inactive', label: 'Inactive' },
                   ]}
-                  value={campaignFilters.status.map(s => ({ value: s, label: s }))}
+                  value={campaignFilters.status.length > 0 
+                    ? campaignFilters.status.map(s => ({ 
+                        value: s, 
+                        label: s.charAt(0).toUpperCase() + s.slice(1) 
+                      }))
+                    : null
+                  }
                   onChange={(selected) => {
                     setCampaignFilters(prev => ({
                       ...prev,
                       status: selected ? selected.map(s => s.value) : []
                     }));
+                    // Reset activeFilter when using advanced status filter
+                    setActiveFilter('all');
                   }}
                   placeholder="Select status..."
                   styles={customSelectStyles}
+                  isClearable
                 />
               </Col>
-              <Col md={3}>
-                <Form.Label className="small fw-bold mb-2">Start Date</Form.Label>
-                <Form.Control
-                  type="date"
-                  value={campaignFilters.dateRange.start}
-                  onChange={(e) => setCampaignFilters(prev => ({
-                    ...prev,
-                    dateRange: { ...prev.dateRange, start: e.target.value }
-                  }))}
-                />
-              </Col>
-              <Col md={3}>
-                <Form.Label className="small fw-bold mb-2">End Date</Form.Label>
-                <Form.Control
-                  type="date"
-                  value={campaignFilters.dateRange.end}
-                  onChange={(e) => setCampaignFilters(prev => ({
-                    ...prev,
-                    dateRange: { ...prev.dateRange, end: e.target.value }
-                  }))}
-                />
-              </Col>
-              <Col md={3}>
+              <Col md={8}>
                 <div className="d-flex gap-2">
-                  <Button 
-                    variant="primary" 
-                    className="flex-grow-1"
-                    onClick={() => {
-                      setCampaignsPagination({ ...campaignsPagination, currentPage: 1 });
-                      setRefreshKey(prev => prev + 1);
-                    }}
-                  >
-                    Apply
-                  </Button>
                   <Button 
                     variant="outline-secondary" 
                     onClick={() => {
                       setCampaignFilters({
                         status: [],
-                        owner: [],
-                        tags: [],
-                        priority: [],
-                        dateRange: { start: '', end: '' }
                       });
+                      setActiveFilter('all');
+                      setCampaignsPagination({ ...campaignsPagination, currentPage: 1 });
+                      setRefreshKey(prev => prev + 1);
                     }}
                   >
                     Reset
@@ -1272,15 +1257,15 @@ const CrmCampaigns = () => {
 
       {/* Campaigns Table */}
       {session?.user?.permissions?.includes('list-crm-campaigns') && (
-        <Card className="border-0 shadow-sm">
-          <Card.Body className="p-0">
+        <Card className="border-0 shadow-sm campaigns-table-wrapper" style={{ width: '100%' }}>
+          <Card.Body className="p-0" style={{ width: '100%' }}>
             <div className="table-responsive">
-              <Table hover className="mb-0">
+              <Table hover className="mb-0" style={{ width: '100%', margin: 0, tableLayout: 'auto' }}>
                 <thead className="bg-light">
                   <tr>
                     {selectedCampaignsColumns.includes('name') && (
                       <th 
-                        style={{ cursor: 'pointer' }}
+                        style={{ cursor: 'pointer', userSelect: 'none' }}
                         onClick={() => {
                           const newDirection = campaignsPagination.sortColumn === 'name' && campaignsPagination.sortDirection === 'asc' ? 'desc' : 'asc';
                           setCampaignsPagination({ ...campaignsPagination, sortColumn: 'name', sortDirection: newDirection, currentPage: 1 });
@@ -1291,7 +1276,7 @@ const CrmCampaigns = () => {
                     )}
                     {selectedCampaignsColumns.includes('status') && (
                       <th 
-                        style={{ cursor: 'pointer' }}
+                        style={{ cursor: 'pointer', userSelect: 'none' }}
                         onClick={() => {
                           const newDirection = campaignsPagination.sortColumn === 'status' && campaignsPagination.sortDirection === 'asc' ? 'desc' : 'asc';
                           setCampaignsPagination({ ...campaignsPagination, sortColumn: 'status', sortDirection: newDirection, currentPage: 1 });
@@ -1302,7 +1287,7 @@ const CrmCampaigns = () => {
                     )}
                     {selectedCampaignsColumns.includes('dateRange') && (
                       <th 
-                        style={{ cursor: 'pointer' }}
+                        style={{ cursor: 'pointer', userSelect: 'none' }}
                         onClick={() => {
                           const newDirection = campaignsPagination.sortColumn === 'start_date' && campaignsPagination.sortDirection === 'asc' ? 'desc' : 'asc';
                           setCampaignsPagination({ ...campaignsPagination, sortColumn: 'start_date', sortDirection: newDirection, currentPage: 1 });
@@ -1314,7 +1299,7 @@ const CrmCampaigns = () => {
                     {selectedCampaignsColumns.includes('campaignUsers') && <th>Campaign Users</th>}
                     {selectedCampaignsColumns.includes('created') && (
                       <th 
-                        style={{ cursor: 'pointer' }}
+                        style={{ cursor: 'pointer', userSelect: 'none' }}
                         onClick={() => {
                           const newDirection = campaignsPagination.sortColumn === 'created_at' && campaignsPagination.sortDirection === 'asc' ? 'desc' : 'asc';
                           setCampaignsPagination({ ...campaignsPagination, sortColumn: 'created_at', sortDirection: newDirection, currentPage: 1 });
@@ -1323,29 +1308,16 @@ const CrmCampaigns = () => {
                         Created {renderSortIcon('created_at', campaignsPagination)}
                       </th>
                     )}
-                    <th>Actions</th>
+                    <th style={{ width: '120px', minWidth: '120px' }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {(() => {
-                    let filteredCampaigns = campaignsData.filter(campaign => {
-                      if (activeFilter === 'active') return campaign.status === 'active';
-                      if (activeFilter === 'inactive') return campaign.status === 'inactive';
-                      
-                      const searchLower = campaignsSearch.toLowerCase();
-                      const matchesSearch = !campaignsSearch || 
-                        campaign.name?.toLowerCase().includes(searchLower) ||
-                        campaign.description?.toLowerCase().includes(searchLower);
-                      
-                      if (campaignFilters.status.length > 0 && !campaignFilters.status.includes(campaign.status)) return false;
-                      
-                      return matchesSearch;
-                    });
-                    
-                    const sorted = sortData(filteredCampaigns, campaignsPagination.sortColumn, campaignsPagination.sortDirection);
+                    // API handles filtering, so we just sort and paginate the data
+                    const sorted = sortData(campaignsData, campaignsPagination.sortColumn, campaignsPagination.sortDirection);
                     const paginated = paginateData(sorted, campaignsPagination.currentPage, campaignsPagination.rowsPerPage);
                     
-                    if (filteredCampaigns.length === 0) {
+                    if (campaignsData.length === 0) {
                       return (
                         <tr>
                           <td colSpan={selectedCampaignsColumns.length + 1} className="text-center py-4 text-muted">
@@ -1361,7 +1333,19 @@ const CrmCampaigns = () => {
                           <td>
                             <div>
                               <div className="fw-semibold">{campaign.name || "Unnamed Campaign"}</div>
-                              <div className="small text-muted mt-1">{campaign.description || "No Description"}</div>
+                              <div 
+                                className="small text-muted mt-1 description-cell" 
+                                title={campaign.description || "No Description"}
+                                style={{
+                                  maxWidth: '300px',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  whiteSpace: 'nowrap',
+                                  display: 'block'
+                                }}
+                              >
+                                {campaign.description || "No Description"}
+                              </div>
                             </div>
                           </td>
                         )}
@@ -1401,7 +1385,7 @@ const CrmCampaigns = () => {
                             </small>
                           </td>
                         )}
-                        <td>
+                        <td style={{ width: '120px', minWidth: '120px' }}>
                           <div className="d-flex gap-1">
                             {session?.user?.permissions?.includes('view-crm-campaigns') && (
                               <Button 
@@ -1446,23 +1430,7 @@ const CrmCampaigns = () => {
             </div>
 
             <div className="p-3">
-              {(() => {
-                let filteredCampaigns = campaignsData.filter(campaign => {
-                  if (activeFilter === 'active') return campaign.status === 'active';
-                  if (activeFilter === 'inactive') return campaign.status === 'inactive';
-                  
-                  const searchLower = campaignsSearch.toLowerCase();
-                  const matchesSearch = !campaignsSearch || 
-                    campaign.name?.toLowerCase().includes(searchLower) ||
-                    campaign.description?.toLowerCase().includes(searchLower);
-                  
-                  if (campaignFilters.status.length > 0 && !campaignFilters.status.includes(campaign.status)) return false;
-                  
-                  return matchesSearch;
-                });
-                
-                return renderPaginationControls(filteredCampaigns.length, campaignsPagination, setCampaignsPagination, 'campaigns');
-              })()}
+              {renderPaginationControls(totalCampaigns, campaignsPagination, setCampaignsPagination, 'campaigns')}
             </div>
           </Card.Body>
         </Card>
@@ -1525,10 +1493,10 @@ const CrmCampaigns = () => {
                   type="date"
                   value={formData.start_date}
                   onChange={handleStartDateChange}
-                  min={getTodayDate()}
+                  min={showEditModal ? undefined : getTodayDate()}
                 />
                 <Form.Text className="text-muted">
-                  Must be today or a future date
+                  {showEditModal ? "Campaign start date" : "Must be today or a future date"}
                 </Form.Text>
               </Form.Group>
             </Col>
@@ -1539,7 +1507,7 @@ const CrmCampaigns = () => {
                   type="date"
                   value={formData.end_date}
                   onChange={handleEndDateChange}
-                  min={getMinEndDate()}
+                  min={showEditModal ? undefined : getMinEndDate()}
                 />
                 <Form.Text className="text-muted">
                   Must be after start date

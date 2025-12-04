@@ -12,6 +12,7 @@ import {
   getDeals,
   getStages,
   deleteDeal,
+  restoreDeal,
   getDeal,
   getDealAttachments,
   uploadDealAttachment,
@@ -80,6 +81,7 @@ import {
   Upload,
   Download as DownloadIcon,
   AlertCircle,
+  RotateCcw,
 } from 'lucide-react';
 import { 
   PieChart, 
@@ -214,13 +216,6 @@ const FilterBar: React.FC<FilterBarProps> = ({
                 >
                   {filter.icon && <span className="d-flex align-items-center">{filter.icon}</span>}
                   {filter.label}
-                  <Badge
-                    bg={isActive ? 'light' : 'light'}
-                    text={isActive ? 'dark' : 'dark'}
-                    className="ms-2"
-                  >
-                    {filter.count}
-                  </Badge>
                 </Button>
               );
             })}
@@ -363,6 +358,9 @@ const CrmDeals = () => {
         if (currentFilters.is_lost !== undefined) {
           params.is_lost = currentFilters.is_lost;
         }
+        if (currentFilters.include_archived !== undefined) {
+          params.include_archived = currentFilters.include_archived;
+        }
 
         const response: any = await getDeals(params);
         console.log("Raw response from getDeals:", response);
@@ -389,6 +387,19 @@ const CrmDeals = () => {
       setCurrentFilters((prev) => {
         const newFilters = { ...prev };
         delete newFilters.stage_id;
+        delete newFilters.include_archived;
+        return newFilters;
+      });
+      // Clear stage dropdown
+      setDealsFilters(prev => ({
+        ...prev,
+        stage: null
+      }));
+    } else if (activeFilter === 'deleted') {
+      setCurrentFilters((prev) => {
+        const newFilters = { ...prev };
+        delete newFilters.stage_id;
+        newFilters.include_archived = true;
         return newFilters;
       });
       // Clear stage dropdown
@@ -400,10 +411,12 @@ const CrmDeals = () => {
       // Find stage by id (activeFilter should be stage id as string)
       const selectedStage = stages.find((s: any) => s.id.toString() === activeFilter);
       if (selectedStage) {
-        setCurrentFilters((prev) => ({
-          ...prev,
-          stage_id: selectedStage.id.toString(),
-        }));
+        setCurrentFilters((prev) => {
+          const newFilters = { ...prev };
+          delete newFilters.include_archived;
+          newFilters.stage_id = selectedStage.id.toString();
+          return newFilters;
+        });
         // Auto-fill stage dropdown
         setDealsFilters(prev => ({
           ...prev,
@@ -521,6 +534,15 @@ const CrmDeals = () => {
       // Handle is_lost filter
       if ('is_lost' in filters) {
         newFilters.is_lost = filters.is_lost;
+      }
+      
+      // Handle include_archived filter
+      if ('include_archived' in filters) {
+        if (filters.include_archived) {
+          newFilters.include_archived = true;
+        } else {
+          delete newFilters.include_archived;
+        }
       }
       
       return newFilters;
@@ -651,6 +673,23 @@ const CrmDeals = () => {
       console.error("Failed to delete deal:", error);
     }
   }, [dealToDelete]);
+
+  // Restore Deal Handler
+  const handleRestoreDeal = useCallback(async (dealId: number) => {
+    if (!window.confirm('Are you sure you want to restore this deal?')) return;
+
+    try {
+      await restoreDeal(dealId);
+      toast.success("Deal restored successfully!");
+      setShowSuccessfulModal(true);
+      setSuccessModalTitle("Deal Restored");
+      setSuccessModalDescription("Deal has been restored successfully");
+      setRefreshKey((oldKey) => oldKey + 1);
+    } catch (error) {
+      console.error("Failed to restore deal:", error);
+      toast.error("Failed to restore deal");
+    }
+  }, []);
 
   // Helper functions
   const handleSort = (column: string, paginationState: any, setPaginationState: (state: any) => void) => {
@@ -861,6 +900,7 @@ const CrmDeals = () => {
     const transformed = dealsData.map(transformDealData);
     const counts: Record<string, number> = {
       all: summaryTiles?.total_deals || totalDeals || transformed.length,
+      deleted: summaryTiles?.deleted_deals || 0,
     };
     
     // Add counts for first 5 stages
@@ -911,6 +951,28 @@ const CrmDeals = () => {
  
   return (
     <React.Fragment>
+      <style dangerouslySetInnerHTML={{__html: `
+        .deals-table-wrapper {
+          width: 100%;
+          overflow: hidden;
+        }
+        .deals-table-wrapper .table-responsive {
+          width: 100%;
+          overflow-x: auto;
+          overflow-y: visible;
+          -webkit-overflow-scrolling: touch;
+        }
+        .deals-table-wrapper .table-responsive table {
+          width: 100%;
+          table-layout: auto;
+          margin-bottom: 0;
+        }
+        .deals-table-wrapper .table-responsive table th,
+        .deals-table-wrapper .table-responsive table td {
+          padding: 12px 16px;
+          vertical-align: middle;
+        }
+      `}} />
       <BreadcrumbItem
         mainTitle="CRM"
         mainLink="/crm/dashboard"
@@ -1050,7 +1112,15 @@ const CrmDeals = () => {
               color: stage.color || '#6c757d',
               activeColor: '#0d6efd',
               icon: <Layers size={16} />
-            }))
+            })),
+            {
+              id: 'deleted',
+              label: 'Deleted',
+              count: filterCounts.deleted || 0,
+              color: '#dc3545',
+              activeColor: '#dc3545',
+              icon: <Trash2 size={16} />
+            }
           ]}
           activeFilter={activeFilter}
           onFilterChange={(filterId) => {
@@ -1148,16 +1218,6 @@ const CrmDeals = () => {
                 <Col md={4}>
                   <div className="d-flex gap-2">
                     <Button
-                      variant="primary"
-                      className="flex-grow-1 d-flex align-items-center justify-content-center"
-                      onClick={() => {
-                        setDealsPagination({ ...dealsPagination, currentPage: 1 });
-                        setRefreshKey(prev => prev + 1);
-                      }}
-                    >
-                      Apply Filters
-                    </Button>
-                    <Button
                       variant="outline-secondary"
                       className="d-flex align-items-center justify-content-center"
                       onClick={() => {
@@ -1238,10 +1298,10 @@ const CrmDeals = () => {
         </div>
 
         {/* Deals Table */}
-        <Card className="border-0 shadow-sm">
-          <Card.Body className="p-0">
+        <Card className="border-0 shadow-sm deals-table-wrapper" style={{ width: '100%' }}>
+          <Card.Body className="p-0" style={{ width: '100%' }}>
             <div className="table-responsive">
-              <Table hover className="mb-0">
+              <Table hover className="mb-0 w-100" style={{ width: '100%', margin: 0 }}>
                 <thead className="bg-light">
                   <tr>
                     {selectedDealsColumns.includes('name') && (
@@ -1316,7 +1376,7 @@ const CrmDeals = () => {
                         Created {renderSortIcon('created', dealsPagination)}
                       </th>
                     )}
-                    <th>Actions</th>
+                    <th style={{ width: '120px', minWidth: '120px' }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1386,38 +1446,61 @@ const CrmDeals = () => {
                         {selectedDealsColumns.includes('created') && (
                           <td>{deal.created || '-'}</td>
                         )}
-                        <td>
+                        <td style={{ width: '120px', minWidth: '120px' }}>
                           <div className="d-flex gap-1">
-                              <Button 
-                                variant="link" 
-                                size="sm" 
-                                className="p-1" 
-                                title="View"
-                                onClick={() => handleViewDeal(deal.rawData?.id || deal.id)}
-                              >
-                                <Eye size={16} />
-                              </Button>
-                              <Button 
-                                variant="link" 
-                                size="sm" 
-                                className="p-1" 
-                                title="Edit"
-                                onClick={() => window.location.href = `/crm/deals/${deal.rawData?.id || deal.id}/edit`}
-                              >
-                                <Edit size={16} />
-                              </Button>
-                              <Button 
-                                variant="link" 
-                                size="sm" 
-                                className="p-1 text-info" 
-                                title="Manage Attachments"
-                                onClick={() => {
-                                  setSelectedDealForAttachments(deal.rawData || deal);
-                                  setShowAttachmentModal(true);
-                                }}
-                              >
-                                <Paperclip size={16} />
-                              </Button>
+                            {activeFilter === 'deleted' ? (
+                              <>
+                                <Button 
+                                  variant="link" 
+                                  size="sm" 
+                                  className="p-1" 
+                                  title="View"
+                                  onClick={() => handleViewDeal(deal.rawData?.id || deal.id)}
+                                >
+                                  <Eye size={16} />
+                                </Button>
+                                <Button 
+                                  variant="link" 
+                                  size="sm" 
+                                  className="p-1 text-success" 
+                                  title="Restore"
+                                  onClick={() => handleRestoreDeal(deal.rawData?.id || deal.id)}
+                                >
+                                  <RotateCcw size={16} />
+                                </Button>
+                              </>
+                            ) : (
+                              <>
+                                <Button 
+                                  variant="link" 
+                                  size="sm" 
+                                  className="p-1" 
+                                  title="View"
+                                  onClick={() => handleViewDeal(deal.rawData?.id || deal.id)}
+                                >
+                                  <Eye size={16} />
+                                </Button>
+                                <Button 
+                                  variant="link" 
+                                  size="sm" 
+                                  className="p-1" 
+                                  title="Edit"
+                                  onClick={() => window.location.href = `/crm/deals/${deal.rawData?.id || deal.id}/edit`}
+                                >
+                                  <Edit size={16} />
+                                </Button>
+                                <Button 
+                                  variant="link" 
+                                  size="sm" 
+                                  className="p-1 text-info" 
+                                  title="Manage Attachments"
+                                  onClick={() => {
+                                    setSelectedDealForAttachments(deal.rawData || deal);
+                                    setShowAttachmentModal(true);
+                                  }}
+                                >
+                                  <Paperclip size={16} />
+                                </Button>
                                 <Button 
                                   variant="link" 
                                   size="sm" 
@@ -1427,15 +1510,17 @@ const CrmDeals = () => {
                                 >
                                   <ShoppingBag size={16} />
                                 </Button>
-                              <Button 
-                                variant="link" 
-                                size="sm" 
-                                className="p-1 text-danger" 
-                                title="Delete"
-                                onClick={() => handleDeleteDeal(deal.rawData?.id || deal.id)}
-                              >
-                                <Trash2 size={16} />
-                              </Button>
+                                <Button 
+                                  variant="link" 
+                                  size="sm" 
+                                  className="p-1 text-danger" 
+                                  title="Delete"
+                                  onClick={() => handleDeleteDeal(deal.rawData?.id || deal.id)}
+                                >
+                                  <Trash2 size={16} />
+                                </Button>
+                              </>
+                            )}
                           </div>
                         </td>
                       </tr>

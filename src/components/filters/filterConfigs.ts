@@ -1164,23 +1164,6 @@ export const createCrmDataFiltersConfig = (
 ): FilterTab[] => {
   return [
     {
-      id: 'assignment-status',
-      title: 'Assignment Status',
-      icon: 'ti ti-user-check',
-      fields: [
-        {
-          type: 'select',
-          name: 'assignment_status',
-          label: 'Assignment Status',
-          options: [
-            { value: '', label: 'All' },
-            { value: 'assigned', label: 'Assigned' },
-            { value: 'unassigned', label: 'Unassigned' }
-          ]
-        }
-      ]
-    },
-    {
       id: 'user-extensions',
       title: 'Users',
       icon: 'ti ti-users',
@@ -1198,23 +1181,6 @@ export const createCrmDataFiltersConfig = (
       ]
     },
     {
-      id: 'view-status',
-      title: 'View Status',
-      icon: 'ti ti-eye',
-      fields: [
-        {
-          type: 'select',
-          name: 'is_viewed',
-          label: 'View Status',
-          options: [
-            { value: '', label: 'All' },
-            { value: 'true', label: 'Viewed' },
-            { value: 'false', label: 'New' }
-          ]
-        }
-      ]
-    },
-    {
       id: 'campaigns',
       title: 'Campaigns',
       icon: 'ti ti-target',
@@ -1228,42 +1194,6 @@ export const createCrmDataFiltersConfig = (
             value: campaign.id,
             label: campaign.name
           })) || []
-        }
-      ]
-    },
-    {
-      id: 'tags',
-      title: 'Tags',
-      icon: 'ti ti-tag',
-      fields: [
-        {
-          type: 'select',
-          isMulti: true,
-          name: 'tags',
-          label: 'Filter by Tags',
-          options: staticTags.map((tag: { value: string; label: string }) => ({
-            value: tag.value,
-            label: tag.label
-          })) || []
-        }
-      ]
-    },
-    {
-      id: 'date-range',
-      title: 'Date Range',
-      icon: 'ti ti-calendar',
-      fields: [
-        {
-          type: 'date',
-          name: 'start_date',
-          label: 'Start Date',
-          placeholder: 'Select start date'
-        },
-        {
-          type: 'date',
-          name: 'end_date',
-          label: 'End Date',
-          placeholder: 'Select end date (must be after start date)'
         }
       ]
     }

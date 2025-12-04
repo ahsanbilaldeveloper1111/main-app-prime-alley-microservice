@@ -35,7 +35,7 @@ export interface StageData {
   active: boolean;
   created_at: string;
   updated_at: string;
-  type: 'lead' | 'lost_reason' | 'deal' | 'order';
+  type: "lead" | "lost_reason" | "deal" | "order";
 }
 
 export interface LostReasonData {
@@ -48,7 +48,6 @@ export interface LostReasonData {
   created_at: string;
   updated_at: string;
 }
-
 
 export interface MeetingData {
   id?: number;
@@ -255,6 +254,15 @@ export const deleteLead = async (id: number): Promise<void> => {
   }
 };
 
+export const restoreLead = async (id: number): Promise<void> => {
+  try {
+    await axiosInstance.post(`/crm/leads/${id}/restore`);
+  } catch (error: any) {
+    toast.error(error?.message || "Failed to restore lead");
+    throw error;
+  }
+};
+
 export const getLead = async (id: number): Promise<LeadData> => {
   try {
     const response = await axiosInstance.get(`/crm/leads/${id}`);
@@ -379,11 +387,19 @@ export const getAssigneeComments = async (leadId: number): Promise<any[]> => {
 };
 
 // Stage Management
-export const getStages = async (type?: 'lead' | 'lost_reason' | 'deal' | 'order'): Promise<StageData[]> => {
+export const getStages = async (
+  type?: "lead" | "lost_reason" | "deal" | "order",
+  params?: { include_archived?: boolean }
+): Promise<StageData[]> => {
   try {
     console.log("getStages: Making API call to /crm/stages");
-    const params = type ? { type } : {};
-    const response = await axiosInstance.get("/crm/stages", { params });
+    const requestParams: any = type ? { type } : {};
+    if (params?.include_archived) {
+      requestParams.include_archived = true;
+    }
+    const response = await axiosInstance.get("/crm/stages", {
+      params: requestParams,
+    });
     console.log("getStages: Raw axios response:", response);
     console.log("getStages: Response data:", response.data);
 
@@ -431,6 +447,15 @@ export const deleteStage = async (id: number): Promise<void> => {
     await axiosInstance.delete(`/crm/stages/${id}`);
   } catch (error: any) {
     toast.error(error?.message || "Failed to delete stage");
+    throw error;
+  }
+};
+
+export const restoreStage = async (id: number): Promise<void> => {
+  try {
+    await axiosInstance.post(`/crm/stages/${id}/restore`);
+  } catch (error: any) {
+    toast.error(error?.message || "Failed to restore stage");
     throw error;
   }
 };
@@ -503,7 +528,7 @@ export const getMeetings = async (
 }> => {
   try {
     const response = await axiosInstance.get("/crm/meetings", { params });
-    return extractData<{data: MeetingData[]}>(response.data);
+    return extractData<{ data: MeetingData[] }>(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to fetch meetings");
     throw error;
@@ -614,10 +639,19 @@ export interface CrmDataPagination {
   to: number | null;
 }
 
+export interface CrmDataMetrics {
+  assigned_records: number;
+  unassigned_records: number;
+  scheduled_records: number;
+  not_scheduled_records: number;
+  scheduled_next_hour_records: number;
+  scheduled_next_24_hours_records: number;
+}
 export interface CrmDataResponse {
   success: boolean;
   data: CrmDataItem[];
   pagination: CrmDataPagination;
+  metrics: CrmDataMetrics;
 }
 
 export interface CrmDataApiResponse {
@@ -633,7 +667,9 @@ export interface CrmDataUploadResponse {
   errors: string[];
 }
 
-export const getCrmData = async (params: PaginationParams = {}): Promise<CrmDataResponse> => {
+export const getCrmData = async (
+  params: PaginationParams = {}
+): Promise<CrmDataResponse> => {
   try {
     params.module_slug = ModuleSlug.CRM_DATA_MANAGEMENT;
     const response = await axiosInstance.get("/crm/crm-data", { params });
@@ -649,21 +685,23 @@ export const getCrmDataById = async (id: number): Promise<CrmDataItem> => {
     const response = await axiosInstance.get(`/crm/crm-data/${id}`);
     return response.data?.data?.data;
   } catch (error: any) {
-    toast.error(error?.response?.data?.message || "Failed to fetch CRM data record");
+    toast.error(
+      error?.response?.data?.message || "Failed to fetch CRM data record"
+    );
     throw error;
   }
 };
 
 export const uploadCrmDataCsv = async (
-  file: File, 
-  campaignIds: string[] = [], 
+  file: File,
+  campaignIds: string[] = [],
   fieldTags: string[] = [],
   assignToCampaignUsers: boolean = false
 ): Promise<CrmDataUploadResponse> => {
   try {
     const formData = new FormData();
     formData.append("csv_file", file);
-    
+
     // Add campaign_ids as an array
     if (campaignIds.length > 0) {
       campaignIds.forEach((campaignId, index) => {
@@ -680,20 +718,24 @@ export const uploadCrmDataCsv = async (
 
     // Add should_assign flag (matching Laravel controller)
     formData.append("should_assign", assignToCampaignUsers.toString());
-    
+
     // Add chunk_size for better performance
     formData.append("chunk_size", "1000");
-    
-    const response = await axiosInstance.post("/crm/crm-data/upload-csv", formData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
-    });
-    
+
+    const response = await axiosInstance.post(
+      "/crm/crm-data/upload-csv",
+      formData,
+      {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      }
+    );
+
     if (response.data.success) {
       toast.success(response.data.message);
     }
-    
+
     return response.data;
   } catch (error: any) {
     toast.error(error?.response?.data?.message || "Failed to upload CSV file");
@@ -729,9 +771,11 @@ export const assignCrmDataToExtension = async (
     }
 
     await axiosInstance.post("/crm/crm_data/assign", payload);
-    
+
     const extensionNames = userExtensions.join(", ");
-    toast.success(`Successfully assigned ${itemIds.length} items to ${extensionNames}`);
+    toast.success(
+      `Successfully assigned ${itemIds.length} items to ${extensionNames}`
+    );
   } catch (error: any) {
     toast.error(error?.response?.data?.message || "Failed to assign CRM data");
     throw error;
@@ -760,14 +804,14 @@ export const assignCrmDataAdvanced = async (
     const payload: any = {
       campaign_ids: campaignIds,
       count: count,
-      distribution_mode: distributionMode
+      distribution_mode: distributionMode,
     };
 
     // Add optional parameters if provided
     if (campaignFilterIds.length > 0) {
       payload.campaign_filter_ids = campaignFilterIds;
     }
-    
+
     if (tagIds.length > 0) {
       payload.tag_ids = tagIds;
     }
@@ -778,11 +822,11 @@ export const assignCrmDataAdvanced = async (
     }
 
     const response = await axiosInstance.post("/crm/crm_data/assign", payload);
-    
+
     if (response.data.success) {
       toast.success(response.data.message);
     }
-    
+
     return response.data;
   } catch (error: any) {
     toast.error(error?.response?.data?.message || "Failed to assign CRM data");
@@ -815,32 +859,36 @@ export const getCrmDataCounts = async (
   try {
     const payload = {
       campaign_ids: campaignIds,
-      tags: tags
+      tags: tags,
     };
 
     const response = await axiosInstance.post("/crm/crm-data/counts", payload);
     return response.data.data?.data;
   } catch (error: any) {
-    toast.error(error?.response?.data?.message || "Failed to get CRM data counts");
+    toast.error(
+      error?.response?.data?.message || "Failed to get CRM data counts"
+    );
     throw error;
   }
 };
 
 // Bulk delete CRM data
-export const bulkDeleteCrmData = async (ids: number[]): Promise<{
+export const bulkDeleteCrmData = async (
+  ids: number[]
+): Promise<{
   success: boolean;
   message: string;
   deleted_count: number;
 }> => {
   try {
     const response = await axiosInstance.post("/crm/crm-data/bulk/delete", {
-       ids : ids
+      ids: ids,
     });
-    
+
     if (response.data.success) {
       toast.success(response.data.message);
     }
-    
+
     return response.data;
   } catch (error: any) {
     toast.error(error?.response?.data?.message || "Failed to delete CRM data");
@@ -849,14 +897,16 @@ export const bulkDeleteCrmData = async (ids: number[]): Promise<{
 };
 
 // Tag management functions
-export const getCrmDataTags = async (): Promise<Array<{
-  id: number;
-  name: string;
-  color?: string;
-  description?: string;
-  created_at: string;
-  updated_at: string;
-}>> => {
+export const getCrmDataTags = async (): Promise<
+  Array<{
+    id: number;
+    name: string;
+    color?: string;
+    description?: string;
+    created_at: string;
+    updated_at: string;
+  }>
+> => {
   try {
     const response = await axiosInstance.get("/crm/crm-data/tags");
     return response.data.data?.data;
@@ -880,11 +930,11 @@ export const createCrmDataTag = async (data: {
 }> => {
   try {
     const response = await axiosInstance.post("/crm/crm-data/tags", data);
-    
+
     if (response.data.success) {
       toast.success(response.data.message);
     }
-    
+
     return response.data.data;
   } catch (error: any) {
     toast.error(error?.response?.data?.message || "Failed to create tag");
@@ -909,11 +959,11 @@ export const updateCrmDataTag = async (
 }> => {
   try {
     const response = await axiosInstance.put(`/crm/crm-data/tags/${id}`, data);
-    
+
     if (response.data.success) {
       toast.success(response.data.message);
     }
-    
+
     return response.data.data;
   } catch (error: any) {
     toast.error(error?.response?.data?.message || "Failed to update tag");
@@ -938,7 +988,7 @@ export const assignTagsToCrmData = async (
   try {
     await axiosInstance.post("/crm/crm-data/tags/assign", {
       crm_data_ids: crmDataIds,
-      tag_ids: tagIds
+      tag_ids: tagIds,
     });
     toast.success("Tags assigned successfully");
   } catch (error: any) {
@@ -954,7 +1004,7 @@ export const removeTagsFromCrmData = async (
   try {
     await axiosInstance.post("/crm/crm-data/tags/remove", {
       crm_data_ids: crmDataIds,
-      tag_ids: tagIds
+      tag_ids: tagIds,
     });
     toast.success("Tags removed successfully");
   } catch (error: any) {
@@ -970,7 +1020,9 @@ export const markCrmDataAsViewed = async (itemId: number): Promise<void> => {
     });
     toast.success("Item marked as viewed");
   } catch (error: any) {
-    toast.error(error?.response?.data?.message || "Failed to mark item as viewed");
+    toast.error(
+      error?.response?.data?.message || "Failed to mark item as viewed"
+    );
     throw error;
   }
 };
@@ -980,7 +1032,7 @@ export interface CampaignField {
   id?: number;
   campaign_id?: number;
   field_name: string;
-  field_type: 'string' | 'text' | 'integer' | 'date' | 'email' | 'dropdown';
+  field_type: "string" | "text" | "integer" | "date" | "email" | "dropdown";
   field_options?: string[];
   options?: Array<string | { value?: string; label?: string }>;
   sort_order?: number;
@@ -992,7 +1044,7 @@ export interface CampaignData {
   description: string | null;
   start_date: string;
   end_date: string;
-  status: 'active' | 'inactive';
+  status: "active" | "inactive";
   options: Record<string, any> | null;
   created_at: string;
   updated_at: string;
@@ -1006,27 +1058,43 @@ export interface CampaignData {
   }[];
 }
 
+export interface CampaignMetrics {
+  active_campaigns: number;
+  inactive_campaigns: number;
+}
+
 export const getCampaigns = async (
   params: PaginationParams = {}
-): Promise<PaginationWrapper<CampaignData>> => {
+): Promise<PaginationWrapper<CampaignData> & { metrics: CampaignMetrics }> => {
   try {
-    const { page = 1, per_page = 15, search = "", filters = {}, module_slug = "" } = params;
-    
+    const {
+      page = 1,
+      per_page = 15,
+      search = "",
+      filters = {},
+      module_slug = "",
+    } = params;
+
     // Build query parameters
     const queryParams: any = {
       page,
       per_page,
-      module_slug:ModuleSlug.CRM_CAMPAIGNS,
-      ...filters
+      module_slug: ModuleSlug.CRM_CAMPAIGNS,
+      ...filters,
     };
-    
+
     // Add search if provided
     if (search) {
       queryParams.search = search;
     }
-    
-    const response = await axiosInstance.get("/crm/campaigns", { params: queryParams });
-    return extractData<PaginationWrapper<CampaignData>>(response.data);
+
+    const response = await axiosInstance.get("/crm/campaigns", {
+      params: queryParams,
+    });
+    response.data.data.data.metrics = response.data?.data?.metrics;
+    return extractData<
+      PaginationWrapper<CampaignData> & { metrics: CampaignMetrics }
+    >(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to fetch campaigns");
     throw error;
@@ -1088,7 +1156,9 @@ export const deleteCampaign = async (id: number): Promise<void> => {
   }
 };
 
-export const getCampaignFields = async (id: number): Promise<CampaignField[]> => {
+export const getCampaignFields = async (
+  id: number
+): Promise<CampaignField[]> => {
   try {
     const response = await axiosInstance.get(`/crm/campaigns/${id}/fields`);
     return extractData<CampaignField[]>(response.data);
@@ -1103,7 +1173,10 @@ export const createCampaignField = async (
   data: Partial<CampaignField>
 ): Promise<CampaignField> => {
   try {
-    const response = await axiosInstance.post(`/crm/campaigns/${campaignId}/fields`, data);
+    const response = await axiosInstance.post(
+      `/crm/campaigns/${campaignId}/fields`,
+      data
+    );
     return extractData<CampaignField>(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to create campaign field");
@@ -1122,15 +1195,18 @@ export const scheduleCall = async (
   data: any;
 }> => {
   try {
-    const response = await axiosInstance.post(`/crm/crm-data/${crmDataId}/schedule-call`, {
-      scheduled_call_at: scheduledCallAt,
-      user_extension: userExtension
-    });
-    
+    const response = await axiosInstance.post(
+      `/crm/crm-data/${crmDataId}/schedule-call`,
+      {
+        scheduled_call_at: scheduledCallAt,
+        user_extension: userExtension,
+      }
+    );
+
     if (response.data.success) {
       toast.success(response.data.message);
     }
-    
+
     return response.data;
   } catch (error: any) {
     toast.error(error?.response?.data?.message || "Failed to schedule call");
@@ -1149,18 +1225,23 @@ export const updateScheduledCall = async (
   data: any;
 }> => {
   try {
-    const response = await axiosInstance.put(`/crm/crm-data/${crmDataId}/schedule-call`, {
-      scheduled_call_at: scheduledCallAt,
-      user_extension: userExtension
-    });
-    
+    const response = await axiosInstance.put(
+      `/crm/crm-data/${crmDataId}/schedule-call`,
+      {
+        scheduled_call_at: scheduledCallAt,
+        user_extension: userExtension,
+      }
+    );
+
     if (response.data.success) {
       toast.success(response.data.message);
     }
-    
+
     return response.data;
   } catch (error: any) {
-    toast.error(error?.response?.data?.message || "Failed to update scheduled call");
+    toast.error(
+      error?.response?.data?.message || "Failed to update scheduled call"
+    );
     throw error;
   }
 };
@@ -1175,17 +1256,22 @@ export const cancelScheduledCall = async (
   data: any;
 }> => {
   try {
-    const response = await axiosInstance.delete(`/crm/crm-data/${crmDataId}/schedule-call`, {
-      data: { user_extension: userExtension }
-    });
-    
+    const response = await axiosInstance.delete(
+      `/crm/crm-data/${crmDataId}/schedule-call`,
+      {
+        data: { user_extension: userExtension },
+      }
+    );
+
     if (response.data.success) {
       toast.success(response.data.message);
     }
-    
+
     return response.data;
   } catch (error: any) {
-    toast.error(error?.response?.data?.message || "Failed to cancel scheduled call");
+    toast.error(
+      error?.response?.data?.message || "Failed to cancel scheduled call"
+    );
     throw error;
   }
 };
@@ -1200,14 +1286,17 @@ export const unscheduleCall = async (
   data: any;
 }> => {
   try {
-    const response = await axiosInstance.post(`/crm/crm-data/${crmDataId}/unschedule-call`, {
-      user_extension: userExtension
-    });
-    
+    const response = await axiosInstance.post(
+      `/crm/crm-data/${crmDataId}/unschedule-call`,
+      {
+        user_extension: userExtension,
+      }
+    );
+
     if (response.data.success) {
       toast.success(response.data.message);
     }
-    
+
     return response.data;
   } catch (error: any) {
     toast.error(error?.response?.data?.message || "Failed to unschedule call");
@@ -1226,16 +1315,19 @@ export const bulkScheduleCalls = async (
   scheduled_count: number;
 }> => {
   try {
-    const response = await axiosInstance.post("/crm/crm-data/bulk-schedule-calls", {
-      crm_data_ids: crmDataIds,
-      scheduled_call_at: scheduledCallAt,
-      user_extension: userExtension
-    });
-    
+    const response = await axiosInstance.post(
+      "/crm/crm-data/bulk-schedule-calls",
+      {
+        crm_data_ids: crmDataIds,
+        scheduled_call_at: scheduledCallAt,
+        user_extension: userExtension,
+      }
+    );
+
     if (response.data.success) {
       toast.success(response.data.message);
     }
-    
+
     return response.data;
   } catch (error: any) {
     toast.error(error?.response?.data?.message || "Failed to schedule calls");
@@ -1253,15 +1345,18 @@ export const bulkUnscheduleCalls = async (
   unscheduled_count: number;
 }> => {
   try {
-    const response = await axiosInstance.post("/crm/crm-data/bulk-unschedule-calls", {
-      crm_data_ids: crmDataIds,
-      user_extension: userExtension
-    });
-    
+    const response = await axiosInstance.post(
+      "/crm/crm-data/bulk-unschedule-calls",
+      {
+        crm_data_ids: crmDataIds,
+        user_extension: userExtension,
+      }
+    );
+
     if (response.data.success) {
       toast.success(response.data.message);
     }
-    
+
     return response.data;
   } catch (error: any) {
     toast.error(error?.response?.data?.message || "Failed to unschedule calls");
@@ -1295,14 +1390,16 @@ export const getCrmDataHistory = async (
     const params: any = {
       page,
       per_page: perPage,
-      ...filters
+      ...filters,
     };
 
-    const response = await axiosInstance.get("/crm/crm-data/history", { params });
-    
+    const response = await axiosInstance.get("/crm/crm-data/history", {
+      params,
+    });
+
     return {
       data: response.data.data?.data,
-      pagination: response.data?.data?.pagination
+      pagination: response.data?.data?.pagination,
     };
   } catch (error: any) {
     console.error("Failed to get CRM data history:", error);
@@ -1423,7 +1520,7 @@ export const getDeals = async (
   try {
     const response = await axiosInstance.get("/crm/deals", { params });
     console.log("Raw response from getDeals:", response);
-    
+
     // Handle nested response structure
     // The API returns: { code: 200, data: { success: true, data: { current_page, data: [...], total, ... }, summary_tiles: {...} } }
     const responseData: any = response.data?.data;
@@ -1431,11 +1528,14 @@ export const getDeals = async (
     const dealsArray: DealData[] = paginationData?.data || [];
     const pagination = paginationData || {};
     const summaryTiles = responseData?.summary_tiles || null;
-    
+
     return {
       dataList: Array.isArray(dealsArray) ? dealsArray : [],
       meta: {
-        total: pagination?.total || (Array.isArray(dealsArray) ? dealsArray.length : 0) || 0,
+        total:
+          pagination?.total ||
+          (Array.isArray(dealsArray) ? dealsArray.length : 0) ||
+          0,
         current_page: pagination?.current_page || 1,
         per_page: pagination?.per_page || 15,
         last_page: pagination?.last_page || 1,
@@ -1455,7 +1555,8 @@ export const getDeal = async (id: number): Promise<DealData> => {
     // Handle nested response structure
     // The API returns: { code: 200, data: { success: true, data: {...} } }
     const responseData: any = response.data?.data;
-    const dealData: DealData = responseData?.data || responseData || response.data;
+    const dealData: DealData =
+      responseData?.data || responseData || response.data;
     return dealData;
   } catch (error: any) {
     toast.error(error?.message || "Failed to fetch deal");
@@ -1463,14 +1564,20 @@ export const getDeal = async (id: number): Promise<DealData> => {
   }
 };
 
-export const createDeal = async (data: Partial<DealData>): Promise<DealData> => {
+export const createDeal = async (
+  data: Partial<DealData>
+): Promise<DealData> => {
   try {
     const response = await axiosInstance.post("/crm/create-deal", data);
     const responseData: any = response.data?.data;
     toast.success("Deal created successfully");
     return responseData || response.data;
   } catch (error: any) {
-    toast.error(error?.response?.data?.message || error?.message || "Failed to create deal");
+    toast.error(
+      error?.response?.data?.message ||
+        error?.message ||
+        "Failed to create deal"
+    );
     throw error;
   }
 };
@@ -1487,7 +1594,11 @@ export const updateDeal = async (
     toast.success("Deal updated successfully");
     return responseData || response.data;
   } catch (error: any) {
-    toast.error(error?.response?.data?.message || error?.message || "Failed to update deal");
+    toast.error(
+      error?.response?.data?.message ||
+        error?.message ||
+        "Failed to update deal"
+    );
     throw error;
   }
 };
@@ -1497,7 +1608,20 @@ export const deleteDeal = async (id: number): Promise<void> => {
     await axiosInstance.delete(`/crm/deals/${id}`);
     toast.success("Deal deleted successfully");
   } catch (error: any) {
-    toast.error(error?.response?.data?.message || error?.message || "Failed to delete deal");
+    toast.error(
+      error?.response?.data?.message ||
+        error?.message ||
+        "Failed to delete deal"
+    );
+    throw error;
+  }
+};
+
+export const restoreDeal = async (id: number): Promise<void> => {
+  try {
+    await axiosInstance.post(`/crm/deals/${id}/restore`);
+  } catch (error: any) {
+    toast.error(error?.message || "Failed to restore deal");
     throw error;
   }
 };
@@ -1520,14 +1644,20 @@ export interface CreateEstimatePayload {
   currency: string;
 }
 
-export const createEstimate = async (data: CreateEstimatePayload): Promise<any> => {
+export const createEstimate = async (
+  data: CreateEstimatePayload
+): Promise<any> => {
   try {
     const response = await axiosInstance.post("/crm/create-estimate", data);
     const responseData: any = response.data?.data;
     toast.success("Estimation chart saved successfully");
     return responseData || response.data;
   } catch (error: any) {
-    toast.error(error?.response?.data?.message || error?.message || "Failed to save estimation chart");
+    toast.error(
+      error?.response?.data?.message ||
+        error?.message ||
+        "Failed to save estimation chart"
+    );
     throw error;
   }
 };
@@ -1547,12 +1677,18 @@ export interface CrmProduct {
   updated_at: string;
 }
 
-export const getCrmProducts = async (params: PaginationParams = {}): Promise<PaginationWrapper<CrmProduct>> => {
+export const getCrmProducts = async (
+  params: PaginationParams = {}
+): Promise<PaginationWrapper<CrmProduct>> => {
   try {
     const response = await axiosInstance.get("/crm/products", { params });
     return extractData<PaginationWrapper<CrmProduct>>(response.data);
   } catch (error: any) {
-    toast.error(error?.response?.data?.message || error?.message || "Failed to fetch products");
+    toast.error(
+      error?.response?.data?.message ||
+        error?.message ||
+        "Failed to fetch products"
+    );
     throw error;
   }
 };
@@ -1572,24 +1708,36 @@ export interface UpdateProductPayload extends CreateProductPayload {
   id: number;
 }
 
-export const createProduct = async (data: CreateProductPayload): Promise<CrmProduct> => {
+export const createProduct = async (
+  data: CreateProductPayload
+): Promise<CrmProduct> => {
   try {
     const response = await axiosInstance.post("/crm/create-product", data);
     toast.success("Product created successfully");
     return extractData<CrmProduct>(response.data);
   } catch (error: any) {
-    toast.error(error?.response?.data?.message || error?.message || "Failed to create product");
+    toast.error(
+      error?.response?.data?.message ||
+        error?.message ||
+        "Failed to create product"
+    );
     throw error;
   }
 };
 
-export const updateProduct = async (data: UpdateProductPayload): Promise<CrmProduct> => {
+export const updateProduct = async (
+  data: UpdateProductPayload
+): Promise<CrmProduct> => {
   try {
     const response = await axiosInstance.post("/crm/update-product", data);
     toast.success("Product updated successfully");
     return extractData<CrmProduct>(response.data);
   } catch (error: any) {
-    toast.error(error?.response?.data?.message || error?.message || "Failed to update product");
+    toast.error(
+      error?.response?.data?.message ||
+        error?.message ||
+        "Failed to update product"
+    );
     throw error;
   }
 };
@@ -1599,7 +1747,11 @@ export const deleteProduct = async (productId: number): Promise<void> => {
     await axiosInstance.delete(`/crm/products/${productId}/delete`);
     toast.success("Product deleted successfully");
   } catch (error: any) {
-    toast.error(error?.response?.data?.message || error?.message || "Failed to delete product");
+    toast.error(
+      error?.response?.data?.message ||
+        error?.message ||
+        "Failed to delete product"
+    );
     throw error;
   }
 };
@@ -1689,18 +1841,21 @@ export const getOrders = async (
   try {
     const response = await axiosInstance.get("/crm/orders", { params });
     console.log("Raw response from getOrders:", response);
-    
+
     // Handle nested response structure
     const responseData: any = response.data?.data;
     const paginationData: any = responseData?.data || {};
     const ordersArray: OrderData[] = paginationData?.data || [];
     const pagination = paginationData || {};
     const summaryTiles = responseData?.summary_tiles || null;
-    
+
     return {
       dataList: Array.isArray(ordersArray) ? ordersArray : [],
       meta: {
-        total: pagination?.total || (Array.isArray(ordersArray) ? ordersArray.length : 0) || 0,
+        total:
+          pagination?.total ||
+          (Array.isArray(ordersArray) ? ordersArray.length : 0) ||
+          0,
         current_page: pagination?.current_page || 1,
         per_page: pagination?.per_page || 15,
         last_page: pagination?.last_page || 1,
@@ -1718,7 +1873,8 @@ export const getOrder = async (id: number): Promise<OrderData> => {
     const response = await axiosInstance.get(`/crm/orders/${id}`);
     console.log("Raw response from getOrder:", response);
     const responseData: any = response.data?.data;
-    const orderData: OrderData = responseData?.data || responseData || response.data;
+    const orderData: OrderData =
+      responseData?.data || responseData || response.data;
     return orderData;
   } catch (error: any) {
     toast.error(error?.message || "Failed to fetch order");
@@ -1731,19 +1887,38 @@ export const deleteOrder = async (id: number): Promise<void> => {
     await axiosInstance.delete(`/crm/orders/${id}`);
     toast.success("Order deleted successfully");
   } catch (error: any) {
-    toast.error(error?.response?.data?.message || error?.message || "Failed to delete order");
+    toast.error(
+      error?.response?.data?.message ||
+        error?.message ||
+        "Failed to delete order"
+    );
     throw error;
   }
 };
 
-export const createOrder = async (data: Partial<OrderData>): Promise<OrderData> => {
+export const restoreOrder = async (id: number): Promise<void> => {
+  try {
+    await axiosInstance.post(`/crm/orders/${id}/restore`);
+  } catch (error: any) {
+    toast.error(error?.message || "Failed to restore order");
+    throw error;
+  }
+};
+
+export const createOrder = async (
+  data: Partial<OrderData>
+): Promise<OrderData> => {
   try {
     const response = await axiosInstance.post("/crm/create-order", data);
     const responseData: any = response.data?.data;
     toast.success("Order created successfully");
     return responseData || response.data;
   } catch (error: any) {
-    toast.error(error?.response?.data?.message || error?.message || "Failed to create order");
+    toast.error(
+      error?.response?.data?.message ||
+        error?.message ||
+        "Failed to create order"
+    );
     throw error;
   }
 };
@@ -1760,7 +1935,11 @@ export const updateOrder = async (
     toast.success("Order updated successfully");
     return responseData || response.data;
   } catch (error: any) {
-    toast.error(error?.response?.data?.message || error?.message || "Failed to update order");
+    toast.error(
+      error?.response?.data?.message ||
+        error?.message ||
+        "Failed to update order"
+    );
     throw error;
   }
 };
@@ -1780,13 +1959,25 @@ export interface AttachmentData {
 }
 
 // Deal Attachments API
-export const getDealAttachments = async (dealId: number): Promise<AttachmentData[]> => {
+export const getDealAttachments = async (
+  dealId: number
+): Promise<AttachmentData[]> => {
   try {
-    const response = await axiosInstance.get(`/crm/deals/${dealId}/attachments`);
+    const response = await axiosInstance.get(
+      `/crm/deals/${dealId}/attachments`
+    );
     const responseData: any = response.data?.data;
-    return Array.isArray(responseData?.data) ? responseData.data : (Array.isArray(responseData) ? responseData : []);
+    return Array.isArray(responseData?.data)
+      ? responseData.data
+      : Array.isArray(responseData)
+      ? responseData
+      : [];
   } catch (error: any) {
-    toast.error(error?.response?.data?.message || error?.message || "Failed to fetch attachments");
+    toast.error(
+      error?.response?.data?.message ||
+        error?.message ||
+        "Failed to fetch attachments"
+    );
     throw error;
   }
 };
@@ -1805,109 +1996,147 @@ export const uploadDealAttachment = async (
 
     // Validate file type
     const allowedTypes = [
-      'application/pdf',
-      'text/csv',
-      'application/vnd.ms-excel',
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'image/jpeg',
-      'image/jpg',
-      'image/png',
-      'image/gif',
-      'image/webp'
+      "application/pdf",
+      "text/csv",
+      "application/vnd.ms-excel",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "image/jpeg",
+      "image/jpg",
+      "image/png",
+      "image/gif",
+      "image/webp",
     ];
-    
+
     if (!allowedTypes.includes(file.type)) {
-      throw new Error("Invalid file type. Allowed types: PDF, CSV, Excel, or Image");
+      throw new Error(
+        "Invalid file type. Allowed types: PDF, CSV, Excel, or Image"
+      );
     }
 
     const formData = new FormData();
-    formData.append('file', file);
-    formData.append('name', name);
+    formData.append("file", file);
+    formData.append("name", name);
 
-    const response = await axiosInstance.post(`/crm/deals/${dealId}/attachments`, formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
-    
+    const response = await axiosInstance.post(
+      `/crm/deals/${dealId}/attachments`,
+      formData,
+      {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      }
+    );
+
     const responseData: any = response.data?.data;
     toast.success("Attachment uploaded successfully");
     return responseData?.data || responseData || response.data;
   } catch (error: any) {
-    const errorMessage = error?.response?.data?.message || error?.message || "Failed to upload attachment";
+    const errorMessage =
+      error?.response?.data?.message ||
+      error?.message ||
+      "Failed to upload attachment";
     toast.error(errorMessage);
     throw error;
   }
 };
 
-export const deleteDealAttachment = async (dealId: number, attachmentId: number): Promise<void> => {
+export const deleteDealAttachment = async (
+  dealId: number,
+  attachmentId: number
+): Promise<void> => {
   try {
-    await axiosInstance.delete(`/crm/deals/${dealId}/attachments/${attachmentId}`);
+    await axiosInstance.delete(
+      `/crm/deals/${dealId}/attachments/${attachmentId}`
+    );
     toast.success("Attachment deleted successfully");
   } catch (error: any) {
-    toast.error(error?.response?.data?.message || error?.message || "Failed to delete attachment");
+    toast.error(
+      error?.response?.data?.message ||
+        error?.message ||
+        "Failed to delete attachment"
+    );
     throw error;
   }
 };
 
-export const downloadDealAttachment = async (dealId: number, attachmentId: number): Promise<void> => {
+export const downloadDealAttachment = async (
+  dealId: number,
+  attachmentId: number
+): Promise<void> => {
   try {
-    const response = await axiosInstance.get(`/crm/deals/${dealId}/attachments/${attachmentId}/download`, {
-      responseType: "blob",
-      headers: {
-        Accept: "blob",
-      },
-    });
-    
+    const response = await axiosInstance.get(
+      `/crm/deals/${dealId}/attachments/${attachmentId}/download`,
+      {
+        responseType: "blob",
+        headers: {
+          Accept: "blob",
+        },
+      }
+    );
+
     // Check if response is valid
     if (!response.data || response.data.size === 0) {
-      throw new Error('Empty file response received');
+      throw new Error("Empty file response received");
     }
-    
+
     // Extract filename from content-disposition header if available
     let filename = `deal-attachment-${attachmentId}`;
-    const contentDisposition = response.headers['content-disposition'];
+    const contentDisposition = response.headers["content-disposition"];
     if (contentDisposition) {
-      const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+      const filenameMatch = contentDisposition.match(
+        /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/
+      );
       if (filenameMatch && filenameMatch[1]) {
-        filename = filenameMatch[1].replace(/['"]/g, '');
+        filename = filenameMatch[1].replace(/['"]/g, "");
       }
     }
-    
+
     // response.data is already a blob when responseType is "blob"
     const blob = response.data;
-    
+
     // Verify blob type (optional check, as we support multiple file types)
     if (!blob.type) {
-      console.warn('No blob type detected');
+      console.warn("No blob type detected");
     }
-    
+
     const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
+    const link = document.createElement("a");
     link.href = url;
     link.download = filename;
-    link.style.display = 'none';
+    link.style.display = "none";
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     window.URL.revokeObjectURL(url);
-    
-    toast.success('Attachment downloaded successfully');
+
+    toast.success("Attachment downloaded successfully");
   } catch (error: any) {
-    console.error('Attachment download error:', error);
+    console.error("Attachment download error:", error);
     toast.error(error?.message || "Failed to download attachment");
     throw error;
   }
 };
 
 // Order Attachments API
-export const getOrderAttachments = async (orderId: number): Promise<AttachmentData[]> => {
+export const getOrderAttachments = async (
+  orderId: number
+): Promise<AttachmentData[]> => {
   try {
-    const response = await axiosInstance.get(`/crm/orders/${orderId}/attachments`);
+    const response = await axiosInstance.get(
+      `/crm/orders/${orderId}/attachments`
+    );
     const responseData: any = response.data?.data;
-    return Array.isArray(responseData?.data) ? responseData.data : (Array.isArray(responseData) ? responseData : []);
+    return Array.isArray(responseData?.data)
+      ? responseData.data
+      : Array.isArray(responseData)
+      ? responseData
+      : [];
   } catch (error: any) {
-    toast.error(error?.response?.data?.message || error?.message || "Failed to fetch attachments");
+    toast.error(
+      error?.response?.data?.message ||
+        error?.message ||
+        "Failed to fetch attachments"
+    );
     throw error;
   }
 };
@@ -1926,96 +2155,122 @@ export const uploadOrderAttachment = async (
 
     // Validate file type
     const allowedTypes = [
-      'application/pdf',
-      'text/csv',
-      'application/vnd.ms-excel',
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'image/jpeg',
-      'image/jpg',
-      'image/png',
-      'image/gif',
-      'image/webp'
+      "application/pdf",
+      "text/csv",
+      "application/vnd.ms-excel",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "image/jpeg",
+      "image/jpg",
+      "image/png",
+      "image/gif",
+      "image/webp",
     ];
-    
+
     if (!allowedTypes.includes(file.type)) {
-      throw new Error("Invalid file type. Allowed types: PDF, CSV, Excel, or Image");
+      throw new Error(
+        "Invalid file type. Allowed types: PDF, CSV, Excel, or Image"
+      );
     }
 
     const formData = new FormData();
-    formData.append('file', file);
-    formData.append('name', name);
+    formData.append("file", file);
+    formData.append("name", name);
 
-    const response = await axiosInstance.post(`/crm/orders/${orderId}/attachments`, formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
-    
+    const response = await axiosInstance.post(
+      `/crm/orders/${orderId}/attachments`,
+      formData,
+      {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      }
+    );
+
     const responseData: any = response.data?.data;
     toast.success("Attachment uploaded successfully");
     return responseData?.data || responseData || response.data;
   } catch (error: any) {
-    const errorMessage = error?.response?.data?.message || error?.message || "Failed to upload attachment";
+    const errorMessage =
+      error?.response?.data?.message ||
+      error?.message ||
+      "Failed to upload attachment";
     toast.error(errorMessage);
     throw error;
   }
 };
 
-export const deleteOrderAttachment = async (orderId: number, attachmentId: number): Promise<void> => {
+export const deleteOrderAttachment = async (
+  orderId: number,
+  attachmentId: number
+): Promise<void> => {
   try {
-    await axiosInstance.delete(`/crm/orders/${orderId}/attachments/${attachmentId}`);
+    await axiosInstance.delete(
+      `/crm/orders/${orderId}/attachments/${attachmentId}`
+    );
     toast.success("Attachment deleted successfully");
   } catch (error: any) {
-    toast.error(error?.response?.data?.message || error?.message || "Failed to delete attachment");
+    toast.error(
+      error?.response?.data?.message ||
+        error?.message ||
+        "Failed to delete attachment"
+    );
     throw error;
   }
 };
 
-export const downloadOrderAttachment = async (orderId: number, attachmentId: number): Promise<void> => {
+export const downloadOrderAttachment = async (
+  orderId: number,
+  attachmentId: number
+): Promise<void> => {
   try {
-    const response = await axiosInstance.get(`/crm/orders/${orderId}/attachments/${attachmentId}/download`, {
-      responseType: "blob",
-      headers: {
-        Accept: "blob",
-      },
-    });
-    
+    const response = await axiosInstance.get(
+      `/crm/orders/${orderId}/attachments/${attachmentId}/download`,
+      {
+        responseType: "blob",
+        headers: {
+          Accept: "blob",
+        },
+      }
+    );
+
     // Check if response is valid
     if (!response.data || response.data.size === 0) {
-      throw new Error('Empty file response received');
+      throw new Error("Empty file response received");
     }
-    
+
     // Extract filename from content-disposition header if available
     let filename = `order-attachment-${attachmentId}`;
-    const contentDisposition = response.headers['content-disposition'];
+    const contentDisposition = response.headers["content-disposition"];
     if (contentDisposition) {
-      const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+      const filenameMatch = contentDisposition.match(
+        /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/
+      );
       if (filenameMatch && filenameMatch[1]) {
-        filename = filenameMatch[1].replace(/['"]/g, '');
+        filename = filenameMatch[1].replace(/['"]/g, "");
       }
     }
-    
+
     // response.data is already a blob when responseType is "blob"
     const blob = response.data;
-    
+
     // Verify blob type (optional check, as we support multiple file types)
     if (!blob.type) {
-      console.warn('No blob type detected');
+      console.warn("No blob type detected");
     }
-    
+
     const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
+    const link = document.createElement("a");
     link.href = url;
     link.download = filename;
-    link.style.display = 'none';
+    link.style.display = "none";
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     window.URL.revokeObjectURL(url);
-    
-    toast.success('Attachment downloaded successfully');
+
+    toast.success("Attachment downloaded successfully");
   } catch (error: any) {
-    console.error('Attachment download error:', error);
+    console.error("Attachment download error:", error);
     toast.error(error?.message || "Failed to download attachment");
     throw error;
   }
@@ -2036,31 +2291,48 @@ export interface FollowUpData {
 }
 
 // Lead Follow-ups API
-export const createLeadFollowUp = async (leadId: number, data: {
-  follow_up_date: string;
-  follow_up_status: string;
-  communication_channel: string;
-  communication_channel_other?: string;
-  notes: string;
-  user_extension: string;
-}): Promise<FollowUpData> => {
+export const createLeadFollowUp = async (
+  leadId: number,
+  data: {
+    follow_up_date: string;
+    follow_up_status: string;
+    communication_channel: string;
+    communication_channel_other?: string;
+    notes: string;
+    user_extension: string;
+  }
+): Promise<FollowUpData> => {
   try {
-    const response = await axiosInstance.post(`/crm/leads/${leadId}/follow-ups`, data);
+    const response = await axiosInstance.post(
+      `/crm/leads/${leadId}/follow-ups`,
+      data
+    );
     const responseData: any = response.data?.data;
     toast.success("Follow-up created successfully");
     return responseData?.data || responseData || response.data;
   } catch (error: any) {
-    toast.error(error?.response?.data?.message || error?.message || "Failed to create follow-up");
+    toast.error(
+      error?.response?.data?.message ||
+        error?.message ||
+        "Failed to create follow-up"
+    );
     throw error;
   }
 };
 
-export const deleteLeadFollowUp = async (leadId: number, followUpId: number): Promise<void> => {
+export const deleteLeadFollowUp = async (
+  leadId: number,
+  followUpId: number
+): Promise<void> => {
   try {
     await axiosInstance.delete(`/crm/leads/${leadId}/follow-ups/${followUpId}`);
     toast.success("Follow-up deleted successfully");
   } catch (error: any) {
-    toast.error(error?.response?.data?.message || error?.message || "Failed to delete follow-up");
+    toast.error(
+      error?.response?.data?.message ||
+        error?.message ||
+        "Failed to delete follow-up"
+    );
     throw error;
   }
 };
@@ -2082,20 +2354,27 @@ export const createMeeting = async (data: {
     toast.success("Meeting created successfully");
     return responseData?.data || responseData || response.data;
   } catch (error: any) {
-    toast.error(error?.response?.data?.message || error?.message || "Failed to create meeting");
+    toast.error(
+      error?.response?.data?.message ||
+        error?.message ||
+        "Failed to create meeting"
+    );
     throw error;
   }
 };
 
-export const updateMeeting = async (meetingId: number, data: {
-  name?: string;
-  meeting_type?: string;
-  meeting_date?: string;
-  meeting_time?: string;
-  meeting_outcome?: string;
-  extensions?: string[];
-  id?: number;
-}): Promise<MeetingData> => {
+export const updateMeeting = async (
+  meetingId: number,
+  data: {
+    name?: string;
+    meeting_type?: string;
+    meeting_date?: string;
+    meeting_time?: string;
+    meeting_outcome?: string;
+    extensions?: string[];
+    id?: number;
+  }
+): Promise<MeetingData> => {
   try {
     data.id = meetingId;
     const response = await axiosInstance.put(`/crm/update-meeting`, data);
@@ -2103,7 +2382,11 @@ export const updateMeeting = async (meetingId: number, data: {
     toast.success("Meeting updated successfully");
     return responseData?.data || responseData || response.data;
   } catch (error: any) {
-    toast.error(error?.response?.data?.message || error?.message || "Failed to update meeting");
+    toast.error(
+      error?.response?.data?.message ||
+        error?.message ||
+        "Failed to update meeting"
+    );
     throw error;
   }
 };
@@ -2113,7 +2396,11 @@ export const deleteMeeting = async (meetingId: number): Promise<void> => {
     await axiosInstance.delete(`/crm/meetings/${meetingId}`);
     toast.success("Meeting deleted successfully");
   } catch (error: any) {
-    toast.error(error?.response?.data?.message || error?.message || "Failed to delete meeting");
+    toast.error(
+      error?.response?.data?.message ||
+        error?.message ||
+        "Failed to delete meeting"
+    );
     throw error;
   }
 };
@@ -2124,7 +2411,7 @@ export interface TaskData {
   name: string;
   user_extension: string;
   created_by: string;
-  urgency: 'low' | 'med' | 'high';
+  urgency: "low" | "med" | "high";
   phone?: string;
   email?: string;
   company_name?: string;
@@ -2142,12 +2429,18 @@ export interface TaskNote {
 }
 
 // Tasks API
-export const getTasks = async (params: PaginationParams = {}): Promise<PaginationWrapper<TaskData>> => {
+export const getTasks = async (
+  params: PaginationParams = {}
+): Promise<PaginationWrapper<TaskData>> => {
   try {
     const response = await axiosInstance.get("/crm/tasks", { params });
     return extractData<PaginationWrapper<TaskData>>(response.data);
   } catch (error: any) {
-    toast.error(error?.response?.data?.message || error?.message || "Failed to fetch tasks");
+    toast.error(
+      error?.response?.data?.message ||
+        error?.message ||
+        "Failed to fetch tasks"
+    );
     throw error;
   }
 };
@@ -2157,7 +2450,9 @@ export const getTask = async (taskId: number): Promise<TaskData> => {
     const response = await axiosInstance.get(`/crm/tasks/${taskId}`);
     return extractData<TaskData>(response.data);
   } catch (error: any) {
-    toast.error(error?.response?.data?.message || error?.message || "Failed to fetch task");
+    toast.error(
+      error?.response?.data?.message || error?.message || "Failed to fetch task"
+    );
     throw error;
   }
 };
@@ -2166,7 +2461,7 @@ export const createTask = async (data: {
   name: string;
   user_extension: string;
   created_by: string;
-  urgency: 'low' | 'med' | 'high';
+  urgency: "low" | "med" | "high";
   phone?: string;
   email?: string;
   company_name?: string;
@@ -2179,28 +2474,39 @@ export const createTask = async (data: {
     toast.success("Task created successfully");
     return responseData?.data || responseData || response.data;
   } catch (error: any) {
-    toast.error(error?.response?.data?.message || error?.message || "Failed to create task");
+    toast.error(
+      error?.response?.data?.message ||
+        error?.message ||
+        "Failed to create task"
+    );
     throw error;
   }
 };
 
-export const updateTask = async (taskId: number, data: {
-  name?: string;
-  user_extension?: string;
-  created_by?: string;
-  urgency?: 'low' | 'med' | 'high';
-  phone?: string;
-  email?: string;
-  company_name?: string;
-  due_date?: string;
-}): Promise<TaskData> => {
+export const updateTask = async (
+  taskId: number,
+  data: {
+    name?: string;
+    user_extension?: string;
+    created_by?: string;
+    urgency?: "low" | "med" | "high";
+    phone?: string;
+    email?: string;
+    company_name?: string;
+    due_date?: string;
+  }
+): Promise<TaskData> => {
   try {
     const response = await axiosInstance.put(`/crm/tasks/${taskId}`, data);
     const responseData: any = response.data?.data;
     toast.success("Task updated successfully");
     return responseData?.data || responseData || response.data;
   } catch (error: any) {
-    toast.error(error?.response?.data?.message || error?.message || "Failed to update task");
+    toast.error(
+      error?.response?.data?.message ||
+        error?.message ||
+        "Failed to update task"
+    );
     throw error;
   }
 };
@@ -2210,43 +2516,74 @@ export const deleteTask = async (taskId: number): Promise<void> => {
     await axiosInstance.delete(`/crm/tasks/${taskId}`);
     toast.success("Task deleted successfully");
   } catch (error: any) {
-    toast.error(error?.response?.data?.message || error?.message || "Failed to delete task");
+    toast.error(
+      error?.response?.data?.message ||
+        error?.message ||
+        "Failed to delete task"
+    );
     throw error;
   }
 };
 
 // Task Notes API
-export const createTaskNote = async (taskId: number, data: { note: string }): Promise<TaskNote> => {
+export const createTaskNote = async (
+  taskId: number,
+  data: { note: string }
+): Promise<TaskNote> => {
   try {
-    const response = await axiosInstance.post(`/crm/tasks/${taskId}/notes`, data);
+    const response = await axiosInstance.post(
+      `/crm/tasks/${taskId}/notes`,
+      data
+    );
     const responseData: any = response.data?.data;
     toast.success("Note added successfully");
     return responseData?.data || responseData || response.data;
   } catch (error: any) {
-    toast.error(error?.response?.data?.message || error?.message || "Failed to create note");
+    toast.error(
+      error?.response?.data?.message ||
+        error?.message ||
+        "Failed to create note"
+    );
     throw error;
   }
 };
 
-export const updateTaskNote = async (taskId: number, noteId: number, data: { note: string }): Promise<TaskNote> => {
+export const updateTaskNote = async (
+  taskId: number,
+  noteId: number,
+  data: { note: string }
+): Promise<TaskNote> => {
   try {
-    const response = await axiosInstance.put(`/crm/tasks/${taskId}/notes/${noteId}`, data);
+    const response = await axiosInstance.put(
+      `/crm/tasks/${taskId}/notes/${noteId}`,
+      data
+    );
     const responseData: any = response.data?.data;
     toast.success("Note updated successfully");
     return responseData?.data || responseData || response.data;
   } catch (error: any) {
-    toast.error(error?.response?.data?.message || error?.message || "Failed to update note");
+    toast.error(
+      error?.response?.data?.message ||
+        error?.message ||
+        "Failed to update note"
+    );
     throw error;
   }
 };
 
-export const deleteTaskNote = async (taskId: number, noteId: number): Promise<void> => {
+export const deleteTaskNote = async (
+  taskId: number,
+  noteId: number
+): Promise<void> => {
   try {
     await axiosInstance.delete(`/crm/tasks/${taskId}/notes/${noteId}`);
     toast.success("Note deleted successfully");
   } catch (error: any) {
-    toast.error(error?.response?.data?.message || error?.message || "Failed to delete note");
+    toast.error(
+      error?.response?.data?.message ||
+        error?.message ||
+        "Failed to delete note"
+    );
     throw error;
   }
 };
-

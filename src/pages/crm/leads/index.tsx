@@ -20,6 +20,7 @@ import {
   deleteLeadFollowUp,
   createMeeting,
   deleteMeeting,
+  restoreLead,
 } from "@utils/crm";
 import { GetHierarchyData } from "@utils/users";
 import {
@@ -71,6 +72,7 @@ import {
   DollarSign,
   UserCheck,
   AlertCircle,
+  RotateCcw,
 } from 'lucide-react';
 import { 
   PieChart, 
@@ -206,13 +208,6 @@ const FilterBar: React.FC<FilterBarProps> = ({
                 >
                   {filter.icon && <span className="d-flex align-items-center">{filter.icon}</span>}
                   {filter.label}
-                  <Badge
-                    bg={isActive ? 'light' : 'light'}
-                    text={isActive ? 'dark' : 'dark'}
-                    className="ms-2"
-                  >
-                    {filter.count}
-                  </Badge>
                 </Button>
               );
             })}
@@ -354,6 +349,9 @@ const CrmLeads = () => {
       if (currentFilters.is_lost !== undefined) {
         params.is_lost = currentFilters.is_lost;
       }
+      if (currentFilters.include_archived !== undefined) {
+        params.include_archived = currentFilters.include_archived;
+      }
 
       const response: any = await getLeads(params);
       console.log("Raw response from getLeads:", response);
@@ -396,6 +394,19 @@ const CrmLeads = () => {
       setCurrentFilters((prev) => {
         const newFilters = { ...prev };
         delete newFilters.stage_id;
+        delete newFilters.include_archived;
+        return newFilters;
+      });
+      // Clear stage dropdown
+      setLeadsFilters(prev => ({
+        ...prev,
+        stage: null
+      }));
+    } else if (activeFilter === 'deleted') {
+      setCurrentFilters((prev) => {
+        const newFilters = { ...prev };
+        delete newFilters.stage_id;
+        newFilters.include_archived = true;
         return newFilters;
       });
       // Clear stage dropdown
@@ -407,10 +418,12 @@ const CrmLeads = () => {
       // Find stage by id (activeFilter should be stage id as string)
       const selectedStage = stages.find((s: any) => s.id.toString() === activeFilter);
       if (selectedStage) {
-        setCurrentFilters((prev) => ({
-          ...prev,
-          stage_id: selectedStage.id.toString(),
-        }));
+        setCurrentFilters((prev) => {
+          const newFilters = { ...prev };
+          delete newFilters.include_archived;
+          newFilters.stage_id = selectedStage.id.toString();
+          return newFilters;
+        });
         // Auto-fill stage dropdown
         setLeadsFilters(prev => ({
           ...prev,
@@ -459,6 +472,15 @@ const CrmLeads = () => {
       // Handle is_lost filter
       if ('is_lost' in filters) {
         newFilters.is_lost = filters.is_lost;
+      }
+      
+      // Handle include_archived filter
+      if ('include_archived' in filters) {
+        if (filters.include_archived) {
+          newFilters.include_archived = true;
+        } else {
+          delete newFilters.include_archived;
+        }
       }
       
       return newFilters;
@@ -634,7 +656,6 @@ const CrmLeads = () => {
       <ArrowUp size={14} className="ms-1" /> : 
       <ArrowDown size={14} className="ms-1" />;
   };
-
   // Transform API lead data to UI format
   const transformLeadData = (lead: any) => {
     // Parse contact_persons - it can be a JSON string or an array
@@ -710,6 +731,23 @@ const CrmLeads = () => {
       console.error("Failed to delete lead:", error);
     }
   }, [leadToDelete]);
+
+  // Restore Lead Handler
+  const handleRestoreLead = useCallback(async (leadId: number) => {
+    if (!window.confirm('Are you sure you want to restore this lead?')) return;
+
+    try {
+      await restoreLead(leadId);
+      toast.success("Lead restored successfully!");
+      setShowSuccessfulModal(true);
+      setSuccessModalTitle("Lead Restored");
+      setSuccessModalDescription("Lead has been restored successfully");
+      setRefreshKey((oldKey) => oldKey + 1);
+    } catch (error) {
+      console.error("Failed to restore lead:", error);
+      toast.error("Failed to restore lead");
+    }
+  }, []);
 
   // Convert Lead Modal
   const [showConvertModal, setShowConvertModal] = useState(false);
@@ -1022,6 +1060,7 @@ const CrmLeads = () => {
     const transformed = leadsData.map(transformLeadData);
     const counts: Record<string, number> = {
       all: summaryTiles?.total_leads || totalLeads || transformed.length,
+      deleted: summaryTiles?.deleted_leads || 0,
     };
     
     // Add counts for first 5 stages
@@ -1039,6 +1078,79 @@ const CrmLeads = () => {
 
   return (
     <React.Fragment>
+      <style dangerouslySetInnerHTML={{__html: `
+        .leads-table-wrapper {
+          width: 100%;
+          overflow: hidden;
+        }
+        .leads-table-wrapper .table-responsive {
+          width: 100%;
+          overflow-x: auto;
+          overflow-y: visible;
+          -webkit-overflow-scrolling: touch;
+        }
+        .leads-table-wrapper .table-responsive table {
+          width: 100%;
+          table-layout: auto;
+          margin-bottom: 0;
+        }
+        .leads-table-wrapper .table-responsive table th,
+        .leads-table-wrapper .table-responsive table td {
+          padding: 12px 16px;
+          vertical-align: middle;
+        }
+        .leads-table-wrapper .table-responsive table th.col-name,
+        .leads-table-wrapper .table-responsive table td.col-name {
+          min-width: 150px;
+          white-space: nowrap;
+        }
+        .leads-table-wrapper .table-responsive table th.col-company,
+        .leads-table-wrapper .table-responsive table td.col-company {
+          min-width: 180px;
+        }
+        .leads-table-wrapper .table-responsive table th.col-email,
+        .leads-table-wrapper .table-responsive table td.col-email {
+          min-width: 200px;
+          white-space: nowrap;
+        }
+        .leads-table-wrapper .table-responsive table th.col-phone,
+        .leads-table-wrapper .table-responsive table td.col-phone {
+          min-width: 150px;
+          white-space: nowrap;
+        }
+        .leads-table-wrapper .table-responsive table th.col-stage,
+        .leads-table-wrapper .table-responsive table td.col-stage {
+          min-width: 120px;
+          white-space: nowrap;
+        }
+        .leads-table-wrapper .table-responsive table th.col-leadPotential,
+        .leads-table-wrapper .table-responsive table td.col-leadPotential {
+          min-width: 130px;
+          white-space: nowrap;
+        }
+        .leads-table-wrapper .table-responsive table th.col-followUps,
+        .leads-table-wrapper .table-responsive table td.col-followUps {
+          min-width: 100px;
+          white-space: nowrap;
+          text-align: center;
+        }
+        .leads-table-wrapper .table-responsive table th.col-assignedUser,
+        .leads-table-wrapper .table-responsive table td.col-assignedUser {
+          min-width: 150px;
+          white-space: nowrap;
+        }
+        .leads-table-wrapper .table-responsive table th.col-created,
+        .leads-table-wrapper .table-responsive table td.col-created {
+          min-width: 120px;
+          white-space: nowrap;
+        }
+        .leads-table-wrapper .table-responsive table th.col-actions,
+        .leads-table-wrapper .table-responsive table td.col-actions {
+          min-width: 120px;
+          width: 120px;
+          white-space: nowrap;
+        }
+      `}} />
       <BreadcrumbItem
         mainTitle="CRM"
         mainLink="/crm/dashboard"
@@ -1178,7 +1290,15 @@ const CrmLeads = () => {
               color: stage.color || '#6c757d',
               activeColor: '#0d6efd',
               icon: <Layers size={16} />
-            }))
+            })),
+            {
+              id: 'deleted',
+              label: 'Deleted',
+              count: filterCounts.deleted || 0,
+              color: '#dc3545',
+              activeColor: '#dc3545',
+              icon: <Trash2 size={16} />
+            }
           ]}
           activeFilter={activeFilter}
           onFilterChange={(filterId) => {
@@ -1275,16 +1395,16 @@ const CrmLeads = () => {
                 </Col>
                 <Col md={4}>
                   <div className="d-flex gap-2">
-                    <Button
+                    {/* <Button
                       variant="primary"
-                      className="flex-grow-1 d-flex align-items-center justify-content-center"
+                      className="d-flex align-items-center justify-content-center"
                       onClick={() => {
                         setLeadsPagination({ ...leadsPagination, currentPage: 1 });
                         setRefreshKey(prev => prev + 1);
                       }}
                     >
                       Apply Filters
-                    </Button>
+                    </Button> */}
                     <Button
                       variant="outline-secondary"
                       className="d-flex align-items-center justify-content-center"
@@ -1365,14 +1485,15 @@ const CrmLeads = () => {
         </div>
 
         {/* Leads Table */}
-        <Card className="border-0 shadow-sm">
-          <Card.Body className="p-0">
+        <Card className="border-0 shadow-sm leads-table-wrapper" style={{ width: '100%' }}>
+          <Card.Body className="p-0" style={{ width: '100%' }}>
             <div className="table-responsive">
-              <Table hover className="mb-0">
+              <Table hover className="mb-0 w-100" style={{ width: '100%', margin: 0 }}>
                 <thead className="bg-light">
                   <tr>
                     {selectedLeadsColumns.includes('name') && (
                       <th 
+                        className="col-name"
                         style={{ cursor: 'pointer', userSelect: 'none' }}
                         onClick={() => handleSort('name', leadsPagination, setLeadsPagination)}
                       >
@@ -1381,6 +1502,7 @@ const CrmLeads = () => {
                     )}
                     {selectedLeadsColumns.includes('company') && (
                       <th 
+                        className="col-company"
                         style={{ cursor: 'pointer', userSelect: 'none' }}
                         onClick={() => handleSort('company', leadsPagination, setLeadsPagination)}
                       >
@@ -1389,6 +1511,7 @@ const CrmLeads = () => {
                     )}
                     {selectedLeadsColumns.includes('email') && (
                       <th 
+                        className="col-email"
                         style={{ cursor: 'pointer', userSelect: 'none' }}
                         onClick={() => handleSort('email', leadsPagination, setLeadsPagination)}
                       >
@@ -1397,6 +1520,7 @@ const CrmLeads = () => {
                     )}
                     {selectedLeadsColumns.includes('phone') && (
                       <th 
+                        className="col-phone"
                         style={{ cursor: 'pointer', userSelect: 'none' }}
                         onClick={() => handleSort('phone', leadsPagination, setLeadsPagination)}
                       >
@@ -1405,6 +1529,7 @@ const CrmLeads = () => {
                     )}
                     {selectedLeadsColumns.includes('stage') && (
                       <th 
+                        className="col-stage"
                         style={{ cursor: 'pointer', userSelect: 'none' }}
                         onClick={() => handleSort('stage', leadsPagination, setLeadsPagination)}
                       >
@@ -1413,6 +1538,7 @@ const CrmLeads = () => {
                     )}
                     {selectedLeadsColumns.includes('leadPotential') && (
                       <th 
+                        className="col-leadPotential"
                         style={{ cursor: 'pointer', userSelect: 'none' }}
                         onClick={() => handleSort('leadPotential', leadsPagination, setLeadsPagination)}
                       >
@@ -1420,10 +1546,11 @@ const CrmLeads = () => {
                       </th>
                     )}
                     {selectedLeadsColumns.includes('followUps') && (
-                      <th>Follow-ups</th>
+                      <th className="col-followUps">Follow-ups</th>
                     )}
                     {selectedLeadsColumns.includes('assignedUser') && (
                       <th 
+                        className="col-assignedUser"
                         style={{ cursor: 'pointer', userSelect: 'none' }}
                         onClick={() => handleSort('assignedUser', leadsPagination, setLeadsPagination)}
                       >
@@ -1432,13 +1559,14 @@ const CrmLeads = () => {
                     )}
                     {selectedLeadsColumns.includes('created') && (
                       <th 
+                        className="col-created"
                         style={{ cursor: 'pointer', userSelect: 'none' }}
                         onClick={() => handleSort('created', leadsPagination, setLeadsPagination)}
                       >
                         Created {renderSortIcon('created', leadsPagination)}
                       </th>
                     )}
-                    <th>Actions</th>
+                    <th className="col-actions" style={{ width: '120px', minWidth: '120px' }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1458,10 +1586,10 @@ const CrmLeads = () => {
                     sortData(filteredLeads, leadsPagination.sortColumn, leadsPagination.sortDirection).map((lead) => (
                       <tr key={lead.id}>
                         {selectedLeadsColumns.includes('name') && (
-                          <td className="fw-semibold">{lead.name}</td>
+                          <td className="col-name fw-semibold">{lead.name}</td>
                         )}
                         {selectedLeadsColumns.includes('company') && (
-                          <td>
+                          <td className="col-company">
                             <div>
                               <div className="fw-medium">{lead.company || 'No Company'}</div>
                               {lead.industry && <small className="text-muted">{lead.industry}</small>}
@@ -1469,13 +1597,13 @@ const CrmLeads = () => {
                           </td>
                         )}
                         {selectedLeadsColumns.includes('email') && (
-                          <td>{lead.email || '-'}</td>
+                          <td className="col-email">{lead.email || '-'}</td>
                         )}
                         {selectedLeadsColumns.includes('phone') && (
-                          <td>{lead.phone || '-'}</td>
+                          <td className="col-phone">{lead.phone || '-'}</td>
                         )}
                         {selectedLeadsColumns.includes('stage') && (
-                          <td>
+                          <td className="col-stage">
                             <Badge 
                               bg={
                                 lead.stage?.toLowerCase().includes('qualified') ? 'success' :
@@ -1488,7 +1616,7 @@ const CrmLeads = () => {
                           </td>
                         )}
                         {selectedLeadsColumns.includes('leadPotential') && (
-                          <td>
+                          <td className="col-leadPotential">
                             <Badge 
                               bg={
                                 lead.leadPotential === 'Hot' ? 'danger' :
@@ -1501,87 +1629,112 @@ const CrmLeads = () => {
                           </td>
                         )}
                         {selectedLeadsColumns.includes('followUps') && (
-                          <td className="text-center">
+                          <td className="col-followUps text-center">
                             <Badge bg="primary" pill>
                               {lead.followUps?.length || 0}
                             </Badge>
                           </td>
                         )}
                         {selectedLeadsColumns.includes('assignedUser') && (
-                          <td>{lead.assignedUser || '-'}</td>
+                          <td className="col-assignedUser">{lead.assignedUser || '-'}</td>
                         )}
                         {selectedLeadsColumns.includes('created') && (
-                          <td>{lead.created || '-'}</td>
+                          <td className="col-created">{lead.created || '-'}</td>
                         )}
-                        <td>
+                        <td className="col-actions" style={{ width: '120px', minWidth: '120px' }}>
                           <div className="d-flex gap-1">
-                            <Button 
-                              variant="link" 
-                              size="sm" 
-                              className="p-1" 
-                              title="View"
-                              onClick={() => handleViewLead(lead.rawData?.id || lead.id)}
-                            >
-                              <Eye size={16} />
-                            </Button>
-                            {session?.user?.permissions?.includes('edit-crm-leads') && (
-                              <Button 
-                                variant="link" 
-                                size="sm" 
-                                className="p-1" 
-                                title="Edit"
-                                onClick={() => window.location.href = `/crm/leads/${lead.rawData?.id || lead.id}/edit`}
-                              >
-                                <Edit size={16} />
-                              </Button>
-                            )}
-                            {session?.user?.permissions?.includes('convert-to-opportunity-crm-leads') && (
-                              <Button 
-                                variant="link" 
-                                size="sm" 
-                                className="p-1 text-success" 
-                                title="Convert to Deal"
-                                onClick={() => handleConvertLead(lead.rawData || lead)}
-                              >
-                                <Handshake size={16} />
-                              </Button>
-                            )}
-                            {session?.user?.permissions?.includes('delete-crm-leads') && (
-                              <Button 
-                                variant="link" 
-                                size="sm" 
-                                className="p-1 text-danger" 
-                                title="Delete"
-                                onClick={() => {
-                                  setLeadToDelete({ id: lead.rawData?.id || lead.id });
-                                  setShowDeleteModal(true);
-                                }}
-                              >
-                                <Trash2 size={16} />
-                              </Button>
-                            )}
-                            <Dropdown className="d-inline">
-                              <Dropdown.Toggle 
-                                as={Button}
-                                variant="link" 
-                                size="sm" 
-                                className="p-1"
-                                title="More Actions"
-                              >
-                                <MoreVertical size={16} />
-                              </Dropdown.Toggle>
-                              <Dropdown.Menu align="end">
-                                {session?.user?.permissions?.includes('mark-as-lost-crm-leads') && (
-                                  <Dropdown.Item 
-                                    className="text-danger"
-                                    onClick={() => handleMarkLost(lead.rawData || lead)}
+                            {activeFilter === 'deleted' ? (
+                              <>
+                                <Button 
+                                  variant="link" 
+                                  size="sm" 
+                                  className="p-1" 
+                                  title="View"
+                                  onClick={() => handleViewLead(lead.rawData?.id || lead.id)}
+                                >
+                                  <Eye size={16} />
+                                </Button>
+                                <Button 
+                                  variant="link" 
+                                  size="sm" 
+                                  className="p-1 text-success" 
+                                  title="Restore"
+                                  onClick={() => handleRestoreLead(lead.rawData?.id || lead.id)}
+                                >
+                                  <RotateCcw size={16} />
+                                </Button>
+                              </>
+                            ) : (
+                              <>
+                                <Button 
+                                  variant="link" 
+                                  size="sm" 
+                                  className="p-1" 
+                                  title="View"
+                                  onClick={() => handleViewLead(lead.rawData?.id || lead.id)}
+                                >
+                                  <Eye size={16} />
+                                </Button>
+                                {session?.user?.permissions?.includes('edit-crm-leads') && (
+                                  <Button 
+                                    variant="link" 
+                                    size="sm" 
+                                    className="p-1" 
+                                    title="Edit"
+                                    onClick={() => window.location.href = `/crm/leads/${lead.rawData?.id || lead.id}/edit`}
                                   >
-                                    <X size={14} className="me-2" />
-                                    Lost
-                                  </Dropdown.Item>
+                                    <Edit size={16} />
+                                  </Button>
                                 )}
-                              </Dropdown.Menu>
-                            </Dropdown>
+                                {session?.user?.permissions?.includes('convert-to-opportunity-crm-leads') && (
+                                  <Button 
+                                    variant="link" 
+                                    size="sm" 
+                                    className="p-1 text-success" 
+                                    title="Convert to Deal"
+                                    onClick={() => handleConvertLead(lead.rawData || lead)}
+                                  >
+                                    <Handshake size={16} />
+                                  </Button>
+                                )}
+                                {session?.user?.permissions?.includes('delete-crm-leads') && (
+                                  <Button 
+                                    variant="link" 
+                                    size="sm" 
+                                    className="p-1 text-danger" 
+                                    title="Delete"
+                                    onClick={() => {
+                                      setLeadToDelete({ id: lead.rawData?.id || lead.id });
+                                      setShowDeleteModal(true);
+                                    }}
+                                  >
+                                    <Trash2 size={16} />
+                                  </Button>
+                                )}
+                                <Dropdown className="d-inline">
+                                  <Dropdown.Toggle 
+                                    as={Button}
+                                    variant="link" 
+                                    size="sm" 
+                                    className="p-1"
+                                    title="More Actions"
+                                  >
+                                    <MoreVertical size={16} />
+                                  </Dropdown.Toggle>
+                                  <Dropdown.Menu align="end">
+                                    {session?.user?.permissions?.includes('mark-as-lost-crm-leads') && (
+                                      <Dropdown.Item 
+                                        className="text-danger"
+                                        onClick={() => handleMarkLost(lead.rawData || lead)}
+                                      >
+                                        <X size={14} className="me-2" />
+                                        Lost
+                                      </Dropdown.Item>
+                                    )}
+                                  </Dropdown.Menu>
+                                </Dropdown>
+                              </>
+                            )}
                           </div>
                         </td>
                       </tr>

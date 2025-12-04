@@ -296,6 +296,7 @@ const CreateOrder = () => {
         currency: formData.currency,
         items: formData.items.map(item => ({
           product_id: String(item.product_id),
+          product_name: item.product_name,
           quantity: item.quantity,
           unit_price: item.unit_price,
           total_price: (parseFloat(item.quantity || "0") * item.unit_price).toFixed(2),

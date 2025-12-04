@@ -33,6 +33,7 @@ import {
   Table,
   InputGroup,
   Modal,
+  Spinner,
 } from "react-bootstrap";
 import Select from 'react-select';
 import { ModuleSlug } from "@utils/Helper";
@@ -67,6 +68,7 @@ import {
   Activity,
   MessageSquare,
 } from 'lucide-react';
+import { FiSearch, FiFilter } from 'react-icons/fi';
 import { 
   PieChart, 
   Pie, 
@@ -140,6 +142,115 @@ const KPICard: React.FC<KPICardData> = ({ title, value, change, isPositive, icon
   );
 };
 
+// Filter Bar Component
+interface FilterBarProps {
+  quickFilters: { id: string; label: string; variant?: string; color?: string; activeColor?: string; icon?: React.ReactNode }[];
+  activeFilter: string;
+  onFilterChange: (filterId: string) => void;
+  searchValue: string;
+  onSearchChange: (value: string) => void;
+  onSearch: () => void;
+  searchPlaceholder?: string;
+  showAdvancedFilters: boolean;
+  onToggleAdvancedFilters: () => void;
+  advancedFilterCount?: number;
+}
+
+const FilterBar: React.FC<FilterBarProps> = ({
+  quickFilters,
+  activeFilter,
+  onFilterChange,
+  searchValue,
+  onSearchChange,
+  onSearch,
+  searchPlaceholder = "Search...",
+  showAdvancedFilters,
+  onToggleAdvancedFilters,
+  advancedFilterCount = 0
+}) => {
+  return (
+    <Card className="border-0 shadow-sm mb-3">
+      <Card.Body className="p-3">
+        <div className="d-flex flex-column flex-lg-row justify-content-between align-items-stretch align-items-lg-center gap-3">
+          {/* Left Side: Quick Filter Buttons */}
+          <div className="d-flex gap-2 flex-wrap align-items-center flex-grow-1">
+            {quickFilters.map(filter => {
+              const isActive = activeFilter === filter.id;
+              const hasCustomColor = filter.color || filter.activeColor;
+
+              // Determine button styles
+              const buttonStyle: React.CSSProperties = {};
+              if (hasCustomColor) {
+                if (isActive) {
+                  const bgColor = filter.activeColor || filter.color;
+                  buttonStyle.background = '#fff';
+                  buttonStyle.borderColor = bgColor;
+                  buttonStyle.color = bgColor;
+                } else {
+                  buttonStyle.background = '#fff';
+                  buttonStyle.borderColor = filter.color;
+                  buttonStyle.color = filter.color;
+                  buttonStyle.opacity = '0.7';
+                }
+              }
+
+              return (
+                <Button
+                  key={filter.id}
+                  variant={hasCustomColor ? undefined : (isActive ? (filter.variant || 'primary') : 'outline-secondary')}
+                  onClick={() => onFilterChange(filter.id)}
+                  className="d-flex align-items-center gap-2"
+                  style={hasCustomColor ? buttonStyle : undefined}
+                >
+                  {filter.icon && <span className="d-flex align-items-center">{filter.icon}</span>}
+                  {filter.label}
+                </Button>
+              );
+            })}
+          </div>
+
+          {/* Right Side: Search and Filters */}
+          <div className="d-flex flex-column flex-sm-row gap-2 align-items-stretch align-items-sm-center flex-shrink-0">
+            <InputGroup style={{ width: '300px', minWidth: '200px' }} className="flex-shrink-0">
+              <Form.Control
+                style={{ height: '41px' }}
+                type="text"
+                placeholder={searchPlaceholder}
+                value={searchValue}
+                onChange={(e) => onSearchChange(e.target.value)}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter') {
+                    onSearch();
+                  }
+                }}
+              />
+              <Button 
+                variant="outline-secondary"
+                onClick={onSearch}
+              >
+                <FiSearch size={16} />
+              </Button>
+            </InputGroup>
+            <Button 
+              variant={showAdvancedFilters ? 'primary' : 'outline-secondary'}
+              onClick={onToggleAdvancedFilters}
+              className="d-flex align-items-center flex-shrink-0"
+            >
+              <FiFilter size={16} className="me-2" />
+              Filters
+              {advancedFilterCount > 0 && (
+                <Badge bg="light" text="dark" className="ms-2">
+                  {advancedFilterCount}
+                </Badge>
+              )}
+            </Button>
+          </div>
+        </div>
+      </Card.Body>
+    </Card>
+  );
+};
+
 const CrmTasks = () => {
   const router = useRouter();
   const { data: session } = useSession();
@@ -154,6 +265,7 @@ const CrmTasks = () => {
   const [search, setSearch] = useState('');
   const [activeFilter, setActiveFilter] = useState('all');
   const [showAnalytics, setShowAnalytics] = useState(false);
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [selectedTasks, setSelectedTasks] = useState<number[]>([]);
   const [selectedColumns, setSelectedColumns] = useState<string[]>(() => {
     const saved = localStorage.getItem('tasksSelectedColumns');
@@ -199,18 +311,36 @@ const CrmTasks = () => {
   const fetchTasks = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await getTasks({
+      const params: any = {
         page: pagination.currentPage,
         per_page: pagination.rowsPerPage,
-        search: search || undefined,
-      });
+      };
+
+      // Add search param
+      if (search) {
+        params.search = search;
+      }
+
+      // Add urgency filter
+      if (activeFilter === 'med-urgency') {
+        params.urgency = 'med';
+      } else if (activeFilter === 'high-urgency') {
+        params.urgency = 'high';
+      }
+
+      // Add overdue filter
+      if (activeFilter === 'overdue') {
+        params.overdue = true;
+      }
+
+      const response = await getTasks(params);
       setTasks(response.data || []);
     } catch (error) {
       console.error('Failed to fetch tasks:', error);
     } finally {
       setLoading(false);
     }
-  }, [pagination.currentPage, pagination.rowsPerPage, search]);
+  }, [pagination.currentPage, pagination.rowsPerPage, search, activeFilter]);
 
   useEffect(() => {
     fetchTasks();
@@ -340,13 +470,11 @@ const CrmTasks = () => {
   // Render sort icon
   const renderSortIcon = (column: string) => {
     if (pagination.sortColumn !== column) {
-      return <ArrowUpDown size={14} className="text-muted" />;
+      return <ArrowUpDown size={14} className="ms-1 text-muted" />;
     }
-    return pagination.sortDirection === 'asc' ? (
-      <ArrowUp size={14} className="text-primary" />
-    ) : (
-      <ArrowDown size={14} className="text-primary" />
-    );
+    return pagination.sortDirection === 'asc' ? 
+      <ArrowUp size={14} className="ms-1" /> : 
+      <ArrowDown size={14} className="ms-1" />;
   };
 
   // Handle create/update task
@@ -488,36 +616,10 @@ const CrmTasks = () => {
     }
   }, [viewingTask, fetchTask]);
 
-  // Filter tasks
+  // Filter tasks - now handled server-side, but keep for display purposes
   const filteredTasks = useMemo(() => {
-    let filtered = tasks;
-
-    // Quick filters
-    if (activeFilter === 'high-urgency') {
-      filtered = filtered.filter(t => t.urgency === 'high');
-    } else if (activeFilter === 'overdue') {
-      const today = new Date().toISOString().split('T')[0];
-      filtered = filtered.filter(t => t.due_date < today);
-    } else if (activeFilter === 'my-tasks') {
-      const userExtension = (session?.user as any)?.extension;
-      if (userExtension) {
-        filtered = filtered.filter(t => t.user_extension === userExtension);
-      }
-    }
-
-    // Search filter
-    if (search) {
-      const searchLower = search.toLowerCase();
-      filtered = filtered.filter(t =>
-        t.name?.toLowerCase().includes(searchLower) ||
-        t.company_name?.toLowerCase().includes(searchLower) ||
-        t.email?.toLowerCase().includes(searchLower) ||
-        t.phone?.toLowerCase().includes(searchLower)
-      );
-    }
-
-    return filtered;
-  }, [tasks, activeFilter, search, session]);
+    return tasks;
+  }, [tasks]);
 
   // Get analytics data
   const analyticsData = useMemo(() => {
@@ -562,6 +664,36 @@ const CrmTasks = () => {
 
   return (
     <React.Fragment>
+      <style dangerouslySetInnerHTML={{__html: `
+        .tasks-table-wrapper {
+          width: 100%;
+          overflow: hidden;
+        }
+        .tasks-table-wrapper .table-responsive {
+          width: 100%;
+          overflow-x: auto;
+          overflow-y: visible;
+          -webkit-overflow-scrolling: touch;
+        }
+        .tasks-table-wrapper .table-responsive table {
+          width: 100%;
+          table-layout: auto;
+          margin-bottom: 0;
+        }
+        .tasks-table-wrapper .table-responsive table th,
+        .tasks-table-wrapper .table-responsive table td {
+          padding: 12px 16px;
+          vertical-align: middle;
+        }
+        .tasks-table-wrapper .table-responsive table td:last-child,
+        .tasks-table-wrapper .table-responsive table th:last-child {
+          max-width: none;
+        }
+        .tasks-table-wrapper .table-responsive table td[style*="width"],
+        .tasks-table-wrapper .table-responsive table th[style*="width"] {
+          max-width: none;
+        }
+      `}} />
       <BreadcrumbItem mainLink="/crm/tasks" mainTitle="CRM" subTitle="Tasks" />
       <Row>
         <Col sm="12">
@@ -700,50 +832,31 @@ const CrmTasks = () => {
                 </>
               )}
 
-              {/* Filters and Search */}
-              <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3 mb-3">
-                <div className="d-flex gap-2 flex-wrap">
-                  <Button
-                    variant={activeFilter === 'all' ? 'primary' : 'outline-secondary'}
-                    size="sm"
-                    onClick={() => setActiveFilter('all')}
-                  >
-                    All
-                  </Button>
-                  <Button
-                    variant={activeFilter === 'my-tasks' ? 'primary' : 'outline-secondary'}
-                    size="sm"
-                    onClick={() => setActiveFilter('my-tasks')}
-                  >
-                    My Tasks
-                  </Button>
-                  <Button
-                    variant={activeFilter === 'high-urgency' ? 'primary' : 'outline-secondary'}
-                    size="sm"
-                    onClick={() => setActiveFilter('high-urgency')}
-                  >
-                    High Urgency
-                  </Button>
-                  <Button
-                    variant={activeFilter === 'overdue' ? 'primary' : 'outline-secondary'}
-                    size="sm"
-                    onClick={() => setActiveFilter('overdue')}
-                  >
-                    Overdue
-                  </Button>
-                </div>
-                <InputGroup style={{ maxWidth: '300px' }}>
-                  <InputGroup.Text>
-                    <Search size={16} />
-                  </InputGroup.Text>
-                  <Form.Control
-                    type="text"
-                    placeholder="Search tasks..."
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                  />
-                </InputGroup>
-              </div>
+              {/* Filter Bar */}
+              <FilterBar
+                quickFilters={[
+                  { id: 'all', label: 'All Tasks', color: '#6c757d', activeColor: '#0d6efd', icon: <CheckCircle size={16} /> },
+                  { id: 'med-urgency', label: 'Medium Priority', color: '#ffc107', activeColor: '#ffc107', icon: <Clock size={16} /> },
+                  { id: 'high-urgency', label: 'High Priority', color: '#dc3545', activeColor: '#dc3545', icon: <AlertCircle size={16} /> },
+                  { id: 'overdue', label: 'Overdue', color: '#dc3545', activeColor: '#dc3545', icon: <Activity size={16} /> },
+                ]}
+                activeFilter={activeFilter}
+                onFilterChange={(filterId) => {
+                  setActiveFilter(filterId);
+                  setPagination((prev) => ({ ...prev, currentPage: 1 }));
+                }}
+                searchValue={search}
+                onSearchChange={(value) => {
+                  setSearch(value);
+                }}
+                onSearch={() => {
+                  setPagination((prev) => ({ ...prev, currentPage: 1 }));
+                }}
+                searchPlaceholder="Search tasks by name, company, email, phone..."
+                showAdvancedFilters={showAdvancedFilters}
+                onToggleAdvancedFilters={() => setShowAdvancedFilters(!showAdvancedFilters)}
+                advancedFilterCount={0}
+              />
 
               {/* Bulk Actions and Column Customization */}
               <div className="d-flex justify-content-end gap-2 mb-3">
@@ -816,187 +929,208 @@ const CrmTasks = () => {
               </div>
 
               {/* Tasks Table */}
-              <div className="table-responsive">
-                <Table hover className="mb-0">
-                  <thead className="bg-light">
-                    <tr>
-                      <th style={{ width: '50px' }}>
-                        <Form.Check
-                          type="checkbox"
-                          checked={filteredTasks.length > 0 && filteredTasks.every(t => selectedTasks.includes(t.id!))}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setSelectedTasks(filteredTasks.map(t => t.id!));
-                            } else {
-                              setSelectedTasks([]);
-                            }
-                          }}
-                        />
-                      </th>
-                      {selectedColumns.includes('task') && (
-                        <th>
-                          <div className="d-flex align-items-center gap-2" style={{ cursor: 'pointer' }} onClick={() => handleSort('name')}>
-                            Task {renderSortIcon('name')}
-                          </div>
-                        </th>
-                      )}
-                      {selectedColumns.includes('assignedTo') && <th>Assigned To</th>}
-                      {selectedColumns.includes('contact') && <th>Contact</th>}
-                      {selectedColumns.includes('company') && <th>Company</th>}
-                      {selectedColumns.includes('urgency') && (
-                        <th>
-                          <div className="d-flex align-items-center gap-2" style={{ cursor: 'pointer' }} onClick={() => handleSort('urgency')}>
-                            Urgency {renderSortIcon('urgency')}
-                          </div>
-                        </th>
-                      )}
-                      {selectedColumns.includes('dueDate') && (
-                        <th>
-                          <div className="d-flex align-items-center gap-2" style={{ cursor: 'pointer' }} onClick={() => handleSort('due_date')}>
-                            Due Date {renderSortIcon('due_date')}
-                          </div>
-                        </th>
-                      )}
-                      <th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {loading ? (
-                      <tr>
-                        <td colSpan={selectedColumns.length + 2} className="text-center py-4">
-                          Loading...
-                        </td>
-                      </tr>
-                    ) : filteredTasks.length === 0 ? (
-                      <tr>
-                        <td colSpan={selectedColumns.length + 2} className="text-center py-4 text-muted">
-                          No tasks found
-                        </td>
-                      </tr>
-                    ) : (
-                      sortData(filteredTasks, pagination.sortColumn, pagination.sortDirection).map((task) => {
-                        const isOverdue = task.due_date < new Date().toISOString().split('T')[0];
-                        return (
-                          <tr key={task.id}>
-                            <td>
-                              <Form.Check
-                                type="checkbox"
-                                checked={selectedTasks.includes(task.id!)}
-                                onChange={(e) => {
-                                  if (e.target.checked) {
-                                    setSelectedTasks([...selectedTasks, task.id!]);
-                                  } else {
-                                    setSelectedTasks(selectedTasks.filter(id => id !== task.id));
-                                  }
-                                }}
-                              />
-                            </td>
-                            {selectedColumns.includes('task') && (
-                              <td>
-                                <div className="fw-semibold">{task.name}</div>
-                                {task.created_at && (
-                                  <small className="text-muted">
-                                    Created: {new Date(task.created_at).toLocaleDateString()}
-                                  </small>
-                                )}
-                              </td>
-                            )}
-                            {selectedColumns.includes('assignedTo') && (
-                              <td>
-                                <div className="d-flex align-items-center gap-2">
-                                  <User size={14} className="text-muted" />
-                                  {extensions.find(e => e.id === task.user_extension)?.display_name || task.user_extension}
-                                </div>
-                              </td>
-                            )}
-                            {selectedColumns.includes('contact') && (
-                              <td>
-                                <div className="fw-medium">{task.email || task.phone || '-'}</div>
-                                {task.phone && task.email && (
-                                  <small className="text-muted">{task.phone}</small>
-                                )}
-                              </td>
-                            )}
-                            {selectedColumns.includes('company') && (
-                              <td>{task.company_name || '-'}</td>
-                            )}
-                            {selectedColumns.includes('urgency') && (
-                              <td>{getUrgencyBadge(task.urgency)}</td>
-                            )}
-                            {selectedColumns.includes('dueDate') && (
-                              <td>
-                                <div className="d-flex align-items-center gap-2">
-                                  <Calendar size={14} className={isOverdue ? 'text-danger' : 'text-muted'} />
-                                  <span className={isOverdue ? 'text-danger fw-semibold' : ''}>
-                                    {new Date(task.due_date).toLocaleDateString()}
-                                  </span>
-                                </div>
-                              </td>
-                            )}
-                            <td>
-                              <div className="d-flex gap-1">
-                                <Button
-                                  variant="link"
-                                  size="sm"
-                                  className="p-1"
-                                  title="View Details"
-                                  onClick={() => {
-                                    fetchTask(task.id!);
-                                    setShowTaskViewModal(true);
+              <Card className="border-0 shadow-sm tasks-table-wrapper" style={{ width: '100%' }}>
+                <Card.Body className="p-0" style={{ width: '100%' }}>
+                  {loading ? (
+                    <div className="text-center py-5">
+                      <Spinner animation="border" variant="primary" />
+                      <p className="mt-3 text-muted">Loading tasks...</p>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="table-responsive">
+                        <Table hover className="mb-0" style={{ width: '100%', margin: 0, tableLayout: 'auto' }}>
+                          <thead className="bg-light">
+                            <tr>
+                              <th style={{ width: '50px' }}>
+                                <Form.Check
+                                  type="checkbox"
+                                  checked={filteredTasks.length > 0 && filteredTasks.every(t => selectedTasks.includes(t.id!))}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      setSelectedTasks(filteredTasks.map(t => t.id!));
+                                    } else {
+                                      setSelectedTasks([]);
+                                    }
                                   }}
+                                />
+                              </th>
+                              {selectedColumns.includes('task') && (
+                                <th 
+                                  style={{ cursor: 'pointer', userSelect: 'none' }}
+                                  onClick={() => handleSort('name')}
                                 >
-                                  <Eye size={16} />
-                                </Button>
-                                <Button
-                                  variant="link"
-                                  size="sm"
-                                  className="p-1"
-                                  title="Edit Task"
-                                  onClick={() => {
-                                    setEditingTask(task);
-                                    setTaskFormData({
-                                      name: task.name,
-                                      user_extension: task.user_extension,
-                                      created_by: task.created_by,
-                                      urgency: task.urgency,
-                                      phone: task.phone || '',
-                                      email: task.email || '',
-                                      company_name: task.company_name || '',
-                                      due_date: task.due_date,
-                                      notes: task.notes?.map(n => ({ note: n.note })) || [],
-                                    });
-                                    setSelectedUserExtension(extensionOptions.find(o => o.value === task.user_extension) || null);
-                                    setShowTaskModal(true);
-                                  }}
+                                  Task {renderSortIcon('name')}
+                                </th>
+                              )}
+                              {selectedColumns.includes('assignedTo') && (
+                                <th 
+                                  style={{ cursor: 'pointer', userSelect: 'none' }}
+                                  onClick={() => handleSort('user_extension')}
                                 >
-                                  <Edit size={16} />
-                                </Button>
-                                <Button
-                                  variant="link"
-                                  size="sm"
-                                  className="p-1 text-danger"
-                                  title="Delete Task"
-                                  onClick={() => {
-                                    setTaskToDelete({ id: task.id! });
-                                    setShowDeleteModal(true);
-                                  }}
+                                  Assigned To {renderSortIcon('user_extension')}
+                                </th>
+                              )}
+                              {selectedColumns.includes('contact') && <th>Contact</th>}
+                              {selectedColumns.includes('company') && (
+                                <th 
+                                  style={{ cursor: 'pointer', userSelect: 'none' }}
+                                  onClick={() => handleSort('company_name')}
                                 >
-                                  <Trash2 size={16} />
-                                </Button>
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })
-                    )}
-                  </tbody>
-                </Table>
-              </div>
+                                  Company {renderSortIcon('company_name')}
+                                </th>
+                              )}
+                              {selectedColumns.includes('urgency') && (
+                                <th 
+                                  style={{ cursor: 'pointer', userSelect: 'none' }}
+                                  onClick={() => handleSort('urgency')}
+                                >
+                                  Urgency {renderSortIcon('urgency')}
+                                </th>
+                              )}
+                              {selectedColumns.includes('dueDate') && (
+                                <th 
+                                  style={{ cursor: 'pointer', userSelect: 'none' }}
+                                  onClick={() => handleSort('due_date')}
+                                >
+                                  Due Date {renderSortIcon('due_date')}
+                                </th>
+                              )}
+                              <th style={{ width: '120px', minWidth: '120px' }}>Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {(() => {
+                              const sorted = sortData(filteredTasks, pagination.sortColumn, pagination.sortDirection);
+                              
+                              if (sorted.length === 0) {
+                                return (
+                                  <tr>
+                                    <td colSpan={selectedColumns.length + 2} className="text-center py-4 text-muted">
+                                      No tasks found matching your criteria
+                                    </td>
+                                  </tr>
+                                );
+                              }
 
-              {/* Pagination */}
-              <div className="mt-3">
-                {renderPaginationControls(filteredTasks.length, pagination, setPagination, 'tasks')}
-              </div>
+                              return sorted.map((task) => {
+                                const isOverdue = task.due_date < new Date().toISOString().split('T')[0];
+                                return (
+                                  <tr key={task.id}>
+                                    <td>
+                                      <Form.Check
+                                        type="checkbox"
+                                        checked={selectedTasks.includes(task.id!)}
+                                        onChange={(e) => {
+                                          if (e.target.checked) {
+                                            setSelectedTasks([...selectedTasks, task.id!]);
+                                          } else {
+                                            setSelectedTasks(selectedTasks.filter(id => id !== task.id));
+                                          }
+                                        }}
+                                      />
+                                    </td>
+                                    {selectedColumns.includes('task') && (
+                                      <td className="fw-semibold">{task.name}</td>
+                                    )}
+                                    {selectedColumns.includes('assignedTo') && (
+                                      <td>
+                                        <Badge bg="success" className="bg-opacity-10 text-dark">
+                                          {extensions.find(e => e.id === task.user_extension)?.display_name || task.user_extension}
+                                        </Badge>
+                                      </td>
+                                    )}
+                                    {selectedColumns.includes('contact') && (
+                                      <td>
+                                        <div className="fw-medium">{task.email || task.phone || '-'}</div>
+                                        {task.phone && task.email && (
+                                          <small className="text-muted">{task.phone}</small>
+                                        )}
+                                      </td>
+                                    )}
+                                    {selectedColumns.includes('company') && (
+                                      <td>{task.company_name || '-'}</td>
+                                    )}
+                                    {selectedColumns.includes('urgency') && (
+                                      <td>{getUrgencyBadge(task.urgency)}</td>
+                                    )}
+                                    {selectedColumns.includes('dueDate') && (
+                                      <td>
+                                        <Badge 
+                                          bg={isOverdue ? 'danger' : 'info'} 
+                                          className="bg-opacity-10 text-dark"
+                                        >
+                                          {new Date(task.due_date).toLocaleDateString()}
+                                          {isOverdue && <span className="ms-1 fw-bold">(Overdue)</span>}
+                                        </Badge>
+                                      </td>
+                                    )}
+                                    <td style={{ width: '120px', minWidth: '120px' }}>
+                                      <div className="d-flex gap-1">
+                                        <Button
+                                          variant="link"
+                                          size="sm"
+                                          className="p-1"
+                                          title="View Details"
+                                          onClick={() => {
+                                            fetchTask(task.id!);
+                                            setShowTaskViewModal(true);
+                                          }}
+                                        >
+                                          <Eye size={16} />
+                                        </Button>
+                                        <Button
+                                          variant="link"
+                                          size="sm"
+                                          className="p-1"
+                                          title="Edit Task"
+                                          onClick={() => {
+                                            setEditingTask(task);
+                                            setTaskFormData({
+                                              name: task.name,
+                                              user_extension: task.user_extension,
+                                              created_by: task.created_by,
+                                              urgency: task.urgency,
+                                              phone: task.phone || '',
+                                              email: task.email || '',
+                                              company_name: task.company_name || '',
+                                              due_date: task.due_date,
+                                              notes: task.notes?.map(n => ({ note: n.note })) || [],
+                                            });
+                                            setSelectedUserExtension(extensionOptions.find(o => o.value === task.user_extension) || null);
+                                            setShowTaskModal(true);
+                                          }}
+                                        >
+                                          <Edit size={16} />
+                                        </Button>
+                                        <Button
+                                          variant="link"
+                                          size="sm"
+                                          className="p-1 text-danger"
+                                          title="Delete Task"
+                                          onClick={() => {
+                                            setTaskToDelete({ id: task.id! });
+                                            setShowDeleteModal(true);
+                                          }}
+                                        >
+                                          <Trash2 size={16} />
+                                        </Button>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                );
+                              });
+                            })()}
+                          </tbody>
+                        </Table>
+                      </div>
+                      <div className="p-3">
+                        {renderPaginationControls(filteredTasks.length, pagination, setPagination, 'tasks')}
+                      </div>
+                    </>
+                  )}
+                </Card.Body>
+              </Card>
             </Card.Body>
           </Card>
         </Col>

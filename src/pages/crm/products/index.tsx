@@ -24,6 +24,7 @@ import {
   Modal,
 } from "react-bootstrap";
 import Select from "react-select";
+import CreatableSelect from "react-select/creatable";
 import {
   PlusCircle,
   Eye,
@@ -52,7 +53,6 @@ interface FilterBarProps {
   quickFilters: {
     id: string;
     label: string;
-    count: number;
     variant?: string;
     color?: string;
     activeColor?: string;
@@ -124,9 +124,6 @@ const FilterBar: React.FC<FilterBarProps> = ({
                     <span className="d-flex align-items-center">{filter.icon}</span>
                   )}
                   {filter.label}
-                  <Badge bg="light" text="dark" className="ms-2">
-                    {filter.count}
-                  </Badge>
                 </Button>
               );
             })}
@@ -200,9 +197,9 @@ const ProductsPage = () => {
   });
   const [productsSearch, setProductsSearch] = useState("");
   const [productsFilters, setProductsFilters] = useState({
-    category: [] as string[],
+    category: null as string | null,
     brand: [] as string[],
-    status: [] as string[],
+    status: null as string | null,
     priceMin: "",
     priceMax: "",
   });
@@ -452,6 +449,25 @@ const ProductsPage = () => {
         params.search = productsSearch;
       }
 
+      // Active filter (active/inactive)
+      if (activeFilter === "active") {
+        params.active = true;
+      } else if (activeFilter === "inactive") {
+        params.active = false;
+      }
+
+      // Category filter
+      if (productsFilters.category) {
+        params.category = productsFilters.category;
+      }
+
+      // Brand filter
+      if (productsFilters.brand.length > 0) {
+        params.brand = productsFilters.brand;
+      }
+
+      // Status filter is handled by activeFilter (active=true/false)
+
       const response = await getCrmProducts(params);
       setProducts(response.data);
     } catch (error: any) {
@@ -463,50 +479,12 @@ const ProductsPage = () => {
 
   useEffect(() => {
     fetchProducts();
-  }, [productsPagination.currentPage, productsPagination.rowsPerPage]);
+  }, [productsPagination.currentPage, productsPagination.rowsPerPage, productsSearch, activeFilter, productsFilters]);
 
-  // Filter and search logic
-  const filteredProducts = useMemo(() => {
-    const displayProducts = products.map(convertToDisplayData);
-
-    return displayProducts.filter((product) => {
-      const matchesSearch =
-        !productsSearch ||
-        product.productName.toLowerCase().includes(productsSearch.toLowerCase()) ||
-        product.sku.toLowerCase().includes(productsSearch.toLowerCase()) ||
-        product.brand.toLowerCase().includes(productsSearch.toLowerCase());
-
-      const matchesCategory =
-        productsFilters.category.length === 0 ||
-        productsFilters.category.includes(product.category);
-
-      const matchesBrand =
-        productsFilters.brand.length === 0 ||
-        productsFilters.brand.includes(product.brand);
-
-      const matchesStatus =
-        productsFilters.status.length === 0 ||
-        productsFilters.status.includes(product.status);
-
-      const matchesActiveFilter =
-        activeFilter === "all" ||
-        (activeFilter === "active" && product.status === "Active") ||
-        (activeFilter === "inactive" && product.status === "Inactive");
-
-      return (
-        matchesSearch &&
-        matchesCategory &&
-        matchesBrand &&
-        matchesStatus &&
-        matchesActiveFilter
-      );
-    });
-  }, [
-    products,
-    productsSearch,
-    productsFilters,
-    activeFilter,
-  ]);
+  // Convert products to display data (no filtering - done by API)
+  const displayProducts = useMemo(() => {
+    return products.map(convertToDisplayData);
+  }, [products]);
 
   // Get unique categories and brands from products
   const uniqueCategories = useMemo(() => {
@@ -527,25 +505,21 @@ const ProductsPage = () => {
 
   // Quick filters
   const productQuickFilters = useMemo(() => {
-    const displayProducts = products.map(convertToDisplayData);
     return [
       {
         id: "all",
         label: "All Products",
-        count: displayProducts.length,
       },
       {
         id: "active",
         label: "Active",
-        count: displayProducts.filter((p) => p.status === "Active").length,
       },
       {
         id: "inactive",
         label: "Inactive",
-        count: displayProducts.filter((p) => p.status === "Inactive").length,
       },
     ];
-  }, [products]);
+  }, []);
 
   // Available columns
   const availableColumns = [
@@ -646,6 +620,36 @@ const ProductsPage = () => {
   return (
     <Layout>
       <BreadcrumbItem mainTitle="CRM" mainLink="/crm/dashboard" subTitle="Products" />
+      <style dangerouslySetInnerHTML={{__html: `
+        .products-table-wrapper {
+          width: 100%;
+          overflow: hidden;
+        }
+        .products-table-wrapper .table-responsive {
+          width: 100%;
+          overflow-x: auto;
+          overflow-y: visible;
+          -webkit-overflow-scrolling: touch;
+        }
+        .products-table-wrapper .table-responsive table {
+          width: 100%;
+          table-layout: auto;
+          margin-bottom: 0;
+        }
+        .products-table-wrapper .table-responsive table th,
+        .products-table-wrapper .table-responsive table td {
+          padding: 12px 16px;
+          vertical-align: middle;
+        }
+        .products-table-wrapper .table-responsive table td:last-child,
+        .products-table-wrapper .table-responsive table th:last-child {
+          max-width: none;
+        }
+        .products-table-wrapper .table-responsive table td[style*="width"],
+        .products-table-wrapper .table-responsive table th[style*="width"] {
+          max-width: none;
+        }
+      `}} />
       <div>
         {/* Product Form Modal */}
         <Modal
@@ -747,21 +751,18 @@ const ProductsPage = () => {
                 <Col md={6}>
                   <Form.Group className="mb-3">
                     <Form.Label className="fw-semibold">Category</Form.Label>
-                    <Form.Select
-                      value={productFormData.category}
-                      onChange={(e) =>
-                        setProductFormData({ ...productFormData, category: e.target.value })
+                    <CreatableSelect
+                      options={uniqueCategories.map((cat) => ({ value: cat, label: cat }))}
+                      value={productFormData.category ? { value: productFormData.category, label: productFormData.category } : null}
+                      onChange={(selected) =>
+                        setProductFormData({ ...productFormData, category: selected ? selected.value : "" })
                       }
-                    >
-                      <option value="">Select category</option>
-                      {uniqueCategories.map((cat) => (
-                        <option key={cat} value={cat}>
-                          {cat}
-                        </option>
-                      ))}
-                    </Form.Select>
+                      placeholder="Select or create category..."
+                      styles={customSelectStyles}
+                      isClearable
+                    />
                     <Form.Text className="text-muted">
-                      Choose the product category for better organization
+                      Choose or create a product category for better organization
                     </Form.Text>
                   </Form.Group>
                 </Col>
@@ -1340,19 +1341,30 @@ const ProductsPage = () => {
         <FilterBar
           quickFilters={productQuickFilters}
           activeFilter={activeFilter}
-          onFilterChange={(filterId) => setActiveFilter(filterId)}
+          onFilterChange={(filterId) => {
+            setActiveFilter(filterId);
+            // Sync status filter dropdown with activeFilter
+            if (filterId === "active") {
+              setProductsFilters((prev) => ({ ...prev, status: "Active" }));
+            } else if (filterId === "inactive") {
+              setProductsFilters((prev) => ({ ...prev, status: "Inactive" }));
+            } else {
+              setProductsFilters((prev) => ({ ...prev, status: null }));
+            }
+            setProductsPagination({ ...productsPagination, currentPage: 1 });
+          }}
           searchValue={productsSearch}
           onSearchChange={(value) => setProductsSearch(value)}
           onSearch={() => {
             setProductsPagination({ ...productsPagination, currentPage: 1 });
           }}
-          searchPlaceholder="Search by product name, SKU, or brand..."
+          searchPlaceholder="Search by product name or SKU..."
           showAdvancedFilters={showAdvancedFilters}
           onToggleAdvancedFilters={() => setShowAdvancedFilters(!showAdvancedFilters)}
           advancedFilterCount={
-            productsFilters.category.length +
+            (productsFilters.category ? 1 : 0) +
             productsFilters.brand.length +
-            productsFilters.status.length
+            (productsFilters.status ? 1 : 0)
           }
         />
 
@@ -1363,53 +1375,49 @@ const ProductsPage = () => {
               <Row className="g-3 align-items-end">
                 <Col md={2}>
                   <Form.Label className="small fw-bold mb-2">Category</Form.Label>
-                  <Select
-                    isMulti
+                  <CreatableSelect
                     options={uniqueCategories.map((cat) => ({ value: cat, label: cat }))}
-                    value={productsFilters.category.map((c) => ({ value: c, label: c }))}
+                    value={productsFilters.category ? { value: productsFilters.category, label: productsFilters.category } : null}
                     onChange={(selected) => {
                       setProductsFilters((prev) => ({
                         ...prev,
-                        category: selected ? selected.map((s) => s.value) : [],
+                        category: selected ? selected.value : null,
                       }));
+                      setProductsPagination({ ...productsPagination, currentPage: 1 });
                     }}
-                    placeholder="Select categories..."
+                    placeholder="Select or create category..."
                     styles={customSelectStyles}
+                    isClearable
                   />
                 </Col>
-                <Col md={2}>
-                  <Form.Label className="small fw-bold mb-2">Brand</Form.Label>
-                  <Select
-                    isMulti
-                    options={uniqueBrands.map((brand) => ({ value: brand, label: brand }))}
-                    value={productsFilters.brand.map((b) => ({ value: b, label: b }))}
-                    onChange={(selected) => {
-                      setProductsFilters((prev) => ({
-                        ...prev,
-                        brand: selected ? selected.map((s) => s.value) : [],
-                      }));
-                    }}
-                    placeholder="Select brands..."
-                    styles={customSelectStyles}
-                  />
-                </Col>
+                
                 <Col md={2}>
                   <Form.Label className="small fw-bold mb-2">Status</Form.Label>
                   <Select
-                    isMulti
                     options={[
                       { value: "Active", label: "Active" },
                       { value: "Inactive", label: "Inactive" },
                     ]}
-                    value={productsFilters.status.map((s) => ({ value: s, label: s }))}
+                    value={productsFilters.status ? { value: productsFilters.status, label: productsFilters.status } : null}
                     onChange={(selected) => {
+                      const statusValue = selected ? selected.value : null;
                       setProductsFilters((prev) => ({
                         ...prev,
-                        status: selected ? selected.map((s) => s.value) : [],
+                        status: statusValue,
                       }));
+                      // Sync activeFilter buttons with status dropdown
+                      if (statusValue === "Active") {
+                        setActiveFilter("active");
+                      } else if (statusValue === "Inactive") {
+                        setActiveFilter("inactive");
+                      } else {
+                        setActiveFilter("all");
+                      }
+                      setProductsPagination({ ...productsPagination, currentPage: 1 });
                     }}
                     placeholder="Select status..."
                     styles={customSelectStyles}
+                    isClearable
                   />
                 </Col>
                 <Col md={2}>
@@ -1419,6 +1427,7 @@ const ProductsPage = () => {
                       className="flex-grow-1 d-flex align-items-center justify-content-center"
                       onClick={() => {
                         setProductsPagination({ ...productsPagination, currentPage: 1 });
+                        // Filters are applied automatically via useEffect
                       }}
                     >
                       Apply
@@ -1428,12 +1437,13 @@ const ProductsPage = () => {
                       className="d-flex align-items-center justify-content-center"
                       onClick={() => {
                         setProductsFilters({
-                          category: [],
+                          category: null,
                           brand: [],
-                          status: [],
+                          status: null,
                           priceMin: "",
                           priceMax: "",
                         });
+                        setActiveFilter("all");
                         setProductsPagination({ ...productsPagination, currentPage: 1 });
                       }}
                     >
@@ -1509,10 +1519,10 @@ const ProductsPage = () => {
         </div>
 
         {/* Products Table */}
-        <Card className="border-0 shadow-sm">
-          <Card.Body className="p-0">
+        <Card className="border-0 shadow-sm products-table-wrapper" style={{ width: '100%' }}>
+          <Card.Body className="p-0" style={{ width: '100%' }}>
             <div className="table-responsive">
-              <Table hover className="mb-0">
+              <Table hover className="mb-0" style={{ width: '100%', margin: 0, tableLayout: 'auto' }}>
                 <thead className="bg-light">
                   <tr>
                     {selectedProductsColumns.includes("productName") && (
@@ -1526,7 +1536,7 @@ const ProductsPage = () => {
                     {selectedProductsColumns.includes("status") && <th>Status</th>}
                     {selectedProductsColumns.includes("description") && <th>Description</th>}
                     {selectedProductsColumns.includes("created") && <th>Created</th>}
-                    <th style={{ width: "120px" }}>Actions</th>
+                    <th style={{ width: '120px', minWidth: '120px' }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1539,7 +1549,7 @@ const ProductsPage = () => {
                         Loading...
                       </td>
                     </tr>
-                  ) : filteredProducts.length === 0 ? (
+                  ) : displayProducts.length === 0 ? (
                     <tr>
                       <td
                         colSpan={selectedProductsColumns.length + 1}
@@ -1551,7 +1561,7 @@ const ProductsPage = () => {
                   ) : (
                     (() => {
                       const sorted = sortData(
-                        filteredProducts,
+                        displayProducts,
                         productsPagination.sortColumn,
                         productsPagination.sortDirection
                       );
@@ -1606,7 +1616,7 @@ const ProductsPage = () => {
                           {selectedProductsColumns.includes("created") && (
                             <td className="text-muted">{product.created}</td>
                           )}
-                          <td>
+                          <td style={{ width: '120px', minWidth: '120px' }}>
                             <div className="d-flex gap-1">
                               <Button
                                 variant="link"
@@ -1652,7 +1662,7 @@ const ProductsPage = () => {
             </div>
             <div className="p-3">
               {renderPaginationControls(
-                filteredProducts.length,
+                displayProducts.length,
                 productsPagination,
                 setProductsPagination,
                 "products"
