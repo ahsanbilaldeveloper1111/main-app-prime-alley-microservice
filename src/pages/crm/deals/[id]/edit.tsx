@@ -347,21 +347,24 @@ const EditDeal = () => {
         mainLink="/crm/dashboard"
         subTitle="Deals"
       />
-      <div>
-        <div className="d-flex justify-content-between align-items-center mb-4">
-          <div>
-            <h2 className="mb-1 fw-bold">Edit Deal</h2>
-            <p className="text-muted mb-0">Update the deal details below</p>
-          </div>
-          <Link href="/crm/deals">
-            <Button variant="outline-secondary">
-              <ArrowLeft size={16} className="me-2" />
-              Back to Deals
-            </Button>
-          </Link>
-        </div>
-
-        <Form onSubmit={handleSubmit}>
+      <div className="container-fluid">
+        {/* Edit Deal Form */}
+        <div className="row">
+          <div className="col-12">
+            <Card className="border-0 shadow-sm">
+              <Card.Header>
+                <div className="d-flex justify-content-between align-items-center">
+                  <h4 className="mb-0 app-heading">Deal Information</h4>
+                  <Link href="/crm/deals">
+                    <Button variant="outline-secondary" size="sm">
+                      <ArrowLeft size={16} className="me-2" />
+                      Back to Deals
+                    </Button>
+                  </Link>
+                </div>
+              </Card.Header>
+              <Card.Body>
+                <Form onSubmit={handleSubmit}>
           {/* Timeline Navigation - Same as create page */}
           <div className="mb-4">
             <div className="d-flex align-items-center justify-content-between position-relative">
@@ -980,15 +983,15 @@ const EditDeal = () => {
                     <Col md={4}>
                       <Form.Group className="mb-3">
                         <Form.Label>Standard Discount (%)</Form.Label>
-                        <Form.Control
-                          type="number"
-                          min="0"
-                          max="100"
-                          step="0.01"
-                          value={formData.standard_discount_percentage}
+                        <Form.Select
+                          value={(formData.standard_discount_percentage && parseFloat(formData.standard_discount_percentage))}
                           onChange={(e) => setFormData({ ...formData, standard_discount_percentage: e.target.value })}
-                          placeholder="0"
-                        />
+                        >
+                          <option value="0">0%</option>
+                          <option value="5">5%</option>
+                          <option value="10">10%</option>
+                          <option value="15">15%</option>
+                        </Form.Select>
                       </Form.Group>
                     </Col>
                     <Col md={4}>
@@ -1038,137 +1041,268 @@ const EditDeal = () => {
                   </div>
 
                   {/* Estimation Items Table */}
-                  <div className="table-responsive">
-                    <Table size="sm" hover className="bg-white">
-                      <thead>
-                        <tr>
-                          <th>#</th>
-                          <th>Product/Service</th>
-                          <th>Description</th>
-                          <th>Qty</th>
-                          <th>Unit Price</th>
-                          <th>Sub Total</th>
-                          <th>Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {estimationItems.map((item, index) => {
-                          const subtotal = item.qty * item.unit_price;
-                          const product = products.find(p => p.id === item.product_id);
-                          const showConversionInfo = product && 
-                            product.currency.toUpperCase() !== formData.currency.toUpperCase() &&
-                            item.original_currency &&
-                            item.original_price !== item.unit_price;
-                          
-                          return (
-                            <tr key={index}>
-                              <td>{index + 1}</td>
-                              <td>
-                                {item.product_service}
-                                {showConversionInfo && (
-                                  <div className="small text-muted">
-                                    Original: {formatCurrency(item.original_price, item.original_currency)}
-                                  </div>
-                                )}
-                              </td>
-                              <td>{item.description || 'N/A'}</td>
-                              <td>{item.qty}</td>
-                              <td>
-                                {formatCurrency(item.unit_price, formData.currency)}
-                                {showConversionInfo && (
-                                  <div className="small text-success">
-                                    Converted
-                                  </div>
-                                )}
-                              </td>
-                              <td className="fw-bold">{formatCurrency(subtotal, formData.currency)}</td>
-                              <td>
-                                <Button
-                                  variant="link"
-                                  size="sm"
-                                  className="p-0 me-2"
-                                  title="Edit Item"
-                                  onClick={() => {
-                                    setEditingItemIndex(index);
-                                    setItemFormData({
-                                      product_id: item.product_id,
-                                      product_service: item.product_service,
-                                      description: item.description,
-                                      qty: item.qty,
-                                      unit_price: item.unit_price,
-                                    });
-                                    setShowAddItemModal(true);
-                                  }}
-                                >
-                                  <Edit size={14} />
-                                </Button>
-                                <Button
-                                  variant="link"
-                                  size="sm"
-                                  className="p-0 text-danger"
-                                  title="Delete Item"
-                                  onClick={() => {
-                                    if (window.confirm('Are you sure you want to delete this item?')) {
-                                      setEstimationItems(estimationItems.filter((_, i) => i !== index));
-                                    }
-                                  }}
-                                >
-                                  <Trash2 size={14} />
-                                </Button>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                        {estimationItems.length === 0 && (
-                          <tr>
-                            <td colSpan={7} className="text-center text-muted py-4">
-                              <Package size={32} className="text-muted mb-2" />
-                              <div>No items in estimation chart</div>
-                              <small>Click "Add Item" to add products or services</small>
-                            </td>
-                          </tr>
-                        )}
-                      </tbody>
-                      {estimationItems.length > 0 && (() => {
-                        const grandTotal = estimationItems.reduce((sum, item) => sum + (item.qty * item.unit_price), 0);
-                        const standardDiscount = (grandTotal * parseFloat(formData.standard_discount_percentage || "0")) / 100;
-                        const specialDiscount = ((grandTotal - standardDiscount) * parseFloat(formData.special_discount_percentage || "0")) / 100;
-                        const totalDiscount = standardDiscount + specialDiscount;
-                        const subtotalAfterDiscount = grandTotal - totalDiscount;
-                        const taxAmount = (subtotalAfterDiscount * parseFloat(formData.tax_percentage || "0")) / 100;
-                        const netValue = subtotalAfterDiscount + taxAmount;
-                        return (
-                          <tfoot>
+                  <div style={{ marginBottom: '30px', width: '100%' }}>
+                    <style dangerouslySetInnerHTML={{__html: `
+                      .order-items-table-wrapper {
+                        width: 100%;
+                        overflow-x: auto;
+                      }
+                      .order-items-table-wrapper .table-responsive {
+                        width: 100%;
+                        border-radius: 8px;
+                        overflow: hidden;
+                        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+                      }
+                      .order-items-table-wrapper table {
+                        width: 100%;
+                        margin: 0;
+                        border-collapse: separate;
+                        border-spacing: 0;
+                        table-layout: auto;
+                      }
+                      .order-items-table-wrapper thead th {
+                        background: #f8f9fa !important;
+                        padding: 12px 16px !important;
+                        font-size: 0.875rem;
+                        font-weight: 600;
+                        text-transform: uppercase;
+                        letter-spacing: 0.5px;
+                        color: #495057;
+                        border-bottom: 2px solid #dee2e6;
+                        white-space: nowrap;
+                      }
+                      .order-items-table-wrapper thead th:first-of-type {
+                        width: 50px !important;
+                        min-width: 50px !important;
+                        text-align: center;
+                      }
+                      .order-items-table-wrapper thead th:last-of-type {
+                        width: 120px !important;
+                        min-width: 120px !important;
+                        text-align: center;
+                      }
+                      .order-items-table-wrapper tbody td {
+                        padding: 14px 16px !important;
+                        font-size: 0.875rem;
+                        vertical-align: middle;
+                        border-bottom: 1px solid #f0f0f0;
+                        background: #fff;
+                        word-wrap: break-word;
+                        overflow-wrap: break-word;
+                      }
+                      .order-items-table-wrapper tbody td:first-of-type {
+                        width: 50px !important;
+                        min-width: 50px !important;
+                        text-align: center;
+                        color: #6c757d;
+                        font-weight: 500;
+                      }
+                      .order-items-table-wrapper tbody td:last-of-type {
+                        width: 120px !important;
+                        min-width: 120px !important;
+                        text-align: center;
+                      }
+                      .order-items-table-wrapper tbody td:nth-last-child(2),
+                      .order-items-table-wrapper thead th:nth-last-child(2) {
+                        min-width: 150px !important;
+                        white-space: nowrap;
+                      }
+                      .order-items-table-wrapper tbody td:nth-last-child(3),
+                      .order-items-table-wrapper thead th:nth-last-child(3) {
+                        min-width: 140px !important;
+                        white-space: nowrap;
+                      }
+                      .order-items-table-wrapper tbody tr:hover {
+                        background-color: #f8f9fa;
+                      }
+                      .order-items-table-wrapper tbody tr:last-child td {
+                        border-bottom: none;
+                      }
+                      .order-items-table-wrapper tfoot td {
+                        padding: 12px 16px !important;
+                        background: #f8f9fa !important;
+                        font-size: 0.875rem;
+                        border-top: 2px solid #dee2e6;
+                        white-space: nowrap;
+                      }
+                      .order-items-table-wrapper tfoot td:first-of-type {
+                        width: auto !important;
+                        min-width: auto !important;
+                        max-width: none !important;
+                      }
+                      .order-items-table-wrapper tfoot td:last-of-type {
+                        width: auto !important;
+                        min-width: 150px !important;
+                        max-width: none !important;
+                        text-align: right;
+                        font-weight: 600;
+                      }
+                      .order-items-table-wrapper tfoot tr:last-child td:first-of-type {
+                        padding-left: 20px !important;
+                      }
+                      .order-items-table-wrapper tfoot tr:last-child td:last-of-type {
+                        padding-right: 20px !important;
+                      }
+                    `}} />
+                    <div className="order-items-table-wrapper">
+                      <div className="table-responsive" style={{ width: '100%' }}>
+                        <Table hover style={{ marginBottom: 0 }}>
+                          <thead>
                             <tr>
-                              <td colSpan={5} className="text-end fw-bold">Subtotal:</td>
-                              <td className="fw-bold">{formatCurrency(grandTotal, formData.currency)}</td>
-                              <td></td>
+                              <th>#</th>
+                              <th style={{ minWidth: '200px' }}>Product Name</th>
+                              <th style={{ minWidth: '120px' }}>SKU</th>
+                              <th style={{ minWidth: '80px', textAlign: 'center' }}>Qty</th>
+                              {estimationItems.some((item) => item.description) && <th style={{ minWidth: '180px' }}>Description</th>}
+                              <th style={{ minWidth: '140px', textAlign: 'right' }}>Unit Price</th>
+                              <th style={{ minWidth: '150px', textAlign: 'right' }}>Total Price</th>
+                              <th>Actions</th>
                             </tr>
-                            {totalDiscount > 0 && (
+                          </thead>
+                          <tbody>
+                            {estimationItems.map((item, index) => {
+                              const subtotal = item.qty * item.unit_price;
+                              const product = products.find(p => p.id === item.product_id);
+                              const showConversionInfo = product && 
+                                product.currency.toUpperCase() !== formData.currency.toUpperCase() &&
+                                item.original_currency &&
+                                item.original_price !== item.unit_price;
+                              
+                              return (
+                                <tr key={index}>
+                                  <td>{index + 1}</td>
+                                  <td className="fw-semibold" style={{ color: '#212529' }}>{item.product_service || 'N/A'}</td>
+                                  <td style={{ color: '#6c757d', fontSize: '0.813rem' }}>{product?.sku || 'N/A'}</td>
+                                  <td style={{ textAlign: 'center', fontWeight: 500, whiteSpace: 'nowrap' }}>{item.qty || '0'}</td>
+                                  {estimationItems.some((i) => i.description) && (
+                                    <td style={{ 
+                                      maxWidth: '180px', 
+                                      overflow: 'hidden', 
+                                      textOverflow: 'ellipsis', 
+                                      whiteSpace: 'nowrap',
+                                      color: '#6c757d',
+                                      fontSize: '0.813rem'
+                                    }}>
+                                      {item.description || '-'}
+                                    </td>
+                                  )}
+                                  <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                                    <div style={{ fontWeight: 500 }}>
+                                      {formData.currency || 'USD'} {parseFloat(String(item.unit_price || '0')).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </div>
+                                    {showConversionInfo && (
+                                      <div className="small text-muted" style={{ fontSize: '0.75rem', marginTop: '2px' }}>
+                                        Original: {formatCurrency(item.original_price, item.original_currency)}
+                                      </div>
+                                    )}
+                                  </td>
+                                  <td style={{ textAlign: 'right', fontWeight: 600, color: '#212529', whiteSpace: 'nowrap' }}>
+                                    {formData.currency || 'USD'} {subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  </td>
+                                  <td>
+                                    <div className="d-flex gap-1 justify-content-center">
+                                      <Button
+                                        variant="link"
+                                        size="sm"
+                                        className="p-1"
+                                        title="Edit Item"
+                                        style={{ minWidth: 'auto', padding: '4px' }}
+                                        onClick={() => {
+                                          setEditingItemIndex(index);
+                                          setItemFormData({
+                                            product_id: item.product_id,
+                                            product_service: item.product_service,
+                                            description: item.description,
+                                            qty: item.qty,
+                                            unit_price: item.unit_price,
+                                          });
+                                          setShowAddItemModal(true);
+                                        }}
+                                      >
+                                        <Edit size={16} />
+                                      </Button>
+                                      <Button
+                                        variant="link"
+                                        size="sm"
+                                        className="p-1 text-danger"
+                                        title="Delete Item"
+                                        style={{ minWidth: 'auto', padding: '4px' }}
+                                        onClick={() => {
+                                          setEstimationItems(estimationItems.filter((_, i) => i !== index));
+                                        }}
+                                      >
+                                        <Trash2 size={16} />
+                                      </Button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                            {estimationItems.length === 0 && (
                               <tr>
-                                <td colSpan={5} className="text-end">
-                                  Discount ({parseFloat(formData.standard_discount_percentage || "0") + parseFloat(formData.special_discount_percentage || "0")}%):
+                                <td colSpan={estimationItems.some((item) => item.description) ? 8 : 7} className="text-center text-muted py-5">
+                                  <Package size={40} className="text-muted mb-3" style={{ opacity: 0.5, display: 'block', margin: '0 auto 12px' }} />
+                                  <div style={{ fontSize: '0.938rem', fontWeight: 500, marginBottom: '4px' }}>No items in estimation chart</div>
+                                  <small style={{ fontSize: '0.813rem' }}>Click "Add Item" to add products or services</small>
                                 </td>
-                                <td>-{formatCurrency(totalDiscount, formData.currency)}</td>
-                                <td></td>
                               </tr>
                             )}
-                            {parseFloat(formData.tax_percentage || "0") > 0 && (
-                              <tr>
-                                <td colSpan={5} className="text-end fw-bold">Tax ({formData.tax_percentage}%):</td>
-                                <td className="fw-bold">{formatCurrency(taxAmount, formData.currency)}</td>
-                                <td></td>
-                              </tr>
-                            )}
-                            <tr className="table-primary">
-                              <td colSpan={5} className="text-end fw-bold">Net Value:</td>
-                              <td className="fw-bold">{formatCurrency(netValue, formData.currency)}</td>
-                              <td></td>
-                            </tr>
-                          </tfoot>
-                        );
-                      })()}
-                    </Table>
+                          </tbody>
+                          {estimationItems.length > 0 && (() => {
+                            const grandTotal = estimationItems.reduce((sum, item) => sum + (item.qty * item.unit_price), 0);
+                            
+                            const totalDiscountPercentage = parseFloat(formData.standard_discount_percentage || "0") + parseFloat(formData.special_discount_percentage || "0");
+                            
+                            const totalDiscount = (grandTotal * totalDiscountPercentage) / 100;
+                            const subtotalAfterDiscount = grandTotal - totalDiscount;
+                            const taxAmount = (subtotalAfterDiscount * parseFloat(formData.tax_percentage || "0")) / 100;
+                            const netValue = subtotalAfterDiscount + taxAmount;
+                            return (
+                              <tfoot>
+                                <tr>
+                                  <td colSpan={estimationItems.some((item) => item.description) ? 7 : 6} style={{ textAlign: 'right', paddingRight: '20px' }}>
+                                    <strong>Subtotal:</strong>
+                                  </td>
+                                  <td style={{ textAlign: 'right', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                                    {formData.currency || 'USD'} {grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  </td>
+                                </tr>
+                                {totalDiscount > 0 && (
+                                  <tr>
+                                    <td colSpan={estimationItems.some((item) => item.description) ? 7 : 6} style={{ textAlign: 'right', paddingRight: '20px' }}>
+                                      <span style={{ color: '#6c757d' }}>
+                                        Discount ({parseFloat(formData.standard_discount_percentage || "0") + parseFloat(formData.special_discount_percentage || "0")}%):
+                                      </span>
+                                    </td>
+                                    <td style={{ textAlign: 'right', color: '#dc3545', whiteSpace: 'nowrap' }}>
+                                      - {formData.currency || 'USD'} {totalDiscount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </td>
+                                  </tr>
+                                )}
+                                {parseFloat(formData.tax_percentage || "0") > 0 && (
+                                  <tr>
+                                    <td colSpan={estimationItems.some((item) => item.description) ? 7 : 6} style={{ textAlign: 'right', paddingRight: '20px' }}>
+                                      <strong>Tax ({formData.tax_percentage}%):</strong>
+                                    </td>
+                                    <td style={{ textAlign: 'right', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                                      {formData.currency || 'USD'} {taxAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </td>
+                                  </tr>
+                                )}
+                                <tr style={{ fontSize: '1rem', borderTop: '2px solid #dee2e6' }}>
+                                  <td colSpan={estimationItems.some((item) => item.description) ? 7 : 6} style={{ textAlign: 'right', paddingRight: '20px', paddingTop: '16px', paddingBottom: '16px', paddingLeft: '20px' }}>
+                                    <strong style={{ fontSize: '1rem' }}>Total:</strong>
+                                  </td>
+                                  <td style={{ textAlign: 'right', fontWeight: 700, fontSize: '1rem', color: '#198754', paddingTop: '16px', paddingBottom: '16px', paddingRight: '20px', whiteSpace: 'nowrap' }}>
+                                    {formData.currency || 'USD'} {netValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  </td>
+                                </tr>
+                              </tfoot>
+                            );
+                          })()}
+                        </Table>
+                      </div>
+                    </div>
                   </div>
                 </Card.Body>
               </Card>
@@ -1619,7 +1753,11 @@ const EditDeal = () => {
               )}
             </div>
           </div>
-        </Form>
+                </Form>
+              </Card.Body>
+            </Card>
+          </div>
+        </div>
       </div>
     </React.Fragment>
   );

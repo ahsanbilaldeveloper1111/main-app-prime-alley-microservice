@@ -1773,28 +1773,30 @@ const CrmLeads = () => {
                                     <Trash2 size={16} />
                                   </Button>
                                 )}
-                                <Dropdown className="d-inline">
-                                  <Dropdown.Toggle 
-                                    as={Button}
-                                    variant="link" 
-                                    size="sm" 
-                                    className="p-1"
-                                    title="More Actions"
-                                  >
-                                    <MoreVertical size={16} />
-                                  </Dropdown.Toggle>
-                                  <Dropdown.Menu align="end">
-                                    {session?.user?.permissions?.includes('mark-as-lost-crm-leads') && (
-                                      <Dropdown.Item 
-                                        className="text-danger"
-                                        onClick={() => handleMarkLost(lead.rawData || lead)}
-                                      >
-                                        <X size={14} className="me-2" />
-                                        Lost
-                                      </Dropdown.Item>
-                                    )}
-                                  </Dropdown.Menu>
-                                </Dropdown>
+                                {activeFilter !== 'lost' && (
+                                  <Dropdown className="d-inline">
+                                    <Dropdown.Toggle 
+                                      as={Button}
+                                      variant="link" 
+                                      size="sm" 
+                                      className="p-1"
+                                      title="More Actions"
+                                    >
+                                      <MoreVertical size={16} />
+                                    </Dropdown.Toggle>
+                                    <Dropdown.Menu align="end">
+                                      {session?.user?.permissions?.includes('mark-as-lost-crm-leads') && (
+                                        <Dropdown.Item 
+                                          className="text-danger"
+                                          onClick={() => handleMarkLost(lead.rawData || lead)}
+                                        >
+                                          <X size={14} className="me-2" />
+                                          Lost
+                                        </Dropdown.Item>
+                                      )}
+                                    </Dropdown.Menu>
+                                  </Dropdown>
+                                )}
                               </>
                             )}
                           </div>

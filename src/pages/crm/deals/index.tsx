@@ -301,6 +301,10 @@ const CrmDeals = () => {
   const [uploadingFile, setUploadingFile] = useState(false);
   const [fileInputRef, setFileInputRef] = useState<HTMLInputElement | null>(null);
   
+  // Delete Attachment Modal
+  const [showDeleteAttachmentModal, setShowDeleteAttachmentModal] = useState(false);
+  const [attachmentToDelete, setAttachmentToDelete] = useState<{ id: number; name: string } | null>(null);
+  
   // Meeting Modal
   const [showAddMeetingModal, setShowAddMeetingModal] = useState(false);
   const [meetingData, setMeetingData] = useState({
@@ -512,16 +516,26 @@ const CrmDeals = () => {
     }
   };
 
-  const handleDeleteAttachment = async (attachmentId: number) => {
+  const handleDeleteAttachment = useCallback(async (attachmentId: number) => {
     if (!selectedDealForAttachments?.id) return;
     
     try {
       await deleteDealAttachment(selectedDealForAttachments.id, attachmentId);
       await fetchAttachments(); // Refresh attachments list
+      toast.success("Attachment deleted successfully!");
     } catch (error) {
       console.error("Failed to delete attachment:", error);
+      toast.error("Failed to delete attachment");
     }
-  };
+  }, [selectedDealForAttachments?.id]);
+
+  const confirmDeleteAttachment = useCallback(async () => {
+    if (!attachmentToDelete) return;
+    
+    await handleDeleteAttachment(attachmentToDelete.id);
+    setShowDeleteAttachmentModal(false);
+    setAttachmentToDelete(null);
+  }, [attachmentToDelete, handleDeleteAttachment]);
 
   const handleDownloadAttachment = async (attachmentId: number) => {
     if (!selectedDealForAttachments?.id) return;
@@ -1525,7 +1539,7 @@ const CrmDeals = () => {
                     ).map((deal) => (
                       <tr key={deal.id}>
                         {selectedDealsColumns.includes('name') && (
-                          <td className="fw-semibold">{deal.name}</td>
+                          <td className="fw-semibold"><div className="text-wrap">{deal.name}</div></td>
                         )}
                         {selectedDealsColumns.includes('company') && (
                           <td>
@@ -1644,26 +1658,28 @@ const CrmDeals = () => {
                                 >
                                   <Trash2 size={16} />
                                 </Button>
-                                <Dropdown className="d-inline">
-                                  <Dropdown.Toggle 
-                                    as={Button}
-                                    variant="link" 
-                                    size="sm" 
-                                    className="p-1"
-                                    title="More Actions"
-                                  >
-                                    <MoreVertical size={16} />
-                                  </Dropdown.Toggle>
-                                  <Dropdown.Menu align="end">
-                                      <Dropdown.Item 
-                                        className="text-danger"
-                                        onClick={() => handleMarkLost(deal.rawData || deal)}
-                                      >
-                                        <X size={14} className="me-2" />
-                                        Lost
-                                      </Dropdown.Item>
-                                  </Dropdown.Menu>
-                                </Dropdown>
+                                {activeFilter !== 'lost' && (
+                                  <Dropdown className="d-inline">
+                                    <Dropdown.Toggle 
+                                      as={Button}
+                                      variant="link" 
+                                      size="sm" 
+                                      className="p-1"
+                                      title="More Actions"
+                                    >
+                                      <MoreVertical size={16} />
+                                    </Dropdown.Toggle>
+                                    <Dropdown.Menu align="end">
+                                        <Dropdown.Item 
+                                          className="text-danger"
+                                          onClick={() => handleMarkLost(deal.rawData || deal)}
+                                        >
+                                          <X size={14} className="me-2" />
+                                          Lost
+                                        </Dropdown.Item>
+                                    </Dropdown.Menu>
+                                  </Dropdown>
+                                )}
                               </>
                             )}
                           </div>
@@ -3435,9 +3451,8 @@ const CrmDeals = () => {
                               className="p-2 text-danger" 
                               title="Delete"
                               onClick={() => {
-                                if (window.confirm(`Are you sure you want to delete "${attachment.name}"?`)) {
-                                  handleDeleteAttachment(attachment.id);
-                                }
+                                setAttachmentToDelete({ id: attachment.id, name: attachment.name });
+                                setShowDeleteAttachmentModal(true);
                               }}
                             >
                               <Trash2 size={18} />
@@ -3670,6 +3685,18 @@ const CrmDeals = () => {
         onConfirm={confirmDeleteMeeting}
         itemName={meetingToDelete?.meetingName}
         itemType="meeting"
+      />
+
+      {/* Delete Attachment Modal */}
+      <DeleteConfirmationModal
+        show={showDeleteAttachmentModal}
+        onHide={() => {
+          setShowDeleteAttachmentModal(false);
+          setAttachmentToDelete(null);
+        }}
+        onConfirm={confirmDeleteAttachment}
+        itemName={attachmentToDelete?.name}
+        itemType="attachment"
       />
 
     </React.Fragment>
