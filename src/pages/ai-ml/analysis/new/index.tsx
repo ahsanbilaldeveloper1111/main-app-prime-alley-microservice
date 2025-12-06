@@ -2132,11 +2132,9 @@ const CallAnalysis = () => {
                                `${currentStep.replace(/_/g, ' ').toLowerCase()}...`}
                             </span>
                           </div>
-                          <div className="progress progress-extra-thin">
-                            <div 
-                              className="progress-bar progress-bar-striped progress-bar-animated bg-primary progress-bar-full" 
-                              role="progressbar"
-                            />
+                          <div className="skeleton-container mt-2">
+                            <div className="skeleton-text" style={{ height: '8px', width: '100%', animationDelay: '0s' }} />
+                            <div className="skeleton-text" style={{ height: '8px', width: '75%', animationDelay: '0.1s' }} />
                           </div>
                         </div>
                       </>

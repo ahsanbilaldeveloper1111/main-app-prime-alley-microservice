@@ -52,16 +52,16 @@ export default function handler(req, res) {
 //  const analysisServerUrl = `${websocketProtocol}://${analysisServerHost}/ws/analysis/${uuid}/${date}/${localPartyNumber}/${ownerUsername}/${imagicle}/`;
 
   //New Analysis Server URL
-  //  const analysisServerUrl = `${websocketProtocol}://${analysisServerHost}/ws/analysis-v2/${uuid}/${date}/${localPartyNumber}/${ownerUsername}/${imagicle}/`;
+   const analysisServerUrl = `${websocketProtocol}://${analysisServerHost}/ws/analysis-v2/${uuid}/${date}/${localPartyNumber}/${ownerUsername}/${imagicle}/`;
   
   //ML Gateway Analysis Server URL
-   const analysisServerUrl = `${websocketProtocol}://${analysisServerHost}/ws/analysis/${uuid}/${date}/${localPartyNumber}/${ownerUsername}/${imagicle}/${callDuration}/${remotePartyNumber}/${callType}/${dateTime}/`;
+  //  const analysisServerUrl = `${websocketProtocol}://${analysisServerHost}/ws/analysis/${uuid}/${date}/${localPartyNumber}/${ownerUsername}/${imagicle}/${callDuration}/${remotePartyNumber}/${callType}/${dateTime}/`;
   
-  console.log('🔗 Connecting to analysis server:', analysisServerUrl);
+  console.log('Connecting to analysis server:', analysisServerUrl);
   
   // Add connection timeout
   const connectionTimeout = setTimeout(() => {
-    console.log('⏰ Connection timeout to analysis server');
+    console.log('Connection timeout to analysis server');
     res.write(`data: ${JSON.stringify({ type: 'error', status: 'timeout', message: 'Connection timeout to analysis server' })}\n\n`);
   }, 10000);
   
