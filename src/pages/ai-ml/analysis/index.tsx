@@ -283,8 +283,8 @@ const CallAnalysis = () => {
 
 
         
-        console.log('Processing done status with result:', result);
-        console.log('Result keys:', Object.keys(result));
+       // console.log('Processing done status with result:', result);
+       // console.log('Result keys:', Object.keys(result));
         
         // Set main analysis data - create analysis object with available fields
         // Even if sentiment/customer_intent are missing, we should set analysis

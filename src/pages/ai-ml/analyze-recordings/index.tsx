@@ -947,7 +947,7 @@ const AnalyzeRecordings = () => {
             const encodedData = encodeAnalysisData(dataObject);
             
             // Pass as single encoded parameter
-            const tempUrl = `/ai-ml/analysis?data=${encodeURIComponent(encodedData)}`;
+            const tempUrl = `/ai-ml/analysis/new?data=${encodeURIComponent(encodedData)}`;
 
             window.open(tempUrl, '_blank');
 
