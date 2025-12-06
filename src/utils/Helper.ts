@@ -707,7 +707,8 @@ export const decodeAnalysisData = (encodedData: string): {
       direction: dataObject.direction || '',
       phone: dataObject.phone || '',
       imagicle: dataObject.imagicle || '',
-      duration: dataObject.duration || ''
+      duration: dataObject.duration || '',
+      dateTime: dataObject.dateTime || ''
     };
   } catch (error) {
     console.error('Error decoding analysis data:', error);

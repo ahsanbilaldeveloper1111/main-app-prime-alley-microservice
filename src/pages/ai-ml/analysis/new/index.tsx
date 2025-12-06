@@ -1200,7 +1200,7 @@ const CallAnalysis = () => {
             <Col md={6}>
               <div className="card">
                 <div className="card-body gbox">
-                  <h6>Completion Percent</h6>
+                  <h5>Completion Percent</h5>
                   {hasCompletionPercent ? (
                     
                     <>
@@ -1234,7 +1234,7 @@ const CallAnalysis = () => {
               <div className="card">
                 <div className="card-body gbox">
                   <div className="vbox">
-                    <h6>Customer Intention</h6>
+                    <h5>Customer Intention</h5>
                   </div>
                   <div className="vbox w-100">
                     {customerIntent ? (
