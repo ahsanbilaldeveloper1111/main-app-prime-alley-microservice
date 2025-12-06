@@ -60,6 +60,7 @@ import { toast } from "react-toastify";
 import countries from "world-countries";
 import _ from "lodash";
 import { useRouter } from "next/router";
+import Head from "next/head";
 import { tmsSession } from "@utils/tmsSession";
 
 
@@ -1009,7 +1010,9 @@ const CreateUserProfile = () => {
 
     return (
         <React.Fragment>
-            <head title="Create User Profile" />
+            <Head>
+                <title>Create User Profile</title>
+            </Head>
             
             {/* Progress Header */}
             <ProgressHeader
