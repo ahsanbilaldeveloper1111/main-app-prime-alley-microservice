@@ -84,7 +84,7 @@ export const FirebaseNotificationProvider: React.FC<FirebaseNotificationProvider
           type: 'FIREBASE_CONFIG',
           config: firebaseConfig,
         });
-        console.log('[FirebaseNotificationProvider] ✅ Firebase config sent to service worker');
+       /// console.log('[FirebaseNotificationProvider] ✅ Firebase config sent to service worker');
       }
 
       // Also send to any waiting or installing workers
@@ -132,7 +132,7 @@ export const FirebaseNotificationProvider: React.FC<FirebaseNotificationProvider
 
           // Listen for service worker updates and re-send config
           registration.addEventListener('updatefound', () => {
-            console.log('[FirebaseNotificationProvider] Service worker update found, re-sending config');
+           // console.log('[FirebaseNotificationProvider] Service worker update found, re-sending config');
             sendConfigToServiceWorker();
           });
         } catch (error) {
@@ -248,18 +248,18 @@ export const FirebaseNotificationProvider: React.FC<FirebaseNotificationProvider
     // The listener itself persists across navigations, but we update the callback
     const setupListener = async () => {
       try {
-        console.log('[FirebaseNotificationProvider] Setting up/updating foreground message listener...');
+       // console.log('[FirebaseNotificationProvider] Setting up/updating foreground message listener...');
         await fcmService.setupForegroundMessageListener((payload: NotificationPayload) => {
-          console.log('========== INCOMING NOTIFICATION ==========');
-          console.log('Notification title:', payload.notification?.title || payload.data?.title);
+          // console.log('========== INCOMING NOTIFICATION ==========');
+          // console.log('Notification title:', payload.notification?.title || payload.data?.title);
           
           // Add notification to context (this will save to localStorage)
           // Use ref to get latest addNotification function
           try {
             addNotificationRef.current(payload);
-            console.log('[FirebaseNotificationProvider] ✅ Notification added to context');
+            //console.log('[FirebaseNotificationProvider] ✅ Notification added to context');
           } catch (error) {
-            console.error('[FirebaseNotificationProvider] ❌ Error calling addNotification:', error);
+            //console.error('[FirebaseNotificationProvider] ❌ Error calling addNotification:', error);
           }
           
           // Also show toast notification
@@ -302,7 +302,7 @@ export const FirebaseNotificationProvider: React.FC<FirebaseNotificationProvider
             }
           }
         });
-        console.log('[FirebaseNotificationProvider] ✅ Listener callback updated');
+        //console.log('[FirebaseNotificationProvider] ✅ Listener callback updated');
       } catch (err) {
         console.error('[FirebaseNotificationProvider] Error setting up listener:', err);
       }

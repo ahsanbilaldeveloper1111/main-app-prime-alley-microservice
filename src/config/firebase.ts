@@ -205,7 +205,7 @@ export const setupOnMessageListener = async (
     });
     
     isListenerSetup = true;
-    console.log('[Firebase] Message listener set up successfully');
+    //console.log('[Firebase] Message listener set up successfully');
   } catch (error) {
     console.error('[Firebase] Error setting up message listener:', error);
   }

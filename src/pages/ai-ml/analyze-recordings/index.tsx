@@ -14,7 +14,7 @@ import { useSession } from 'next-auth/react';
 import { ModuleSlug } from '@utils/Helper';
 import AnimatedNumber from '@components/AnimatedNumber';
 import EmptyState from '@components/EmptyState';
-import { formatDateTimeToLocal, GlobalDateTimeFormat ,formatDuration} from '@utils/Helper';
+import { formatDateTimeToLocal, GlobalDateTimeFormat ,formatDuration, encodeAnalysisData} from '@utils/Helper';
 import { useHierarchyData } from '@components/filters/useHierarchyData';
 import CreatableSelect from 'react-select/creatable';
 import AudioPlayer, { AudioPlayerRef } from '@components/AudioPlayer';
@@ -931,8 +931,23 @@ const AnalyzeRecordings = () => {
     const handleAnalysis = async (props: any) => {
         try {
             const { Id, AudioTrack } = props;
-      
-            const tempUrl = `/ai-ml/analysis?id=${Id}&file=${AudioTrack}&direction=${props.Direction}&phone=${props.RemotePartyNumber}&imagicle=${props.imagicle}&duration=${props.Duration}`;
+
+            // Create data object with all parameters
+            const dataObject = {
+                id: Id || '',
+                file: AudioTrack || '',
+                direction: props.Direction || '',
+                phone: props.RemotePartyNumber || '',
+                imagicle: props.imagicle || '',
+                duration: props.Duration || '',
+                dateTime: props.DateTime || '',
+            };
+
+            // Encode data to base64 (unreadable format) using helper function
+            const encodedData = encodeAnalysisData(dataObject);
+            
+            // Pass as single encoded parameter
+            const tempUrl = `/ai-ml/analysis?data=${encodeURIComponent(encodedData)}`;
 
             window.open(tempUrl, '_blank');
 

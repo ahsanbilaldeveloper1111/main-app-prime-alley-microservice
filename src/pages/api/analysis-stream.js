@@ -7,25 +7,24 @@ export default function handler(req, res) {
   }
 
   // Get parameters from query string
-  const { uuid, date, localPartyNumber, ownerUsername, imagicle } = req.query;
+  const { uuid, date, localPartyNumber, ownerUsername, imagicle, callDuration, callType, remotePartyNumber, dateTime } = req.query;
   
   // Get WebSocket protocol configuration
   const websocketProtocol = process.env.WEBSOCKET_PROTOCOL || 'wss';
   
   // Check if analysis server URL is configured
   if (!process.env.NEXT_PUBLIC_PRIVATE_AIML_SOCKET_URL) {
-    console.error('Analysis server URL not configured: NEXT_PUBLIC_PRIVATE_AIML_SOCKET_URL');
     res.write(`data: ${JSON.stringify({ type: 'error', status: 'error', message: 'Analysis server URL not configured. Please set NEXT_PUBLIC_PRIVATE_AIML_SOCKET_URL environment variable.' })}\n\n`);
     res.end();
     return;
   }
   
   // Log connection for monitoring
-  console.log('SSE connection request:', { uuid, date, localPartyNumber, ownerUsername, imagicle });
-  console.log('Analysis server config:', { 
-    host: process.env.NEXT_PUBLIC_PRIVATE_AIML_SOCKET_URL, 
-    protocol: websocketProtocol 
-  });
+  
+  // console.log('Analysis server config:', { 
+  //   host: process.env.NEXT_PUBLIC_PRIVATE_AIML_SOCKET_URL, 
+  //   protocol: websocketProtocol 
+  // });
   
   // Validate required parameters
   if (!uuid || !date || !localPartyNumber || !ownerUsername || !imagicle) {
@@ -50,12 +49,13 @@ export default function handler(req, res) {
   const analysisServerHost = process.env.NEXT_PUBLIC_PRIVATE_AIML_SOCKET_URL;
    
   //Old Analysis Server URL
-  const analysisServerUrl = `${websocketProtocol}://${analysisServerHost}/ws/analysis/${uuid}/${date}/${localPartyNumber}/${ownerUsername}/${imagicle}/`;
+//  const analysisServerUrl = `${websocketProtocol}://${analysisServerHost}/ws/analysis/${uuid}/${date}/${localPartyNumber}/${ownerUsername}/${imagicle}/`;
 
   //New Analysis Server URL
+  //  const analysisServerUrl = `${websocketProtocol}://${analysisServerHost}/ws/analysis-v2/${uuid}/${date}/${localPartyNumber}/${ownerUsername}/${imagicle}/`;
   
   //ML Gateway Analysis Server URL
-  //  const analysisServerUrl = `${websocketProtocol}://${analysisServerHost}/ws/analysis/${uuid}/${date}/${localPartyNumber}/${ownerUsername}/${imagicle}/10000/10001/OUTGOING/`;
+   const analysisServerUrl = `${websocketProtocol}://${analysisServerHost}/ws/analysis/${uuid}/${date}/${localPartyNumber}/${ownerUsername}/${imagicle}/${callDuration}/${remotePartyNumber}/${callType}/${dateTime}/`;
   
   console.log('🔗 Connecting to analysis server:', analysisServerUrl);
   
@@ -82,11 +82,11 @@ export default function handler(req, res) {
     wsOptions.rejectUnauthorized = false; // Accept self-signed certificates
   }
 
-  console.log('WebSocket connection options:', JSON.stringify(wsOptions, null, 2));
+
   const wsAnalysis = new WebSocket(analysisServerUrl, wsOptions);
 
   // Send initial connection status
-  res.write(`data: ${JSON.stringify({ type: 'connection', status: 'connecting', message: 'Connecting to analysis server...', step: 'Connecting to server' })}\n\n`);
+  // res.write(`data: ${JSON.stringify({ type: 'connection', status: 'connecting', message: 'Connecting to analysis server...', step: 'Connecting to server' })}\n\n`);
   
   // Send keep-alive ping every 30 seconds
   const keepAlive = setInterval(() => {
@@ -99,8 +99,8 @@ export default function handler(req, res) {
   wsAnalysis.on('open', () => {
     console.log('Connected to analysis server');
     clearTimeout(connectionTimeout);
-    res.write(`data: ${JSON.stringify({ type: 'connection', status: 'connected', message: 'Connected to analysis server',step: 'Connected to server' })}\n\n`);
-    res.write(`data: ${JSON.stringify({ type: 'connection', status: 'connected', message: 'Connected to analysis server',step: 'Connected to server' })}\n\n`);
+    
+    // res.write(`data: ${JSON.stringify({ type: 'connection', status: 'connected', message: 'Connected to analysis server',step: 'Connected to server' })}\n\n`);
     
     // Send command to start analysis
     const analysisCommand = {

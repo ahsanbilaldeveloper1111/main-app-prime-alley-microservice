@@ -1,31 +1,26 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
-import { Row, Col, Card, Button, Spinner, Alert, Form, InputGroup } from 'react-bootstrap';
+import { Row, Col, Card, Button, Spinner, Alert, Form } from 'react-bootstrap';
 import { toast } from 'react-toastify';
-import moment from 'moment';
 import Tab from 'react-bootstrap/Tab';
 import Tabs from 'react-bootstrap/Tabs';
-import dynamic from 'next/dynamic';
 import { useAnalysisSSE } from '@hooks/useAnalysisSSE';
 
 // Components
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
 import AudioPlayer, { AudioPlayerRef } from '@components/AudioPlayer';
+import { TextSkeleton, ListSkeleton, CategorySkeleton, TableSkeleton } from '@components/skeletons';
 import { formatDuration, decodeAnalysisData } from '@utils/Helper';
 
 // Utils
-import { GetCallAnalysis, GetTranscriptions, GetTranslations } from '@utils/aiml';
+import { GetTranscriptions,GetTranslations } from '@utils/aiml';
 import axiosInstance from '@utils/axios';
 
 // Assets
 import imgStatus1 from '@assets/images/widget/img-status-1.svg';
-import imgStatus2 from '@assets/images/widget/img-status-2.svg';
 import imgStatus3 from '@assets/images/widget/img-status-3.svg';
-import imgStatus4 from '@assets/images/widget/img-status-4.svg';
 import avatar from '@assets/images/user/avatar-3.jpg';
-import PageLoader from '@components/PageLoader';
 
 // Styles
 import '@assets/scss/datatable-style.scss';
@@ -33,8 +28,24 @@ import '@assets/scss/aiml.scss';
 import '@assets/scss/chat.scss';
 import '@assets/scss/audio-player.scss';
 import '@assets/scss/tabs.scss';
+import '@assets/scss/analysis-new.scss';
 
+// Constants
 const UNABLE_TO_ANALYZE_CALL = 'Unable to process request at this moment. Please try again later.';
+const STEP_CODES = {
+  TRANSCRIPTION: '001',
+  ANALYSIS: '002',
+  QUALIFICATION_FIELDS: '003',
+  CLASSIFICATION: '004',
+  SUMMARY: '005',
+  LEAD_QUALITY: '006',
+  BUYER_INTENT: '007',
+  FEEDBACK: '008',
+  FROM_DATABAE:'100'
+} as const;
+
+const TRANSCRIPTION_SPEAKER_1 = 'Speaker 1';
+const TRANSCRIPTION_SPEAKER_2 = 'Speaker 2';
 
 interface SummaryData {
   summary: string;
@@ -45,28 +56,6 @@ interface SummaryData {
   }>;
 }
 
-interface CallAnalysis {
-  sentiment: string;
-  customer_intent: string;
-  key_topics: string[];
-  action_items: string[];
-  entities_customer: { name: string; phone: string,email: string }[];
-  customer_emotions: string[];
-  operator_emotions: string[];
-  call_categories: string[];
-  resolution_status: string;
-  follow_up_required: boolean;
-  summary: string;
-}
-
-interface DomainSpecificAnalysis {
-  localPartyNumber: string;
-  ownerUsername: string;
-  completion_percent: number;
-  matched_fields_count: number;
-  qualified: boolean;
-}
-
 interface Transcription {
   speaker: string;
   text: string;
@@ -74,79 +63,369 @@ interface Transcription {
   end: number;
 }
 
-interface ExtractEntities {
-  [key: string]: string;
-}
-
-// Skeleton placeholder component for text content
-const TextSkeleton = ({ lines = 5, lastLineWidth = '60%' }: { lines?: number; lastLineWidth?: string }) => {
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-      {Array.from({ length: lines }, (_, index) => {
-        const lineNumber = index + 1;
-        return (
-          <div
-            key={lineNumber}
-            className="skeleton-text"
-            style={{
-              height: '12px',
-              width: lineNumber === lines ? lastLineWidth : '100%',
-              background: 'linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%)',
-              backgroundSize: '200% 100%',
-              animation: 'skeleton-loading 1.5s ease-in-out infinite',
-              borderRadius: '4px',
-              animationDelay: `${lineNumber * 0.1}s`
-            }}
-          ></div>
-        );
-      })}
-    </div>
-  );
-};
-
 const CallAnalysis = () => {
-  const { data: session, status } = useSession();
   const router = useRouter();
   
-  // State declarations
-  const [analysis, setAnalysis] = useState<CallAnalysis | null>(null);
+  // Analysis state
+  const [chunksAnalysisData, setChunksAnalysisData] = useState<any>({
+    summary: '',
+    main_topic: '',
+    interaction_type: '',
+    analysis: [],
+    extracted_qualification_fields: null,
+    qualified:false,
+    call_categories: [],
+    transcriptions: [],
+    sentiment: '',
+    resolution_status: '',
+    customer_intent: '',
+    key_topics: [],
+    action_items: [],
+    entities_customer: [],
+    customer_emotions: [],
+    operator_emotions: [],
+    follow_up_required: false,
+    tags: [],
+  });
+
+  const [tagsArrayProcessing, setTagsArrayProcessing] = useState<any[]>([]);
+
+  // UI state
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [summaryData, setSummaryData] = useState<SummaryData | null>(null);
-  const [domainSpecificAnalysis, setDomainSpecificAnalysis] = useState<DomainSpecificAnalysis | null>(null);
-  const [transcription, setTranscription] = useState<Transcription[] | null>(null);
-  const [extractEntities, setExtractEntities] = useState<ExtractEntities | null>(null);
-
-  const [callDuration, setCallDuration] = useState<string | null>(null);
-  const [callDurationFormatted, setCallDurationFormatted] = useState<string | null>(null);
-
-
-  const [callType, setCallType] = useState<string | null>(null);
-  const [dataFound, setDataFound] = useState<boolean>(false);
   const [analysisComplete, setAnalysisComplete] = useState<boolean>(false);
+  const [validAnalysis, setValidAnalysis] = useState(true);
+  const [callTranslation, setCallTranslation] = useState(false);
   
   // Step tracking state
   const [steps, setSteps] = useState<Array<{ step: string; message: string; status: string; timestamp: number }>>([]);
   const [currentStep, setCurrentStep] = useState<string | null>(null);
   
-  // Audio related state
+  // Call parameters state
   const [uuid, setUuid] = useState('');
   const [date, setDate] = useState('');
   const [localPartyNumber, setLocalPartyNumber] = useState('');
+  const [remotePartyNumber, setRemotePartyNumber] = useState('');
   const [ownerUsername, setOwnerUsername] = useState('');
   const [imagicle, setImagicle] = useState('');
+  const [callType, setCallType] = useState<string | null>(null);
+  const [callDuration, setCallDuration] = useState<string | null>(null);
+  const [callDurationFormatted, setCallDurationFormatted] = useState<string | null>(null);
+  const [dateTime, setDateTime] = useState('');
+  
+  // Audio state
   const [audioTrackId, setAudioTrackId] = useState('');
   const [audioUrl, setAudioUrl] = useState<string>('');
   const [audioLoading, setAudioLoading] = useState(false);
   const [audioError, setAudioError] = useState<string | null>(null);
-  const [lastClickedTime, setLastClickedTime] = useState<string | null>(null);
   const [playingSegment, setPlayingSegment] = useState<{ start: number; end: number } | null>(null);
   const [mediaPlayerShow, setMediaPlayerShow] = useState(false);
-  const [validAnalysis, setValidAnalysis] = useState(false);
+
+  // Translation state
+  const [translations, setTranslations] = useState<any | null>(null);
+  const [isError, setIsError] = useState(false);
+  const [activeTab, setActiveTab] = useState('summary');
+  const [subActiveTab, setSubActiveTab] = useState('en');
+
+
 
   // Refs
   const audioPlayerRef = useRef<AudioPlayerRef>(null);
   const audioStopTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Helper functions
+  const normalizeStep = (step: string) => step.toLowerCase().trim();
+  
+  // Data access helpers
+  const getAnalysis = () => chunksAnalysisData?.analysis;
+  const hasData = (data: any) => data !== null && data !== undefined;
+  const hasArrayData = (arr: any) => Array.isArray(arr) && arr.length > 0;
+  const capitalizeFirst = (str: string) => {
+    if (!str) return '';
+    return str.replaceAll('_', ' ').replace(/\b\w/g, (char) => char.toUpperCase());
+  };
+  
+  // Customer entity helpers
+  const getCustomerEntity = () => {
+    const analysis = getAnalysis();
+    return analysis?.entities_customer?.[0];
+  };
+  
+  const hasCustomerName = () => !!getCustomerEntity()?.name;
+  const hasCustomerPhone = () => !!getCustomerEntity()?.phone;
+
+  const updateStepInList = (
+    prevSteps: Array<{ step: string; message: string; status: string; timestamp: number }>,
+    stepEntry: { step: string; message: string; status: string; timestamp: number }
+  ) => {
+    const currentStepNormalized = normalizeStep(stepEntry.step);
+    const existingIndex = prevSteps.findIndex(s => normalizeStep(s.step) === currentStepNormalized);
+    
+    let updated = [...prevSteps];
+    
+    if (existingIndex >= 0) {
+      updated[existingIndex] = stepEntry;
+    } else {
+      updated = [...prevSteps, stepEntry];
+    }
+    
+    // Mark previous steps as done when a new step becomes active
+    if ((stepEntry.status === 'processing' || stepEntry.status === 'connecting' || stepEntry.status === 'connected') && updated.length > 1) {
+      const currentIndex = existingIndex >= 0 ? existingIndex : updated.length - 1;
+      for (let i = 0; i < currentIndex; i++) {
+        if (updated[i].status !== 'done' && updated[i].status !== 'error') {
+          updated[i] = { ...updated[i], status: 'done' };
+        }
+      }
+    }
+    
+    return updated;
+  };
+
+  const handleStepDataUpdate = (stepCode: string, result: any) => {
+
+    // Initialize tags array and merge lead_quality, buyer_intent, and feedback
+    
+    
+    // Set tags if we have any
+    // if(tagsArray.length > 0){
+    //   updates.tags = tagsArray;
+    // }
+    switch (stepCode) {
+      case STEP_CODES.TRANSCRIPTION:
+        if (result.transcription !== undefined) {
+          setChunksAnalysisData((prev: any) => ({ ...prev, transcriptions: result.transcription }));
+        }
+        break;
+
+      case STEP_CODES.ANALYSIS:
+        if (result.analysis !== undefined) {
+          setChunksAnalysisData((prev: any) => ({ ...prev, analysis: result.analysis }));
+        }
+        break;
+
+      case STEP_CODES.QUALIFICATION_FIELDS:
+        if (result.extracted_qualification_fields !== undefined) {
+          setChunksAnalysisData((prev: any) => ({ ...prev, extracted_qualification_fields: result.extracted_qualification_fields }));
+        }
+        if (result.qualified !== undefined) {
+          setChunksAnalysisData((prev: any) => ({ ...prev, qualified: result.qualified }));
+        }
+
+        //completion_percent
+        if (result.completion_percent !== undefined) {
+          setChunksAnalysisData((prev: any) => ({ ...prev, completion_percent: result.completion_percent }));
+        }
+        break;
+
+      case STEP_CODES.CLASSIFICATION:
+        if (result.classification !== undefined) {
+          setChunksAnalysisData((prev: any) => ({ ...prev, main_topic: result.classification?.main_topic }));
+        }
+        break;
+
+      case STEP_CODES.SUMMARY:
+        if (result.summary !== undefined) {
+          setChunksAnalysisData((prev: any) => ({ ...prev, summary: result.summary }));
+        }
+        break;
+
+      case STEP_CODES.LEAD_QUALITY:
+        if(result.lead_quality !== undefined && result.lead_quality !== null){
+          Object.entries(result.lead_quality).forEach(([key, value]) => {
+            setTagsArrayProcessing((prev: any) => [...prev, { [key]: [value, ''] }]);
+          });
+        }
+        break;
+
+      case STEP_CODES.BUYER_INTENT:
+        // // Convert buyer_intent object to tags format
+        if(result.buyer_intent !== undefined && result.buyer_intent !== null){
+          Object.entries(result.buyer_intent).forEach(([key, value]) => {
+            setTagsArrayProcessing((prev: any) => [...prev, { [key]: [value, ''] }]);
+          });
+        }
+        break;
+
+
+      case STEP_CODES.FEEDBACK:
+       // // Convert feedback object to tags format
+      if(result.feedback !== undefined && result.feedback !== null){
+        Object.entries(result.feedback).forEach(([key, value]) => {
+          setTagsArrayProcessing((prev: any) => [...prev, { [key]: [value, ''] }]);
+        });
+      }
+        break;
+
+      default:
+        console.log('Unknown step code:', stepCode);
+        break;
+    }
+  };
+
+  const handleDoneStatus = (parsedData: any) => {
+    setLoading(false);
+    setCallTranslation(true);
+     
+    
+    // Update step status if step field exists
+    if (parsedData.step) {
+      const stepEntry = {
+        step: parsedData.step,
+        message: parsedData.message || 'Completed',
+        status: 'done',
+        timestamp: Date.now()
+      };
+      
+      setSteps((prev: Array<{ step: string; message: string; status: string; timestamp: number }>) => {
+        const currentStepNormalized = normalizeStep(parsedData.step);
+        const existingIndex = prev.findIndex((s: { step: string; message: string; status: string; timestamp: number }) => normalizeStep(s.step) === currentStepNormalized);
+        
+        if (existingIndex >= 0) {
+          const updated = [...prev];
+          updated[existingIndex] = stepEntry;
+          return updated;
+        }
+        return [...prev, stepEntry];
+      });
+    }
+    
+    if (!parsedData.result) {
+      console.warn('Status is done but result is missing:', parsedData);
+      return;
+    }
+    
+    const result = parsedData.result;
+    console.log('Done status - Full result:', result);
+    
+    // Build update object with all available data in a single update
+    const updates: any = {};
+    
+    if(result.transcription !== undefined && result.transcription !== null){
+      updates.transcriptions = result.transcription;
+    }
+    if(result.analysis !== undefined && result.analysis !== null){
+      updates.analysis = result.analysis;
+    }
+    if(result.extracted_qualification_fields !== undefined && result.extracted_qualification_fields !== null){
+      updates.extracted_qualification_fields = result.extracted_qualification_fields;
+    }
+    if(result.qualified !== undefined && result.qualified !== null){
+      updates.qualified = result.qualified;
+    }
+    if(result.completion_percent !== undefined && result.completion_percent !== null){
+      updates.completion_percent = result.completion_percent;
+    }
+    if(result.classification !== undefined && result.classification !== null){
+      updates.main_topic = result?.classification?.main_topic;
+    }
+    if(result.summary !== undefined && result.summary !== null){
+      updates.summary = result.summary;
+    }
+    
+    // Initialize tags array and merge lead_quality, buyer_intent, and feedback
+    const tagsArray: any[] = [];
+    
+    // Convert lead_quality object to tags format
+    if(result.lead_quality !== undefined && result.lead_quality !== null){
+      Object.entries(result.lead_quality).forEach(([key, value]) => {
+        tagsArray.push({ [key]: [value, ''] });
+      });
+    }
+    
+    // Convert buyer_intent object to tags format
+    if(result.buyer_intent !== undefined && result.buyer_intent !== null){
+      Object.entries(result.buyer_intent).forEach(([key, value]) => {
+        tagsArray.push({ [key]: [value, ''] });
+      });
+    }
+    
+    // Convert feedback object to tags format
+    if(result.feedback !== undefined && result.feedback !== null){
+      Object.entries(result.feedback).forEach(([key, value]) => {
+        tagsArray.push({ [key]: [value, ''] });
+      });
+    }
+    
+    // Set tags if we have any
+    if(tagsArray.length > 0){
+      updates.tags = tagsArray;
+    }
+
+    
+    
+    // Apply all updates in a single state update
+    if(Object.keys(updates).length > 0){
+     
+      setChunksAnalysisData((prev: any) => ({ ...prev, ...updates }));
+    } else {
+      console.warn('No valid updates found in result:', result);
+    }
+    // Handle analysis errors
+    if (result.analysis && result.analysis.error) {
+      console.error('Analysis error:', result.analysis.error);
+      setError(UNABLE_TO_ANALYZE_CALL);
+      setLoading(false);
+      setAnalysisComplete(true);
+      
+    } else {
+      setValidAnalysis(true);
+    }
+
+    
+    setLoading(false);
+    setAnalysisComplete(true);
+    setCurrentStep(null);
+    
+    // Mark all steps as done
+    setSteps((prev: Array<{ step: string; message: string; status: string; timestamp: number }>) => prev.map((s: { step: string; message: string; status: string; timestamp: number }) => ({ ...s, status: 'done' })));
+
+    
+    disconnectSocket();
+  };
+
+  const handleErrorStatus = (parsedData: any) => {
+    console.error('Error status received from server:', parsedData);
+    const errorMessage = parsedData.msg || parsedData.message || 'Analysis error occurred';
+    setError(errorMessage);
+    setLoading(false);
+    setAnalysisComplete(true);
+    
+    // Update step error status
+    if (currentStep) {
+      setSteps((prev: Array<{ step: string; message: string; status: string; timestamp: number }>) => prev.map((s: { step: string; message: string; status: string; timestamp: number }) => 
+        s.step === currentStep ? { ...s, status: 'error', message: errorMessage } : s
+      ));
+    } else if (parsedData.step) {
+      const stepEntry = {
+        step: parsedData.step,
+        message: errorMessage,
+        status: 'error',
+        timestamp: Date.now()
+      };
+      setSteps((prev: Array<{ step: string; message: string; status: string; timestamp: number }>) => {
+        const existingIndex = prev.findIndex((s: { step: string; message: string; status: string; timestamp: number }) => s.step === parsedData.step);
+        if (existingIndex >= 0) {
+          const updated = [...prev];
+          updated[existingIndex] = stepEntry;
+          return updated;
+        }
+        return [...prev, stepEntry];
+      });
+      setCurrentStep(parsedData.step);
+    } else {
+      setSteps((prev: Array<{ step: string; message: string; status: string; timestamp: number }>) => {
+        if (prev.length > 0) {
+          const updated = [...prev];
+          updated[updated.length - 1] = { ...updated[updated.length - 1], status: 'error', message: errorMessage };
+          return updated;
+        }
+        return prev;
+      });
+    }
+    
+    disconnectSocket();
+  };
 
   // Server-Sent Events connection to analysis server
   const {
@@ -158,15 +437,21 @@ const CallAnalysis = () => {
     connect: connectSocket,
     disconnect: disconnectSocket
   } = useAnalysisSSE({
+
     uuid: uuid,
     date: date,
     localPartyNumber: localPartyNumber,
     ownerUsername: ownerUsername,
     imagicle: imagicle,
+
+    callDuration: callDuration?.toString(),
+    callType: callType?.toString(),
+    remotePartyNumber: remotePartyNumber,
+    dateTime: dateTime,
+
     preventAutoConnect: analysisComplete,
     onMessage: (data) => {
       if (!data) {
-        console.log('onMessage called with no data');
         return;
       }
 
@@ -182,11 +467,7 @@ const CallAnalysis = () => {
         }
       }
 
-      console.log('SSE message received in component:', parsedData);
-      console.log('Data type:', typeof parsedData);
-      console.log('Data status:', parsedData.status);
-      console.log('Data step:', parsedData.step);
-      console.log('Data result:', parsedData.result);
+     // console.log('SSE message received in component:', parsedData);
 
       // UNIVERSAL STEP TRACKING: Handle ALL events with a step field first
       // This ensures every event with a step is captured, regardless of type/status
@@ -198,261 +479,35 @@ const CallAnalysis = () => {
           timestamp: Date.now()
         };
         
-        setSteps(prev => {
-          // Normalize step names for comparison (case-insensitive, trim whitespace)
-          const normalizeStep = (step: string) => step.toLowerCase().trim();
-          const currentStepNormalized = normalizeStep(parsedData.step);
-          
-          const existingIndex = prev.findIndex(s => normalizeStep(s.step) === currentStepNormalized);
-          if (existingIndex >= 0) {
-            // Update existing step
-            const updated = [...prev];
-            updated[existingIndex] = stepEntry;
-            console.log('Updated existing step:', parsedData.step, 'Total steps:', updated.length);
-            return updated;
-          } else {
-            // Add new step
-            const newSteps = [...prev, stepEntry];
-            console.log('Added new step:', parsedData.step, 'Total steps:', newSteps.length, 'All steps:', newSteps.map(s => s.step));
-            return newSteps;
-          }
-        });
+        setSteps((prev: Array<{ step: string; message: string; status: string; timestamp: number }>) => updateStepInList(prev, stepEntry));
         
         // Set current step if it's processing or connecting
         if (parsedData.status === 'processing' || parsedData.status === 'connecting' || parsedData.status === 'connected') {
           setCurrentStep(parsedData.step);
+
+          // Update data based on step code
+          if (parsedData.result && parsedData.step_code) {
+            handleStepDataUpdate(parsedData.step_code, parsedData.result);
+          }
         }
       }
 
-      // IMPORTANT: Handle processing steps BEFORE done status
-      // This ensures all steps including final "processing" step are captured
-      if (parsedData.status === 'processing') {
-        console.log('Processing status detected:', { step: parsedData.step, message: parsedData.message, uuid: parsedData.uuid });
-        setLoading(true);
-      }
       
-      // Handle final analysis result
-      if (parsedData.status === 'done') {
-        console.log('Status is done, checking result...');
-        
-        // If done status has a step field, ensure it's added/updated first
-        // This handles cases like "transcription_done" step
-        if (parsedData.step) {
-          const stepEntry = {
-            step: parsedData.step,
-            message: parsedData.message || 'Completed',
-            status: 'completed',
-            timestamp: Date.now()
-          };
-          
-          setSteps(prev => {
-            const normalizeStep = (step: string) => step.toLowerCase().trim();
-            const currentStepNormalized = normalizeStep(parsedData.step);
-            const existingIndex = prev.findIndex(s => normalizeStep(s.step) === currentStepNormalized);
-            
-            if (existingIndex >= 0) {
-              const updated = [...prev];
-              updated[existingIndex] = stepEntry;
-              return updated;
-            } else {
-              return [...prev, stepEntry];
-            }
-          });
-        }
-        
-        if (!parsedData.result) {
-          console.warn('Status is done but result is missing:', parsedData);
-          return;
-        }
-        
-        const result = parsedData.result;
 
-        //if result has analysis with error
-        if (result.analysis && result.analysis.error) {
-          console.error('Analysis error:', result.analysis.error);
-          //setError(result.analysis.error);
-          setError(UNABLE_TO_ANALYZE_CALL);
-          //toast.error(result.analysis.error);
-          setLoading(false);
-          setAnalysisComplete(true);
-          setValidAnalysis(false);
-          
-        }else{
-          setValidAnalysis(true);
-        }
-
-
-        
-        console.log('Processing done status with result:', result);
-        console.log('Result keys:', Object.keys(result));
-        
-        // Set main analysis data - create analysis object with available fields
-        // Even if sentiment/customer_intent are missing, we should set analysis
-        // so the render condition passes
-        const analysisData: CallAnalysis = {
-          sentiment: result.sentiment || '',
-          customer_intent: result.customer_intent || result.interaction_type || '',
-          key_topics: result.main_topic ? [result.main_topic] : [],
-          action_items: [],
-          entities_customer: [],
-          customer_emotions: [],
-          operator_emotions: [],
-          call_categories: [],
-          resolution_status: '',
-          follow_up_required: false,
-          summary: result.summary || ''
-        };
-        setAnalysis(analysisData);
-       
-        
-        // Handle the new response structure where data is directly in result
-        // Set domain specific analysis
-        if (result.localPartyNumber || result.ownerUsername || result.qualified !== undefined) {
-          const domainAnalysis: DomainSpecificAnalysis = {
-            localPartyNumber: result.localPartyNumber || '',
-            ownerUsername: Array.isArray(result.ownerUsername) ? result.ownerUsername[0] : (result.ownerUsername || ''),
-            completion_percent: result.completion_percent || 0,
-            matched_fields_count: result.matched_fields_count || 0,
-            qualified: result.qualified || false
-          };
-          setDomainSpecificAnalysis(domainAnalysis);
-        }
-        
-        // Set summary data
-        if (result.summary || result.interaction_type || result.main_topic) {
-          const summaryData: SummaryData = {
-            summary: result.summary || '',
-            interaction_type: result.interaction_type || '',
-            main_topic: result.main_topic || '',
-            tags: result.tags || []
-          };
-          setSummaryData(summaryData);
-        }
-        
-        // Set transcription (directly in result, not in domain_specific_analysis)
-        if (result.transcription && Array.isArray(result.transcription)) {
-          // Convert string timestamps to numbers if needed
-          const transcription = result.transcription.map((item: any) => ({
-            speaker: item.speaker || '',
-            text: item.text || '',
-            start: typeof item.start === 'string' ? Number.parseFloat(item.start) : (item.start || 0),
-            end: typeof item.end === 'string' ? Number.parseFloat(item.end) : (item.end || 0)
-          }));
-          setTranscription(transcription);
-        }
-        
-        // Set extracted entities
-        if (result.extracted_qualification_fields) {
-          setExtractEntities(result.extracted_qualification_fields);
-        }
-        
-        // Set call duration if available
-        // if (result.domain_specific_duration) {
-        //   setCallDuration(result.domain_specific_duration);
-        // }
-        
-        // Also handle old structure for backward compatibility
-        if (result.domain_specific_analysis) {
-          const domainAnalysis = result.domain_specific_analysis;
-          setDomainSpecificAnalysis(domainAnalysis);
-          setSummaryData(domainAnalysis?.summary_data);
-          setTranscription(domainAnalysis?.transcription);
-          setExtractEntities(domainAnalysis?.extracted_qualification_fields);
-          // setCallDuration(domainAnalysis?.domain_specific_duration);
-        }
-        
-        // Always set these flags when we receive done status
-        console.log('Setting dataFound=true, loading=false, analysisComplete=true');
-        setDataFound(true);
-        setLoading(false);
-        setAnalysisComplete(true);
-        
-        // Mark all steps as completed - preserve all existing steps
-        setSteps(prev => {
-          const completedSteps = prev.map(s => ({ ...s, status: 'completed' }));
-          console.log('Marking all steps as completed. Total steps:', completedSteps.length, 'Steps:', completedSteps.map(s => s.step));
-          return completedSteps;
-        });
-        setCurrentStep(null);
-        
-        console.log('Analysis data set, disconnecting socket');
-        console.log('Result data processed:', {
-          hasTranscription: !!(result.transcription),
-          hasSummary: !!(result.summary),
-          hasDomainAnalysis: !!(result.localPartyNumber || result.ownerUsername),
-          hasExtractEntities: !!(result.extracted_qualification_fields)
-        });
-        
-        // Disconnect socket when analysis is complete
-        disconnectSocket();
+      // Handle status-specific logic
+      if (parsedData.status === 'processing') {
+        setLoading(true);
+      } else if (parsedData.status === 'done') {
+        handleDoneStatus(parsedData);
+      } else if (parsedData.status === 'error') {
+        handleErrorStatus(parsedData);
       }
-      // Handle error status - stop connection and don't retry
-      else if (parsedData.status === 'error') {
-        console.error('Error status received from server:', parsedData);
-        const errorMessage = parsedData.msg || parsedData.message || 'Analysis error occurred';
-        setError(errorMessage);
-        setLoading(false);
-        setAnalysisComplete(true); // Prevent auto-reconnect
-        
-        // Mark current step as error, or add error as a new step if no current step
-        if (currentStep) {
-          setSteps(prev => prev.map(s => 
-            s.step === currentStep ? { ...s, status: 'error', message: errorMessage } : s
-          ));
-        } else if (parsedData.step) {
-          // If error has a step field, add it as an error step
-          const stepEntry = {
-            step: parsedData.step,
-            message: errorMessage,
-            status: 'error',
-            timestamp: Date.now()
-          };
-          setSteps(prev => {
-            const existingIndex = prev.findIndex(s => s.step === parsedData.step);
-            if (existingIndex >= 0) {
-              const updated = [...prev];
-              updated[existingIndex] = stepEntry;
-              return updated;
-            }
-            return [...prev, stepEntry];
-          });
-          setCurrentStep(parsedData.step);
-        } else {
-          // If no step, mark the last step as error
-          setSteps(prev => {
-            if (prev.length > 0) {
-              const updated = [...prev];
-              updated[updated.length - 1] = { ...updated[updated.length - 1], status: 'error', message: errorMessage };
-              return updated;
-            }
-            return prev;
-          });
-        }
-        
-        // Disconnect socket immediately on error
-        disconnectSocket();
-       // toast.error(errorMessage);
-      }
-      // Note: All steps are now handled universally at the top of the handler
-      // This connection handler is kept for backward compatibility and additional logic if needed
-      // Steps with step field are already captured above, so this mainly handles connection-specific logic
+
+      // Handle connection type messages
       if (parsedData.type === 'connection') {
         setLoading(true);
-        // Step tracking is already handled in the universal handler above
-        // This section can be used for connection-specific side effects if needed
       }
-      // Handle ping messages
-      else if (parsedData.type === 'ping') {
-        // Keep connection alive
-      }
-      // Fallback for other data structures
-      else if (parsedData.analysis) {
-        setAnalysis(parsedData.analysis);
-      } else if (parsedData.sentiment || parsedData.customer_intent) {
-        setAnalysis(parsedData);
-      } else {
-        console.log('Unhandled message type:', parsedData);
-      }
+      // Ping messages are handled silently to keep connection alive
     },
     onError: (error) => {
       console.error('Analysis SSE error:', error);
@@ -471,6 +526,7 @@ const CallAnalysis = () => {
       // Connection closed - handled silently
     }
   });
+      
 
  
 
@@ -481,7 +537,7 @@ const CallAnalysis = () => {
 
     try {
       // Check for new encoded data format first, then fallback to old format for backward compatibility
-      const { data, id, file, direction, phone, imagicle, duration } = router.query;
+      const { data, id, file, direction, phone, imagicle, duration, dateTime } = router.query;
       
       let decodedId = '';
       let decodedFile = '';
@@ -489,6 +545,7 @@ const CallAnalysis = () => {
       let decodedPhone = '';
       let decodedImagicle = '';
       let decodedDuration = '';
+      let decodedDateTime = '';
 
       // If encoded data exists, decode it
       if (data) {
@@ -502,6 +559,8 @@ const CallAnalysis = () => {
           decodedPhone = dataObject.phone;
           decodedImagicle = dataObject.imagicle;
           decodedDuration = dataObject.duration;
+          decodedDateTime = dataObject.dateTime;
+
         } catch (decodeError) {
           console.error('Error decoding encoded data:', decodeError);
           // Fallback to old format if decoding fails
@@ -511,6 +570,7 @@ const CallAnalysis = () => {
           decodedPhone = phone ? decodeURIComponent(phone as string) : '';
           decodedImagicle = imagicle ? decodeURIComponent(imagicle as string) : '';
           decodedDuration = duration ? decodeURIComponent(duration as string) : '';
+          decodedDateTime = dateTime ? decodeURIComponent(dateTime as string) : '';
         }
       } else {
         // Fallback to old format for backward compatibility
@@ -520,6 +580,7 @@ const CallAnalysis = () => {
         decodedPhone = phone ? decodeURIComponent(phone as string) : '';
         decodedImagicle = imagicle ? decodeURIComponent(imagicle as string) : '';
         decodedDuration = duration ? decodeURIComponent(duration as string) : '';
+        decodedDateTime = dateTime ? decodeURIComponent(dateTime as string) : '';
       }
       
       // Set basic parameters
@@ -532,15 +593,20 @@ const CallAnalysis = () => {
       }
       if (decodedPhone) {
         setLocalPartyNumber(decodedPhone);
+        setRemotePartyNumber(decodedPhone);
       }
 
       if (decodedImagicle) {
         setImagicle(decodedImagicle);
       }
       if (decodedDuration) {
-        setCallDuration(decodedDuration);
         const formatedDuration = formatDuration(parseInt(decodedDuration)/10000000);
-        setCallDuration(formatedDuration as string);
+        setCallDurationFormatted(formatedDuration as string);
+        setCallDuration(decodedDuration);
+      }
+
+      if (decodedDateTime) {
+        setDateTime(decodedDateTime);
       }
       
       // Parse file path for additional parameters
@@ -569,7 +635,7 @@ const CallAnalysis = () => {
             setDate(formattedDate);
             
             // Trigger analysis
-            handleGetCallAnalysisWithData(formattedDate, extension, user, decodedId, decodedImagicle);
+            handleGetCallAnalysisWithData(formattedDate, extension, user, decodedId, decodedImagicle,decodedDateTime,decodedDuration,decodedDirection,decodedPhone);
           }
         }
       }
@@ -612,13 +678,26 @@ const CallAnalysis = () => {
     }
   };
 
-  const handleGetCallAnalysisWithData = async (dateParam: string, localPartyNumberParam: string, ownerUsernameParam: string, uuidParam: string, imagicleParam: string) => {
+  const handleGetCallAnalysisWithData = async (dateParam: string, localPartyNumberParam: string, ownerUsernameParam: string, uuidParam: string, imagicleParam: string, dateTimeParam: string, durationParam: string, directionParam: string, phoneParam: string) => {
     // Set the parameters
     setUuid(uuidParam);
     setDate(dateParam);
     setLocalPartyNumber(localPartyNumberParam);
     setOwnerUsername(ownerUsernameParam);
     setImagicle(imagicleParam);
+
+    if (dateTimeParam) {
+      setDateTime(dateTimeParam);
+    }
+    if (durationParam) {
+      setCallDuration(durationParam);
+    }
+    if (directionParam) {
+      setCallType(directionParam);
+    }
+    if (phoneParam) {
+      setRemotePartyNumber(phoneParam);
+    }
     // Set loading state
     setLoading(true);
     setError(null);
@@ -703,7 +782,6 @@ const CallAnalysis = () => {
       setPlayingSegment({ start, end });
       audioPlayerRef.current.seekTo(start);
       audioPlayerRef.current.play();
-      setLastClickedTime(start.toString());
       
       const duration = end - start;
       
@@ -734,10 +812,6 @@ const CallAnalysis = () => {
     handleGetCallAnalysis();
     handleGetTranslations();
   };
-
-
-
-
 
   const renderAnalysisForm = () => (
     <Row className="mb-1">
@@ -870,13 +944,8 @@ const CallAnalysis = () => {
                         setDate('');
                         
                         // Clear all analysis data
-                        setAnalysis(null);
-                        setSummaryData(null);
-                        setDomainSpecificAnalysis(null);
-                        setTranscription(null);
-                        setExtractEntities(null);
-                        setCallDuration(null);
-                        setDataFound(false);
+                        
+                        setCallDurationFormatted(null);
                         setAnalysisComplete(false);
                         
                         // Clear loading and error states
@@ -918,448 +987,545 @@ const CallAnalysis = () => {
     </Row>
   );
 
-  const renderCustomerInfo = () => (
-    <Row>
-      <Col md={12}>
-        <div className="card">
-          <div className="card-header">
-            <h5 className="card-title">Customer Information</h5>
-          </div>
-          <div className="card-body">
-            <Row className="between">
-              {analysis?.follow_up_required && (
-              <Col>
-                <div className="callType">
-                  <div className={`ic_box ${analysis?.follow_up_required === true ? 'bg-success' : 'bg-danger'}`}>
-                    {analysis?.follow_up_required === true ? 
-                      <i className="material-icons-two-tone">check</i> : 
-                      <i className="material-icons-two-tone">close</i>
-                    }
-                  </div>
-                  <div className="desc">
-                    <small className="card-title">Follow Up Required</small>
-                    <h5 className="card-text">
-                      {analysis?.follow_up_required === true ? 'Yes' : 'No'}
-                    </h5>
-                  </div>
-                </div>
-              </Col>
-              )}
+  const renderCustomerInfo = () => {
+    const analysis = getAnalysis();
+    const customerEntity = getCustomerEntity();
+    const followUpRequired = analysis?.follow_up_required;
+    
+    return (
+      <Row>
+        <Col md={12}>
+          <div className="card">
+            <div className="card-header">
+              <h5 className="card-title">Customer Information</h5>
+            </div>
+            <div className="card-body">
+              <Row className="between">
+                {hasData(followUpRequired) ? (
+                  <Col>
+                    <div className="callType">
+                      <div className={`ic_box ${followUpRequired ? 'bg-success' : 'bg-danger'}`}>
+                        <i className={`material-icons-two-tone ${followUpRequired ? 'check' : 'close'}`} />
+                      </div>
+                      <div className="desc">
+                        <small className="card-title">Follow Up Required</small>
+                        <h5 className="card-text">{followUpRequired ? 'Yes' : 'No'}</h5>
+                      </div>
+                    </div>
+                  </Col>
+                ) : (
+                  <Col>
+                    <div className="callType">
+                      <div className="desc">
+                        <small className="card-title">Follow Up Required</small>
+                        {!analysisComplete ? <TextSkeleton lines={1} /> : <p className="text-muted">No data available</p>}
+                      </div>
+                    </div>
+                  </Col>
+                )}
 
-              {callType && (
-              <Col>
-                <div className="callType">
-                  <div className="ic_box bg-success">
-                    <i className="material-icons-two-tone">call</i>
-                  </div>
-                  <div className="desc">
-                    <small className="card-title">Call Type</small>
-                    <h5 className="card-text">{callType}</h5>
-                  </div>
-                </div>
-              </Col>
-              )}
+                {callType ? (
+                  <Col>
+                    <div className="callType">
+                      <div className="ic_box bg-success">
+                        <i className="material-icons-two-tone">call</i>
+                      </div>
+                      <div className="desc">
+                        <small className="card-title">Call Type</small>
+                        <h5 className="card-text">{callType}</h5>
+                      </div>
+                    </div>
+                  </Col>
+                ) : (
+                  <Col>
+                    <div className="callType">
+                      <div className="desc">
+                        <small className="card-title">Call Type</small>
+                        <TextSkeleton lines={1} />
+                      </div>
+                    </div>
+                  </Col>
+                )}
 
-              {analysis?.entities_customer && analysis.entities_customer.length > 0 && analysis.entities_customer[0]?.name && (
+                {/* {hasCustomerName() ? (
+                  <Col>
+                    <div className="callType">
+                      <div className="desc">
+                        <small className="card-title">Customer Name</small>
+                        <h5 className="card-text">{customerEntity?.name}</h5>
+                      </div>
+                    </div>
+                  </Col>
+                ) : (
+                  <Col>
+                    <div className="callType">
+                      <div className="desc">
+                        <small className="card-title">Customer Name</small>
+                        <TextSkeleton lines={1} />
+                      </div>
+                    </div>
+                  </Col>
+                )} */}
+
+<Col>
+                    <div className="callType">
+                      <div className="desc">
+                        <small className="card-title">Phone Number</small>
+                        <h5 className="card-text">{remotePartyNumber}</h5>
+                      </div>
+                    </div>
+                  </Col>
+
                 <Col>
                   <div className="callType">
                     <div className="desc">
-                      <small className="card-title">Customer Name</small>
-                      <h5 className="card-text">
-                        {analysis?.entities_customer && analysis.entities_customer.length > 0 && analysis.entities_customer[0]?.name}
-                      </h5>
+                      <small className="card-title">Call Duration</small>
+                      {callDurationFormatted ? (
+                        <h5 className="card-text">{callDurationFormatted}</h5>
+                      ) : (
+                        <div className="card-text"><TextSkeleton lines={1} /></div>
+                      )}
                     </div>
                   </div>
                 </Col>
-              )}
-
-              {analysis?.entities_customer && analysis.entities_customer.length > 0 && analysis.entities_customer[0]?.phone && (
-              <Col>
-                <div className="callType">
-                  <div className="desc">
-                    <small className="card-title">Phone Number</small>
-                    <h5 className="card-text">
-                    {analysis?.entities_customer && analysis.entities_customer.length > 0 && analysis.entities_customer[0]?.phone}
-                    </h5>
-                  </div>
-                </div>
-              </Col>
-              )}
-
-              <Col>
-                <div className="callType">
-                  <div className="desc">
-                    <small className="card-title">Call Duration</small>
-                    <h5 className="card-text">{callDurationFormatted}</h5>
-                  </div>
-                </div>
-              </Col>
-            </Row>
+              </Row>
+            </div>
           </div>
-        </div>
-      </Col>
-    </Row>
-  );
+        </Col>
+      </Row>
+    );
+  };
 
-  const renderSummaryCards = () => (
-    <Row>
-      <Col md={6}>
-        <div className="card" style={{ backgroundImage: `url(${imgStatus1.src})` }}>
-          <div className="card-body box1 gbox">
-            {analysis?.resolution_status && (
-              <div className="vbox">
+  const renderSummaryCards = () => {
+    const analysis = getAnalysis();
+    const resolutionStatus = analysis?.resolution_status;
+    const sentiment = analysis?.sentiment;
+    const summary = chunksAnalysisData?.summary;
+    const customerIntent = analysis?.customer_intent;
+    const qualified = chunksAnalysisData?.qualified;
+      const hasCompletionPercent = chunksAnalysisData?.completion_percent !== undefined && 
+      chunksAnalysisData.completion_percent !== null;
+    const completionPercent = hasCompletionPercent ? chunksAnalysisData.completion_percent : 0;
+    
+    return (
+      <Row>
+        <Col md={6}>
+          <div className="card" style={{ backgroundImage: `url(${imgStatus1.src})` }}>
+            <div className="card-body box1 gbox">
+              <div className="vbox w-100">
                 <h5>Resolution Status</h5>
                 <div className="card-text">
-                  <h6>{analysis?.resolution_status?.charAt(0).toUpperCase() + analysis.resolution_status.slice(1)}</h6>
+                  {hasData(resolutionStatus) ? (
+                    <h6>{capitalizeFirst(resolutionStatus)}</h6>
+                  ) : (
+                    <>
+                    {!analysisComplete && <TextSkeleton lines={1} />}
+                    {analysisComplete && <p className="text-muted">No data available</p>}
+                    </>
+                  )}
                 </div>
               </div>
-            )}
 
-            {analysis?.sentiment && (
-              <div className="vbox">
+              <div className="vbox w-100">
                 <h5>Sentiment</h5>
                 <div className="card-text">
-                  {/* <h6>{analysis?.sentiment?.charAt(0).toUpperCase() + analysis.sentiment.slice(1)}</h6> */}
+                  {hasData(sentiment) ? (
+                    <h6>{capitalizeFirst(sentiment)}</h6>
+                  ) : (
+                    <>
+                    {!analysisComplete && <TextSkeleton lines={1} />}
+                    {analysisComplete && <p className="text-muted">No data available</p>}
+                    </>
+                  )}
                 </div>
               </div>
-            )}
 
-            
-            <div className="vbox w-100">
-              <h5>Main Intention</h5>
-              <div className="card-text">
-                {summaryData?.main_topic ? (
-                  <h6>{summaryData.main_topic}</h6>
-                ) : (
-                  <p className="text-muted">No data available</p>
-                )}
+              <div className="vbox w-100">
+                <h5>Main Intention</h5>
+                <div className="card-text">
+                  {chunksAnalysisData?.main_topic && chunksAnalysisData.main_topic.trim().length > 0 ? (
+                    <h6>{chunksAnalysisData.main_topic}</h6>
+                  ) : (
+                    <>
+                    {!analysisComplete && <TextSkeleton lines={1} />}
+                    {analysisComplete && <p className="text-muted">No data available</p>}
+                    </>
+
+                  )}
+                </div>
               </div>
-            </div>
 
-            <div className="vbox w-100">
-              <h5>Summary</h5>
-              <div className="card-text">
-                {summaryData?.summary || analysis?.summary ? (
-                  <h6>{summaryData?.summary || analysis?.summary}</h6>
-                ) : (
-                  <p className="text-muted">No data available</p>
-                )}
+              <div className="vbox w-100">
+                <h5>Summary</h5>
+                <div className="card-text">
+                  {hasData(summary) ? (
+                    <h6>{summary}</h6>
+                  ) : (
+                    <>
+                    {!analysisComplete && <TextSkeleton lines={2} lastLineWidth="70%" />}
+                    {analysisComplete && <p className="text-muted">No data available</p>}
+                    </>
+                  )}
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      </Col>
+        </Col>
 
-      <Col md={6}>
-        <Row>
-
-         
-          <Col md={12}>
-            <div className={`card ${domainSpecificAnalysis?.qualified ? 'bg-success' : 'bg-danger'}`}
-                 style={{ backgroundImage: `url(${imgStatus3.src})` }}>
-              <div className="card-body gbox">
-                <div className="vbox">
-                  <h6 className="text-white">Overall Assessment</h6>
-                </div>
-                <div className="vbox">
-                  <p className="card-text text-white size2">
-                    {domainSpecificAnalysis?.qualified ? 'Qualified' : 'Unqualified'}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </Col>
-         
-
-          <Col md={6}>
-            <div className="card">
-              <div className="card-body gbox">
-                <h6>Completion Percent</h6>
-                <p className="card-text size2 text-bold">
-                  {domainSpecificAnalysis?.completion_percent || 0}%
-                </p>
-                <div className="progress mb-3" style={{ height: '10px', width: '100%' }}>
-                  <div 
-                    className="progress-bar bg-success" 
-                    role="progressbar" 
-                    style={{ width: `${domainSpecificAnalysis?.completion_percent || 0}%` }}
-                    aria-valuenow={domainSpecificAnalysis?.completion_percent || 0}
-                    aria-valuemin={0} 
-                    aria-valuemax={100}
-                  />
-                </div>
-              </div>
-            </div>
-          </Col>
-
-          <Col md={6}>
-            <div className="card">
-              <div className="card-body gbox">
-                <div className="vbox">
-                  <h6>Customer Intention</h6>
-                </div>
-                <div className="vbox">
-                  <h5 className="card-text size2">
-                    {analysis?.customer_intent ? (
-                      <h6>{analysis?.customer_intent}</h6>
+        <Col md={6}>
+          <Row>
+            <Col md={12}>
+              <div className={`card ${qualified ? 'bg-success' : 'bg-danger'}`}
+                   style={{ backgroundImage: `url(${imgStatus3.src})` }}>
+                <div className="card-body gbox">
+                  <div className="vbox">
+                    <h6 className="text-white">Overall Assessment</h6>
+                  </div>
+                  <div className="vbox">
+                    {hasData(qualified) ? (
+                      <p className="card-text text-white size2">{qualified ? 'Qualified' : 'Unqualified'}</p>
                     ) : (
-                      <p className="text-muted">No data available</p>
+                      <div className="card-text text-white size2">
+                        <>
+                        {!analysisComplete && <TextSkeleton lines={1} />}
+                        {analysisComplete && <p className="text-muted">No data available</p>}
+                        </>
+                        </div>
                     )}
-                  </h5>
+                  </div>
                 </div>
               </div>
-            </div>
-          </Col>
-        </Row>
-      </Col>
-    </Row>
-  );
+            </Col>
 
-  const renderEmotionsAndTopics = () => (
-    <Row>
-      <Col md={7}>
-        <Row>
-          <Col md={7}>
-            <div className="card">
-              <div className="card-body gbox gbox3">
-                <Row className="w-100">
-                  <Col md={6}>
-                    <div className="vbox">
-                      <h5 className="mb-3">Customer Emotions</h5>
-                    </div>
-                    <div className="card-text">
-                      {analysis?.customer_emotions && analysis?.customer_emotions.length > 0 && analysis?.customer_emotions.map((emotion, index) => (
-                        <div className="text-capitalize me-2" key={index}>
-                          <div className="emo_text">{emotion}</div>
-                          <div className="emo_pbar">
-                            <div className="progress mb-3" style={{ height: '10px', width: '100%' }}>
-                              <div 
-                                className="progress-bar bg-success" 
-                                role="progressbar" 
-                                style={{ width: `${domainSpecificAnalysis?.completion_percent || 0}%` }}
-                                aria-valuenow={domainSpecificAnalysis?.completion_percent || 0}
-                                aria-valuemin={0} 
-                                aria-valuemax={100}
-                              />
-                            </div>
-                          </div>
+            <Col md={6}>
+              <div className="card">
+                <div className="card-body gbox">
+                  <h6>Completion Percent</h6>
+                  {hasCompletionPercent ? (
+                    
+                    <>
+                    <p className="card-text size2 text-bold">{completionPercent}%</p>
+                    <div className="progress mb-3 progress-thin">
+                    <div 
+                      className="progress-bar bg-success" 
+                      role="progressbar" 
+                      style={{ width: `${completionPercent}%` }}
+                      aria-valuenow={completionPercent}
+                      aria-valuemin={0} 
+                      aria-valuemax={100}
+                    />
+                  </div>
+                    </>
+                  ) : (
+                    <div className="card-text size2 text-bold d-block w-100">
+                      <>
+                      {!analysisComplete && <TextSkeleton lines={2} />}
+                      {analysisComplete && <p className="text-muted">No data available</p>}
+                      </>
+                      </div>
+                  )}
+                  
+                  
+                </div>
+              </div>
+            </Col>
+
+            <Col md={6}>
+              <div className="card">
+                <div className="card-body gbox">
+                  <div className="vbox">
+                    <h6>Customer Intention</h6>
+                  </div>
+                  <div className="vbox w-100">
+                    {customerIntent ? (
+                      <div className="card-text size2">
+                        <h6>{customerIntent.charAt(0).toUpperCase() + customerIntent.slice(1)}</h6>
+                      </div>
+                    ) : (
+                      <div className="card-text d-block w-100">
+                        <>
+                        {!analysisComplete && <TextSkeleton lines={2} />}
+                        {analysisComplete && <p className="text-muted">No data available</p>}
+                        </>
                         </div>
-                      ))}
-                      {analysis?.customer_emotions && analysis?.customer_emotions.length === 0 && (
-                        <p className="text-muted">No data available</p>
-                      )}
-                    </div>
-                  </Col>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </Col>
+          </Row>
+        </Col>
+      </Row>
+    );
+  };
 
-                  <Col md={6}>
-                    <div className="vbox">
-                      <h5 className="mb-3">Operator Emotions</h5>
+  const renderEmotionsAndTopics = () => {
+    const analysis = getAnalysis();
+    const customerEmotions = analysis?.customer_emotions;
+    const operatorEmotions = analysis?.operator_emotions;
+    const keyTopics = analysis?.key_topics;
+    const actionItems = analysis?.action_items;
+    const callCategories = analysis?.call_categories;
+    const qualificationFields = chunksAnalysisData?.extracted_qualification_fields;
+    const hasQualificationFields = qualificationFields && Object.entries(qualificationFields).length > 0;
+    
+    return (
+      <Row>
+        <Col md={7}>
+          <Row>
+            <Col md={7}>
+              <div className="card">
+                <div className="card-body gbox gbox3">
+                  <Row className="w-100">
+                    <Col md={6}>
+                      <div className="vbox">
+                        <h5 className="mb-3">Customer Emotions</h5>
+                      </div>
                       <div className="card-text">
-                        {analysis?.operator_emotions && analysis?.operator_emotions.length > 0 && analysis?.operator_emotions.map((emotion, index) => (
-                          <div className="text-capitalize me-2" key={index}>
-                            <div className="emo_text">{emotion}</div>
-                            <div className="emo_pbar">
-                              <div className="progress mb-3" style={{ height: '10px', width: '100%' }}>
-                                <div 
-                                  className="progress-bar bg-success" 
-                                  role="progressbar" 
-                                  style={{ width: `${domainSpecificAnalysis?.completion_percent || 0}%` }}
-                                  aria-valuenow={domainSpecificAnalysis?.completion_percent || 0}
-                                  aria-valuemin={0} 
-                                  aria-valuemax={100}
-                                />
-                              </div>
+                        {hasArrayData(customerEmotions) ? (
+                          customerEmotions.map((emotion: any, index: number) => (
+                            <div className="text-capitalize me-2" key={index}>
+                              <div className="emo_text">{emotion}</div>
                             </div>
-                          </div>
-                        ))}
-                        {analysis?.operator_emotions && analysis?.operator_emotions.length === 0 && (
-                          <p className="text-muted">No data available</p>
+                          ))
+                        ) : (
+                          <>
+                          {!analysisComplete && <ListSkeleton items={3} />}
+                          {analysisComplete && <p className="text-muted">No data available</p>}
+                          </>
+                          
                         )}
                       </div>
-                    </div>
-                  </Col>
-                </Row>
-              </div>
-            </div>
-          </Col>
+                    </Col>
 
-          <Col md={5}>
-            <div className="card">
-              <div className="card-body gbox gbox3">
-                <div className="vbox">
-                  <h5 className="mb-3">Key Topics</h5>
-                </div>
-                <div className="vbox">
-                  <div className="card-text">
-                    {analysis?.key_topics && analysis?.key_topics.length > 0 && analysis?.key_topics.map((item, index) => (
-                      <div className="mb-2 callType" key={index}>
-                        <div className="ic_box bg-success">
-                          <i className="material-icons-two-tone">check</i>
-                        </div>
-                        <div className="">
-                          <h6 className="card-text text-capitalize font-weight-normal">{item}</h6>
-                        </div>
-                      </div>
-                    ))}
-                    {analysis?.key_topics && analysis?.key_topics.length === 0 && (
-                      <p className="text-muted">No data available</p>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </Col>
-        </Row>
-
-        <Row>
-          <Col md={12}>
-            <div className="card">
-              <div className="card-body gbox">
-                <h5 className="card-title">Tags</h5>
-                <div className="card-text w-100">
-                {summaryData?.tags && summaryData?.tags.length > 0 ? (
-                  <table className="table-bordered table-sm w-100">
-                    <thead>
-                      <tr>
-                        <th>Icon</th>
-                        <th>Name</th>
-                        <th className="text-left">Description</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {summaryData?.tags && summaryData?.tags.length > 0 && summaryData?.tags.map((item: any, index: number) => (
-                        <tr key={index}>
-                          <td>
-                            <div className="tboxIn">
-                              <div className={`ic_box small ${Object.values(item)[0] === true ? 'bg-success' : 'bg-danger'}`}>
-                                {Object.values(item)[0] === true ? 
-                                  <i className="material-icons-two-tone">check</i> : 
-                                  <i className="material-icons-two-tone">close</i>
-                                }
+                    <Col md={6}>
+                      <div className="vbox">
+                        <h5 className="mb-3">Operator Emotions</h5>
+                        <div className="card-text">
+                          {hasArrayData(operatorEmotions) ? (
+                            operatorEmotions.map((emotion: any, index: number) => (
+                              <div className="text-capitalize me-2" key={index}>
+                                <div className="emo_text">{emotion}</div>
                               </div>
-                            </div>
-                          </td>
-                          <td className="text-capitalize">
-                            {Object.keys(item)[0].replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                          </td>
-                          <td className="text-capitalize text-left">{String(Object.values(item)[1])}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  ): (
-                    <p className="text-muted">No data available</p>
-                  )}
-                </div>
-              </div>
-            </div>
-          </Col>
-        </Row>
-
-        <Row>
-          <Col md={12}>
-            <div className="card">
-              <div className="card-body gbox vboxStyleTwo">
-                <div className="vbox">
-                  <h5 className="mb-3">Details Summary</h5>
-                </div>
-                <div className="vbox">
-                  <div className="card-text">
-                    {summaryData?.summary ? (
-                      <p>{summaryData?.summary}</p>
-                    ) : (
-                      <p className="text-muted">No data available</p>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </Col>
-        </Row>
-      </Col>
-
-      <Col md={5}>
-        <Row>
-          <Col md={12}>
-            <div className="card">
-              <div className="card-body gbox">
-                <h5 className="card-title">Qualification Fields</h5>
-                <div className="card-text w-100">
-                {extractEntities && Object.entries(extractEntities).length > 0 ? (
-                  <table className="table-bordered table-sm w-100">
-                    <thead>
-                      <tr>
-                        <th>Name</th>
-                        <th className="text-center">Value</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {extractEntities && Object.entries(extractEntities).length > 0 && Object.entries(extractEntities).map(([key, value], index) => (
-                        <tr key={index}>
-                          <td>{key}</td>
-                          <td className="text-capitalize text-center">{value === "null" ? "-" : value}</td>
-                        </tr>
-                      ))}
-                     
-                    </tbody>
-                  </table>
-                  ): (
-                    <p className="text-muted">No data available</p>
-                  )}
-                </div>
-              </div>
-            </div>
-          </Col>
-
-          <Col md={12}>
-            <div className="card">
-              <div className="card-body">
-                <h5 className="card-title">Action Items</h5>
-                {analysis?.action_items && analysis?.action_items.length > 0 && analysis?.action_items.map((item: any, index: number) => (
-                  <div className="tagOuter" key={index}>
-                    <div className="tagIcon bg-success">
-                      <i className="material-icons-two-tone">check</i>
-                    </div>
-                    <div className="tagVal">
-                      <h6 className="card-text text-capitalize">{item}</h6>
-                    </div>
-                  </div>
-                ))}
-                {analysis?.action_items && analysis?.action_items.length === 0 && (
-                  <p className="text-muted">No data available</p>
-                )}
-              </div>
-            </div>
-
-            <div className="card">
-              <div className="card-body gbox vboxStyleTwo">
-                <div className="vbox">
-                  <h5 className="mb-3">Categories</h5>
-                </div>
-                <div className="vbox">
-                  <div className="card-text">
-                    {analysis?.call_categories && analysis?.call_categories.length > 0 && analysis?.call_categories.map((item, index) => (
-                      <div className="mb-2 callType" key={index}>
-                        <div className="ic_box bg-success">
-                          <i className="material-icons-two-tone">check</i>
-                        </div>
-                        <div className="">
-                          <h6 className="card-text text-capitalize font-weight-normal">{item}</h6>
+                            ))
+                          ) : (
+                            <>
+                            {!analysisComplete && <ListSkeleton items={3} />}
+                            {analysisComplete && <p className="text-muted">No data available</p>}
+                            </>
+                          )}
                         </div>
                       </div>
-                    ))}
-                    {analysis?.call_categories && analysis?.call_categories.length === 0 && (
-                      <p className="text-muted">No data available</p>
+                    </Col>
+                  </Row>
+                </div>
+              </div>
+            </Col>
+
+            <Col md={5}>
+              <div className="card">
+                <div className="card-body gbox gbox3">
+                  <div className="vbox">
+                    <h5 className="mb-3">Key Topics</h5>
+                  </div>
+                  <div className="vbox w-100">
+                    <div className="card-text">
+                      {hasArrayData(keyTopics) ? (
+                        keyTopics.map((item: any, index: number) => (
+                          <div className="mb-2 callType" key={index}>
+                            <div className="ic_box bg-success">
+                              <i className="material-icons-two-tone">check</i>
+                            </div>
+                            <div>
+                              <h6 className="card-text text-capitalize font-weight-normal">{item}</h6>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <>
+                        {!analysisComplete && <ListSkeleton items={3} />}
+                        {analysisComplete && <p className="text-muted">No data available</p>}
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </Col>
+          </Row>
+
+          <Row>
+            <Col md={12}>
+              <div className="card">
+                <div className="card-body gbox">
+                  <h5 className="card-title">Tags</h5>
+                  <div className="card-text w-100">
+                    {hasArrayData(chunksAnalysisData?.tags) ? (
+                      <table className="table-bordered table-sm w-100">
+                        <thead>
+                          <tr>
+                            <th>Icon</th>
+                            <th>Name</th>
+                            <th className="text-left">Description</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {chunksAnalysisData?.tags?.map((item: any, index: number) => {
+                            const key = Object.keys(item)[0];
+                            const valueArray = Object.values(item)[0] as any[];
+                            const isTrue = valueArray[0] === true;
+                            const description = valueArray || '';
+                            return (
+                              <tr key={index}>
+                                <td>
+                                  <div className="tboxIn"> 
+                                    <div className={`ic_box small ${isTrue ? 'bg-success' : 'bg-danger'}`}>
+                                      <i className={`material-icons-two-tone`}>
+                                        {isTrue ? 'check' : 'close'}
+                                      </i>
+                                    </div>
+                                  </div>
+                                </td>
+                                <td className="text-capitalize">
+                                  {key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                                </td>
+                                <td className="text-capitalize text-left">{description}</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    ) : (
+                      <>
+                      {!analysisComplete && <TextSkeleton lines={3}  />}
+                      {analysisComplete && <p className="text-muted">No data available</p>}
+                      </>
                     )}
                   </div>
                 </div>
               </div>
-            </div>
-          </Col>
-        </Row>
-      </Col>
-    </Row>
-  );
+            </Col>
+          </Row>
+
+          <Row>
+            <Col md={12}>
+              <div className="card">
+                <div className="card-body gbox vboxStyleTwo">
+                  <div className="vbox">
+                    <h5 className="mb-3">Details Summary</h5>
+                  </div>
+                  <div className="vbox w-100">
+                    <div className="card-text">
+                      {!hasData(chunksAnalysisData?.summary) ? (
+                        <>
+                        {!analysisComplete && <TextSkeleton lines={4} lastLineWidth="70%" />}
+                        {analysisComplete && <p className="text-muted">No data available</p>}
+                        </>
+                      ) : (
+                        <p>{chunksAnalysisData.summary}</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </Col>
+          </Row>
+        </Col>
+
+        <Col md={5}>
+          <Row>
+            <Col md={12}>
+              <div className="card">
+                <div className="card-body gbox">
+                  <h5 className="card-title">Qualification Fields</h5>
+                  <div className="card-text w-100">
+                    {hasQualificationFields ? (
+                      <table className="table-bordered table-sm w-100">
+                        <thead>
+                          <tr>
+                            <th>Name</th>
+                            <th className="text-center">Value</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {Object.entries(qualificationFields).map(([key, value], index: number) => (
+                            <tr key={index}>
+                              <td>{key}</td>
+                              <td className="text-capitalize text-center">{value === "null" ? "-" : String(value as string)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    ) : (
+                      <>
+                      {!analysisComplete && <TextSkeleton lines={6}  />}
+                      {analysisComplete && <p className="text-muted">No data available</p>}
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </Col>
+
+            <Col md={12}>
+              <div className="card">
+                <div className="card-body">
+                  <h5 className="card-title">Action Items</h5>
+                  {hasArrayData(actionItems) ? (
+                    actionItems.map((item: any, index: number) => (
+                      <div className="tagOuter" key={index}>
+                        <div className="tagIcon bg-success">
+                          <i className="material-icons-two-tone">check</i>
+                        </div>
+                        <div className="tagVal">
+                          <h6 className="card-text text-capitalize">{item}</h6>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <>
+                    {!analysisComplete && <TextSkeleton lines={3} />}
+                    {analysisComplete && <p className="text-muted">No data available</p>}
+                    </>
+
+                  )}
+                </div>
+              </div>
+
+              <div className="card">
+                <div className="card-body gbox vboxStyleTwo">
+                  <div className="vbox">
+                    <h5 className="mb-3">Categories</h5>
+                  </div>
+                  <div className="vbox w-100">
+                    <div className="card-text">
+                      {hasArrayData(callCategories) ? (
+                        callCategories.map((item: any, index: number) => (
+                          <div className="mb-2 callType" key={index}>
+                            <div className="ic_box bg-success">
+                              <i className="material-icons-two-tone">check</i>
+                            </div>
+                            <div>
+                              <h6 className="card-text text-capitalize font-weight-normal">{item}</h6>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <>
+                        {!analysisComplete && <TextSkeleton lines={3} />}
+                        {analysisComplete && <p className="text-muted">No data available</p>}
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </Col>
+          </Row>
+        </Col>
+      </Row>
+    );
+  };
 
   const renderTranscript = () => (
     <Row>
@@ -1412,9 +1578,9 @@ const CallAnalysis = () => {
                 </Col>
               </Row>
 
-              {transcription && transcription.length > 0 && transcription.map((transcriptItem: Transcription, index: number) => (
+              {chunksAnalysisData?.transcriptions && chunksAnalysisData.transcriptions.length > 0 && chunksAnalysisData.transcriptions.map((transcriptItem: Transcription, index: number) => (
                 <div key={index}>
-                  {transcriptItem.speaker === 'Operator' ? (
+                  {chunksAnalysisData.transcriptions[index].speaker ===TRANSCRIPTION_SPEAKER_1 ? (
                     <Row>
                       <Col md={6}>
                         <div className="message-in">
@@ -1427,7 +1593,7 @@ const CallAnalysis = () => {
                             </div>
                             <div className="flex-grow-1 mx-3">
                               <div className="d-flex align-items-start flex-column">
-                                <p className="mb-1 text-muted"><small>Operator</small></p>
+                                {/* <p className="mb-1 text-muted"><small>Operator</small></p> */}
                                 <div className="message d-flex align-items-start flex-column">
                                   <div className="d-flex align-items-center mb-1 chat-msg">
                                     <div className="flex-grow-1 me-3">
@@ -1436,7 +1602,7 @@ const CallAnalysis = () => {
                                         {transcriptItem.start && transcriptItem.end && mediaPlayerShow && (
                                           <p className="text-primary mb-0">
                                             <span 
-                                              className="time-stamp" 
+                                              className="time-stamp cursor-pointer" 
                                               onClick={() => {
                                                 const isCurrentlyPlaying = playingSegment && 
                                                   playingSegment.start === transcriptItem.start && 
@@ -1447,7 +1613,6 @@ const CallAnalysis = () => {
                                                   handleTimeClick(transcriptItem.start, transcriptItem.end);
                                                 }
                                               }}
-                                              style={{ cursor: 'pointer' }}
                                             >
                                               <i className={`ti ${playingSegment && 
                                                 playingSegment.start === transcriptItem.start && 
@@ -1483,7 +1648,7 @@ const CallAnalysis = () => {
                       <Col md={6}>
                         <div className="message-out">
                           <div className="d-flex align-items-end flex-column">
-                            <p className="mb-1 text-muted"><small>Customer</small></p>
+                            {/* <p className="mb-1 text-muted"><small>Customer</small></p> */}
                             <div className="message d-flex align-items-end flex-column">
                               <div className="d-flex align-items-center mb-1 chat-msg">
                                 <div className="flex-grow-1 ms-3">
@@ -1492,7 +1657,7 @@ const CallAnalysis = () => {
                                     {transcriptItem.start && transcriptItem.end && mediaPlayerShow && (
                                       <p className="text-white mb-0">
                                         <span 
-                                          className="time-stamp" 
+                                          className="time-stamp cursor-pointer time-stamp-padding" 
                                           onClick={() => {
                                             const isCurrentlyPlaying = playingSegment && 
                                               playingSegment.start === transcriptItem.start && 
@@ -1503,7 +1668,6 @@ const CallAnalysis = () => {
                                               handleTimeClick(transcriptItem.start, transcriptItem.end);
                                             }
                                           }}
-                                          style={{ cursor: 'pointer', padding: '0px 4px' }}
                                         >
                                           <i className={`ti ${playingSegment && 
                                             playingSegment.start === transcriptItem.start && 
@@ -1541,26 +1705,19 @@ const CallAnalysis = () => {
     </Row>
   );
 
-
-
-  const [target, setTarget] = useState('');
-  const [translations, setTranslations] = useState<any | null>(null);
-  const [isError, setIsError] = useState(false);
-  const [activeTab, setActiveTab] = useState('summary');
-  const [subActiveTab, setSubActiveTab] = useState('en');
-
   useEffect(() => {
     
     if(validAnalysis){
-      handleGetTranslations();
+      if(uuid !== '' && callTranslation===true){
+        handleGetTranslations();
+      }
     }
-  }, [uuid]);
+  }, [uuid, callTranslation]);
 
   const handleGetTranslations = async () => {
     try {
-      const response = await GetTranscriptions(uuid);
-      setTranslations(response);
-      console.log(response);
+      const response = await GetTranslations(uuid);
+      setTranslations(response?.translations);
 
   } catch (err) {
       //setError(err instanceof Error ? err.message : 'An error occurred');
@@ -1574,9 +1731,9 @@ const CallAnalysis = () => {
   const renderTranslate = () => (
     <Row>
       <Col md={12}>
-    
+      
 
-            {translations && (
+            {translations  && (
             <Row>
                 <Col md={12}>
                     {isError && (
@@ -1585,7 +1742,7 @@ const CallAnalysis = () => {
                         </div>
                     )}
 
-                    {!isError && translations && (
+                   
                       <>
                      
                        <Tabs
@@ -1596,20 +1753,32 @@ const CallAnalysis = () => {
                        onSelect={(k) => setSubActiveTab(k || 'en')}
                   >
                       <Tab eventKey="en" title="English">
-                          <p>{translations?.transcription}</p>
+                          <p style={{whiteSpace: 'pre-wrap',
+    fontFamily: 'monospace',
+    fontSize: '20px'
+}}>{translations?.en}</p>
                       </Tab>
                       <Tab eventKey="ar" title="Arabic">
-                          <p>{translations?.transcription_ar}</p>
+                          <p style={{whiteSpace: 'pre-wrap',
+    fontFamily: 'monospace',
+    fontSize: '20px'
+}}>{translations?.ar}</p>
                       </Tab>
                       <Tab eventKey="ur" title="Urdu">
-                          <p>{translations?.transcription_ur}</p>
+                          <p style={{whiteSpace: 'pre-wrap',
+    fontFamily: 'monospace',
+    fontSize: '20px'
+}}>{translations?.ur}</p>
                       </Tab>
                       <Tab eventKey="hi" title="Hindi">
-                          <p>{translations?.transcription_hi}</p>
+                          <p style={{whiteSpace: 'pre-wrap',
+    fontFamily: 'monospace',
+    fontSize: '20px'
+}}>{translations?.hi}</p>
                       </Tab>
                       </Tabs>
                       </>
-                    )}
+                  
                    
                     
                         
@@ -1629,7 +1798,7 @@ const CallAnalysis = () => {
           <div className="page-header-title">
             <Row className="align-items-center">
               <Col md={3}>
-                <h2 className="mb-0 d-flex align-items-center">Call Analysis</h2>
+                <h2 className="mb-0 d-flex align-items-center">Call Analysis (New)</h2>
               </Col>
               <Col md={9} className="text-end">
                 {/* Connection status hidden for cleaner UI */}
@@ -1643,7 +1812,8 @@ const CallAnalysis = () => {
       {renderAnalysisForm()}
       
       {/* Show steps progress */}
-      {(loading || steps.length > 0) && (
+      
+      {!error  && (
         <Row className="mb-3">
           <Col md={12}>
             <Card>
@@ -1651,7 +1821,7 @@ const CallAnalysis = () => {
                 <h6 className="card-title mb-0">Analysis Progress</h6>
               </Card.Header>
               <Card.Body className="py-2">
-                {steps.length === 0 ? (
+                {steps.length === 0 && !error ? (
                   <div className="text-center p-2">
                     <Spinner animation="border" size="sm" className="me-2" />
                     <span>Initializing analysis...</span>
@@ -1661,10 +1831,11 @@ const CallAnalysis = () => {
                     <div className="analysis-progress-wrapper">
                       {steps.map((stepEntry, index) => {
                         const isActive = stepEntry.step === currentStep && stepEntry.status === 'processing';
-                        const isCompleted = stepEntry.status === 'completed';
+                        const isCompleted = stepEntry.status === 'done';
+
                         const isError = stepEntry.status === 'error';
                         const isLast = index === steps.length - 1;
-                        const prevCompleted = index > 0 && steps[index - 1]?.status === 'completed';
+                        const prevCompleted = index > 0 && steps[index - 1]?.status === 'done';
                         
                         return (
                           <React.Fragment key={`${stepEntry.step}-${stepEntry.timestamp}-${index}`}>
@@ -1672,14 +1843,13 @@ const CallAnalysis = () => {
                               className="analysis-progress-step-wrapper"
                               style={{ 
                                 flex: `1 1 ${100 / steps.length}%`,
-                                maxWidth: `${100 / steps.length}%`,
-                                minWidth: 0
+                                maxWidth: `${100 / steps.length}%`
                               }}
                             >
                               <div 
                                 className={`analysis-progress-step ${
                                   isActive ? 'active' : 
-                                  isCompleted ? 'completed' : 
+                                  isCompleted ? 'done' : 
                                   isError ? 'error' : 
                                   'pending'
                                 }`}
@@ -1688,7 +1858,7 @@ const CallAnalysis = () => {
                                   <div 
                                     className={`step-circle ${
                                       isActive ? 'active' : 
-                                      isCompleted ? 'completed' : 
+                                      isCompleted ? 'done' : 
                                       isError ? 'error' : 
                                       'pending'
                                     }`}
@@ -1795,7 +1965,7 @@ const CallAnalysis = () => {
                         animation: pulse-ring 2s infinite;
                       }
                       
-                      .step-circle.completed {
+                      .step-circle.done {
                         background: linear-gradient(135deg, #198754 0%, #146c43 100%);
                         color: white;
                         border: 2px solid #146c43;
@@ -1863,7 +2033,7 @@ const CallAnalysis = () => {
                         font-weight: 700;
                       }
                       
-                      .analysis-progress-step.completed .step-title {
+                      .analysis-progress-step.done .step-title {
                         color: #198754;
                         font-weight: 600;
                       }
@@ -1937,6 +2107,116 @@ const CallAnalysis = () => {
           </Col>
         </Row>
       )}
+
+      {/* Interactive Status Blocks - User-friendly progress messages */}
+      {!error  && steps.length > 0 && (
+        <Row className="mb-3">
+          <Col md={12}>
+            <Card className="border-0 shadow-sm">
+              <Card.Body className="py-3">
+                <div className="d-flex align-items-center justify-content-between">
+                  <div className="d-flex align-items-center flex-grow-1">
+                    {currentStep && steps.find(s => s.step === currentStep && s.status === 'processing') ? (
+                      <>
+                        <div className="me-3">
+                          <Spinner animation="border" size="sm" variant="primary" className="me-2" />
+                        </div>
+                        <div className="flex-grow-1">
+                          <div className="d-flex align-items-center mb-1">
+                            <span className="badge bg-primary bg-opacity-10 text-primary me-2 px-2 py-1">
+                              <i className="ti ti-brain me-1"></i>
+                              Processing...
+                            </span>
+                            <span className="text-muted small text-capitalize">
+                              {steps.find(s => s.step === currentStep)?.message || 
+                               `${currentStep.replace(/_/g, ' ').toLowerCase()}...`}
+                            </span>
+                          </div>
+                          <div className="progress progress-extra-thin">
+                            <div 
+                              className="progress-bar progress-bar-striped progress-bar-animated bg-primary progress-bar-full" 
+                              role="progressbar"
+                            />
+                          </div>
+                        </div>
+                      </>
+                    ) : steps.some(s => s.status === 'done') && !currentStep ? (
+                      <>
+                        <div className="me-3">
+                          <i className="ti ti-check-circle text-success icon-large"></i>
+                        </div>
+                        <div className="flex-grow-1">
+                          <h6 className="mb-1 text-success fw-bold">Analysis Complete</h6>
+                          <p className="text-muted small mb-0">All steps have been processed successfully. Review the results below.</p>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="me-3">
+                          <Spinner animation="border" size="sm" variant="secondary" className="me-2" />
+                        </div>
+                        <div className="flex-grow-1">
+                          <h6 className="mb-1">Preparing Analysis</h6>
+                          <p className="text-muted small mb-0">Initializing analysis pipeline...</p>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                  {/* {currentStep && (
+                    <div className="text-end ms-3">
+                      <div className="badge bg-info bg-opacity-10 text-info px-3 py-2">
+                        <i className="ti ti-info-circle me-1"></i>
+                        Step: {steps.findIndex(s => s.step === currentStep) + 1} of {steps.length}
+                      </div>
+                    </div>
+                  )} */}
+                </div>
+              </Card.Body>
+            </Card>
+          </Col>
+        </Row>
+      )}
+
+      {/* Detailed Step Information Card */}
+      {/* {currentStep && steps.find(s => s.step === currentStep) && (
+        <Row className="mb-3">
+          <Col md={12}>
+            <Card className="border-0 shadow-sm bg-light">
+              <Card.Body className="py-3">
+                <div className="d-flex align-items-start">
+                  <div className="me-3">
+                    <div className="bg-primary bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center avatar-medium">
+                      <i className="ti ti-cpu text-primary"></i>
+                    </div>
+                  </div>
+                  <div className="flex-grow-1">
+                    <h6 className="mb-2">
+                      {steps.find(s => s.step === currentStep)?.step.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                    </h6>
+                    {steps.find(s => s.step === currentStep)?.message && (
+                      <p className="text-muted small mb-2">
+                        {steps.find(s => s.step === currentStep)?.message}
+                      </p>
+                    )}
+                    <div className="d-flex align-items-center gap-3">
+                      <span className="badge bg-primary bg-opacity-10 text-primary">
+                        <i className="ti ti-clock me-1"></i>
+                        {steps.find(s => s.step === currentStep)?.status === 'processing' ? 'In Progress' : 
+                         steps.find(s => s.step === currentStep)?.status === 'done' ? 'Completed' : 'Pending'}
+                      </span>
+                      {steps.find(s => s.step === currentStep)?.timestamp && (
+                        <span className="text-muted small">
+                          Started: {new Date(steps.find(s => s.step === currentStep)?.timestamp || 0).toLocaleTimeString()}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </Card.Body>
+            </Card>
+          </Col>
+        </Row>
+      )} */}
       
       {/* Show error if any - after progress bar */}
       {error && (
@@ -1952,9 +2232,9 @@ const CallAnalysis = () => {
       
       {!error && validAnalysis && (
         <div className="analysis-container">
-        {loading ? (
+        {/* {loading ? (
           <Row>
-            {/* <PageLoader isLoading={true} /> */}
+           
             <Col md={12}>
               <div className="text-center p-5">
                 <Spinner animation="border" role="status">
@@ -1964,7 +2244,7 @@ const CallAnalysis = () => {
               </div>
             </Col>
           </Row>
-        ) : (dataFound || analysis || summaryData || transcription) ? (
+        ) : (validAnalysis) ? ( */}
           <Tabs activeKey={activeTab} onSelect={(k) => setActiveTab(k || 'summary')} id="system-tabs" className="mb-3">
             <Tab eventKey="summary" title="Summary">
             
@@ -1987,9 +2267,9 @@ const CallAnalysis = () => {
 
 
           </Tabs>
-        ) : (
-          <></>
-        )}
+        {/* // ) : (
+        //   <></>
+        // )} */}
       </div>
       )}
 

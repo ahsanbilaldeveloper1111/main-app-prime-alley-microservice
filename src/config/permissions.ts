@@ -17,6 +17,7 @@ export const routePermissions: RoutePermission[] = [
     {path: '/plan-upgrade',permissions: ['']},
     {path: '/live-calls-test',permissions: ['']},
     {path: '/resources',permissions: ['']},
+    {path: '/notifications',permissions: ['']},
    
     {path: '/resources/faq',permissions: ['']},
     {path: '/resources/help-materials',permissions: ['']},
@@ -183,7 +184,13 @@ export const routePermissions: RoutePermission[] = [
             },
             {
                 path: '/list',
-                permissions: ['view-ticket-tickets']
+                permissions: ['view-ticket-tickets'],
+                children: [
+                    {
+                        path: '/:id',
+                        permissions: ['view-ticket-tickets']
+                    }
+                ]
             },
             {
                 path: '/statuses',
@@ -219,6 +226,10 @@ export const routePermissions: RoutePermission[] = [
                 children: [
                     {
                         path: '/',
+                        permissions: ['transcriptions-analysis-aiml']
+                    },
+                    {
+                        path: '/new',
                         permissions: ['transcriptions-analysis-aiml']
                     }
                 ]

@@ -530,3 +530,187 @@ export const hasPermission = async (
     return false;
   }
 };
+
+/**
+ * Get the secret key for encoding/decoding from environment variable
+ * Falls back to default key if not set
+ * @private
+ */
+const getSecretKey = (): string => {
+  const envKey = process.env.NEXT_PUBLIC_ENCODING_SECRET_KEY;
+  if (!envKey) {
+    console.warn('NEXT_PUBLIC_ENCODING_SECRET_KEY not set, using default key');
+    return 'A1n@lY$i$K3y#2024!XoR';
+  }
+  return envKey;
+};
+
+/**
+ * XOR cipher helper function for obfuscation
+ * @private
+ */
+const xorCipher = (text: string, key: string): string => {
+  let result = '';
+  for (let i = 0; i < text.length; i++) {
+    const keyChar = key[i % key.length];
+    result += String.fromCharCode(text.charCodeAt(i) ^ keyChar.charCodeAt(0));
+  }
+  return result;
+};
+
+/**
+ * Apply character rotation/shifting for additional obfuscation
+ * @private
+ */
+const rotateChars = (text: string, shift: number, forward: boolean = true): string => {
+  return text.split('').map(char => {
+    const code = char.charCodeAt(0);
+    if (code >= 32 && code <= 126) { // Printable ASCII range
+      const range = 126 - 32 + 1;
+      const newCode = forward 
+        ? ((code - 32 + shift) % range) + 32
+        : ((code - 32 - shift + range) % range) + 32;
+      return String.fromCharCode(newCode);
+    }
+    return char;
+  }).join('');
+};
+
+/**
+ * Apply multi-layer encoding to a string
+ * Uses XOR cipher, character rotation, and multiple base64 encoding layers
+ * @private
+ */
+const applyMultiLayerEncoding = (text: string, secretKey: string): string => {
+  // Step 1: Apply XOR cipher
+  const xorEncrypted = xorCipher(text, secretKey);
+  
+  // Step 2: Apply character rotation (forward)
+  const rotated = rotateChars(xorEncrypted, 13, true);
+  
+  // Step 3: First base64 encoding
+  const base64Layer1 = btoa(rotated);
+  
+  // Step 4: Apply XOR cipher again on base64 string
+  const xorLayer2 = xorCipher(base64Layer1, secretKey.split('').reverse().join(''));
+  
+  // Step 5: Apply reverse character rotation
+  const rotated2 = rotateChars(xorLayer2, 7, false);
+  
+  // Step 6: Final base64 encoding
+  const finalEncoded = btoa(rotated2);
+  
+  return finalEncoded;
+};
+
+/**
+ * Apply multi-layer decoding to reverse the encoding process
+ * Reverses XOR cipher, character rotation, and multiple base64 encoding layers
+ * @private
+ */
+const applyMultiLayerDecoding = (encodedText: string, secretKey: string): string => {
+  // Step 1: Decode final base64 layer
+  const base64Decoded1 = atob(encodedText);
+  
+  // Step 2: Reverse character rotation (forward)
+  const derotated1 = rotateChars(base64Decoded1, 7, true);
+  
+  // Step 3: Reverse XOR cipher (second layer)
+  const xorDecrypted1 = xorCipher(derotated1, secretKey.split('').reverse().join(''));
+  
+  // Step 4: Decode first base64 layer
+  const base64Decoded2 = atob(xorDecrypted1);
+  
+  // Step 5: Reverse character rotation (backward)
+  const derotated2 = rotateChars(base64Decoded2, 13, false);
+  
+  // Step 6: Reverse XOR cipher (first layer)
+  const xorDecrypted2 = xorCipher(derotated2, secretKey);
+  
+  return xorDecrypted2;
+};
+
+/**
+ * Encode analysis data with multi-layer encryption for URL parameter
+ * Uses XOR cipher, character rotation, and multiple base64 encoding layers
+ * 
+ * @param dataObject - Object containing analysis parameters (id, file, direction, phone, imagicle, duration)
+ * @returns Complex encoded string ready for URL
+ * 
+ * @example
+ * const data = { id: '123', file: 'path/to/file', direction: 'IN', phone: '1234567890', imagicle: 'node1', duration: '1234567890' };
+ * const encoded = encodeAnalysisData(data);
+ */
+export const encodeAnalysisData = (dataObject: {
+  id?: string;
+  file?: string;
+  direction?: string;
+  phone?: string;
+  imagicle?: string;
+  duration?: string;
+  dateTime?: string;
+}): string => {
+  try {
+    // Get secret key from environment variable
+    const secretKey = getSecretKey();
+    
+    // Convert to JSON string
+    const jsonString = JSON.stringify(dataObject);
+    
+    // Apply multi-layer encoding
+    const finalEncoded = applyMultiLayerEncoding(jsonString, secretKey);
+    
+    return finalEncoded;
+  } catch (error) {
+    console.error('Error encoding analysis data:', error);
+    throw error;
+  }
+};
+
+/**
+ * Decode complex encoded analysis data from URL parameter
+ * Reverses the multi-layer encryption process
+ * 
+ * @param encodedData - Complex encoded string from URL
+ * @returns Decoded data object with analysis parameters
+ * 
+ * @example
+ * const encoded = "...";
+ * const decoded = decodeAnalysisData(encoded);
+ * // Returns: { id: '123', file: 'path/to/file', direction: 'IN', phone: '1234567890', imagicle: 'node1', duration: '1234567890' }
+ */
+export const decodeAnalysisData = (encodedData: string): {
+  id: string;
+  file: string;
+  direction: string;
+  phone: string;
+  imagicle: string;
+  duration: string;
+  dateTime: string;
+} => {
+  try {
+    // Get secret key from environment variable (must match encoding key)
+    const secretKey = getSecretKey();
+    
+    // Decode from URL encoding first
+    const urlDecoded = decodeURIComponent(encodedData);
+    
+    // Apply multi-layer decoding
+    const decodedString = applyMultiLayerDecoding(urlDecoded, secretKey);
+    
+    // Parse JSON
+    const dataObject = JSON.parse(decodedString);
+    
+    return {
+      id: dataObject.id || '',
+      file: dataObject.file || '',
+      direction: dataObject.direction || '',
+      phone: dataObject.phone || '',
+      imagicle: dataObject.imagicle || '',
+      duration: dataObject.duration || ''
+    };
+  } catch (error) {
+    console.error('Error decoding analysis data:', error);
+    throw error;
+  }
+};

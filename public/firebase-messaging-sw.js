@@ -48,7 +48,7 @@ function getMessagingInstance() {
 // Set up background message handler when Firebase is initialized
 function setupBackgroundMessageHandler() {
   if (backgroundMessageHandlerSetup) {
-    console.log('[Service Worker] Background message handler already set up');
+    //console.log('[Service Worker] Background message handler already set up');
     return;
   }
 
@@ -73,10 +73,10 @@ function setupBackgroundMessageHandler() {
 // Listen for Firebase config from main thread
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'FIREBASE_CONFIG') {
-    console.log('[Service Worker] Received Firebase config from main thread');
+   // console.log('[Service Worker] Received Firebase config from main thread');
     firebaseConfig = event.data.config;
     if (initializeFirebase()) {
-      console.log('[Service Worker] Firebase initialized, setting up background message handler');
+      //console.log('[Service Worker] Firebase initialized, setting up background message handler');
       setupBackgroundMessageHandler();
     } else {
       console.error('[Service Worker] Failed to initialize Firebase');

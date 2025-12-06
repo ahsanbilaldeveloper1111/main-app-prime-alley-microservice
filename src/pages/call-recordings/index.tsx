@@ -40,7 +40,7 @@ import imgStatus4 from '@assets/images/widget/img-status-4.svg';
 import router from 'next/router';
 import axiosInstance from '@utils/axios';
 import { toast } from 'react-toastify';
-import { convertUTCToUserTimezone, convertUTCTimeToUserTimezone, convertUTCSeparateDateTimeToUserTime, convertUTCSeparateDateTimeToUserDate, formatDuration, convertUTCDateToUserTimezone, GlobalDateFormat, GlobalTimeFormat, GlobalDateTimeFormat } from '@utils/Helper';
+import { convertUTCToUserTimezone, convertUTCTimeToUserTimezone, convertUTCSeparateDateTimeToUserTime, convertUTCSeparateDateTimeToUserDate, formatDuration, convertUTCDateToUserTimezone, GlobalDateFormat, GlobalTimeFormat, GlobalDateTimeFormat, encodeAnalysisData } from '@utils/Helper';
 import PageLoader from '@components/PageLoader';
 import CircularProgressLoader from '@components/CircularProgressLoader';
 import CircularProgressCircle from '@components/CircularProgressCircle';
@@ -724,7 +724,23 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
     try {
       const { Id, AudioTrack } = props;
 
-      const tempUrl = `/ai-ml/analysis?id=${Id}&file=${AudioTrack}&direction=${props.Direction}&phone=${props.RemotePartyNumber}&imagicle=${props.imagicle}&duration=${props.Duration}`;
+      // Create data object with all parameters
+      const dataObject = {
+        id: Id || '',
+        file: AudioTrack || '',
+        direction: props.Direction || '',
+        phone: props.RemotePartyNumber || '',
+        imagicle: props.imagicle || '',
+        duration: props.Duration || '',
+        dateTime: props.DateTime || '',
+
+      };
+
+      // Encode data to base64 (unreadable format) using helper function
+      const encodedData = encodeAnalysisData(dataObject);
+      
+      // Pass as single encoded parameter
+      const tempUrl = `/ai-ml/analysis/new?data=${encodeURIComponent(encodedData)}`;
 
       window.open(tempUrl, '_blank');
       
