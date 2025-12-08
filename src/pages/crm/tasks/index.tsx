@@ -304,8 +304,8 @@ const CrmTasks = () => {
   useEffect(() => {
     const fetchExtensions = async () => {
       try {
-        const data = await GetHierarchyData(ModuleSlug.CRM_LEADS);
-        setExtensions(data.users || []);
+        const data = await GetHierarchyData(ModuleSlug.CRM_TASKS);
+        setExtensions(data.extensions || data.users || []);
       } catch (error) {
         console.error('Failed to fetch extensions:', error);
       }
@@ -719,6 +719,10 @@ const CrmTasks = () => {
     return match || null;
   }, [extensionOptions, extensions]);
 
+  if (!session?.user?.permissions?.includes('list-crm-tasks')) {
+    return null;
+  }
+
   return (
     <React.Fragment>
       <style dangerouslySetInnerHTML={{__html: `
@@ -768,25 +772,27 @@ const CrmTasks = () => {
                   <BarChart3 size={16} className="me-2" />
                   {showAnalytics ? 'Hide Analytics' : 'Show Analytics'}
                 </Button>
-                <Button variant="primary" onClick={() => {
-                  setEditingTask(null);
-                  setTaskFormData({
-                    name: '',
-                    user_extension: '',
-                    created_by: (session?.user as any)?.extension || 'admin',
-                    urgency: 'med',
-                    phone: '',
-                    email: '',
-                    company_name: '',
-                    due_date: '',
-                    notes: [],
-                  });
-                  setSelectedUserExtension(null);
-                  setShowTaskModal(true);
-                }}>
-                  <Plus size={16} className="me-2" />
-                  Create Task
-                </Button>
+                {session?.user?.permissions?.includes('add-crm-tasks') && (
+                  <Button variant="primary" onClick={() => {
+                    setEditingTask(null);
+                    setTaskFormData({
+                      name: '',
+                      user_extension: '',
+                      created_by: (session?.user as any)?.extension || 'admin',
+                      urgency: 'med',
+                      phone: '',
+                      email: '',
+                      company_name: '',
+                      due_date: '',
+                      notes: [],
+                    });
+                    setSelectedUserExtension(null);
+                    setShowTaskModal(true);
+                  }}>
+                    <Plus size={16} className="me-2" />
+                    Create Task
+                  </Button>
+                )}
               </div>
             </Card.Header>
             <Card.Body>
@@ -1137,42 +1143,46 @@ const CrmTasks = () => {
                                         >
                                           <Eye size={16} />
                                         </Button>
-                                        <Button
-                                          variant="link"
-                                          size="sm"
-                                          className="p-1"
-                                          title="Edit Task"
-                                          onClick={() => {
-                                            setEditingTask(task);
-                                            setTaskFormData({
-                                              name: task.name,
-                                              user_extension: task.user_extension,
-                                              created_by: task.created_by || (session?.user as any)?.extension || 'admin',
-                                              urgency: task.urgency,
-                                              phone: task.phone || '',
-                                              email: task.email || '',
-                                              company_name: task.company_name || '',
-                                              due_date: task.due_date,
-                                              notes: task.notes?.map(n => ({ note: n.note })) || [],
-                                            });
-                                            setSelectedUserExtension(findMatchingExtension(task.user_extension));
-                                            setShowTaskModal(true);
-                                          }}
-                                        >
-                                          <Edit size={16} />
-                                        </Button>
-                                        <Button
-                                          variant="link"
-                                          size="sm"
-                                          className="p-1 text-danger"
-                                          title="Delete Task"
-                                          onClick={() => {
-                                            setTaskToDelete({ id: task.id!, name: task.name });
-                                            setShowDeleteModal(true);
-                                          }}
-                                        >
-                                          <Trash2 size={16} />
-                                        </Button>
+                                        {session?.user?.permissions?.includes('edit-crm-tasks') && (
+                                          <Button
+                                            variant="link"
+                                            size="sm"
+                                            className="p-1"
+                                            title="Edit Task"
+                                            onClick={() => {
+                                              setEditingTask(task);
+                                              setTaskFormData({
+                                                name: task.name,
+                                                user_extension: task.user_extension,
+                                                created_by: task.created_by || (session?.user as any)?.extension || 'admin',
+                                                urgency: task.urgency,
+                                                phone: task.phone || '',
+                                                email: task.email || '',
+                                                company_name: task.company_name || '',
+                                                due_date: task.due_date,
+                                                notes: task.notes?.map(n => ({ note: n.note })) || [],
+                                              });
+                                              setSelectedUserExtension(findMatchingExtension(task.user_extension));
+                                              setShowTaskModal(true);
+                                            }}
+                                          >
+                                            <Edit size={16} />
+                                          </Button>
+                                        )}
+                                        {session?.user?.permissions?.includes('delete-crm-tasks') && (
+                                          <Button
+                                            variant="link"
+                                            size="sm"
+                                            className="p-1 text-danger"
+                                            title="Delete Task"
+                                            onClick={() => {
+                                              setTaskToDelete({ id: task.id!, name: task.name });
+                                              setShowDeleteModal(true);
+                                            }}
+                                          >
+                                            <Trash2 size={16} />
+                                          </Button>
+                                        )}
                                       </div>
                                     </td>
                                   </tr>

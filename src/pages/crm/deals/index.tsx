@@ -349,7 +349,7 @@ const CrmDeals = () => {
   useEffect(() => {
     fetchStages();
     fetchLostReasons();
-    fetchExtensions(ModuleSlug.CRM_LEADS);
+    fetchExtensions(ModuleSlug.CRM_DEALS);
   }, []);
 
   // Fetch deals when filters or search change
@@ -625,7 +625,7 @@ const CrmDeals = () => {
     }
   };
 
-  const fetchExtensions = async (moduleSlug: string = ModuleSlug.CRM_LEADS) => {
+  const fetchExtensions = async (moduleSlug: string = ModuleSlug.CRM_DEALS) => {
     try {
       const hierarchyData = await GetHierarchyData(moduleSlug);
       if (hierarchyData?.extensions) {
@@ -1079,6 +1079,10 @@ const CrmDeals = () => {
       fontSize: '0.875rem'
     })
   };
+ 
+  if (!session?.user?.permissions?.includes('list-crm-deals')) {
+    return null;
+  }
  
   return (
     <React.Fragment>
@@ -1619,6 +1623,7 @@ const CrmDeals = () => {
                                 >
                                   <Eye size={16} />
                                 </Button>
+                                {session?.user?.permissions?.includes('edit-crm-deals') && (
                                 <Button 
                                   variant="link" 
                                   size="sm" 
@@ -1628,6 +1633,7 @@ const CrmDeals = () => {
                                 >
                                   <Edit size={16} />
                                 </Button>
+                                )}
                                 <Button 
                                   variant="link" 
                                   size="sm" 
@@ -1640,6 +1646,7 @@ const CrmDeals = () => {
                                 >
                                   <Paperclip size={16} />
                                 </Button>
+                                {session?.user?.permissions?.includes('add-crm-orders') && (
                                 <Button 
                                   variant="link" 
                                   size="sm" 
@@ -1649,6 +1656,8 @@ const CrmDeals = () => {
                                 >
                                   <ShoppingBag size={16} />
                                 </Button>
+                                )}
+                                {session?.user?.permissions?.includes('delete-crm-deals') && (
                                 <Button 
                                   variant="link" 
                                   size="sm" 
@@ -1658,6 +1667,7 @@ const CrmDeals = () => {
                                 >
                                   <Trash2 size={16} />
                                 </Button>
+                                )}
                                 {activeFilter !== 'lost' && (
                                   <Dropdown className="d-inline">
                                     <Dropdown.Toggle 
@@ -2767,6 +2777,7 @@ const CrmDeals = () => {
                         <Users size={18} style={{ color: '#4680ff' }} />
                         Meetings ({viewingDeal.meetings.length})
                       </div>
+                      {session?.user?.permissions?.includes('add-meeting-crm-deals') && (
                       <Button
                         variant="outline-primary"
                         size="sm"
@@ -2788,6 +2799,7 @@ const CrmDeals = () => {
                         <Plus size={14} className="me-1" />
                         Schedule Meeting
                       </Button>
+                      )}
                     </div>
                     <div style={{ position: 'relative', paddingLeft: '30px', marginBottom: '30px' }}>
                       <div style={{
@@ -2843,6 +2855,7 @@ const CrmDeals = () => {
                                 </div>
                               )}
                             </div>
+                            {session?.user?.permissions?.includes('delete-meeting-crm-deals') && (
                             <Button
                               variant="link"
                               size="sm"
@@ -2852,6 +2865,7 @@ const CrmDeals = () => {
                             >
                               <Trash2 size={16} />
                             </Button>
+                            )}
                           </div>
                         </div>
                       ))}
@@ -2872,6 +2886,7 @@ const CrmDeals = () => {
                     <div style={{ fontSize: '14px', color: '#6b7280', marginBottom: '16px' }}>
                       No meetings scheduled yet
                     </div>
+                    {session?.user?.permissions?.includes('add-meeting-crm-deals') && (
                     <Button
                       variant="outline-primary"
                       onClick={() => {
@@ -2891,6 +2906,7 @@ const CrmDeals = () => {
                       <Plus size={14} className="me-1" />
                       Schedule Meeting
                     </Button>
+                    )}
                   </div>
                 )}
 

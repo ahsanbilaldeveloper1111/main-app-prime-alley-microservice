@@ -48,6 +48,7 @@ import {
 import { toast } from "react-toastify";
 import "@assets/scss/common.scss";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
+import { useSession } from "next-auth/react";
 
 // Filter Bar Component
 interface FilterBarProps {
@@ -187,6 +188,8 @@ interface ProductDisplayData {
 }
 
 const ProductsPage = () => {
+  const { data: session } = useSession();
+  
   // State
   const [products, setProducts] = useState<CrmProduct[]>([]);
   const [loading, setLoading] = useState(true);
@@ -625,6 +628,9 @@ const ProductsPage = () => {
     }
   };
 
+  if (!session?.user?.permissions?.includes('list-crm-products')) {
+    return null;
+  }
 
   return (
     <Layout>
@@ -750,6 +756,7 @@ const ProductsPage = () => {
                       <option value="GBP">GBP</option>
                       <option value="INR">INR</option>
                       <option value="AUD">AUD</option>
+                      <option value="AED">AED</option>
                     </Form.Select>
                     <Form.Text className="text-muted">Select the currency for this product</Form.Text>
                   </Form.Group>
@@ -1269,17 +1276,19 @@ const ProductsPage = () => {
             </Modal.Body>
 
             <Modal.Footer style={{ borderTop: "1px solid #e5e7eb", padding: "20px 30px" }}>
-              <Button
-                variant="outline-primary"
-                onClick={() => {
-                  setShowProductViewModal(false);
-                  handleOpenProductModal(viewingProduct);
-                }}
-                className="d-flex align-items-center gap-2"
-              >
-                <Edit size={16} />
-                Edit Product
-              </Button>
+              {session?.user?.permissions?.includes('edit-crm-products') && (
+                <Button
+                  variant="outline-primary"
+                  onClick={() => {
+                    setShowProductViewModal(false);
+                    handleOpenProductModal(viewingProduct);
+                  }}
+                  className="d-flex align-items-center gap-2"
+                >
+                  <Edit size={16} />
+                  Edit Product
+                </Button>
+              )}
               <Button variant="secondary" onClick={() => setShowProductViewModal(false)}>
                 Close
               </Button>
@@ -1293,14 +1302,16 @@ const ProductsPage = () => {
             <h3 className="fw-bold mb-1">Products</h3>
             <p className="text-muted mb-0">Manage your product catalog</p>
           </div>
-          <Button
-            variant="primary"
-            onClick={() => handleOpenProductModal()}
-            className="d-flex align-items-center gap-2"
-          >
-            <PlusCircle size={18} />
-            Add Product
-          </Button>
+          {session?.user?.permissions?.includes('add-crm-products') && (
+            <Button
+              variant="primary"
+              onClick={() => handleOpenProductModal()}
+              className="d-flex align-items-center gap-2"
+            >
+              <PlusCircle size={18} />
+              Add Product
+            </Button>
+          )}
         </div>
 
         {/* Filter Bar */}
@@ -1597,27 +1608,31 @@ const ProductsPage = () => {
                               >
                                 <Eye size={16} />
                               </Button>
-                              <Button
-                                variant="link"
-                                size="sm"
-                                className="p-1"
-                                title="Edit"
-                                onClick={() => handleOpenProductModal(product)}
-                              >
-                                <Edit size={16} />
-                              </Button>
-                              <Button
-                                variant="link"
-                                size="sm"
-                                className="p-1 text-danger"
-                                title="Delete"
-                                onClick={() => {
-                                  setDeletingProduct(product);
-                                  setShowProductDeleteModal(true);
-                                }}
-                              >
-                                <Trash2 size={16} />
-                              </Button>
+                              {session?.user?.permissions?.includes('edit-crm-products') && (
+                                <Button
+                                  variant="link"
+                                  size="sm"
+                                  className="p-1"
+                                  title="Edit"
+                                  onClick={() => handleOpenProductModal(product)}
+                                >
+                                  <Edit size={16} />
+                                </Button>
+                              )}
+                              {session?.user?.permissions?.includes('delete-crm-products') && (
+                                <Button
+                                  variant="link"
+                                  size="sm"
+                                  className="p-1 text-danger"
+                                  title="Delete"
+                                  onClick={() => {
+                                    setDeletingProduct(product);
+                                    setShowProductDeleteModal(true);
+                                  }}
+                                >
+                                  <Trash2 size={16} />
+                                </Button>
+                              )}
                             </div>
                           </td>
                         </tr>

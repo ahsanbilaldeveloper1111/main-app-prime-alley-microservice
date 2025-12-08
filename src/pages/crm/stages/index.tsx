@@ -827,6 +827,10 @@ const StagesManagement = () => {
     return counts;
   }, [stagesData]);
 
+  if (!session?.user?.permissions?.includes('list-crm-stages')) {
+    return null;
+  }
+
   return (
     <React.Fragment>
       <style dangerouslySetInnerHTML={{__html: `

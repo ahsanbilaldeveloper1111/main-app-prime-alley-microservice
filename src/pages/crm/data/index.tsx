@@ -1020,6 +1020,11 @@ const CrmProspectsManagement = () => {
 
   // Upload CSV file
   const handleUpload = async () => {
+    if (!session?.user?.permissions?.includes('add-crm-data-management')) {
+      toast.error("You don't have permission to upload data");
+      return;
+    }
+
     if (!selectedFile) {
       toast.error("Please select a file to upload");
       return;
@@ -1841,6 +1846,10 @@ const CrmProspectsManagement = () => {
     ]
   );
 
+  if (!session?.user?.permissions?.includes('list-crm-data-management')) {
+    return null;
+  }
+
   return (
     <React.Fragment>
       <style dangerouslySetInnerHTML={{__html: `
@@ -2523,6 +2532,7 @@ const CrmProspectsManagement = () => {
       </div>
 
       {/* Upload Modal */}
+      {session?.user?.permissions?.includes('add-crm-data-management') && (
       <Modal show={showUploadModal} onHide={() => setShowUploadModal(false)} size="lg" centered>
         <Modal.Header closeButton className="border-bottom bg-light">
           <Modal.Title>Upload CSV - Import Prospects</Modal.Title>
@@ -2599,6 +2609,7 @@ const CrmProspectsManagement = () => {
           </Button>
         </Modal.Footer>
       </Modal>
+      )}
 
 
 

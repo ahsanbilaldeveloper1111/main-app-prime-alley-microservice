@@ -13,7 +13,7 @@ import {
 } from "@utils/crm";
 import { GetHierarchyData } from "@utils/users";
 import { Button, Row, Col, Form, Card, Badge, Table, Modal } from "react-bootstrap";
-import { CheckCircle, ChevronLeft, ChevronRight, ArrowLeft, FileText, Eye, Plus, Edit, Trash2, Package, History, Calendar, RefreshCw } from "lucide-react";
+import { CheckCircle, ChevronLeft, ChevronRight, ArrowLeft, FileText, Plus, Edit, Trash2, Package, History, Calendar, RefreshCw } from "lucide-react";
 import Select from 'react-select';
 import PhoneInput from "react-phone-number-input";
 import { parsePhoneNumber } from "react-phone-number-input";
@@ -161,20 +161,23 @@ const EditDeal = () => {
         });
 
         // Set additional data
-        setEstimates(deal.estimates || []);
+        // Sort estimates by created_at date (newest first) to ensure latest revision is always first
+        const sortedEstimates = deal.estimates && deal.estimates.length > 0
+          ? [...deal.estimates].sort((a: any, b: any) => {
+              const dateA = new Date(a.created_at).getTime();
+              const dateB = new Date(b.created_at).getTime();
+              return dateB - dateA; // Sort descending (newest first)
+            })
+          : [];
+        setEstimates(sortedEstimates);
         setAttachments((deal as any).attachments || []);
         setHistories((deal as any).histories || []);
         setNegotiationBar(deal.negotiation_bar || 0);
         setProbability(deal.probability || 0);
 
         // Load estimation chart from the most recent estimate or deal
-        if (deal.estimates && deal.estimates.length > 0) {
-          // Sort estimates by created_at date to get the latest one
-          const sortedEstimates = [...deal.estimates].sort((a: any, b: any) => {
-            const dateA = new Date(a.created_at).getTime();
-            const dateB = new Date(b.created_at).getTime();
-            return dateB - dateA; // Sort descending (newest first)
-          });
+        if (sortedEstimates.length > 0) {
+          // Get the latest estimate (first in sorted array)
           const latestEstimate = sortedEstimates[0];
           
           // Load tax and discount percentages from the latest estimate
@@ -555,6 +558,7 @@ const EditDeal = () => {
                           <option value="CAD">CAD</option>
                           <option value="JPY">JPY</option>
                           <option value="CNY">CNY</option>
+                          <option value="AED">AED</option>
                         </Form.Select>
                       </Form.Group>
                     </Col>
@@ -1588,7 +1592,6 @@ const EditDeal = () => {
                         </thead>
                         <tbody>
                           {estimates.map((estimate: any, index: number) => {
-                            const isCurrent = index === estimates.length - 1;
                             const grandTotal = parseFloat(estimate.grand_total || "0");
                             const netValue = parseFloat(estimate.net_value || "0");
                             const itemCount = estimate.estimation_chart?.length || 0;
@@ -1596,12 +1599,9 @@ const EditDeal = () => {
                             return (
                               <tr key={estimate.id || index}>
                                 <td>
-                                  <Badge bg={isCurrent ? 'success' : 'secondary'}>
+                                  <Badge bg="secondary">
                                     {estimate.version || `v${estimates.length - index}.0`}
                                   </Badge>
-                                  {isCurrent && (
-                                    <Badge bg="info" className="ms-2">Current</Badge>
-                                  )}
                                 </td>
                                 <td>
                                   <div className="d-flex align-items-center">
@@ -1623,61 +1623,41 @@ const EditDeal = () => {
                                     <Button
                                       variant="link"
                                       size="sm"
-                                      className="p-1"
-                                      title="View Details"
+                                      className="p-1 text-info"
+                                      title="Load Version"
                                       onClick={() => {
-                                        // Show details in a simple way - could be expanded to a detail modal
-                                        const items = estimate.estimation_chart || [];
-                                        const itemsList = items.map((item: any, idx: number) => 
-                                          `${idx + 1}. ${item.product_service} - Qty: ${item.qty} - Price: ${item.unit_price}`
-                                        ).join('\n');
-                                        alert(`Version ${estimate.version || `v${estimates.length - index}.0`}\n\nItems:\n${itemsList || 'No items'}`);
+                                        // Load the revision items
+                                        if (estimate.estimation_chart && estimate.estimation_chart.length > 0) {
+                                          setEstimationItems(estimate.estimation_chart.map((item: any) => ({
+                                            product_id: item.product_id || 0,
+                                            product_service: item.product_service || "",
+                                            description: item.description || "",
+                                            qty: item.qty || 1,
+                                            unit_price: item.unit_price || 0,
+                                            original_currency: item.original_currency || estimate.currency || formData.currency,
+                                            original_price: item.original_price || item.unit_price || 0,
+                                          })));
+                                          
+                                          // Also restore tax and discount percentages if available
+                                          if (estimate.tax_percentage) {
+                                            setFormData(prev => ({ ...prev, tax_percentage: estimate.tax_percentage.toString() }));
+                                          }
+                                          if (estimate.standard_discount_percentage) {
+                                            setFormData(prev => ({ ...prev, standard_discount_percentage: estimate.standard_discount_percentage.toString() }));
+                                          }
+                                          if (estimate.special_discount_percentage) {
+                                            setFormData(prev => ({ ...prev, special_discount_percentage: estimate.special_discount_percentage.toString() }));
+                                          }
+                                          
+                                          setShowRevisionHistoryModal(false);
+                                          toast.success(`${estimate.version || `v${estimates.length - index}.0`} has been loaded successfully!`);
+                                        } else {
+                                          toast.error("This revision has no items to load");
+                                        }
                                       }}
                                     >
-                                      <Eye size={14} />
+                                      <RefreshCw size={14} />
                                     </Button>
-                                    {!isCurrent && (
-                                      <Button
-                                        variant="link"
-                                        size="sm"
-                                        className="p-1 text-info"
-                                        title="Restore Version"
-                                        onClick={() => {
-                                          if (window.confirm(`Are you sure you want to restore ${estimate.version || `v${estimates.length - index}.0`}?\n\nThis will replace the current estimation with the selected version.`)) {
-                                            // Restore the revision items
-                                            if (estimate.estimation_chart && estimate.estimation_chart.length > 0) {
-                                              setEstimationItems(estimate.estimation_chart.map((item: any) => ({
-                                                product_id: item.product_id || 0,
-                                                product_service: item.product_service || "",
-                                                description: item.description || "",
-                                                qty: item.qty || 1,
-                                                unit_price: item.unit_price || 0,
-                                                original_currency: item.original_currency || estimate.currency || formData.currency,
-                                                original_price: item.original_price || item.unit_price || 0,
-                                              })));
-                                              
-                                              // Also restore tax and discount percentages if available
-                                              if (estimate.tax_percentage) {
-                                                setFormData(prev => ({ ...prev, tax_percentage: estimate.tax_percentage.toString() }));
-                                              }
-                                              if (estimate.standard_discount_percentage) {
-                                                setFormData(prev => ({ ...prev, standard_discount_percentage: estimate.standard_discount_percentage.toString() }));
-                                              }
-                                              if (estimate.special_discount_percentage) {
-                                                setFormData(prev => ({ ...prev, special_discount_percentage: estimate.special_discount_percentage.toString() }));
-                                              }
-                                              
-                                              setShowRevisionHistoryModal(false);
-                                              toast.success(`${estimate.version || `v${estimates.length - index}.0`} has been restored successfully!`);
-                                            } else {
-                                              toast.error("This revision has no items to restore");
-                                            }
-                                          }
-                                        }}
-                                      >
-                                        <RefreshCw size={14} />
-                                      </Button>
-                                    )}
                                   </div>
                                 </td>
                               </tr>
@@ -1697,7 +1677,7 @@ const EditDeal = () => {
                           <Col md={6}>
                             <small className="text-muted">Latest Update</small>
                             <div className="fw-bold">
-                              {estimates.length > 0 ? new Date(estimates[estimates.length - 1].created_at).toLocaleString() : 'N/A'}
+                              {estimates.length > 0 ? new Date(estimates[0].created_at).toLocaleString() : 'N/A'}
                             </div>
                           </Col>
                         </Row>

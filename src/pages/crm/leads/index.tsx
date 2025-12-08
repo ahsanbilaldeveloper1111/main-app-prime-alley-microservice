@@ -1751,7 +1751,7 @@ const CrmLeads = () => {
                                     <Edit size={16} />
                                   </Button>
                                 )}
-                                {session?.user?.permissions?.includes('convert-to-opportunity-crm-leads') && (
+                                {session?.user?.permissions?.includes('add-crm-deals') && (
                                   <Button 
                                     variant="link" 
                                     size="sm" 
@@ -2911,26 +2911,28 @@ const CrmLeads = () => {
                         <History size={18} style={{ color: '#4680ff' }} />
                         Follow-up Activity ({viewingLead.follow_ups.length})
                       </div>
-                      <Button
-                        variant="outline-primary"
-                        size="sm"
-                        onClick={() => {
-                          setFollowupData({
-                            leadId: viewingLead.id,
-                            leadName: viewingLead.name,
-                            followUpDate: '',
-                            followUpStatus: 'Pending',
-                            communicationChannel: 'Phone Call',
-                            communicationChannelOther: '',
-                            notes: '',
-                            userExtension: (session?.user as any)?.extension || 'admin',
-                          });
-                          setShowAddFollowupModal(true);
-                        }}
-                      >
-                        <Plus size={14} className="me-1" />
-                        Add Follow-up
-                      </Button>
+                      {session?.user?.permissions?.includes('add-follow-up-crm-leads') && (
+                        <Button
+                          variant="outline-primary"
+                          size="sm"
+                          onClick={() => {
+                            setFollowupData({
+                              leadId: viewingLead.id,
+                              leadName: viewingLead.name,
+                              followUpDate: '',
+                              followUpStatus: 'Pending',
+                              communicationChannel: 'Phone Call',
+                              communicationChannelOther: '',
+                              notes: '',
+                              userExtension: (session?.user as any)?.extension || 'admin',
+                            });
+                            setShowAddFollowupModal(true);
+                          }}
+                        >
+                          <Plus size={14} className="me-1" />
+                          Add Follow-up
+                        </Button>
+                      )}
                     </div>
                     <div style={{ position: 'relative', paddingLeft: '30px', marginBottom: '30px' }}>
                       <div style={{
@@ -2979,15 +2981,17 @@ const CrmLeads = () => {
                                 </div>
                               )}
                             </div>
-                            <Button
-                              variant="link"
-                              size="sm"
-                              className="p-1 text-danger"
-                              title="Delete"
-                              onClick={() => handleDeleteFollowUp(viewingLead.id, followUp.id, viewingLead.name)}
-                            >
-                              <Trash2 size={16} />
-                            </Button>
+                            {session?.user?.permissions?.includes('delete-follow-up-crm-leads') && (
+                              <Button
+                                variant="link"
+                                size="sm"
+                                className="p-1 text-danger"
+                                title="Delete"
+                                onClick={() => handleDeleteFollowUp(viewingLead.id, followUp.id, viewingLead.name)}
+                              >
+                                <Trash2 size={16} />
+                              </Button>
+                            )}
                           </div>
                         </div>
                       ))}
@@ -3008,25 +3012,27 @@ const CrmLeads = () => {
                     <div style={{ fontSize: '14px', color: '#6b7280', marginBottom: '16px' }}>
                       No follow-ups yet
                     </div>
-                    <Button
-                      variant="outline-primary"
-                      onClick={() => {
-                        setFollowupData({
-                          leadId: viewingLead.id,
-                          leadName: viewingLead.name,
-                          followUpDate: '',
-                          followUpStatus: 'Pending',
-                          communicationChannel: 'Phone Call',
-                          communicationChannelOther: '',
-                          notes: '',
-                          userExtension: (session?.user as any)?.extension || 'admin',
-                        });
-                        setShowAddFollowupModal(true);
-                      }}
-                    >
-                      <Plus size={14} className="me-1" />
-                      Add Follow-up
-                    </Button>
+                    {session?.user?.permissions?.includes('add-follow-up-crm-leads') && (
+                      <Button
+                        variant="outline-primary"
+                        onClick={() => {
+                          setFollowupData({
+                            leadId: viewingLead.id,
+                            leadName: viewingLead.name,
+                            followUpDate: '',
+                            followUpStatus: 'Pending',
+                            communicationChannel: 'Phone Call',
+                            communicationChannelOther: '',
+                            notes: '',
+                            userExtension: (session?.user as any)?.extension || 'admin',
+                          });
+                          setShowAddFollowupModal(true);
+                        }}
+                      >
+                        <Plus size={14} className="me-1" />
+                        Add Follow-up
+                      </Button>
+                    )}
                   </div>
                 )}
 
@@ -3049,27 +3055,29 @@ const CrmLeads = () => {
                         <Users size={18} style={{ color: '#4680ff' }} />
                         Meetings ({viewingLead.meetings.length})
                       </div>
-                      <Button
-                        variant="outline-primary"
-                        size="sm"
-                        onClick={() => {
-                          setMeetingData({
-                            leadId: viewingLead.id,
-                            leadName: viewingLead.name,
-                            meetingName: '',
-                            meetingType: 'Online',
-                            meetingDate: '',
-                            meetingTime: '',
-                            meetingOutcome: '',
-                            extensions: [],
-                          });
-                          setMeetingAttendees([]);
-                          setShowAddMeetingModal(true);
-                        }}
-                      >
-                        <Plus size={14} className="me-1" />
-                        Schedule Meeting
-                      </Button>
+                      {session?.user?.permissions?.includes('add-meeting-crm-leads') && (
+                        <Button
+                          variant="outline-primary"
+                          size="sm"
+                          onClick={() => {
+                            setMeetingData({
+                              leadId: viewingLead.id,
+                              leadName: viewingLead.name,
+                              meetingName: '',
+                              meetingType: 'Online',
+                              meetingDate: '',
+                              meetingTime: '',
+                              meetingOutcome: '',
+                              extensions: [],
+                            });
+                            setMeetingAttendees([]);
+                            setShowAddMeetingModal(true);
+                          }}
+                        >
+                          <Plus size={14} className="me-1" />
+                          Schedule Meeting
+                        </Button>
+                      )}
                     </div>
                     <div style={{ position: 'relative', paddingLeft: '30px', marginBottom: '30px' }}>
                       <div style={{
@@ -3125,15 +3133,17 @@ const CrmLeads = () => {
                                 </div>
                               )}
                             </div>
-                            <Button
-                              variant="link"
-                              size="sm"
-                              className="p-1 text-danger"
-                              title="Delete"
-                              onClick={() => handleDeleteMeeting(meeting.id, meeting.name)}
-                            >
-                              <Trash2 size={16} />
-                            </Button>
+                            {session?.user?.permissions?.includes('delete-meeting-crm-leads') && (
+                              <Button
+                                variant="link"
+                                size="sm"
+                                className="p-1 text-danger"
+                                title="Delete"
+                                onClick={() => handleDeleteMeeting(meeting.id, meeting.name)}
+                              >
+                                <Trash2 size={16} />
+                              </Button>
+                            )}
                           </div>
                         </div>
                       ))}
@@ -3154,25 +3164,27 @@ const CrmLeads = () => {
                     <div style={{ fontSize: '14px', color: '#6b7280', marginBottom: '16px' }}>
                       No meetings scheduled yet
                     </div>
-                    <Button
-                      variant="outline-primary"
-                      onClick={() => {
-                        setMeetingData({
-                          leadId: viewingLead.id,
-                          leadName: viewingLead.name,
-                          meetingName: '',
-                          meetingType: 'Online',
-                          meetingDate: '',
-                          meetingTime: '',
-                          meetingOutcome: '',
-                          extensions: [],
-                        });
-                        setShowAddMeetingModal(true);
-                      }}
-                    >
-                      <Plus size={14} className="me-1" />
-                      Schedule Meeting
-                    </Button>
+                    {session?.user?.permissions?.includes('add-meeting-crm-leads') && (
+                      <Button
+                        variant="outline-primary"
+                        onClick={() => {
+                          setMeetingData({
+                            leadId: viewingLead.id,
+                            leadName: viewingLead.name,
+                            meetingName: '',
+                            meetingType: 'Online',
+                            meetingDate: '',
+                            meetingTime: '',
+                            meetingOutcome: '',
+                            extensions: [],
+                          });
+                          setShowAddMeetingModal(true);
+                        }}
+                      >
+                        <Plus size={14} className="me-1" />
+                        Schedule Meeting
+                      </Button>
+                    )}
                   </div>
                 )}
 
@@ -3217,7 +3229,7 @@ const CrmLeads = () => {
                       Edit Lead
                     </Button>
                   )}
-                  {session?.user?.permissions?.includes('convert-to-opportunity-crm-leads') && (
+                  {session?.user?.permissions?.includes('add-crm-deals') && (
                     <Button
                       variant="success"
                       style={{

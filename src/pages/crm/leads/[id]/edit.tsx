@@ -463,6 +463,7 @@ const EditLead = () => {
         ...(formData.campaign_id && { campaign_id: String(formData.campaign_id) }),
         ...(formData.crm_data_id && { crm_data_id: String(formData.crm_data_id) }),
         ...(formData.source && { source: formData.source }),
+        ...(formData.description && { description: formData.description }),
         ...(formData.company_name && { company_name: formData.company_name }),
         ...(formData.industry && { industry: formData.industry }),
         ...(formData.business_type && { business_type: formData.business_type }),

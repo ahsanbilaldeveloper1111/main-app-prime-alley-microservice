@@ -681,6 +681,7 @@ const CreateOrder = () => {
                           <option value="CAD">CAD</option>
                           <option value="JPY">JPY</option>
                           <option value="CNY">CNY</option>
+                          <option value="AED">AED</option>
                         </Form.Select>
                       </Form.Group>
                     </Col>

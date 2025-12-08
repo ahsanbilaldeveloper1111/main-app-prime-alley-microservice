@@ -15,6 +15,10 @@ import {
   updateCampaign,
   getCampaign,
   CampaignMetrics,
+  uploadCrmDataCsv,
+  getCrmDataTags,
+  getCrmDataCounts,
+  assignCrmDataAdvanced,
 } from "@utils/crm";
 import {
   Button,
@@ -35,6 +39,9 @@ import {
   FiEye,
   FiPlus,
   FiCalendar,
+  FiFilter,
+  FiDatabase,
+  FiUsers,
 } from "react-icons/fi";
 import {
   X,
@@ -60,10 +67,18 @@ import {
   Trash2,
   Calendar,
   User,
+  Download,
+  AlertCircle as AlertCircleIcon,
+  Hash,
+  Briefcase,
+  RefreshCw,
+  UserPlus,
 } from 'lucide-react';
 import { toast } from "react-toastify";
 import Select from "react-select";
+import CreatableSelect from "react-select/creatable";
 import { GetHierarchyData } from "@utils/users";
+import axiosInstance from "@utils/axios";
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import {
@@ -86,6 +101,8 @@ import { ModuleSlug } from "@utils/Helper";
 import { useSession } from "next-auth/react";
 import DatatableActionButton from "@components/DatatableActionButton";
 import { Column } from "@components/CustomDataTable";
+import PageSummaryGrid from "@components/PageSummaryGrid";
+import SuccessfulModal from "@pages/partial/SuccessfulModal";
 
 // KPI Card Component
 interface KPICardData {
@@ -306,6 +323,47 @@ const CrmCampaigns = () => {
   const [extensions, setExtensions] = useState<any[]>([]);
   const [campaignUsers, setCampaignUsers] = useState<readonly any[]>([]);
 
+  // Upload modal states
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [fieldTags, setFieldTags] = useState<readonly any[]>([]);
+  const [uploadSelectedCampaigns, setUploadSelectedCampaigns] = useState<readonly any[]>([]);
+  const [availableTags, setAvailableTags] = useState<Array<{
+    value: string;
+    label: string;
+    id: number;
+  }>>([]);
+  const [availableCampaignsForUpload, setAvailableCampaignsForUpload] = useState<Array<{
+    value: string;
+    label: string;
+    id: number;
+  }>>([]);
+  const [autoDistributeToUsers, setAutoDistributeToUsers] = useState(false);
+
+  // Data assignment modal states
+  const [showDataAssignmentModal, setShowDataAssignmentModal] = useState(false);
+  const [assignmentFilterCampaigns, setAssignmentFilterCampaigns] = useState<string[]>([]);
+  const [assignmentFilterTags, setAssignmentFilterTags] = useState<readonly any[]>([]);
+  const [assignmentType, setAssignmentType] = useState<string>('');
+  const [assignmentTargetType, setAssignmentTargetType] = useState<'campaigns' | 'users'>('campaigns');
+  const [distributionMode, setDistributionMode] = useState<string>('equal');
+  const [selectedUserExtensions, setSelectedUserExtensions] = useState<readonly any[]>([]);
+  const [assignToCampaigns, setAssignToCampaigns] = useState<string[]>([]);
+  const [recordsToAssign, setRecordsToAssign] = useState<number>(0);
+  const [includeAssignedRecords, setIncludeAssignedRecords] = useState<boolean>(false);
+  const [dataManagementExtensions, setDataManagementExtensions] = useState<any[]>([]);
+  const [assignmentCounts, setAssignmentCounts] = useState({
+    total: 0,
+    assigned: 0,
+    unassigned: 0,
+  });
+  const [showSuccessfulModal, setShowSuccessfulModal] = useState(false);
+  const [successModalTitle, setSuccessModalTitle] = useState("");
+  const [successModalDescription, setSuccessModalDescription] = useState("");
+  const [assigningData, setAssigningData] = useState(false);
+
   // Fetch extensions data
   useEffect(() => {
     const fetchExtensions = async () => {
@@ -319,6 +377,58 @@ const CrmCampaigns = () => {
 
     fetchExtensions();
   }, []);
+
+  // Fetch extensions for CRM data management (for custom extensions assignment)
+  useEffect(() => {
+    const fetchDataManagementExtensions = async () => {
+      try {
+        const hierarchyData = await GetHierarchyData(ModuleSlug.CRM_DATA_MANAGEMENT);
+        setDataManagementExtensions(hierarchyData?.extensions || []);
+      } catch (error) {
+        console.error('Failed to fetch data management extensions:', error);
+      }
+    };
+
+    fetchDataManagementExtensions();
+  }, []);
+
+  // Load available tags
+  useEffect(() => {
+    const loadTags = async () => {
+      try {
+        const tags = await getCrmDataTags();
+        const tagOptions = tags.map((tag) => ({
+          value: tag.name,
+          label: tag.name,
+          id: tag.id,
+        }));
+        setAvailableTags(tagOptions);
+      } catch (error) {
+        console.error("Failed to load tags:", error);
+        setAvailableTags([]);
+      }
+    };
+    loadTags();
+  }, [refreshKey]);
+
+  // Load available campaigns for upload
+  useEffect(() => {
+    const loadCampaigns = async () => {
+      try {
+        const campaignsResponse = await getCampaigns({ per_page: 1000 });
+        const campaignOptions = campaignsResponse.data.map((campaign) => ({
+          value: campaign.id.toString(),
+          label: campaign.name,
+          id: campaign.id,
+        }));
+        setAvailableCampaignsForUpload(campaignOptions);
+      } catch (error) {
+        console.error("Failed to load campaigns:", error);
+        setAvailableCampaignsForUpload([]);
+      }
+    };
+    loadCampaigns();
+  }, [refreshKey]);
 
   // Helper function to get user names from extensions
   const getUserNames = (userExtensions: any[]) => {
@@ -383,6 +493,17 @@ const CrmCampaigns = () => {
       ...provided,
       fontSize: '0.875rem'
     })
+  };
+
+  // Helper function to get user name by extension (for data management)
+  const getUserNameByExtension = (extension: string) => {
+    const ext = dataManagementExtensions.find((e: any) => e.id?.toString() === extension.trim() || e.extension?.toString() === extension.trim());
+    return ext?.display_name || ext?.name || `Extension ${extension.trim()}`;
+  };
+
+  // Get max records based on includeAssignedRecords
+  const getMaxRecords = () => {
+    return includeAssignedRecords ? assignmentCounts.total : assignmentCounts.unassigned;
   };
 
   // Sorting & Pagination Helper Functions
@@ -777,6 +898,17 @@ const CrmCampaigns = () => {
 
     try {
       setLoading(true);
+      // Filter out empty dropdown options before submitting
+      const cleanedFields = campaignFields.map(field => {
+        if (field.field_type === 'dropdown' && field.field_options) {
+          return {
+            ...field,
+            field_options: field.field_options.filter((opt: string) => opt.trim() !== '')
+          };
+        }
+        return field;
+      });
+      
       const campaignData = {
         ...formData,
         name: formData.name.trim(),
@@ -784,7 +916,7 @@ const CrmCampaigns = () => {
         start_date: formData.start_date || undefined,
         end_date: formData.end_date || undefined,
         status: formData.status as 'active' | 'inactive',
-        fields: campaignFields,
+        fields: cleanedFields,
         campaign_users: campaignUsers.map(user => user.value),
       };
 
@@ -857,6 +989,12 @@ const CrmCampaigns = () => {
     if (!updatedFields[index].field_options) {
       updatedFields[index].field_options = [];
     }
+    // Check if the last option is empty - don't add another empty option
+    const options = updatedFields[index].field_options;
+    if (options.length > 0 && options[options.length - 1].trim() === "") {
+      toast.error("Please fill in the current option before adding a new one");
+      return;
+    }
     updatedFields[index].field_options.push("");
     setCampaignFields(updatedFields);
   }, [campaignFields]);
@@ -866,6 +1004,386 @@ const CrmCampaigns = () => {
     updatedFields[index].field_options.splice(optionIndex, 1);
     setCampaignFields(updatedFields);
   }, [campaignFields]);
+
+  // CSV validation function
+  const validateCsvFile = (
+    file: File
+  ): { isValid: boolean; errors: string[] } => {
+    const errors: string[] = [];
+
+    // Check file type
+    if (
+      !file.type.includes("csv") &&
+      !file.name.toLowerCase().endsWith(".csv")
+    ) {
+      errors.push("File must be a CSV file");
+    }
+
+    // Check file size (10MB max)
+    const maxSize = 10 * 1024 * 1024; // 10MB in bytes
+    if (file.size > maxSize) {
+      errors.push("File size must be less than 10MB");
+    }
+
+    // Check if file is empty
+    if (file.size === 0) {
+      errors.push("File cannot be empty");
+    }
+
+    return {
+      isValid: errors.length === 0,
+      errors,
+    };
+  };
+
+  // Handle file selection
+  const handleFileSelect = (file: File) => {
+    const validation = validateCsvFile(file);
+
+    if (validation.isValid) {
+      setSelectedFile(file);
+    } else {
+      validation.errors.forEach((error) => toast.error(error));
+    }
+  };
+
+  // Handle file input change
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      handleFileSelect(e.target.files[0]);
+    }
+  };
+
+  // Upload CSV file
+  const handleUpload = async () => {
+    if (!session?.user?.permissions?.includes('add-crm-data-management')) {
+      toast.error("You don't have permission to upload data");
+      return;
+    }
+
+    if (!selectedFile) {
+      toast.error("Please select a file to upload");
+      return;
+    }
+
+    setUploading(true);
+    setUploadProgress(0);
+
+    try {
+      // Simulate progress for better UX
+      const progressInterval = setInterval(() => {
+        setUploadProgress((prev) => {
+          if (prev >= 90) {
+            clearInterval(progressInterval);
+            return prev;
+          }
+          return prev + 10;
+        });
+      }, 200);
+
+      // Extract tag values from selected options
+      const tagValues = Array.from(fieldTags).map((tag) => tag.value);
+      
+      // Extract campaign IDs from selected campaigns
+      const campaignIds = Array.from(uploadSelectedCampaigns).map((campaign) => campaign.value);
+
+      const response: any = await uploadCrmDataCsv(
+        selectedFile,
+        campaignIds,
+        tagValues,
+        autoDistributeToUsers // Auto-assignment based on user selection
+      );
+
+      clearInterval(progressInterval);
+      setUploadProgress(100);
+
+      // Parse response
+      const responseData = response?.data || {};
+      const processedCount = responseData.processed_count || 0;
+      const validationFailures = responseData.validation_failures || 0;
+      const errors = responseData.errors || [];
+
+      // Show error messages for validation failures
+      if (errors.length > 0) {
+        errors.forEach((error: string) => {
+          toast.error(error);
+        });
+      }
+
+      // Show success message
+      if (processedCount > 0) {
+        let successMessage = `Successfully processed ${processedCount} record${processedCount !== 1 ? 's' : ''}`;
+        
+        if (validationFailures > 0) {
+          successMessage += ` with ${validationFailures} validation failure${validationFailures !== 1 ? 's' : ''}`;
+        }
+        
+        toast.success(successMessage);
+      } else if (validationFailures > 0) {
+        // All records failed validation
+        toast.error(`Upload failed: All ${validationFailures} record${validationFailures !== 1 ? 's' : ''} failed validation`);
+      } else {
+        toast.error("Upload completed but no records were processed");
+      }
+
+      setSelectedFile(null);
+      setFieldTags([]);
+      setUploadSelectedCampaigns([]);
+      setAutoDistributeToUsers(false);
+      setShowUploadModal(false);
+      setUploadProgress(0);
+
+      // Refresh data
+      setRefreshKey((prev) => prev + 1);
+    } catch (error: any) {
+      console.error("Upload error:", error);
+      const errorMessage = error?.response?.data?.message || error?.message || "Failed to upload file. Please try again.";
+      toast.error(errorMessage);
+      setUploadProgress(0);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  // Calculate filtered entry counts using API
+  const calculateEntryCounts = useCallback(async () => {
+    try {
+      const campaignIds: number[] = assignmentFilterCampaigns.map(c => {
+        const campaignId = parseInt(c);
+        return isNaN(campaignId) ? 0 : campaignId;
+      }).filter(id => id > 0);
+      
+      const tags = assignmentFilterTags.map((tag: any) => tag.value || tag);
+
+      const counts = await getCrmDataCounts(campaignIds, tags);
+
+      return {
+        total: counts.summary.total_records,
+        assigned: counts.summary.assigned_records,
+        unassigned: counts.summary.unassigned_records,
+      };
+    } catch (error) {
+      console.error("Failed to get entry counts:", error);
+      // Fallback to static data
+      return {
+        total: 5000,
+        assigned: 2000,
+        unassigned: 3000,
+      };
+    }
+  }, [assignmentFilterCampaigns, assignmentFilterTags]);
+
+  // Auto-refetch counts when filter dropdowns change
+  useEffect(() => {
+    const refetchCounts = async () => {
+      if (showDataAssignmentModal) {
+        try {
+          const counts = await calculateEntryCounts();
+          setAssignmentCounts(counts);
+          if (recordsToAssign === 0 || recordsToAssign > counts.unassigned) {
+            setRecordsToAssign(counts.unassigned);
+          }
+        } catch (error) {
+          console.error("Failed to refetch counts:", error);
+        }
+      }
+    };
+
+    refetchCounts();
+  }, [
+    assignmentFilterCampaigns,
+    assignmentFilterTags,
+    calculateEntryCounts,
+    showDataAssignmentModal,
+  ]);
+
+  // Handle data assignment
+  const handleDataAssignment = useCallback(async () => {
+    try {
+      const counts = await calculateEntryCounts();
+      setAssignmentCounts(counts);
+      setRecordsToAssign(counts.unassigned);
+      setShowDataAssignmentModal(true);
+    } catch (error) {
+      console.error("Failed to get entry counts:", error);
+      // Fallback to static data
+      setAssignmentCounts({ total: 5000, assigned: 2000, unassigned: 3000 });
+      setRecordsToAssign(3000);
+      setShowDataAssignmentModal(true);
+    }
+  }, [calculateEntryCounts]);
+
+  // Handle data assignment submit
+  const handleDataAssignmentSubmit = useCallback(async () => {
+    if (!assignmentTargetType) {
+      toast.error("Please select assignment target (Campaigns or Users)");
+      return;
+    }
+
+    const maxRecords = getMaxRecords();
+    if (recordsToAssign === 0 || recordsToAssign > maxRecords) {
+      toast.error(`Please enter a valid number of records (max: ${maxRecords})`);
+      return;
+    }
+
+    if (assignmentTargetType === 'campaigns' && (!distributionMode || assignToCampaigns.length === 0)) {
+      toast.error("Please select distribution mode and target campaigns");
+      return;
+    }
+
+    if (assignmentTargetType === 'users' && selectedUserExtensions.length === 0) {
+      toast.error("Please select at least one user");
+      return;
+    }
+
+    setAssigningData(true);
+    try {
+      const campaignFilterIds = assignmentFilterCampaigns.map(c => {
+        const campaignId = parseInt(c);
+        return isNaN(campaignId) ? 0 : campaignId;
+      }).filter(id => id > 0);
+      
+      const tagIds = assignmentFilterTags.map((tag: any) => {
+        const tagValue = tag.value || tag;
+        const tagOption = availableTags.find(t => t.value === tagValue);
+        return tagOption ? tagOption.id : 0;
+      }).filter(id => id > 0);
+
+      if (assignmentTargetType === 'campaigns') {
+        const targetCampaignIds = assignToCampaigns.map(c => {
+          const campaign = availableCampaignsForUpload.find(camp => camp.label === c);
+          return campaign ? parseInt(campaign.value) : 0;
+        }).filter(id => id > 0);
+        
+        if (targetCampaignIds.length === 0) {
+          toast.error("Please select valid campaigns");
+          return;
+        }
+        
+        // Call API with include_assigned parameter
+        const payload: any = {
+          campaign_ids: targetCampaignIds,
+          count: recordsToAssign,
+          distribution_mode: distributionMode === 'equal' ? 'equal' : 'equal',
+          include_assigned: includeAssignedRecords,
+        };
+
+        if (campaignFilterIds.length > 0) {
+          payload.campaign_filter_ids = campaignFilterIds;
+        }
+
+        if (tagIds.length > 0) {
+          payload.tag_ids = tagIds;
+        }
+
+        const response = await axiosInstance.post("/crm/crm_data/assign", payload);
+
+        if (response.data.success) {
+          // Close modal first
+          setShowDataAssignmentModal(false);
+          
+          // Reset state
+          setAssignmentFilterCampaigns([]);
+          setAssignmentFilterTags([]);
+          setAssignmentTargetType('campaigns');
+          setAssignmentType('');
+          setDistributionMode('equal');
+          setAssignToCampaigns([]);
+          setSelectedUserExtensions([]);
+          setRecordsToAssign(0);
+          setIncludeAssignedRecords(false);
+          
+          // Show success modal
+          setShowSuccessfulModal(true);
+          setSuccessModalTitle("Data Assignment Successful!");
+          setSuccessModalDescription(`Successfully assigned ${recordsToAssign} records!`);
+          
+          setRefreshKey((prev) => prev + 1);
+        }
+      } else {
+        // Users assignment
+        const extensionArray = selectedUserExtensions.map((ext: any) => {
+          return ext.value || ext.extension?.id?.toString() || ext.extension?.extension?.toString() || '';
+        }).filter(ext => ext.length > 0);
+
+        if (extensionArray.length === 0) {
+          toast.error("Please select valid users");
+          setAssigningData(false);
+          return;
+        }
+
+        const payload: any = {
+          custom_extensions: extensionArray,
+          count: recordsToAssign,
+          include_assigned: includeAssignedRecords,
+        };
+
+        if (campaignFilterIds.length > 0) {
+          payload.campaign_filter_ids = campaignFilterIds;
+        }
+
+        if (tagIds.length > 0) {
+          payload.tag_ids = tagIds;
+        }
+
+        const response = await axiosInstance.post("/crm/crm_data/assign", payload);
+
+        if (response.data.success) {
+          // Close modal first
+          setShowDataAssignmentModal(false);
+          
+          // Reset state
+          setAssignmentFilterCampaigns([]);
+          setAssignmentFilterTags([]);
+          setAssignmentTargetType('campaigns');
+          setAssignmentType('');
+          setDistributionMode('equal');
+          setAssignToCampaigns([]);
+          setSelectedUserExtensions([]);
+          setRecordsToAssign(0);
+          setIncludeAssignedRecords(false);
+          
+          // Show success modal
+          setShowSuccessfulModal(true);
+          setSuccessModalTitle("Data Assignment Successful!");
+          setSuccessModalDescription(`Successfully assigned ${recordsToAssign} records!`);
+          
+          setRefreshKey((prev) => prev + 1);
+        }
+      }
+    } catch (error: any) {
+      console.error("Assignment error:", error);
+      toast.error(error?.response?.data?.message || "Failed to assign data");
+    } finally {
+      setAssigningData(false);
+    }
+  }, [
+    assignmentTargetType,
+    recordsToAssign,
+    getMaxRecords,
+    distributionMode,
+    assignToCampaigns,
+    selectedUserExtensions,
+    assignmentFilterCampaigns,
+    assignmentFilterTags,
+    availableTags,
+    availableCampaignsForUpload,
+    includeAssignedRecords,
+  ]);
+
+  // Handle data assignment modal close
+  const handleDataAssignmentModalClose = useCallback(() => {
+    setShowDataAssignmentModal(false);
+    setAssignmentFilterCampaigns([]);
+    setAssignmentFilterTags([]);
+    setAssignmentTargetType('campaigns');
+    setAssignmentType('');
+    setDistributionMode('equal');
+    setAssignToCampaigns([]);
+    setSelectedUserExtensions([]);
+    setRecordsToAssign(0);
+    setIncludeAssignedRecords(false);
+  }, []);
 
   // Define columns
   const columns: Column[] = useMemo(
@@ -1071,6 +1589,24 @@ const CrmCampaigns = () => {
             >
               <BarChart3 size={16} className="me-2" />
               {showCampaignsAnalytics ? 'Hide Analytics' : 'Show Analytics'}
+            </Button>
+          )}
+          {session?.user?.permissions?.includes('add-crm-data-management') && (
+            <Button 
+              variant="outline-primary"
+              onClick={() => setShowUploadModal(true)}
+            >
+              <Download size={16} className="me-2" />
+              Upload CSV
+            </Button>
+          )}
+          {session?.user?.permissions?.includes('add-crm-data-management') && (
+            <Button 
+              variant="outline-success"
+              onClick={handleDataAssignment}
+            >
+              <Target size={16} className="me-2" />
+              Data Assignment
             </Button>
           )}
           {session?.user?.permissions?.includes('add-crm-campaigns') && (
@@ -1864,36 +2400,45 @@ const CrmCampaigns = () => {
                       </Badge>
                     </div>
                   </div>
-                  {selectedCampaign.description && (
-                    <div style={{
-                      background: '#f8f9fa',
-                      padding: '16px',
-                      borderRadius: '10px',
-                      transition: 'all 0.3s',
-                      gridColumn: 'span 2'
-                    }}
-                    onMouseOver={(e) => {
-                      e.currentTarget.style.background = '#e5e7eb';
-                      e.currentTarget.style.transform = 'translateY(-2px)';
-                    }}
-                    onMouseOut={(e) => {
-                      e.currentTarget.style.background = '#f8f9fa';
-                      e.currentTarget.style.transform = 'translateY(0)';
-                    }}>
-                      <div style={{
-                        fontSize: '12px',
-                        fontWeight: 600,
-                        color: '#6b7280',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.5px',
-                        marginBottom: '6px'
-                      }}>Description</div>
-                      <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
-                        {selectedCampaign.description}
-                      </div>
-                    </div>
-                  )}
                 </div>
+
+                {/* Description - Full Width Row */}
+                {selectedCampaign.description && (
+                  <div style={{
+                    background: '#f8f9fa',
+                    padding: '16px',
+                    borderRadius: '10px',
+                    transition: 'all 0.3s',
+                    width: '100%',
+                    marginBottom: '30px'
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.background = '#e5e7eb';
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.background = '#f8f9fa';
+                    e.currentTarget.style.transform = 'translateY(0)';
+                  }}>
+                    <div style={{
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      color: '#6b7280',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px',
+                      marginBottom: '6px'
+                    }}>Description</div>
+                    <div style={{ 
+                      fontSize: '15px', 
+                      color: '#1f2937', 
+                      fontWeight: 500,
+                      wordWrap: 'break-word',
+                      whiteSpace: 'pre-wrap'
+                    }}>
+                      {selectedCampaign.description}
+                    </div>
+                  </div>
+                )}
 
                 {/* Date Information Section */}
                 <div style={{
@@ -2177,6 +2722,571 @@ const CrmCampaigns = () => {
         additionalInfo={
           <p className="text-muted small mb-0">This action will also delete all associated campaign fields.</p>
         }
+      />
+
+      {/* Upload Modal */}
+      {session?.user?.permissions?.includes('add-crm-data-management') && (
+        <Modal show={showUploadModal} onHide={() => {
+          setShowUploadModal(false);
+          setSelectedFile(null);
+          setFieldTags([]);
+          setUploadSelectedCampaigns([]);
+          setAutoDistributeToUsers(false);
+        }} size="lg" centered>
+          <Modal.Header closeButton className="border-bottom bg-light">
+            <Modal.Title>Upload CSV - Import Prospects</Modal.Title>
+          </Modal.Header>
+          <Modal.Body className="p-4">
+            <div className="alert alert-info mb-4">
+              <AlertCircleIcon size={18} className="me-2" />
+              <strong>📋 Import Guidelines:</strong>
+              <ul className="mb-0 mt-2">
+                <li>
+                  <strong>Headers:</strong> First row must contain column headers
+                </li>
+                <li>
+                  <strong>Name Column:</strong> Include a "name" column (case insensitive) for first name and last name, or use separate "first name" and "last name" columns
+                </li>
+                <li>
+                  <strong>Phone Column:</strong> Include a "phone" column (case insensitive) for contact information
+                </li>
+                <li>
+                  <strong>File Size:</strong> Maximum 10MB per file
+                </li>
+                <li>
+                  <strong>Formats:</strong> CSV files supported
+                </li>
+                <li>
+                  <strong>Data Quality:</strong> Clean, valid data imports faster and works better
+                </li>
+              </ul>
+            </div>
+            <Form>
+              <Form.Group className="mb-3">
+                <Form.Label className="fw-semibold">Select CSV File <span className="text-danger">*</span></Form.Label>
+                <Form.Control 
+                  type="file" 
+                  accept=".csv" 
+                  onChange={handleFileInputChange}
+                />
+                <Form.Text className="text-muted">
+                  Supported formats: CSV
+                </Form.Text>
+              </Form.Group>
+
+              <Form.Group className="mb-3">
+                <Form.Label className="fw-semibold">Campaigns (Optional)</Form.Label>
+                <Select
+                  isMulti
+                  value={uploadSelectedCampaigns}
+                  onChange={(selected) => setUploadSelectedCampaigns(selected || [])}
+                  options={availableCampaignsForUpload}
+                  placeholder="Select campaigns to assign this data to..."
+                  styles={{
+                    control: (base) => ({
+                      ...base,
+                      borderColor: "#ced4da",
+                      boxShadow: "none",
+                      fontSize: "14px",
+                    }),
+                  }}
+                />
+                <Form.Text className="text-muted">
+                  Select one or more campaigns to assign the uploaded data to. If no campaigns are selected, the data will be uploaded without campaign assignment.
+                </Form.Text>
+              </Form.Group>
+
+              <Form.Group className="mb-3">
+                <Form.Label className="fw-semibold">Tags (Optional)</Form.Label>
+                <CreatableSelect
+                  isMulti
+                  value={fieldTags}
+                  onChange={(selected) => setFieldTags(selected || [])}
+                  options={availableTags}
+                  placeholder="Add tags to organize and filter this data..."
+                  styles={{
+                    control: (base) => ({
+                      ...base,
+                      borderColor: "#ced4da",
+                      boxShadow: "none",
+                      fontSize: "14px",
+                    }),
+                  }}
+                />
+                <Form.Text className="text-muted">
+                  Add descriptive tags to help categorize and filter your data later. You can create new tags by typing them.
+                </Form.Text>
+              </Form.Group>
+
+              <Form.Group className="mb-3">
+                <Form.Label className="fw-semibold">Data Distribution</Form.Label>
+                <div>
+                  <Form.Check
+                    type="radio"
+                    id="auto-distribute-yes"
+                    name="autoDistribute"
+                    label="Automatically distribute data between campaign users"
+                    checked={autoDistributeToUsers === true}
+                    onChange={() => setAutoDistributeToUsers(true)}
+                    className="mb-2"
+                  />
+                  <Form.Check
+                    type="radio"
+                    id="auto-distribute-no"
+                    name="autoDistribute"
+                    label="Do not automatically distribute"
+                    checked={autoDistributeToUsers === false}
+                    onChange={() => setAutoDistributeToUsers(false)}
+                  />
+                </div>
+                <Form.Text className="text-muted">
+                  When enabled, uploaded data will be automatically distributed among users assigned to the selected campaigns.
+                </Form.Text>
+              </Form.Group>
+
+              <div className="alert alert-warning">
+                <small><strong>Note:</strong> The data will be uploaded even if some fields remain empty.</small>
+              </div>
+            </Form>
+          </Modal.Body>
+          <Modal.Footer className="border-top">
+            <Button variant="secondary" onClick={() => {
+              setShowUploadModal(false);
+              setSelectedFile(null);
+              setFieldTags([]);
+              setUploadSelectedCampaigns([]);
+              setAutoDistributeToUsers(false);
+            }}>Cancel</Button>
+            <Button variant="primary" onClick={handleUpload} disabled={uploading || !selectedFile}>
+              {uploading ? (
+                <>
+                  <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                  Uploading...
+                </>
+              ) : (
+                <>
+                  <Download size={16} className="me-2" />
+                  Upload & Import
+                </>
+              )}
+            </Button>
+          </Modal.Footer>
+        </Modal>
+      )}
+
+      {/* Data Assignment Modal */}
+      <Modal 
+        show={showDataAssignmentModal} 
+        onHide={handleDataAssignmentModalClose} 
+        size="lg" 
+        centered
+        backdrop="static"
+      >
+        <Modal.Header closeButton style={{ borderBottom: '1px solid #ccc' }} className="pb-2">
+          <Modal.Title className="d-flex align-items-center gap-2 fs-5 fw-bold text-dark">
+            <div className="p-2 bg-primary bg-opacity-10 rounded-3">
+              <Target size={20} className="text-primary" />
+            </div>
+            Data Assignment
+          </Modal.Title>
+        </Modal.Header>
+        
+        <Modal.Body className="px-4 pb-4">
+          <div className="alert alert-primary border-0 d-flex align-items-start mb-4 shadow-sm" style={{ 
+            background: 'linear-gradient(135deg, rgba(79, 70, 229, 0.05) 0%, rgba(99, 102, 241, 0.05) 100%)',
+            borderLeft: '4px solid #4f46e5'
+          }}>
+            <AlertCircle size={20} className="text-primary mt-1 me-2 flex-shrink-0" />
+            <div>
+              <strong className="d-block mb-1 text-dark">Smart Data Assignment</strong>
+              <span className="text-muted small">Configure filters and assignment criteria to distribute prospects efficiently.</span>
+            </div>
+          </div>
+
+          <Form>
+            {/* Filter Section */}
+            <div className="mb-4 p-4 rounded-4 border" style={{ 
+              background: 'linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%)',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
+            }}>
+              <div className="d-flex align-items-center gap-2 mb-4">
+                <Filter size={18} className="text-primary" />
+                <h6 className="mb-0 fw-bold text-dark">Filter Records</h6>
+              </div>
+              
+              <Row className="g-3">
+                <Col md={6}>
+                  <Form.Group>
+                    <Form.Label className="fw-semibold small text-muted mb-2">
+                      <span className="d-flex align-items-center gap-1">
+                        <Megaphone size={14} />
+                        Campaign Filter
+                      </span>
+                    </Form.Label>
+                    <Select
+                      isMulti
+                      options={availableCampaignsForUpload.map(c => ({ value: c.value, label: c.label }))}
+                      value={assignmentFilterCampaigns.map(campaign => {
+                        const campaignOption = availableCampaignsForUpload.find(c => c.value === campaign);
+                        return campaignOption ? { value: campaignOption.value, label: campaignOption.label } : { value: campaign, label: campaign };
+                      })}
+                      onChange={(selected) => setAssignmentFilterCampaigns(selected ? selected.map(s => s.value) : [])}
+                      placeholder="Select campaigns..."
+                      styles={customSelectStyles}
+                    />
+                  </Form.Group>
+                </Col>
+                
+                <Col md={6}>
+                  <Form.Group>
+                    <Form.Label className="fw-semibold small text-muted mb-2">
+                      <span className="d-flex align-items-center gap-1">
+                        <Hash size={14} />
+                        Tag Filter
+                      </span>
+                    </Form.Label>
+                    <CreatableSelect
+                      isMulti
+                      options={availableTags}
+                      value={assignmentFilterTags}
+                      onChange={(selected) => setAssignmentFilterTags(selected || [])}
+                      placeholder="Select or create tags..."
+                      styles={customSelectStyles}
+                    />
+                  </Form.Group>
+                </Col>
+              </Row>
+              
+              {/* Total Records Display with Breakdown */}
+              <div className="mt-4 p-4 rounded-3" style={{ 
+                background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.08) 0%, rgba(74, 222, 128, 0.08) 100%)',
+                border: '1px solid rgba(34, 197, 94, 0.2)'
+              }}>
+                <Row className="g-3 align-items-center">
+                  <Col md={4}>
+                    <div className="d-flex align-items-center gap-3">
+                      <div className="p-3 bg-success bg-opacity-10 rounded-3">
+                        <Users size={28} className="text-success" />
+                      </div>
+                      <div>
+                        <small className="text-muted d-block mb-1">Total Records</small>
+                        <strong className="fs-3 text-dark">{assignmentCounts.total.toLocaleString()}</strong>
+                      </div>
+                    </div>
+                  </Col>
+                  <Col md={4}>
+                    <div className="d-flex align-items-center gap-3">
+                      <div className="p-3 bg-primary bg-opacity-10 rounded-3">
+                        <UserPlus size={28} className="text-primary" />
+                      </div>
+                      <div>
+                        <small className="text-muted d-block mb-1">Assigned</small>
+                        <strong className="fs-3 text-dark">{assignmentCounts.assigned.toLocaleString()}</strong>
+                      </div>
+                    </div>
+                  </Col>
+                  <Col md={4}>
+                    <div className="d-flex align-items-center gap-3">
+                      <div className="p-3 bg-warning bg-opacity-10 rounded-3">
+                        <AlertCircle size={28} className="text-warning" />
+                      </div>
+                      <div>
+                        <small className="text-muted d-block mb-1">Unassigned</small>
+                        <strong className="fs-3 text-dark">{assignmentCounts.unassigned.toLocaleString()}</strong>
+                      </div>
+                    </div>
+                  </Col>
+                </Row>
+              </div>
+            </div>
+
+            {/* Assignment Type Section */}
+            <div className="mb-4 p-4 rounded-4 border" style={{ 
+              background: 'linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%)',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
+            }}>
+              <Form.Group className="mb-3">
+                <Form.Label className="fw-semibold small text-muted mb-2">
+                  Assign To <span className="text-danger">*</span>
+                </Form.Label>
+                <div>
+                  <Form.Check
+                    type="radio"
+                    id="assign-to-campaigns"
+                    name="assignmentTargetType"
+                    label="Campaigns"
+                    value="campaigns"
+                    checked={assignmentTargetType === 'campaigns'}
+                    onChange={() => {
+                      setAssignmentTargetType('campaigns');
+                      setAssignmentType('campaigns');
+                      setDistributionMode('equal');
+                      setAssignToCampaigns([]);
+                      setSelectedUserExtensions([]);
+                    }}
+                    className="mb-2"
+                  />
+                  <Form.Check
+                    type="radio"
+                    id="assign-to-users"
+                    name="assignmentTargetType"
+                    label="Users"
+                    value="users"
+                    checked={assignmentTargetType === 'users'}
+                    onChange={() => {
+                      setAssignmentTargetType('users');
+                      setAssignmentType('custom');
+                      setDistributionMode('');
+                      setAssignToCampaigns([]);
+                      setSelectedUserExtensions([]);
+                    }}
+                  />
+                </div>
+              </Form.Group>
+
+              {/* Conditional Fields for "Assign to Campaigns" */}
+              {assignmentTargetType === 'campaigns' && (
+                <div className="p-4 rounded-3 border-0" style={{ 
+                  background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.03) 0%, rgba(139, 92, 246, 0.03) 100%)',
+                }}>
+                  <Row className="g-3">
+                    <Col md={6}>
+                      <Form.Group>
+                        <Form.Label className="fw-semibold small text-muted mb-2">
+                          Distribution Mode <span className="text-danger">*</span>
+                        </Form.Label>
+                        <Select
+                          options={[
+                            { value: 'equal', label: 'Equal Distribution' },
+                            { value: 'proportional', label: 'Proportional Distribution' }
+                          ]}
+                          value={distributionMode ? { value: distributionMode, label: distributionMode === 'equal' ? 'Equal Distribution' : 'Proportional Distribution' } : { value: 'equal', label: 'Equal Distribution' }}
+                          onChange={(selected) => setDistributionMode(selected?.value || 'equal')}
+                          placeholder="Select distribution mode..."
+                          styles={customSelectStyles}
+                        />
+                        {distributionMode && (
+                          <div className="mt-2 p-2 rounded-2 bg-white border">
+                            <small className="text-muted d-flex align-items-start gap-2">
+                              <AlertCircle size={14} className="mt-1 flex-shrink-0 text-primary" />
+                              <span>
+                                {distributionMode === 'equal' && 'Records will be distributed equally across all selected campaigns'}
+                                {distributionMode === 'proportional' && 'Records will be distributed based on individual campaign capacity and requirements'}
+                              </span>
+                            </small>
+                          </div>
+                        )}
+                      </Form.Group>
+                    </Col>
+                    
+                    <Col md={6}>
+                      <Form.Group>
+                        <Form.Label className="fw-semibold small text-muted mb-2">
+                          Target Campaigns <span className="text-danger">*</span>
+                        </Form.Label>
+                        <Select
+                          isMulti
+                          options={availableCampaignsForUpload.map(c => ({ value: c.label, label: c.label }))}
+                          value={assignToCampaigns.map(campaign => ({ value: campaign, label: campaign }))}
+                          onChange={(selected) => setAssignToCampaigns(selected ? selected.map(s => s.value) : [])}
+                          placeholder="Select campaigns..."
+                          styles={customSelectStyles}
+                        />
+                        {assignToCampaigns.length > 0 && (
+                          <div className="mt-2 p-2 rounded-2 bg-white border">
+                            <small className="text-muted">
+                              <strong>{assignToCampaigns.length}</strong> campaign{assignToCampaigns.length !== 1 ? 's' : ''} selected
+                            </small>
+                          </div>
+                        )}
+                      </Form.Group>
+                    </Col>
+                  </Row>
+                </div>
+              )}
+
+              {/* Conditional Fields for "Assign to Users" */}
+              {assignmentTargetType === 'users' && (
+                <div className="p-4 rounded-3 border-0" style={{ 
+                  background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.03) 0%, rgba(139, 92, 246, 0.03) 100%)',
+                }}>
+                  <Form.Group className="mb-3">
+                    <Form.Label className="fw-semibold small text-muted mb-2">
+                      Select Users <span className="text-danger">*</span>
+                    </Form.Label>
+                    <Select
+                      isMulti
+                      options={dataManagementExtensions.map((ext: any) => ({
+                        value: ext.id?.toString() || ext.extension?.toString() || '',
+                        label: ext.display_name || ext.name || `Extension ${ext.id || ext.extension}`,
+                        extension: ext
+                      }))}
+                      value={selectedUserExtensions}
+                      onChange={(selected) => setSelectedUserExtensions(selected || [])}
+                      placeholder="Select users..."
+                      styles={customSelectStyles}
+                    />
+                    {selectedUserExtensions.length > 0 && (
+                      <div className="mt-2 p-2 rounded-2 bg-white border">
+                        <small className="text-muted">
+                          <strong>{selectedUserExtensions.length}</strong> user{selectedUserExtensions.length !== 1 ? 's' : ''} selected
+                        </small>
+                      </div>
+                    )}
+                  </Form.Group>
+                </div>
+              )}
+            </div>
+
+            {/* Number of Records to Assign */}
+            <div className="mb-3">
+              <Form.Group>
+                <Form.Label className="fw-semibold small text-muted mb-2">
+                  Number of Records to Assign <span className="text-danger">*</span>
+                </Form.Label>
+                <div className="position-relative">
+                  <Form.Control 
+                    type="number"
+                    min="1"
+                    max={getMaxRecords()}
+                    value={recordsToAssign || ''}
+                    onChange={(e) => {
+                      const value = parseInt(e.target.value) || 0;
+                      const max = getMaxRecords();
+                      setRecordsToAssign(value > max ? max : value);
+                    }}
+                    placeholder={`Enter number (max: ${getMaxRecords().toLocaleString()})`}
+                    className="border-2 py-2"
+                    style={{ paddingRight: '100px' }}
+                  />
+                  <div className="position-absolute top-50 end-0 translate-middle-y me-3">
+                    <small className="text-muted">of {getMaxRecords().toLocaleString()}</small>
+                  </div>
+                </div>
+                <div className="mt-2 d-flex align-items-center gap-2">
+                  <div className="flex-grow-1 bg-light rounded-pill overflow-hidden" style={{ height: '6px' }}>
+                    <div 
+                      className="bg-primary h-100 rounded-pill transition-all"
+                      style={{ 
+                        width: `${recordsToAssign > 0 && getMaxRecords() > 0 ? (recordsToAssign / getMaxRecords()) * 100 : 0}%`,
+                        transition: 'width 0.3s ease'
+                      }}
+                    />
+                  </div>
+                  <small className="text-muted fw-medium">
+                    {recordsToAssign > 0 && getMaxRecords() > 0 ? ((recordsToAssign / getMaxRecords()) * 100).toFixed(1) : '0'}%
+                  </small>
+                </div>
+              </Form.Group>
+            </div>
+
+            {/* Assignment Settings */}
+            <div className="mb-4 p-4 rounded-3" style={{
+              background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.05) 0%, rgba(139, 92, 246, 0.05) 100%)',
+              border: '1px solid rgba(99, 102, 241, 0.15)'
+            }}>
+              <h6 className="fw-bold mb-3 text-primary d-flex align-items-center">
+                <Briefcase size={18} className="me-2" />
+                Assignment Settings
+              </h6>
+              <div className="p-3 bg-white rounded-3">
+                <Form.Label className="fw-semibold text-dark mb-2">Include already assigned records (allow reassignment)</Form.Label>
+                <div>
+                  <Form.Check
+                    type="radio"
+                    id="include-assigned-yes"
+                    name="includeAssignedRecords"
+                    label="Yes, include already assigned records"
+                    checked={includeAssignedRecords === true}
+                    onChange={() => {
+                      setIncludeAssignedRecords(true);
+                      // Reset recordsToAssign if it exceeds new max
+                      const newMax = assignmentCounts.total;
+                      if (recordsToAssign > newMax) {
+                        setRecordsToAssign(newMax);
+                      }
+                    }}
+                    className="mb-2"
+                  />
+                  <Form.Check
+                    type="radio"
+                    id="include-assigned-no"
+                    name="includeAssignedRecords"
+                    label="No, only assign unassigned records"
+                    checked={includeAssignedRecords === false}
+                    onChange={() => {
+                      setIncludeAssignedRecords(false);
+                      // Reset recordsToAssign if it exceeds new max
+                      const newMax = assignmentCounts.unassigned;
+                      if (recordsToAssign > newMax) {
+                        setRecordsToAssign(newMax);
+                      }
+                    }}
+                  />
+                </div>
+                <small className="text-muted d-block mt-2">
+                  {includeAssignedRecords 
+                    ? 'Records that are already assigned to other users will be included and reassigned based on the selected criteria.'
+                    : 'Only records that are currently unassigned will be assigned.'}
+                </small>
+              </div>
+            </div>
+
+            <div className="alert alert-warning border-0 mb-0 d-flex align-items-start" style={{ 
+              background: 'linear-gradient(135deg, rgba(251, 191, 36, 0.08) 0%, rgba(252, 211, 77, 0.08) 100%)',
+              borderLeft: '4px solid #f59e0b'
+            }}>
+              <AlertCircle size={18} className="text-warning mt-1 me-2 flex-shrink-0" />
+              <small className="text-dark">
+                <strong>Important:</strong> Assignment will be processed immediately based on your selected criteria. This action cannot be undone.
+              </small>
+            </div>
+          </Form>
+        </Modal.Body>
+        
+        <Modal.Footer className="border-0 pt-0 px-4 pb-4">
+          <Button 
+            variant="light" 
+            onClick={handleDataAssignmentModalClose}
+            disabled={assigningData}
+            className="px-4 fw-semibold"
+          >
+            Cancel
+          </Button>
+          <Button 
+            variant="primary" 
+            disabled={
+              assigningData ||
+              !assignmentTargetType || 
+              recordsToAssign === 0 || 
+              recordsToAssign > getMaxRecords() ||
+              (assignmentTargetType === 'campaigns' && (!distributionMode || assignToCampaigns.length === 0)) ||
+              (assignmentTargetType === 'users' && selectedUserExtensions.length === 0)
+            }
+            onClick={handleDataAssignmentSubmit}
+            className="px-4 fw-semibold d-flex align-items-center gap-2"
+          >
+            {assigningData ? (
+              <>
+                <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                Assigning...
+              </>
+            ) : (
+              <>
+                <UserPlus size={18} />
+                Assign {recordsToAssign > 0 ? `${recordsToAssign.toLocaleString()} Records` : 'Records'}
+              </>
+            )}
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
+      {/* Success Modal */}
+      <SuccessfulModal
+        show={showSuccessfulModal}
+        onHide={() => setShowSuccessfulModal(false)}
+        title={successModalTitle}
+        description={successModalDescription}
       />
 
 

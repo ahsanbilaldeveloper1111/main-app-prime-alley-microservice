@@ -333,7 +333,7 @@ const CrmOrders = () => {
   useEffect(() => {
     fetchStages();
     fetchLostReasons();
-    fetchExtensions(ModuleSlug.CRM_LEADS);
+    fetchExtensions(ModuleSlug.CRM_ORDERS);
   }, []);
 
   // Fetch orders when filters or search change
@@ -1042,6 +1042,10 @@ const CrmOrders = () => {
     })
   };
  
+  if (!session?.user?.permissions?.includes('list-crm-orders')) {
+    return null;
+  }
+ 
   return (
     <React.Fragment>
       <style dangerouslySetInnerHTML={{__html: `
@@ -1645,6 +1649,7 @@ const CrmOrders = () => {
                                 >
                                   <Eye size={16} />
                                 </Button>
+                                {session?.user?.permissions?.includes('edit-crm-orders') && (
                                 <Button 
                                   variant="link" 
                                   size="sm" 
@@ -1654,6 +1659,7 @@ const CrmOrders = () => {
                                 >
                                   <Edit size={16} />
                                 </Button>
+                                )}
                                 <Button 
                                   variant="link" 
                                   size="sm" 
@@ -1666,6 +1672,7 @@ const CrmOrders = () => {
                                 >
                                   <Paperclip size={16} />
                                 </Button>
+                                {session?.user?.permissions?.includes('delete-crm-orders') && (
                                 <Button 
                                   variant="link" 
                                   size="sm" 
@@ -1675,6 +1682,7 @@ const CrmOrders = () => {
                                 >
                                   <Trash2 size={16} />
                                 </Button>
+                                )}
                                 {activeFilter !== 'lost' && (
                                   <Dropdown className="d-inline">
                                     <Dropdown.Toggle 
