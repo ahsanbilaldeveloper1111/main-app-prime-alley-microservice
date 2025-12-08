@@ -10,6 +10,12 @@ interface SSEConfig {
   localPartyNumber?: string;
   ownerUsername?: string;
   imagicle?: string;
+
+  callDuration?: string;
+  callType?: string;
+  remotePartyNumber?: string;
+  dateTime?: string;
+
   preventAutoConnect?: boolean;
 }
 
@@ -103,13 +109,7 @@ export const useAnalysisSSE = (config: SSEConfig) => {
       isConnectingRef.current = false;
       autoConnectTriggeredRef.current = false; // Reset so we can try again when parameters are ready
       currentConnectionUrlRef.current = ''; // Clear URL ref
-      console.warn('⚠️ Cannot connect: Missing required parameters', {
-        uuid: configRef.current.uuid,
-        date: configRef.current.date,
-        localPartyNumber: configRef.current.localPartyNumber,
-        ownerUsername: configRef.current.ownerUsername,
-        imagicle: configRef.current.imagicle
-      });
+      
       setState(prev => ({
         ...prev,
         connecting: false,
@@ -133,6 +133,11 @@ export const useAnalysisSSE = (config: SSEConfig) => {
       if (configRef.current.localPartyNumber) params.append('localPartyNumber', configRef.current.localPartyNumber);
       if (configRef.current.ownerUsername) params.append('ownerUsername', configRef.current.ownerUsername);
       if (configRef.current.imagicle) params.append('imagicle', configRef.current.imagicle);
+
+      if (configRef.current.callDuration) params.append('callDuration', configRef.current.callDuration);
+      if (configRef.current.callType) params.append('callType', configRef.current.callType);
+      if (configRef.current.remotePartyNumber) params.append('remotePartyNumber', configRef.current.remotePartyNumber);
+      if (configRef.current.dateTime) params.append('dateTime', configRef.current.dateTime);
       
       const sseUrl = `/api/analysis-stream?${params.toString()}`;
       
@@ -151,7 +156,7 @@ export const useAnalysisSSE = (config: SSEConfig) => {
       // This prevents race conditions where multiple calls happen before EventSource is created
       currentConnectionUrlRef.current = sseUrl;
       
-      console.log('Creating new EventSource for:', sseUrl);
+      //console.log('Creating new EventSource for:', sseUrl);
       const eventSource = new EventSource(sseUrl);
       eventSourceRef.current = eventSource;
 
@@ -171,10 +176,10 @@ export const useAnalysisSSE = (config: SSEConfig) => {
       };
 
       eventSource.onmessage = (event) => {
-        console.log('EventSource onmessage triggered, raw event.data:', event.data);
+        //console.log('EventSource onmessage triggered, raw event.data:', event.data);
         try {
           const data = JSON.parse(event.data);
-          console.log('Parsed SSE data:', data);
+          //console.log('Parsed SSE data:', data);
           
           // Check if message indicates an error - stop connection and don't reconnect
           if (data.status === 'error') {
@@ -208,7 +213,7 @@ export const useAnalysisSSE = (config: SSEConfig) => {
             ...prev,
             lastMessage: data
           }));
-          console.log('Calling onMessage callback with data:', data);
+          // console.log('Calling onMessage callback with data:', data);
           configRef.current.onMessage?.(data);
         } catch (error) {
           // Still call onMessage with raw data in case it's not JSON
@@ -322,6 +327,12 @@ export const useAnalysisSSE = (config: SSEConfig) => {
     if (configRef.current.localPartyNumber) params.append('localPartyNumber', configRef.current.localPartyNumber);
     if (configRef.current.ownerUsername) params.append('ownerUsername', configRef.current.ownerUsername);
     if (configRef.current.imagicle) params.append('imagicle', configRef.current.imagicle);
+
+    if (configRef.current.callDuration) params.append('callDuration', configRef.current.callDuration);
+    if (configRef.current.callType) params.append('callType', configRef.current.callType);
+    if (configRef.current.remotePartyNumber) params.append('remotePartyNumber', configRef.current.remotePartyNumber);
+    if (configRef.current.dateTime) params.append('dateTime', configRef.current.dateTime);
+
     const sseUrl = `/api/analysis-stream?${params.toString()}`;
     
     // CRITICAL: Check if we're already connecting to this exact URL

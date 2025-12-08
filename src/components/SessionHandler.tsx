@@ -13,7 +13,7 @@ const SessionHandler: React.FC<SessionHandlerProps> = ({ children }) => {
   const router = useRouter();
   
   // Detect browser close and clear all sessions
-  useBrowserCloseDetection();
+  //useBrowserCloseDetection();
 
   useEffect(() => {
     // Handle session state changes

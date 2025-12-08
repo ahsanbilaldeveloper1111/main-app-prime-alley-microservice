@@ -19,6 +19,7 @@ import {
   AddComment,
   AddAssigneeComment,
   loadImage,
+  GetTicket,
 } from "@utils/tickets";
 import { GetHierarchyData } from "@utils/users";
 import { GetAllStatuses } from "@utils/ticket-statuses";
@@ -47,7 +48,7 @@ import { User,Edit,Trash2,Eye,Plus, Filter, Search,Info, AlertCircle, CheckCircl
 
 import ThemeSelect from "@components/ThemeSelect";
 import Select from "react-select";
-
+import { useRouter } from "next/router";
 
 interface SelectOption {
   value: number;
@@ -79,6 +80,7 @@ const getStatusBadgeColor = (status: string) => {
 const priorityLabels = ["Low", "Medium", "High", "Critical"];
 
 const TicketList = () => {
+  const router = useRouter();
   const { data: session, status } = useSession();
   const [activeTab, setActiveTab] = useState<'public' | 'internal' | 'activity'>('public');
 
@@ -287,7 +289,7 @@ const TicketList = () => {
           <div className="d-flex justify-content-center gap-2">
             {session?.user?.permissions?.includes('view-ticket-tickets') && (
               <Button variant="light" size="sm" className="btn-action-style-2 p-1 text-secondary" title="View">
-                <Eye size={16}  onClick={() => handleViewTicket(props)} />
+                <Eye size={16}  onClick={() => handleViewTicket(props.id)} />
               </Button>
             )}
             {session?.user?.permissions?.includes('edit-ticket-tickets') && (
@@ -542,52 +544,66 @@ const TicketList = () => {
     }
   }, []);
 
-  const handleViewTicket = useCallback(async (props: any) => {
-    setViewTicketData(props);
-    console.log("View ticket:", props);
-    setShowViewTicketModal(true);
-
-    // Fetch comments when opening the modal
-    fetchComments(props.id);
-
-    // Fetch submodule and submodule child data if module_id exists
-    if (props.module_id) {
-      try {
-        const submoduleData = await GetAllSubmodules();
-        const filteredSubmodules =
-          submoduleData?.filter(
-            (sub: any) => sub.module_id == props.module_id
-          ) || [];
-
-        if (props.submodule_id) {
-          const submoduleChildData = await GetAllSubmoduleChildren();
-          const filteredChildren =
-            submoduleChildData?.filter(
-              (child: any) => child.submodule_id == props.submodule_id
-            ) || [];
-
-          // Update viewTicketData with the fetched submodule information
-          setViewTicketData({
-            ...props,
-            submodule: filteredSubmodules.find(
-              (sub: any) => sub.id == props.submodule_id
-            ),
-            submodule_child: filteredChildren.find(
-              (child: any) => child.id == props.submodule_child_id
-            ),
-          });
-        } else {
-          setViewTicketData({
-            ...props,
-            submodule: null,
-            submodule_child: null,
-          });
-        }
-      } catch (error) {
-        console.error("Error fetching submodule data:", error);
-      }
-    }
+  const handleViewTicket = useCallback(async (ticketId: string) => {
+    router.push(`/tickets/list/${ticketId}`);
   }, []);
+
+  // const handleViewTicket = useCallback(async (props: any) => {
+  //   setViewTicketData(props);
+
+  //   const ticketData = await GetTicket(props.id);
+  //   if(ticketData && ticketData.success==true){
+  //     //setViewTicketData(ticketData.data);
+  //     console.log("Ticket data xxxxx:", ticketData.data);
+  //   }
+
+    
+
+
+  //   console.log("View ticket:", props);
+  //   setShowViewTicketModal(true);
+
+  //   // Fetch comments when opening the modal
+  //   fetchComments(props.id);
+
+  //   // Fetch submodule and submodule child data if module_id exists
+  //   if (props.module_id) {
+  //     try {
+  //       const submoduleData = await GetAllSubmodules();
+  //       const filteredSubmodules =
+  //         submoduleData?.filter(
+  //           (sub: any) => sub.module_id == props.module_id
+  //         ) || [];
+
+  //       if (props.submodule_id) {
+  //         const submoduleChildData = await GetAllSubmoduleChildren();
+  //         const filteredChildren =
+  //           submoduleChildData?.filter(
+  //             (child: any) => child.submodule_id == props.submodule_id
+  //           ) || [];
+
+  //         // Update viewTicketData with the fetched submodule information
+  //         setViewTicketData({
+  //           ...props,
+  //           submodule: filteredSubmodules.find(
+  //             (sub: any) => sub.id == props.submodule_id
+  //           ),
+  //           submodule_child: filteredChildren.find(
+  //             (child: any) => child.id == props.submodule_child_id
+  //           ),
+  //         });
+  //       } else {
+  //         setViewTicketData({
+  //           ...props,
+  //           submodule: null,
+  //           submodule_child: null,
+  //         });
+  //       }
+  //     } catch (error) {
+  //       console.error("Error fetching submodule data:", error);
+  //     }
+  //   }
+  // }, []);
 
   const handleAddComment = useCallback(
     async (ticketId: string) => {

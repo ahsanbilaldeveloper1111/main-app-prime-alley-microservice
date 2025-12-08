@@ -26,16 +26,16 @@ import axiosInstance from "./axios";
     }
   };
 
-export const GetTranslations = async (uuid: string, target: string) => {
+export const GetTranslations = async (uuid: string, target_lang?: string) => {
   try {
     const response = await axiosInstance.post(`aiml/translations`, {
       uuid,
-      target
+      ...(target_lang && { target_lang })
     });
 
     if(response.data){
       const responseData = response.data;
-      return responseData;
+    return responseData;
     }else{
       toast.error('Failed to get translations');
       return false;
