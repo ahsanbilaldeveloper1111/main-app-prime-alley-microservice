@@ -353,6 +353,12 @@ MENU_COLORS: {
     CREATE_CRM_OPPORTUNITIES: 'add-crm-opportunities',
     VIEW_CRM_LEADS: 'view-crm-leads',
     CREATE_CRM_LEADS: 'add-crm-leads',
+    VIEW_CRM_DEALS: 'view-crm-deals',
+    CREATE_CRM_DEALS: 'add-crm-deals',
+    VIEW_CRM_ORDERS: 'view-crm-orders',
+    CREATE_CRM_ORDERS: 'add-crm-orders',
+    VIEW_CRM_TASKS: 'view-crm-tasks',
+    VIEW_CRM_PRODUCTS: 'view-crm-products',
     VIEW_CRM_STAGES: 'view-crm-stages',
     VIEW_CRM_LOST_REASONS: 'view-crm-lost-reasons',
 

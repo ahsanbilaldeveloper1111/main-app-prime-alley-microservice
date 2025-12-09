@@ -140,28 +140,28 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
           id: 'crm-deals',
           title: HEADER_CONSTANTS.SUBMENU_LABELS.DEALS,
           icon: <Target size={16} />,
-          permission: PERMISSIONS.VIEW_CRM_LEADS,
+          permission: PERMISSIONS.VIEW_CRM_DEALS,
           url: '/crm/deals'
         },
         {
           id: 'crm-orders',
           title: HEADER_CONSTANTS.SUBMENU_LABELS.ORDERS,
           icon: <Target size={16} />,
-          permission: PERMISSIONS.VIEW_CRM_LEADS,
+          permission: PERMISSIONS.VIEW_CRM_ORDERS,
           url: '/crm/orders'
         },
         {
           id: 'crm-products',
           title: HEADER_CONSTANTS.SUBMENU_LABELS.PRODUCTS,
           icon: <Package size={16} />,
-          permission: PERMISSIONS.VIEW_CRM_LEADS,
+          permission: PERMISSIONS.VIEW_CRM_PRODUCTS,
           url: '/crm/products'
         },
         {
           id: 'crm-tasks',
           title: HEADER_CONSTANTS.SUBMENU_LABELS.TASKS,
           icon: <BarChart3 size={16} />,
-          permission: PERMISSIONS.VIEW_CRM_STAGES,
+          permission: PERMISSIONS.VIEW_CRM_TASKS,
           url: '/crm/tasks'
         },
         {

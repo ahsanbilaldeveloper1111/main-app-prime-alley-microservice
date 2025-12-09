@@ -288,25 +288,25 @@ export const routePermissions: RoutePermission[] = [
                 ]
             },
             { 
-                path: '/deals',permissions: [PERMISSIONS.VIEW_CRM_LEADS],
+                path: '/deals',permissions: [PERMISSIONS.VIEW_CRM_DEALS],
                 children: [
-                    { path: '/',permissions: [PERMISSIONS.VIEW_CRM_LEADS]},
-                    { path: '/create',permissions: [PERMISSIONS.CREATE_CRM_LEADS]},
+                    { path: '/',permissions: [PERMISSIONS.VIEW_CRM_DEALS]},
+                    { path: '/create',permissions: [PERMISSIONS.CREATE_CRM_DEALS]},
                 ]
             },
             { 
-                path: '/orders',permissions: [PERMISSIONS.VIEW_CRM_LEADS],
+                path: '/orders',permissions: [PERMISSIONS.VIEW_CRM_ORDERS],
                 children: [
-                    { path: '/',permissions: [PERMISSIONS.VIEW_CRM_LEADS]},
-                    { path: '/create',permissions: [PERMISSIONS.CREATE_CRM_LEADS]},
+                    { path: '/',permissions: [PERMISSIONS.VIEW_CRM_ORDERS]},
+                    { path: '/create',permissions: [PERMISSIONS.CREATE_CRM_ORDERS]},
                 ]
             },
             { path: '/lost-reasons',permissions: [PERMISSIONS.VIEW_CRM_LOST_REASONS]},
             { path: '/opportunities',permissions: [PERMISSIONS.VIEW_CRM_OPPORTUNITIES]},
             { path: '/opportunities/create',permissions: [PERMISSIONS.CREATE_CRM_OPPORTUNITIES]},
             { path: '/stages',permissions: [PERMISSIONS.VIEW_CRM_STAGES]},
-            { path: '/tasks',permissions: [PERMISSIONS.VIEW_CRM_STAGES]},
-            { path: '/products',permissions: [PERMISSIONS.VIEW_CRM_STAGES]},
+            { path: '/tasks',permissions: [PERMISSIONS.VIEW_CRM_TASKS]},
+            { path: '/products',permissions: [PERMISSIONS.VIEW_CRM_PRODUCTS]},
         ]
     },
     
