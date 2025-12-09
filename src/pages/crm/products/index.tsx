@@ -633,7 +633,7 @@ const ProductsPage = () => {
   }
 
   return (
-    <Layout>
+    <React.Fragment>
       <BreadcrumbItem mainTitle="CRM" mainLink="/crm/dashboard" subTitle="Products" />
       <style dangerouslySetInnerHTML={{__html: `
         .products-table-wrapper {
@@ -1653,8 +1653,12 @@ const ProductsPage = () => {
           </Card.Body>
         </Card>
       </div>
-    </Layout>
+    </React.Fragment>
   );
+};
+
+ProductsPage.getLayout = (page: React.ReactNode) => {
+  return <Layout>{page}</Layout>;
 };
 
 export default ProductsPage;

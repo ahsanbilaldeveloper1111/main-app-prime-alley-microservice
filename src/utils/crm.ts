@@ -1437,6 +1437,65 @@ export const getCrmDataHistory = async (
   }
 };
 
+// History List Interface
+export interface HistoryListRecord {
+  updated_at: string;
+  record_type: "lead" | "deal" | "order" | "prospect";
+  record_name: string;
+  action_by: string;
+  record_id: string;
+  assigned_to: string;
+  stage_name: string;
+}
+
+// Get History List
+export const getHistoryList = async (
+  params: PaginationParams = {}
+): Promise<PaginationWrapper<HistoryListRecord>> => {
+  try {
+    const response = await axiosInstance.get("/crm/history/list", { params });
+    return extractData<{data: PaginationWrapper<HistoryListRecord>}>(response)?.data;
+  } catch (error: any) {
+    toast.error(error?.message || "Failed to fetch history list");
+    throw error;
+  }
+};
+
+// History Chain Record Interface
+export interface HistoryChainRecord {
+  id: number;
+  entity_type: "Prospect" | "Lead" | "Deal" | "Order";
+  entity_id: string;
+  entity_name: string;
+  event: string;
+  action: string | null;
+  action_display: string;
+  description: string;
+  changes: any[];
+  user_extension: string | null;
+  user_extension_done_by: string | null;
+  user_extension_done_to: string | null;
+  total_records: number | null;
+  details: any[];
+  created_at: string;
+  created_at_human: string;
+  created_at_formatted: string;
+}
+
+// Get History Chain for a specific record
+export const getHistoryChain = async (
+  entityType: "prospect" | "lead" | "deal" | "order",
+  entityId: string | number
+): Promise<HistoryChainRecord[]> => {
+  try {
+    const response = await axiosInstance.get(`/crm/history/${entityType}/${entityId}/chain`);
+    return extractData<HistoryChainRecord[]>(response.data);
+  } catch (error: any) {
+    toast.error(error?.message || "Failed to fetch history chain");
+    throw error;
+  }
+};
+
 // Deal Management
 export interface DealData {
   id: number;

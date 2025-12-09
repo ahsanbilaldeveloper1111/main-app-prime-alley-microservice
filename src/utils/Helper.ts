@@ -429,6 +429,7 @@ export const ModuleSlug = {
   CRM_TASKS:'crm-tasks',
   CRM_STAGES:'crm-stages',
   CRM_LOST_REASONS:'crm-lost-reasons',
+  CRM_HISTORY:'crm-history',
 }
 
 export const formatCurrency = (amount: number | null): string => {
