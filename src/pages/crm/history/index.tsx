@@ -2,9 +2,11 @@ import React, { ReactElement, useState, useEffect, useCallback } from "react";
 import { Row, Col, Card, Button, Badge, Table, Form, Modal, InputGroup } from "react-bootstrap";
 import Select from "react-select";
 import Layout from "@layout/index";
+import ProtectedRoute from "@components/ProtectedRoute";
 import { HistoryListRecord, getHistoryChain, HistoryChainRecord, getStages, StageData, getCrmDataById, CrmDataItem } from "@utils/crm";
 import { GetHierarchyData } from "@utils/users";
 import axiosInstance from "@utils/axios";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
 import {
   Users,
   Target,
@@ -953,9 +955,12 @@ const HistoryPage = () => {
     );
   };
 
+  const { PERMISSIONS } = HEADER_CONSTANTS;
+
   return (
-    <div>
-      {ActivityTimelineModal()}
+    <ProtectedRoute requiredPermissions={[PERMISSIONS.VIEW_CRM_HISTORY]}>
+      <div>
+        {ActivityTimelineModal()}
 
       {/* Header */}
       <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4">
@@ -1327,7 +1332,8 @@ const HistoryPage = () => {
           </div>
         </Card.Body>
       </Card>
-    </div>
+      </div>
+    </ProtectedRoute>
   );
 };
 

@@ -361,6 +361,11 @@ MENU_COLORS: {
     VIEW_CRM_PRODUCTS: 'view-crm-products',
     VIEW_CRM_STAGES: 'view-crm-stages',
     VIEW_CRM_LOST_REASONS: 'view-crm-lost-reasons',
+    VIEW_CRM_REPORTS: 'view-reports-crm-reports',
+    VIEW_CRM_LEADS_REPORTS: 'view-leads-reports-crm-reports',
+    VIEW_CRM_DEALS_REPORTS: 'view-deals-reports-crm-reports',
+    VIEW_CRM_ORDERS_REPORTS: 'view-orders-reports-crm-reports',
+    VIEW_CRM_HISTORY: 'view-crm-history',
 
     VIEW_GSM_DASHBOARD: 'dashboard-gsm-management',
     VIEW_GSM_MANAGEMENT: 'view-gsm-management',

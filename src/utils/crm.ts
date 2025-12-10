@@ -2676,3 +2676,461 @@ export const deleteTaskNote = async (
     throw error;
   }
 };
+
+// Lead Reports Interfaces
+export interface LeadOverviewReport {
+  total_leads: number;
+  new_leads: number;
+  owned_leads: number;
+  unassigned_leads: number;
+}
+
+export interface LeadSourceReport {
+  source: string;
+  count: string;
+  percentage: number;
+}
+
+export interface LeadAssignmentReport {
+  user_extension: string;
+  assigned_count: string;
+  unassigned_count: number;
+}
+
+export interface LeadConversionByStage {
+  stage: string;
+  count: string;
+  converted: number;
+}
+
+export interface LeadConversionReport {
+  total_leads: number;
+  converted_to_deals: number;
+  conversion_rate: number;
+  by_stage: LeadConversionByStage[];
+}
+
+export interface LeadStageDurationReport {
+  stage: string;
+  lead_count: number;
+  avg_duration_days: number;
+  min_duration_days: number;
+  max_duration_days: number;
+}
+
+// Lead Reports API
+export interface LeadReportFilters {
+  date_from?: string;
+  date_to?: string;
+  date_field?: string;
+  stage_id?: number;
+  source?: string;
+  owner?: string;
+}
+
+export const getLeadOverviewReport = async (filters?: LeadReportFilters): Promise<LeadOverviewReport> => {
+  try {
+    const params: any = {};
+    if (filters?.date_from) params.date_from = filters.date_from;
+    if (filters?.date_to) params.date_to = filters.date_to;
+    if (filters?.date_field) params.date_field = filters.date_field;
+    if (filters?.stage_id) params.stage_id = filters.stage_id;
+    if (filters?.source) params.source = filters.source;
+    if (filters?.owner) params.owner = filters.owner;
+    
+    const response = await axiosInstance.get("/crm/leads/reports/overview", { params });
+    return extractData<LeadOverviewReport>(response.data);
+  } catch (error: any) {
+    toast.error(error?.message || "Failed to fetch lead overview report");
+    throw error;
+  }
+};
+
+export const getLeadSourceReport = async (filters?: LeadReportFilters): Promise<LeadSourceReport[]> => {
+  try {
+    const params: any = {};
+    if (filters?.date_from) params.date_from = filters.date_from;
+    if (filters?.date_to) params.date_to = filters.date_to;
+    if (filters?.date_field) params.date_field = filters.date_field;
+    if (filters?.stage_id) params.stage_id = filters.stage_id;
+    if (filters?.source) params.source = filters.source;
+    if (filters?.owner) params.owner = filters.owner;
+    
+    const response = await axiosInstance.get("/crm/leads/reports/source", { params });
+    const data = extractData<LeadSourceReport[]>(response.data);
+    return Array.isArray(data) ? data : [];
+  } catch (error: any) {
+    toast.error(error?.message || "Failed to fetch lead source report");
+    throw error;
+  }
+};
+
+export const getLeadAssignmentReport = async (filters?: LeadReportFilters): Promise<LeadAssignmentReport[]> => {
+  try {
+    const params: any = {};
+    if (filters?.date_from) params.date_from = filters.date_from;
+    if (filters?.date_to) params.date_to = filters.date_to;
+    if (filters?.date_field) params.date_field = filters.date_field;
+    if (filters?.stage_id) params.stage_id = filters.stage_id;
+    if (filters?.source) params.source = filters.source;
+    if (filters?.owner) params.owner = filters.owner;
+    
+    const response = await axiosInstance.get("/crm/leads/reports/assignment", { params });
+    const data = extractData<LeadAssignmentReport[]>(response.data);
+    return Array.isArray(data) ? data : [];
+  } catch (error: any) {
+    toast.error(error?.message || "Failed to fetch lead assignment report");
+    throw error;
+  }
+};
+
+export const getLeadConversionReport = async (filters?: LeadReportFilters): Promise<LeadConversionReport> => {
+  try {
+    const params: any = {};
+    if (filters?.date_from) params.date_from = filters.date_from;
+    if (filters?.date_to) params.date_to = filters.date_to;
+    if (filters?.date_field) params.date_field = filters.date_field;
+    if (filters?.stage_id) params.stage_id = filters.stage_id;
+    if (filters?.source) params.source = filters.source;
+    if (filters?.owner) params.owner = filters.owner;
+    
+    const response = await axiosInstance.get("/crm/leads/reports/conversion", { params });
+    return extractData<LeadConversionReport>(response.data);
+  } catch (error: any) {
+    toast.error(error?.message || "Failed to fetch lead conversion report");
+    throw error;
+  }
+};
+
+export const getLeadStageDurationReport = async (filters?: LeadReportFilters): Promise<LeadStageDurationReport[]> => {
+  try {
+    const params: any = {};
+    if (filters?.date_from) params.date_from = filters.date_from;
+    if (filters?.date_to) params.date_to = filters.date_to;
+    if (filters?.date_field) params.date_field = filters.date_field;
+    if (filters?.stage_id) params.stage_id = filters.stage_id;
+    if (filters?.source) params.source = filters.source;
+    if (filters?.owner) params.owner = filters.owner;
+    
+    const response = await axiosInstance.get("/crm/leads/reports/stage-duration", { params });
+    const data = extractData<LeadStageDurationReport[]>(response.data);
+    return Array.isArray(data) ? data : [];
+  } catch (error: any) {
+    toast.error(error?.message || "Failed to fetch lead stage duration report");
+    throw error;
+  }
+};
+
+// Deal Reports Interfaces
+export interface DealFunnelReport {
+  stage: string;
+  count: number;
+  value: number;
+  currency: string;
+  percentage: number;
+}
+
+export interface DealValueByCurrency {
+  currency: string;
+  deal_count: number;
+  total_value: number;
+  avg_value: number;
+}
+
+export interface DealValueByOwner {
+  owner: string;
+  currency: string;
+  deal_count: number;
+  total_value: number;
+  avg_value: number;
+}
+
+export interface DealValueReport {
+  by_currency: DealValueByCurrency[];
+  by_owner: DealValueByOwner[];
+}
+
+export interface DealStageDurationReport {
+  stage: string;
+  deal_count: number;
+  avg_duration_days: number;
+  min_duration_days: number;
+  max_duration_days: number;
+}
+
+export interface DealLostReasonReport {
+  reason: string;
+  currency: string;
+  count: number;
+  percentage: number;
+  total_value: number;
+}
+
+export interface DealConversionReport {
+  total_deals: number;
+  converted_to_orders: number;
+  conversion_rate: number;
+  order_value_by_currency: Array<{
+    currency: string;
+    order_count: number;
+    total_value: number;
+  }>;
+}
+
+export interface DealReportFilters {
+  date_from?: string;
+  date_to?: string;
+  date_field?: string;
+  stage_id?: number;
+  currency?: string;
+  owner?: string;
+}
+
+// Deal Reports API
+export const getDealFunnelReport = async (filters?: DealReportFilters): Promise<DealFunnelReport[]> => {
+  try {
+    const params: any = {};
+    if (filters?.date_from) params.date_from = filters.date_from;
+    if (filters?.date_to) params.date_to = filters.date_to;
+    if (filters?.date_field) params.date_field = filters.date_field;
+    if (filters?.stage_id) params.stage_id = filters.stage_id;
+    if (filters?.currency) params.currency = filters.currency;
+    if (filters?.owner) params.owner = filters.owner;
+    
+    const response = await axiosInstance.get("/crm/deals/reports/funnel", { params });
+    const data = extractData<DealFunnelReport[]>(response.data);
+    return Array.isArray(data) ? data : [];
+  } catch (error: any) {
+    toast.error(error?.message || "Failed to fetch deal funnel report");
+    throw error;
+  }
+};
+
+export const getDealValueReport = async (filters?: DealReportFilters): Promise<DealValueReport> => {
+  try {
+    const params: any = {};
+    if (filters?.date_from) params.date_from = filters.date_from;
+    if (filters?.date_to) params.date_to = filters.date_to;
+    if (filters?.date_field) params.date_field = filters.date_field;
+    if (filters?.stage_id) params.stage_id = filters.stage_id;
+    if (filters?.currency) params.currency = filters.currency;
+    if (filters?.owner) params.owner = filters.owner;
+    
+    const response = await axiosInstance.get("/crm/deals/reports/value", { params });
+    return extractData<DealValueReport>(response.data);
+  } catch (error: any) {
+    toast.error(error?.message || "Failed to fetch deal value report");
+    throw error;
+  }
+};
+
+export const getDealStageDurationReport = async (filters?: DealReportFilters): Promise<DealStageDurationReport[]> => {
+  try {
+    const params: any = {};
+    if (filters?.date_from) params.date_from = filters.date_from;
+    if (filters?.date_to) params.date_to = filters.date_to;
+    if (filters?.date_field) params.date_field = filters.date_field;
+    if (filters?.stage_id) params.stage_id = filters.stage_id;
+    if (filters?.currency) params.currency = filters.currency;
+    if (filters?.owner) params.owner = filters.owner;
+    
+    const response = await axiosInstance.get("/crm/deals/reports/stage-duration", { params });
+    const data = extractData<DealStageDurationReport[]>(response.data);
+    return Array.isArray(data) ? data : [];
+  } catch (error: any) {
+    toast.error(error?.message || "Failed to fetch deal stage duration report");
+    throw error;
+  }
+};
+
+export const getDealLostReasonReport = async (filters?: DealReportFilters): Promise<DealLostReasonReport[]> => {
+  try {
+    const params: any = {};
+    if (filters?.date_from) params.date_from = filters.date_from;
+    if (filters?.date_to) params.date_to = filters.date_to;
+    if (filters?.date_field) params.date_field = filters.date_field;
+    if (filters?.stage_id) params.stage_id = filters.stage_id;
+    if (filters?.currency) params.currency = filters.currency;
+    if (filters?.owner) params.owner = filters.owner;
+    
+    const response = await axiosInstance.get("/crm/deals/reports/lost-reasons", { params });
+    const data = extractData<DealLostReasonReport[]>(response.data);
+    return Array.isArray(data) ? data : [];
+  } catch (error: any) {
+    toast.error(error?.message || "Failed to fetch deal lost reason report");
+    throw error;
+  }
+};
+
+export const getDealConversionReport = async (filters?: DealReportFilters): Promise<DealConversionReport> => {
+  try {
+    const params: any = {};
+    if (filters?.date_from) params.date_from = filters.date_from;
+    if (filters?.date_to) params.date_to = filters.date_to;
+    if (filters?.date_field) params.date_field = filters.date_field;
+    if (filters?.stage_id) params.stage_id = filters.stage_id;
+    if (filters?.currency) params.currency = filters.currency;
+    if (filters?.owner) params.owner = filters.owner;
+    
+    const response = await axiosInstance.get("/crm/deals/reports/conversion", { params });
+    return extractData<DealConversionReport>(response.data);
+  } catch (error: any) {
+    toast.error(error?.message || "Failed to fetch deal conversion report");
+    throw error;
+  }
+};
+
+// Order Reports Interfaces
+export interface OrderSummaryReport {
+  total_orders: number;
+  by_currency: Array<{
+    currency: string;
+    order_count: number;
+    total_value: number;
+    avg_value: number;
+  }>;
+}
+
+export interface OrderStatusReport {
+  status: string;
+  count: number;
+  percentage: number;
+}
+
+export interface OrderRevenueByMonth {
+  month: string;
+  currency: string;
+  order_count: number;
+  total_value: number;
+}
+
+export interface OrderRevenueByOwner {
+  owner: string | null;
+  currency: string;
+  order_count: number;
+  total_value: number;
+}
+
+export interface OrderRevenueReport {
+  by_month: OrderRevenueByMonth[];
+  by_owner: OrderRevenueByOwner[];
+}
+
+export interface OrderStageDurationReport {
+  stage: string;
+  order_count: number;
+  avg_duration_days: number;
+  min_duration_days: number;
+  max_duration_days: number;
+}
+
+export interface OrderCancellationReport {
+  reason: string;
+  currency: string;
+  count: number;
+  percentage: number;
+  total_value: number;
+}
+
+export interface OrderReportFilters {
+  date_from?: string;
+  date_to?: string;
+  date_field?: string;
+  stage_id?: number;
+  currency?: string;
+  owner?: string;
+}
+
+// Order Reports API
+export const getOrderSummaryReport = async (filters?: OrderReportFilters): Promise<OrderSummaryReport> => {
+  try {
+    const params: any = {};
+    if (filters?.date_from) params.date_from = filters.date_from;
+    if (filters?.date_to) params.date_to = filters.date_to;
+    if (filters?.date_field) params.date_field = filters.date_field;
+    if (filters?.stage_id) params.stage_id = filters.stage_id;
+    if (filters?.currency) params.currency = filters.currency;
+    if (filters?.owner) params.owner = filters.owner;
+    
+    const response = await axiosInstance.get("/crm/orders/reports/summary", { params });
+    return extractData<OrderSummaryReport>(response.data);
+  } catch (error: any) {
+    toast.error(error?.message || "Failed to fetch order summary report");
+    throw error;
+  }
+};
+
+export const getOrderStatusReport = async (filters?: OrderReportFilters): Promise<OrderStatusReport[]> => {
+  try {
+    const params: any = {};
+    if (filters?.date_from) params.date_from = filters.date_from;
+    if (filters?.date_to) params.date_to = filters.date_to;
+    if (filters?.date_field) params.date_field = filters.date_field;
+    if (filters?.stage_id) params.stage_id = filters.stage_id;
+    if (filters?.currency) params.currency = filters.currency;
+    if (filters?.owner) params.owner = filters.owner;
+    
+    const response = await axiosInstance.get("/crm/orders/reports/status", { params });
+    const data = extractData<OrderStatusReport[]>(response.data);
+    return Array.isArray(data) ? data : [];
+  } catch (error: any) {
+    toast.error(error?.message || "Failed to fetch order status report");
+    throw error;
+  }
+};
+
+export const getOrderRevenueReport = async (filters?: OrderReportFilters): Promise<OrderRevenueReport> => {
+  try {
+    const params: any = {};
+    if (filters?.date_from) params.date_from = filters.date_from;
+    if (filters?.date_to) params.date_to = filters.date_to;
+    if (filters?.date_field) params.date_field = filters.date_field;
+    if (filters?.stage_id) params.stage_id = filters.stage_id;
+    if (filters?.currency) params.currency = filters.currency;
+    if (filters?.owner) params.owner = filters.owner;
+    
+    const response = await axiosInstance.get("/crm/orders/reports/revenue", { params });
+    return extractData<OrderRevenueReport>(response.data);
+  } catch (error: any) {
+    toast.error(error?.message || "Failed to fetch order revenue report");
+    throw error;
+  }
+};
+
+export const getOrderStageDurationReport = async (filters?: OrderReportFilters): Promise<OrderStageDurationReport[]> => {
+  try {
+    const params: any = {};
+    if (filters?.date_from) params.date_from = filters.date_from;
+    if (filters?.date_to) params.date_to = filters.date_to;
+    if (filters?.date_field) params.date_field = filters.date_field;
+    if (filters?.stage_id) params.stage_id = filters.stage_id;
+    if (filters?.currency) params.currency = filters.currency;
+    if (filters?.owner) params.owner = filters.owner;
+    
+    const response = await axiosInstance.get("/crm/orders/reports/stage-duration", { params });
+    const data = extractData<OrderStageDurationReport[]>(response.data);
+    return Array.isArray(data) ? data : [];
+  } catch (error: any) {
+    toast.error(error?.message || "Failed to fetch order stage duration report");
+    throw error;
+  }
+};
+
+export const getOrderCancellationReport = async (filters?: OrderReportFilters): Promise<OrderCancellationReport[]> => {
+  try {
+    const params: any = {};
+    if (filters?.date_from) params.date_from = filters.date_from;
+    if (filters?.date_to) params.date_to = filters.date_to;
+    if (filters?.date_field) params.date_field = filters.date_field;
+    if (filters?.stage_id) params.stage_id = filters.stage_id;
+    if (filters?.currency) params.currency = filters.currency;
+    if (filters?.owner) params.owner = filters.owner;
+    
+    const response = await axiosInstance.get("/crm/orders/reports/cancellation", { params });
+    const data = extractData<OrderCancellationReport[]>(response.data);
+    return Array.isArray(data) ? data : [];
+  } catch (error: any) {
+    toast.error(error?.message || "Failed to fetch order cancellation report");
+    throw error;
+  }
+};

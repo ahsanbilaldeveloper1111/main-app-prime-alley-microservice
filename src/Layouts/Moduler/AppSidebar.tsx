@@ -183,14 +183,14 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
           id: 'crm-history',
           title: 'History',
           icon: <History size={16} />,
-          permission: PERMISSIONS.VIEW_CRM_DASHBOARD, // Using dashboard permission as placeholder
+          permission: PERMISSIONS.VIEW_CRM_HISTORY,
           url: '/crm/history'
         },
         {
           id: 'crm-reports',
           title: 'Reports',
           icon: <BarChart3 size={16} />,
-          permission: PERMISSIONS.VIEW_CRM_DASHBOARD, // Using dashboard permission as placeholder
+          permission: PERMISSIONS.VIEW_CRM_REPORTS,
           url: '/crm/reports'
         }
       ].filter(item => !item.permission || hasPermission(item.permission))
