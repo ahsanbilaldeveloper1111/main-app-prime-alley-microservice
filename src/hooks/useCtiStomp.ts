@@ -64,6 +64,9 @@ export default function useCtiStomp(wsPath = '/ws') {
   const userAddressRef = useRef<string | null>(null);
   const isConnectingRef = useRef(false);
   const isInitializedRef = useRef(false);
+  const connectionStartTimeRef = useRef<number | null>(null);
+  const reconnectionTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const isReconnectingRef = useRef(false);
   
   // Store latest callback functions in refs to avoid stale closures
   // These will be initialized after the functions are defined
@@ -75,10 +78,8 @@ export default function useCtiStomp(wsPath = '/ws') {
   // Load persisted call states from localStorage
   const loadPersistedCallStates = useCallback(() => {
     try {
-      //console.log('Loading persisted call states from localStorage...')
       const storedTimestamp = localStorage.getItem(CALL_STATES_TIMESTAMP_KEY);
       if (!storedTimestamp) {
-       // console.log('No stored timestamp found, no persisted call states to load')
         return;
       }
 
@@ -88,7 +89,6 @@ export default function useCtiStomp(wsPath = '/ws') {
 
       // Check if stored data is still valid (not expired)
       if (hoursDiff > STORAGE_EXPIRY_HOURS) {
-        console.log('Stored call states expired, clearing localStorage');
         localStorage.removeItem(CALL_STATES_STORAGE_KEY);
         localStorage.removeItem(CALL_STATES_TIMESTAMP_KEY);
         return;
@@ -97,7 +97,6 @@ export default function useCtiStomp(wsPath = '/ws') {
       const storedCallStates = localStorage.getItem(CALL_STATES_STORAGE_KEY);
       if (storedCallStates) {
         const parsedCallStates = JSON.parse(storedCallStates);
-        console.log('Loaded persisted call states:', parsedCallStates);
         
         // Filter only active calls (not terminated) and normalize currentState
         const activeCallStates = Object.entries(parsedCallStates).reduce((acc, [callId, callEvent]) => {
@@ -145,15 +144,9 @@ export default function useCtiStomp(wsPath = '/ws') {
 
         if (Object.keys(activeCallStates).length > 0) {
           setCallStateMap(activeCallStates);
-          //console.log('Restored active call states:', activeCallStates);
-        } else {
-          //console.log('No active call states found in persisted data')
         }
-      } else {
-        //console.log('No stored call states found')
       }
     } catch (error) {
-      //console.error('Error loading persisted call states:', error);
       // Clear corrupted data
       localStorage.removeItem(CALL_STATES_STORAGE_KEY);
       localStorage.removeItem(CALL_STATES_TIMESTAMP_KEY);
@@ -306,23 +299,15 @@ export default function useCtiStomp(wsPath = '/ws') {
 
       // Process parties to ensure callingDeviceType is included
       const processedParties = partiesToProcess.map((party: any) => {
-        // console.log(`🔍 Processing party:`, {
-        //   callingAddress: party.callingAddress,
-        //   callingDeviceName: party.callingDeviceName,
-        //   callingDeviceType: party.callingDeviceType,
-        //   hasDeviceType: !!party.callingDeviceType
-        // });
-        
         // First try to get device info from stored caller info
         let storedCallerInfo = null;
         try {
           const stored = localStorage.getItem('cti_caller_info');
           if (stored) {
             storedCallerInfo = JSON.parse(stored);
-            console.log(`📋 Found stored caller info:`, storedCallerInfo);
           }
         } catch (error) {
-          console.error('Error retrieving stored caller info:', error);
+          // Ignore error
         }
         
         // If we have stored caller info and it matches this party, use it
@@ -330,42 +315,16 @@ export default function useCtiStomp(wsPath = '/ws') {
             storedCallerInfo.callingAddress === party.callingAddress && 
             storedCallerInfo.callingDeviceName === party.callingDeviceName) {
           party.callingDeviceType = storedCallerInfo.callingDeviceType;
-          console.log(`✅ Using stored caller info:`, {
-            deviceName: party.callingDeviceName,
-            deviceType: party.callingDeviceType
-          });
         }
         // If callingDeviceType is still missing, try to get it from the dnsMap
         else if (!party.callingDeviceType && party.callingAddress && party.callingDeviceName) {
-          // console.log(`🔍 Looking up device type for:`, {
-          //   callingAddress: party.callingAddress,
-          //   callingDeviceName: party.callingDeviceName,
-          //   dnsMapHasAddress: !!dnsMap[party.callingAddress],
-          //   dnsMapKeys: Object.keys(dnsMap),
-          //   dnsMapForAddress: dnsMap[party.callingAddress]
-          // });
-          
           const userDevices = dnsMap[party.callingAddress]?.devices;
           if (userDevices) {
-            
-            
-            
             const device = Object.values(userDevices).find((d: any) => d.deviceName === party.callingDeviceName);
             if (device) {
               party.callingDeviceType = device.deviceType;
-              
-            } else {
-              
             }
-          } else {
-           
           }
-        } else {
-          // console.log(`ℹ️ Device type already present or missing required data:`, {
-          //   callingDeviceType: party.callingDeviceType,
-          //   callingAddress: party.callingAddress,
-          //   callingDeviceName: party.callingDeviceName
-          // });
         }
         
         // Fallback: If still no device type, try to infer from device name
@@ -384,13 +343,8 @@ export default function useCtiStomp(wsPath = '/ws') {
           }
           
           party.callingDeviceType = inferredType;
-          // console.log(`🔄 Inferred device type:`, {
-          //   deviceName: party.callingDeviceName,
-          //   inferredType: inferredType
-          // });
         }
         
-        //console.log(`Final party data:`, party);
         return party;
       });
 
@@ -587,7 +541,6 @@ export default function useCtiStomp(wsPath = '/ws') {
   // Helper function to publish STOMP messages via API
   const publishStompMessage = useCallback(async (destination: string, body: string = '') => {
     if (!tokenRef.current || !userAddressRef.current) {
-      console.error('No token or userAddress available for publishing message');
       return false;
     }
 
@@ -602,7 +555,6 @@ export default function useCtiStomp(wsPath = '/ws') {
 
       return response.data.success === true;
     } catch (error) {
-      console.error('Error publishing STOMP message:', error);
       return false;
     }
   }, []);
@@ -635,28 +587,35 @@ export default function useCtiStomp(wsPath = '/ws') {
             userAddressRef.current = userAddress;
             return { token, userAddress };
           } else {
-            console.error('Missing token or userAddress in API response:', data);
             return null;
           }
         } else {
-          console.error('Failed to get bearer token:', response.statusText);
           return null;
         }
       } catch (error) {
-        console.error('Error getting bearer token:', error);
         return null;
       }
     };
 
-    const connectViaSSE = async (token: string, userAddress: string) => {
-      // Prevent multiple connections
-      if (eventSourceRef.current && eventSourceRef.current.readyState !== EventSource.CLOSED) {
-        console.log('⚠️ EventSource already exists and is not closed, skipping new connection');
-        return null;
+    const connectViaSSE = async (token: string, userAddress: string, forceReconnect: boolean = false) => {
+      // Prevent multiple connections unless forcing reconnect
+      if (!forceReconnect) {
+        if (eventSourceRef.current && eventSourceRef.current.readyState !== EventSource.CLOSED) {
+          return null;
+        }
+        
+        if (isConnectingRef.current) {
+          return null;
+        }
+      } else {
+        // Force reconnect: close existing connection first
+        if (eventSourceRef.current) {
+          eventSourceRef.current.close();
+          eventSourceRef.current = null;
+        }
       }
       
-      if (isConnectingRef.current) {
-        console.log('⚠️ Connection already in progress, skipping');
+      if (isConnectingRef.current && !forceReconnect) {
         return null;
       }
       
@@ -671,14 +630,8 @@ export default function useCtiStomp(wsPath = '/ws') {
       params.append('userAddress', userAddress);
       const sseUrl = `/api/cti-stomp-stream?${params.toString()}`;
       
-      // console.log('🔗 Connecting to CTI via SSE proxy...');
-      // console.log('🔗 SSE URL:', sseUrl);
-      // console.log('🔗 Token present:', !!token);
-      // console.log('🔗 UserAddress:', userAddress);
-      
       // Close existing connection if any
       if (eventSourceRef.current) {
-        console.log('🧹 Closing existing EventSource before creating new one');
         eventSourceRef.current.close();
         eventSourceRef.current = null;
       }
@@ -688,18 +641,49 @@ export default function useCtiStomp(wsPath = '/ws') {
       eventSourceRef.current = eventSource;
 
       eventSource.onopen = () => {
-        //console.log('✅ SSE connection opened');
         isConnectingRef.current = false;
         isInitializedRef.current = true;
         setIsInitialized(true);
         setError(null);
+        isReconnectingRef.current = false; // Reset reconnection flag
+        
+        // Track connection start time
+        connectionStartTimeRef.current = Date.now();
+        
+        // Clear any existing reconnection timer
+        if (reconnectionTimerRef.current) {
+          clearTimeout(reconnectionTimerRef.current);
+          reconnectionTimerRef.current = null;
+        }
+        
+        // Set up timer to reconnect after 15 minutes (900000ms)
+        reconnectionTimerRef.current = setTimeout(async () => {
+          console.log('🔄 15 minutes elapsed, reconnecting with fresh token...');
+          
+          // Close existing connection
+          if (eventSourceRef.current) {
+            eventSourceRef.current.close();
+            eventSourceRef.current = null;
+          }
+          
+          // Reset connection state
+          isConnectingRef.current = false;
+          isInitializedRef.current = false;
+          connectionStartTimeRef.current = null;
+          
+          // Get fresh token and reconnect
+          const freshToken = await getBearerToken();
+          if (freshToken) {
+            await connectViaSSE(freshToken.token, freshToken.userAddress, true);
+          } else {
+            setError('Failed to get fresh token for reconnection');
+          }
+        }, 900000); // 15 minutes
       };
 
       eventSource.onmessage = (event) => {
-       // console.log('📨 SSE message received:', event.data);
         try {
           const data = JSON.parse(event.data);
-          console.log('📨 Parsed SSE data:', data);
           
           switch (data.type) {
             case 'complete_state':
@@ -711,14 +695,12 @@ export default function useCtiStomp(wsPath = '/ws') {
                   setEventLog(prev => [...prev, { type: 'initial-state', data: grouped, timestamp: new Date().toISOString() }]);
                 }
               } catch (err) {
-                console.error('Failed to process initial state:', err);
                 setError('Failed to process initial state');
               }
               break;
               
             case 'dns_states':
               try {
-                console.log('dns-states received:', data.data);
                 const s = data.data;
                 setDnsMap(prev => {
                   const updated = { ...prev };
@@ -727,33 +709,27 @@ export default function useCtiStomp(wsPath = '/ws') {
                     updated[dn] = { dn, devices: {} };
                   }
                   updated[dn].devices[deviceName] = s;
-                  console.log('updated dns map:', updated);
                   if (updateSummaryDataRef.current) {
                     updateSummaryDataRef.current(updated);
                   }
                   return updated;
                 });
               } catch (err) {
-                console.error('Failed to process update:', err);
                 setError('Failed to process update');
               }
               break;
               
             case 'call_events':
               try {
-                console.log('================= CALL EVENTS ====================');
-                console.log('call-events received:', data.data);
                 if (handleCallEventRef.current) {
                   handleCallEventRef.current(data.data);
                 }
               } catch (err) {
-                console.error('Failed to process call event:', err);
                 setError('Failed to process call event');
               }
               break;
               
             case 'stomp_connected':
-              console.log('STOMP connected via proxy');
               setIsInitialized(true);
               setError(null);
               // Request initial state after connection
@@ -769,7 +745,49 @@ export default function useCtiStomp(wsPath = '/ws') {
               
             case 'connection':
               if (data.status === 'disconnected') {
-                setIsInitialized(false);
+                // Only set initialized to false if we're not preserving state
+                // This allows UI to keep showing existing data during reconnection
+                if (!data.preserveState) {
+                  setIsInitialized(false);
+                }
+              } else if (data.status === 'reconnecting') {
+                // During reconnection, keep initialized state but show reconnecting indicator
+                // Don't clear state - preserve existing dnsMap and callStateMap
+                setError(null); // Clear any previous errors
+                
+                // When server indicates reconnecting, get fresh token and reconnect
+                if (!isReconnectingRef.current) {
+                  isReconnectingRef.current = true;
+                  console.log('🔄 Server reconnecting, getting fresh token and reconnecting...');
+                  
+                  // Close current connection
+                  if (eventSourceRef.current) {
+                    eventSourceRef.current.close();
+                    eventSourceRef.current = null;
+                  }
+                  
+                  // Clear reconnection timer if it exists
+                  if (reconnectionTimerRef.current) {
+                    clearTimeout(reconnectionTimerRef.current);
+                    reconnectionTimerRef.current = null;
+                  }
+                  connectionStartTimeRef.current = null;
+                  
+                  // Get fresh token and reconnect after a short delay
+                  setTimeout(async () => {
+                    if (isReconnectingRef.current) {
+                      const freshToken = await getBearerToken();
+                      if (freshToken) {
+                        isReconnectingRef.current = false;
+                        await connectViaSSE(freshToken.token, freshToken.userAddress, true);
+                      } else {
+                        console.error('❌ Failed to get fresh token for reconnection');
+                        isReconnectingRef.current = false;
+                        setError('Failed to reconnect: could not get fresh token');
+                      }
+                    }
+                  }, 1000); // Wait 1 second before reconnecting
+                }
               }
               break;
               
@@ -783,81 +801,103 @@ export default function useCtiStomp(wsPath = '/ws') {
               break;
               
             case 'test':
-              console.log('✅ Test message received - SSE stream is working!', data);
+              // Ignore test messages
               break;
               
             default:
-              console.log('Unknown message type:', data.type);
+              break;
           }
         } catch (error) {
-          console.error('Error parsing SSE message:', error);
+          // Ignore parsing errors
         }
       };
 
       eventSource.onerror = (error) => {
         const readyState = eventSource.readyState;
-        console.error('❌ SSE connection error:', error);
-        //console.error('❌ EventSource readyState:', readyState);
-        //console.error('❌ EventSource URL:', sseUrl);
         
         // EventSource states: CONNECTING (0), OPEN (1), CLOSED (2)
         if (readyState === EventSource.CLOSED) {
-          console.log('🔌 EventSource is CLOSED - connection failed permanently');
           isConnectingRef.current = false;
           isInitializedRef.current = false;
           setError('SSE connection closed');
           setIsInitialized(false);
           
-          // Don't let EventSource auto-retry - we'll handle reconnection manually if needed
+          // Don't let EventSource auto-retry - we'll handle reconnection manually
           if (eventSourceRef.current) {
             eventSourceRef.current.close();
             eventSourceRef.current = null;
           }
+          
+          // Clear reconnection timer if it exists
+          if (reconnectionTimerRef.current) {
+            clearTimeout(reconnectionTimerRef.current);
+            reconnectionTimerRef.current = null;
+          }
+          connectionStartTimeRef.current = null;
+          
+          // Reconnect with fresh token after a short delay
+          if (!isReconnectingRef.current) {
+            isReconnectingRef.current = true;
+            console.log('🔄 Connection closed, will reconnect with fresh token...');
+            
+            setTimeout(async () => {
+              if (isReconnectingRef.current) {
+                // Get fresh token and reconnect
+                const freshToken = await getBearerToken();
+                if (freshToken) {
+                  isReconnectingRef.current = false;
+                  await connectViaSSE(freshToken.token, freshToken.userAddress, true);
+                } else {
+                  console.error('❌ Failed to get fresh token for reconnection');
+                  isReconnectingRef.current = false;
+                  setError('Failed to reconnect: could not get fresh token');
+                }
+              }
+            }, 2000); // Wait 2 seconds before reconnecting
+          }
         } else if (readyState === EventSource.CONNECTING) {
-         // console.log('⏳ EventSource is CONNECTING - waiting for connection...');
           // Don't set error yet, it's still trying to connect
         } else if (readyState === EventSource.OPEN) {
-          //console.log('✅ EventSource is OPEN - connection is active');
           // Connection is open, this might be a temporary error, don't close
         }
       };
 
       // Cleanup function
       return () => {
-        console.log('🧹 Cleaning up SSE connection');
         if (eventSourceRef.current) {
           eventSourceRef.current.close();
           eventSourceRef.current = null;
         }
+        if (reconnectionTimerRef.current) {
+          clearTimeout(reconnectionTimerRef.current);
+          reconnectionTimerRef.current = null;
+        }
         isConnectingRef.current = false;
         isInitializedRef.current = false;
+        connectionStartTimeRef.current = null;
+        isReconnectingRef.current = false;
       };
     };
 
     const initialize = async () => {
       // Prevent multiple initializations
       if (isInitializedRef.current) {
-        console.log('⚠️ Already initialized, skipping initialization');
         return null;
       }
       
       if (isConnectingRef.current) {
-        console.log('⚠️ Connection already in progress, skipping initialization');
         return null;
       }
       
       // Check if EventSource already exists and is open
       if (eventSourceRef.current && eventSourceRef.current.readyState === EventSource.OPEN) {
-        console.log('⚠️ EventSource already open, skipping initialization');
         return null;
       }
       
-      console.log('🚀 Initializing CTI connection via proxy...');
       const token = await getBearerToken();
       if (token) {
         return await connectViaSSE(token.token, token.userAddress);
       } else {
-        console.error('Service unavailable');
         setError('Service unavailable');
         isConnectingRef.current = false;
         return null;
@@ -872,7 +912,6 @@ export default function useCtiStomp(wsPath = '/ws') {
 
     // Cleanup on unmount
     return () => {
-      console.log('🧹 Component unmounting, cleaning up CTI connection');
       if (cleanup && typeof cleanup === 'function') {
         cleanup();
       }
@@ -880,8 +919,14 @@ export default function useCtiStomp(wsPath = '/ws') {
         eventSourceRef.current.close();
         eventSourceRef.current = null;
       }
+      if (reconnectionTimerRef.current) {
+        clearTimeout(reconnectionTimerRef.current);
+        reconnectionTimerRef.current = null;
+      }
       isConnectingRef.current = false;
       isInitializedRef.current = false;
+      connectionStartTimeRef.current = null;
+      isReconnectingRef.current = false;
     };
     // Empty dependency array - only run once on mount
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -890,7 +935,6 @@ export default function useCtiStomp(wsPath = '/ws') {
   // Helper: Get devices array for a DN
   const getDevicesForDn = useCallback((dn: string) => {
     const devices = dnsMap[dn] ? Object.values(dnsMap[dn].devices) : [];
-    console.log(`Getting devices for DN ${dn}:`, devices);
     return devices;
   }, [dnsMap]);
 
@@ -1031,12 +1075,11 @@ export default function useCtiStomp(wsPath = '/ws') {
       const hoursDiff = (now.getTime() - timestamp.getTime()) / (1000 * 60 * 60);
 
       if (hoursDiff > STORAGE_EXPIRY_HOURS) {
-        console.log('Clearing expired call states from localStorage');
         localStorage.removeItem(CALL_STATES_STORAGE_KEY);
         localStorage.removeItem(CALL_STATES_TIMESTAMP_KEY);
       }
     } catch (error) {
-      console.error('Error clearing expired call states:', error);
+      // Ignore error
     }
   }, []);
 
@@ -1047,7 +1090,6 @@ export default function useCtiStomp(wsPath = '/ws') {
       if (!storedCallStates) return;
 
       const parsedCallStates = JSON.parse(storedCallStates);
-      //console.log('Syncing persisted call states with server:', parsedCallStates);
 
       // Request call state updates for persisted calls
       if (clientRef.current && clientRef.current.connected) {
@@ -1059,7 +1101,7 @@ export default function useCtiStomp(wsPath = '/ws') {
         });
       }
     } catch (error) {
-      console.error('Error syncing persisted call states:', error);
+      // Ignore error
     }
   }, []);
 
@@ -1097,7 +1139,6 @@ export default function useCtiStomp(wsPath = '/ws') {
 
       return activeCallIds;
     } catch (error) {
-      console.error('Error getting active call IDs from localStorage:', error);
       return [];
     }
   }, []);
@@ -1128,14 +1169,6 @@ export default function useCtiStomp(wsPath = '/ws') {
     if (isInitialized && dnsMap && Object.keys(dnsMap).length > 0) {
       // Remove terminating calls from store
       removeTerminatingCalls();
-      
-      // Get active call IDs from localStorage
-      const activeCallIds = getActiveCallIdsFromLocalStorage();
-      console.log('Active call IDs from localStorage (currentState != DISCONNECTED):', activeCallIds);
-      
-      // Get all call IDs from current state
-      const allCallIds = getAllCallIds();
-      console.log('All call IDs from current state:', allCallIds);
       
       // Execute callback (handle both sync and async callbacks)
       await callback();

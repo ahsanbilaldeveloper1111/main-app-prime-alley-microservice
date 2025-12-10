@@ -464,11 +464,22 @@ const LiveCallDashboard = () => {
   // Listen for fullscreen changes
   useEffect(() => {
     const handleFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement)
+      const isFullscreen = !!document.fullscreenElement
+      setIsFullscreen(isFullscreen)
+      
+      // Add/remove class to body for CSS targeting
+      if (isFullscreen) {
+        document.body.classList.add('fullscreen-mode')
+      } else {
+        document.body.classList.remove('fullscreen-mode')
+      }
     }
 
     document.addEventListener('fullscreenchange', handleFullscreenChange)
-    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange)
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange)
+      document.body.classList.remove('fullscreen-mode')
+    }
   }, [])
 
 
@@ -1077,6 +1088,58 @@ const LiveCallDashboard = () => {
       .device-icon-wrapper.position-relative.active.monitoring {
     display: none !important;
 }
+    
+    /* Hide top bar and sidebar when in fullscreen */
+    body.fullscreen-mode .navbar,
+    body.fullscreen-mode nav.navbar,
+    body.fullscreen-mode .navbar-expand-lg,
+    :fullscreen .navbar,
+    :fullscreen nav.navbar,
+    :fullscreen .navbar-expand-lg {
+      display: none !important;
+    }
+    
+    body.fullscreen-mode .position-fixed.d-lg-none,
+    :fullscreen .position-fixed.d-lg-none {
+      display: none !important;
+    }
+    
+    body.fullscreen-mode .sidebar-card,
+    body.fullscreen-mode .sidebar-scrollbar,
+    body.fullscreen-mode .sidebar-backdrop,
+    body.fullscreen-mode [class*="AppSidebar"],
+    body.fullscreen-mode [class*="ApplicationSidebar"],
+    :fullscreen .sidebar-card,
+    :fullscreen .sidebar-scrollbar,
+    :fullscreen .sidebar-backdrop,
+    :fullscreen [class*="AppSidebar"],
+    :fullscreen [class*="ApplicationSidebar"] {
+      display: none !important;
+    }
+    
+    body.fullscreen-mode footer,
+    body.fullscreen-mode [class*="Footer"],
+    :fullscreen footer,
+    :fullscreen [class*="Footer"] {
+      display: none !important;
+    }
+    
+    /* Adjust main content when fullscreen */
+    body.fullscreen-mode .main-content-wrapper,
+    :fullscreen .main-content-wrapper {
+      margin-left: 0 !important;
+      margin-top: 0 !important;
+      width: 100% !important;
+      padding: 0 !important;
+    }
+    
+    body.fullscreen-mode .d-flex.flex-grow-1,
+    :fullscreen .d-flex.flex-grow-1 {
+      margin-top: 0 !important;
+    }
+      body.fullscreen-mode .pc-content,:fullscreen .pc-content {
+      padding:15px;
+      }
     
   `
 
