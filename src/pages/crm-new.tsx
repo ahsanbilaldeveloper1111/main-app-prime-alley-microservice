@@ -5,6 +5,7 @@ import React, { useState, ChangeEvent } from 'react';
 import { Container, Row, Col, Card, Button, Badge, Table, Form, Modal, Dropdown, ProgressBar, InputGroup } from 'react-bootstrap';
 import Select from 'react-select';
 import ExpandableSidebar from '@components/updated-sidebar'
+import KPIOverview from '@components/KPIS-overview';
 import CompanyLogo2 from "@assets/images/ringedge-logo-black-n-blue.png";
 import { 
   LayoutDashboard, 
@@ -92,7 +93,8 @@ import {
   LineChart,
   Line,
   Area,
-  AreaChart
+  AreaChart,
+  ComposedChart 
 } from 'recharts';
 import "@assets/scss/ticketsnew.scss";
 // Types
@@ -887,6 +889,9 @@ const CRMPortal = () => {
   const [selectedDateRange, setSelectedDateRange] = useState('last-30-days');
   const [customDateFrom, setCustomDateFrom] = useState('');
   const [customDateTo, setCustomDateTo] = useState('');
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [startDate, setStartDate] = useState('2024-10-10');
+  const [endDate, setEndDate] = useState('2024-10-20');
   const [selectedReportStages, setSelectedReportStages] = useState<string[]>([]);
   const [selectedReportUsers, setSelectedReportUsers] = useState<string[]>([]);
   const [selectedReportStatus, setSelectedReportStatus] = useState<string[]>([]);
@@ -947,12 +952,21 @@ const CRMPortal = () => {
     { id: 15, firstName: 'George', lastName: 'King', phone: '+1234500004', email: 'george.king@email.com', dataSource: 'Campaign', sourceFile: 'Q4 Campaign 2025', assignedTo: 'Mike Johnson (503)', lastCalled: '2025-11-18', lastCallStatus: 'Answered', callDisposition: 'Interested', nextCallScheduled: '2025-11-29 15:00', viewStatus: 'Viewed', tags: ['Warm'], importedBy: 'Manager Two (602)', callHistory: [{ date: '2025-11-18', status: 'Answered', comments: 'Requested follow-up call' }] }
   ];
   
+  type Stage = "New" | "Contacted" | "Qualified" | "Lost" | "FollowUp";
 
+  const stageColors: Record<Stage, { text: string; bg: string }> = {
+    New: { text: "#0d6efd", bg: "rgba(13,110,253,0.12)" },
+    Contacted: { text: "#198754", bg: "rgba(25,135,84,0.12)" },
+    Qualified: { text: "#fd7e14", bg: "rgba(253,126,20,0.12)" },
+    Lost: { text: "#dc3545", bg: "rgba(220,53,69,0.12)" },
+    FollowUp: { text: "#6f42c1", bg: "rgba(111,66,193,0.12)" },
+  };
+  
   const recentLeads: Lead[] = [
     { id: 1, name: 'Miss Laine', email: 'laine@email.com', phone: '+1234567890', company: 'Tech Corp', stage: 'New', created: 'Nov 17, 2025', lastActivity: 'Nov 17, 2025 17:41', assignedTo: 'John Doe', leadPotential: 'Warm', urgency: 'High', followUpCount: 2, leadScore: 73.5 },
-    { id: 2, name: 'Mr. Shayir', email: 'shayir@email.com', phone: '+1234567891', company: 'Digital Inc', stage: 'New', created: 'Nov 17, 2025', lastActivity: 'Nov 17, 2025 17:31', assignedTo: 'Jane Smith', leadPotential: 'Hot', urgency: 'Medium', followUpCount: 1, leadScore: 72.5 },
-    { id: 3, name: 'Mr Hassan Khokhar', email: 'hassan@email.com', phone: '+1234567892', company: 'Solutions Ltd', stage: 'Contacted', created: 'Nov 15, 2025', lastActivity: 'Nov 15, 2025 14:55', assignedTo: 'Mike Johnson', leadPotential: 'Hot', urgency: 'High', followUpCount: 3, leadScore: 90.25 },
-    { id: 4, name: 'Mr Niazi', email: 'niazi@email.com', phone: '+1234567893', company: 'Global Co', stage: 'New', created: 'Nov 13, 2025', lastActivity: 'Nov 13, 2025 16:40', assignedTo: 'Sarah Williams', leadPotential: 'Cold', urgency: 'Low', followUpCount: 0, leadScore: 0 },
+    { id: 2, name: 'Mr. Shayir', email: 'shayir@email.com', phone: '+1234567891', company: 'Digital Inc', stage: 'Contacted', created: 'Nov 17, 2025', lastActivity: 'Nov 17, 2025 17:31', assignedTo: 'Jane Smith', leadPotential: 'Hot', urgency: 'Medium', followUpCount: 1, leadScore: 72.5 },
+    { id: 3, name: 'Mr Hassan Khokhar', email: 'hassan@email.com', phone: '+1234567892', company: 'Solutions Ltd', stage: 'Qualified', created: 'Nov 15, 2025', lastActivity: 'Nov 15, 2025 14:55', assignedTo: 'Mike Johnson', leadPotential: 'Hot', urgency: 'High', followUpCount: 3, leadScore: 90.25 },
+    { id: 4, name: 'Mr Niazi', email: 'niazi@email.com', phone: '+1234567893', company: 'Global Co', stage: 'FollowUp', created: 'Nov 13, 2025', lastActivity: 'Nov 13, 2025 16:40', assignedTo: 'Sarah Williams', leadPotential: 'Cold', urgency: 'Low', followUpCount: 0, leadScore: 0 },
     // { id: 5, name: 'Mr Hilal', email: 'hilal@email.com', phone: '+1234567894', company: 'Enterprise Systems', stage: 'Contacted', created: 'Nov 12, 2025', lastActivity: 'Nov 12, 2025 17:18', assignedTo: 'Tom Brown', leadPotential: 'Warm', urgency: 'Medium', followUpCount: 1, leadScore: 50 },
   
     // { id: 6, name: 'Miss Ayesha', email: 'ayesha@email.com', phone: '+1234567895', company: 'Tech Hive', stage: 'New', created: 'Nov 11, 2025', lastActivity: 'Nov 11, 2025 14:22', assignedTo: 'John Doe', leadPotential: 'Warm', urgency: 'Medium', followUpCount: 1, leadScore: 61 },
@@ -1388,16 +1402,16 @@ const CRMPortal = () => {
             .kpi-card-col { flex: 0 0 100% !important; max-width: 100% !important; }
           }
         `}</style>
-        <Row className="mb-4">
+        {/* <Row className="mb-4">
           {displayedKpiData.map((kpi, index) => (
             <Col key={index} className="mb-3 kpi-card-col">
               <KPICard {...kpi} />
             </Col>
           ))}
-        </Row>
+        </Row> */}
 
         {/* Expand/Collapse Button */}
-        {kpiData.length > 4 && (
+        {/* {kpiData.length > 4 && (
           <div className="text-center mb-4 margin-minus-10">
             <Button 
               variant="link" 
@@ -1417,7 +1431,70 @@ const CRMPortal = () => {
               )}
             </Button>
           </div>
-        )}
+        )} */}
+
+        {/* Dashboard Overview KPIs */}
+        <KPIOverview
+          title="Dashboard Overview"
+          items={[
+            {
+              icon: <Target size={24} />,
+              iconColor: '#0d6efd',
+              label: 'TOTAL LEADS',
+              value: '58',
+              trend: {
+                value: '+12.5% vs last month',
+                isPositive: true,
+                label: ''
+              }
+            },
+            {
+              icon: <Handshake size={24} />,
+              iconColor: '#198754',
+              label: 'TOTAL DEALS',
+              value: '51',
+              trend: {
+                value: '+8.2% this month',
+                isPositive: true,
+                label: ''
+              }
+            },
+            {
+              icon: <Calendar size={24} />,
+              iconColor: '#0dcaf0',
+              label: 'TOTAL MEETINGS',
+              value: '15',
+              trend: {
+                value: '+3 this month',
+                isPositive: true,
+                label: ''
+              }
+            },
+            {
+              icon: <Clock size={24} />,
+              iconColor: '#ffc107',
+              label: 'MEETINGS NEXT 24H',
+              value: '0',
+              trend: {
+                value: '0 this month ',
+                isPositive: false,
+                label: ''
+              }
+            },
+            {
+              icon: <Megaphone size={24} />,
+              iconColor: '#0d6efd',
+              label: 'TOTAL CAMPAIGNS',
+              value: '20',
+              trend: {
+                value: '+5% this month',
+                isPositive: true,
+                label: ''
+              }
+            }
+          ]}
+        />
+
 
         {/* Expanded Widget Data */}
         {expandedWidget && widgetData.length > 0 && (
@@ -1618,12 +1695,13 @@ const CRMPortal = () => {
           <div key={index} className="mb-3">
             <div className="d-flex justify-content-between align-items-center mb-2">
               <span className="fw-semibold">{item.stage}</span>
-              <Badge bg="primary" className="bg-opacity-10 text-dark">{item.count}</Badge>
+              <span className="fw-semibold" style={{color: "#0d6efd"}}>{item.count}</span>
+              {/* <Badge bg="primary" className="bg-opacity-10 text-dark">{item.count}</Badge> */}
             </div>
-            <ProgressBar 
+            <ProgressBar
               now={(item.count / 45) * 100} 
               style={{ height: '8px', backgroundColor: '#e9ecef' }}
-              className="rounded"
+              className="rounded custom-progress-bar-bg"
             />
           </div>
         ))}
@@ -1653,7 +1731,7 @@ const CRMPortal = () => {
             </tr>
           </thead>
           <tbody>
-            {recentLeads.map((lead) => (
+            {/* {recentLeads.map((lead) => (
               <tr key={lead.id}>
                 <td style={{ fontSize: '0.9rem', fontWeight: 500 }}>{lead.name}</td>
                 <td>
@@ -1664,7 +1742,46 @@ const CRMPortal = () => {
                 <td style={{ fontSize: '0.85rem', color: '#6c757d' }}>{lead.created}</td>
                 <td style={{ fontSize: '0.85rem', color: '#6c757d' }}>{lead.lastActivity}</td>
               </tr>
-            ))}
+            ))} */}
+            {recentLeads.map((lead) => {
+  const colors = stageColors[lead.stage as Stage] || stageColors["New"];
+
+  return (
+    <tr key={lead.id}>
+      <td style={{ fontSize: "0.9rem", fontWeight: 500 }}>
+        {lead.name}
+      </td>
+
+      <td>
+      <div
+  style={{
+    display: "inline-block",
+    padding: "4px 12px",
+    borderRadius: "20px",
+    backgroundColor: colors.bg,
+    color: colors.text,
+    fontWeight: 600,
+    fontSize: "0.75rem",
+    lineHeight: 1,
+    whiteSpace: "nowrap",
+  }}
+>
+  {lead.stage}
+</div>
+
+      </td>
+
+      <td style={{ fontSize: "0.85rem", color: "#6c757d" }}>
+        {lead.created}
+      </td>
+
+      <td style={{ fontSize: "0.85rem", color: "#6c757d" }}>
+        {lead.lastActivity}
+      </td>
+    </tr>
+  );
+})}
+
           </tbody>
         </Table>
       </div>
@@ -1672,158 +1789,349 @@ const CRMPortal = () => {
   </Card>
 </Col>
 </Row>
-        {/* Recent Activities */}
-<Row>
-  {/* Recent Opportunities */}
-  <Col lg={6} className="mb-4">
-            <Card className="border-0 shadow-sm">
-              <Card.Body>
-                <div className="d-flex justify-content-between align-items-center mb-4">
-                  <h5 className="mb-0 fw-bold" style={{ color: '#2c3e50' }}>Recent Deals</h5>
-                  <Button variant="link" size="sm" className="text-decoration-none" onClick={() => setActiveScreen('deals')}>
-                    View All →
-                  </Button>
-                </div>
-                <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
-                  {recentOpportunities.slice(0, 5).map((opp) => (
-                    <div key={opp.id} className="mb-3 d-flex align-items-start gap-2">
-                      {/* Blue Dot Indicator */}
-                      <div style={{
-                        width: '8px',
-                        height: '8px',
-                        borderRadius: '50%',
-                        backgroundColor: '#0d6efd',
-                        marginTop: '6px',
-                        flexShrink: 0
-                      }} />
-                      
-                      <div className="flex-grow-1">
-                        {/* Opportunity Name */}
-                        <h6 className="mb-2" style={{ fontSize: '0.95rem', fontWeight: 600, color: '#2c3e50' }}>
-                          {opp.name}
-                        </h6>
-                        
-                        {/* Meta Information */}
-                        <div className="d-flex flex-wrap align-items-center gap-2 mb-2">
-                          <small className="text-muted d-flex align-items-center gap-1">
-                            <Calendar size={14} />
-                            {opp.created}
-                          </small>
-                          <small className="text-muted d-flex align-items-center gap-1">
-                            <Tag size={14} />
-                            {opp.value}
-                          </small>
-                          <Badge 
-                            bg={
-                              opp.stage === 'Won' ? 'success' :
-                              opp.stage === 'Lost' ? 'danger' :
-                              opp.stage === 'Meeting' ? 'primary' :
-                              'secondary'
-                            }
-                            style={{
-                              fontSize: '0.7rem',
-                              fontWeight: 500,
-                              padding: '4px 10px',
-                              textTransform: 'uppercase',
-                              backgroundColor: 
-                                opp.stage === 'Won' ? '#d4edda' :
-                                opp.stage === 'Lost' ? '#f8d7da' :
-                                opp.stage === 'Meeting' ? '#d1ecf1' :
-                                '#e2e3e5',
-                              color:
-                                opp.stage === 'Won' ? '#155724' :
-                                opp.stage === 'Lost' ? '#721c24' :
-                                opp.stage === 'Meeting' ? '#0c5460' :
-                                '#383d41',
-                              border: 'none'
-                            }}
-                          >
-                            {opp.stage}
-                          </Badge>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </Card.Body>
-            </Card>
-          </Col>
 
-          {/* Recent Orders */}
-          <Col lg={6} className="mb-4">
-            <Card className="border-0 shadow-sm">
-              <Card.Body>
-                <div className="d-flex justify-content-between align-items-center mb-4">
-                  <h5 className="mb-0 fw-bold" style={{ color: '#2c3e50' }}>Recent Orders</h5>
-                  <Button variant="link" size="sm" className="text-decoration-none" onClick={() => setActiveScreen('orders')}>
-                    View All →
-                  </Button>
+
+<Row className="g-4">
+  {/* Recent Deals */}
+  <Col lg={6}>
+    <Card className="border-0 shadow-sm h-100" style={{ 
+      borderRadius: '12px',
+      transition: 'all 0.3s ease'
+    }}>
+      <Card.Body className="p-4">
+        {/* Header */}
+        <div className="d-flex justify-content-between align-items-center mb-4 pb-3" style={{
+          borderBottom: '2px solid #f1f5f9'
+        }}>
+          <div className="d-flex align-items-center gap-2">
+            <div style={{
+              width: '40px',
+              height: '40px',
+              borderRadius: '10px',
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
+              <TrendingUp size={20} color="white" />
+            </div>
+            <div>
+              <h5 className="mb-0 fw-bold" style={{ color: '#1e293b', fontSize: '1.1rem' }}>
+                Recent Deals
+              </h5>
+              <small className="text-muted" style={{ fontSize: '0.8rem' }}>
+                Latest opportunities
+              </small>
+            </div>
+          </div>
+          <button
+            onClick={() => setActiveScreen('deals')}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: '#667eea',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              fontSize: '0.875rem',
+              fontWeight: 600,
+              padding: '6px 12px',
+              borderRadius: '8px',
+              transition: 'all 0.2s ease'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = '#f1f5f9';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent';
+            }}
+          >
+            View All <ArrowRight size={16} />
+          </button>
+        </div>
+
+        {/* List */}
+        {/* Table Header */}
+        {/* <div className="d-flex align-items-center px-3 py-2 mb-2" style={{
+          backgroundColor: '#f8fafc',
+          borderRadius: '8px',
+          fontSize: '0.75rem',
+          fontWeight: 700,
+          color: '#64748b',
+          textTransform: 'uppercase',
+          letterSpacing: '0.5px'
+        }}>
+          <div style={{ flex: '1 1 45%' }}>Deal Name</div>
+          <div style={{ flex: '1 1 30%', textAlign: 'center' }}>Value</div>
+          <div style={{ flex: '1 1 25%', textAlign: 'center' }}>Status</div>
+        </div> */}
+
+        {/* List */}
+        <div style={{ maxHeight: '400px', overflowY: 'auto', overflowX: 'hidden' }}>
+          {recentOpportunities.slice(0, 5).map((opp, index) => {
+            const getStageStyles = (stage: string) => {
+              const styles: Record<string, { bg: string; color: string; icon: string }> = {
+                'Won': { bg: '#dcfce7', color: '#166534', icon: '✓' },
+                'Lost': { bg: '#fee2e2', color: '#991b1b', icon: '✕' },
+                'Meeting': { bg: '#dbeafe', color: '#1e40af', icon: '●' },
+                'Proposal': { bg: '#fef3c7', color: '#92400e', icon: '◐' }
+              };
+              return styles[stage] || { bg: '#f3f4f6', color: '#374151', icon: '○' };
+            };
+            const stageStyle = getStageStyles(opp.stage);
+            
+            return (
+              <div
+                key={opp.id}
+                className="d-flex align-items-center px-3 py-3 mb-2"
+                style={{
+                  borderRadius: '8px',
+                  background: 'white',
+                  border: '1px solid #e2e8f0',
+                  transition: 'all 0.2s ease',
+                  cursor: 'pointer'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#f8fafc';
+                  e.currentTarget.style.borderColor = '#cbd5e1';
+                  e.currentTarget.style.transform = 'translateX(2px)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'white';
+                  e.currentTarget.style.borderColor = '#e2e8f0';
+                  e.currentTarget.style.transform = 'translateX(0)';
+                }}
+              >
+                {/* Deal Name */}
+                <div style={{ flex: '1 1 45%' }}>
+                  <h6 className="mb-1" style={{ 
+                    fontSize: '0.9rem', 
+                    fontWeight: 600, 
+                    color: '#1e293b',
+                    lineHeight: 1.3
+                  }}>
+                    {opp.name}
+                  </h6>
+                  <span className="d-flex align-items-center gap-1" style={{
+                    fontSize: '0.75rem',
+                    color: '#64748b'
+                  }}>
+                    <Calendar size={12} strokeWidth={2} />
+                    {opp.created}
+                  </span>
                 </div>
-                <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
-                  {recentOrders.slice(0, 5).map((order) => (
-                    <div key={order.id} className="mb-3 d-flex align-items-start gap-2">
-                      {/* Blue Dot Indicator */}
-                      <div style={{
-                        width: '8px',
-                        height: '8px',
-                        borderRadius: '50%',
-                        backgroundColor: '#0d6efd',
-                        marginTop: '6px',
-                        flexShrink: 0
-                      }} />
-                      
-                      <div className="flex-grow-1">
-                        {/* Order ID and Customer */}
-                        <h6 className="mb-2" style={{ fontSize: '0.95rem', fontWeight: 600, color: '#2c3e50' }}>
-                          {order.id} - {order.customer}
-                        </h6>
-                        
-                        {/* Meta Information */}
-                        <div className="d-flex flex-wrap align-items-center gap-2 mb-2">
-                          <small className="text-muted d-flex align-items-center gap-1">
-                            <Calendar size={14} />
-                            {order.date}
-                          </small>
-                          <small className="text-muted d-flex align-items-center gap-1">
-                            <Tag size={14} />
-                            {order.product}
-                          </small>
-                          <Badge 
-                            bg={
-                              order.status === 'Delivered' ? 'success' :
-                              order.status === 'In Progress' ? 'info' :
-                              order.status === 'Approved' ? 'primary' :
-                              'warning'
-                            }
-                            style={{
-                              fontSize: '0.7rem',
-                              fontWeight: 500,
-                              padding: '4px 10px',
-                              textTransform: 'uppercase',
-                              backgroundColor: 
-                                order.status === 'Delivered' ? '#d4edda' :
-                                order.status === 'In Progress' ? '#d1ecf1' :
-                                order.status === 'Approved' ? '#cce5ff' :
-                                '#fff3cd',
-                              color:
-                                order.status === 'Delivered' ? '#155724' :
-                                order.status === 'In Progress' ? '#0c5460' :
-                                order.status === 'Approved' ? '#004085' :
-                                '#856404',
-                              border: 'none'
-                            }}
-                          >
-                            {order.status}
-                          </Badge>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+
+                {/* Value */}
+                <div style={{ flex: '1 1 30%', textAlign: 'center' }}>
+                  <span className="d-inline-flex align-items-center gap-1" style={{
+                    fontSize: '0.9rem',
+                    color: '#16a34a',
+                    fontWeight: 700
+                  }}>
+                    <DollarSign size={14} strokeWidth={2.5} />
+                    {opp.value}
+                  </span>
                 </div>
-              </Card.Body>
-            </Card>
-          </Col>
+
+                {/* Stage Badge */}
+                <div style={{ flex: '1 1 25%', textAlign: 'center' }}>
+                  <div
+                    style={{
+                      backgroundColor: stageStyle.bg,
+                      color: stageStyle.color,
+                      fontSize: '0.7rem',
+                      fontWeight: 600,
+                      padding: '5px 10px',
+                      borderRadius: '6px',
+                      border: 'none',
+                      letterSpacing: '0.3px',
+                      display: 'inline-block',
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    {stageStyle.icon} {opp.stage}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </Card.Body>
+    </Card>
+  </Col>
+
+  {/* Recent Orders */}
+  <Col lg={6}>
+    <Card className="border-0 shadow-sm h-100" style={{ 
+      borderRadius: '12px',
+      transition: 'all 0.3s ease'
+    }}>
+      <Card.Body className="p-4">
+        {/* Header */}
+        <div className="d-flex justify-content-between align-items-center mb-4 pb-3" style={{
+          borderBottom: '2px solid #f1f5f9'
+        }}>
+          <div className="d-flex align-items-center gap-2">
+            <div style={{
+              width: '40px',
+              height: '40px',
+              borderRadius: '10px',
+              background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
+              <ShoppingBag size={20} color="white" />
+            </div>
+            <div>
+              <h5 className="mb-0 fw-bold" style={{ color: '#1e293b', fontSize: '1.1rem' }}>
+                Recent Orders
+              </h5>
+              <small className="text-muted" style={{ fontSize: '0.8rem' }}>
+                Latest transactions
+              </small>
+            </div>
+          </div>
+          <button
+            onClick={() => setActiveScreen('orders')}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: '#f5576c',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              fontSize: '0.875rem',
+              fontWeight: 600,
+              padding: '6px 12px',
+              borderRadius: '8px',
+              transition: 'all 0.2s ease'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = '#f1f5f9';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent';
+            }}
+          >
+            View All <ArrowRight size={16} />
+          </button>
+        </div>
+
+        {/* List */}
+        {/* Table Header */}
+        {/* <div className="d-flex align-items-center px-3 py-2 mb-2" style={{
+          backgroundColor: '#f8fafc',
+          borderRadius: '8px',
+          fontSize: '0.75rem',
+          fontWeight: 700,
+          color: '#64748b',
+          textTransform: 'uppercase',
+          letterSpacing: '0.5px'
+        }}>
+          <div style={{ flex: '1 1 45%' }}>Deal Name</div>
+          <div style={{ flex: '1 1 30%', textAlign: 'center' }}>Value</div>
+          <div style={{ flex: '1 1 25%', textAlign: 'center' }}>Status</div>
+        </div> */}
+
+        {/* List */}
+        <div style={{ maxHeight: '400px', overflowY: 'auto', overflowX: 'hidden' }}>
+          {recentOpportunities.slice(0, 5).map((opp, index) => {
+            const getStageStyles = (stage: string) => {
+              const styles: Record<string, { bg: string; color: string; icon: string }> = {
+                'Won': { bg: '#dcfce7', color: '#166534', icon: '✓' },
+                'Lost': { bg: '#fee2e2', color: '#991b1b', icon: '✕' },
+                'Meeting': { bg: '#dbeafe', color: '#1e40af', icon: '●' },
+                'Proposal': { bg: '#fef3c7', color: '#92400e', icon: '◐' }
+              };
+              return styles[stage] || { bg: '#f3f4f6', color: '#374151', icon: '○' };
+            };
+            const stageStyle = getStageStyles(opp.stage);
+            
+            return (
+              <div
+                key={opp.id}
+                className="d-flex align-items-center px-3 py-3 mb-2"
+                style={{
+                  borderRadius: '8px',
+                  background: 'white',
+                  border: '1px solid #e2e8f0',
+                  transition: 'all 0.2s ease',
+                  cursor: 'pointer'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#f8fafc';
+                  e.currentTarget.style.borderColor = '#cbd5e1';
+                  e.currentTarget.style.transform = 'translateX(2px)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'white';
+                  e.currentTarget.style.borderColor = '#e2e8f0';
+                  e.currentTarget.style.transform = 'translateX(0)';
+                }}
+              >
+                {/* Deal Name */}
+                <div style={{ flex: '1 1 45%' }}>
+                  <h6 className="mb-1" style={{ 
+                    fontSize: '0.9rem', 
+                    fontWeight: 600, 
+                    color: '#1e293b',
+                    lineHeight: 1.3
+                  }}>
+                    {opp.name}
+                  </h6>
+                  <span className="d-flex align-items-center gap-1" style={{
+                    fontSize: '0.75rem',
+                    color: '#64748b'
+                  }}>
+                    <Calendar size={12} strokeWidth={2} />
+                    {opp.created}
+                  </span>
+                </div>
+
+                {/* Value */}
+                <div style={{ flex: '1 1 30%', textAlign: 'center' }}>
+                  <span className="d-inline-flex align-items-center gap-1" style={{
+                    fontSize: '0.9rem',
+                    color: '#16a34a',
+                    fontWeight: 700
+                  }}>
+                    <DollarSign size={14} strokeWidth={2.5} />
+                    {opp.value}
+                  </span>
+                </div>
+
+                {/* Stage Badge */}
+                <div style={{ flex: '1 1 25%', textAlign: 'center' }}>
+                  <div
+                    style={{
+                      backgroundColor: stageStyle.bg,
+                      color: stageStyle.color,
+                      fontSize: '0.7rem',
+                      fontWeight: 600,
+                      padding: '5px 10px',
+                      borderRadius: '6px',
+                      border: 'none',
+                      letterSpacing: '0.3px',
+                      display: 'inline-block',
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    {stageStyle.icon} {opp.stage}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </Card.Body>
+    </Card>
+  </Col>
 </Row>
+
+
       </div>
     );
   };
@@ -17560,7 +17868,7 @@ const CRMPortal = () => {
       return (
         <Modal show={showActivityTimelineModal} onHide={() => setShowActivityTimelineModal(false)} size="xl" centered>
           {/* Enhanced Header with Gradient */}
-          <Modal.Header closeButton style={{  color: '#000', padding: '24px 32px', borderBottom: '1px solid #ccc' }}>
+          <Modal.Header closeButton style={{  color: '#000', padding: '24px 0px', borderBottom: '1px solid #ccc' }}>
             <div className="w-100">
               <div className="d-flex align-items-center justify-content-between">
                 <div>
@@ -18291,6 +18599,2277 @@ const CRMPortal = () => {
 
   // Reports Screen
   // NEW COMPREHENSIVE REPORTING COMPONENT
+  // MODERN REPORTING COMPONENT WITH TAB DESIGN (Reference Design Style)
+  const renderReportsModern = () => {
+    // Report tabs configuration
+    const reportTabs = [
+      { id: 'leads', label: 'Leads', icon: <Target size={16} /> },
+      { id: 'deals', label: 'Deals', icon: <Handshake size={16} /> },
+      { id: 'orders', label: 'Orders', icon: <ShoppingBag size={16} /> },
+      // { id: 'prospects', label: 'Prospects', icon: <Users size={16} /> },
+      { id: 'activities', label: 'Activities', icon: <Activity size={16} /> },
+      // { id: 'campaigns', label: 'Campaigns', icon: <Megaphone size={16} /> }
+    ];
+
+    // Sample report data based on selected module
+    const getReportData = () => {
+      const baseData = {
+        leads: {
+          totalCount: 156,
+          totalValue: '$425,000',
+          conversionRate: '34.2%',
+          avgResponseTime: '2.3 hrs',
+          chartData: [
+            { name: 'Mon', value: 12, converted: 4 },
+            { name: 'Tue', value: 19, converted: 7 },
+            { name: 'Wed', value: 15, converted: 5 },
+            { name: 'Thu', value: 22, converted: 8 },
+            { name: 'Fri', value: 28, converted: 11 },
+            { name: 'Sat', value: 18, converted: 6 },
+            { name: 'Sun', value: 14, converted: 5 }
+          ],
+          tableData: [
+            { id: 1, name: 'John Smith', email: 'john@email.com', stage: 'Qualified', value: '$25,000', owner: 'Sarah Williams', date: '2025-12-01', score: 85 },
+            { id: 2, name: 'Jane Doe', email: 'jane@email.com', stage: 'Negotiation', value: '$18,500', owner: 'John Doe', date: '2025-12-02', score: 78 },
+            { id: 3, name: 'Bob Wilson', email: 'bob@email.com', stage: 'New', value: '$12,000', owner: 'Mike Johnson', date: '2025-12-03', score: 65 },
+            { id: 4, name: 'Alice Brown', email: 'alice@email.com', stage: 'Won', value: '$32,000', owner: 'Sarah Williams', date: '2025-11-28', score: 92 },
+            { id: 5, name: 'Charlie Davis', email: 'charlie@email.com', stage: 'Contacted', value: '$15,000', owner: 'Jane Smith', date: '2025-12-01', score: 70 }
+          ]
+        },
+        deals: {
+          totalCount: 89,
+          totalValue: '$1,245,000',
+          conversionRate: '67.8%',
+          avgResponseTime: '1.8 hrs',
+          chartData: [
+            { name: 'Mon', value: 8, converted: 5 },
+            { name: 'Tue', value: 12, converted: 9 },
+            { name: 'Wed', value: 10, converted: 7 },
+            { name: 'Thu', value: 15, converted: 11 },
+            { name: 'Fri', value: 18, converted: 13 },
+            { name: 'Sat', value: 11, converted: 8 },
+            { name: 'Sun', value: 9, converted: 6 }
+          ],
+          tableData: [
+            { id: 1, name: 'Enterprise Deal A', email: 'contact@companya.com', stage: 'Proposal', value: '$125,000', owner: 'Sarah Williams', date: '2025-12-01', score: 88 },
+            { id: 2, name: 'Corp Contract B', email: 'sales@companyb.com', stage: 'Negotiation', value: '$98,500', owner: 'John Doe', date: '2025-12-02', score: 82 },
+            { id: 3, name: 'SMB Project C', email: 'info@companyc.com', stage: 'Closed Won', value: '$45,000', owner: 'Mike Johnson', date: '2025-11-30', score: 95 },
+            { id: 4, name: 'Strategic Deal D', email: 'bd@companyd.com', stage: 'Proposal', value: '$180,000', owner: 'Sarah Williams', date: '2025-12-03', score: 90 },
+            { id: 5, name: 'Partnership E', email: 'partner@companye.com', stage: 'Negotiation', value: '$67,000', owner: 'Jane Smith', date: '2025-12-02', score: 75 }
+          ]
+        },
+        orders: {
+          totalCount: 234,
+          totalValue: '$856,000',
+          conversionRate: '89.3%',
+          avgResponseTime: '3.2 hrs',
+          chartData: [
+            { name: 'Mon', value: 22, converted: 20 },
+            { name: 'Tue', value: 35, converted: 32 },
+            { name: 'Wed', value: 28, converted: 25 },
+            { name: 'Thu', value: 40, converted: 36 },
+            { name: 'Fri', value: 45, converted: 41 },
+            { name: 'Sat', value: 30, converted: 27 },
+            { name: 'Sun', value: 25, converted: 22 }
+          ],
+          tableData: [
+            { id: 1, name: 'Order #10234', email: 'customer1@email.com', stage: 'Processing', value: '$3,200', owner: 'Processing Team', date: '2025-12-03', score: 0 },
+            { id: 2, name: 'Order #10235', email: 'customer2@email.com', stage: 'Shipped', value: '$5,400', owner: 'Fulfillment', date: '2025-12-02', score: 0 },
+            { id: 3, name: 'Order #10236', email: 'customer3@email.com', stage: 'Delivered', value: '$2,800', owner: 'Completed', date: '2025-12-01', score: 0 },
+            { id: 4, name: 'Order #10237', email: 'customer4@email.com', stage: 'Pending', value: '$7,600', owner: 'Sales Team', date: '2025-12-03', score: 0 },
+            { id: 5, name: 'Order #10238', email: 'customer5@email.com', stage: 'Processing', value: '$4,100', owner: 'Processing Team', date: '2025-12-03', score: 0 }
+          ]
+        },
+        prospects: {
+          totalCount: 412,
+          totalValue: '$0',
+          conversionRate: '18.5%',
+          avgResponseTime: '4.5 hrs',
+          chartData: [
+            { name: 'Mon', value: 35, converted: 7 },
+            { name: 'Tue', value: 48, converted: 9 },
+            { name: 'Wed', value: 42, converted: 8 },
+            { name: 'Thu', value: 55, converted: 10 },
+            { name: 'Fri', value: 62, converted: 12 },
+            { name: 'Sat', value: 38, converted: 7 },
+            { name: 'Sun', value: 30, converted: 5 }
+          ],
+          tableData: [
+            { id: 1, name: 'Prospect A', email: 'prospecta@email.com', stage: 'New', value: '-', owner: 'John Doe', date: '2025-12-03', score: 45 },
+            { id: 2, name: 'Prospect B', email: 'prospectb@email.com', stage: 'Contacted', value: '-', owner: 'Sarah Williams', date: '2025-12-03', score: 58 },
+            { id: 3, name: 'Prospect C', email: 'prospectc@email.com', stage: 'Qualified', value: '-', owner: 'Mike Johnson', date: '2025-12-02', score: 72 },
+            { id: 4, name: 'Prospect D', email: 'prospectd@email.com', stage: 'New', value: '-', owner: 'Jane Smith', date: '2025-12-03', score: 38 },
+            { id: 5, name: 'Prospect E', email: 'prospecte@email.com', stage: 'Contacted', value: '-', owner: 'Tom Brown', date: '2025-12-02', score: 62 }
+          ]
+        },
+        activities: {
+          totalCount: 1247,
+          totalValue: '-',
+          conversionRate: '76.4%',
+          avgResponseTime: '1.2 hrs',
+          chartData: [
+            { name: 'Mon', value: 145, converted: 112 },
+            { name: 'Tue', value: 189, converted: 145 },
+            { name: 'Wed', value: 167, converted: 128 },
+            { name: 'Thu', value: 203, converted: 156 },
+            { name: 'Fri', value: 224, converted: 172 },
+            { name: 'Sat', value: 112, converted: 85 },
+            { name: 'Sun', value: 98, converted: 75 }
+          ],
+          tableData: [
+            { id: 1, name: 'Follow-up Call', email: 'customer1@email.com', stage: 'Completed', value: '-', owner: 'Sarah Williams', date: '2025-12-03 14:30', score: 0 },
+            { id: 2, name: 'Demo Meeting', email: 'customer2@email.com', stage: 'Scheduled', value: '-', owner: 'John Doe', date: '2025-12-04 10:00', score: 0 },
+            { id: 3, name: 'Email Sent', email: 'customer3@email.com', stage: 'Completed', value: '-', owner: 'Mike Johnson', date: '2025-12-03 11:15', score: 0 },
+            { id: 4, name: 'Proposal Review', email: 'customer4@email.com', stage: 'Pending', value: '-', owner: 'Jane Smith', date: '2025-12-03 16:00', score: 0 },
+            { id: 5, name: 'Contract Discussion', email: 'customer5@email.com', stage: 'Completed', value: '-', owner: 'Tom Brown', date: '2025-12-03 13:45', score: 0 }
+          ]
+        },
+        campaigns: {
+          totalCount: 23,
+          totalValue: '$285,000',
+          conversionRate: '42.1%',
+          avgResponseTime: '5.8 hrs',
+          chartData: [
+            { name: 'Mon', value: 2, converted: 1 },
+            { name: 'Tue', value: 4, converted: 2 },
+            { name: 'Wed', value: 3, converted: 1 },
+            { name: 'Thu', value: 5, converted: 2 },
+            { name: 'Fri', value: 6, converted: 3 },
+            { name: 'Sat', value: 2, converted: 1 },
+            { name: 'Sun', value: 1, converted: 0 }
+          ],
+          tableData: [
+            { id: 1, name: 'Q4 Campaign 2025', email: 'marketing@company.com', stage: 'Active', value: '$45,000', owner: 'Marketing Team', date: '2025-11-01', score: 0 },
+            { id: 2, name: 'Winter Sale 2025', email: 'sales@company.com', stage: 'Completed', value: '$67,000', owner: 'Sales Team', date: '2025-11-15', score: 0 },
+            { id: 3, name: 'Black Friday', email: 'promo@company.com', stage: 'Completed', value: '$89,000', owner: 'Promo Team', date: '2025-11-25', score: 0 },
+            { id: 4, name: 'Holiday Special', email: 'marketing@company.com', stage: 'Active', value: '$52,000', owner: 'Marketing Team', date: '2025-12-01', score: 0 },
+            { id: 5, name: 'Year End Deals', email: 'sales@company.com', stage: 'Planning', value: '$32,000', owner: 'Sales Team', date: '2025-12-10', score: 0 }
+          ]
+        }
+      };
+      
+      return baseData[selectedReportModule as keyof typeof baseData] || baseData.leads;
+    };
+
+    const reportData = getReportData();
+
+    return (
+      <div style={{ background: '#f8f9fa', minHeight: '100vh' }}>
+        {/* Header with Title and Date Range */}
+        <div style={{
+          background: 'white',
+          padding: '20px 32px',
+          borderBottom: '1px solid #e5e7eb',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
+        }}>
+          <h2 className="mb-0 fw-bold" style={{ fontSize: '20px', color: '#1f2937' }}>Reports</h2>
+          <div className="d-flex gap-3 align-items-center">
+            <div style={{ position: 'relative' }}>
+              <div 
+                onClick={() => setShowDatePicker(!showDatePicker)}
+                className="d-flex align-items-center gap-2" 
+                style={{
+                  padding: '8px 16px',
+                  background: '#f8f9fa',
+                  borderRadius: '8px',
+                  border: '1px solid #dee2e6',
+                  cursor: 'pointer',
+                  userSelect: 'none'
+                }}
+              >
+                <Calendar size={16} style={{ color: '#6b7280' }} />
+                <span style={{ fontSize: '14px', color: '#1f2937', fontWeight: 500 }}>
+                  {new Date(startDate).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })} - {new Date(endDate).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}
+                </span>
+              </div>
+              {showDatePicker && (
+                <div style={{
+                  position: 'absolute',
+                  top: '100%',
+                  right: 0,
+                  marginTop: '8px',
+                  background: 'white',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: '8px',
+                  padding: '16px',
+                  boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)',
+                  zIndex: 1000,
+                  minWidth: '320px'
+                }}>
+                  <div style={{ marginBottom: '12px' }}>
+                    <label style={{ fontSize: '12px', color: '#6b7280', display: 'block', marginBottom: '4px' }}>Start Date</label>
+                    <input
+                      type="date"
+                      value={startDate}
+                      onChange={(e) => setStartDate(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '8px 12px',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '6px',
+                        fontSize: '14px'
+                      }}
+                    />
+                  </div>
+                  <div style={{ marginBottom: '12px' }}>
+                    <label style={{ fontSize: '12px', color: '#6b7280', display: 'block', marginBottom: '4px' }}>End Date</label>
+                    <input
+                      type="date"
+                      value={endDate}
+                      onChange={(e) => setEndDate(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '8px 12px',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '6px',
+                        fontSize: '14px'
+                      }}
+                    />
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                    <button
+                      onClick={() => setShowDatePicker(false)}
+                      style={{
+                        padding: '6px 12px',
+                        background: 'white',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '6px',
+                        fontSize: '13px',
+                        cursor: 'pointer',
+                        color: '#374151'
+                      }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => setShowDatePicker(false)}
+                      style={{
+                        padding: '6px 12px',
+                        background: '#4F46E5',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '6px',
+                        fontSize: '13px',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Apply
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+            <Button 
+              variant="primary" 
+              size="sm"
+              style={{
+                background: '#4F46E5',
+                border: 'none',
+                padding: '8px 20px',
+                fontSize: '14px',
+                fontWeight: 500
+              }}
+            >
+              <Download size={16} className="me-2" />
+              Export
+            </Button>
+          </div>
+        </div>
+
+        {/* Tab Navigation */}
+        <div style={{
+          background: 'white',
+          padding: '0 32px',
+          borderBottom: '1px solid #e5e7eb',
+          display: 'flex',
+          gap: '32px'
+        }}>
+          {reportTabs.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setSelectedReportModule(tab.id)}
+              style={{
+                padding: '16px 0',
+                border: 'none',
+                background: 'transparent',
+                borderBottom: selectedReportModule === tab.id ? '2px solid #4F46E5' : '2px solid transparent',
+                color: selectedReportModule === tab.id ? '#4F46E5' : '#6b7280',
+                fontWeight: 500,
+                fontSize: '14px',
+                cursor: 'pointer',
+                transition: 'all 0.2s'
+              }}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Lead Reports */}
+        {selectedReportModule === 'leads' && (
+          <div style={{ padding: '24px 0px', background: '#f8f9fa' }}>
+            {/* Advanced Filters for Leads */}
+            <Card className="border-0 shadow-sm mb-4">
+              <Card.Body>
+                <Row className="g-3 align-items-end">
+                  <Col md={2}>
+                    <Form.Label className="small fw-bold mb-2">Lead Source</Form.Label>
+                    <Form.Select size="sm" style={{ fontSize: '0.875rem' }}>
+                      <option value="">All Sources</option>
+                      <option value="website">Website</option>
+                      <option value="referral">Referral</option>
+                      <option value="social">Social Media</option>
+                      <option value="email">Email Campaign</option>
+                      <option value="trade">Trade Show</option>
+                      <option value="cold">Cold Call</option>
+                    </Form.Select>
+                  </Col>
+                  <Col md={2}>
+                    <Form.Label className="small fw-bold mb-2">Lead Stage</Form.Label>
+                    <Form.Select size="sm" style={{ fontSize: '0.875rem' }}>
+                      <option value="">All Stages</option>
+                      <option value="new">New</option>
+                      <option value="contacted">Contacted</option>
+                      <option value="qualified">Qualified</option>
+                      <option value="proposal">Proposal</option>
+                      <option value="negotiation">Negotiation</option>
+                    </Form.Select>
+                  </Col>
+                  <Col md={2}>
+                    <Form.Label className="small fw-bold mb-2">Assigned To</Form.Label>
+                    <Form.Select size="sm" style={{ fontSize: '0.875rem' }}>
+                      <option value="">All Users</option>
+                      <option value="sarah">Sarah Johnson</option>
+                      <option value="michael">Michael Chen</option>
+                      <option value="emily">Emily Rodriguez</option>
+                      <option value="david">David Thompson</option>
+                      <option value="lisa">Lisa Anderson</option>
+                      <option value="james">James Wilson</option>
+                      <option value="maria">Maria Garcia</option>
+                    </Form.Select>
+                  </Col>
+                  <Col md={2}>
+                    <Form.Label className="small fw-bold mb-2">Lead Score</Form.Label>
+                    <Form.Select size="sm" style={{ fontSize: '0.875rem' }}>
+                      <option value="">All Scores</option>
+                      <option value="hot">Hot (80-100)</option>
+                      <option value="warm">Warm (60-79)</option>
+                      <option value="cold">Cold (0-59)</option>
+                    </Form.Select>
+                  </Col>
+                  <Col md={2}>
+                    <Form.Label className="small fw-bold mb-2">Date Range</Form.Label>
+                    <Form.Select size="sm" style={{ fontSize: '0.875rem' }}>
+                      <option value="7">Last 7 days</option>
+                      <option value="30">Last 30 days</option>
+                      <option value="90">Last 90 days</option>
+                      <option value="custom">Custom Range</option>
+                    </Form.Select>
+                  </Col>
+                  <Col md={2}>
+                    <div className="d-flex gap-2">
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        className="flex-grow-1"
+                        onClick={() => console.log('Apply lead filters')}
+                      >
+                        Apply
+                      </Button>
+                      <Button
+                        variant="outline-secondary"
+                        size="sm"
+                        onClick={() => console.log('Reset lead filters')}
+                      >
+                        Reset
+                      </Button>
+                    </div>
+                  </Col>
+                </Row>
+              </Card.Body>
+            </Card>
+
+
+            {/* Lead Overview KPIs */}
+            <KPIOverview
+              title="Lead Overview"
+              items={[
+                {
+                  icon: <Users size={24} />,
+                  iconColor: '#4F46E5',
+                  label: 'TOTAL LEADS',
+                  value: '1,247',
+                  trend: {
+                    value: '+18%',
+                    isPositive: true,
+                    label: 'vs last month'
+                  }
+                },
+                {
+                  icon: <UserPlus size={24} />,
+                  iconColor: '#10b981',
+                  label: 'NEW LEADS',
+                  value: '190',
+                  trend: {
+                    value: '+24%',
+                    isPositive: true,
+                    label: 'this week'
+                  }
+                },
+                {
+                  icon: <UserCheck size={24} />,
+                  iconColor: '#f59e0b',
+                  label: 'ASSIGNED LEADS',
+                  value: '892',
+                  trend: {
+                    value: '71.5% of total',
+                    isPositive: false,
+                    label: ''
+                  }
+                },
+                {
+                  icon: <AlertCircle size={24} />,
+                  iconColor: '#3b82f6',
+                  label: 'UNASSIGNED',
+                  value: '87',
+                  trend: {
+                    value: '7.0% needs assignment',
+                    isPositive: false,
+                    label: ''
+                  }
+                },
+                {
+                  icon: <Handshake size={24} />,
+                  iconColor: '#8b5cf6',
+                  label: 'CONVERTED',
+                  value: '328',
+                  trend: {
+                    value: '+12%',
+                    isPositive: true,
+                    label: 'growth'
+                  }
+                }
+              ]}
+            />
+
+            {/* Lead Source and Assignment Report - Combined Row */}
+            <Row className="g-3 mb-3">
+              {/* Lead Source Analysis */}
+              <Col lg={5}>
+                <div style={{ background: 'white', borderRadius: '8px', padding: '20px', border: '1px solid #e5e7eb', height: '100%' }}>
+                  <h6 className="mb-3" style={{ fontSize: '15px', fontWeight: 600, color: '#1f2937' }}>Lead Source Analysis</h6>
+                  <Row className="g-0">
+                    <Col xs={6}>
+                      <ResponsiveContainer width="100%" height={280}>
+                        <PieChart>
+                          <Pie
+                            data={[
+                              { name: 'Website', value: 412, percentage: 33.0 },
+                              { name: 'Referral', value: 324, percentage: 26.0 },
+                              { name: 'Social Media', value: 236, percentage: 18.9 },
+                              { name: 'Email Campaign', value: 162, percentage: 13.0 },
+                              { name: 'Trade Show', value: 75, percentage: 6.0 },
+                              { name: 'Cold Call', value: 38, percentage: 3.1 }
+                            ]}
+                            cx="50%"
+                            cy="50%"
+                            labelLine={false}
+                            label={false}
+                            outerRadius={85}
+                            fill="#8884d8"
+                            dataKey="value"
+                          >
+                            {[
+                              { name: 'Website', value: 412, percentage: 33.0 },
+                              { name: 'Referral', value: 324, percentage: 26.0 },
+                              { name: 'Social Media', value: 236, percentage: 18.9 },
+                              { name: 'Email Campaign', value: 162, percentage: 13.0 },
+                              { name: 'Trade Show', value: 75, percentage: 6.0 },
+                              { name: 'Cold Call', value: 38, percentage: 3.1 }
+                            ].map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={['#4F46E5', '#10b981', '#f59e0b', '#3b82f6', '#8b5cf6', '#ef4444'][index % 6]} />
+                            ))}
+                          </Pie>
+                          <Tooltip />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </Col>
+                    <Col xs={6}>
+                      <div className="d-flex flex-column justify-content-center h-100 ps-2">
+                        {[
+                          { source: 'Website', count: 412, percentage: '33.0%', color: '#4F46E5' },
+                          { source: 'Referral', count: 324, percentage: '26.0%', color: '#10b981' },
+                          { source: 'Social Media', count: 236, percentage: '18.9%', color: '#f59e0b' },
+                          { source: 'Email', count: 162, percentage: '13.0%', color: '#3b82f6' },
+                          { source: 'Trade Show', count: 75, percentage: '6.0%', color: '#8b5cf6' },
+                          { source: 'Cold Call', count: 38, percentage: '3.1%', color: '#ef4444' }
+                        ].map((item, idx) => (
+                          <div key={idx} className="d-flex align-items-center gap-2 mb-2" style={{ fontSize: '11px' }}>
+                            <div style={{ width: '8px', height: '8px', borderRadius: '2px', background: item.color, flexShrink: 0 }}></div>
+                            <span style={{ color: '#6b7280', whiteSpace: 'nowrap', flex: 1 }}>{item.source}</span>
+                            <span style={{ fontWeight: 600, color: '#1f2937' }}>{item.count}</span>
+                            <span style={{ color: '#6b7280', fontSize: '10px' }}>({item.percentage})</span>
+                          </div>
+                        ))}
+                      </div>
+                    </Col>
+                  </Row>
+                </div>
+              </Col>
+
+              {/* Lead Assignment Report */}
+              <Col lg={7}>
+                <div style={{ background: 'white', borderRadius: '8px', padding: '20px', border: '1px solid #e5e7eb', height: '100%' }}>
+                  <h6 className="mb-3" style={{ fontSize: '15px', fontWeight: 600, color: '#1f2937' }}>Lead Assignment Report</h6>
+                  <div style={{ maxHeight: '340px', overflowY: 'auto' }}>
+                    <table className="table table-sm table-hover mb-0" style={{ fontSize: '12px' }}>
+                      <thead style={{ background: '#f8f9fa', position: 'sticky', top: 0, zIndex: 1 }}>
+                        <tr>
+                          <th style={{ border: 'none', padding: '10px', fontWeight: 600, color: '#1f2937' }}>User/Owner</th>
+                          <th style={{ border: 'none', padding: '10px', fontWeight: 600, color: '#1f2937', textAlign: 'right' }}>Assigned Leads</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {[
+                          { owner: 'Sarah Johnson', leads: 182 },
+                          { owner: 'Michael Chen', leads: 156 },
+                          { owner: 'Emily Rodriguez', leads: 143 },
+                          { owner: 'David Thompson', leads: 127 },
+                          { owner: 'Lisa Anderson', leads: 116 },
+                          { owner: 'James Wilson', leads: 98 },
+                          { owner: 'Maria Garcia', leads: 70 }
+                        ].map((item, idx) => (
+                          <tr key={idx}>
+                            <td style={{ padding: '10px', borderTop: '1px solid #f0f0f0', color: '#1f2937', fontWeight: 500 }}>
+                              {item.owner}
+                            </td>
+                            <td style={{ padding: '10px', borderTop: '1px solid #f0f0f0', textAlign: 'right', fontWeight: 600, color: '#4F46E5' }}>
+                              {item.leads}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </Col>
+            </Row>
+
+            {/* Conversion and Stage Duration - Combined Row */}
+            <Row className="g-3 mb-3">
+              {/* Conversion Report */}
+              <Col lg={6}>
+                <div style={{ background: 'white', borderRadius: '8px', padding: '20px', border: '1px solid #e5e7eb' }}>
+                  <h6 className="mb-3" style={{ fontSize: '15px', fontWeight: 600, color: '#1f2937' }}>Conversion Report by Stage</h6>
+                  <div style={{ maxHeight: '280px', overflowY: 'auto' }}>
+                    <table className="table table-sm table-hover mb-0" style={{ fontSize: '12px' }}>
+                      <thead style={{ background: '#f8f9fa', position: 'sticky', top: 0, zIndex: 1 }}>
+                        <tr>
+                          <th style={{ border: 'none', padding: '10px', fontWeight: 600, color: '#1f2937' }}>Stage</th>
+                          <th style={{ border: 'none', padding: '10px', fontWeight: 600, color: '#1f2937', textAlign: 'right' }}>Total Leads</th>
+                          <th style={{ border: 'none', padding: '10px', fontWeight: 600, color: '#1f2937', textAlign: 'right' }}>Converted</th>
+                          <th style={{ border: 'none', padding: '10px', fontWeight: 600, color: '#1f2937', textAlign: 'right' }}>Conv. Rate</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {[
+                          { stage: 'New', total: 412, converted: 132, rate: '32.0%' },
+                          { stage: 'Contacted', total: 356, converted: 125, rate: '35.1%' },
+                          { stage: 'Qualified', total: 284, converted: 98, rate: '34.5%' },
+                          { stage: 'Proposal', total: 198, converted: 78, rate: '39.4%' },
+                          { stage: 'Negotiation', total: 124, converted: 56, rate: '45.2%' }
+                        ].map((item, idx) => (
+                          <tr key={idx}>
+                            <td style={{ padding: '10px', borderTop: '1px solid #f0f0f0', color: '#1f2937', fontWeight: 500 }}>
+                              {item.stage}
+                            </td>
+                            <td style={{ padding: '10px', borderTop: '1px solid #f0f0f0', textAlign: 'right', color: '#6b7280' }}>
+                              {item.total}
+                            </td>
+                            <td style={{ padding: '10px', borderTop: '1px solid #f0f0f0', textAlign: 'right', fontWeight: 600, color: '#10b981' }}>
+                              {item.converted}
+                            </td>
+                            <td style={{ padding: '10px', borderTop: '1px solid #f0f0f0', textAlign: 'right', fontWeight: 600, color: '#4F46E5' }}>
+                              {item.rate}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </Col>
+
+              {/* Stage Duration Report */}
+              <Col lg={6}>
+                <div style={{ background: 'white', borderRadius: '8px', padding: '20px', border: '1px solid #e5e7eb' }}>
+                  <h6 className="mb-3" style={{ fontSize: '15px', fontWeight: 600, color: '#1f2937' }}>Stage Duration Report</h6>
+                  <div style={{ maxHeight: '280px', overflowY: 'auto' }}>
+                    <table className="table table-sm table-hover mb-0" style={{ fontSize: '12px' }}>
+                      <thead style={{ background: '#f8f9fa', position: 'sticky', top: 0, zIndex: 1 }}>
+                        <tr>
+                          <th style={{ border: 'none', padding: '10px', fontWeight: 600, color: '#1f2937' }}>Stage</th>
+                          <th style={{ border: 'none', padding: '10px', fontWeight: 600, color: '#1f2937', textAlign: 'right' }}>Leads</th>
+                          <th style={{ border: 'none', padding: '10px', fontWeight: 600, color: '#1f2937', textAlign: 'right' }}>Avg (Days)</th>
+                          <th style={{ border: 'none', padding: '10px', fontWeight: 600, color: '#1f2937', textAlign: 'right' }}>Min</th>
+                          <th style={{ border: 'none', padding: '10px', fontWeight: 600, color: '#1f2937', textAlign: 'right' }}>Max</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {[
+                          { stage: 'New', leadsInStage: 87, avgDuration: '3.2', minDuration: '0.5', maxDuration: '12' },
+                          { stage: 'Contacted', leadsInStage: 124, avgDuration: '5.8', minDuration: '1', maxDuration: '18' },
+                          { stage: 'Qualified', leadsInStage: 186, avgDuration: '8.4', minDuration: '2', maxDuration: '25' },
+                          { stage: 'Proposal', leadsInStage: 142, avgDuration: '12.6', minDuration: '4', maxDuration: '35' },
+                          { stage: 'Negotiation', leadsInStage: 98, avgDuration: '15.3', minDuration: '6', maxDuration: '45' }
+                        ].map((item, idx) => (
+                          <tr key={idx}>
+                            <td style={{ padding: '10px', borderTop: '1px solid #f0f0f0', color: '#1f2937', fontWeight: 500 }}>
+                              {item.stage}
+                            </td>
+                            <td style={{ padding: '10px', borderTop: '1px solid #f0f0f0', textAlign: 'right', fontWeight: 600, color: '#1f2937' }}>
+                              {item.leadsInStage}
+                            </td>
+                            <td style={{ padding: '10px', borderTop: '1px solid #f0f0f0', textAlign: 'right', fontWeight: 600, color: '#4F46E5' }}>
+                              {item.avgDuration}
+                            </td>
+                            <td style={{ padding: '10px', borderTop: '1px solid #f0f0f0', textAlign: 'right', color: '#10b981' }}>
+                              {item.minDuration}
+                            </td>
+                            <td style={{ padding: '10px', borderTop: '1px solid #f0f0f0', textAlign: 'right', color: '#6b7280' }}>
+                              {item.maxDuration}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </Col>
+            </Row>
+
+
+          </div>
+        )}
+
+        {/* Deal Reports */}
+        {selectedReportModule === 'deals' && (
+          <div style={{ padding: '24px 0px', background: '#f8f9fa' }}>
+            {/* Advanced Filters for Deals */}
+            <Card className="border-0 shadow-sm mb-4">
+              <Card.Body>
+                <Row className="g-3 align-items-end">
+                  <Col md={2}>
+                    <Form.Label className="small fw-bold mb-2">Deal Stage</Form.Label>
+                    <Form.Select size="sm" style={{ fontSize: '0.875rem' }}>
+                      <option value="">All Stages</option>
+                      <option value="qualification">Qualification</option>
+                      <option value="proposal">Proposal</option>
+                      <option value="negotiation">Negotiation</option>
+                      <option value="closing">Closing</option>
+                      <option value="won">Won</option>
+                      <option value="lost">Lost</option>
+                    </Form.Select>
+                  </Col>
+                  <Col md={2}>
+                    <Form.Label className="small fw-bold mb-2">Currency</Form.Label>
+                    <Form.Select size="sm" style={{ fontSize: '0.875rem' }}>
+                      <option value="USD">USD</option>
+                      <option value="PKR">PKR</option>
+                      <option value="EUR">EUR</option>
+                      <option value="GBP">GBP</option>
+                    </Form.Select>
+                  </Col>
+                  <Col md={2}>
+                    <Form.Label className="small fw-bold mb-2">Owner</Form.Label>
+                    <Form.Select size="sm" style={{ fontSize: '0.875rem' }}>
+                      <option value="">All Owners</option>
+                      <option value="sarah">Sarah Johnson</option>
+                      <option value="michael">Michael Chen</option>
+                      <option value="emily">Emily Rodriguez</option>
+                      <option value="david">David Thompson</option>
+                      <option value="lisa">Lisa Anderson</option>
+                      <option value="james">James Wilson</option>
+                      <option value="maria">Maria Garcia</option>
+                    </Form.Select>
+                  </Col>
+                  <Col md={2}>
+                    <Form.Label className="small fw-bold mb-2">Deal Value</Form.Label>
+                    <Form.Select size="sm" style={{ fontSize: '0.875rem' }}>
+                      <option value="">All Values</option>
+                      <option value="low">&lt; $10,000</option>
+                      <option value="medium">$10,000 - $50,000</option>
+                      <option value="high">&gt; $50,000</option>
+                    </Form.Select>
+                  </Col>
+                  <Col md={2}>
+                    <Form.Label className="small fw-bold mb-2">Date Range</Form.Label>
+                    <Form.Select size="sm" style={{ fontSize: '0.875rem' }}>
+                      <option value="7">Last 7 days</option>
+                      <option value="30">Last 30 days</option>
+                      <option value="90">Last 90 days</option>
+                      <option value="custom">Custom Range</option>
+                    </Form.Select>
+                  </Col>
+                  <Col md={2}>
+                    <div className="d-flex gap-2">
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        className="flex-grow-1"
+                        onClick={() => console.log('Apply deal filters')}
+                      >
+                        Apply
+                      </Button>
+                      <Button
+                        variant="outline-secondary"
+                        size="sm"
+                        onClick={() => console.log('Reset deal filters')}
+                      >
+                        Reset
+                      </Button>
+                    </div>
+                  </Col>
+                </Row>
+              </Card.Body>
+            </Card>
+
+            {/* Deal Overview KPIs */}
+            <div style={{ marginBottom: '24px' }}>
+              <h6 className="mb-3" style={{ fontSize: '16px', fontWeight: 600, color: '#1f2937' }}>Deal Overview</h6>
+              <Row className="g-3">
+                <Col xs={12} sm={6} md={4} lg={3} style={{ flex: '0 0 auto', width: '25%' }} className="d-none d-lg-block">
+                  <Card className="border-0 shadow-sm">
+                    <Card.Body>
+                      <div className="d-flex align-items-end justify-content-between mb-3">
+                        <div>
+                          <DollarSign size={16} />
+                        </div>
+                        <div className="text-end">
+                          <p className="text-muted text-uppercase small mb-1" style={{ fontSize: '0.75rem', fontWeight: 500 }}>
+                            TOTAL VALUE (USD)
+                          </p>
+                        </div>
+                      </div>
+                      <h2 className="mb-2 fw-bold text-end" style={{ fontSize: '1.75rem' }}>
+                        $2.4M
+                      </h2>
+                      <div className="d-flex align-items-center justify-content-end mt-2">
+                        <TrendingUp 
+                          size={16} 
+                          className="text-success" 
+                          style={{ marginRight: '0.25rem' }}
+                        />
+                        <span className="small text-success" style={{ fontSize: '0.8rem', fontWeight: 500 }}>
+                          +24%
+                        </span>
+                        <span className="text-muted small ms-1" style={{ fontSize: '0.8rem' }}>
+                          vs last month
+                        </span>
+                      </div>
+                    </Card.Body>
+                  </Card>
+                </Col>
+                <Col xs={12} sm={6} md={4} className="d-lg-none">
+                  <Card className="border-0 shadow-sm">
+                    <Card.Body>
+                      <div className="d-flex align-items-end justify-content-between mb-3">
+                        <div>
+                          <DollarSign size={16} />
+                        </div>
+                        <div className="text-end">
+                          <p className="text-muted text-uppercase small mb-1" style={{ fontSize: '0.75rem', fontWeight: 500 }}>
+                            TOTAL VALUE (USD)
+                          </p>
+                        </div>
+                      </div>
+                      <h2 className="mb-2 fw-bold text-end" style={{ fontSize: '1.75rem' }}>
+                        $2.4M
+                      </h2>
+                      <div className="d-flex align-items-center justify-content-end mt-2">
+                        <TrendingUp 
+                          size={16} 
+                          className="text-success" 
+                          style={{ marginRight: '0.25rem' }}
+                        />
+                        <span className="small text-success" style={{ fontSize: '0.8rem', fontWeight: 500 }}>
+                          +24%
+                        </span>
+                        <span className="text-muted small ms-1" style={{ fontSize: '0.8rem' }}>
+                          vs last month
+                        </span>
+                      </div>
+                    </Card.Body>
+                  </Card>
+                </Col>
+
+                <Col xs={12} sm={6} md={4} lg={3} style={{ flex: '0 0 auto', width: '25%' }} className="d-none d-lg-block">
+                  <Card className="border-0 shadow-sm">
+                    <Card.Body>
+                      <div className="d-flex align-items-end justify-content-between mb-3">
+                        <div>
+                          <Handshake size={16} />
+                        </div>
+                        <div className="text-end">
+                          <p className="text-muted text-uppercase small mb-1" style={{ fontSize: '0.75rem', fontWeight: 500 }}>
+                            TOTAL DEALS
+                          </p>
+                        </div>
+                      </div>
+                      <h2 className="mb-2 fw-bold text-end" style={{ fontSize: '1.75rem' }}>
+                        328
+                      </h2>
+                      <div className="d-flex align-items-center justify-content-end mt-2">
+                        <TrendingUp 
+                          size={16} 
+                          className="text-success" 
+                          style={{ marginRight: '0.25rem' }}
+                        />
+                        <span className="small text-success" style={{ fontSize: '0.8rem', fontWeight: 500 }}>
+                          +12%
+                        </span>
+                        <span className="text-muted small ms-1" style={{ fontSize: '0.8rem' }}>
+                          growth
+                        </span>
+                      </div>
+                    </Card.Body>
+                  </Card>
+                </Col>
+                <Col xs={12} sm={6} md={4} className="d-lg-none">
+                  <Card className="border-0 shadow-sm">
+                    <Card.Body>
+                      <div className="d-flex align-items-end justify-content-between mb-3">
+                        <div>
+                          <Handshake size={16} />
+                        </div>
+                        <div className="text-end">
+                          <p className="text-muted text-uppercase small mb-1" style={{ fontSize: '0.75rem', fontWeight: 500 }}>
+                            TOTAL DEALS
+                          </p>
+                        </div>
+                      </div>
+                      <h2 className="mb-2 fw-bold text-end" style={{ fontSize: '1.75rem' }}>
+                        328
+                      </h2>
+                      <div className="d-flex align-items-center justify-content-end mt-2">
+                        <TrendingUp 
+                          size={16} 
+                          className="text-success" 
+                          style={{ marginRight: '0.25rem' }}
+                        />
+                        <span className="small text-success" style={{ fontSize: '0.8rem', fontWeight: 500 }}>
+                          +12%
+                        </span>
+                        <span className="text-muted small ms-1" style={{ fontSize: '0.8rem' }}>
+                          growth
+                        </span>
+                      </div>
+                    </Card.Body>
+                  </Card>
+                </Col>
+
+                <Col xs={12} sm={6} md={4} lg={3} style={{ flex: '0 0 auto', width: '25%' }} className="d-none d-lg-block">
+                  <Card className="border-0 shadow-sm">
+                    <Card.Body>
+                      <div className="d-flex align-items-end justify-content-between mb-3">
+                        <div>
+                          <ShoppingBag size={16} />
+                        </div>
+                        <div className="text-end">
+                          <p className="text-muted text-uppercase small mb-1" style={{ fontSize: '0.75rem', fontWeight: 500 }}>
+                            CONVERTED TO ORDERS
+                          </p>
+                        </div>
+                      </div>
+                      <h2 className="mb-2 fw-bold text-end" style={{ fontSize: '1.75rem' }}>
+                        142
+                      </h2>
+                      <div className="d-flex align-items-center justify-content-end mt-2">
+                        <TrendingUp 
+                          size={16} 
+                          className="text-success" 
+                          style={{ marginRight: '0.25rem' }}
+                        />
+                        <span className="small text-success" style={{ fontSize: '0.8rem', fontWeight: 500 }}>
+                          +18%
+                        </span>
+                        <span className="text-muted small ms-1" style={{ fontSize: '0.8rem' }}>
+                          conversion
+                        </span>
+                      </div>
+                    </Card.Body>
+                  </Card>
+                </Col>
+                <Col xs={12} sm={6} md={4} className="d-lg-none">
+                  <Card className="border-0 shadow-sm">
+                    <Card.Body>
+                      <div className="d-flex align-items-end justify-content-between mb-3">
+                        <div>
+                          <ShoppingBag size={16} />
+                        </div>
+                        <div className="text-end">
+                          <p className="text-muted text-uppercase small mb-1" style={{ fontSize: '0.75rem', fontWeight: 500 }}>
+                            CONVERTED TO ORDERS
+                          </p>
+                        </div>
+                      </div>
+                      <h2 className="mb-2 fw-bold text-end" style={{ fontSize: '1.75rem' }}>
+                        142
+                      </h2>
+                      <div className="d-flex align-items-center justify-content-end mt-2">
+                        <TrendingUp 
+                          size={16} 
+                          className="text-success" 
+                          style={{ marginRight: '0.25rem' }}
+                        />
+                        <span className="small text-success" style={{ fontSize: '0.8rem', fontWeight: 500 }}>
+                          +18%
+                        </span>
+                        <span className="text-muted small ms-1" style={{ fontSize: '0.8rem' }}>
+                          conversion
+                        </span>
+                      </div>
+                    </Card.Body>
+                  </Card>
+                </Col>
+
+                <Col xs={12} sm={6} md={4} lg={3} style={{ flex: '0 0 auto', width: '25%' }} className="d-none d-lg-block">
+                  <Card className="border-0 shadow-sm">
+                    <Card.Body>
+                      <div className="d-flex align-items-end justify-content-between mb-3">
+                        <div>
+                          <TrendingUp size={16} />
+                        </div>
+                        <div className="text-end">
+                          <p className="text-muted text-uppercase small mb-1" style={{ fontSize: '0.75rem', fontWeight: 500 }}>
+                            CONVERSION RATE
+                          </p>
+                        </div>
+                      </div>
+                      <h2 className="mb-2 fw-bold text-end" style={{ fontSize: '1.75rem' }}>
+                        43.3%
+                      </h2>
+                      <div className="d-flex align-items-center justify-content-end mt-2">
+                        <span className="text-muted small" style={{ fontSize: '0.8rem' }}>
+                          142 of 328 deals
+                        </span>
+                      </div>
+                    </Card.Body>
+                  </Card>
+                </Col>
+                <Col xs={12} sm={6} md={4} className="d-lg-none">
+                  <Card className="border-0 shadow-sm">
+                    <Card.Body>
+                      <div className="d-flex align-items-end justify-content-between mb-3">
+                        <div>
+                          <TrendingUp size={16} />
+                        </div>
+                        <div className="text-end">
+                          <p className="text-muted text-uppercase small mb-1" style={{ fontSize: '0.75rem', fontWeight: 500 }}>
+                            CONVERSION RATE
+                          </p>
+                        </div>
+                      </div>
+                      <h2 className="mb-2 fw-bold text-end" style={{ fontSize: '1.75rem' }}>
+                        43.3%
+                      </h2>
+                      <div className="d-flex align-items-center justify-content-end mt-2">
+                        <span className="text-muted small" style={{ fontSize: '0.8rem' }}>
+                          142 of 328 deals
+                        </span>
+                      </div>
+                    </Card.Body>
+                  </Card>
+                </Col>
+              </Row>
+            </div>
+
+            {/* Deal Funnel Report */}
+            <Row className="g-3 mb-3">
+              <Col lg={12}>
+                <div style={{ background: 'white', borderRadius: '8px', padding: '20px', border: '1px solid #e5e7eb' }}>
+                  <h6 className="mb-3" style={{ fontSize: '15px', fontWeight: 600, color: '#1f2937' }}>Deal Funnel Report</h6>
+                  <div style={{ maxHeight: '340px', overflowY: 'auto' }}>
+                    <table className="table table-sm table-hover mb-0" style={{ fontSize: '12px' }}>
+                      <thead style={{ background: '#f8f9fa', position: 'sticky', top: 0, zIndex: 1 }}>
+                        <tr>
+                          <th style={{ border: 'none', padding: '10px', fontWeight: 600, color: '#1f2937' }}>Stage</th>
+                          <th style={{ border: 'none', padding: '10px', fontWeight: 600, color: '#1f2937', textAlign: 'center' }}>Currency</th>
+                          <th style={{ border: 'none', padding: '10px', fontWeight: 600, color: '#1f2937', textAlign: 'right' }}>Deals</th>
+                          <th style={{ border: 'none', padding: '10px', fontWeight: 600, color: '#1f2937', textAlign: 'right' }}>Total Value</th>
+                          <th style={{ border: 'none', padding: '10px', fontWeight: 600, color: '#1f2937', textAlign: 'right' }}>% of Total</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {[
+                          { stage: 'Qualification', currency: 'USD', deals: 328, totalValue: '$2,400,000', percentage: '100%', color: '#4F46E5' },
+                          { stage: 'Proposal', currency: 'USD', deals: 256, totalValue: '$1,920,000', percentage: '80%', color: '#6366f1' },
+                          { stage: 'Negotiation', currency: 'USD', deals: 198, totalValue: '$1,560,000', percentage: '65%', color: '#8b5cf6' },
+                          { stage: 'Closing', currency: 'USD', deals: 164, totalValue: '$1,320,000', percentage: '55%', color: '#10b981' },
+                          { stage: 'Won', currency: 'USD', deals: 142, totalValue: '$1,180,000', percentage: '49%', color: '#059669' }
+                        ].map((item, idx) => (
+                          <tr key={idx}>
+                            <td style={{ padding: '10px', borderTop: '1px solid #f0f0f0' }}>
+                              <div className="d-flex align-items-center gap-2">
+                                <div style={{ width: '8px', height: '8px', borderRadius: '2px', background: item.color, flexShrink: 0 }}></div>
+                                <span style={{ color: '#1f2937', fontWeight: 500 }}>{item.stage}</span>
+                              </div>
+                            </td>
+                            <td style={{ padding: '10px', borderTop: '1px solid #f0f0f0', textAlign: 'center', color: '#6b7280' }}>
+                              {item.currency}
+                            </td>
+                            <td style={{ padding: '10px', borderTop: '1px solid #f0f0f0', textAlign: 'right', fontWeight: 600, color: '#1f2937' }}>
+                              {item.deals}
+                            </td>
+                            <td style={{ padding: '10px', borderTop: '1px solid #f0f0f0', textAlign: 'right', fontWeight: 600, color: '#10b981' }}>
+                              {item.totalValue}
+                            </td>
+                            <td style={{ padding: '10px', borderTop: '1px solid #f0f0f0', textAlign: 'right', fontWeight: 600, color: '#4F46E5' }}>
+                              {item.percentage}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </Col>
+            </Row>
+
+            {/* Deal Value and Stage Duration Reports */}
+            <Row className="g-3 mb-3">
+              {/* Deal Value Report */}
+              <Col lg={6}>
+                <div style={{ background: 'white', borderRadius: '8px', padding: '20px', border: '1px solid #e5e7eb' }}>
+                  <h6 className="mb-3" style={{ fontSize: '15px', fontWeight: 600, color: '#1f2937' }}>Deal Value Report</h6>
+                  <div style={{ maxHeight: '280px', overflowY: 'auto' }}>
+                    <table className="table table-sm table-hover mb-0" style={{ fontSize: '12px' }}>
+                      <thead style={{ background: '#f8f9fa', position: 'sticky', top: 0, zIndex: 1 }}>
+                        <tr>
+                          <th style={{ border: 'none', padding: '10px', fontWeight: 600, color: '#1f2937' }}>Owner</th>
+                          <th style={{ border: 'none', padding: '10px', fontWeight: 600, color: '#1f2937', textAlign: 'center' }}>Currency</th>
+                          <th style={{ border: 'none', padding: '10px', fontWeight: 600, color: '#1f2937', textAlign: 'right' }}>Deals</th>
+                          <th style={{ border: 'none', padding: '10px', fontWeight: 600, color: '#1f2937', textAlign: 'right' }}>Total Value</th>
+                          <th style={{ border: 'none', padding: '10px', fontWeight: 600, color: '#1f2937', textAlign: 'right' }}>Avg Value</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {[
+                          { owner: 'Sarah Johnson', currency: 'USD', deals: 42, totalValue: '$892,400', avgValue: '$21,248' },
+                          { owner: 'Michael Chen', currency: 'USD', deals: 38, totalValue: '$756,200', avgValue: '$19,900' },
+                          { owner: 'Emily Rodriguez', currency: 'USD', deals: 35, totalValue: '$698,500', avgValue: '$19,957' },
+                          { owner: 'David Thompson', currency: 'USD', deals: 31, totalValue: '$612,800', avgValue: '$19,768' },
+                          { owner: 'Lisa Anderson', currency: 'USD', deals: 28, totalValue: '$548,300', avgValue: '$19,582' },
+                          // { owner: 'James Wilson', currency: 'USD', deals: 24, totalValue: '$486,000', avgValue: '$20,250' },
+                          // { owner: 'Maria Garcia', currency: 'USD', deals: 19, totalValue: '$405,800', avgValue: '$21,358' }
+                        ].map((item, idx) => (
+                          <tr key={idx}>
+                            <td style={{ padding: '10px', borderTop: '1px solid #f0f0f0', color: '#1f2937', fontWeight: 500 }}>
+                              {item.owner}
+                            </td>
+                            <td style={{ padding: '10px', borderTop: '1px solid #f0f0f0', textAlign: 'center', color: '#6b7280' }}>
+                              {item.currency}
+                            </td>
+                            <td style={{ padding: '10px', borderTop: '1px solid #f0f0f0', textAlign: 'right', fontWeight: 600, color: '#1f2937' }}>
+                              {item.deals}
+                            </td>
+                            <td style={{ padding: '10px', borderTop: '1px solid #f0f0f0', textAlign: 'right', fontWeight: 600, color: '#10b981' }}>
+                              {item.totalValue}
+                            </td>
+                            <td style={{ padding: '10px', borderTop: '1px solid #f0f0f0', textAlign: 'right', fontWeight: 600, color: '#4F46E5' }}>
+                              {item.avgValue}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </Col>
+
+              {/* Stage Duration Report */}
+              <Col lg={6}>
+                <div style={{ background: 'white', borderRadius: '8px', padding: '20px', border: '1px solid #e5e7eb' }}>
+                  <h6 className="mb-3" style={{ fontSize: '15px', fontWeight: 600, color: '#1f2937' }}>Stage Duration Report</h6>
+                  <div style={{ maxHeight: '280px', overflowY: 'auto' }}>
+                    <table className="table table-sm table-hover mb-0" style={{ fontSize: '12px' }}>
+                      <thead style={{ background: '#f8f9fa', position: 'sticky', top: 0, zIndex: 1 }}>
+                        <tr>
+                          <th style={{ border: 'none', padding: '10px', fontWeight: 600, color: '#1f2937' }}>Stage</th>
+                          <th style={{ border: 'none', padding: '10px', fontWeight: 600, color: '#1f2937', textAlign: 'right' }}>Deals</th>
+                          <th style={{ border: 'none', padding: '10px', fontWeight: 600, color: '#1f2937', textAlign: 'right' }}>Avg Duration (Days)</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {[
+                          { stage: 'Qualification', deals: 328, avgDuration: '8.5' },
+                          { stage: 'Proposal', deals: 256, avgDuration: '12.3' },
+                          { stage: 'Negotiation', deals: 198, avgDuration: '15.8' },
+                          { stage: 'Closing', deals: 164, avgDuration: '18.4' },
+                          { stage: 'Won', deals: 142, avgDuration: '22.6' }
+                        ].map((item, idx) => (
+                          <tr key={idx}>
+                            <td style={{ padding: '10px', borderTop: '1px solid #f0f0f0', color: '#1f2937', fontWeight: 500 }}>
+                              {item.stage}
+                            </td>
+                            <td style={{ padding: '10px', borderTop: '1px solid #f0f0f0', textAlign: 'right', fontWeight: 600, color: '#1f2937' }}>
+                              {item.deals}
+                            </td>
+                            <td style={{ padding: '10px', borderTop: '1px solid #f0f0f0', textAlign: 'right', fontWeight: 600, color: '#4F46E5' }}>
+                              {item.avgDuration}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </Col>
+            </Row>
+
+            {/* Lost Reasons Report */}
+            <Row className="g-3 mb-3">
+              <Col lg={12}>
+                <div style={{ background: 'white', borderRadius: '8px', padding: '20px', border: '1px solid #e5e7eb' }}>
+                  <h6 className="mb-3" style={{ fontSize: '15px', fontWeight: 600, color: '#1f2937' }}>Lost Reasons Report</h6>
+                  <Row className="g-0">
+                    <Col xs={5}>
+                      <ResponsiveContainer width="100%" height={300}>
+                        <PieChart>
+                          <Pie
+                            data={[
+                              { reason: 'Price', count: 45, valueLost: 486000, percentage: 36.3 },
+                              { reason: 'Competitor', count: 32, valueLost: 352000, percentage: 25.8 },
+                              { reason: 'Timing', count: 24, valueLost: 264000, percentage: 19.4 },
+                              { reason: 'No Response', count: 18, valueLost: 198000, percentage: 14.5 },
+                              { reason: 'Other', count: 5, valueLost: 55000, percentage: 4.0 }
+                            ]}
+                            cx="50%"
+                            cy="50%"
+                            labelLine={false}
+                            label={false}
+                            outerRadius={90}
+                            fill="#8884d8"
+                            dataKey="count"
+                          >
+                            {[
+                              { reason: 'Price', count: 45 },
+                              { reason: 'Competitor', count: 32 },
+                              { reason: 'Timing', count: 24 },
+                              { reason: 'No Response', count: 18 },
+                              { reason: 'Other', count: 5 }
+                            ].map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={['#ef4444', '#f59e0b', '#3b82f6', '#6b7280', '#9ca3af'][index % 5]} />
+                            ))}
+                          </Pie>
+                          <Tooltip />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </Col>
+                    <Col xs={7}>
+                      <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                        <table className="table table-sm table-hover mb-0" style={{ fontSize: '12px' }}>
+                          <thead style={{ background: '#f8f9fa', position: 'sticky', top: 0, zIndex: 1 }}>
+                            <tr>
+                              <th style={{ border: 'none', padding: '10px', fontWeight: 600, color: '#1f2937' }}>Lost Reason</th>
+                              <th style={{ border: 'none', padding: '10px', fontWeight: 600, color: '#1f2937', textAlign: 'center' }}>Currency</th>
+                              <th style={{ border: 'none', padding: '10px', fontWeight: 600, color: '#1f2937', textAlign: 'right' }}>Count</th>
+                              <th style={{ border: 'none', padding: '10px', fontWeight: 600, color: '#1f2937', textAlign: 'right' }}>% of Lost</th>
+                              <th style={{ border: 'none', padding: '10px', fontWeight: 600, color: '#1f2937', textAlign: 'right' }}>Total Value Lost</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {[
+                              { reason: 'Price', currency: 'USD', count: 45, percentage: '36.3%', valueLost: '$486,000', color: '#ef4444' },
+                              { reason: 'Competitor', currency: 'USD', count: 32, percentage: '25.8%', valueLost: '$352,000', color: '#f59e0b' },
+                              { reason: 'Timing', currency: 'USD', count: 24, percentage: '19.4%', valueLost: '$264,000', color: '#3b82f6' },
+                              { reason: 'No Response', currency: 'USD', count: 18, percentage: '14.5%', valueLost: '$198,000', color: '#6b7280' },
+                              { reason: 'Other', currency: 'USD', count: 5, percentage: '4.0%', valueLost: '$55,000', color: '#9ca3af' }
+                            ].map((item, idx) => (
+                              <tr key={idx}>
+                                <td style={{ padding: '10px', borderTop: '1px solid #f0f0f0' }}>
+                                  <div className="d-flex align-items-center gap-2">
+                                    <div style={{ width: '8px', height: '8px', borderRadius: '2px', background: item.color, flexShrink: 0 }}></div>
+                                    <span style={{ color: '#1f2937', fontWeight: 500 }}>{item.reason}</span>
+                                  </div>
+                                </td>
+                                <td style={{ padding: '10px', borderTop: '1px solid #f0f0f0', textAlign: 'center', color: '#6b7280' }}>
+                                  {item.currency}
+                                </td>
+                                <td style={{ padding: '10px', borderTop: '1px solid #f0f0f0', textAlign: 'right', fontWeight: 600, color: '#1f2937' }}>
+                                  {item.count}
+                                </td>
+                                <td style={{ padding: '10px', borderTop: '1px solid #f0f0f0', textAlign: 'right', fontWeight: 600, color: '#4F46E5' }}>
+                                  {item.percentage}
+                                </td>
+                                <td style={{ padding: '10px', borderTop: '1px solid #f0f0f0', textAlign: 'right', fontWeight: 600, color: '#ef4444' }}>
+                                  {item.valueLost}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </Col>
+                  </Row>
+                </div>
+              </Col>
+            </Row>
+          </div>
+        )}
+
+        {/* Order Reports */}
+        {selectedReportModule === 'orders' && (
+          <div style={{ padding: '24px 0px', background: '#f8f9fa' }}>
+            {/* Advanced Filters for Orders */}
+            <Card className="border-0 shadow-sm mb-4">
+              <Card.Body>
+                <Row className="g-3 align-items-end">
+                  <Col md={2}>
+                    <Form.Label className="small fw-bold mb-2">Order Stage</Form.Label>
+                    <Form.Select size="sm" style={{ fontSize: '0.875rem' }}>
+                      <option value="">All Stages</option>
+                      <option value="pending">Pending</option>
+                      <option value="approved">Approved</option>
+                      <option value="processing">Processing</option>
+                      <option value="shipped">Shipped</option>
+                      <option value="delivered">Delivered</option>
+                      <option value="cancelled">Cancelled</option>
+                    </Form.Select>
+                  </Col>
+                  <Col md={2}>
+                    <Form.Label className="small fw-bold mb-2">Currency</Form.Label>
+                    <Form.Select size="sm" style={{ fontSize: '0.875rem' }}>
+                      <option value="USD">USD</option>
+                      <option value="PKR">PKR</option>
+                      <option value="EUR">EUR</option>
+                      <option value="GBP">GBP</option>
+                    </Form.Select>
+                  </Col>
+                  <Col md={2}>
+                    <Form.Label className="small fw-bold mb-2">Owner/Team</Form.Label>
+                    <Form.Select size="sm" style={{ fontSize: '0.875rem' }}>
+                      <option value="">All Owners</option>
+                      <option value="sarah">Sarah Johnson</option>
+                      <option value="michael">Michael Chen</option>
+                      <option value="emily">Emily Rodriguez</option>
+                      <option value="david">David Thompson</option>
+                      <option value="lisa">Lisa Anderson</option>
+                      <option value="sales">Sales Team</option>
+                      <option value="fulfillment">Fulfillment Team</option>
+                    </Form.Select>
+                  </Col>
+                  <Col md={2}>
+                    <Form.Label className="small fw-bold mb-2">Priority</Form.Label>
+                    <Form.Select size="sm" style={{ fontSize: '0.875rem' }}>
+                      <option value="">All Priorities</option>
+                      <option value="urgent">Urgent</option>
+                      <option value="high">High</option>
+                      <option value="normal">Normal</option>
+                      <option value="low">Low</option>
+                    </Form.Select>
+                  </Col>
+                  <Col md={2}>
+                    <Form.Label className="small fw-bold mb-2">Date Range</Form.Label>
+                    <Form.Select size="sm" style={{ fontSize: '0.875rem' }}>
+                      <option value="7">Last 7 days</option>
+                      <option value="30">Last 30 days</option>
+                      <option value="90">Last 90 days</option>
+                      <option value="custom">Custom Range</option>
+                    </Form.Select>
+                  </Col>
+                  <Col md={2}>
+                    <div className="d-flex gap-2">
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        className="flex-grow-1"
+                        onClick={() => console.log('Apply order filters')}
+                      >
+                        Apply
+                      </Button>
+                      <Button
+                        variant="outline-secondary"
+                        size="sm"
+                        onClick={() => console.log('Reset order filters')}
+                      >
+                        Reset
+                      </Button>
+                    </div>
+                  </Col>
+                </Row>
+              </Card.Body>
+            </Card>
+
+            {/* Order Overview KPIs */}
+            <div style={{ marginBottom: '24px' }}>
+              <h6 className="mb-3" style={{ fontSize: '16px', fontWeight: 600, color: '#1f2937' }}>Order Overview</h6>
+              <Row className="g-3">
+                <Col xs={12} sm={6} md={4} lg={3} style={{ flex: '0 0 auto', width: '20%' }} className="d-none d-lg-block">
+                  <Card className="border-0 shadow-sm">
+                    <Card.Body>
+                      <div className="d-flex align-items-end justify-content-between mb-3">
+                        <div>
+                          <ShoppingBag size={16} />
+                        </div>
+                        <div className="text-end">
+                          <p className="text-muted text-uppercase small mb-1" style={{ fontSize: '0.75rem', fontWeight: 500 }}>
+                            TOTAL ORDERS
+                          </p>
+                        </div>
+                      </div>
+                      <h2 className="mb-2 fw-bold text-end" style={{ fontSize: '1.75rem' }}>
+                        1,847
+                      </h2>
+                      <div className="d-flex align-items-center justify-content-end mt-2">
+                        <TrendingUp 
+                          size={16} 
+                          className="text-success" 
+                          style={{ marginRight: '0.25rem' }}
+                        />
+                        <span className="small text-success" style={{ fontSize: '0.8rem', fontWeight: 500 }}>
+                          +15%
+                        </span>
+                        <span className="text-muted small ms-1" style={{ fontSize: '0.8rem' }}>
+                          vs last month
+                        </span>
+                      </div>
+                    </Card.Body>
+                  </Card>
+                </Col>
+                <Col xs={12} sm={6} md={4} className="d-lg-none">
+                  <Card className="border-0 shadow-sm">
+                    <Card.Body>
+                      <div className="d-flex align-items-end justify-content-between mb-3">
+                        <div>
+                          <ShoppingBag size={16} />
+                        </div>
+                        <div className="text-end">
+                          <p className="text-muted text-uppercase small mb-1" style={{ fontSize: '0.75rem', fontWeight: 500 }}>
+                            TOTAL ORDERS
+                          </p>
+                        </div>
+                      </div>
+                      <h2 className="mb-2 fw-bold text-end" style={{ fontSize: '1.75rem' }}>
+                        1,847
+                      </h2>
+                      <div className="d-flex align-items-center justify-content-end mt-2">
+                        <TrendingUp 
+                          size={16} 
+                          className="text-success" 
+                          style={{ marginRight: '0.25rem' }}
+                        />
+                        <span className="small text-success" style={{ fontSize: '0.8rem', fontWeight: 500 }}>
+                          +15%
+                        </span>
+                        <span className="text-muted small ms-1" style={{ fontSize: '0.8rem' }}>
+                          vs last month
+                        </span>
+                      </div>
+                    </Card.Body>
+                  </Card>
+                </Col>
+
+                <Col xs={12} sm={6} md={4} lg={3} style={{ flex: '0 0 auto', width: '20%' }} className="d-none d-lg-block">
+                  <Card className="border-0 shadow-sm">
+                    <Card.Body>
+                      <div className="d-flex align-items-end justify-content-between mb-3">
+                        <div>
+                          <Clock size={16} />
+                        </div>
+                        <div className="text-end">
+                          <p className="text-muted text-uppercase small mb-1" style={{ fontSize: '0.75rem', fontWeight: 500 }}>
+                            PENDING
+                          </p>
+                        </div>
+                      </div>
+                      <h2 className="mb-2 fw-bold text-end" style={{ fontSize: '1.75rem' }}>
+                        342
+                      </h2>
+                      <div className="d-flex align-items-center justify-content-end mt-2">
+                        <span className="text-muted small" style={{ fontSize: '0.8rem' }}>
+                          18.5% of total
+                        </span>
+                      </div>
+                    </Card.Body>
+                  </Card>
+                </Col>
+                <Col xs={12} sm={6} md={4} className="d-lg-none">
+                  <Card className="border-0 shadow-sm">
+                    <Card.Body>
+                      <div className="d-flex align-items-end justify-content-between mb-3">
+                        <div>
+                          <Clock size={16} />
+                        </div>
+                        <div className="text-end">
+                          <p className="text-muted text-uppercase small mb-1" style={{ fontSize: '0.75rem', fontWeight: 500 }}>
+                            PENDING
+                          </p>
+                        </div>
+                      </div>
+                      <h2 className="mb-2 fw-bold text-end" style={{ fontSize: '1.75rem' }}>
+                        342
+                      </h2>
+                      <div className="d-flex align-items-center justify-content-end mt-2">
+                        <span className="text-muted small" style={{ fontSize: '0.8rem' }}>
+                          18.5% of total
+                        </span>
+                      </div>
+                    </Card.Body>
+                  </Card>
+                </Col>
+
+                <Col xs={12} sm={6} md={4} lg={3} style={{ flex: '0 0 auto', width: '20%' }} className="d-none d-lg-block">
+                  <Card className="border-0 shadow-sm">
+                    <Card.Body>
+                      <div className="d-flex align-items-end justify-content-between mb-3">
+                        <div>
+                          <CheckCircle size={16} />
+                        </div>
+                        <div className="text-end">
+                          <p className="text-muted text-uppercase small mb-1" style={{ fontSize: '0.75rem', fontWeight: 500 }}>
+                            APPROVED
+                          </p>
+                        </div>
+                      </div>
+                      <h2 className="mb-2 fw-bold text-end" style={{ fontSize: '1.75rem' }}>
+                        1,286
+                      </h2>
+                      <div className="d-flex align-items-center justify-content-end mt-2">
+                        <TrendingUp 
+                          size={16} 
+                          className="text-success" 
+                          style={{ marginRight: '0.25rem' }}
+                        />
+                        <span className="small text-success" style={{ fontSize: '0.8rem', fontWeight: 500 }}>
+                          +18%
+                        </span>
+                        <span className="text-muted small ms-1" style={{ fontSize: '0.8rem' }}>
+                          approval rate
+                        </span>
+                      </div>
+                    </Card.Body>
+                  </Card>
+                </Col>
+                <Col xs={12} sm={6} md={4} className="d-lg-none">
+                  <Card className="border-0 shadow-sm">
+                    <Card.Body>
+                      <div className="d-flex align-items-end justify-content-between mb-3">
+                        <div>
+                          <CheckCircle size={16} />
+                        </div>
+                        <div className="text-end">
+                          <p className="text-muted text-uppercase small mb-1" style={{ fontSize: '0.75rem', fontWeight: 500 }}>
+                            APPROVED
+                          </p>
+                        </div>
+                      </div>
+                      <h2 className="mb-2 fw-bold text-end" style={{ fontSize: '1.75rem' }}>
+                        1,286
+                      </h2>
+                      <div className="d-flex align-items-center justify-content-end mt-2">
+                        <TrendingUp 
+                          size={16} 
+                          className="text-success" 
+                          style={{ marginRight: '0.25rem' }}
+                        />
+                        <span className="small text-success" style={{ fontSize: '0.8rem', fontWeight: 500 }}>
+                          +18%
+                        </span>
+                        <span className="text-muted small ms-1" style={{ fontSize: '0.8rem' }}>
+                          approval rate
+                        </span>
+                      </div>
+                    </Card.Body>
+                  </Card>
+                </Col>
+
+                <Col xs={12} sm={6} md={4} lg={3} style={{ flex: '0 0 auto', width: '20%' }} className="d-none d-lg-block">
+                  <Card className="border-0 shadow-sm">
+                    <Card.Body>
+                      <div className="d-flex align-items-end justify-content-between mb-3">
+                        <div>
+                          <DollarSign size={16} />
+                        </div>
+                        <div className="text-end">
+                          <p className="text-muted text-uppercase small mb-1" style={{ fontSize: '0.75rem', fontWeight: 500 }}>
+                            TOTAL REVENUE
+                          </p>
+                        </div>
+                      </div>
+                      <h2 className="mb-2 fw-bold text-end" style={{ fontSize: '1.75rem' }}>
+                        $3.8M
+                      </h2>
+                      <div className="d-flex align-items-center justify-content-end mt-2">
+                        <TrendingUp 
+                          size={16} 
+                          className="text-success" 
+                          style={{ marginRight: '0.25rem' }}
+                        />
+                        <span className="small text-success" style={{ fontSize: '0.8rem', fontWeight: 500 }}>
+                          +22%
+                        </span>
+                        <span className="text-muted small ms-1" style={{ fontSize: '0.8rem' }}>
+                          growth
+                        </span>
+                      </div>
+                    </Card.Body>
+                  </Card>
+                </Col>
+                <Col xs={12} sm={6} md={4} className="d-lg-none">
+                  <Card className="border-0 shadow-sm">
+                    <Card.Body>
+                      <div className="d-flex align-items-end justify-content-between mb-3">
+                        <div>
+                          <DollarSign size={16} />
+                        </div>
+                        <div className="text-end">
+                          <p className="text-muted text-uppercase small mb-1" style={{ fontSize: '0.75rem', fontWeight: 500 }}>
+                            TOTAL REVENUE
+                          </p>
+                        </div>
+                      </div>
+                      <h2 className="mb-2 fw-bold text-end" style={{ fontSize: '1.75rem' }}>
+                        $3.8M
+                      </h2>
+                      <div className="d-flex align-items-center justify-content-end mt-2">
+                        <TrendingUp 
+                          size={16} 
+                          className="text-success" 
+                          style={{ marginRight: '0.25rem' }}
+                        />
+                        <span className="small text-success" style={{ fontSize: '0.8rem', fontWeight: 500 }}>
+                          +22%
+                        </span>
+                        <span className="text-muted small ms-1" style={{ fontSize: '0.8rem' }}>
+                          growth
+                        </span>
+                      </div>
+                    </Card.Body>
+                  </Card>
+                </Col>
+
+                <Col xs={12} sm={6} md={4} lg={3} style={{ flex: '0 0 auto', width: '20%' }} className="d-none d-lg-block">
+                  <Card className="border-0 shadow-sm">
+                    <Card.Body>
+                      <div className="d-flex align-items-end justify-content-between mb-3">
+                        <div>
+                          <Wallet size={16} />
+                        </div>
+                        <div className="text-end">
+                          <p className="text-muted text-uppercase small mb-1" style={{ fontSize: '0.75rem', fontWeight: 500 }}>
+                            AVG ORDER VALUE
+                          </p>
+                        </div>
+                      </div>
+                      <h2 className="mb-2 fw-bold text-end" style={{ fontSize: '1.75rem' }}>
+                        $2,058
+                      </h2>
+                      <div className="d-flex align-items-center justify-content-end mt-2">
+                        <TrendingUp 
+                          size={16} 
+                          className="text-success" 
+                          style={{ marginRight: '0.25rem' }}
+                        />
+                        <span className="small text-success" style={{ fontSize: '0.8rem', fontWeight: 500 }}>
+                          +6%
+                        </span>
+                        <span className="text-muted small ms-1" style={{ fontSize: '0.8rem' }}>
+                          vs last month
+                        </span>
+                      </div>
+                    </Card.Body>
+                  </Card>
+                </Col>
+                <Col xs={12} sm={6} md={4} className="d-lg-none">
+                  <Card className="border-0 shadow-sm">
+                    <Card.Body>
+                      <div className="d-flex align-items-end justify-content-between mb-3">
+                        <div>
+                          <Wallet size={16} />
+                        </div>
+                        <div className="text-end">
+                          <p className="text-muted text-uppercase small mb-1" style={{ fontSize: '0.75rem', fontWeight: 500 }}>
+                            AVG ORDER VALUE
+                          </p>
+                        </div>
+                      </div>
+                      <h2 className="mb-2 fw-bold text-end" style={{ fontSize: '1.75rem' }}>
+                        $2,058
+                      </h2>
+                      <div className="d-flex align-items-center justify-content-end mt-2">
+                        <TrendingUp 
+                          size={16} 
+                          className="text-success" 
+                          style={{ marginRight: '0.25rem' }}
+                        />
+                        <span className="small text-success" style={{ fontSize: '0.8rem', fontWeight: 500 }}>
+                          +6%
+                        </span>
+                        <span className="text-muted small ms-1" style={{ fontSize: '0.8rem' }}>
+                          vs last month
+                        </span>
+                      </div>
+                    </Card.Body>
+                  </Card>
+                </Col>
+              </Row>
+            </div>
+
+            {/* Revenue by Month Report */}
+            <Row className="g-3 mb-3">
+              <Col lg={12}>
+                <div style={{ background: 'white', borderRadius: '8px', padding: '20px', border: '1px solid #e5e7eb' }}>
+                  <h6 className="mb-3" style={{ fontSize: '15px', fontWeight: 600, color: '#1f2937' }}>Revenue by Month</h6>
+                  
+                  <Row className="g-3">
+                    {/* Chart - Left Side */}
+                    <Col lg={7}>
+                      <ResponsiveContainer width="100%" height={380}>
+                        <ComposedChart 
+                          data={[
+                            { month: 'Jan', orders: 142, revenue: 285000 },
+                            { month: 'Feb', orders: 156, revenue: 312000 },
+                            { month: 'Mar', orders: 168, revenue: 336000 },
+                            { month: 'Apr', orders: 145, revenue: 298000 },
+                            { month: 'May', orders: 178, revenue: 356000 },
+                            { month: 'Jun', orders: 192, revenue: 384000 },
+                            { month: 'Jul', orders: 186, revenue: 372000 },
+                            { month: 'Aug', orders: 198, revenue: 396000 },
+                            { month: 'Sep', orders: 205, revenue: 410000 },
+                            { month: 'Oct', orders: 218, revenue: 436000 },
+                            { month: 'Nov', orders: 234, revenue: 468000 },
+                            { month: 'Dec', orders: 225, revenue: 450000 }
+                          ]}
+                          barCategoryGap="15%"
+                        >
+                          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                          <XAxis 
+                            dataKey="month" 
+                            stroke="#6b7280"
+                            style={{ fontSize: '12px' }}
+                          />
+                          <YAxis 
+                            yAxisId="left"
+                            stroke="#4F46E5"
+                            style={{ fontSize: '12px' }}
+                            tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
+                          />
+                          <YAxis 
+                            yAxisId="right"
+                            orientation="right"
+                            stroke="#10b981"
+                            style={{ fontSize: '12px' }}
+                          />
+                          <Tooltip 
+                            contentStyle={{
+                              background: 'white',
+                              border: '1px solid #e5e7eb',
+                              borderRadius: '8px',
+                              boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                            }}
+                            formatter={(value: any, name: string) => {
+                              if (name === 'Revenue') return [`$${value.toLocaleString()}`, 'Revenue'];
+                              return [value, 'Orders'];
+                            }}
+                          />
+                          <Legend />
+                          <Bar yAxisId="left" dataKey="revenue" fill="#4F46E5" name="Revenue" radius={[8, 8, 0, 0]} />
+                          <Bar yAxisId="right" dataKey="orders" fill="#10b981" name="Orders" radius={[8, 8, 0, 0]} />
+                        </ComposedChart>
+                      </ResponsiveContainer>
+                    </Col>
+
+                    {/* Table - Right Side */}
+                    <Col lg={5}>
+                      <div style={{ maxHeight: '340px', overflowY: 'auto' }}>
+                        <table className="table table-sm table-hover mb-0" style={{ fontSize: '12px' }}>
+                          <thead style={{ background: '#f8f9fa', position: 'sticky', top: 0, zIndex: 1 }}>
+                            <tr>
+                              <th style={{ border: 'none', padding: '10px', fontWeight: 600, color: '#1f2937' }}>Month</th>
+                              <th style={{ border: 'none', padding: '10px', fontWeight: 600, color: '#1f2937', textAlign: 'center' }}>Currency</th>
+                              <th style={{ border: 'none', padding: '10px', fontWeight: 600, color: '#1f2937', textAlign: 'right' }}>Orders</th>
+                              <th style={{ border: 'none', padding: '10px', fontWeight: 600, color: '#1f2937', textAlign: 'right' }}>Revenue</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {[
+                              { month: 'January 2025', currency: 'USD', orders: 142, revenue: '$285,000' },
+                              { month: 'February 2025', currency: 'USD', orders: 156, revenue: '$312,000' },
+                              { month: 'March 2025', currency: 'USD', orders: 168, revenue: '$336,000' },
+                              { month: 'April 2025', currency: 'USD', orders: 145, revenue: '$298,000' },
+                              { month: 'May 2025', currency: 'USD', orders: 178, revenue: '$356,000' },
+                              { month: 'June 2025', currency: 'USD', orders: 192, revenue: '$384,000' },
+                              { month: 'July 2025', currency: 'USD', orders: 186, revenue: '$372,000' },
+                              { month: 'August 2025', currency: 'USD', orders: 198, revenue: '$396,000' },
+                              { month: 'September 2025', currency: 'USD', orders: 205, revenue: '$410,000' },
+                              { month: 'October 2025', currency: 'USD', orders: 218, revenue: '$436,000' },
+                              { month: 'November 2025', currency: 'USD', orders: 234, revenue: '$468,000' },
+                              { month: 'December 2025', currency: 'USD', orders: 225, revenue: '$450,000' }
+                            ].map((item, idx) => (
+                              <tr key={idx}>
+                                <td style={{ padding: '10px', borderTop: '1px solid #f0f0f0', color: '#1f2937', fontWeight: 500 }}>
+                                  {item.month}
+                                </td>
+                                <td style={{ padding: '10px', borderTop: '1px solid #f0f0f0', textAlign: 'center', color: '#6b7280' }}>
+                                  {item.currency}
+                                </td>
+                                <td style={{ padding: '10px', borderTop: '1px solid #f0f0f0', textAlign: 'right', fontWeight: 600, color: '#1f2937' }}>
+                                  {item.orders}
+                                </td>
+                                <td style={{ padding: '10px', borderTop: '1px solid #f0f0f0', textAlign: 'right', fontWeight: 600, color: '#10b981' }}>
+                                  {item.revenue}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </Col>
+                  </Row>
+                </div>
+              </Col>
+            </Row>
+
+            {/* Revenue by Owner and Stage Duration Reports */}
+            <Row className="g-3 mb-3">
+              {/* Revenue by Owner Report */}
+              <Col lg={6}>
+                <div style={{ background: 'white', borderRadius: '8px', padding: '20px', border: '1px solid #e5e7eb' }}>
+                  <h6 className="mb-3" style={{ fontSize: '15px', fontWeight: 600, color: '#1f2937' }}>Revenue by Owner</h6>
+                  <div style={{ maxHeight: '340px', overflowY: 'auto' }}>
+                    <table className="table table-sm table-hover mb-0" style={{ fontSize: '12px' }}>
+                      <thead style={{ background: '#f8f9fa', position: 'sticky', top: 0, zIndex: 1 }}>
+                        <tr>
+                          <th style={{ border: 'none', padding: '10px', fontWeight: 600, color: '#1f2937' }}>Owner</th>
+                          <th style={{ border: 'none', padding: '10px', fontWeight: 600, color: '#1f2937', textAlign: 'center' }}>Currency</th>
+                          <th style={{ border: 'none', padding: '10px', fontWeight: 600, color: '#1f2937', textAlign: 'right' }}>Orders</th>
+                          <th style={{ border: 'none', padding: '10px', fontWeight: 600, color: '#1f2937', textAlign: 'right' }}>Total Revenue</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {[
+                          { owner: 'Sarah Johnson', currency: 'USD', orders: 286, revenue: '$612,400' },
+                          { owner: 'Michael Chen', currency: 'USD', orders: 248, revenue: '$524,800' },
+                          { owner: 'Emily Rodriguez', currency: 'USD', orders: 234, revenue: '$486,200' },
+                          { owner: 'David Thompson', currency: 'USD', orders: 218, revenue: '$458,600' },
+                          { owner: 'Lisa Anderson', currency: 'USD', orders: 196, revenue: '$412,800' },
+                          { owner: 'Sales Team', currency: 'USD', orders: 342, revenue: '$724,200' },
+                          // { owner: 'Fulfillment Team', currency: 'USD', orders: 323, revenue: '$681,000' }
+                        ].map((item, idx) => (
+                          <tr key={idx}>
+                            <td style={{ padding: '10px', borderTop: '1px solid #f0f0f0', color: '#1f2937', fontWeight: 500 }}>
+                              {item.owner}
+                            </td>
+                            <td style={{ padding: '10px', borderTop: '1px solid #f0f0f0', textAlign: 'center', color: '#6b7280' }}>
+                              {item.currency}
+                            </td>
+                            <td style={{ padding: '10px', borderTop: '1px solid #f0f0f0', textAlign: 'right', fontWeight: 600, color: '#1f2937' }}>
+                              {item.orders}
+                            </td>
+                            <td style={{ padding: '10px', borderTop: '1px solid #f0f0f0', textAlign: 'right', fontWeight: 600, color: '#10b981' }}>
+                              {item.revenue}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </Col>
+
+              {/* Stage Duration Report */}
+              <Col lg={6}>
+                <div style={{ background: 'white', borderRadius: '8px', padding: '20px', border: '1px solid #e5e7eb' }}>
+                  <h6 className="mb-3" style={{ fontSize: '15px', fontWeight: 600, color: '#1f2937' }}>Stage Duration</h6>
+                  <div style={{ maxHeight: '340px', overflowY: 'auto' }}>
+                    <table className="table table-sm table-hover mb-0" style={{ fontSize: '12px' }}>
+                      <thead style={{ background: '#f8f9fa', position: 'sticky', top: 0, zIndex: 1 }}>
+                        <tr>
+                          <th style={{ border: 'none', padding: '10px', fontWeight: 600, color: '#1f2937' }}>Stage</th>
+                          <th style={{ border: 'none', padding: '10px', fontWeight: 600, color: '#1f2937', textAlign: 'right' }}>Orders</th>
+                          <th style={{ border: 'none', padding: '10px', fontWeight: 600, color: '#1f2937', textAlign: 'right' }}>Avg Duration (Days)</th>
+                          <th style={{ border: 'none', padding: '10px', fontWeight: 600, color: '#1f2937', textAlign: 'right' }}>Min</th>
+                          <th style={{ border: 'none', padding: '10px', fontWeight: 600, color: '#1f2937', textAlign: 'right' }}>Max</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {[
+                          { stage: 'Pending', orders: 342, avgDuration: '2.4', min: '0.5', max: '8' },
+                          { stage: 'Approved', orders: 1286, avgDuration: '1.2', min: '0.2', max: '4' },
+                          { stage: 'Processing', orders: 486, avgDuration: '4.8', min: '2', max: '12' },
+                          { stage: 'Shipped', orders: 624, avgDuration: '6.2', min: '3', max: '15' },
+                          { stage: 'Delivered', orders: 892, avgDuration: '8.6', min: '5', max: '20' },
+                          { stage: 'Cancelled', orders: 219, avgDuration: '3.2', min: '1', max: '10' }
+                        ].map((item, idx) => (
+                          <tr key={idx}>
+                            <td style={{ padding: '10px', borderTop: '1px solid #f0f0f0', color: '#1f2937', fontWeight: 500 }}>
+                              {item.stage}
+                            </td>
+                            <td style={{ padding: '10px', borderTop: '1px solid #f0f0f0', textAlign: 'right', fontWeight: 600, color: '#1f2937' }}>
+                              {item.orders}
+                            </td>
+                            <td style={{ padding: '10px', borderTop: '1px solid #f0f0f0', textAlign: 'right', fontWeight: 600, color: '#4F46E5' }}>
+                              {item.avgDuration}
+                            </td>
+                            <td style={{ padding: '10px', borderTop: '1px solid #f0f0f0', textAlign: 'right', color: '#10b981' }}>
+                              {item.min}
+                            </td>
+                            <td style={{ padding: '10px', borderTop: '1px solid #f0f0f0', textAlign: 'right', color: '#6b7280' }}>
+                              {item.max}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </Col>
+            </Row>
+
+            {/* Cancellations Report */}
+            <Row className="g-3 mb-3">
+              <Col lg={12}>
+                <div style={{ background: 'white', borderRadius: '8px', padding: '20px', border: '1px solid #e5e7eb' }}>
+                  <h6 className="mb-3" style={{ fontSize: '15px', fontWeight: 600, color: '#1f2937' }}>Cancellations</h6>
+                  <Row className="g-0">
+                    <Col xs={3}>
+                      <ResponsiveContainer width="100%" height={300}>
+                        <PieChart>
+                          <Pie
+                            data={[
+                              { reason: 'Out of Stock', count: 68, valueLost: 142800, percentage: 31.1 },
+                              { reason: 'Customer Request', count: 52, valueLost: 108400, percentage: 23.7 },
+                              { reason: 'Payment Failed', count: 45, valueLost: 94500, percentage: 20.5 },
+                              { reason: 'Delivery Issues', count: 34, valueLost: 71200, percentage: 15.5 },
+                              { reason: 'Other', count: 20, valueLost: 42000, percentage: 9.1 }
+                            ]}
+                            cx="50%"
+                            cy="50%"
+                            labelLine={false}
+                            label={false}
+                            outerRadius={90}
+                            fill="#8884d8"
+                            dataKey="count"
+                          >
+                            {[
+                              { reason: 'Out of Stock', count: 68 },
+                              { reason: 'Customer Request', count: 52 },
+                              { reason: 'Payment Failed', count: 45 },
+                              { reason: 'Delivery Issues', count: 34 },
+                              { reason: 'Other', count: 20 }
+                            ].map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={['#ef4444', '#f59e0b', '#dc2626', '#b91c1c', '#991b1b'][index % 5]} />
+                            ))}
+                          </Pie>
+                          <Tooltip />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </Col>
+                    <Col xs={9}>
+                      <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                        <table className="table table-sm table-hover mb-0" style={{ fontSize: '12px' }}>
+                          <thead style={{ background: '#f8f9fa', position: 'sticky', top: 0, zIndex: 1 }}>
+                            <tr>
+                              <th style={{ border: 'none', padding: '10px', fontWeight: 600, color: '#1f2937' }}>Lost Reason</th>
+                              <th style={{ border: 'none', padding: '10px', fontWeight: 600, color: '#1f2937', textAlign: 'center' }}>Currency</th>
+                              <th style={{ border: 'none', padding: '10px', fontWeight: 600, color: '#1f2937', textAlign: 'right' }}>Count</th>
+                              <th style={{ border: 'none', padding: '10px', fontWeight: 600, color: '#1f2937', textAlign: 'right' }}>% of Cancelled</th>
+                              <th style={{ border: 'none', padding: '10px', fontWeight: 600, color: '#1f2937', textAlign: 'right' }}>Value Lost</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {[
+                              { reason: 'Out of Stock', currency: 'USD', count: 68, percentage: '31.1%', valueLost: '$142,800', color: '#ef4444' },
+                              { reason: 'Customer Request', currency: 'USD', count: 52, percentage: '23.7%', valueLost: '$108,400', color: '#f59e0b' },
+                              { reason: 'Payment Failed', currency: 'USD', count: 45, percentage: '20.5%', valueLost: '$94,500', color: '#dc2626' },
+                              { reason: 'Delivery Issues', currency: 'USD', count: 34, percentage: '15.5%', valueLost: '$71,200', color: '#b91c1c' },
+                              { reason: 'Other', currency: 'USD', count: 20, percentage: '9.1%', valueLost: '$42,000', color: '#991b1b' }
+                            ].map((item, idx) => (
+                              <tr key={idx}>
+                                <td style={{ padding: '10px', borderTop: '1px solid #f0f0f0' }}>
+                                  <div className="d-flex align-items-center gap-2">
+                                    <div style={{ width: '8px', height: '8px', borderRadius: '2px', background: item.color, flexShrink: 0 }}></div>
+                                    <span style={{ color: '#1f2937', fontWeight: 500 }}>{item.reason}</span>
+                                  </div>
+                                </td>
+                                <td style={{ padding: '10px', borderTop: '1px solid #f0f0f0', textAlign: 'center', color: '#6b7280' }}>
+                                  {item.currency}
+                                </td>
+                                <td style={{ padding: '10px', borderTop: '1px solid #f0f0f0', textAlign: 'right', fontWeight: 600, color: '#1f2937' }}>
+                                  {item.count}
+                                </td>
+                                <td style={{ padding: '10px', borderTop: '1px solid #f0f0f0', textAlign: 'right', fontWeight: 600, color: '#4F46E5' }}>
+                                  {item.percentage}
+                                </td>
+                                <td style={{ padding: '10px', borderTop: '1px solid #f0f0f0', textAlign: 'right', fontWeight: 600, color: '#ef4444' }}>
+                                  {item.valueLost}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </Col>
+                  </Row>
+                </div>
+              </Col>
+            </Row>
+
+          </div>
+        )}
+
+        {/* Activity Reports */}
+        {selectedReportModule === 'activities' && (
+          <div style={{ padding: '24px 0px', background: '#f8f9fa' }}>
+            {/* Advanced Filters for Activities */}
+            <Card className="border-0 shadow-sm mb-4">
+              <Card.Body>
+                <Row className="g-3 align-items-end">
+                  <Col md={2}>
+                    <Form.Label className="small fw-bold mb-2">Activity Type</Form.Label>
+                    <Form.Select size="sm" style={{ fontSize: '0.875rem' }}>
+                      <option value="">All Types</option>
+                      <option value="followup">Follow-up Call</option>
+                      <option value="demo">Demo Meeting</option>
+                      <option value="email">Email Sent</option>
+                      <option value="proposal">Proposal Review</option>
+                      <option value="contract">Contract Discussion</option>
+                    </Form.Select>
+                  </Col>
+                  <Col md={2}>
+                    <Form.Label className="small fw-bold mb-2">User/Owner</Form.Label>
+                    <Form.Select size="sm" style={{ fontSize: '0.875rem' }}>
+                      <option value="">All Users</option>
+                      <option value="sarah">Sarah Johnson</option>
+                      <option value="michael">Michael Chen</option>
+                      <option value="emily">Emily Rodriguez</option>
+                      <option value="david">David Thompson</option>
+                      <option value="lisa">Lisa Anderson</option>
+                    </Form.Select>
+                  </Col>
+                  <Col md={2}>
+                    <Form.Label className="small fw-bold mb-2">Entity Type</Form.Label>
+                    <Form.Select size="sm" style={{ fontSize: '0.875rem' }}>
+                      <option value="">All Types</option>
+                      <option value="lead">Lead</option>
+                      <option value="deal">Deal</option>
+                      <option value="order">Order</option>
+                      <option value="campaign">Campaign</option>
+                    </Form.Select>
+                  </Col>
+                  <Col md={2}>
+                    <Form.Label className="small fw-bold mb-2">Date Range</Form.Label>
+                    <Form.Select size="sm" style={{ fontSize: '0.875rem' }}>
+                      <option value="7">Last 7 days</option>
+                      <option value="30">Last 30 days</option>
+                      <option value="90">Last 90 days</option>
+                      <option value="custom">Custom Range</option>
+                    </Form.Select>
+                  </Col>
+                  <Col md={4}>
+                    <div className="d-flex gap-2">
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        className="flex-grow-1"
+                        onClick={() => console.log('Apply activity filters')}
+                      >
+                        Apply
+                      </Button>
+                      <Button
+                        variant="outline-secondary"
+                        size="sm"
+                        onClick={() => console.log('Reset activity filters')}
+                      >
+                        Reset
+                      </Button>
+                    </div>
+                  </Col>
+                </Row>
+              </Card.Body>
+            </Card>
+
+            {/* User Activity Report with Chart */}
+            <Row className="g-3 mb-3">
+              <Col lg={12}>
+                <div style={{ background: 'white', borderRadius: '8px', padding: '20px', border: '1px solid #e5e7eb' }}>
+                  <h6 className="mb-3" style={{ fontSize: '15px', fontWeight: 600, color: '#1f2937' }}>User Activity</h6>
+                  
+                  {/* Bar Chart */}
+                  <ResponsiveContainer width="100%" height={280}>
+                    <BarChart data={[
+                      { user: 'Sarah J.', totalActivities: 342, stageChanges: 89, assignments: 124, updates: 129 },
+                      { user: 'Michael C.', totalActivities: 298, stageChanges: 76, assignments: 108, updates: 114 },
+                      { user: 'Emily R.', totalActivities: 276, stageChanges: 68, assignments: 98, updates: 110 },
+                      { user: 'David T.', totalActivities: 254, stageChanges: 62, assignments: 89, updates: 103 },
+                      { user: 'Lisa A.', totalActivities: 232, stageChanges: 58, assignments: 82, updates: 92 },
+                      { user: 'James W.', totalActivities: 198, stageChanges: 48, assignments: 72, updates: 78 },
+                      { user: 'Maria G.', totalActivities: 186, stageChanges: 45, assignments: 68, updates: 73 }
+                    ]}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                      <XAxis 
+                        dataKey="user" 
+                        stroke="#6b7280"
+                        style={{ fontSize: '12px' }}
+                      />
+                      <YAxis 
+                        stroke="#6b7280"
+                        style={{ fontSize: '12px' }}
+                      />
+                      <Tooltip 
+                        contentStyle={{
+                          background: 'white',
+                          border: '1px solid #e5e7eb',
+                          borderRadius: '8px',
+                          boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                        }}
+                      />
+                      <Legend />
+                      <Bar dataKey="totalActivities" fill="#4F46E5" name="Total Activities" radius={[8, 8, 0, 0]} />
+                      <Bar dataKey="stageChanges" fill="#10b981" name="Stage Changes" radius={[8, 8, 0, 0]} />
+                      <Bar dataKey="assignments" fill="#f59e0b" name="Assignments" radius={[8, 8, 0, 0]} />
+                      <Bar dataKey="updates" fill="#6b7280" name="Updates" radius={[8, 8, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+
+                  {/* Table */}
+                  <div style={{ maxHeight: '300px', overflowY: 'auto', marginTop: '20px' }}>
+                    <table className="table table-sm table-hover mb-0" style={{ fontSize: '12px' }}>
+                      <thead style={{ background: '#f8f9fa', position: 'sticky', top: 0, zIndex: 1 }}>
+                        <tr>
+                          <th style={{ border: 'none', padding: '10px', fontWeight: 600, color: '#1f2937' }}>User</th>
+                          <th style={{ border: 'none', padding: '10px', fontWeight: 600, color: '#1f2937', textAlign: 'right' }}>Total Activities</th>
+                          <th style={{ border: 'none', padding: '10px', fontWeight: 600, color: '#1f2937', textAlign: 'right' }}>Stage Changes</th>
+                          <th style={{ border: 'none', padding: '10px', fontWeight: 600, color: '#1f2937', textAlign: 'right' }}>Assignments</th>
+                          <th style={{ border: 'none', padding: '10px', fontWeight: 600, color: '#1f2937', textAlign: 'right' }}>Updates</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {[
+                          { user: 'Sarah Johnson', totalActivities: 342, stageChanges: 89, assignments: 124, updates: 129 },
+                          { user: 'Michael Chen', totalActivities: 298, stageChanges: 76, assignments: 108, updates: 114 },
+                          { user: 'Emily Rodriguez', totalActivities: 276, stageChanges: 68, assignments: 98, updates: 110 },
+                          { user: 'David Thompson', totalActivities: 254, stageChanges: 62, assignments: 89, updates: 103 },
+                          { user: 'Lisa Anderson', totalActivities: 232, stageChanges: 58, assignments: 82, updates: 92 },
+                          { user: 'James Wilson', totalActivities: 198, stageChanges: 48, assignments: 72, updates: 78 },
+                          { user: 'Maria Garcia', totalActivities: 186, stageChanges: 45, assignments: 68, updates: 73 }
+                        ].map((item, idx) => (
+                          <tr key={idx}>
+                            <td style={{ padding: '10px', borderTop: '1px solid #f0f0f0', color: '#1f2937', fontWeight: 500 }}>
+                              {item.user}
+                            </td>
+                            <td style={{ padding: '10px', borderTop: '1px solid #f0f0f0', textAlign: 'right', fontWeight: 600, color: '#4F46E5' }}>
+                              {item.totalActivities}
+                            </td>
+                            <td style={{ padding: '10px', borderTop: '1px solid #f0f0f0', textAlign: 'right', fontWeight: 600, color: '#10b981' }}>
+                              {item.stageChanges}
+                            </td>
+                            <td style={{ padding: '10px', borderTop: '1px solid #f0f0f0', textAlign: 'right', fontWeight: 600, color: '#f59e0b' }}>
+                              {item.assignments}
+                            </td>
+                            <td style={{ padding: '10px', borderTop: '1px solid #f0f0f0', textAlign: 'right', fontWeight: 600, color: '#6b7280' }}>
+                              {item.updates}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </Col>
+            </Row>
+
+            {/* Stage Movement and Stagnant Records - Side by Side */}
+            <Row className="g-3 mb-3">
+              {/* Stage Movement Report */}
+              <Col lg={6}>
+                <div style={{ background: 'white', borderRadius: '8px', padding: '20px', border: '1px solid #e5e7eb', height: '100%' }}>
+                  <h6 className="mb-3" style={{ fontSize: '15px', fontWeight: 600, color: '#1f2937' }}>Stage Movement</h6>
+                  <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
+                    <table className="table table-sm table-hover mb-0" style={{ fontSize: '12px' }}>
+                      <thead style={{ background: '#f8f9fa', position: 'sticky', top: 0, zIndex: 1 }}>
+                        <tr>
+                          <th style={{ border: 'none', padding: '10px', fontWeight: 600, color: '#1f2937' }}>Stage</th>
+                          <th style={{ border: 'none', padding: '10px', fontWeight: 600, color: '#1f2937', textAlign: 'center' }}>Entity</th>
+                          <th style={{ border: 'none', padding: '10px', fontWeight: 600, color: '#1f2937', textAlign: 'right' }}>In</th>
+                          <th style={{ border: 'none', padding: '10px', fontWeight: 600, color: '#1f2937', textAlign: 'right' }}>Out</th>
+                          <th style={{ border: 'none', padding: '10px', fontWeight: 600, color: '#1f2937', textAlign: 'right' }}>Net</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {[
+                          { stage: 'New', entityType: 'Lead', transitionsIn: 156, transitionsOut: 124, netChange: '+32' },
+                          { stage: 'Contacted', entityType: 'Lead', transitionsIn: 124, transitionsOut: 98, netChange: '+26' },
+                          { stage: 'Qualified', entityType: 'Lead', transitionsIn: 98, transitionsOut: 76, netChange: '+22' },
+                          { stage: 'Proposal', entityType: 'Deal', transitionsIn: 76, transitionsOut: 58, netChange: '+18' },
+                          { stage: 'Negotiation', entityType: 'Deal', transitionsIn: 58, transitionsOut: 45, netChange: '+13' },
+                          { stage: 'Closed Won', entityType: 'Deal', transitionsIn: 45, transitionsOut: 0, netChange: '+45' },
+                          { stage: 'Pending', entityType: 'Order', transitionsIn: 234, transitionsOut: 198, netChange: '+36' },
+                          { stage: 'Processing', entityType: 'Order', transitionsIn: 198, transitionsOut: 176, netChange: '+22' },
+                          { stage: 'Shipped', entityType: 'Order', transitionsIn: 176, transitionsOut: 154, netChange: '+22' },
+                          { stage: 'Delivered', entityType: 'Order', transitionsIn: 154, transitionsOut: 0, netChange: '+154' }
+                        ].map((item, idx) => (
+                          <tr key={idx}>
+                            <td style={{ padding: '10px', borderTop: '1px solid #f0f0f0', color: '#1f2937', fontWeight: 500 }}>
+                              {item.stage}
+                            </td>
+                            <td style={{ padding: '10px', borderTop: '1px solid #f0f0f0', textAlign: 'center', color: '#6b7280', fontSize: '11px' }}>
+                              {item.entityType}
+                            </td>
+                            <td style={{ padding: '10px', borderTop: '1px solid #f0f0f0', textAlign: 'right', fontWeight: 600, color: '#10b981' }}>
+                              {item.transitionsIn}
+                            </td>
+                            <td style={{ padding: '10px', borderTop: '1px solid #f0f0f0', textAlign: 'right', fontWeight: 600, color: '#ef4444' }}>
+                              {item.transitionsOut}
+                            </td>
+                            <td style={{ padding: '10px', borderTop: '1px solid #f0f0f0', textAlign: 'right', fontWeight: 600, color: item.netChange.startsWith('+') ? '#4F46E5' : '#6b7280' }}>
+                              {item.netChange}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </Col>
+
+              {/* Stagnant Records Report */}
+              <Col lg={6}>
+                <div style={{ background: 'white', borderRadius: '8px', padding: '20px', border: '1px solid #e5e7eb', height: '100%' }}>
+                  <h6 className="mb-3" style={{ fontSize: '15px', fontWeight: 600, color: '#1f2937' }}>Stagnant Records</h6>
+                  <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
+                    <table className="table table-sm table-hover mb-0" style={{ fontSize: '12px' }}>
+                      <thead style={{ background: '#f8f9fa', position: 'sticky', top: 0, zIndex: 1 }}>
+                        <tr>
+                          <th style={{ border: 'none', padding: '10px', fontWeight: 600, color: '#1f2937' }}>Type</th>
+                          <th style={{ border: 'none', padding: '10px', fontWeight: 600, color: '#1f2937' }}>Name</th>
+                          <th style={{ border: 'none', padding: '10px', fontWeight: 600, color: '#1f2937' }}>Owner</th>
+                          <th style={{ border: 'none', padding: '10px', fontWeight: 600, color: '#1f2937', textAlign: 'right' }}>Days</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {[
+                          { type: 'Lead', name: 'Acme Corporation', owner: 'Sarah Johnson', stage: 'Qualified', lastActivity: '2025-10-15', daysStagnant: 52 },
+                          { type: 'Lead', name: 'Tech Solutions Inc', owner: 'Michael Chen', stage: 'Contacted', lastActivity: '2025-10-22', daysStagnant: 45 },
+                          { type: 'Deal', name: 'Enterprise Contract A', owner: 'Emily Rodriguez', stage: 'Proposal', lastActivity: '2025-11-01', daysStagnant: 35 },
+                          { type: 'Lead', name: 'Global Industries', owner: 'David Thompson', stage: 'New', lastActivity: '2025-11-05', daysStagnant: 31 },
+                          { type: 'Deal', name: 'Strategic Partnership B', owner: 'Lisa Anderson', stage: 'Negotiation', lastActivity: '2025-11-08', daysStagnant: 28 },
+                          { type: 'Order', name: 'Order #10145', owner: 'Sales Team', stage: 'Pending', lastActivity: '2025-11-12', daysStagnant: 24 },
+                          { type: 'Lead', name: 'Startup Ventures LLC', owner: 'James Wilson', stage: 'Qualified', lastActivity: '2025-11-15', daysStagnant: 21 },
+                          { type: 'Deal', name: 'SMB Deal C', owner: 'Maria Garcia', stage: 'Proposal', lastActivity: '2025-11-18', daysStagnant: 18 },
+                          { type: 'Order', name: 'Order #10198', owner: 'Fulfillment Team', stage: 'Processing', lastActivity: '2025-11-20', daysStagnant: 16 },
+                          { type: 'Lead', name: 'Innovation Partners', owner: 'Sarah Johnson', stage: 'Contacted', lastActivity: '2025-11-22', daysStagnant: 14 }
+                        ].map((item, idx) => (
+                          <tr key={idx}>
+                            <td style={{ padding: '10px', borderTop: '1px solid #f0f0f0' }}>
+                              <Badge 
+                                bg={item.type === 'Lead' ? 'primary' : item.type === 'Deal' ? 'success' : 'warning'} 
+                                className="bg-opacity-10"
+                                style={{ fontSize: '10px' }}
+                              >
+                                {item.type}
+                              </Badge>
+                            </td>
+                            <td style={{ padding: '10px', borderTop: '1px solid #f0f0f0', color: '#1f2937', fontWeight: 500, fontSize: '11px' }}>
+                              {item.name}
+                            </td>
+                            <td style={{ padding: '10px', borderTop: '1px solid #f0f0f0', color: '#6b7280', fontSize: '11px' }}>
+                              {item.owner}
+                            </td>
+                            <td style={{ padding: '10px', borderTop: '1px solid #f0f0f0', textAlign: 'right', fontWeight: 600, color: item.daysStagnant > 30 ? '#ef4444' : item.daysStagnant > 20 ? '#f59e0b' : '#6b7280' }}>
+                              {item.daysStagnant}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </Col>
+            </Row>
+
+          </div>
+        )}
+
+        {/* Default Reports for Other Modules */}
+        {!['leads', 'deals', 'orders', 'activities'].includes(selectedReportModule) && (
+          <div style={{ padding: '24px 0px', background: '#f8f9fa' }}>
+            <Row className="g-3 mb-4">
+              <Col lg={3} md={6}>
+                <div style={{ background: 'white', borderRadius: '8px', padding: '20px', border: '1px solid #e5e7eb' }}>
+                  <p className="text-muted mb-1" style={{ fontSize: '12px', fontWeight: 500 }}>Total Items</p>
+                  <h3 className="mb-0 fw-bold" style={{ fontSize: '24px', color: '#1f2937' }}>1,247</h3>
+                  <div className="d-flex align-items-center gap-1 mt-2">
+                    <span className="text-success" style={{ fontSize: '12px', fontWeight: 600 }}>+18%</span>
+                    <ArrowUp size={12} className="text-success" />
+                  </div>
+                </div>
+              </Col>
+              <Col lg={3} md={6}>
+                <div style={{ background: 'white', borderRadius: '8px', padding: '20px', border: '1px solid #e5e7eb' }}>
+                  <p className="text-muted mb-1" style={{ fontSize: '12px', fontWeight: 500 }}>Active Items</p>
+                  <h3 className="mb-0 fw-bold" style={{ fontSize: '24px', color: '#4F46E5' }}>892</h3>
+                  <div className="d-flex align-items-center gap-1 mt-2">
+                    <span className="text-success" style={{ fontSize: '12px', fontWeight: 600 }}>+22%</span>
+                    <ArrowUp size={12} className="text-success" />
+                  </div>
+                </div>
+              </Col>
+              <Col lg={3} md={6}>
+                <div style={{ background: 'white', borderRadius: '8px', padding: '20px', border: '1px solid #e5e7eb' }}>
+                  <p className="text-muted mb-1" style={{ fontSize: '12px', fontWeight: 500 }}>Conversion Rate</p>
+                  <h3 className="mb-0 fw-bold" style={{ fontSize: '24px', color: '#10b981' }}>26.3%</h3>
+                  <div className="d-flex align-items-center gap-1 mt-2">
+                    <span className="text-success" style={{ fontSize: '12px', fontWeight: 600 }}>+8%</span>
+                    <ArrowUp size={12} className="text-success" />
+                  </div>
+                </div>
+              </Col>
+              <Col lg={3} md={6}>
+                <div style={{ background: 'white', borderRadius: '8px', padding: '20px', border: '1px solid #e5e7eb' }}>
+                  <p className="text-muted mb-1" style={{ fontSize: '12px', fontWeight: 500 }}>Total Value</p>
+                  <h3 className="mb-0 fw-bold" style={{ fontSize: '24px', color: '#1f2937' }}>$2.4M</h3>
+                  <div className="d-flex align-items-center gap-1 mt-2">
+                    <span className="text-success" style={{ fontSize: '12px', fontWeight: 600 }}>+24%</span>
+                    <ArrowUp size={12} className="text-success" />
+                  </div>
+                </div>
+              </Col>
+            </Row>
+
+            <Row className="g-3">
+              <Col lg={12}>
+                <div style={{ background: 'white', borderRadius: '8px', padding: '20px', border: '1px solid #e5e7eb' }}>
+                  <h6 className="mb-3" style={{ fontSize: '14px', fontWeight: 600, color: '#1f2937' }}>Activity Overview</h6>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <AreaChart data={reportData.chartData}>
+                      <defs>
+                        <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#4F46E5" stopOpacity={0.3}/>
+                          <stop offset="95%" stopColor="#4F46E5" stopOpacity={0}/>
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
+                      <XAxis dataKey="name" stroke="#9CA3AF" style={{ fontSize: '11px' }} />
+                      <YAxis stroke="#9CA3AF" style={{ fontSize: '11px' }} />
+                      <Tooltip contentStyle={{ background: 'white', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '12px' }} />
+                      <Area type="monotone" dataKey="value" stroke="#4F46E5" fill="url(#colorValue)" strokeWidth={2} />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </Col>
+            </Row>
+          </div>
+        )}
+
+
+      </div>
+    );
+  };
+
   const renderReportsNew = () => {
     // Report modules configuration
     const reportModules = [
@@ -20207,7 +22786,8 @@ const CRMPortal = () => {
       case 'stages': return renderStages();
       case 'products': return renderProducts();
       case 'activities': return renderActivityTrackerUpdated(); // Use renderActivityTrackerNew() or renderActivities() for old versions
-      case 'reports': return renderReportsNew(); // NEW: Comprehensive reporting with dynamic filters
+      case 'reports': return renderReportsModern(); // MODERN: Tab-based reporting with reference design styling
+      // case 'reports': return renderReportsNew(); // NEW: Comprehensive reporting with dynamic filters
       // case 'reports': return renderReportsOld(); // OLD: Basic static reports (commented out)
       default: return renderDashboard();
     }
