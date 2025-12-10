@@ -57,10 +57,19 @@ const ProductDetails = () => {
             </div>
           }
          },
+
          { key: 'base_price', name: 'Base Price', selector: (row: any) => row.product?.base_price, sortable: true,
           cell: (row: any) => {
             return <div>
-              <p className="text-primary fw-semibold">{row?.product?.currency} {formatNumber(row?.product?.base_price)}</p>
+              <p className="text-primary fw-semibold">{row?.company?.profile?.currency || row?.product?.currency || 'USD'} {formatNumber(row?.product?.base_price)}</p>
+            </div>
+          }
+         },
+
+         { key: 'selling_price', name: 'Selling Price', selector: (row: any) => row?.selling_price, sortable: true,
+          cell: (row: any) => {
+            return <div>
+              <p className="text-primary fw-semibold">{row?.company?.profile?.currency || row?.product?.currency || 'USD'} {formatNumber(row?.selling_price)}</p>
             </div>
           }
          },

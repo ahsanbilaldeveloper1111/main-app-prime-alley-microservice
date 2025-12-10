@@ -40,7 +40,7 @@ const CALL_STATES_STORAGE_KEY = 'cti_call_states';
 const CALL_STATES_TIMESTAMP_KEY = 'cti_call_states_timestamp';
 const STORAGE_EXPIRY_HOURS = 24; // Call states expire after 24 hours
 
-export default function useCtiStomp(wsPath = '/ws') {
+export default function useCtiStompProxy(wsPath = '/ws') {
   const [dnsMap, setDnsMap] = useState<Record<string, { dn: string; devices: Record<string, CtiDevice> }>>({});
   const [callStateMap, setCallStateMap] = useState<Record<string, CtiCallEvent>>({});
   const [eventLog, setEventLog] = useState<any[]>([]);
@@ -696,7 +696,7 @@ export default function useCtiStomp(wsPath = '/ws') {
       };
 
       eventSource.onmessage = (event) => {
-       // console.log('📨 SSE message received:', event.data);
+        //console.log('📨 SSE message received:', event.data);
         try {
           const data = JSON.parse(event.data);
           console.log('📨 Parsed SSE data:', data);
@@ -798,8 +798,8 @@ export default function useCtiStomp(wsPath = '/ws') {
         const readyState = eventSource.readyState;
         console.error('❌ SSE connection error:', error);
         //console.error('❌ EventSource readyState:', readyState);
-        //console.error('❌ EventSource URL:', sseUrl);
-        
+       // console.error('❌ EventSource URL:', sseUrl);
+        //
         // EventSource states: CONNECTING (0), OPEN (1), CLOSED (2)
         if (readyState === EventSource.CLOSED) {
           console.log('🔌 EventSource is CLOSED - connection failed permanently');
@@ -814,7 +814,7 @@ export default function useCtiStomp(wsPath = '/ws') {
             eventSourceRef.current = null;
           }
         } else if (readyState === EventSource.CONNECTING) {
-         // console.log('⏳ EventSource is CONNECTING - waiting for connection...');
+          //console.log('⏳ EventSource is CONNECTING - waiting for connection...');
           // Don't set error yet, it's still trying to connect
         } else if (readyState === EventSource.OPEN) {
           //console.log('✅ EventSource is OPEN - connection is active');

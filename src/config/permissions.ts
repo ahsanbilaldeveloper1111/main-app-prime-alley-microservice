@@ -18,6 +18,7 @@ export const routePermissions: RoutePermission[] = [
     {path: '/live-calls-test',permissions: ['']},
     {path: '/resources',permissions: ['']},
     {path: '/notifications',permissions: ['']},
+    {path: '/test-cti-proxy',permissions: ['']},
    
     {path: '/resources/faq',permissions: ['']},
     {path: '/resources/help-materials',permissions: ['']},
