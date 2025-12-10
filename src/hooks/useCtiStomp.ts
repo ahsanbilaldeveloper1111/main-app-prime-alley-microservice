@@ -40,7 +40,28 @@ const CALL_STATES_STORAGE_KEY = 'cti_call_states';
 const CALL_STATES_TIMESTAMP_KEY = 'cti_call_states_timestamp';
 const STORAGE_EXPIRY_HOURS = 24; // Call states expire after 24 hours
 
-export default function useCtiStomp(wsPath = '/ws') {
+// Generate unique instance ID for each hook instance
+let instanceCounter = 0;
+const generateInstanceId = () => {
+  instanceCounter++;
+  return `cti-stomp-${instanceCounter}-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+};
+
+/**
+ * Custom hook for CTI STOMP WebSocket connection via SSE
+ * 
+ * Each page/component that uses this hook will get its own independent connection.
+ * On mount, it always creates a fresh connection (closing any existing one first).
+ * On reconnect, it always creates a fresh connection with a new token.
+ * 
+ * @param wsPath - WebSocket path (default: '/ws')
+ * @param instanceId - Optional unique instance ID. If not provided, one will be auto-generated.
+ *                     Each hook instance gets a unique ID to ensure isolation between pages.
+ */
+export default function useCtiStomp(wsPath = '/ws', instanceId?: string) {
+  // Generate unique instance ID if not provided
+  // This ensures each page/component gets its own isolated connection
+  const instanceIdRef = useRef<string>(instanceId || generateInstanceId());
   const [dnsMap, setDnsMap] = useState<Record<string, { dn: string; devices: Record<string, CtiDevice> }>>({});
   const [callStateMap, setCallStateMap] = useState<Record<string, CtiCallEvent>>({});
   const [eventLog, setEventLog] = useState<any[]>([]);
@@ -598,24 +619,31 @@ export default function useCtiStomp(wsPath = '/ws') {
     };
 
     const connectViaSSE = async (token: string, userAddress: string, forceReconnect: boolean = false) => {
-      // Prevent multiple connections unless forcing reconnect
-      if (!forceReconnect) {
-        if (eventSourceRef.current && eventSourceRef.current.readyState !== EventSource.CLOSED) {
-          return null;
-        }
-        
-        if (isConnectingRef.current) {
-          return null;
-        }
-      } else {
-        // Force reconnect: close existing connection first
-        if (eventSourceRef.current) {
-          eventSourceRef.current.close();
-          eventSourceRef.current = null;
-        }
+      const currentInstanceId = instanceIdRef.current;
+      
+      // Always close existing connection first to ensure fresh connection
+      if (eventSourceRef.current) {
+        console.log(`[${currentInstanceId}] 🔄 Closing existing connection before creating new one...`);
+        eventSourceRef.current.close();
+        eventSourceRef.current = null;
+        // Wait a bit to ensure connection is fully closed
+        await new Promise(resolve => setTimeout(resolve, 500));
       }
       
-      if (isConnectingRef.current && !forceReconnect) {
+      // Reset connection state to ensure fresh start
+      isConnectingRef.current = false;
+      isInitializedRef.current = false;
+      connectionStartTimeRef.current = null;
+      
+      // Clear reconnection timer if it exists
+      if (reconnectionTimerRef.current) {
+        clearTimeout(reconnectionTimerRef.current);
+        reconnectionTimerRef.current = null;
+      }
+      
+      // Prevent multiple simultaneous connections for this instance
+      if (isConnectingRef.current) {
+        console.log(`[${currentInstanceId}] Already connecting, skipping...`);
         return null;
       }
       
@@ -624,23 +652,24 @@ export default function useCtiStomp(wsPath = '/ws') {
       // Set userAddress in state
       setUserAddress(userAddress);
       
-      // Build SSE URL - EventSource uses absolute path, not axios baseURL
+      // Build SSE URL with instance ID to help identify connections
+      // EventSource uses absolute path, not axios baseURL
       const params = new URLSearchParams();
       params.append('token', token);
       params.append('userAddress', userAddress);
+      params.append('instanceId', currentInstanceId); // Add instance ID for debugging
       const sseUrl = `/api/cti-stomp-stream?${params.toString()}`;
       
-      // Close existing connection if any
-      if (eventSourceRef.current) {
-        eventSourceRef.current.close();
-        eventSourceRef.current = null;
-      }
+      console.log(`[${currentInstanceId}] Creating fresh SSE connection...`);
       
       // Create EventSource for SSE connection
       const eventSource = new EventSource(sseUrl);
       eventSourceRef.current = eventSource;
 
       eventSource.onopen = () => {
+        const currentInstanceId = instanceIdRef.current;
+        console.log(`[${currentInstanceId}] ✅ Connection opened successfully`);
+        
         isConnectingRef.current = false;
         isInitializedRef.current = true;
         setIsInitialized(true);
@@ -658,9 +687,9 @@ export default function useCtiStomp(wsPath = '/ws') {
         
         // Set up timer to reconnect after 15 minutes (900000ms)
         reconnectionTimerRef.current = setTimeout(async () => {
-          console.log('🔄 15 minutes elapsed, reconnecting with fresh token...');
+          console.log(`[${currentInstanceId}] 🔄 15 minutes elapsed, closing existing connection and reconnecting with fresh token...`);
           
-          // Close existing connection
+          // First, close existing connection completely
           if (eventSourceRef.current) {
             eventSourceRef.current.close();
             eventSourceRef.current = null;
@@ -670,8 +699,13 @@ export default function useCtiStomp(wsPath = '/ws') {
           isConnectingRef.current = false;
           isInitializedRef.current = false;
           connectionStartTimeRef.current = null;
+          isReconnectingRef.current = false;
           
-          // Get fresh token and reconnect
+          // Wait a bit to ensure connection is fully closed
+          await new Promise(resolve => setTimeout(resolve, 500));
+          
+          // Get fresh token and reconnect with fresh connection
+          console.log(`[${currentInstanceId}] 🔄 Getting fresh token and creating new connection...`);
           const freshToken = await getBearerToken();
           if (freshToken) {
             await connectViaSSE(freshToken.token, freshToken.userAddress, true);
@@ -757,36 +791,42 @@ export default function useCtiStomp(wsPath = '/ws') {
                 
                 // When server indicates reconnecting, get fresh token and reconnect
                 if (!isReconnectingRef.current) {
+                  const currentInstanceId = instanceIdRef.current;
                   isReconnectingRef.current = true;
-                  console.log('🔄 Server reconnecting, getting fresh token and reconnecting...');
+                  console.log(`[${currentInstanceId}] 🔄 Server reconnecting, closing existing connection first...`);
                   
-                  // Close current connection
+                  // First, close current connection completely
                   if (eventSourceRef.current) {
                     eventSourceRef.current.close();
                     eventSourceRef.current = null;
                   }
+                  
+                  // Reset connection state
+                  isConnectingRef.current = false;
+                  isInitializedRef.current = false;
+                  connectionStartTimeRef.current = null;
                   
                   // Clear reconnection timer if it exists
                   if (reconnectionTimerRef.current) {
                     clearTimeout(reconnectionTimerRef.current);
                     reconnectionTimerRef.current = null;
                   }
-                  connectionStartTimeRef.current = null;
                   
-                  // Get fresh token and reconnect after a short delay
+                  // Wait for connection to fully close, then get fresh token and reconnect
                   setTimeout(async () => {
                     if (isReconnectingRef.current) {
+                      console.log(`[${currentInstanceId}] 🔄 Getting fresh token and creating new connection...`);
                       const freshToken = await getBearerToken();
                       if (freshToken) {
                         isReconnectingRef.current = false;
                         await connectViaSSE(freshToken.token, freshToken.userAddress, true);
                       } else {
-                        console.error('❌ Failed to get fresh token for reconnection');
+                        console.error(`[${currentInstanceId}] ❌ Failed to get fresh token for reconnection`);
                         isReconnectingRef.current = false;
                         setError('Failed to reconnect: could not get fresh token');
                       }
                     }
-                  }, 1000); // Wait 1 second before reconnecting
+                  }, 1000); // Wait 1 second to ensure connection is closed
                 }
               }
               break;
@@ -813,16 +853,19 @@ export default function useCtiStomp(wsPath = '/ws') {
       };
 
       eventSource.onerror = (error) => {
+        const currentInstanceId = instanceIdRef.current;
         const readyState = eventSource.readyState;
         
         // EventSource states: CONNECTING (0), OPEN (1), CLOSED (2)
         if (readyState === EventSource.CLOSED) {
+          console.log(`[${currentInstanceId}] ⚠️ SSE connection closed`);
           isConnectingRef.current = false;
           isInitializedRef.current = false;
           setError('SSE connection closed');
           setIsInitialized(false);
           
           // Don't let EventSource auto-retry - we'll handle reconnection manually
+          // Close existing connection first
           if (eventSourceRef.current) {
             eventSourceRef.current.close();
             eventSourceRef.current = null;
@@ -838,27 +881,30 @@ export default function useCtiStomp(wsPath = '/ws') {
           // Reconnect with fresh token after a short delay
           if (!isReconnectingRef.current) {
             isReconnectingRef.current = true;
-            console.log('🔄 Connection closed, will reconnect with fresh token...');
+            console.log(`[${currentInstanceId}] 🔄 Connection closed, will reconnect with fresh token after closing existing connection...`);
             
             setTimeout(async () => {
               if (isReconnectingRef.current) {
-                // Get fresh token and reconnect
+                console.log(`[${currentInstanceId}] 🔄 Getting fresh token and creating new connection...`);
+                // Get fresh token and reconnect with fresh connection
                 const freshToken = await getBearerToken();
                 if (freshToken) {
                   isReconnectingRef.current = false;
                   await connectViaSSE(freshToken.token, freshToken.userAddress, true);
                 } else {
-                  console.error('❌ Failed to get fresh token for reconnection');
+                  console.error(`[${currentInstanceId}] ❌ Failed to get fresh token for reconnection`);
                   isReconnectingRef.current = false;
                   setError('Failed to reconnect: could not get fresh token');
                 }
               }
-            }, 2000); // Wait 2 seconds before reconnecting
+            }, 2000); // Wait 2 seconds to ensure connection is fully closed
           }
         } else if (readyState === EventSource.CONNECTING) {
           // Don't set error yet, it's still trying to connect
+          console.log(`[${currentInstanceId}] 🔄 Connection state: CONNECTING`);
         } else if (readyState === EventSource.OPEN) {
           // Connection is open, this might be a temporary error, don't close
+          console.log(`[${currentInstanceId}] ⚠️ Temporary error on open connection`);
         }
       };
 
@@ -880,23 +926,40 @@ export default function useCtiStomp(wsPath = '/ws') {
     };
 
     const initialize = async () => {
-      // Prevent multiple initializations
-      if (isInitializedRef.current) {
-        return null;
+      const currentInstanceId = instanceIdRef.current;
+      console.log(`[${currentInstanceId}] Initializing new connection...`);
+      
+      // Always close any existing connection first to ensure fresh connection
+      if (eventSourceRef.current) {
+        console.log(`[${currentInstanceId}] Closing existing connection before creating new one...`);
+        eventSourceRef.current.close();
+        eventSourceRef.current = null;
+        // Wait a bit to ensure connection is fully closed
+        await new Promise(resolve => setTimeout(resolve, 300));
       }
       
+      // Reset all connection state to ensure fresh start
+      isConnectingRef.current = false;
+      isInitializedRef.current = false;
+      connectionStartTimeRef.current = null;
+      isReconnectingRef.current = false;
+      
+      // Clear any existing reconnection timer
+      if (reconnectionTimerRef.current) {
+        clearTimeout(reconnectionTimerRef.current);
+        reconnectionTimerRef.current = null;
+      }
+      
+      // Prevent multiple simultaneous initializations for this instance
       if (isConnectingRef.current) {
-        return null;
-      }
-      
-      // Check if EventSource already exists and is open
-      if (eventSourceRef.current && eventSourceRef.current.readyState === EventSource.OPEN) {
+        console.log(`[${currentInstanceId}] Already connecting, skipping...`);
         return null;
       }
       
       const token = await getBearerToken();
       if (token) {
-        return await connectViaSSE(token.token, token.userAddress);
+        console.log(`[${currentInstanceId}] Got token, creating fresh connection...`);
+        return await connectViaSSE(token.token, token.userAddress, true); // Force fresh connection
       } else {
         setError('Service unavailable');
         isConnectingRef.current = false;
@@ -904,29 +967,40 @@ export default function useCtiStomp(wsPath = '/ws') {
       }
     };
 
-    // Only initialize once on mount
+    // Initialize on mount - always create fresh connection
     let cleanup: (() => void) | null = null;
     initialize().then(cleanupFn => {
       cleanup = cleanupFn;
     });
 
-    // Cleanup on unmount
+    // Cleanup on unmount - ensure connection is fully closed
     return () => {
+      const currentInstanceId = instanceIdRef.current;
+      console.log(`[${currentInstanceId}] Component unmounting, cleaning up connection...`);
+      
       if (cleanup && typeof cleanup === 'function') {
         cleanup();
       }
+      
+      // Force close connection
       if (eventSourceRef.current) {
         eventSourceRef.current.close();
         eventSourceRef.current = null;
       }
+      
+      // Clear reconnection timer
       if (reconnectionTimerRef.current) {
         clearTimeout(reconnectionTimerRef.current);
         reconnectionTimerRef.current = null;
       }
+      
+      // Reset all state
       isConnectingRef.current = false;
       isInitializedRef.current = false;
       connectionStartTimeRef.current = null;
       isReconnectingRef.current = false;
+      
+      console.log(`[${currentInstanceId}] Cleanup complete`);
     };
     // Empty dependency array - only run once on mount
     // eslint-disable-next-line react-hooks/exhaustive-deps
