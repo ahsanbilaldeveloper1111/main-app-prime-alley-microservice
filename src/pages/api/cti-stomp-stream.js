@@ -33,12 +33,8 @@ const reconnectingConnections = new Set();
 
 // Optimized subscription setup
 const setupSubscriptions = (client, connectionKey) => {
-  // Check if subscriptions are already set up for this connection
-  if (subscriptionsSetup.has(connectionKey)) {
-    console.log('⚠️ Subscriptions already set up for connection:', connectionKey, '- skipping');
-    return;
-  }
-  
+  // Always set up subscriptions - even if they were set up before, they might have been lost
+  // during reconnection. The STOMP client will handle duplicate subscriptions gracefully.
   console.log('Setting up STOMP subscriptions for connection:', connectionKey);
   const streams = sseStreams.get(connectionKey) || [];
   
@@ -142,6 +138,8 @@ const setupSubscriptions = (client, connectionKey) => {
   
   // Mark subscriptions as set up
   subscriptionsSetup.add(connectionKey);
+  
+  console.log('✅ STOMP subscriptions set up for connection:', connectionKey);
 
 };
 
@@ -265,6 +263,12 @@ export default function handler(req, res) {
   if (existingConnection && existingConnection.client && existingConnection.client.connected) {
     console.log('🔄 Reusing existing STOMP connection for user:', userAddress);
     existingConnection.lastUsed = Date.now();
+    
+    // Always ensure subscriptions are set up for reused connections
+    // Clear the flag first to force fresh subscription setup
+    subscriptionsSetup.delete(connectionKey);
+    console.log('📡 Setting up subscriptions for reused connection:', connectionKey);
+    setupSubscriptions(existingConnection.client, connectionKey);
     
     // Write connection message and flush
     try {
@@ -398,6 +402,10 @@ export default function handler(req, res) {
         
         // Clear reconnection flag if it was set
         reconnectingConnections.delete(connectionKey);
+        
+        // Clear old subscriptions setup flag to ensure fresh subscriptions are set up
+        // This is important after reconnection
+        subscriptionsSetup.delete(connectionKey);
         
         // Add to connection pool
         connectionPool.set(connectionKey, {

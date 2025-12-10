@@ -618,27 +618,93 @@ export default function useCtiStomp(wsPath = '/ws', instanceId?: string) {
       }
     };
 
-    const connectViaSSE = async (token: string, userAddress: string, forceReconnect: boolean = false) => {
+    // Helper function to fully close and cleanup all connections
+    const fullyCloseConnection = async (preserveReconnecting: boolean = false) => {
       const currentInstanceId = instanceIdRef.current;
+      console.log(`[${currentInstanceId}] 🧹 Fully closing all connections and resetting state...`);
       
-      // Always close existing connection first to ensure fresh connection
+      // Preserve reconnecting flag if needed
+      const wasReconnecting = isReconnectingRef.current;
+      
+      // Close EventSource connection
       if (eventSourceRef.current) {
-        console.log(`[${currentInstanceId}] 🔄 Closing existing connection before creating new one...`);
-        eventSourceRef.current.close();
+        try {
+          eventSourceRef.current.close();
+        } catch (err) {
+          // Ignore errors during close
+        }
         eventSourceRef.current = null;
-        // Wait a bit to ensure connection is fully closed
-        await new Promise(resolve => setTimeout(resolve, 500));
       }
       
-      // Reset connection state to ensure fresh start
+      // Clear STOMP client reference if it exists
+      if (clientRef.current) {
+        try {
+          if (clientRef.current.connected) {
+            clientRef.current.deactivate();
+          }
+        } catch (err) {
+          // Ignore errors during deactivation
+        }
+        clientRef.current = null;
+      }
+      
+      // Clear reconnection timer
+      if (reconnectionTimerRef.current) {
+        clearTimeout(reconnectionTimerRef.current);
+        reconnectionTimerRef.current = null;
+      }
+      
+      // Reset all connection state flags
       isConnectingRef.current = false;
       isInitializedRef.current = false;
       connectionStartTimeRef.current = null;
       
-      // Clear reconnection timer if it exists
-      if (reconnectionTimerRef.current) {
-        clearTimeout(reconnectionTimerRef.current);
-        reconnectionTimerRef.current = null;
+      // Only reset reconnecting flag if not preserving it
+      if (!preserveReconnecting) {
+        isReconnectingRef.current = false;
+      } else {
+        // Restore the reconnecting flag if we're preserving it
+        isReconnectingRef.current = wasReconnecting;
+      }
+      
+      // Clear token and userAddress refs to force fresh token on next connection
+      tokenRef.current = null;
+      userAddressRef.current = null;
+      
+      // Reset UI state
+      setIsInitialized(false);
+      setError(null);
+      
+      // Wait a bit to ensure all connections are fully closed
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    };
+
+    const connectViaSSE = async (token: string, userAddress: string, forceReconnect: boolean = false) => {
+      const currentInstanceId = instanceIdRef.current;
+      
+      // If force reconnect, fully close everything first
+      if (forceReconnect) {
+        await fullyCloseConnection();
+      } else {
+        // Always close existing connection first to ensure fresh connection
+        if (eventSourceRef.current) {
+          console.log(`[${currentInstanceId}] 🔄 Closing existing connection before creating new one...`);
+          eventSourceRef.current.close();
+          eventSourceRef.current = null;
+          // Wait a bit to ensure connection is fully closed
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+        
+        // Reset connection state to ensure fresh start
+        isConnectingRef.current = false;
+        isInitializedRef.current = false;
+        connectionStartTimeRef.current = null;
+        
+        // Clear reconnection timer if it exists
+        if (reconnectionTimerRef.current) {
+          clearTimeout(reconnectionTimerRef.current);
+          reconnectionTimerRef.current = null;
+        }
       }
       
       // Prevent multiple simultaneous connections for this instance
@@ -648,6 +714,10 @@ export default function useCtiStomp(wsPath = '/ws', instanceId?: string) {
       }
       
       isConnectingRef.current = true;
+      
+      // Store token and userAddress in refs to ensure they're current
+      tokenRef.current = token;
+      userAddressRef.current = userAddress;
       
       // Set userAddress in state
       setUserAddress(userAddress);
@@ -687,22 +757,10 @@ export default function useCtiStomp(wsPath = '/ws', instanceId?: string) {
         
         // Set up timer to reconnect after 15 minutes (900000ms)
         reconnectionTimerRef.current = setTimeout(async () => {
-          console.log(`[${currentInstanceId}] 🔄 15 minutes elapsed, closing existing connection and reconnecting with fresh token...`);
+          console.log(`[${currentInstanceId}] 🔄 15 minutes elapsed, fully closing connection and reconnecting with fresh token...`);
           
-          // First, close existing connection completely
-          if (eventSourceRef.current) {
-            eventSourceRef.current.close();
-            eventSourceRef.current = null;
-          }
-          
-          // Reset connection state
-          isConnectingRef.current = false;
-          isInitializedRef.current = false;
-          connectionStartTimeRef.current = null;
-          isReconnectingRef.current = false;
-          
-          // Wait a bit to ensure connection is fully closed
-          await new Promise(resolve => setTimeout(resolve, 500));
+          // Fully close all connections and reset state
+          await fullyCloseConnection();
           
           // Get fresh token and reconnect with fresh connection
           console.log(`[${currentInstanceId}] 🔄 Getting fresh token and creating new connection...`);
@@ -778,6 +836,7 @@ export default function useCtiStomp(wsPath = '/ws', instanceId?: string) {
               break;
               
             case 'connection':
+              console.log(`[${instanceIdRef.current}] 📨 Received connection message:`, data);
               if (data.status === 'disconnected') {
                 // Only set initialized to false if we're not preserving state
                 // This allows UI to keep showing existing data during reconnection
@@ -785,39 +844,21 @@ export default function useCtiStomp(wsPath = '/ws', instanceId?: string) {
                   setIsInitialized(false);
                 }
               } else if (data.status === 'reconnecting') {
-                // During reconnection, keep initialized state but show reconnecting indicator
-                // Don't clear state - preserve existing dnsMap and callStateMap
-                setError(null); // Clear any previous errors
-                
-                // When server indicates reconnecting, get fresh token and reconnect
+                console.log(`[${instanceIdRef.current}] 🔄 Received reconnecting status from server`);
+                // During reconnection, get fresh token and reconnect
                 if (!isReconnectingRef.current) {
                   const currentInstanceId = instanceIdRef.current;
                   isReconnectingRef.current = true;
-                  console.log(`[${currentInstanceId}] 🔄 Server reconnecting, closing existing connection first...`);
+                  console.log(`[${currentInstanceId}] 🔄 Server reconnecting, fully closing connection and getting fresh token...`);
                   
-                  // First, close current connection completely
-                  if (eventSourceRef.current) {
-                    eventSourceRef.current.close();
-                    eventSourceRef.current = null;
-                  }
-                  
-                  // Reset connection state
-                  isConnectingRef.current = false;
-                  isInitializedRef.current = false;
-                  connectionStartTimeRef.current = null;
-                  
-                  // Clear reconnection timer if it exists
-                  if (reconnectionTimerRef.current) {
-                    clearTimeout(reconnectionTimerRef.current);
-                    reconnectionTimerRef.current = null;
-                  }
-                  
-                  // Wait for connection to fully close, then get fresh token and reconnect
-                  setTimeout(async () => {
+                  // Fully close all connections and reset state, but preserve reconnecting flag
+                  fullyCloseConnection(true).then(async () => {
+                    // Double-check we're still supposed to reconnect
                     if (isReconnectingRef.current) {
                       console.log(`[${currentInstanceId}] 🔄 Getting fresh token and creating new connection...`);
                       const freshToken = await getBearerToken();
                       if (freshToken) {
+                        console.log(`[${currentInstanceId}] ✅ Got fresh token, creating new connection...`);
                         isReconnectingRef.current = false;
                         await connectViaSSE(freshToken.token, freshToken.userAddress, true);
                       } else {
@@ -825,8 +866,16 @@ export default function useCtiStomp(wsPath = '/ws', instanceId?: string) {
                         isReconnectingRef.current = false;
                         setError('Failed to reconnect: could not get fresh token');
                       }
+                    } else {
+                      console.log(`[${currentInstanceId}] ⚠️ Reconnection cancelled (flag was reset)`);
                     }
-                  }, 1000); // Wait 1 second to ensure connection is closed
+                  }).catch((error) => {
+                    console.error(`[${currentInstanceId}] ❌ Error during reconnection:`, error);
+                    isReconnectingRef.current = false;
+                    setError('Failed to reconnect: ' + (error.message || 'unknown error'));
+                  });
+                } else {
+                  console.log(`[${currentInstanceId}] ⚠️ Reconnection already in progress, ignoring duplicate message`);
                 }
               }
               break;
@@ -859,31 +908,18 @@ export default function useCtiStomp(wsPath = '/ws', instanceId?: string) {
         // EventSource states: CONNECTING (0), OPEN (1), CLOSED (2)
         if (readyState === EventSource.CLOSED) {
           console.log(`[${currentInstanceId}] ⚠️ SSE connection closed`);
-          isConnectingRef.current = false;
-          isInitializedRef.current = false;
-          setError('SSE connection closed');
           setIsInitialized(false);
+          setError('SSE connection closed');
           
-          // Don't let EventSource auto-retry - we'll handle reconnection manually
-          // Close existing connection first
-          if (eventSourceRef.current) {
-            eventSourceRef.current.close();
-            eventSourceRef.current = null;
-          }
-          
-          // Clear reconnection timer if it exists
-          if (reconnectionTimerRef.current) {
-            clearTimeout(reconnectionTimerRef.current);
-            reconnectionTimerRef.current = null;
-          }
-          connectionStartTimeRef.current = null;
-          
-          // Reconnect with fresh token after a short delay
+          // Reconnect with fresh token after fully closing connection
           if (!isReconnectingRef.current) {
             isReconnectingRef.current = true;
-            console.log(`[${currentInstanceId}] 🔄 Connection closed, will reconnect with fresh token after closing existing connection...`);
+            console.log(`[${currentInstanceId}] 🔄 Connection closed, fully closing and reconnecting with fresh token...`);
             
-            setTimeout(async () => {
+            // Fully close all connections and reset state, then reconnect
+            // Preserve reconnecting flag so the check in .then() works
+            fullyCloseConnection(true).then(async () => {
+              // Double-check we're still supposed to reconnect
               if (isReconnectingRef.current) {
                 console.log(`[${currentInstanceId}] 🔄 Getting fresh token and creating new connection...`);
                 // Get fresh token and reconnect with fresh connection
@@ -896,8 +932,14 @@ export default function useCtiStomp(wsPath = '/ws', instanceId?: string) {
                   isReconnectingRef.current = false;
                   setError('Failed to reconnect: could not get fresh token');
                 }
+              } else {
+                console.log(`[${currentInstanceId}] ⚠️ Reconnection cancelled (flag was reset)`);
               }
-            }, 2000); // Wait 2 seconds to ensure connection is fully closed
+            }).catch((error) => {
+              console.error(`[${currentInstanceId}] ❌ Error during reconnection:`, error);
+              isReconnectingRef.current = false;
+              setError('Failed to reconnect: ' + (error.message || 'unknown error'));
+            });
           }
         } else if (readyState === EventSource.CONNECTING) {
           // Don't set error yet, it's still trying to connect
@@ -929,26 +971,8 @@ export default function useCtiStomp(wsPath = '/ws', instanceId?: string) {
       const currentInstanceId = instanceIdRef.current;
       console.log(`[${currentInstanceId}] Initializing new connection...`);
       
-      // Always close any existing connection first to ensure fresh connection
-      if (eventSourceRef.current) {
-        console.log(`[${currentInstanceId}] Closing existing connection before creating new one...`);
-        eventSourceRef.current.close();
-        eventSourceRef.current = null;
-        // Wait a bit to ensure connection is fully closed
-        await new Promise(resolve => setTimeout(resolve, 300));
-      }
-      
-      // Reset all connection state to ensure fresh start
-      isConnectingRef.current = false;
-      isInitializedRef.current = false;
-      connectionStartTimeRef.current = null;
-      isReconnectingRef.current = false;
-      
-      // Clear any existing reconnection timer
-      if (reconnectionTimerRef.current) {
-        clearTimeout(reconnectionTimerRef.current);
-        reconnectionTimerRef.current = null;
-      }
+      // Always fully close any existing connection first to ensure fresh connection
+      await fullyCloseConnection();
       
       // Prevent multiple simultaneous initializations for this instance
       if (isConnectingRef.current) {
@@ -982,25 +1006,10 @@ export default function useCtiStomp(wsPath = '/ws', instanceId?: string) {
         cleanup();
       }
       
-      // Force close connection
-      if (eventSourceRef.current) {
-        eventSourceRef.current.close();
-        eventSourceRef.current = null;
-      }
-      
-      // Clear reconnection timer
-      if (reconnectionTimerRef.current) {
-        clearTimeout(reconnectionTimerRef.current);
-        reconnectionTimerRef.current = null;
-      }
-      
-      // Reset all state
-      isConnectingRef.current = false;
-      isInitializedRef.current = false;
-      connectionStartTimeRef.current = null;
-      isReconnectingRef.current = false;
-      
-      console.log(`[${currentInstanceId}] Cleanup complete`);
+      // Fully close all connections
+      fullyCloseConnection().then(() => {
+        console.log(`[${currentInstanceId}] Cleanup complete`);
+      });
     };
     // Empty dependency array - only run once on mount
     // eslint-disable-next-line react-hooks/exhaustive-deps
