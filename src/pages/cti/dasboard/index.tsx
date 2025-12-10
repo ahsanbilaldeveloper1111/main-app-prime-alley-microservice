@@ -743,10 +743,10 @@ const CtiDashboard = () => {
                   console.log('🧪 EventSource readyState:', testSSE.readyState);
                   
                   testSSE.onopen = () => {
-                    console.log('✅ Simple SSE connected');
-                    console.log('✅ Simple SSE readyState:', testSSE.readyState);
-                    console.log('✅ Simple SSE URL:', testSSE.url);
-                    console.log('✅ Simple SSE withCredentials:', testSSE.withCredentials);
+                    // console.log('✅ Simple SSE connected');
+                    // console.log('✅ Simple SSE readyState:', testSSE.readyState);
+                    // console.log('✅ Simple SSE URL:', testSSE.url);
+                    // console.log('✅ Simple SSE withCredentials:', testSSE.withCredentials);
                     
                     const testEvent = {
                       type: 'test_sse',
@@ -817,9 +817,9 @@ const CtiDashboard = () => {
                   console.log('🧪 CTI test EventSource readyState:', testSSE.readyState);
                   
                   testSSE.onopen = () => {
-                    console.log('✅ CTI test SSE connected');
-                    console.log('✅ CTI test SSE readyState:', testSSE.readyState);
-                    console.log('✅ CTI test SSE URL:', testSSE.url);
+                    // console.log('✅ CTI test SSE connected');
+                    // console.log('✅ CTI test SSE readyState:', testSSE.readyState);
+                    // console.log('✅ CTI test SSE URL:', testSSE.url);
                     
                     const testEvent = {
                       type: 'test_sse',
@@ -902,9 +902,9 @@ const CtiDashboard = () => {
                       console.log('🧪 CTI STOMP EventSource readyState:', testSSE.readyState);
                       
                       testSSE.onopen = () => {
-                        console.log('✅ CTI STOMP SSE connected');
-                        console.log('✅ CTI STOMP SSE readyState:', testSSE.readyState);
-                        console.log('✅ CTI STOMP SSE URL:', testSSE.url);
+                        // console.log('✅ CTI STOMP SSE connected');
+                        // console.log('✅ CTI STOMP SSE readyState:', testSSE.readyState);
+                        // console.log('✅ CTI STOMP SSE URL:', testSSE.url);
                         
                         const testEvent = {
                           type: 'test_stomp',

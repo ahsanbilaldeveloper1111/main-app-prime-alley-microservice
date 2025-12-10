@@ -1,11 +1,13 @@
 // src/pages/api/cti-stomp-stream.js
 import { Client } from '@stomp/stompjs';
 
-// Connection pool to reuse connections
+// Connection pool to reuse STOMP connections
 const connectionPool = new Map();
-const MAX_CONNECTIONS = 10;
-const CONNECTION_TIMEOUT = 30000; // 30 seconds
+const CONNECTION_TIMEOUT = 300000; // 5 minutes
 const KEEP_ALIVE_INTERVAL = 30000; // 30 seconds
+
+// Track which connections have subscriptions set up
+const subscriptionsSetup = new Set();
 
 // Clean up stale connections
 const cleanupStaleConnections = () => {
@@ -23,21 +25,45 @@ const cleanupStaleConnections = () => {
 // Set up periodic cleanup
 setInterval(cleanupStaleConnections, 60000); // Every minute
 
+// Store SSE response streams for each connection
+const sseStreams = new Map();
+
 // Optimized subscription setup
-const setupSubscriptions = (client, res) => {
-  console.log('🔧 Setting up STOMP subscriptions for SSE client');
+const setupSubscriptions = (client, connectionKey) => {
+  // Check if subscriptions are already set up for this connection
+  if (subscriptionsSetup.has(connectionKey)) {
+    console.log('⚠️ Subscriptions already set up for connection:', connectionKey, '- skipping');
+    return;
+  }
+  
+  console.log('🔧 Setting up STOMP subscriptions for connection:', connectionKey);
+  const streams = sseStreams.get(connectionKey) || [];
+  console.log(`📊 Found ${streams.length} SSE stream(s) for connection: ${connectionKey}`);
   
   // Subscribe to complete-state
   const sub1 = client.subscribe('/user/topic/complete-state', (message) => {
-    console.log('🔔 STOMP complete-state message received:', message.body);
+    console.log('🔔 STOMP complete-state message received');
     try {
       const payload = JSON.parse(message.body);
-      if (!res.destroyed) {
-        console.log('📤 Sending complete-state to SSE client');
-        res.write(`data: ${JSON.stringify({ type: 'complete_state', data: payload })}\n\n`);
-      } else {
-        console.log('⚠️ SSE response destroyed, not sending complete-state');
-      }
+      const currentStreams = sseStreams.get(connectionKey) || [];
+      console.log(`📤 Sending complete-state to ${currentStreams.length} SSE stream(s)`);
+      
+      currentStreams.forEach((res, index) => {
+        if (!res.destroyed) {
+          try {
+            const sseData = `data: ${JSON.stringify({ type: 'complete_state', data: payload })}\n\n`;
+            res.write(sseData);
+            if (res.flush) {
+              res.flush();
+            }
+            console.log(`✅ Sent complete-state to stream ${index + 1}`);
+          } catch (writeErr) {
+            console.error(`❌ Error writing to stream ${index + 1}:`, writeErr);
+          }
+        } else {
+          console.log(`⚠️ Stream ${index + 1} is destroyed, skipping`);
+        }
+      });
     } catch (err) {
       console.error('Error parsing complete-state payload:', err);
     }
@@ -46,15 +72,28 @@ const setupSubscriptions = (client, res) => {
   
   // Subscribe to dns-states
   const sub2 = client.subscribe('/user/topic/dns-states', (message) => {
-    console.log('🔔 STOMP dns-states message received:', message.body);
+    console.log('🔔 STOMP dns-states message received');
     try {
       const payload = JSON.parse(message.body);
-      if (!res.destroyed) {
-        console.log('📤 Sending dns-states to SSE client');
-        res.write(`data: ${JSON.stringify({ type: 'dns_states', data: payload })}\n\n`);
-      } else {
-        console.log('⚠️ SSE response destroyed, not sending dns-states');
-      }
+      const currentStreams = sseStreams.get(connectionKey) || [];
+      console.log(`📤 Sending dns-states to ${currentStreams.length} SSE stream(s)`);
+      
+      currentStreams.forEach((res, index) => {
+        if (!res.destroyed) {
+          try {
+            const sseData = `data: ${JSON.stringify({ type: 'dns_states', data: payload })}\n\n`;
+            res.write(sseData);
+            if (res.flush) {
+              res.flush();
+            }
+            console.log(`✅ Sent dns-states to stream ${index + 1}`);
+          } catch (writeErr) {
+            console.error(`❌ Error writing to stream ${index + 1}:`, writeErr);
+          }
+        } else {
+          console.log(`⚠️ Stream ${index + 1} is destroyed, skipping`);
+        }
+      });
     } catch (err) {
       console.error('Error parsing dns-states payload:', err);
     }
@@ -63,80 +102,99 @@ const setupSubscriptions = (client, res) => {
   
   // Subscribe to call-events
   const sub3 = client.subscribe('/user/topic/call-events', (message) => {
-    console.log('🔔 STOMP call-events message received:', message.body);
+    console.log('🔔 STOMP call-events message received');
     try {
       const payload = JSON.parse(message.body);
-      if (!res.destroyed) {
-        console.log('📤 Sending call-events to SSE client');
-        res.write(`data: ${JSON.stringify({ type: 'call_events', data: payload })}\n\n`);
-      } else {
-        console.log('⚠️ SSE response destroyed, not sending call-events');
-      }
+      const currentStreams = sseStreams.get(connectionKey) || [];
+      console.log(`📤 Sending call-events to ${currentStreams.length} SSE stream(s)`);
+      
+      currentStreams.forEach((res, index) => {
+        if (!res.destroyed) {
+          try {
+            const sseData = `data: ${JSON.stringify({ type: 'call_events', data: payload })}\n\n`;
+            res.write(sseData);
+            if (res.flush) {
+              res.flush();
+            }
+            console.log(`✅ Sent call-events to stream ${index + 1}`);
+          } catch (writeErr) {
+            console.error(`❌ Error writing to stream ${index + 1}:`, writeErr);
+          }
+        } else {
+          console.log(`⚠️ Stream ${index + 1} is destroyed, skipping`);
+        }
+      });
     } catch (err) {
       console.error('Error parsing call-events payload:', err);
     }
   });
   console.log('✅ Subscribed to call-events with ID:', sub3.id);
+  
+  // Mark subscriptions as set up
+  subscriptionsSetup.add(connectionKey);
+  console.log('✅ Subscriptions setup complete for connection:', connectionKey);
 };
 
-// Helper function to set up SSE response for existing connection
-const setupSSEResponse = (res, client, userAddress) => {
-  console.log('🔧 Setting up SSE response for existing connection');
-  res.writeHead(200, {
-    'Content-Type': 'text/event-stream',
-    'Cache-Control': 'no-cache',
-    'Connection': 'keep-alive',
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Cache-Control',
-    'X-Accel-Buffering': 'no',
-    'Transfer-Encoding': 'chunked'
-  });
-
-  res.write(`data: ${JSON.stringify({ type: 'connection', status: 'connected', message: 'Using existing STOMP connection' })}\n\n`);
-
-  // Set up subscriptions for the existing connection
-  console.log('🔧 Setting up subscriptions for existing connection');
-  setupSubscriptions(client, res);
-
-  // Set up keep-alive for existing connection
-  const keepAlive = setInterval(() => {
-    if (!res.destroyed) {
-      res.write(`data: ${JSON.stringify({ type: 'ping', timestamp: Date.now() })}\n\n`);
-    }
-  }, KEEP_ALIVE_INTERVAL);
-
-  // Handle client disconnect
-  res.on('close', () => {
-    clearInterval(keepAlive);
-  });
-
-  res.on('finish', () => {
-    clearInterval(keepAlive);
-  });
+// Handle POST requests for publishing STOMP messages
+const handlePublishMessage = (req, res) => {
+  const { token, userAddress, destination, body } = req.body;
+  
+  if (!token || !userAddress || !destination) {
+    return res.status(400).json({ 
+      success: false, 
+      error: 'Missing required parameters: token, userAddress, destination' 
+    });
+  }
+  
+  const connectionKey = `${userAddress}-${token.substring(0, 20)}`;
+  const existingConnection = connectionPool.get(connectionKey);
+  
+  if (!existingConnection || !existingConnection.client || !existingConnection.client.connected) {
+    return res.status(400).json({ 
+      success: false, 
+      error: 'No active STOMP connection found. Please establish SSE connection first.' 
+    });
+  }
+  
+  try {
+    existingConnection.client.publish({
+      destination,
+      body: body || ''
+    });
+    
+    existingConnection.lastUsed = Date.now();
+    
+    return res.status(200).json({ 
+      success: true, 
+      message: 'Message published successfully' 
+    });
+  } catch (error) {
+    console.error('Error publishing STOMP message:', error);
+    return res.status(500).json({ 
+      success: false, 
+      error: error.message 
+    });
+  }
 };
 
 export default function handler(req, res) {
-  console.log('🚀 CTI STOMP Stream API called');
-  console.log('🚀 Method:', req.method);
-  console.log('🚀 Headers:', req.headers);
-  console.log('🚀 Query:', req.query);
+  // Handle POST requests for publishing messages
+  if (req.method === 'POST') {
+    return handlePublishMessage(req, res);
+  }
   
   if (req.method !== 'GET') {
-    console.log('❌ Method not allowed:', req.method);
     return res.status(405).json({ message: 'Method not allowed' });
   }
 
   // Get parameters from query string
   const { token, userAddress } = req.query;
-  console.log('🔑 Token present:', !!token);
-  console.log('👤 User address:', userAddress);
   
   // Get WebSocket protocol configuration
   const websocketProtocol = process.env.WEBSOCKET_PROTOCOL || 'ws';
   
   // Check if CTI server URL is configured
   if (!process.env.NEXT_PUBLIC_PRIVATE_CTI_SOCKET_URL) {
-    console.error('❌ CTI server URL not configured: NEXT_PUBLIC_PRIVATE_CTI_SOCKET_URL');
     res.write(`data: ${JSON.stringify({ type: 'error', status: 'error', message: 'CTI server URL not configured. Please set NEXT_PUBLIC_PRIVATE_CTI_SOCKET_URL environment variable.' })}\n\n`);
     res.end();
     return;
@@ -144,7 +202,6 @@ export default function handler(req, res) {
   
   // Validate required parameters
   if (!token || !userAddress) {
-    console.error('❌ Missing required parameters:', { token: !!token, userAddress });
     res.writeHead(200, {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache',
@@ -157,37 +214,29 @@ export default function handler(req, res) {
     return;
   }
 
-  // Check connection pool for existing connection
-  const connectionKey = `${userAddress}-${token.substring(0, 20)}`;
-  const existingConnection = connectionPool.get(connectionKey);
-  
-  // Always create new SSE connection, but reuse STOMP client if available
-  let stompClient = null;
-  if (existingConnection && existingConnection.client && existingConnection.client.connected) {
-    console.log('🔄 Reusing existing STOMP connection for user:', userAddress);
-    console.log('🔄 STOMP client connected:', existingConnection.client.connected);
-    existingConnection.lastUsed = Date.now();
-    stompClient = existingConnection.client;
-  } else {
-    console.log('🔄 Creating new STOMP connection for user:', userAddress);
-  }
-
   // Set up Server-Sent Events
-  console.log('🔧 Setting up new SSE connection');
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache',
     'Connection': 'keep-alive',
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Cache-Control',
-    'X-Accel-Buffering': 'no', // Disable nginx buffering
-    'Transfer-Encoding': 'chunked',
-    'X-Content-Type-Options': 'nosniff'
+    'X-Accel-Buffering': 'no',
+    'Transfer-Encoding': 'chunked'
   });
 
-  res.write(`data: ${JSON.stringify({ type: 'connection', status: 'connecting', message: 'Establishing STOMP connection...' })}\n\n`);
-  console.log('📤 Sent initial connection message to SSE client');
-
+  const connectionKey = `${userAddress}-${token.substring(0, 20)}`;
+  
+  // Check connection pool for existing connection
+  const existingConnection = connectionPool.get(connectionKey);
+  
+  // Add this SSE stream to the connection's stream list BEFORE setting up subscriptions
+  if (!sseStreams.has(connectionKey)) {
+    sseStreams.set(connectionKey, []);
+  }
+  sseStreams.get(connectionKey).push(res);
+  console.log(`📝 Added SSE stream to connection ${connectionKey}. Total streams: ${sseStreams.get(connectionKey).length}`);
+  
   // Send keep-alive ping every 30 seconds
   const keepAlive = setInterval(() => {
     if (!res.destroyed) {
@@ -195,33 +244,41 @@ export default function handler(req, res) {
     }
   }, KEEP_ALIVE_INTERVAL);
 
-  // If we have an existing STOMP client, use it and set up subscriptions
-  if (stompClient) {
-    console.log('✅ Using existing STOMP client, setting up subscriptions');
-    console.log('✅ STOMP client connected:', stompClient.connected);
-    console.log('✅ STOMP client subscriptions:', Object.keys(stompClient.subscriptions || {}));
+  // If we have an existing STOMP client, use it
+  if (existingConnection && existingConnection.client && existingConnection.client.connected) {
+    console.log('🔄 Reusing existing STOMP connection for user:', userAddress);
+    existingConnection.lastUsed = Date.now();
     
-    const connectionMessage = { type: 'connection', status: 'connected', message: 'Using existing STOMP connection' };
-    console.log('📤 Sending connection message:', connectionMessage);
-    res.write(`data: ${JSON.stringify(connectionMessage)}\n\n`);
+    // Write connection message and flush
+    const sseData = `data: ${JSON.stringify({ type: 'stomp_connected', message: 'STOMP connected' })}\n\n`;
+    res.write(sseData);
+    if (res.flush) {
+      res.flush();
+    }
+    console.log('✅ Sent stomp_connected to new SSE stream');
     
-    // Set up subscriptions for this SSE client
-    console.log('🔧 Setting up subscriptions for existing STOMP client');
-    setupSubscriptions(stompClient, res);
+    // Request initial state
+    existingConnection.client.publish({
+      destination: '/app/request/initial-state',
+      body: ''
+    });
     
-    // Handle client disconnect
-    res.on('close', () => {
-      console.log('🔌 SSE client disconnected (close)');
+    // Cleanup on disconnect
+    const cleanup = () => {
       clearInterval(keepAlive);
-    });
-    res.on('finish', () => {
-      console.log('🔌 SSE client disconnected (finish)');
-      clearInterval(keepAlive);
-    });
-    res.on('error', (err) => {
-      console.log('❌ SSE client error:', err);
-      clearInterval(keepAlive);
-    });
+      const streams = sseStreams.get(connectionKey) || [];
+      const index = streams.indexOf(res);
+      if (index > -1) {
+        streams.splice(index, 1);
+      }
+      if (streams.length === 0) {
+        sseStreams.delete(connectionKey);
+      }
+    };
+    
+    res.on('close', cleanup);
+    res.on('finish', cleanup);
+    res.on('error', cleanup);
     
     return;
   }
@@ -230,14 +287,14 @@ export default function handler(req, res) {
   const ctiServerHost = process.env.NEXT_PUBLIC_PRIVATE_CTI_SOCKET_URL;
   const ctiServerPort = process.env.CTI_SERVER_PORT || '8008';
   
-  // Optimized connection attempts - only try the most likely working URLs
+  // Connection attempts
   const connectionAttempts = [
-    `ws://${ctiServerHost}:${ctiServerPort}/ws`,   // Primary: Non-SSL with port 8008
-    `ws://${ctiServerHost}/ws`,                   // Fallback: Non-SSL without port
-    `wss://${ctiServerHost}:${ctiServerPort}/ws`  // SSL fallback
+    `ws://${ctiServerHost}:${ctiServerPort}/ws`,
+    `ws://${ctiServerHost}/ws`,
+    `wss://${ctiServerHost}:${ctiServerPort}/ws`
   ];
   
-  console.log('🔗 CTI connection attempt for user:', userAddress);
+  console.log('🔗 Creating new CTI STOMP connection for user:', userAddress);
   
   // Add connection timeout
   const connectionTimeout = setTimeout(() => {
@@ -248,8 +305,7 @@ export default function handler(req, res) {
     }
   }, 15000);
   
-  // Send initial connection status
-  res.write(`data: ${JSON.stringify({ type: 'connection', status: 'connecting', message: 'Connecting to server...' })}\n\n`);
+  res.write(`data: ${JSON.stringify({ type: 'connection', status: 'connecting', message: 'Connecting to CTI server...' })}\n\n`);
   
   let currentAttempt = 0;
   let client = null;
@@ -257,7 +313,6 @@ export default function handler(req, res) {
   const tryConnection = (url) => {
     console.log(`🔄 Attempting connection ${currentAttempt + 1}/${connectionAttempts.length}: ${url}`);
     
-    // Validate URL before creating client
     if (!url) {
       console.error('❌ Invalid URL provided:', url);
       return;
@@ -271,7 +326,6 @@ export default function handler(req, res) {
       },
       debug: (str) => {
         // Disable debug logging for production
-        // console.log('STOMP Debug:', str);
       },
       onConnect: (frame) => {
         console.log('✅ STOMP Connected successfully for user:', userAddress);
@@ -284,10 +338,38 @@ export default function handler(req, res) {
           userAddress
         });
         
-        res.write(`data: ${JSON.stringify({ type: 'stomp_connected', message: 'STOMP connected' })}\n\n`);
+        // Set up subscriptions (this will use the streams already added)
+        setupSubscriptions(client, connectionKey);
         
-        // Set up optimized subscriptions
-        setupSubscriptions(client, res);
+        // Notify all SSE streams
+        const streams = sseStreams.get(connectionKey) || [];
+        console.log(`📤 Notifying ${streams.length} SSE stream(s) of STOMP connection`);
+        streams.forEach((stream, index) => {
+          if (!stream.destroyed) {
+            try {
+              const sseData = `data: ${JSON.stringify({ type: 'stomp_connected', message: 'STOMP connected' })}\n\n`;
+              stream.write(sseData);
+              if (stream.flush) {
+                stream.flush();
+              }
+              console.log(`✅ Sent stomp_connected to stream ${index + 1}`);
+              
+              // Send a test message to verify the stream is working
+              setTimeout(() => {
+                if (!stream.destroyed) {
+                  const testData = `data: ${JSON.stringify({ type: 'test', message: 'SSE stream is working', timestamp: Date.now() })}\n\n`;
+                  stream.write(testData);
+                  if (stream.flush) {
+                    stream.flush();
+                  }
+                  console.log(`✅ Sent test message to stream ${index + 1}`);
+                }
+              }, 1000);
+            } catch (writeErr) {
+              console.error(`❌ Error writing stomp_connected to stream ${index + 1}:`, writeErr);
+            }
+          }
+        });
         
         // Request initial state
         client.publish({
@@ -299,7 +381,12 @@ export default function handler(req, res) {
       },
       onStompError: (frame) => {
         console.error('STOMP Error:', frame);
-        res.write(`data: ${JSON.stringify({ type: 'stomp_error', message: frame.headers.message || 'STOMP error' })}\n\n`);
+        const streams = sseStreams.get(connectionKey) || [];
+        streams.forEach(stream => {
+          if (!stream.destroyed) {
+            stream.write(`data: ${JSON.stringify({ type: 'stomp_error', message: frame.headers.message || 'STOMP error' })}\n\n`);
+          }
+        });
       },
       onWebSocketError: (error) => {
         console.error('WebSocket Error:', error.message);
@@ -319,20 +406,28 @@ export default function handler(req, res) {
           clearTimeout(connectionTimeout);
           clearInterval(keepAlive);
           
-          if (!res.destroyed) {
-            res.write(`data: ${JSON.stringify({ 
-              type: 'error', 
-              status: 'error', 
-              message: `All WebSocket connection attempts failed`, 
-              details: `Tried ${connectionAttempts.length} different URLs. Please check if the CTI server is running and accessible.`
-            })}\n\n`);
-            res.end();
-          }
+          const streams = sseStreams.get(connectionKey) || [];
+          streams.forEach(stream => {
+            if (!stream.destroyed) {
+              stream.write(`data: ${JSON.stringify({ 
+                type: 'error', 
+                status: 'error', 
+                message: `All WebSocket connection attempts failed`, 
+                details: `Tried ${connectionAttempts.length} different URLs. Please check if the CTI server is running and accessible.`
+              })}\n\n`);
+              stream.end();
+            }
+          });
         }
       },
       onWebSocketClose: (event) => {
         console.log('WebSocket closed:', event);
-        res.write(`data: ${JSON.stringify({ type: 'connection', status: 'disconnected', message: 'CTI server disconnected', code: event.code, reason: event.reason })}\n\n`);
+        const streams = sseStreams.get(connectionKey) || [];
+        streams.forEach(stream => {
+          if (!stream.destroyed) {
+            stream.write(`data: ${JSON.stringify({ type: 'connection', status: 'disconnected', message: 'CTI server disconnected', code: event.code, reason: event.reason })}\n\n`);
+          }
+        });
       }
     });
 
@@ -343,36 +438,23 @@ export default function handler(req, res) {
   // Start the first connection attempt
   tryConnection(connectionAttempts[0]);
 
-  // Optimized cleanup handlers
+  // Cleanup handlers
   const cleanup = () => {
-    console.log('🧹 Cleaning up SSE connection');
     clearTimeout(connectionTimeout);
     clearInterval(keepAlive);
-    // Don't deactivate STOMP client here as it might be used by other SSE clients
-    // The connection pool will handle cleanup of stale connections
+    const streams = sseStreams.get(connectionKey) || [];
+    const index = streams.indexOf(res);
+    if (index > -1) {
+      streams.splice(index, 1);
+    }
+    if (streams.length === 0) {
+      sseStreams.delete(connectionKey);
+    }
   };
 
-  // Handle client disconnect
-  req.on('close', () => {
-    console.log('🔌 Request closed');
-    cleanup();
-  });
-
-  // Handle response close
-  res.on('close', () => {
-    console.log('🔌 Response closed');
-    cleanup();
-  });
-
-  // Handle response finish
-  res.on('finish', () => {
-    console.log('🔌 Response finished');
-    cleanup();
-  });
-
-  // Handle response error
-  res.on('error', (err) => {
-    console.log('❌ Response error:', err);
-    cleanup();
-  });
+  req.on('close', cleanup);
+  res.on('close', cleanup);
+  res.on('finish', cleanup);
+  res.on('error', cleanup);
 }
+

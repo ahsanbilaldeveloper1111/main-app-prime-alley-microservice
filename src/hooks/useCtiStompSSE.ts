@@ -585,16 +585,16 @@ export default function useCtiStompSSE() {
 
       eventSource.onerror = (error) => {
         console.error('❌ CTI SSE connection error:', error);
-        console.error('❌ SSE ReadyState:', eventSource.readyState);
-        console.error('❌ SSE URL:', sseUrl);
-        console.error('❌ EventSource object:', eventSource);
-        console.error('❌ Error event details:', {
-          type: error.type,
-          target: error.target,
-          currentTarget: error.currentTarget,
-          isTrusted: error.isTrusted,
-          timeStamp: error.timeStamp
-        });
+        // console.error('❌ SSE ReadyState:', eventSource.readyState);
+        // console.error('❌ SSE URL:', sseUrl);
+        // console.error('❌ EventSource object:', eventSource);
+        // console.error('❌ Error event details:', {
+        //   type: error.type,
+        //   target: error.target,
+        //   currentTarget: error.currentTarget,
+        //   isTrusted: error.isTrusted,
+        //   timeStamp: error.timeStamp
+        // });
         setError('CTI SSE connection error');
         setIsInitialized(false);
         isConnectingRef.current = false;
