@@ -227,7 +227,7 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
           permission: PERMISSIONS.DIAL_CALL_CTI,
           url: '/cti/dialer'
         }
-      ]
+      ].filter(item => !item.permission || hasPermission(item.permission))
     },
 
     {
@@ -345,19 +345,6 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
       label: MENU_LABELS.BILLING,
       url: '',
       subItems: [
-        // {
-        //   id: 'customer-section',
-        //   title: 'Customer',
-        //   icon: <Users size={16} />,
-        //   url: '',
-        //   subItems: [
-        //     { id: 'customer-dashboard', title: 'Customer Dashboard', icon: <LayoutDashboard size={16} />, url: '/accounting/customer/dashboard' },
-        //     { id: 'account-overview', title: 'Account Overview', icon: <Eye size={16} />, url: '/accounting/customer/account-overview' },
-        //     { id: 'product-details', title: 'Product Details', icon: <ShoppingBag size={16} />, url: '/accounting/customer/product-details' },
-        //     { id: 'billing-history', title: 'Billing History', icon: <FileText size={16} />, url: '/accounting/customer/billing-history' },
-        //     { id: 'payment-methods', title: 'Payment Methods', icon: <CreditCard size={16} />, url: '/accounting/customer/payment-methods' },
-        //   ]
-        // },
 
             { 
               id: 'customer-dashboard', 
@@ -658,8 +645,6 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
         }
       ]
     }
-
-    
 
 
   ].filter(item => !item.permission || hasPermission(item.permission));
