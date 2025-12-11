@@ -193,13 +193,13 @@ const EditRolePermission = () => {
             <Col md={12}>
                 <div className="page-header-title style-2">
                 <Row className="d-flex justify-content-between align-items-center">
-                    <Col md={6}>
+                    <Col md={7}>
                       
-                      <h2 className="mb-0">Assign Rank Permission</h2>
+                      <h2 className="mb-0">Assign Permission to <b className='text-primary'>{roleName}</b></h2>
                     </Col>
 
 
-                    <Col md={6} className="d-flex justify-content-end">
+                    <Col md={5} className="d-flex justify-content-end">
                       
                     <div className="action-buttons">
                          <div className="search-container">

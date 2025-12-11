@@ -102,24 +102,34 @@ const GsmPorts = () => {
         </div>
       ),
     },
+
+    ...(session?.user?.permissions?.includes('imei-gsm-ports') ? [
     {
       key: "imei",
       name: "IMEI",
       selector: (row: any) => row.imei,
       sortable: true,
     },
+    ] : []),
+
+    ...(session?.user?.permissions?.includes('imsi-gsm-ports') ? [
     {
       key: "imsi",
       name: "IMSI",
       selector: (row: any) => row.imsi,
       sortable: true,
     },
+    ] : []),
+
+    ...(session?.user?.permissions?.includes('iccid-gsm-ports') ? [
     {
       key: "iccid",
       name: "ICCID",
       selector: (row: any) => row.iccid,
       sortable: true,
     },
+    ] : []),
+    
     {
       key: "status",
       name: "Port Status",

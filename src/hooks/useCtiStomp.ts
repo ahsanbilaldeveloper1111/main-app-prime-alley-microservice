@@ -40,7 +40,28 @@ const CALL_STATES_STORAGE_KEY = 'cti_call_states';
 const CALL_STATES_TIMESTAMP_KEY = 'cti_call_states_timestamp';
 const STORAGE_EXPIRY_HOURS = 24; // Call states expire after 24 hours
 
-export default function useCtiStomp(wsPath = '/ws') {
+// Generate unique instance ID for each hook instance
+let instanceCounter = 0;
+const generateInstanceId = () => {
+  instanceCounter++;
+  return `cti-stomp-${instanceCounter}-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+};
+
+/**
+ * Custom hook for CTI STOMP WebSocket connection via SSE
+ * 
+ * Each page/component that uses this hook will get its own independent connection.
+ * On mount, it always creates a fresh connection (closing any existing one first).
+ * On reconnect, it always creates a fresh connection with a new token.
+ * 
+ * @param wsPath - WebSocket path (default: '/ws')
+ * @param instanceId - Optional unique instance ID. If not provided, one will be auto-generated.
+ *                     Each hook instance gets a unique ID to ensure isolation between pages.
+ */
+export default function useCtiStomp(wsPath = '/ws', instanceId?: string) {
+  // Generate unique instance ID if not provided
+  // This ensures each page/component gets its own isolated connection
+  const instanceIdRef = useRef<string>(instanceId || generateInstanceId());
   const [dnsMap, setDnsMap] = useState<Record<string, { dn: string; devices: Record<string, CtiDevice> }>>({});
   const [callStateMap, setCallStateMap] = useState<Record<string, CtiCallEvent>>({});
   const [eventLog, setEventLog] = useState<any[]>([]);
@@ -64,6 +85,9 @@ export default function useCtiStomp(wsPath = '/ws') {
   const userAddressRef = useRef<string | null>(null);
   const isConnectingRef = useRef(false);
   const isInitializedRef = useRef(false);
+  const connectionStartTimeRef = useRef<number | null>(null);
+  const reconnectionTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const isReconnectingRef = useRef(false);
   
   // Store latest callback functions in refs to avoid stale closures
   // These will be initialized after the functions are defined
@@ -75,10 +99,8 @@ export default function useCtiStomp(wsPath = '/ws') {
   // Load persisted call states from localStorage
   const loadPersistedCallStates = useCallback(() => {
     try {
-      //console.log('Loading persisted call states from localStorage...')
       const storedTimestamp = localStorage.getItem(CALL_STATES_TIMESTAMP_KEY);
       if (!storedTimestamp) {
-       // console.log('No stored timestamp found, no persisted call states to load')
         return;
       }
 
@@ -88,7 +110,6 @@ export default function useCtiStomp(wsPath = '/ws') {
 
       // Check if stored data is still valid (not expired)
       if (hoursDiff > STORAGE_EXPIRY_HOURS) {
-        console.log('Stored call states expired, clearing localStorage');
         localStorage.removeItem(CALL_STATES_STORAGE_KEY);
         localStorage.removeItem(CALL_STATES_TIMESTAMP_KEY);
         return;
@@ -97,7 +118,6 @@ export default function useCtiStomp(wsPath = '/ws') {
       const storedCallStates = localStorage.getItem(CALL_STATES_STORAGE_KEY);
       if (storedCallStates) {
         const parsedCallStates = JSON.parse(storedCallStates);
-        console.log('Loaded persisted call states:', parsedCallStates);
         
         // Filter only active calls (not terminated) and normalize currentState
         const activeCallStates = Object.entries(parsedCallStates).reduce((acc, [callId, callEvent]) => {
@@ -145,15 +165,9 @@ export default function useCtiStomp(wsPath = '/ws') {
 
         if (Object.keys(activeCallStates).length > 0) {
           setCallStateMap(activeCallStates);
-          //console.log('Restored active call states:', activeCallStates);
-        } else {
-          //console.log('No active call states found in persisted data')
         }
-      } else {
-        //console.log('No stored call states found')
       }
     } catch (error) {
-      //console.error('Error loading persisted call states:', error);
       // Clear corrupted data
       localStorage.removeItem(CALL_STATES_STORAGE_KEY);
       localStorage.removeItem(CALL_STATES_TIMESTAMP_KEY);
@@ -306,23 +320,15 @@ export default function useCtiStomp(wsPath = '/ws') {
 
       // Process parties to ensure callingDeviceType is included
       const processedParties = partiesToProcess.map((party: any) => {
-        // console.log(`🔍 Processing party:`, {
-        //   callingAddress: party.callingAddress,
-        //   callingDeviceName: party.callingDeviceName,
-        //   callingDeviceType: party.callingDeviceType,
-        //   hasDeviceType: !!party.callingDeviceType
-        // });
-        
         // First try to get device info from stored caller info
         let storedCallerInfo = null;
         try {
           const stored = localStorage.getItem('cti_caller_info');
           if (stored) {
             storedCallerInfo = JSON.parse(stored);
-            console.log(`📋 Found stored caller info:`, storedCallerInfo);
           }
         } catch (error) {
-          console.error('Error retrieving stored caller info:', error);
+          // Ignore error
         }
         
         // If we have stored caller info and it matches this party, use it
@@ -330,42 +336,16 @@ export default function useCtiStomp(wsPath = '/ws') {
             storedCallerInfo.callingAddress === party.callingAddress && 
             storedCallerInfo.callingDeviceName === party.callingDeviceName) {
           party.callingDeviceType = storedCallerInfo.callingDeviceType;
-          console.log(`✅ Using stored caller info:`, {
-            deviceName: party.callingDeviceName,
-            deviceType: party.callingDeviceType
-          });
         }
         // If callingDeviceType is still missing, try to get it from the dnsMap
         else if (!party.callingDeviceType && party.callingAddress && party.callingDeviceName) {
-          // console.log(`🔍 Looking up device type for:`, {
-          //   callingAddress: party.callingAddress,
-          //   callingDeviceName: party.callingDeviceName,
-          //   dnsMapHasAddress: !!dnsMap[party.callingAddress],
-          //   dnsMapKeys: Object.keys(dnsMap),
-          //   dnsMapForAddress: dnsMap[party.callingAddress]
-          // });
-          
           const userDevices = dnsMap[party.callingAddress]?.devices;
           if (userDevices) {
-            
-            
-            
             const device = Object.values(userDevices).find((d: any) => d.deviceName === party.callingDeviceName);
             if (device) {
               party.callingDeviceType = device.deviceType;
-              
-            } else {
-              
             }
-          } else {
-           
           }
-        } else {
-          // console.log(`ℹ️ Device type already present or missing required data:`, {
-          //   callingDeviceType: party.callingDeviceType,
-          //   callingAddress: party.callingAddress,
-          //   callingDeviceName: party.callingDeviceName
-          // });
         }
         
         // Fallback: If still no device type, try to infer from device name
@@ -384,13 +364,8 @@ export default function useCtiStomp(wsPath = '/ws') {
           }
           
           party.callingDeviceType = inferredType;
-          // console.log(`🔄 Inferred device type:`, {
-          //   deviceName: party.callingDeviceName,
-          //   inferredType: inferredType
-          // });
         }
         
-        //console.log(`Final party data:`, party);
         return party;
       });
 
@@ -587,7 +562,6 @@ export default function useCtiStomp(wsPath = '/ws') {
   // Helper function to publish STOMP messages via API
   const publishStompMessage = useCallback(async (destination: string, body: string = '') => {
     if (!tokenRef.current || !userAddressRef.current) {
-      console.error('No token or userAddress available for publishing message');
       return false;
     }
 
@@ -602,7 +576,6 @@ export default function useCtiStomp(wsPath = '/ws') {
 
       return response.data.success === true;
     } catch (error) {
-      console.error('Error publishing STOMP message:', error);
       return false;
     }
   }, []);
@@ -635,71 +608,174 @@ export default function useCtiStomp(wsPath = '/ws') {
             userAddressRef.current = userAddress;
             return { token, userAddress };
           } else {
-            console.error('Missing token or userAddress in API response:', data);
             return null;
           }
         } else {
-          console.error('Failed to get bearer token:', response.statusText);
           return null;
         }
       } catch (error) {
-        console.error('Error getting bearer token:', error);
         return null;
       }
     };
 
-    const connectViaSSE = async (token: string, userAddress: string) => {
-      // Prevent multiple connections
-      if (eventSourceRef.current && eventSourceRef.current.readyState !== EventSource.CLOSED) {
-        console.log('⚠️ EventSource already exists and is not closed, skipping new connection');
-        return null;
+    // Helper function to fully close and cleanup all connections
+    const fullyCloseConnection = async (preserveReconnecting: boolean = false) => {
+      const currentInstanceId = instanceIdRef.current;
+      console.log(`[${currentInstanceId}] 🧹 Fully closing all connections and resetting state...`);
+      
+      // Preserve reconnecting flag if needed
+      const wasReconnecting = isReconnectingRef.current;
+      
+      // Close EventSource connection
+      if (eventSourceRef.current) {
+        try {
+          eventSourceRef.current.close();
+        } catch (err) {
+          // Ignore errors during close
+        }
+        eventSourceRef.current = null;
       }
       
+      // Clear STOMP client reference if it exists
+      if (clientRef.current) {
+        try {
+          if (clientRef.current.connected) {
+            clientRef.current.deactivate();
+          }
+        } catch (err) {
+          // Ignore errors during deactivation
+        }
+        clientRef.current = null;
+      }
+      
+      // Clear reconnection timer
+      if (reconnectionTimerRef.current) {
+        clearTimeout(reconnectionTimerRef.current);
+        reconnectionTimerRef.current = null;
+      }
+      
+      // Reset all connection state flags
+      isConnectingRef.current = false;
+      isInitializedRef.current = false;
+      connectionStartTimeRef.current = null;
+      
+      // Only reset reconnecting flag if not preserving it
+      if (!preserveReconnecting) {
+        isReconnectingRef.current = false;
+      } else {
+        // Restore the reconnecting flag if we're preserving it
+        isReconnectingRef.current = wasReconnecting;
+      }
+      
+      // Clear token and userAddress refs to force fresh token on next connection
+      tokenRef.current = null;
+      userAddressRef.current = null;
+      
+      // Reset UI state
+      setIsInitialized(false);
+      setError(null);
+      
+      // Wait a bit to ensure all connections are fully closed
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    };
+
+    const connectViaSSE = async (token: string, userAddress: string, forceReconnect: boolean = false) => {
+      const currentInstanceId = instanceIdRef.current;
+      
+      // If force reconnect, fully close everything first
+      if (forceReconnect) {
+        await fullyCloseConnection();
+      } else {
+        // Always close existing connection first to ensure fresh connection
+        if (eventSourceRef.current) {
+          console.log(`[${currentInstanceId}] 🔄 Closing existing connection before creating new one...`);
+          eventSourceRef.current.close();
+          eventSourceRef.current = null;
+          // Wait a bit to ensure connection is fully closed
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+        
+        // Reset connection state to ensure fresh start
+        isConnectingRef.current = false;
+        isInitializedRef.current = false;
+        connectionStartTimeRef.current = null;
+        
+        // Clear reconnection timer if it exists
+        if (reconnectionTimerRef.current) {
+          clearTimeout(reconnectionTimerRef.current);
+          reconnectionTimerRef.current = null;
+        }
+      }
+      
+      // Prevent multiple simultaneous connections for this instance
       if (isConnectingRef.current) {
-        console.log('⚠️ Connection already in progress, skipping');
+        console.log(`[${currentInstanceId}] Already connecting, skipping...`);
         return null;
       }
       
       isConnectingRef.current = true;
       
+      // Store token and userAddress in refs to ensure they're current
+      tokenRef.current = token;
+      userAddressRef.current = userAddress;
+      
       // Set userAddress in state
       setUserAddress(userAddress);
       
-      // Build SSE URL - EventSource uses absolute path, not axios baseURL
+      // Build SSE URL with instance ID to help identify connections
+      // EventSource uses absolute path, not axios baseURL
       const params = new URLSearchParams();
       params.append('token', token);
       params.append('userAddress', userAddress);
+      params.append('instanceId', currentInstanceId); // Add instance ID for debugging
       const sseUrl = `/api/cti-stomp-stream?${params.toString()}`;
       
-      // console.log('🔗 Connecting to CTI via SSE proxy...');
-      // console.log('🔗 SSE URL:', sseUrl);
-      // console.log('🔗 Token present:', !!token);
-      // console.log('🔗 UserAddress:', userAddress);
-      
-      // Close existing connection if any
-      if (eventSourceRef.current) {
-        console.log('🧹 Closing existing EventSource before creating new one');
-        eventSourceRef.current.close();
-        eventSourceRef.current = null;
-      }
+      console.log(`[${currentInstanceId}] Creating fresh SSE connection...`);
       
       // Create EventSource for SSE connection
       const eventSource = new EventSource(sseUrl);
       eventSourceRef.current = eventSource;
 
       eventSource.onopen = () => {
-        //console.log('✅ SSE connection opened');
+        const currentInstanceId = instanceIdRef.current;
+        console.log(`[${currentInstanceId}] ✅ Connection opened successfully`);
+        
         isConnectingRef.current = false;
         isInitializedRef.current = true;
         setIsInitialized(true);
         setError(null);
+        isReconnectingRef.current = false; // Reset reconnection flag
+        
+        // Track connection start time
+        connectionStartTimeRef.current = Date.now();
+        
+        // Clear any existing reconnection timer
+        if (reconnectionTimerRef.current) {
+          clearTimeout(reconnectionTimerRef.current);
+          reconnectionTimerRef.current = null;
+        }
+        
+        // Set up timer to reconnect after 15 minutes (900000ms)
+        reconnectionTimerRef.current = setTimeout(async () => {
+          console.log(`[${currentInstanceId}] 🔄 15 minutes elapsed, fully closing connection and reconnecting with fresh token...`);
+          
+          // Fully close all connections and reset state
+          await fullyCloseConnection();
+          
+          // Get fresh token and reconnect with fresh connection
+          console.log(`[${currentInstanceId}] 🔄 Getting fresh token and creating new connection...`);
+          const freshToken = await getBearerToken();
+          if (freshToken) {
+            await connectViaSSE(freshToken.token, freshToken.userAddress, true);
+          } else {
+            setError('Failed to get fresh token for reconnection');
+          }
+        }, 900000); // 15 minutes
       };
 
       eventSource.onmessage = (event) => {
-       // console.log('📨 SSE message received:', event.data);
         try {
           const data = JSON.parse(event.data);
-          console.log('📨 Parsed SSE data:', data);
           
           switch (data.type) {
             case 'complete_state':
@@ -711,14 +787,12 @@ export default function useCtiStomp(wsPath = '/ws') {
                   setEventLog(prev => [...prev, { type: 'initial-state', data: grouped, timestamp: new Date().toISOString() }]);
                 }
               } catch (err) {
-                console.error('Failed to process initial state:', err);
                 setError('Failed to process initial state');
               }
               break;
               
             case 'dns_states':
               try {
-                console.log('dns-states received:', data.data);
                 const s = data.data;
                 setDnsMap(prev => {
                   const updated = { ...prev };
@@ -727,33 +801,27 @@ export default function useCtiStomp(wsPath = '/ws') {
                     updated[dn] = { dn, devices: {} };
                   }
                   updated[dn].devices[deviceName] = s;
-                  console.log('updated dns map:', updated);
                   if (updateSummaryDataRef.current) {
                     updateSummaryDataRef.current(updated);
                   }
                   return updated;
                 });
               } catch (err) {
-                console.error('Failed to process update:', err);
                 setError('Failed to process update');
               }
               break;
               
             case 'call_events':
               try {
-                console.log('================= CALL EVENTS ====================');
-                console.log('call-events received:', data.data);
                 if (handleCallEventRef.current) {
                   handleCallEventRef.current(data.data);
                 }
               } catch (err) {
-                console.error('Failed to process call event:', err);
                 setError('Failed to process call event');
               }
               break;
               
             case 'stomp_connected':
-              console.log('STOMP connected via proxy');
               setIsInitialized(true);
               setError(null);
               // Request initial state after connection
@@ -768,8 +836,47 @@ export default function useCtiStomp(wsPath = '/ws') {
               break;
               
             case 'connection':
+              console.log(`[${instanceIdRef.current}] 📨 Received connection message:`, data);
               if (data.status === 'disconnected') {
-                setIsInitialized(false);
+                // Only set initialized to false if we're not preserving state
+                // This allows UI to keep showing existing data during reconnection
+                if (!data.preserveState) {
+                  setIsInitialized(false);
+                }
+              } else if (data.status === 'reconnecting') {
+                console.log(`[${instanceIdRef.current}] 🔄 Received reconnecting status from server`);
+                // During reconnection, get fresh token and reconnect
+                if (!isReconnectingRef.current) {
+                  const currentInstanceId = instanceIdRef.current;
+                  isReconnectingRef.current = true;
+                  console.log(`[${currentInstanceId}] 🔄 Server reconnecting, fully closing connection and getting fresh token...`);
+                  
+                  // Fully close all connections and reset state, but preserve reconnecting flag
+                  fullyCloseConnection(true).then(async () => {
+                    // Double-check we're still supposed to reconnect
+                    if (isReconnectingRef.current) {
+                      console.log(`[${currentInstanceId}] 🔄 Getting fresh token and creating new connection...`);
+                      const freshToken = await getBearerToken();
+                      if (freshToken) {
+                        console.log(`[${currentInstanceId}] ✅ Got fresh token, creating new connection...`);
+                        isReconnectingRef.current = false;
+                        await connectViaSSE(freshToken.token, freshToken.userAddress, true);
+                      } else {
+                        console.error(`[${currentInstanceId}] ❌ Failed to get fresh token for reconnection`);
+                        isReconnectingRef.current = false;
+                        setError('Failed to reconnect: could not get fresh token');
+                      }
+                    } else {
+                      console.log(`[${currentInstanceId}] ⚠️ Reconnection cancelled (flag was reset)`);
+                    }
+                  }).catch((error) => {
+                    console.error(`[${currentInstanceId}] ❌ Error during reconnection:`, error);
+                    isReconnectingRef.current = false;
+                    setError('Failed to reconnect: ' + (error.message || 'unknown error'));
+                  });
+                } else {
+                  console.log(`[${currentInstanceId}] ⚠️ Reconnection already in progress, ignoring duplicate message`);
+                }
               }
               break;
               
@@ -783,105 +890,126 @@ export default function useCtiStomp(wsPath = '/ws') {
               break;
               
             case 'test':
-              console.log('✅ Test message received - SSE stream is working!', data);
+              // Ignore test messages
               break;
               
             default:
-              console.log('Unknown message type:', data.type);
+              break;
           }
         } catch (error) {
-          console.error('Error parsing SSE message:', error);
+          // Ignore parsing errors
         }
       };
 
       eventSource.onerror = (error) => {
+        const currentInstanceId = instanceIdRef.current;
         const readyState = eventSource.readyState;
-        console.error('❌ SSE connection error:', error);
-        //console.error('❌ EventSource readyState:', readyState);
-        //console.error('❌ EventSource URL:', sseUrl);
         
         // EventSource states: CONNECTING (0), OPEN (1), CLOSED (2)
         if (readyState === EventSource.CLOSED) {
-          console.log('🔌 EventSource is CLOSED - connection failed permanently');
-          isConnectingRef.current = false;
-          isInitializedRef.current = false;
-          setError('SSE connection closed');
+          console.log(`[${currentInstanceId}] ⚠️ SSE connection closed`);
           setIsInitialized(false);
+          setError('SSE connection closed');
           
-          // Don't let EventSource auto-retry - we'll handle reconnection manually if needed
-          if (eventSourceRef.current) {
-            eventSourceRef.current.close();
-            eventSourceRef.current = null;
+          // Reconnect with fresh token after fully closing connection
+          if (!isReconnectingRef.current) {
+            isReconnectingRef.current = true;
+            console.log(`[${currentInstanceId}] 🔄 Connection closed, fully closing and reconnecting with fresh token...`);
+            
+            // Fully close all connections and reset state, then reconnect
+            // Preserve reconnecting flag so the check in .then() works
+            fullyCloseConnection(true).then(async () => {
+              // Double-check we're still supposed to reconnect
+              if (isReconnectingRef.current) {
+                console.log(`[${currentInstanceId}] 🔄 Getting fresh token and creating new connection...`);
+                // Get fresh token and reconnect with fresh connection
+                const freshToken = await getBearerToken();
+                if (freshToken) {
+                  isReconnectingRef.current = false;
+                  await connectViaSSE(freshToken.token, freshToken.userAddress, true);
+                } else {
+                  console.error(`[${currentInstanceId}] ❌ Failed to get fresh token for reconnection`);
+                  isReconnectingRef.current = false;
+                  setError('Failed to reconnect: could not get fresh token');
+                }
+              } else {
+                console.log(`[${currentInstanceId}] ⚠️ Reconnection cancelled (flag was reset)`);
+              }
+            }).catch((error) => {
+              console.error(`[${currentInstanceId}] ❌ Error during reconnection:`, error);
+              isReconnectingRef.current = false;
+              setError('Failed to reconnect: ' + (error.message || 'unknown error'));
+            });
           }
         } else if (readyState === EventSource.CONNECTING) {
-         // console.log('⏳ EventSource is CONNECTING - waiting for connection...');
           // Don't set error yet, it's still trying to connect
+          console.log(`[${currentInstanceId}] 🔄 Connection state: CONNECTING`);
         } else if (readyState === EventSource.OPEN) {
-          //console.log('✅ EventSource is OPEN - connection is active');
           // Connection is open, this might be a temporary error, don't close
+          console.log(`[${currentInstanceId}] ⚠️ Temporary error on open connection`);
         }
       };
 
       // Cleanup function
       return () => {
-        console.log('🧹 Cleaning up SSE connection');
         if (eventSourceRef.current) {
           eventSourceRef.current.close();
           eventSourceRef.current = null;
         }
+        if (reconnectionTimerRef.current) {
+          clearTimeout(reconnectionTimerRef.current);
+          reconnectionTimerRef.current = null;
+        }
         isConnectingRef.current = false;
         isInitializedRef.current = false;
+        connectionStartTimeRef.current = null;
+        isReconnectingRef.current = false;
       };
     };
 
     const initialize = async () => {
-      // Prevent multiple initializations
-      if (isInitializedRef.current) {
-        console.log('⚠️ Already initialized, skipping initialization');
-        return null;
-      }
+      const currentInstanceId = instanceIdRef.current;
+      console.log(`[${currentInstanceId}] Initializing new connection...`);
       
+      // Always fully close any existing connection first to ensure fresh connection
+      await fullyCloseConnection();
+      
+      // Prevent multiple simultaneous initializations for this instance
       if (isConnectingRef.current) {
-        console.log('⚠️ Connection already in progress, skipping initialization');
+        console.log(`[${currentInstanceId}] Already connecting, skipping...`);
         return null;
       }
       
-      // Check if EventSource already exists and is open
-      if (eventSourceRef.current && eventSourceRef.current.readyState === EventSource.OPEN) {
-        console.log('⚠️ EventSource already open, skipping initialization');
-        return null;
-      }
-      
-      console.log('🚀 Initializing CTI connection via proxy...');
       const token = await getBearerToken();
       if (token) {
-        return await connectViaSSE(token.token, token.userAddress);
+        console.log(`[${currentInstanceId}] Got token, creating fresh connection...`);
+        return await connectViaSSE(token.token, token.userAddress, true); // Force fresh connection
       } else {
-        console.error('Service unavailable');
         setError('Service unavailable');
         isConnectingRef.current = false;
         return null;
       }
     };
 
-    // Only initialize once on mount
+    // Initialize on mount - always create fresh connection
     let cleanup: (() => void) | null = null;
     initialize().then(cleanupFn => {
       cleanup = cleanupFn;
     });
 
-    // Cleanup on unmount
+    // Cleanup on unmount - ensure connection is fully closed
     return () => {
-      console.log('🧹 Component unmounting, cleaning up CTI connection');
+      const currentInstanceId = instanceIdRef.current;
+      console.log(`[${currentInstanceId}] Component unmounting, cleaning up connection...`);
+      
       if (cleanup && typeof cleanup === 'function') {
         cleanup();
       }
-      if (eventSourceRef.current) {
-        eventSourceRef.current.close();
-        eventSourceRef.current = null;
-      }
-      isConnectingRef.current = false;
-      isInitializedRef.current = false;
+      
+      // Fully close all connections
+      fullyCloseConnection().then(() => {
+        console.log(`[${currentInstanceId}] Cleanup complete`);
+      });
     };
     // Empty dependency array - only run once on mount
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -890,7 +1018,6 @@ export default function useCtiStomp(wsPath = '/ws') {
   // Helper: Get devices array for a DN
   const getDevicesForDn = useCallback((dn: string) => {
     const devices = dnsMap[dn] ? Object.values(dnsMap[dn].devices) : [];
-    console.log(`Getting devices for DN ${dn}:`, devices);
     return devices;
   }, [dnsMap]);
 
@@ -1031,12 +1158,11 @@ export default function useCtiStomp(wsPath = '/ws') {
       const hoursDiff = (now.getTime() - timestamp.getTime()) / (1000 * 60 * 60);
 
       if (hoursDiff > STORAGE_EXPIRY_HOURS) {
-        console.log('Clearing expired call states from localStorage');
         localStorage.removeItem(CALL_STATES_STORAGE_KEY);
         localStorage.removeItem(CALL_STATES_TIMESTAMP_KEY);
       }
     } catch (error) {
-      console.error('Error clearing expired call states:', error);
+      // Ignore error
     }
   }, []);
 
@@ -1047,7 +1173,6 @@ export default function useCtiStomp(wsPath = '/ws') {
       if (!storedCallStates) return;
 
       const parsedCallStates = JSON.parse(storedCallStates);
-      //console.log('Syncing persisted call states with server:', parsedCallStates);
 
       // Request call state updates for persisted calls
       if (clientRef.current && clientRef.current.connected) {
@@ -1059,7 +1184,7 @@ export default function useCtiStomp(wsPath = '/ws') {
         });
       }
     } catch (error) {
-      console.error('Error syncing persisted call states:', error);
+      // Ignore error
     }
   }, []);
 
@@ -1097,7 +1222,6 @@ export default function useCtiStomp(wsPath = '/ws') {
 
       return activeCallIds;
     } catch (error) {
-      console.error('Error getting active call IDs from localStorage:', error);
       return [];
     }
   }, []);
@@ -1128,14 +1252,6 @@ export default function useCtiStomp(wsPath = '/ws') {
     if (isInitialized && dnsMap && Object.keys(dnsMap).length > 0) {
       // Remove terminating calls from store
       removeTerminatingCalls();
-      
-      // Get active call IDs from localStorage
-      const activeCallIds = getActiveCallIdsFromLocalStorage();
-      console.log('Active call IDs from localStorage (currentState != DISCONNECTED):', activeCallIds);
-      
-      // Get all call IDs from current state
-      const allCallIds = getAllCallIds();
-      console.log('All call IDs from current state:', allCallIds);
       
       // Execute callback (handle both sync and async callbacks)
       await callback();

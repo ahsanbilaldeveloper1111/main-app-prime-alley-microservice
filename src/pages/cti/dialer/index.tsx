@@ -16,6 +16,7 @@ import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import PageHeader from "@components/PageHeader";
 import "@assets/scss/pgDialer.scss";
+import { PhoneIcon } from 'lucide-react'
 
 
 const CtiDialer = () => {
@@ -2550,6 +2551,21 @@ const CtiDialer = () => {
     return true
   }
 
+  // Check if user is registered/online
+  const isUserRegistered = () => {
+    if (!userAddress || !dnsMap || !dnsMap[userAddress]) {
+      return false
+    }
+    
+    const userDevices = Object.values(dnsMap[userAddress].devices || {})
+    if (userDevices.length === 0) {
+      return false
+    }
+    
+    // Check if any device is registered
+    return userDevices.some((device: any) => device.terminalState === 'REGISTERED')
+  }
+
   // Error and loading states
   if (error) {
     return (
@@ -2564,6 +2580,123 @@ const CtiDialer = () => {
       <div className="alert alert-info m-3">
         Connecting to server...
       </div>
+    )
+  }
+
+  // Get user devices for display
+  const getUserDevices = () => {
+    if (!userAddress || !dnsMap || !dnsMap[userAddress]) {
+      return []
+    }
+    
+    const userDevices = Object.values(dnsMap[userAddress].devices || {})
+    return userDevices.map((device: any) => ({
+      deviceName: device.deviceName || 'Unknown',
+      deviceType: device.deviceType || 'UNKNOWN',
+      terminalState: device.terminalState || 'UNREGISTERED',
+      when: device.when || new Date().toISOString()
+    }))
+  }
+
+  // Get badge variant for device status
+  const getDeviceStatusBadgeVariant = (terminalState: string) => {
+    switch (terminalState) {
+      case 'REGISTERED': return 'success'
+      case 'UNREGISTERED': return 'danger'
+      case 'STALE': return 'warning'
+      default: return 'secondary'
+    }
+  }
+
+  // Get device type label
+  const getDeviceTypeLabel = (deviceType: string) => {
+    switch (deviceType) {
+      case 'SOFT': return 'Soft Phone'
+      case 'HARD': return 'Hard Phone'
+      case 'ANDROID': return 'Android'
+      case 'IOS': return 'iPhone'
+      default: return deviceType
+    }
+  }
+
+  // Check if user is registered before allowing access to dialer
+  if (!isUserRegistered()) {
+    const userDevices = getUserDevices()
+    
+    return (
+      <React.Fragment>
+        <BreadcrumbItem mainTitle="CTI" mainLink="/cti" subTitle="Live Dialer" showPageLoader={showPageLoader} />
+        <PageHeader 
+          title="Live Dialer"
+          buttons={
+            <Link href="/cti" className="btn btn-primary">
+              <i className="material-icons-two-tone me-2" style={{ backgroundColor: '#fff' }}>arrow_back</i>
+              Back
+            </Link>
+          }
+        />
+        <div className="container mt-4">
+          <div className="alert alert-warning" role="alert">
+            <div className="d-flex align-items-center mb-3">
+              <i className="material-icons-two-tone me-3" style={{ fontSize: '3rem', color: '#ffc107' }}>warning</i>
+              <div>
+                <h4 className="alert-heading mb-2">Device Not Registered</h4>
+                <p className="mb-2">
+                  Your extension <strong>{userAddress || 'Unknown'}</strong> is not currently registered or online.
+                </p>
+                <p className="mb-0">
+                   The dialer will be available once your device status shows as "Online" or "Registered".
+                </p>
+              </div>
+            </div>
+            
+            {/* User Devices List */}
+            {userDevices.length > 0 && (
+              <div className="mt-4 pt-3 border-top">
+                <h6 className="mb-3">
+                  <i className="material-icons-two-tone me-2">devices</i>
+                  Your Devices
+                </h6>
+                <div className="row g-2">
+                  {userDevices.map((device, index) => (
+                    <div key={index} className="col-md-6">
+                      <div className="card">
+                        <div className="card-body">
+                          <div className="d-flex justify-content-between align-items-start mb-2">
+                            <div>
+                              {/* <h6 className="mb-1">{device.deviceName}</h6> */}
+                              <h6 className="mb-1">{getDeviceTypeLabel(device.deviceType)}</h6>
+                              
+                              {/* <small className="text-muted">
+                                {getDeviceTypeLabel(device.deviceType)}
+                              </small> */}
+                            </div>
+                            <Badge bg={getDeviceStatusBadgeVariant(device.terminalState)}>
+                              {device.terminalState}
+                            </Badge>
+                          </div>
+                          <small className="text-muted">
+                            Last seen: {new Date(device.when).toLocaleString()}
+                          </small>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {userDevices.length === 0 && (
+              <div className="mt-3 pt-3 border-top">
+                <p className="text-muted mb-0">
+                  <i className="material-icons-two-tone me-2">info</i>
+                  No devices found for this extension.
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      </React.Fragment>
     )
   }
 
@@ -2597,8 +2730,8 @@ const CtiDialer = () => {
                 <Col md={4} style={{ backgroundColor: 'rgb(198 203 208 / 35%)' }}>
                   <div className="mb-4">
                     <h6 className="fw-bold mb-3 text-start mt-3">
-                      <i className="material-icons-two-tone me-2">people</i>
-                      Available Extensions
+                      <PhoneIcon size={20} className="me-2" />
+                      Extensions
                     </h6>
                     
                     <div className="mb-3">

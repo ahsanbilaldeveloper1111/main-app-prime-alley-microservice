@@ -1454,7 +1454,7 @@ const Header = ({ themeMode }: HeaderProps) => {
                 </li>
                 )}
 
-                {session?.user?.permissions?.includes(PERMISSIONS.VIEW_UPTIME_SLA_NETOPS) && (
+                {session?.user?.permissions?.includes(PERMISSIONS.VIEW_NETOPS_UPTIME_SLA) && (
                 <li className="pc-item">
                     <Link className="pc-link" href={`${BASE_URL}/netops/uptime-sla`}>
                         <span className="pc-micon"><i className="ph-duotone ph-chart-line-up"></i></span>

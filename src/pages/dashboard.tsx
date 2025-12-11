@@ -208,7 +208,7 @@ const Dashboard = () => {
             <p className='topTicker'>
             🚀 New Feature: AI-Powered Call Summaries now available! Check it out
             </p>
-            {isNotificationSupported && notificationPermission !== 'granted' && (
+            {/* {isNotificationSupported && notificationPermission !== 'granted' && (
                 <div className="container-fluid py-2">
                     <div className="alert alert-warning alert-dismissible fade show d-flex align-items-center" role="alert">
                         <div className="flex-grow-1">
@@ -241,7 +241,7 @@ const Dashboard = () => {
                         <button type="button" className="btn-close ms-2" data-bs-dismiss="alert" aria-label="Close"></button>
                     </div>
                 </div>
-            )}
+            )} */}
             <div className="container-fluid  py-5">
                 {/* Header Section */}
                 <div className="row mb-2">

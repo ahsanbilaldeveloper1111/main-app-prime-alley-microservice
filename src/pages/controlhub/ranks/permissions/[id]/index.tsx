@@ -78,13 +78,13 @@ const ViewRolePermission = () => {
             <Col md={12}>
                 <div className="page-header-title style-2">
                 <Row className="d-flex justify-content-between align-items-center">
-                    <Col md={6}>
+                    <Col md={8}>
                       
-                      <h2 className="mb-0">View Rank Permission</h2>
+                      <h2 className="mb-0">View Permission for <b className='text-primary'>{roleName}</b></h2>
                     </Col>
 
 
-                    <Col md={6} className="d-flex justify-content-end">
+                    <Col md={4} className="d-flex justify-content-end">
                       
                     <div className="action-buttons">
                     <div className="search-container">

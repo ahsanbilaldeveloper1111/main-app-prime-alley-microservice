@@ -39,7 +39,17 @@ import {
   Workflow,
   NotebookText,
   DollarSign,
-  PhoneCallIcon
+  PhoneCallIcon,
+  MonitorSpeaker,
+  Monitor,
+  Server,
+  Group,
+  ShieldPlus,
+  Shield,
+  NotebookTabs,
+  HelpCircle,
+  Info,
+  CircleQuestionMark
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -227,7 +237,7 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
           permission: PERMISSIONS.DIAL_CALL_CTI,
           url: '/cti/dialer'
         }
-      ]
+      ].filter(item => !item.permission || hasPermission(item.permission))
     },
 
     {
@@ -260,6 +270,16 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
           icon: <Phone size={16} />,
           permission: PERMISSIONS.VIEW_CALL_RECORDINGS,
           url: '/call-recordings'
+        },
+        {
+          id: 'call-reports',
+          key: 'call-reports',
+          permission: PERMISSIONS.REPORTS_SERVICES,
+          icon: <ChartNoAxesCombined size={20} />,
+          color: MENU_COLORS.REPORTS,
+          title: MENU_LABELS.REPORTS,
+          label: MENU_LABELS.REPORTS,
+          url: '/reports',
         }
       ].filter(item => !item.permission || hasPermission(item.permission))
     },
@@ -345,19 +365,6 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
       label: MENU_LABELS.BILLING,
       url: '',
       subItems: [
-        // {
-        //   id: 'customer-section',
-        //   title: 'Customer',
-        //   icon: <Users size={16} />,
-        //   url: '',
-        //   subItems: [
-        //     { id: 'customer-dashboard', title: 'Customer Dashboard', icon: <LayoutDashboard size={16} />, url: '/accounting/customer/dashboard' },
-        //     { id: 'account-overview', title: 'Account Overview', icon: <Eye size={16} />, url: '/accounting/customer/account-overview' },
-        //     { id: 'product-details', title: 'Product Details', icon: <ShoppingBag size={16} />, url: '/accounting/customer/product-details' },
-        //     { id: 'billing-history', title: 'Billing History', icon: <FileText size={16} />, url: '/accounting/customer/billing-history' },
-        //     { id: 'payment-methods', title: 'Payment Methods', icon: <CreditCard size={16} />, url: '/accounting/customer/payment-methods' },
-        //   ]
-        // },
 
             { 
               id: 'customer-dashboard', 
@@ -563,28 +570,28 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
         {
           id: 'netops-devices',
           title: HEADER_CONSTANTS.SUBMENU_LABELS.NETOPS_DEVICES,
-          icon: <List size={16} />,
+          icon: <MonitorSpeaker size={16} />,
           permission: PERMISSIONS.VIEW_NETOPS_DEVICES,
           url: '/netops/devices'
         },
         {
           id: 'netops-services',
           title: HEADER_CONSTANTS.SUBMENU_LABELS.NETOPS_SERVICES,
-          icon: <List size={16} />,
+          icon: <Server size={16} />,
           permission: PERMISSIONS.VIEW_NETOPS_SERVICES,
           url: '/netops/services'
         },
         {
           id: 'netops-alerts',
           title: HEADER_CONSTANTS.SUBMENU_LABELS.NETOPS_ALERTS,
-          icon: <List size={16} />,
+          icon: <Megaphone size={16} />,
           permission: PERMISSIONS.VIEW_NETOPS_ALERTS,
           url: '/netops/alerts'
         },
         {
           id: 'netops-uptime-sla',
           title: HEADER_CONSTANTS.SUBMENU_LABELS.NETOPS_UPTIME_SLA,
-          icon: <List size={16} />,
+          icon: <Monitor size={16} />,
           permission: PERMISSIONS.VIEW_NETOPS_UPTIME_SLA,
           url: '/netops/uptime-sla'
         }
@@ -611,14 +618,14 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
         {
           id: 'controlhub-ranks',
           title: HEADER_CONSTANTS.SUBMENU_LABELS.RANKS,
-          icon: <List size={16} />,
+          icon: <Shield size={16} />,
           permission: PERMISSIONS.VIEW_RANKS,
           url: '/controlhub/ranks'
         },
         {
           id: 'controlhub-groups',
           title: HEADER_CONSTANTS.SUBMENU_LABELS.GROUPS,
-          icon: <List size={16} />,
+          icon: <Group size={16} />,
           permission: PERMISSIONS.VIEW_GROUPS,
           url: '/controlhub/groups'
         }
@@ -638,28 +645,26 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
         {
           id: 'resources-faq',
           title: HEADER_CONSTANTS.SUBMENU_LABELS.FAQ,
-          icon: <List size={16} />,
+          icon: <CircleQuestionMark size={16} />,
           permission: '',
           url: '/resources/faq'
         },
         {
           id: 'resources-help-materials',
           title: HEADER_CONSTANTS.SUBMENU_LABELS.HELP_MATERIALS,
-          icon: <List size={16} />,
+          icon: <Info size={16} />,
           permission: '',
           url: '/resources/help-materials'
         },
         {
           id: 'resources-contact-support',
           title: HEADER_CONSTANTS.SUBMENU_LABELS.CONTACT_SUPPORT,
-          icon: <List size={16} />,
+          icon: <NotebookTabs size={16} />,
           permission: '',
           url: '/resources/contact-support'
         }
       ]
     }
-
-    
 
 
   ].filter(item => !item.permission || hasPermission(item.permission));
