@@ -39,7 +39,17 @@ import {
   Workflow,
   NotebookText,
   DollarSign,
-  PhoneCallIcon
+  PhoneCallIcon,
+  MonitorSpeaker,
+  Monitor,
+  Server,
+  Group,
+  ShieldPlus,
+  Shield,
+  NotebookTabs,
+  HelpCircle,
+  Info,
+  CircleQuestionMark
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -550,28 +560,28 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
         {
           id: 'netops-devices',
           title: HEADER_CONSTANTS.SUBMENU_LABELS.NETOPS_DEVICES,
-          icon: <List size={16} />,
+          icon: <MonitorSpeaker size={16} />,
           permission: PERMISSIONS.VIEW_NETOPS_DEVICES,
           url: '/netops/devices'
         },
         {
           id: 'netops-services',
           title: HEADER_CONSTANTS.SUBMENU_LABELS.NETOPS_SERVICES,
-          icon: <List size={16} />,
+          icon: <Server size={16} />,
           permission: PERMISSIONS.VIEW_NETOPS_SERVICES,
           url: '/netops/services'
         },
         {
           id: 'netops-alerts',
           title: HEADER_CONSTANTS.SUBMENU_LABELS.NETOPS_ALERTS,
-          icon: <List size={16} />,
+          icon: <Megaphone size={16} />,
           permission: PERMISSIONS.VIEW_NETOPS_ALERTS,
           url: '/netops/alerts'
         },
         {
           id: 'netops-uptime-sla',
           title: HEADER_CONSTANTS.SUBMENU_LABELS.NETOPS_UPTIME_SLA,
-          icon: <List size={16} />,
+          icon: <Monitor size={16} />,
           permission: PERMISSIONS.VIEW_NETOPS_UPTIME_SLA,
           url: '/netops/uptime-sla'
         }
@@ -598,14 +608,14 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
         {
           id: 'controlhub-ranks',
           title: HEADER_CONSTANTS.SUBMENU_LABELS.RANKS,
-          icon: <List size={16} />,
+          icon: <Shield size={16} />,
           permission: PERMISSIONS.VIEW_RANKS,
           url: '/controlhub/ranks'
         },
         {
           id: 'controlhub-groups',
           title: HEADER_CONSTANTS.SUBMENU_LABELS.GROUPS,
-          icon: <List size={16} />,
+          icon: <Group size={16} />,
           permission: PERMISSIONS.VIEW_GROUPS,
           url: '/controlhub/groups'
         }
@@ -625,21 +635,21 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
         {
           id: 'resources-faq',
           title: HEADER_CONSTANTS.SUBMENU_LABELS.FAQ,
-          icon: <List size={16} />,
+          icon: <CircleQuestionMark size={16} />,
           permission: '',
           url: '/resources/faq'
         },
         {
           id: 'resources-help-materials',
           title: HEADER_CONSTANTS.SUBMENU_LABELS.HELP_MATERIALS,
-          icon: <List size={16} />,
+          icon: <Info size={16} />,
           permission: '',
           url: '/resources/help-materials'
         },
         {
           id: 'resources-contact-support',
           title: HEADER_CONSTANTS.SUBMENU_LABELS.CONTACT_SUPPORT,
-          icon: <List size={16} />,
+          icon: <NotebookTabs size={16} />,
           permission: '',
           url: '/resources/contact-support'
         }

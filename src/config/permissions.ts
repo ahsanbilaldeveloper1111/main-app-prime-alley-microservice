@@ -46,27 +46,27 @@ export const routePermissions: RoutePermission[] = [
     //netops services start
     {
         path: '/netops',
-        permissions: [PERMISSIONS.CONTROL_HUB_SERVICES],
+        permissions: [PERMISSIONS.NETOPS_SERVICES],
         children: [
             {
                 path: '/dashboard',
-                permissions: [PERMISSIONS.CONTROL_HUB_SERVICES]
+                permissions: [PERMISSIONS.VIEW_NETOPS_DASHBOARD]
             },
             {
                 path: '/devices',
-                permissions: [PERMISSIONS.CONTROL_HUB_SERVICES]
+                permissions: [PERMISSIONS.VIEW_NETOPS_DEVICES]
             },
             {
                 path: '/services',
-                permissions: [PERMISSIONS.CONTROL_HUB_SERVICES]
+                permissions: [PERMISSIONS.VIEW_NETOPS_SERVICES]
             },
             {
                 path: '/alerts',
-                permissions: [PERMISSIONS.CONTROL_HUB_SERVICES]
+                permissions: [PERMISSIONS.VIEW_NETOPS_ALERTS]
             },
             {
                 path: '/uptime-sla',
-                permissions: [PERMISSIONS.CONTROL_HUB_SERVICES]
+                permissions: [PERMISSIONS.VIEW_NETOPS_UPTIME_SLA]
             },
         ]
     },
