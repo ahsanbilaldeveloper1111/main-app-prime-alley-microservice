@@ -274,26 +274,24 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
         {
           id: 'call-reports',
           key: 'call-reports',
-          permission: PERMISSIONS.REPORTS_SERVICES,
+          permission: PERMISSIONS.VIEW_CALL_REPORTS,
           icon: <ChartNoAxesCombined size={20} />,
-          color: MENU_COLORS.REPORTS,
-          title: MENU_LABELS.REPORTS,
-          label: MENU_LABELS.REPORTS,
-          url: '/reports',
+          title: MENU_LABELS.CALL_REPORTS,
+          url: '/call-reports',
         }
       ].filter(item => !item.permission || hasPermission(item.permission))
     },
 
-    {
-      id: 'call-reports',
-      key: 'call-reports',
-      permission: PERMISSIONS.REPORTS_SERVICES,
-      icon: <ChartNoAxesCombined size={20} />,
-      color: MENU_COLORS.REPORTS,
-      title: MENU_LABELS.REPORTS,
-      label: MENU_LABELS.REPORTS,
-      url: '/reports',
-    },
+    // {
+    //   id: 'call-reports',
+    //   key: 'call-reports',
+    //   permission: PERMISSIONS.REPORTS_SERVICES,
+    //   icon: <ChartNoAxesCombined size={20} />,
+    //   color: MENU_COLORS.REPORTS,
+    //   title: MENU_LABELS.REPORTS,
+    //   label: MENU_LABELS.REPORTS,
+    //   url: '/reports',
+    // },
 
     {
       id: 'ai-ml',
