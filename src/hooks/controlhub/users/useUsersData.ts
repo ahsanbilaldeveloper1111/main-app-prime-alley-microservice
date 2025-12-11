@@ -26,45 +26,46 @@ export const useUsersData = (session: any, initialBaseColumns: Column[]) => {
         async (page = 1, perPage = 15, search = "") => {
             const response = await getAllUsers({ page, perPage, search, filters: currentFilters });
             
-            // Derive dynamic custom-field columns from the returned rows
-            try {
-                const rows = response?.dataList || [];
-                
-                if (Array.isArray(rows)) { 
-                    const baseKeysLower = new Set(initialBaseColumns.map((c: Column) => c.key.toLowerCase()));
-                    const seen = new Set<string>();
-                    const dynamicCols: Column[] = [];
+            // TEMPORARILY COMMENTED OUT: Derive dynamic custom-field columns from the returned rows
+            // This is commented out to debug multiple API calls issue
+            // try {
+            //     const rows = response?.dataList || [];
+            //     
+            //     if (Array.isArray(rows)) { 
+            //         const baseKeysLower = new Set(initialBaseColumns.map((c: Column) => c.key.toLowerCase()));
+            //         const seen = new Set<string>();
+            //         const dynamicCols: Column[] = [];
 
-                    rows.forEach((row: any) => {
-                        const fields = Array.isArray(row?.custom_fields) ? row.custom_fields : [];
-                        fields.forEach((f: any) => {
-                            const fieldNameRaw = f?.field_name;
-                            const fieldName = typeof fieldNameRaw === 'string' ? fieldNameRaw.trim() : '';
-                            if (!fieldName) return;
-                            const normalized = fieldName.toLowerCase();
-                            if (baseKeysLower.has(normalized)) return;
-                            if (seen.has(normalized)) return;
-                            seen.add(normalized);
+            //         rows.forEach((row: any) => {
+            //             const fields = Array.isArray(row?.custom_fields) ? row.custom_fields : [];
+            //             fields.forEach((f: any) => {
+            //                 const fieldNameRaw = f?.field_name;
+            //                 const fieldName = typeof fieldNameRaw === 'string' ? fieldNameRaw.trim() : '';
+            //                 if (!fieldName) return;
+            //                 const normalized = fieldName.toLowerCase();
+            //                 if (baseKeysLower.has(normalized)) return;
+            //                 if (seen.has(normalized)) return;
+            //                 seen.add(normalized);
 
-                            dynamicCols.push({
-                                key: fieldName,
-                                name: fieldName,
-                                sortable: true,
-                                selector: (r: any) => {
-                                    const cf = (Array.isArray(r?.custom_fields) ? r.custom_fields : []).find((x: any) => String(x?.field_name).trim() === fieldName);
-                                    return cf?.field_value ?? '';
-                                },
-                            });
-                        });
-                    });
+            //                 dynamicCols.push({
+            //                     key: fieldName,
+            //                     name: fieldName,
+            //                     sortable: true,
+            //                     selector: (r: any) => {
+            //                         const cf = (Array.isArray(r?.custom_fields) ? r.custom_fields : []).find((x: any) => String(x?.field_name).trim() === fieldName);
+            //                         return cf?.field_value ?? '';
+            //                     },
+            //                 });
+            //             });
+            //         });
 
-                    setCustomFieldColumns(dynamicCols);
-                } else {
-                    setCustomFieldColumns([]);
-                }
-            } catch (error) {
-                setCustomFieldColumns([]);
-            }
+            //         setCustomFieldColumns(dynamicCols);
+            //     } else {
+            //         setCustomFieldColumns([]);
+            //     }
+            // } catch (error) {
+            //     setCustomFieldColumns([]);
+            // }
 
             setSummary({
                 users: response?.summary?.users,
