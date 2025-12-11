@@ -915,7 +915,7 @@ const CrmOrders = () => {
       customerPhone: order.customer_phone || '',
       deal: order.deal?.name || order.deal_id || '',
       dealId: order.deal_id || null,
-      stage: order.stage?.name || 'New',
+      stage: order.stage?.name || 'No Stage',
       stageId: order.order_stage_id || null,
       value: order.final_amount || order.total_amount || '0',
       currency: order.currency || 'USD',
@@ -968,7 +968,7 @@ const CrmOrders = () => {
     // Stage distribution
     const stageCounts: Record<string, number> = {};
     transformedOrders.forEach(o => {
-      const stage = o.stage || 'New';
+      const stage = o.stage || 'No Stage';
       stageCounts[stage] = (stageCounts[stage] || 0) + 1;
     });
     

@@ -116,26 +116,34 @@ interface KPICardData {
   onClick?: () => void;
 }
 
-const KPICard: React.FC<KPICardData> = ({ title, value, change, isPositive, icon, color, onClick }) => {
+const KPICard: React.FC<KPICardData> = ({
+  title,
+  value,
+  change,
+  isPositive,
+  icon,
+  color,
+  onClick,
+}) => {
   return (
-    <Card 
-      className={onClick ? 'h-100' : ''} 
-      style={{ 
-        cursor: onClick ? 'pointer' : 'default',
-        transition: 'all 0.2s ease',
-        border: '1px solid #e9ecef'
+    <Card
+      className={onClick ? "h-100" : ""}
+      style={{
+        cursor: onClick ? "pointer" : "default",
+        transition: "all 0.2s ease",
+        border: "1px solid #e9ecef",
       }}
       onClick={onClick}
       onMouseEnter={(e) => {
         if (onClick) {
-          e.currentTarget.style.transform = 'translateY(-4px)';
-          e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)';
+          e.currentTarget.style.transform = "translateY(-4px)";
+          e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.1)";
         }
       }}
       onMouseLeave={(e) => {
         if (onClick) {
-          e.currentTarget.style.transform = 'translateY(0)';
-          e.currentTarget.style.boxShadow = 'none';
+          e.currentTarget.style.transform = "translateY(0)";
+          e.currentTarget.style.boxShadow = "none";
         }
       }}
     >
@@ -145,7 +153,10 @@ const KPICard: React.FC<KPICardData> = ({ title, value, change, isPositive, icon
             <div className={`text-${color}`}>{icon}</div>
           </div>
           {change && (
-            <Badge bg={isPositive ? 'success' : 'danger'} className="bg-opacity-10">
+            <Badge
+              bg={isPositive ? "success" : "danger"}
+              className="bg-opacity-10"
+            >
               {isPositive ? <ArrowUp size={12} /> : <ArrowDown size={12} />}
               {change}
             </Badge>
@@ -160,7 +171,14 @@ const KPICard: React.FC<KPICardData> = ({ title, value, change, isPositive, icon
 
 // Filter Bar Component (from crm-new.tsx design)
 interface FilterBarProps {
-  quickFilters: { id: string; label: string; variant?: string; color?: string; activeColor?: string; icon?: React.ReactNode }[];
+  quickFilters: {
+    id: string;
+    label: string;
+    variant?: string;
+    color?: string;
+    activeColor?: string;
+    icon?: React.ReactNode;
+  }[];
   activeFilter: string;
   onFilterChange: (filterId: string) => void;
   searchValue: string;
@@ -182,7 +200,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
   searchPlaceholder = "Search...",
   showAdvancedFilters,
   onToggleAdvancedFilters,
-  advancedFilterCount = 0
+  advancedFilterCount = 0,
 }) => {
   return (
     <Card className="border-0 shadow-sm mb-3">
@@ -190,7 +208,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
         <div className="d-flex flex-column flex-lg-row justify-content-between align-items-stretch align-items-lg-center gap-3">
           {/* Left Side: Quick Filter Buttons */}
           <div className="d-flex gap-2 flex-wrap align-items-center flex-grow-1">
-            {quickFilters.map(filter => {
+            {quickFilters.map((filter) => {
               const isActive = activeFilter === filter.id;
               const hasCustomColor = filter.color || filter.activeColor;
 
@@ -199,26 +217,36 @@ const FilterBar: React.FC<FilterBarProps> = ({
               if (hasCustomColor) {
                 if (isActive) {
                   const bgColor = filter.activeColor || filter.color;
-                  buttonStyle.background = '#fff';
+                  buttonStyle.background = "#fff";
                   buttonStyle.borderColor = bgColor;
                   buttonStyle.color = bgColor;
                 } else {
-                  buttonStyle.background = '#fff';
+                  buttonStyle.background = "#fff";
                   buttonStyle.borderColor = filter.color;
                   buttonStyle.color = filter.color;
-                  buttonStyle.opacity = '0.7';
+                  buttonStyle.opacity = "0.7";
                 }
               }
 
               return (
                 <Button
                   key={filter.id}
-                  variant={hasCustomColor ? undefined : (isActive ? (filter.variant || 'primary') : 'outline-secondary')}
+                  variant={
+                    hasCustomColor
+                      ? undefined
+                      : isActive
+                      ? filter.variant || "primary"
+                      : "outline-secondary"
+                  }
                   onClick={() => onFilterChange(filter.id)}
                   className="d-flex align-items-center gap-2"
                   style={hasCustomColor ? buttonStyle : undefined}
                 >
-                  {filter.icon && <span className="d-flex align-items-center">{filter.icon}</span>}
+                  {filter.icon && (
+                    <span className="d-flex align-items-center">
+                      {filter.icon}
+                    </span>
+                  )}
                   {filter.label}
                 </Button>
               );
@@ -227,28 +255,28 @@ const FilterBar: React.FC<FilterBarProps> = ({
 
           {/* Right Side: Search and Filters */}
           <div className="d-flex flex-column flex-sm-row gap-2 align-items-stretch align-items-sm-center flex-shrink-0">
-            <InputGroup style={{ width: '300px', minWidth: '200px' }} className="flex-shrink-0">
+            <InputGroup
+              style={{ width: "300px", minWidth: "200px" }}
+              className="flex-shrink-0"
+            >
               <Form.Control
-                style={{ height: '41px' }}
+                style={{ height: "41px" }}
                 type="text"
                 placeholder={searchPlaceholder}
                 value={searchValue}
                 onChange={(e) => onSearchChange(e.target.value)}
                 onKeyPress={(e) => {
-                  if (e.key === 'Enter') {
+                  if (e.key === "Enter") {
                     onSearch();
                   }
                 }}
               />
-              <Button 
-                variant="outline-secondary"
-                onClick={onSearch}
-              >
+              <Button variant="outline-secondary" onClick={onSearch}>
                 <FiSearch size={16} />
               </Button>
             </InputGroup>
-            <Button 
-              variant={showAdvancedFilters ? 'primary' : 'outline-secondary'}
+            <Button
+              variant={showAdvancedFilters ? "primary" : "outline-secondary"}
               onClick={onToggleAdvancedFilters}
               className="d-flex align-items-center flex-shrink-0"
             >
@@ -354,32 +382,44 @@ const CrmProspectsManagement = () => {
 
   // History modal state
   const [showHistoryModal, setShowHistoryModal] = useState(false);
-  
+
   const [showProspectsAnalytics, setShowProspectsAnalytics] = useState(false);
   const [showAllProspectStats, setShowAllProspectStats] = useState(false);
-  const [activeFilter, setActiveFilter] = useState('all');
+  const [activeFilter, setActiveFilter] = useState("all");
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
-  const [prospectsSearch, setProspectsSearch] = useState('');
+  const [prospectsSearch, setProspectsSearch] = useState("");
   const [prospectsFilters, setProspectsFilters] = useState({
     assignedTo: null as string | null,
     campaigns: null as string[] | null,
   });
-  
+
   // Column customization and pagination states
   const [selectedColumns, setSelectedColumns] = useState<string[]>(() => {
-    const saved = localStorage.getItem('crmDataSelectedColumns');
-    return saved ? JSON.parse(saved) : ['name', 'phone', 'user_extension', 'campaign', 'last_called_at', 'last_call_end_reason', 'disposition', 'scheduled_call_at', 'tags'];
+    const saved = localStorage.getItem("crmDataSelectedColumns");
+    return saved
+      ? JSON.parse(saved)
+      : [
+          "name",
+          "phone",
+          "user_extension",
+          "campaign",
+          "last_called_at",
+          "last_call_end_reason",
+          "disposition",
+          "scheduled_call_at",
+          "tags",
+        ];
   });
-  const [pagination, setPagination] = useState({ 
-    currentPage: 1, 
-    rowsPerPage: 15, 
-    sortColumn: '', 
-    sortDirection: 'asc' as 'asc' | 'desc' 
+  const [pagination, setPagination] = useState({
+    currentPage: 1,
+    rowsPerPage: 15,
+    sortColumn: "",
+    sortDirection: "asc" as "asc" | "desc",
   });
   const [dataList, setDataList] = useState<CrmDataItem[]>([]);
   const [totalRecords, setTotalRecords] = useState(0);
   const [loading, setLoading] = useState(false);
-  const [metrics, setMetrics] = useState<CrmDataMetrics >({
+  const [metrics, setMetrics] = useState<CrmDataMetrics>({
     assigned_records: 0,
     unassigned_records: 0,
     scheduled_records: 0,
@@ -497,7 +537,7 @@ const CrmProspectsManagement = () => {
         const batch = campaignIds.slice(i, i + batchSize);
         const campaignsResponse = await getCampaigns({
           per_page: 1000,
-          filters: { ids: batch},
+          filters: { ids: batch },
           module_slug: ModuleSlug.CRM_CAMPAIGNS,
         });
 
@@ -550,42 +590,44 @@ const CrmProspectsManagement = () => {
   const customSelectStyles = {
     control: (provided: any, state: any) => ({
       ...provided,
-      minHeight: '45px',
-      fontSize: '0.875rem',
-      borderColor: state.isFocused ? '#86b7fe' : '#dee2e6',
-      boxShadow: state.isFocused ? '0 0 0 0.2rem rgba(13, 110, 253, 0.25)' : 'none',
-      '&:hover': {
-        borderColor: '#86b7fe'
-      }
+      minHeight: "45px",
+      fontSize: "0.875rem",
+      borderColor: state.isFocused ? "#86b7fe" : "#dee2e6",
+      boxShadow: state.isFocused
+        ? "0 0 0 0.2rem rgba(13, 110, 253, 0.25)"
+        : "none",
+      "&:hover": {
+        borderColor: "#86b7fe",
+      },
     }),
     multiValue: (provided: any) => ({
       ...provided,
-      backgroundColor: '#0d6efd',
-      color: 'white',
-      fontSize: '0.813rem'
+      backgroundColor: "#0d6efd",
+      color: "white",
+      fontSize: "0.813rem",
     }),
     multiValueLabel: (provided: any) => ({
       ...provided,
-      color: 'white',
-      padding: '2px 6px'
+      color: "white",
+      padding: "2px 6px",
     }),
     multiValueRemove: (provided: any) => ({
       ...provided,
-      color: 'white',
-      '&:hover': {
-        backgroundColor: '#0b5ed7',
-        color: 'white'
-      }
+      color: "white",
+      "&:hover": {
+        backgroundColor: "#0b5ed7",
+        color: "white",
+      },
     }),
     placeholder: (provided: any) => ({
       ...provided,
-      color: '#6c757d',
-      fontSize: '0.875rem'
+      color: "#6c757d",
+      fontSize: "0.875rem",
     }),
     singleValue: (provided: any) => ({
       ...provided,
-      fontSize: '0.875rem'
-    })
+      fontSize: "0.875rem",
+    }),
   };
 
   const memoizedFilters = useMemo(() => currentFilters, [currentFilters]);
@@ -594,7 +636,9 @@ const CrmProspectsManagement = () => {
   useEffect(() => {
     const fetchExtensions = async () => {
       try {
-        const hierarchyData = await GetHierarchyData(ModuleSlug.CRM_DATA_MANAGEMENT);
+        const hierarchyData = await GetHierarchyData(
+          ModuleSlug.CRM_DATA_MANAGEMENT
+        );
         if (hierarchyData?.extensions) {
           setExtensions(hierarchyData.extensions);
         }
@@ -678,21 +722,21 @@ const CrmProspectsManagement = () => {
 
   // Handle activeFilter changes to update currentFilters
   useEffect(() => {
-    if (activeFilter === 'all') {
+    if (activeFilter === "all") {
       setCurrentFilters((prev) => {
         const newFilters = { ...prev };
         delete newFilters.has_scheduled_calls;
         delete newFilters.has_tickets;
         return newFilters;
       });
-    } else if (activeFilter === 'scheduled') {
+    } else if (activeFilter === "scheduled") {
       setCurrentFilters((prev) => {
         const newFilters = { ...prev };
         delete newFilters.has_tickets;
         newFilters.has_scheduled_calls = true;
         return newFilters;
       });
-    } else if (activeFilter === 'has_leads') {
+    } else if (activeFilter === "has_leads") {
       setCurrentFilters((prev) => {
         const newFilters = { ...prev };
         delete newFilters.has_scheduled_calls;
@@ -705,30 +749,46 @@ const CrmProspectsManagement = () => {
 
   // Helper functions for sorting and pagination
   const handleSort = (column: string) => {
-    const newDirection = pagination.sortColumn === column && pagination.sortDirection === 'asc' ? 'desc' : 'asc';
-    setPagination({ ...pagination, sortColumn: column, sortDirection: newDirection, currentPage: 1 });
+    const newDirection =
+      pagination.sortColumn === column && pagination.sortDirection === "asc"
+        ? "desc"
+        : "asc";
+    setPagination({
+      ...pagination,
+      sortColumn: column,
+      sortDirection: newDirection,
+      currentPage: 1,
+    });
   };
 
-  const sortData = <T extends Record<string, any>>(data: T[], sortColumn: string, sortDirection: 'asc' | 'desc'): T[] => {
+  const sortData = <T extends Record<string, any>>(
+    data: T[],
+    sortColumn: string,
+    sortDirection: "asc" | "desc"
+  ): T[] => {
     if (!sortColumn) return data;
-    
+
     return [...data].sort((a, b) => {
       let aVal = a[sortColumn];
       let bVal = b[sortColumn];
-      
-      if (aVal === undefined) aVal = '';
-      if (bVal === undefined) bVal = '';
-      
+
+      if (aVal === undefined) aVal = "";
+      if (bVal === undefined) bVal = "";
+
       const aStr = String(aVal).toLowerCase();
       const bStr = String(bVal).toLowerCase();
-      
-      if (aStr < bStr) return sortDirection === 'asc' ? -1 : 1;
-      if (aStr > bStr) return sortDirection === 'asc' ? 1 : -1;
+
+      if (aStr < bStr) return sortDirection === "asc" ? -1 : 1;
+      if (aStr > bStr) return sortDirection === "asc" ? 1 : -1;
       return 0;
     });
   };
 
-  const paginateData = <T,>(data: T[], currentPage: number, rowsPerPage: number): T[] => {
+  const paginateData = <T,>(
+    data: T[],
+    currentPage: number,
+    rowsPerPage: number
+  ): T[] => {
     const startIndex = (currentPage - 1) * rowsPerPage;
     const endIndex = startIndex + rowsPerPage;
     return data.slice(startIndex, endIndex);
@@ -742,9 +802,11 @@ const CrmProspectsManagement = () => {
     if (pagination.sortColumn !== column) {
       return <ArrowUpDown size={14} className="ms-1 text-muted" />;
     }
-    return pagination.sortDirection === 'asc' ? 
-      <ArrowUp size={14} className="ms-1" /> : 
-      <ArrowDown size={14} className="ms-1" />;
+    return pagination.sortDirection === "asc" ? (
+      <ArrowUp size={14} className="ms-1" />
+    ) : (
+      <ArrowDown size={14} className="ms-1" />
+    );
   };
 
   const renderPaginationControls = () => {
@@ -760,8 +822,14 @@ const CrmProspectsManagement = () => {
           <Form.Select
             size="sm"
             value={rowsPerPage}
-            onChange={(e) => setPagination({ ...pagination, rowsPerPage: Number(e.target.value), currentPage: 1 })}
-            style={{ width: 'auto' }}
+            onChange={(e) =>
+              setPagination({
+                ...pagination,
+                rowsPerPage: Number(e.target.value),
+                currentPage: 1,
+              })
+            }
+            style={{ width: "auto" }}
           >
             <option value={10}>10</option>
             <option value={15}>15</option>
@@ -771,7 +839,7 @@ const CrmProspectsManagement = () => {
           </Form.Select>
           <span className="text-muted small">entries</span>
         </div>
-        
+
         <div className="text-muted small">
           Showing {startRow} to {endRow} of {totalRecords} prospects
         </div>
@@ -789,11 +857,13 @@ const CrmProspectsManagement = () => {
             size="sm"
             variant="outline-secondary"
             disabled={currentPage === 1}
-            onClick={() => setPagination({ ...pagination, currentPage: currentPage - 1 })}
+            onClick={() =>
+              setPagination({ ...pagination, currentPage: currentPage - 1 })
+            }
           >
             <ChevronLeft size={14} />
           </Button>
-          
+
           {[...Array(totalPages)].map((_, index) => {
             const pageNum = index + 1;
             if (
@@ -805,23 +875,36 @@ const CrmProspectsManagement = () => {
                 <Button
                   key={pageNum}
                   size="sm"
-                  variant={currentPage === pageNum ? 'primary' : 'outline-secondary'}
-                  onClick={() => setPagination({ ...pagination, currentPage: pageNum })}
+                  variant={
+                    currentPage === pageNum ? "primary" : "outline-secondary"
+                  }
+                  onClick={() =>
+                    setPagination({ ...pagination, currentPage: pageNum })
+                  }
                 >
                   {pageNum}
                 </Button>
               );
-            } else if (pageNum === currentPage - 2 || pageNum === currentPage + 2) {
-              return <span key={pageNum} className="px-2">...</span>;
+            } else if (
+              pageNum === currentPage - 2 ||
+              pageNum === currentPage + 2
+            ) {
+              return (
+                <span key={pageNum} className="px-2">
+                  ...
+                </span>
+              );
             }
             return null;
           })}
-          
+
           <Button
             size="sm"
             variant="outline-secondary"
             disabled={currentPage === totalPages}
-            onClick={() => setPagination({ ...pagination, currentPage: currentPage + 1 })}
+            onClick={() =>
+              setPagination({ ...pagination, currentPage: currentPage + 1 })
+            }
           >
             <ChevronRight size={14} />
           </Button>
@@ -829,7 +912,9 @@ const CrmProspectsManagement = () => {
             size="sm"
             variant="outline-secondary"
             disabled={currentPage === totalPages}
-            onClick={() => setPagination({ ...pagination, currentPage: totalPages })}
+            onClick={() =>
+              setPagination({ ...pagination, currentPage: totalPages })
+            }
           >
             <ChevronsRight size={14} />
           </Button>
@@ -839,104 +924,103 @@ const CrmProspectsManagement = () => {
   };
 
   // Fetch prospects data
-  const fetchCrmData = useCallback(
-    async () => {
-      // Increment request ID to track the latest request
-      requestIdRef.current += 1;
-      const currentRequestId = requestIdRef.current;
+  const fetchCrmData = useCallback(async () => {
+    // Increment request ID to track the latest request
+    requestIdRef.current += 1;
+    const currentRequestId = requestIdRef.current;
 
-      setLoading(true);
-      try {
-        const params: any = {
-          page: pagination.currentPage,
-          per_page: pagination.rowsPerPage,
-        };
+    setLoading(true);
+    try {
+      const params: any = {
+        page: pagination.currentPage,
+        per_page: pagination.rowsPerPage,
+      };
 
-        if (memoizedFilters.search) {
-          params.search = memoizedFilters.search;
-        }
+      if (memoizedFilters.search) {
+        params.search = memoizedFilters.search;
+      }
 
-        if (
-          memoizedFilters.campaign_id &&
-          memoizedFilters.campaign_id.length > 0
-        ) {
-          params.campaign_ids = memoizedFilters.campaign_id;
-        }
+      if (
+        memoizedFilters.campaign_id &&
+        memoizedFilters.campaign_id.length > 0
+      ) {
+        params.campaign_ids = memoizedFilters.campaign_id;
+      }
 
-        if (memoizedFilters.tags && memoizedFilters.tags.length > 0) {
-          params.tags = memoizedFilters.tags;
-        }
+      if (memoizedFilters.tags && memoizedFilters.tags.length > 0) {
+        params.tags = memoizedFilters.tags;
+      }
 
-        if (memoizedFilters.assignment_status) {
-          params.assignment_status = memoizedFilters.assignment_status;
-        }
+      if (memoizedFilters.assignment_status) {
+        params.assignment_status = memoizedFilters.assignment_status;
+      }
 
-        if (
-          memoizedFilters.user_extension &&
-          memoizedFilters.user_extension.length > 0
-        ) {
-          params.user_extensions = memoizedFilters.user_extension;
-        }
+      if (
+        memoizedFilters.user_extension &&
+        memoizedFilters.user_extension.length > 0
+      ) {
+        params.user_extensions = memoizedFilters.user_extension;
+      }
 
-        if (
-          memoizedFilters.is_viewed !== undefined &&
-          memoizedFilters.is_viewed !== ""
-        ) {
-          params.is_viewed = memoizedFilters.is_viewed;
-        }
+      if (
+        memoizedFilters.is_viewed !== undefined &&
+        memoizedFilters.is_viewed !== ""
+      ) {
+        params.is_viewed = memoizedFilters.is_viewed;
+      }
 
-        if (memoizedFilters.start_date) {
-          params.date_from = memoizedFilters.start_date;
-        }
+      if (memoizedFilters.start_date) {
+        params.date_from = memoizedFilters.start_date;
+      }
 
-        if (memoizedFilters.end_date) {
-          params.date_to = memoizedFilters.end_date;
-        }
+      if (memoizedFilters.end_date) {
+        params.date_to = memoizedFilters.end_date;
+      }
 
-        if (memoizedFilters.has_scheduled_calls !== undefined) {
-          params.has_scheduled_calls = memoizedFilters.has_scheduled_calls;
-        }
+      if (memoizedFilters.has_scheduled_calls !== undefined) {
+        params.has_scheduled_calls = memoizedFilters.has_scheduled_calls;
+      }
 
-        if (memoizedFilters.has_tickets !== undefined) {
-          params.has_tickets = memoizedFilters.has_tickets;
-        }
+      if (memoizedFilters.has_tickets !== undefined) {
+        params.has_tickets = memoizedFilters.has_tickets;
+      }
 
-        params.module_slug = ModuleSlug.CRM_DATA_MANAGEMENT;
+      params.module_slug = ModuleSlug.CRM_DATA_MANAGEMENT;
 
-        const response = await getCrmData(params);
-        
-        // Only update state if this is still the latest request
-        if (currentRequestId !== requestIdRef.current) {
-          return;
-        }
-        
-        setDataList(response.data || []);
-        setTotalRecords(response.pagination.total || 0);
-        setMetrics(response.metrics || {
+      const response = await getCrmData(params);
+
+      // Only update state if this is still the latest request
+      if (currentRequestId !== requestIdRef.current) {
+        return;
+      }
+
+      setDataList(response.data || []);
+      setTotalRecords(response.pagination.total || 0);
+      setMetrics(
+        response.metrics || {
           assigned_records: 0,
           unassigned_records: 0,
           scheduled_records: 0,
           not_scheduled_records: 0,
           scheduled_next_hour_records: 0,
           scheduled_next_24_hours_records: 0,
-        });
-      } catch (error: any) {
-        // Only handle error if this is still the latest request
-        if (currentRequestId !== requestIdRef.current) {
-          return;
         }
-        console.error("Failed to fetch CRM data:", error);
-        setDataList([]);
-        setTotalRecords(0);
-      } finally {
-        // Only set loading to false if this is still the current request
-        if (currentRequestId === requestIdRef.current) {
-          setLoading(false);
-        }
+      );
+    } catch (error: any) {
+      // Only handle error if this is still the latest request
+      if (currentRequestId !== requestIdRef.current) {
+        return;
       }
-    },
-    [memoizedFilters, pagination]
-  );
+      console.error("Failed to fetch CRM data:", error);
+      setDataList([]);
+      setTotalRecords(0);
+    } finally {
+      // Only set loading to false if this is still the current request
+      if (currentRequestId === requestIdRef.current) {
+        setLoading(false);
+      }
+    }
+  }, [memoizedFilters, pagination]);
 
   // Load data when filters or pagination changes
   useEffect(() => {
@@ -945,7 +1029,10 @@ const CrmProspectsManagement = () => {
 
   // Save selected columns to localStorage
   useEffect(() => {
-    localStorage.setItem('crmDataSelectedColumns', JSON.stringify(selectedColumns));
+    localStorage.setItem(
+      "crmDataSelectedColumns",
+      JSON.stringify(selectedColumns)
+    );
   }, [selectedColumns]);
 
   // CSV validation function
@@ -1020,7 +1107,7 @@ const CrmProspectsManagement = () => {
 
   // Upload CSV file
   const handleUpload = async () => {
-    if (!session?.user?.permissions?.includes('add-crm-data-management')) {
+    if (!session?.user?.permissions?.includes("add-crm-data-management")) {
       toast.error("You don't have permission to upload data");
       return;
     }
@@ -1052,7 +1139,7 @@ const CrmProspectsManagement = () => {
         selectedFile,
         [], // No campaigns selected
         tagValues,
-        false // No auto-assignment
+        true // No auto-assignment
       );
 
       clearInterval(progressInterval);
@@ -1074,18 +1161,26 @@ const CrmProspectsManagement = () => {
 
       // Show success message
       if (processedCount > 0) {
-        let successMessage = `Successfully processed ${processedCount} record${processedCount !== 1 ? 's' : ''}`;
-        
+        let successMessage = `Successfully processed ${processedCount} record${
+          processedCount !== 1 ? "s" : ""
+        }`;
+
         if (validationFailures > 0) {
-          successMessage += ` with ${validationFailures} validation failure${validationFailures !== 1 ? 's' : ''}`;
+          successMessage += ` with ${validationFailures} validation failure${
+            validationFailures !== 1 ? "s" : ""
+          }`;
         }
-        
+
         setSuccessModalTitle("Upload Successful");
         setSuccessModalDescription(successMessage);
         setShowSuccessfulModal(true);
       } else if (validationFailures > 0) {
         // All records failed validation
-        toast.error(`Upload failed: All ${validationFailures} record${validationFailures !== 1 ? 's' : ''} failed validation`);
+        toast.error(
+          `Upload failed: All ${validationFailures} record${
+            validationFailures !== 1 ? "s" : ""
+          } failed validation`
+        );
       } else {
         toast.error("Upload completed but no records were processed");
       }
@@ -1099,7 +1194,10 @@ const CrmProspectsManagement = () => {
       setRefreshKey((prev) => prev + 1);
     } catch (error: any) {
       console.error("Upload error:", error);
-      const errorMessage = error?.response?.data?.message || error?.message || "Failed to upload file. Please try again.";
+      const errorMessage =
+        error?.response?.data?.message ||
+        error?.message ||
+        "Failed to upload file. Please try again.";
       toast.error(errorMessage);
       setUploadProgress(0);
     } finally {
@@ -1201,7 +1299,6 @@ const CrmProspectsManagement = () => {
     }
   }, [calculateEntryCounts]);
 
-
   const [showSuccessfulModal, setShowSuccessfulModal] = useState(false);
   const [successModalTitle, setSuccessModalTitle] = useState("");
   const [successModalDescription, setSuccessModalDescription] = useState("");
@@ -1293,8 +1390,6 @@ const CrmProspectsManagement = () => {
       setShowSuccessfulModal(true);
       setSuccessModalTitle("Data Assignment Successful!");
       setSuccessModalDescription("The data has been successfully assigned.");
-
-
 
       setRefreshKey((prev) => prev + 1);
     } catch (error: any) {
@@ -1417,13 +1512,17 @@ const CrmProspectsManagement = () => {
     // If lead generation is selected, redirect to create lead page with prospect data
     if (afterCallData.generateLead === "yes" && selectedDataItem) {
       // Show success message and navigate to create lead page
-      toast.success("Redirecting to create lead page with pre-filled prospect data...");
+      toast.success(
+        "Redirecting to create lead page with pre-filled prospect data..."
+      );
       window.location.href = `/crm/leads/create?crm_data_id=${selectedDataItem.id}`;
     } else {
       toast.success("After call data saved successfully! No lead generated.");
       setShowSuccessfulModal(true);
       setSuccessModalTitle("After Call Successful!");
-      setSuccessModalDescription("The after call data has been successfully saved.");
+      setSuccessModalDescription(
+        "The after call data has been successfully saved."
+      );
     }
   }, [afterCallData, selectedDataItem, handleAfterCallModalClose]);
 
@@ -1481,7 +1580,8 @@ const CrmProspectsManagement = () => {
       await scheduleCall(
         selectedEntryForSchedule.id,
         scheduledDateTime,
-        userExtension
+        userExtension,
+        scheduleData.notes
       );
       setRefreshKey((prev) => prev + 1);
       handleScheduleModalClose();
@@ -1584,7 +1684,9 @@ const CrmProspectsManagement = () => {
           return (
             <div>
               {props?.campaign ? (
-                <span className="status-badge primary">{props.campaign?.name}</span>
+                <span className="status-badge primary">
+                  {props.campaign?.name}
+                </span>
               ) : (
                 <span className="status-badge info">No Campaign</span>
               )}
@@ -1598,23 +1700,21 @@ const CrmProspectsManagement = () => {
         selector: (row: any) => row.last_called_at,
         sortable: true,
         cell: (props: any) => {
-          
           // Generate random date within last week
           const now = moment();
-          const oneWeekAgo = moment().subtract(7, 'days');
+          const oneWeekAgo = moment().subtract(7, "days");
           const randomDays = Math.floor(Math.random() * 7);
           const randomHours = Math.floor(Math.random() * 24);
           const randomMinutes = Math.floor(Math.random() * 60);
-          
+
           const lastCalled = oneWeekAgo
-            .add(randomDays, 'days')
-            .add(randomHours, 'hours')
-            .add(randomMinutes, 'minutes')
+            .add(randomDays, "days")
+            .add(randomHours, "hours")
+            .add(randomMinutes, "minutes")
             .toISOString();
-            
+
           return (
             <div className="d-flex align-items-center">
-             
               <span className="">
                 {moment(lastCalled).format("MMM DD, HH:mm")}
               </span>
@@ -1693,7 +1793,6 @@ const CrmProspectsManagement = () => {
 
           return (
             <div className="d-flex align-items-center">
-             
               <span
                 className={`status-badge ${
                   isOverdue ? "danger" : isNextHour ? "warning" : ""
@@ -1710,27 +1809,28 @@ const CrmProspectsManagement = () => {
         },
       },
 
-      ...(session?.user?.permissions?.includes('view-crm-data-management') ? [
-      {
-        key: "view_action",
-        name: "View",
-        selector: (row: any) => row.id,
-        sortable: false,
-        cell: (props: any) => (
-          <Button
-            variant="primary"
-            className="app-button"
-            size="sm"
-            onClick={() => handleViewData(props)}
-            title="View Details"
-          >
-            <FiEye size={14} />
-          </Button>
-        ),
-      },
-      ] : []),
+      ...(session?.user?.permissions?.includes("view-crm-data-management")
+        ? [
+            {
+              key: "view_action",
+              name: "View",
+              selector: (row: any) => row.id,
+              sortable: false,
+              cell: (props: any) => (
+                <Button
+                  variant="primary"
+                  className="app-button"
+                  size="sm"
+                  onClick={() => handleViewData(props)}
+                  title="View Details"
+                >
+                  <FiEye size={14} />
+                </Button>
+              ),
+            },
+          ]
+        : []),
 
-     
       {
         key: "call_action",
         name: "Call",
@@ -1738,61 +1838,63 @@ const CrmProspectsManagement = () => {
         sortable: false,
         cell: (props: any) => (
           <div className="d-flex gap-1">
-           
-           {session?.user?.permissions?.includes('call-service-crm-data-management') && (
-            <Button
-              variant="success"
-              className="app-button"
-              size="sm"
-              onClick={() => handleCallClick(props)}
-              title="Call Now"
-            >
-              <FiPhone size={14} />
-            </Button>
-            )}
-            
- <Dropdown>
-            <Dropdown.Toggle
-              variant="outline-secondary"
-              size="sm"
-              className="app-button"
-              id={`dropdown-${props.id}`}
-            >
-              <FiMoreVertical size={14} />
-            </Dropdown.Toggle>
-            <Dropdown.Menu>
-              {session?.user?.permissions?.includes('call-service-crm-data-management') && (
-                <>
-                  {props.scheduled_call_at ? (
-                    <Dropdown.Item onClick={() => handleUnscheduleCall(props)}>
-                      <FiX size={14} className="me-2" />
-                      Unschedule Call
-                    </Dropdown.Item>
-                  ) : (
-                    <Dropdown.Item onClick={() => handleScheduleCall(props)}>
-                      <FiCalendar size={14} className="me-2" />
-                      Schedule Call
-                    </Dropdown.Item>
-                  )}
-                  <Dropdown.Divider />
-                </>
-              )}
-              <Dropdown.Item
-                onClick={() => {
-                  window.location.href = `/crm/leads/create?crm_data_id=${props.id}`;
-                }}
+            {session?.user?.permissions?.includes(
+              "call-service-crm-data-management"
+            ) && (
+              <Button
+                variant="success"
+                className="app-button"
+                size="sm"
+                onClick={() => handleCallClick(props)}
+                title="Call Now"
               >
-                <FiTarget size={14} className="me-2" />
-                Convert to Lead
-              </Dropdown.Item>
-            </Dropdown.Menu>
-          </Dropdown>
-       
+                <FiPhone size={14} />
+              </Button>
+            )}
+
+            <Dropdown>
+              <Dropdown.Toggle
+                variant="outline-secondary"
+                size="sm"
+                className="app-button"
+                id={`dropdown-${props.id}`}
+              >
+                <FiMoreVertical size={14} />
+              </Dropdown.Toggle>
+              <Dropdown.Menu>
+                {session?.user?.permissions?.includes(
+                  "call-service-crm-data-management"
+                ) && (
+                  <>
+                    {props.scheduled_call_at ? (
+                      <Dropdown.Item
+                        onClick={() => handleUnscheduleCall(props)}
+                      >
+                        <FiX size={14} className="me-2" />
+                        Unschedule Call
+                      </Dropdown.Item>
+                    ) : (
+                      <Dropdown.Item onClick={() => handleScheduleCall(props)}>
+                        <FiCalendar size={14} className="me-2" />
+                        Schedule Call
+                      </Dropdown.Item>
+                    )}
+                    <Dropdown.Divider />
+                  </>
+                )}
+                <Dropdown.Item
+                  onClick={() => {
+                    window.location.href = `/crm/leads/create?crm_data_id=${props.id}`;
+                  }}
+                >
+                  <FiTarget size={14} className="me-2" />
+                  Convert to Lead
+                </Dropdown.Item>
+              </Dropdown.Menu>
+            </Dropdown>
           </div>
         ),
       },
- 
-      
 
       {
         key: "tags",
@@ -1846,13 +1948,15 @@ const CrmProspectsManagement = () => {
     ]
   );
 
-  if (!session?.user?.permissions?.includes('list-crm-data-management')) {
+  if (!session?.user?.permissions?.includes("list-crm-data-management")) {
     return null;
   }
 
   return (
     <React.Fragment>
-      <style dangerouslySetInnerHTML={{__html: `
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
         .prospects-table-wrapper {
           width: 100%;
           overflow: hidden;
@@ -1899,7 +2003,9 @@ const CrmProspectsManagement = () => {
         .timeline-item:last-child .timeline-line {
           display: none;
         }
-      `}} />
+      `,
+        }}
+      />
       <BreadcrumbItem
         mainTitle="CRM"
         mainLink="/crm/dashboard"
@@ -1909,19 +2015,24 @@ const CrmProspectsManagement = () => {
       <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4">
         <div>
           <h2 className="mb-1 fw-bold">Prospects</h2>
-          <p className="text-muted mb-0">Manage your prospects and schedule calls</p>
+          <p className="text-muted mb-0">
+            Manage your prospects and schedule calls
+          </p>
         </div>
         <div className="d-flex flex-wrap gap-2">
-          <Button 
+          <Button
             variant={showProspectsAnalytics ? "primary" : "outline-secondary"}
             onClick={() => setShowProspectsAnalytics(!showProspectsAnalytics)}
           >
             <FiDatabase size={16} className="me-2" />
-            {showProspectsAnalytics ? 'Hide Analytics' : 'Show Analytics'}
+            {showProspectsAnalytics ? "Hide Analytics" : "Show Analytics"}
           </Button>
-     
-          {session?.user?.permissions?.includes('add-crm-data-management') && (
-            <Button variant="outline-primary" onClick={() => setShowUploadModal(true)}>
+
+          {session?.user?.permissions?.includes("add-crm-data-management") && (
+            <Button
+              variant="outline-primary"
+              onClick={() => setShowUploadModal(true)}
+            >
               <Download size={16} className="me-2" />
               Upload CSV
             </Button>
@@ -1936,7 +2047,7 @@ const CrmProspectsManagement = () => {
             {/* Summary Stats Grid - Using KPICard design */}
             <Row className="mb-2">
               <Col xl={3} lg={4} md={6} className="mb-3">
-                <KPICard 
+                <KPICard
                   title="Total Records"
                   value={totalRecords}
                   icon={<Users size={24} />}
@@ -1944,7 +2055,7 @@ const CrmProspectsManagement = () => {
                 />
               </Col>
               <Col xl={3} lg={4} md={6} className="mb-3">
-                <KPICard 
+                <KPICard
                   title="Scheduled"
                   value={metrics.scheduled_records}
                   icon={<Calendar size={24} />}
@@ -1952,7 +2063,7 @@ const CrmProspectsManagement = () => {
                 />
               </Col>
               <Col xl={3} lg={4} md={6} className="mb-3">
-                <KPICard 
+                <KPICard
                   title="Not Scheduled"
                   value={metrics.not_scheduled_records}
                   icon={<XCircle size={24} />}
@@ -1960,7 +2071,7 @@ const CrmProspectsManagement = () => {
                 />
               </Col>
               <Col xl={3} lg={4} md={6} className="mb-3">
-                <KPICard 
+                <KPICard
                   title="Next Hour"
                   value={metrics.scheduled_next_hour_records}
                   icon={<ClockIcon size={24} />}
@@ -1970,16 +2081,16 @@ const CrmProspectsManagement = () => {
               {showAllProspectStats && (
                 <>
                   <Col xl={3} lg={4} md={6} className="mb-3">
-                    <KPICard 
+                    <KPICard
                       title="Next 24h"
                       value={metrics.scheduled_next_24_hours_records}
                       icon={<Calendar size={24} />}
                       color="warning"
                     />
                   </Col>
-                 
+
                   <Col xl={3} lg={4} md={6} className="mb-3">
-                    <KPICard 
+                    <KPICard
                       title="Assigned Entries"
                       value={metrics.assigned_records}
                       icon={<UserPlus size={24} />}
@@ -1987,7 +2098,7 @@ const CrmProspectsManagement = () => {
                     />
                   </Col>
                   <Col xl={3} lg={4} md={6} className="mb-3">
-                    <KPICard 
+                    <KPICard
                       title="Unassigned Entries"
                       value={metrics.unassigned_records}
                       icon={<AlertCircleIcon size={24} />}
@@ -1997,10 +2108,10 @@ const CrmProspectsManagement = () => {
                 </>
               )}
             </Row>
-            
+
             <div className="text-center mb-4">
-              <Button 
-                variant="link" 
+              <Button
+                variant="link"
                 onClick={() => setShowAllProspectStats(!showAllProspectStats)}
                 className="text-decoration-none"
               >
@@ -2019,16 +2130,32 @@ const CrmProspectsManagement = () => {
             </div>
           </>
         )}
-       
 
-       
         {/* Filter Bar */}
-        {session?.user?.permissions?.includes('list-crm-data-management') && (
+        {session?.user?.permissions?.includes("list-crm-data-management") && (
           <FilterBar
             quickFilters={[
-              { id: 'all', label: 'All Prospects', color: '#6c757d', activeColor: '#0d6efd', icon: <Users size={16} /> },
-              { id: 'scheduled', label: 'Scheduled', color: '#20c997', activeColor: '#20c997', icon: <FiCalendar size={16} /> },
-              { id: 'has_leads', label: 'Has Leads', color: '#0dcaf0', activeColor: '#0dcaf0', icon: <FiTarget size={16} /> },
+              {
+                id: "all",
+                label: "All Prospects",
+                color: "#6c757d",
+                activeColor: "#0d6efd",
+                icon: <Users size={16} />,
+              },
+              {
+                id: "scheduled",
+                label: "Scheduled",
+                color: "#20c997",
+                activeColor: "#20c997",
+                icon: <FiCalendar size={16} />,
+              },
+              {
+                id: "has_leads",
+                label: "Converted to Leads",
+                color: "#0dcaf0",
+                activeColor: "#0dcaf0",
+                icon: <FiTarget size={16} />,
+              },
             ]}
             activeFilter={activeFilter}
             onFilterChange={(filterId) => {
@@ -2039,127 +2166,183 @@ const CrmProspectsManagement = () => {
             onSearchChange={(value) => {
               setProspectsSearch(value);
             }}
-            onSearch={() => handleFiltersChange({...currentFilters, search: prospectsSearch})}
+            onSearch={() =>
+              handleFiltersChange({
+                ...currentFilters,
+                search: prospectsSearch,
+              })
+            }
             searchPlaceholder="Search prospects by name, phone, email..."
             showAdvancedFilters={showAdvancedFilters}
-            onToggleAdvancedFilters={() => setShowAdvancedFilters(!showAdvancedFilters)}
+            onToggleAdvancedFilters={() =>
+              setShowAdvancedFilters(!showAdvancedFilters)
+            }
             advancedFilterCount={
               (prospectsFilters.assignedTo !== null ? 1 : 0) +
-              (prospectsFilters.campaigns !== null && prospectsFilters.campaigns.length > 0 ? 1 : 0)
+              (prospectsFilters.campaigns !== null &&
+              prospectsFilters.campaigns.length > 0
+                ? 1
+                : 0)
             }
           />
         )}
 
         {/* Advanced Filters */}
-        {showAdvancedFilters && session?.user?.permissions?.includes('list-crm-data-management') && (
-          <Card className="border-0 shadow-sm mb-4">
-            <Card.Body>
-              <Row className="g-3 align-items-end">
-                <Col md={4}>
-                  <Form.Label className="small fw-bold mb-2">Assigned To</Form.Label>
-                  <Select
-                    options={extensions.map((ext: any) => ({ 
-                      value: ext.id || ext.extension, 
-                      label: ext.display_name || ext.name || ext.id || ext.extension
-                    }))}
-                    value={prospectsFilters.assignedTo ? (() => {
-                      const assignedToId = prospectsFilters.assignedTo;
-                      const ext = extensions.find((e: any) => (e.id || e.extension) === assignedToId);
-                      return ext ? { 
-                        value: assignedToId, 
-                        label: ext.display_name || ext.name || assignedToId 
-                      } : { value: assignedToId, label: assignedToId };
-                    })() : null}
-                    onChange={(selected) => {
-                      const assignedToValue = selected ? selected.value : null;
-                      setProspectsFilters(prev => ({
-                        ...prev,
-                        assignedTo: assignedToValue
-                      }));
-                      // Update currentFilters for API call
-                      handleFiltersChange({ 
-                        user_extension: assignedToValue ? [assignedToValue] : null 
-                      });
-                      // Reset to all when assigned filter changes
-                      setActiveFilter('all');
-                    }}
-                    placeholder="Select user..."
-                    styles={customSelectStyles}
-                    isClearable
-                  />
-                </Col>
-                <Col md={4}>
-                  <Form.Label className="small fw-bold mb-2">Campaigns</Form.Label>
-                  <Select
-                    isMulti
-                    options={availableCampaigns.map(c => ({ value: c.value, label: c.label }))}
-                    value={prospectsFilters.campaigns ? prospectsFilters.campaigns.map((campaignId: string) => {
-                      const campaign = availableCampaigns.find((c: any) => c.value === campaignId);
-                      return campaign ? { value: campaignId, label: campaign.label } : { value: campaignId, label: campaignId };
-                    }) : null}
-                    onChange={(selected) => {
-                      const campaignValues = selected ? selected.map((s: any) => s.value) : null;
-                      setProspectsFilters(prev => ({
-                        ...prev,
-                        campaigns: campaignValues
-                      }));
-                      // Update currentFilters for API call
-                      handleFiltersChange({ 
-                        campaign_id: campaignValues || null 
-                      });
-                      // Reset to all when campaign filter changes
-                      setActiveFilter('all');
-                    }}
-                    placeholder="Select campaigns..."
-                    styles={customSelectStyles}
-                    isClearable
-                  />
-                </Col>
-                <Col md={4}>
-                  <div className="d-flex gap-2">
-                    <Button
-                      variant="outline-secondary"
-                      className="d-flex align-items-center justify-content-center"
-                      onClick={() => {
-                        setProspectsFilters({
-                          assignedTo: null,
-                          campaigns: null,
+        {showAdvancedFilters &&
+          session?.user?.permissions?.includes("list-crm-data-management") && (
+            <Card className="border-0 shadow-sm mb-4">
+              <Card.Body>
+                <Row className="g-3 align-items-end">
+                  <Col md={4}>
+                    <Form.Label className="small fw-bold mb-2">
+                      Assigned To
+                    </Form.Label>
+                    <Select
+                      options={extensions.map((ext: any) => ({
+                        value: ext.id || ext.extension,
+                        label:
+                          ext.display_name ||
+                          ext.name ||
+                          ext.id ||
+                          ext.extension,
+                      }))}
+                      value={
+                        prospectsFilters.assignedTo
+                          ? (() => {
+                              const assignedToId = prospectsFilters.assignedTo;
+                              const ext = extensions.find(
+                                (e: any) =>
+                                  (e.id || e.extension) === assignedToId
+                              );
+                              return ext
+                                ? {
+                                    value: assignedToId,
+                                    label:
+                                      ext.display_name ||
+                                      ext.name ||
+                                      assignedToId,
+                                  }
+                                : { value: assignedToId, label: assignedToId };
+                            })()
+                          : null
+                      }
+                      onChange={(selected) => {
+                        const assignedToValue = selected
+                          ? selected.value
+                          : null;
+                        setProspectsFilters((prev) => ({
+                          ...prev,
+                          assignedTo: assignedToValue,
+                        }));
+                        // Update currentFilters for API call
+                        handleFiltersChange({
+                          user_extension: assignedToValue
+                            ? [assignedToValue]
+                            : null,
                         });
-                        setCurrentFilters({});
-                        setActiveFilter('all');
-                        setPagination((prev) => ({ ...prev, currentPage: 1 }));
-                        setRefreshKey(prev => prev + 1);
+                        // Reset to all when assigned filter changes
+                        setActiveFilter("all");
                       }}
-                    >
-                      Reset
-                    </Button>
-                  </div>
-                </Col>
-              </Row>
-            </Card.Body>
-          </Card>
-        )}
+                      placeholder="Select user..."
+                      styles={customSelectStyles}
+                      isClearable
+                    />
+                  </Col>
+                  <Col md={4}>
+                    <Form.Label className="small fw-bold mb-2">
+                      Campaigns
+                    </Form.Label>
+                    <Select
+                      isMulti
+                      options={availableCampaigns.map((c) => ({
+                        value: c.value,
+                        label: c.label,
+                      }))}
+                      value={
+                        prospectsFilters.campaigns
+                          ? prospectsFilters.campaigns.map(
+                              (campaignId: string) => {
+                                const campaign = availableCampaigns.find(
+                                  (c: any) => c.value === campaignId
+                                );
+                                return campaign
+                                  ? { value: campaignId, label: campaign.label }
+                                  : { value: campaignId, label: campaignId };
+                              }
+                            )
+                          : null
+                      }
+                      onChange={(selected) => {
+                        const campaignValues = selected
+                          ? selected.map((s: any) => s.value)
+                          : null;
+                        setProspectsFilters((prev) => ({
+                          ...prev,
+                          campaigns: campaignValues,
+                        }));
+                        // Update currentFilters for API call
+                        handleFiltersChange({
+                          campaign_id: campaignValues || null,
+                        });
+                        // Reset to all when campaign filter changes
+                        setActiveFilter("all");
+                      }}
+                      placeholder="Select campaigns..."
+                      styles={customSelectStyles}
+                      isClearable
+                    />
+                  </Col>
+                  <Col md={4}>
+                    <div className="d-flex gap-2">
+                      <Button
+                        variant="outline-secondary"
+                        className="d-flex align-items-center justify-content-center"
+                        onClick={() => {
+                          setProspectsFilters({
+                            assignedTo: null,
+                            campaigns: null,
+                          });
+                          setCurrentFilters({});
+                          setActiveFilter("all");
+                          setPagination((prev) => ({
+                            ...prev,
+                            currentPage: 1,
+                          }));
+                          setRefreshKey((prev) => prev + 1);
+                        }}
+                      >
+                        Reset
+                      </Button>
+                    </div>
+                  </Col>
+                </Row>
+              </Card.Body>
+            </Card>
+          )}
 
         {/* Bulk Actions and Column Customization */}
         <div className="d-flex justify-content-end gap-2 mb-3">
-          {/* Bulk Actions Dropdown - Only show when items are selected */}
-          {selectedItems.length > 0 && (
-            <Dropdown>
-              <Dropdown.Toggle variant="outline-primary" size="sm">
-                <CheckSquare size={16} className="me-2" />
-                Bulk Actions ({selectedItems.length})
-              </Dropdown.Toggle>
-              <Dropdown.Menu align="end">
-                <Dropdown.Item 
-                  onClick={() => setShowBulkDeleteModal(true)}
-                  className="d-flex align-items-center text-danger"
-                >
-                  <Trash2 size={14} className="me-2" />
-                  Delete Selected ({selectedItems.length})
-                </Dropdown.Item>
-              </Dropdown.Menu>
-            </Dropdown>
-          )}
+          {/* Bulk Actions Dropdown - Only show when items are selected and user has delete permission */}
+          {selectedItems.length > 0 &&
+            session?.user?.permissions?.includes(
+              "delete-crm-data-management"
+            ) && (
+              <Dropdown>
+                <Dropdown.Toggle variant="outline-primary" size="sm">
+                  <CheckSquare size={16} className="me-2" />
+                  Bulk Actions ({selectedItems.length})
+                </Dropdown.Toggle>
+                <Dropdown.Menu align="end">
+                  <Dropdown.Item
+                    onClick={() => setShowBulkDeleteModal(true)}
+                    className="d-flex align-items-center text-danger"
+                  >
+                    <Trash2 size={14} className="me-2" />
+                    Delete Selected ({selectedItems.length})
+                  </Dropdown.Item>
+                </Dropdown.Menu>
+              </Dropdown>
+            )}
 
           {/* Column Customization */}
           <Dropdown>
@@ -2167,17 +2350,20 @@ const CrmProspectsManagement = () => {
               <Layers size={16} className="me-2" />
               Customize Table
             </Dropdown.Toggle>
-            <Dropdown.Menu align="end" style={{ maxHeight: '300px', overflowY: 'auto' }}>
+            <Dropdown.Menu
+              align="end"
+              style={{ maxHeight: "300px", overflowY: "auto" }}
+            >
               {[
-                { key: 'name', label: 'Name' },
-                { key: 'phone', label: 'Phone' },
-                { key: 'user_extension', label: 'Assigned To' },
-                { key: 'campaign', label: 'Campaign' },
-                { key: 'last_called_at', label: 'Last Called' },
-                { key: 'last_call_end_reason', label: 'Last Call Status' },
-                { key: 'disposition', label: 'Disposition' },
-                { key: 'scheduled_call_at', label: 'Next Call Scheduled' },
-                { key: 'tags', label: 'Tags' }
+                { key: "name", label: "Name" },
+                { key: "phone", label: "Phone" },
+                { key: "user_extension", label: "Assigned To" },
+                { key: "campaign", label: "Campaign" },
+                { key: "last_called_at", label: "Last Called" },
+                { key: "last_call_end_reason", label: "Last Call Status" },
+                { key: "disposition", label: "Disposition" },
+                { key: "scheduled_call_at", label: "Next Call Scheduled" },
+                { key: "tags", label: "Tags" },
               ].map((col) => (
                 <Dropdown.Item key={col.key} as="div">
                   <Form.Check
@@ -2188,17 +2374,47 @@ const CrmProspectsManagement = () => {
                       if (e.target.checked) {
                         setSelectedColumns([...selectedColumns, col.key]);
                       } else {
-                        setSelectedColumns(selectedColumns.filter(c => c !== col.key));
+                        setSelectedColumns(
+                          selectedColumns.filter((c) => c !== col.key)
+                        );
                       }
                     }}
                   />
                 </Dropdown.Item>
               ))}
               <Dropdown.Divider />
-              <Dropdown.Item onClick={() => setSelectedColumns(['name', 'phone', 'user_extension', 'campaign', 'last_called_at', 'last_call_end_reason', 'disposition', 'scheduled_call_at', 'tags'])}>
+              <Dropdown.Item
+                onClick={() =>
+                  setSelectedColumns([
+                    "name",
+                    "phone",
+                    "user_extension",
+                    "campaign",
+                    "last_called_at",
+                    "last_call_end_reason",
+                    "disposition",
+                    "scheduled_call_at",
+                    "tags",
+                  ])
+                }
+              >
                 Select All
               </Dropdown.Item>
-              <Dropdown.Item onClick={() => setSelectedColumns(['name', 'phone', 'user_extension', 'campaign', 'last_called_at', 'last_call_end_reason', 'disposition', 'scheduled_call_at', 'tags'])}>
+              <Dropdown.Item
+                onClick={() =>
+                  setSelectedColumns([
+                    "name",
+                    "phone",
+                    "user_extension",
+                    "campaign",
+                    "last_called_at",
+                    "last_call_end_reason",
+                    "disposition",
+                    "scheduled_call_at",
+                    "tags",
+                  ])
+                }
+              >
                 Reset to Default
               </Dropdown.Item>
             </Dropdown.Menu>
@@ -2206,9 +2422,12 @@ const CrmProspectsManagement = () => {
         </div>
 
         {/* Prospects Table */}
-        {session?.user?.permissions?.includes('list-crm-data-management') && (
-          <Card className="border-0 shadow-sm prospects-table-wrapper" style={{ width: '100%' }}>
-            <Card.Body className="p-0" style={{ width: '100%' }}>
+        {session?.user?.permissions?.includes("list-crm-data-management") && (
+          <Card
+            className="border-0 shadow-sm prospects-table-wrapper"
+            style={{ width: "100%" }}
+          >
+            <Card.Body className="p-0" style={{ width: "100%" }}>
               {loading ? (
                 <div className="text-center py-5">
                   <Spinner animation="border" variant="primary" />
@@ -2217,98 +2436,135 @@ const CrmProspectsManagement = () => {
               ) : (
                 <>
                   <div className="table-responsive">
-                    <Table hover className="mb-0" style={{ width: '100%', margin: 0, tableLayout: 'auto' }}>
+                    <Table
+                      hover
+                      className="mb-0"
+                      style={{ width: "100%", margin: 0, tableLayout: "auto" }}
+                    >
                       <thead className="bg-light">
                         <tr>
-                          <th style={{ width: '20px', minWidth: "unset", paddingRight:"2px" }}>
-                            <Form.Check
-                              type="checkbox"
-                              checked={selectedItems.length > 0 && selectedItems.length === dataList.length}
-                              onChange={(e) => {
-                                if (e.target.checked) {
-                                  setSelectedItems(dataList.map(item => item.id));
-                                } else {
-                                  setSelectedItems([]);
-                                }
+                          {session?.user?.permissions?.includes(
+                            "delete-crm-data-management"
+                          ) && (
+                            <th
+                              style={{
+                                width: "20px",
+                                minWidth: "unset",
+                                paddingRight: "2px",
                               }}
-                            />
+                            >
+                              <Form.Check
+                                type="checkbox"
+                                checked={
+                                  selectedItems.length > 0 &&
+                                  selectedItems.length === dataList.length
+                                }
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setSelectedItems(
+                                      dataList.map((item) => item.id)
+                                    );
+                                  } else {
+                                    setSelectedItems([]);
+                                  }
+                                }}
+                              />
+                            </th>
+                          )}
+                          {selectedColumns.includes("name") && (
+                            <th
+                              style={{ cursor: "pointer", userSelect: "none" }}
+                              onClick={() => handleSort("name")}
+                            >
+                              Name {renderSortIcon("name")}
+                            </th>
+                          )}
+                          {selectedColumns.includes("phone") && (
+                            <th
+                              style={{ cursor: "pointer", userSelect: "none" }}
+                              onClick={() => handleSort("phone")}
+                            >
+                              Phone {renderSortIcon("phone")}
+                            </th>
+                          )}
+                          {selectedColumns.includes("user_extension") && (
+                            <th
+                              style={{ cursor: "pointer", userSelect: "none" }}
+                              onClick={() => handleSort("user_extension")}
+                            >
+                              Assigned To {renderSortIcon("user_extension")}
+                            </th>
+                          )}
+                          {selectedColumns.includes("campaign") && (
+                            <th
+                              style={{ cursor: "pointer", userSelect: "none" }}
+                              onClick={() => handleSort("campaign_id")}
+                            >
+                              Campaign {renderSortIcon("campaign_id")}
+                            </th>
+                          )}
+                          {selectedColumns.includes("last_called_at") && (
+                            <th
+                              style={{ cursor: "pointer", userSelect: "none" }}
+                              onClick={() => handleSort("last_called_at")}
+                            >
+                              Last Called {renderSortIcon("last_called_at")}
+                            </th>
+                          )}
+                          {selectedColumns.includes("last_call_end_reason") && (
+                            <th
+                              style={{ cursor: "pointer", userSelect: "none" }}
+                              onClick={() => handleSort("last_call_end_reason")}
+                            >
+                              Last Call Status{" "}
+                              {renderSortIcon("last_call_end_reason")}
+                            </th>
+                          )}
+                          {selectedColumns.includes("disposition") && (
+                            <th
+                              style={{ cursor: "pointer", userSelect: "none" }}
+                              onClick={() => handleSort("disposition")}
+                            >
+                              Disposition {renderSortIcon("disposition")}
+                            </th>
+                          )}
+                          {selectedColumns.includes("scheduled_call_at") && (
+                            <th
+                              style={{ cursor: "pointer", userSelect: "none" }}
+                              onClick={() => handleSort("scheduled_call_at")}
+                            >
+                              Next Call Scheduled{" "}
+                              {renderSortIcon("scheduled_call_at")}
+                            </th>
+                          )}
+                          {selectedColumns.includes("tags") && <th>Tags</th>}
+                          <th style={{ width: "120px", minWidth: "120px" }}>
+                            Actions
                           </th>
-                          {selectedColumns.includes('name') && (
-                            <th 
-                              style={{ cursor: 'pointer', userSelect: 'none' }}
-                              onClick={() => handleSort('name')}
-                            >
-                              Name {renderSortIcon('name')}
-                            </th>
-                          )}
-                          {selectedColumns.includes('phone') && (
-                            <th 
-                              style={{ cursor: 'pointer', userSelect: 'none' }}
-                              onClick={() => handleSort('phone')}
-                            >
-                              Phone {renderSortIcon('phone')}
-                            </th>
-                          )}
-                          {selectedColumns.includes('user_extension') && (
-                            <th 
-                              style={{ cursor: 'pointer', userSelect: 'none' }}
-                              onClick={() => handleSort('user_extension')}
-                            >
-                              Assigned To {renderSortIcon('user_extension')}
-                            </th>
-                          )}
-                          {selectedColumns.includes('campaign') && (
-                            <th 
-                              style={{ cursor: 'pointer', userSelect: 'none' }}
-                              onClick={() => handleSort('campaign_id')}
-                            >
-                              Campaign {renderSortIcon('campaign_id')}
-                            </th>
-                          )}
-                          {selectedColumns.includes('last_called_at') && (
-                            <th 
-                              style={{ cursor: 'pointer', userSelect: 'none' }}
-                              onClick={() => handleSort('last_called_at')}
-                            >
-                              Last Called {renderSortIcon('last_called_at')}
-                            </th>
-                          )}
-                          {selectedColumns.includes('last_call_end_reason') && (
-                            <th 
-                              style={{ cursor: 'pointer', userSelect: 'none' }}
-                              onClick={() => handleSort('last_call_end_reason')}
-                            >
-                              Last Call Status {renderSortIcon('last_call_end_reason')}
-                            </th>
-                          )}
-                          {selectedColumns.includes('disposition') && (
-                            <th 
-                              style={{ cursor: 'pointer', userSelect: 'none' }}
-                              onClick={() => handleSort('disposition')}
-                            >
-                              Disposition {renderSortIcon('disposition')}
-                            </th>
-                          )}
-                          {selectedColumns.includes('scheduled_call_at') && (
-                            <th 
-                              style={{ cursor: 'pointer', userSelect: 'none' }}
-                              onClick={() => handleSort('scheduled_call_at')}
-                            >
-                              Next Call Scheduled {renderSortIcon('scheduled_call_at')}
-                            </th>
-                          )}
-                          {selectedColumns.includes('tags') && <th>Tags</th>}
-                          <th style={{ width: '120px', minWidth: '120px' }}>Actions</th>
                         </tr>
                       </thead>
                       <tbody>
                         {(() => {
-                          const sorted = sortData(dataList, pagination.sortColumn, pagination.sortDirection);
-                          
+                          const sorted = sortData(
+                            dataList,
+                            pagination.sortColumn,
+                            pagination.sortDirection
+                          );
+
                           if (sorted.length === 0) {
                             return (
                               <tr>
-                                <td colSpan={selectedColumns.length + 2} className="text-center py-4 text-muted">
+                                <td
+                                  colSpan={
+                                    selectedColumns.length +
+                                    (session?.user?.permissions?.includes(
+                                      "delete-crm-data-management"
+                                    )
+                                      ? 2
+                                      : 1)
+                                  }
+                                  className="text-center py-4 text-muted"
+                                >
                                   No prospects found matching your criteria
                                 </td>
                               </tr>
@@ -2316,143 +2572,272 @@ const CrmProspectsManagement = () => {
                           }
 
                           return sorted.map((item: any) => {
-                            const endReason = callEndReasons.find((r) => r.value === ((item as any).last_call_end_reason || "answered")) || callEndReasons[0];
+                            const endReason =
+                              callEndReasons.find(
+                                (r) =>
+                                  r.value ===
+                                  ((item as any).last_call_end_reason ||
+                                    "answered")
+                              ) || callEndReasons[0];
                             const dispositions = [
-                              { value: "interested", label: "Interested", color: "success" },
-                              { value: "not_interested", label: "Not Interested", color: "danger" },
-                              { value: "callback_requested", label: "Callback Requested", color: "warning" },
-                              { value: "no_answer", label: "No Answer", color: "warning" },
+                              {
+                                value: "interested",
+                                label: "Interested",
+                                color: "success",
+                              },
+                              {
+                                value: "not_interested",
+                                label: "Not Interested",
+                                color: "danger",
+                              },
+                              {
+                                value: "callback_requested",
+                                label: "Callback Requested",
+                                color: "warning",
+                              },
+                              {
+                                value: "no_answer",
+                                label: "No Answer",
+                                color: "warning",
+                              },
                               { value: "busy", label: "Busy", color: "info" },
-                              { value: "do_not_call", label: "Do Not Call", color: "danger" },
-                              { value: "wrong_number", label: "Wrong Number", color: "info" },
-                              { value: "follow_up", label: "Follow Up", color: "primary" },
+                              {
+                                value: "do_not_call",
+                                label: "Do Not Call",
+                                color: "danger",
+                              },
+                              {
+                                value: "wrong_number",
+                                label: "Wrong Number",
+                                color: "info",
+                              },
+                              {
+                                value: "follow_up",
+                                label: "Follow Up",
+                                color: "primary",
+                              },
                             ];
-                            const randomDisposition = dispositions[Math.floor(Math.random() * dispositions.length)];
+                            const randomDisposition =
+                              dispositions[
+                                Math.floor(Math.random() * dispositions.length)
+                              ];
 
                             return (
                               <tr key={item.id}>
-                                <td style={{ width: '20px', minWidth: "unset"  ,paddingRight:"2px" }}>
-                                  <Form.Check
-                                    type="checkbox"
-                                    checked={selectedItems.includes(item.id)}
-                                    onChange={(e) => {
-                                      if (e.target.checked) {
-                                        setSelectedItems([...selectedItems, item.id]);
-                                      } else {
-                                        setSelectedItems(selectedItems.filter(id => id !== item.id));
-                                      }
+                                {session?.user?.permissions?.includes(
+                                  "delete-crm-data-management"
+                                ) && (
+                                  <td
+                                    style={{
+                                      width: "20px",
+                                      minWidth: "unset",
+                                      paddingRight: "2px",
                                     }}
-                                  />
-                                </td>
-                                {selectedColumns.includes('name') && (
-                                  <td className="fw-semibold">{item.name || 'N/A'}</td>
+                                  >
+                                    <Form.Check
+                                      type="checkbox"
+                                      checked={selectedItems.includes(item.id)}
+                                      onChange={(e) => {
+                                        if (e.target.checked) {
+                                          setSelectedItems([
+                                            ...selectedItems,
+                                            item.id,
+                                          ]);
+                                        } else {
+                                          setSelectedItems(
+                                            selectedItems.filter(
+                                              (id) => id !== item.id
+                                            )
+                                          );
+                                        }
+                                      }}
+                                    />
+                                  </td>
                                 )}
-                                {selectedColumns.includes('phone') && (
+                                {selectedColumns.includes("name") && (
+                                  <td className="fw-semibold">
+                                    {item.name || "N/A"}
+                                  </td>
+                                )}
+                                {selectedColumns.includes("phone") && (
                                   <td>
-                                    <Badge bg="info" className="bg-opacity-10 text-dark">
-                                      {item.phone || 'N/A'}
+                                    <Badge
+                                      bg="info"
+                                      className="bg-opacity-10 text-dark"
+                                    >
+                                      {item.phone || "N/A"}
                                     </Badge>
                                   </td>
                                 )}
-                                {selectedColumns.includes('user_extension') && (
+                                {selectedColumns.includes("user_extension") && (
                                   <td>
                                     {item.user_extension ? (
-                                      <Badge bg="success" className="bg-opacity-10 text-dark">
+                                      <Badge
+                                        bg="success"
+                                        className="bg-opacity-10 text-dark"
+                                      >
                                         {extensions.find(
-                                          (ext: any) => ext.id.toString() === item.user_extension?.toString()
+                                          (ext: any) =>
+                                            ext.id.toString() ===
+                                            item.user_extension?.toString()
                                         )?.display_name || item.user_extension}
                                       </Badge>
                                     ) : (
-                                      <Badge bg="secondary" className="bg-opacity-10 text-dark">Unassigned</Badge>
+                                      <Badge
+                                        bg="secondary"
+                                        className="bg-opacity-10 text-dark"
+                                      >
+                                        Unassigned
+                                      </Badge>
                                     )}
                                   </td>
                                 )}
-                                {selectedColumns.includes('campaign') && (
+                                {selectedColumns.includes("campaign") && (
                                   <td>
                                     {(item as any).campaign ? (
-                                      <Badge bg="primary" className="bg-opacity-10 text-dark">
+                                      <Badge
+                                        bg="primary"
+                                        className="bg-opacity-10 text-dark"
+                                      >
                                         {(item as any).campaign.name}
                                       </Badge>
                                     ) : (
-                                      <Badge bg="info" className="bg-opacity-10 text-dark">No Campaign</Badge>
+                                      <Badge
+                                        bg="info"
+                                        className="bg-opacity-10 text-dark"
+                                      >
+                                        No Campaign
+                                      </Badge>
                                     )}
                                   </td>
                                 )}
-                                {selectedColumns.includes('last_called_at') && (
+                                {selectedColumns.includes("last_called_at") && (
                                   <td>
-                                    {(item as any).last_called_at ? (
-                                      moment((item as any).last_called_at).format("MMM DD, HH:mm")
-                                    ) : (
-                                      '-'
-                                    )}
+                                    {(item as any).last_called_at
+                                      ? moment(
+                                          (item as any).last_called_at
+                                        ).format("MMM DD, HH:mm")
+                                      : "-"}
                                   </td>
                                 )}
-                                {selectedColumns.includes('last_call_end_reason') && (
+                                {selectedColumns.includes(
+                                  "last_call_end_reason"
+                                ) && (
                                   <td>
                                     {(item as any).last_call_end_reason ? (
-                                      <Badge bg={endReason.color as any} className="bg-opacity-10 text-dark">
+                                      <Badge
+                                        bg={endReason.color as any}
+                                        className="bg-opacity-10 text-dark"
+                                      >
                                         {endReason.label}
                                       </Badge>
-                                    ) : '-'}
+                                    ) : (
+                                      "-"
+                                    )}
                                   </td>
                                 )}
-                                {selectedColumns.includes('disposition') && (
+                                {selectedColumns.includes("disposition") && (
                                   <td>
                                     {(item as any).disposition ? (
-                                      <Badge bg={randomDisposition.color as any} className="bg-opacity-10 text-dark">
+                                      <Badge
+                                        bg={randomDisposition.color as any}
+                                        className="bg-opacity-10 text-dark"
+                                      >
                                         {randomDisposition.label}
                                       </Badge>
-                                    ) : '-'}
+                                    ) : (
+                                      "-"
+                                    )}
                                   </td>
                                 )}
-                                {selectedColumns.includes('scheduled_call_at') && (
+                                {selectedColumns.includes(
+                                  "scheduled_call_at"
+                                ) && (
                                   <td>
                                     {(item as any).scheduled_call_at ? (
                                       (() => {
-                                        const scheduledAt = (item as any).scheduled_call_at;
-                                        const isOverdue = moment(scheduledAt).isBefore(moment());
-                                        const isNextHour = moment(scheduledAt).isBefore(moment().add(1, "hour"));
+                                        const scheduledAt = (item as any)
+                                          .scheduled_call_at;
+                                        const isOverdue = moment(
+                                          scheduledAt
+                                        ).isBefore(moment());
+                                        const isNextHour = moment(
+                                          scheduledAt
+                                        ).isBefore(moment().add(1, "hour"));
                                         return (
-                                          <Badge 
-                                            bg={isOverdue ? 'danger' : isNextHour ? 'warning' : 'info'} 
+                                          <Badge
+                                            bg={
+                                              isOverdue
+                                                ? "danger"
+                                                : isNextHour
+                                                ? "warning"
+                                                : "info"
+                                            }
                                             className="bg-opacity-10 text-dark"
                                           >
-                                            {moment(scheduledAt).format("MMM DD, HH:mm")}
-                                            {isOverdue && <span className="ms-1 fw-bold">(Overdue)</span>}
-                                            {isNextHour && !isOverdue && <span className="ms-1 fw-bold">(Soon)</span>}
+                                            {moment(scheduledAt).format(
+                                              "MMM DD, HH:mm"
+                                            )}
+                                            {isOverdue && (
+                                              <span className="ms-1 fw-bold">
+                                                (Overdue)
+                                              </span>
+                                            )}
+                                            {isNextHour && !isOverdue && (
+                                              <span className="ms-1 fw-bold">
+                                                (Soon)
+                                              </span>
+                                            )}
                                           </Badge>
                                         );
                                       })()
                                     ) : (
-                                      <Badge bg="info" className="bg-opacity-10 text-dark">Not scheduled</Badge>
+                                      <Badge
+                                        bg="info"
+                                        className="bg-opacity-10 text-dark"
+                                      >
+                                        Not scheduled
+                                      </Badge>
                                     )}
                                   </td>
                                 )}
-                                {selectedColumns.includes('tags') && (
+                                {selectedColumns.includes("tags") && (
                                   <td>
                                     <div className="d-flex gap-1 flex-wrap">
-                                      {((item as any).tags || []).map((tag: any, idx: number) => (
-                                        <Badge key={idx} bg="secondary" className="bg-opacity-10 text-dark">
-                                          {tag.name || tag}
-                                        </Badge>
-                                      ))}
+                                      {((item as any).tags || []).map(
+                                        (tag: any, idx: number) => (
+                                          <Badge
+                                            key={idx}
+                                            bg="secondary"
+                                            className="bg-opacity-10 text-dark"
+                                          >
+                                            {tag.name || tag}
+                                          </Badge>
+                                        )
+                                      )}
                                     </div>
                                   </td>
                                 )}
-                                <td style={{ width: '120px', minWidth: '120px' }}>
+                                <td
+                                  style={{ width: "120px", minWidth: "120px" }}
+                                >
                                   <div className="d-flex gap-1">
-                                    {session?.user?.permissions?.includes('view-crm-data-management') && (
-                                      <Button 
-                                        variant="link" 
-                                        size="sm" 
-                                        className="p-1" 
+                                    {session?.user?.permissions?.includes(
+                                      "view-crm-data-management"
+                                    ) && (
+                                      <Button
+                                        variant="link"
+                                        size="sm"
+                                        className="p-1"
                                         title="View Details"
                                         onClick={() => handleViewData(item)}
                                       >
                                         <Eye size={16} />
                                       </Button>
                                     )}
-                                    {session?.user?.permissions?.includes('call-service-crm-data-management') && (
+                                    {session?.user?.permissions?.includes(
+                                      "call-service-crm-data-management"
+                                    ) && (
                                       <Button
                                         variant="link"
                                         size="sm"
@@ -2464,48 +2849,73 @@ const CrmProspectsManagement = () => {
                                       </Button>
                                     )}
                                     <Dropdown className="d-inline">
-                                      <Dropdown.Toggle 
+                                      <Dropdown.Toggle
                                         as={Button}
-                                        variant="link" 
-                                        size="sm" 
+                                        variant="link"
+                                        size="sm"
                                         className="p-1"
                                         title="More Actions"
                                       >
                                         <MoreVertical size={16} />
                                       </Dropdown.Toggle>
                                       <Dropdown.Menu align="end">
-                                        {session?.user?.permissions?.includes('call-service-crm-data-management') && (
+                                        {session?.user?.permissions?.includes(
+                                          "call-service-crm-data-management"
+                                        ) && (
                                           <>
                                             {(item as any).scheduled_call_at ? (
-                                              <Dropdown.Item onClick={() => handleUnscheduleCall(item)}>
-                                                <FiX size={14} className="me-2" />
+                                              <Dropdown.Item
+                                                onClick={() =>
+                                                  handleUnscheduleCall(item)
+                                                }
+                                              >
+                                                <FiX
+                                                  size={14}
+                                                  className="me-2"
+                                                />
                                                 Unschedule Call
                                               </Dropdown.Item>
                                             ) : (
-                                              <Dropdown.Item onClick={() => handleScheduleCall(item)}>
-                                                <FiCalendar size={14} className="me-2" />
+                                              <Dropdown.Item
+                                                onClick={() =>
+                                                  handleScheduleCall(item)
+                                                }
+                                              >
+                                                <FiCalendar
+                                                  size={14}
+                                                  className="me-2"
+                                                />
                                                 Schedule Call
                                               </Dropdown.Item>
                                             )}
                                             <Dropdown.Divider />
                                           </>
                                         )}
-                                        <Dropdown.Item onClick={() => {
-                                          window.location.href = `/crm/leads/create?crm_data_id=${item.id}`;
-                                        }}>
-                                          <FiTarget size={14} className="me-2" />
+                                        <Dropdown.Item
+                                          onClick={() => {
+                                            window.location.href = `/crm/leads/create?crm_data_id=${item.id}`;
+                                          }}
+                                        >
+                                          <FiTarget
+                                            size={14}
+                                            className="me-2"
+                                          />
                                           Convert to Lead
                                         </Dropdown.Item>
-                                        <Dropdown.Item onClick={() => {
+                                        {/* <Dropdown.Item onClick={() => {
                                           window.location.href = `tel:${item.phone}`;
                                         }}>
                                           <PhoneIcon size={14} className="me-2" />
                                           Call Prospect
-                                        </Dropdown.Item>
+                                        </Dropdown.Item> */}
                                         {(item as any).email && (
-                                          <Dropdown.Item onClick={() => {
-                                            window.location.href = `mailto:${(item as any).email}`;
-                                          }}>
+                                          <Dropdown.Item
+                                            onClick={() => {
+                                              window.location.href = `mailto:${
+                                                (item as any).email
+                                              }`;
+                                            }}
+                                          >
                                             <Mail size={14} className="me-2" />
                                             Send Email
                                           </Dropdown.Item>
@@ -2521,9 +2931,7 @@ const CrmProspectsManagement = () => {
                       </tbody>
                     </Table>
                   </div>
-                  <div className="p-3">
-                    {renderPaginationControls()}
-                  </div>
+                  <div className="p-3">{renderPaginationControls()}</div>
                 </>
               )}
             </Card.Body>
@@ -2532,215 +2940,274 @@ const CrmProspectsManagement = () => {
       </div>
 
       {/* Upload Modal */}
-      {session?.user?.permissions?.includes('add-crm-data-management') && (
-      <Modal show={showUploadModal} onHide={() => setShowUploadModal(false)} size="lg" centered>
-        <Modal.Header closeButton className="border-bottom bg-light">
-          <Modal.Title>Upload CSV - Import Prospects</Modal.Title>
-        </Modal.Header>
-        <Modal.Body className="p-4">
-          <div className="alert alert-info mb-4">
-            <AlertCircleIcon size={18} className="me-2" />
-            <strong>📋 Import Guidelines:</strong>
-            <ul className="mb-0 mt-2">
-              <li>
-                <strong>Headers:</strong> First row must contain column headers
-              </li>
-              <li>
-                <strong>Name Column:</strong> Include a "name" column (case insensitive) for first name and last name, or use separate "first name" and "last name" columns
-              </li>
-              <li>
-                <strong>Phone Column:</strong> Include a "phone" column (case insensitive) for contact information
-              </li>
-              <li>
-                <strong>File Size:</strong> Maximum 10MB per file
-              </li>
-              <li>
-                <strong>Formats:</strong> CSV files supported
-              </li>
-              <li>
-                <strong>Data Quality:</strong> Clean, valid data imports faster and works better
-              </li>
-            </ul>
-          </div>
-          <Form>
-            <Form.Group className="mb-3">
-              <Form.Label className="fw-semibold">Select CSV File <span className="text-danger">*</span></Form.Label>
-              <Form.Control 
-                type="file" 
-                accept=".csv" 
-                onChange={handleFileInputChange}
-              />
-              <Form.Text className="text-muted">
-                Supported formats: CSV
-              </Form.Text>
-            </Form.Group>
-
-            <Form.Group className="mb-3">
-              <Form.Label className="fw-semibold">Tags (Optional)</Form.Label>
-              <CreatableSelect
-                isMulti
-                value={fieldTags}
-                onChange={(selected) => setFieldTags(selected || [])}
-                options={availableTags}
-                placeholder="Add tags to organize and filter this data..."
-                styles={{
-                  control: (base) => ({
-                    ...base,
-                    borderColor: "#ced4da",
-                    boxShadow: "none",
-                    fontSize: "14px",
-                  }),
-                }}
-              />
-              <Form.Text className="text-muted">
-                Add descriptive tags to help categorize and filter your data later. You can create new tags by typing them.
-              </Form.Text>
-            </Form.Group>
-            <div className="alert alert-warning">
-              <small><strong>Note:</strong> The data will be uploaded even if some fields remain empty.</small>
+      {session?.user?.permissions?.includes("add-crm-data-management") && (
+        <Modal
+          show={showUploadModal}
+          onHide={() => setShowUploadModal(false)}
+          size="lg"
+          centered
+        >
+          <Modal.Header closeButton className="border-bottom bg-light">
+            <Modal.Title>Upload CSV - Import Prospects</Modal.Title>
+          </Modal.Header>
+          <Modal.Body className="p-4">
+            <div className="alert alert-info mb-4">
+              <AlertCircleIcon size={18} className="me-2" />
+              <strong>📋 Import Guidelines:</strong>
+              <ul className="mb-0 mt-2">
+                <li>
+                  <strong>Headers:</strong> First row must contain column
+                  headers
+                </li>
+                <li>
+                  <strong>Name Column:</strong> Include a "name" column (case
+                  insensitive) for first name and last name, or use separate
+                  "first name" and "last name" columns
+                </li>
+                <li>
+                  <strong>Phone Column:</strong> Include a "phone" column (case
+                  insensitive) for contact information. Phone must follow the
+                  E.164 format.
+                </li>
+                <li>
+                  <strong>File Size:</strong> Maximum 10MB per file
+                </li>
+                <li>
+                  <strong>Formats:</strong> CSV files supported
+                </li>
+                <li>
+                  <strong>Data Quality:</strong> Clean, valid data imports
+                  faster and works better
+                </li>
+              </ul>
             </div>
-          </Form>
-        </Modal.Body>
-        <Modal.Footer className="border-top">
-          <Button variant="secondary" onClick={() => setShowUploadModal(false)}>Cancel</Button>
-          <Button variant="primary" onClick={() => handleUpload()}>
-            <Download size={16} className="me-2" />
-            Upload & Import
-          </Button>
-        </Modal.Footer>
-      </Modal>
+            <Form>
+              <Form.Group className="mb-3">
+                <Form.Label className="fw-semibold">
+                  Select CSV File <span className="text-danger">*</span>
+                </Form.Label>
+                <Form.Control
+                  type="file"
+                  accept=".csv"
+                  onChange={handleFileInputChange}
+                />
+                <Form.Text className="text-muted">
+                  Supported formats: CSV
+                </Form.Text>
+              </Form.Group>
+
+              <Form.Group className="mb-3">
+                <Form.Label className="fw-semibold">Tags (Optional)</Form.Label>
+                <CreatableSelect
+                  isMulti
+                  value={fieldTags}
+                  onChange={(selected) => setFieldTags(selected || [])}
+                  options={availableTags}
+                  placeholder="Add tags to organize and filter this data..."
+                  styles={{
+                    control: (base) => ({
+                      ...base,
+                      borderColor: "#ced4da",
+                      boxShadow: "none",
+                      fontSize: "14px",
+                    }),
+                  }}
+                />
+                <Form.Text className="text-muted">
+                  Add descriptive tags to help categorize and filter your data
+                  later. You can create new tags by typing them.
+                </Form.Text>
+              </Form.Group>
+              <div className="alert alert-warning">
+                <small>
+                  <strong>Note:</strong> The data will be uploaded even if some
+                  fields remain empty.
+                </small>
+              </div>
+            </Form>
+          </Modal.Body>
+          <Modal.Footer className="border-top">
+            <Button
+              variant="secondary"
+              onClick={() => setShowUploadModal(false)}
+            >
+              Cancel
+            </Button>
+            <Button variant="primary" onClick={() => handleUpload()}>
+              <Download size={16} className="me-2" />
+              Upload & Import
+            </Button>
+          </Modal.Footer>
+        </Modal>
       )}
-
-
-
-
-
 
       {/* View Data Modal */}
       {selectedDataItem && (
-        <Modal show={showViewModal} onHide={() => setShowViewModal(false)} size="xl" centered>
+        <Modal
+          show={showViewModal}
+          onHide={() => setShowViewModal(false)}
+          size="xl"
+          centered
+        >
           {/* Custom Header */}
-          <div style={{
-            color: 'black',
-            padding: '30px',
-            position: 'relative',
-            borderTopLeftRadius: '8px',
-            borderTopRightRadius: '8px',
-            borderBottom: '1px solid #e5e7eb'
-          }}>
-            <button 
+          <div
+            style={{
+              color: "black",
+              padding: "30px",
+              position: "relative",
+              borderTopLeftRadius: "8px",
+              borderTopRightRadius: "8px",
+              borderBottom: "1px solid #e5e7eb",
+            }}
+          >
+            <button
               onClick={() => setShowViewModal(false)}
               style={{
-                position: 'absolute',
-                top: '20px',
-                right: '20px',
-                background: 'rgba(255,255,255,0.2)',
-                border: 'none',
-                color: 'black',
-                width: '36px',
-                height: '36px',
-                borderRadius: '50%',
-                cursor: 'pointer',
-                transition: 'all 0.3s',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
+                position: "absolute",
+                top: "20px",
+                right: "20px",
+                background: "rgba(255,255,255,0.2)",
+                border: "none",
+                color: "black",
+                width: "36px",
+                height: "36px",
+                borderRadius: "50%",
+                cursor: "pointer",
+                transition: "all 0.3s",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
               }}
               onMouseOver={(e) => {
-                e.currentTarget.style.background = 'rgba(255,255,255,0.3)';
-                e.currentTarget.style.transform = 'rotate(90deg)';
+                e.currentTarget.style.background = "rgba(255,255,255,0.3)";
+                e.currentTarget.style.transform = "rotate(90deg)";
               }}
               onMouseOut={(e) => {
-                e.currentTarget.style.background = 'rgba(255,255,255,0.2)';
-                e.currentTarget.style.transform = 'rotate(0deg)';
+                e.currentTarget.style.background = "rgba(255,255,255,0.2)";
+                e.currentTarget.style.transform = "rotate(0deg)";
               }}
             >
               <X size={20} />
             </button>
-            <h3 style={{ margin: 0, fontWeight: 600, fontSize: '24px' }}>
+            <h3 style={{ margin: 0, fontWeight: 600, fontSize: "24px" }}>
               {selectedDataItem.name || `Prospect #${selectedDataItem.id}`}
             </h3>
-            <p style={{ margin: '8px 0 0 0', opacity: 0.9, fontSize: '14px' }}>
+            <p style={{ margin: "8px 0 0 0", opacity: 0.9, fontSize: "14px" }}>
               Prospect Details
             </p>
           </div>
 
-          <Modal.Body style={{ padding: '30px' }}>
+          <Modal.Body style={{ padding: "30px" }}>
             {/* Prospect Information Section */}
-            <div style={{
-              fontSize: '16px',
-              fontWeight: 600,
-              color: '#1f2937',
-              marginBottom: '20px',
-              paddingBottom: '10px',
-              borderBottom: '2px solid #f8f9fa',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '10px'
-            }}>
-              <Target size={18} style={{ color: '#4680ff' }} />
+            <div
+              style={{
+                fontSize: "16px",
+                fontWeight: 600,
+                color: "#1f2937",
+                marginBottom: "20px",
+                paddingBottom: "10px",
+                borderBottom: "2px solid #f8f9fa",
+                display: "flex",
+                alignItems: "center",
+                gap: "10px",
+              }}
+            >
+              <Target size={18} style={{ color: "#4680ff" }} />
               Prospect Information
             </div>
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-              gap: '20px',
-              marginBottom: '30px'
-            }}>
-              <div style={{
-                background: '#f8f9fa',
-                padding: '16px',
-                borderRadius: '10px',
-                transition: 'all 0.3s'
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
+                gap: "20px",
+                marginBottom: "30px",
               }}
-              onMouseOver={(e) => {
-                e.currentTarget.style.background = '#e5e7eb';
-                e.currentTarget.style.transform = 'translateY(-2px)';
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.background = '#f8f9fa';
-                e.currentTarget.style.transform = 'translateY(0)';
-              }}>
-                <div style={{
-                  fontSize: '12px',
-                  fontWeight: 600,
-                  color: '#6b7280',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.5px',
-                  marginBottom: '6px'
-                }}>Name</div>
-                <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
-                  {selectedDataItem.name || 'N/A'}
+            >
+              <div
+                style={{
+                  background: "#f8f9fa",
+                  padding: "16px",
+                  borderRadius: "10px",
+                  transition: "all 0.3s",
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.background = "#e5e7eb";
+                  e.currentTarget.style.transform = "translateY(-2px)";
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.background = "#f8f9fa";
+                  e.currentTarget.style.transform = "translateY(0)";
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: "12px",
+                    fontWeight: 600,
+                    color: "#6b7280",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.5px",
+                    marginBottom: "6px",
+                  }}
+                >
+                  Name
+                </div>
+                <div
+                  style={{
+                    fontSize: "15px",
+                    color: "#1f2937",
+                    fontWeight: 500,
+                  }}
+                >
+                  {selectedDataItem.name || "N/A"}
                 </div>
               </div>
-              <div style={{
-                background: '#f8f9fa',
-                padding: '16px',
-                borderRadius: '10px',
-                transition: 'all 0.3s'
-              }}
-              onMouseOver={(e) => {
-                e.currentTarget.style.background = '#e5e7eb';
-                e.currentTarget.style.transform = 'translateY(-2px)';
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.background = '#f8f9fa';
-                e.currentTarget.style.transform = 'translateY(0)';
-              }}>
-                <div style={{
-                  fontSize: '12px',
-                  fontWeight: 600,
-                  color: '#6b7280',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.5px',
-                  marginBottom: '6px'
-                }}>Phone</div>
-                <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
-                  <PhoneIcon size={14} style={{ color: '#4680ff', marginRight: '6px', display: 'inline' }} />
-                  {selectedDataItem.phone || 'N/A'}
+              <div
+                style={{
+                  background: "#f8f9fa",
+                  padding: "16px",
+                  borderRadius: "10px",
+                  transition: "all 0.3s",
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.background = "#e5e7eb";
+                  e.currentTarget.style.transform = "translateY(-2px)";
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.background = "#f8f9fa";
+                  e.currentTarget.style.transform = "translateY(0)";
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: "12px",
+                    fontWeight: 600,
+                    color: "#6b7280",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.5px",
+                    marginBottom: "6px",
+                  }}
+                >
+                  Phone
+                </div>
+                <div
+                  style={{
+                    fontSize: "15px",
+                    color: "#1f2937",
+                    fontWeight: 500,
+                  }}
+                >
+                  <PhoneIcon
+                    size={14}
+                    style={{
+                      color: "#4680ff",
+                      marginRight: "6px",
+                      display: "inline",
+                    }}
+                  />
+                  {selectedDataItem.phone || "N/A"}
                 </div>
               </div>
-              <div style={{
+              {/* <div style={{
                 background: '#f8f9fa',
                 padding: '16px',
                 borderRadius: '10px',
@@ -2767,158 +3234,302 @@ const CrmProspectsManagement = () => {
                     {selectedDataItem.is_viewed ? 'Viewed' : 'New'}
                   </Badge>
                 </div>
-              </div>
-              <div style={{
-                background: '#f8f9fa',
-                padding: '16px',
-                borderRadius: '10px',
-                transition: 'all 0.3s'
-              }}
-              onMouseOver={(e) => {
-                e.currentTarget.style.background = '#e5e7eb';
-                e.currentTarget.style.transform = 'translateY(-2px)';
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.background = '#f8f9fa';
-                e.currentTarget.style.transform = 'translateY(0)';
-              }}>
-                <div style={{
-                  fontSize: '12px',
-                  fontWeight: 600,
-                  color: '#6b7280',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.5px',
-                  marginBottom: '6px'
-                }}>Assigned To</div>
-                <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
-                  <User size={14} style={{ color: '#4680ff', marginRight: '6px', display: 'inline' }} />
+              </div> */}
+              <div
+                style={{
+                  background: "#f8f9fa",
+                  padding: "16px",
+                  borderRadius: "10px",
+                  transition: "all 0.3s",
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.background = "#e5e7eb";
+                  e.currentTarget.style.transform = "translateY(-2px)";
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.background = "#f8f9fa";
+                  e.currentTarget.style.transform = "translateY(0)";
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: "12px",
+                    fontWeight: 600,
+                    color: "#6b7280",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.5px",
+                    marginBottom: "6px",
+                  }}
+                >
+                  Assigned To
+                </div>
+                <div
+                  style={{
+                    fontSize: "15px",
+                    color: "#1f2937",
+                    fontWeight: 500,
+                  }}
+                >
+                  <User
+                    size={14}
+                    style={{
+                      color: "#4680ff",
+                      marginRight: "6px",
+                      display: "inline",
+                    }}
+                  />
                   {selectedDataItem.user_extension
                     ? extensions.find(
                         (extension: any) =>
                           extension.id.toString() ===
                           selectedDataItem.user_extension?.toString()
                       )?.display_name || selectedDataItem.user_extension
-                    : 'Unassigned'}
+                    : "Unassigned"}
                 </div>
               </div>
-              <div style={{
-                background: '#f8f9fa',
-                padding: '16px',
-                borderRadius: '10px',
-                transition: 'all 0.3s'
-              }}
-              onMouseOver={(e) => {
-                e.currentTarget.style.background = '#e5e7eb';
-                e.currentTarget.style.transform = 'translateY(-2px)';
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.background = '#f8f9fa';
-                e.currentTarget.style.transform = 'translateY(0)';
-              }}>
-                <div style={{
-                  fontSize: '12px',
-                  fontWeight: 600,
-                  color: '#6b7280',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.5px',
-                  marginBottom: '6px'
-                }}>Campaign</div>
-                <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+              <div
+                style={{
+                  background: "#f8f9fa",
+                  padding: "16px",
+                  borderRadius: "10px",
+                  transition: "all 0.3s",
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.background = "#e5e7eb";
+                  e.currentTarget.style.transform = "translateY(-2px)";
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.background = "#f8f9fa";
+                  e.currentTarget.style.transform = "translateY(0)";
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: "12px",
+                    fontWeight: 600,
+                    color: "#6b7280",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.5px",
+                    marginBottom: "6px",
+                  }}
+                >
+                  Campaign
+                </div>
+                <div
+                  style={{
+                    fontSize: "15px",
+                    color: "#1f2937",
+                    fontWeight: 500,
+                  }}
+                >
                   {availableCampaigns.find(
                     (c) => c.value === selectedDataItem.campaign_id?.toString()
-                  )?.label || 'No Campaign'}
+                  )?.label || "No Campaign"}
                 </div>
               </div>
-              <div style={{
-                background: '#f8f9fa',
-                padding: '16px',
-                borderRadius: '10px',
-                transition: 'all 0.3s'
-              }}
-              onMouseOver={(e) => {
-                e.currentTarget.style.background = '#e5e7eb';
-                e.currentTarget.style.transform = 'translateY(-2px)';
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.background = '#f8f9fa';
-                e.currentTarget.style.transform = 'translateY(0)';
-              }}>
-                <div style={{
-                  fontSize: '12px',
-                  fontWeight: 600,
-                  color: '#6b7280',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.5px',
-                  marginBottom: '6px'
-                }}>Created Date</div>
-                <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
-                  <Calendar size={14} style={{ color: '#4680ff', marginRight: '6px', display: 'inline' }} />
-                  {selectedDataItem.created_at ? moment(selectedDataItem.created_at).format("MMM DD, YYYY") : 'N/A'}
+              <div
+                style={{
+                  background: "#f8f9fa",
+                  padding: "16px",
+                  borderRadius: "10px",
+                  transition: "all 0.3s",
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.background = "#e5e7eb";
+                  e.currentTarget.style.transform = "translateY(-2px)";
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.background = "#f8f9fa";
+                  e.currentTarget.style.transform = "translateY(0)";
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: "12px",
+                    fontWeight: 600,
+                    color: "#6b7280",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.5px",
+                    marginBottom: "6px",
+                  }}
+                >
+                  Created Date
+                </div>
+                <div
+                  style={{
+                    fontSize: "15px",
+                    color: "#1f2937",
+                    fontWeight: 500,
+                  }}
+                >
+                  <Calendar
+                    size={14}
+                    style={{
+                      color: "#4680ff",
+                      marginRight: "6px",
+                      display: "inline",
+                    }}
+                  />
+                  {selectedDataItem.created_at
+                    ? moment(selectedDataItem.created_at).format("MMM DD, YYYY")
+                    : "N/A"}
                 </div>
               </div>
             </div>
 
-            {/* Custom Data Fields Section */}
-            {selectedDataItem.data && Object.keys(selectedDataItem.data).length > 0 && (
-              <>
-                <div style={{
-                  fontSize: '16px',
-                  fontWeight: 600,
-                  color: '#1f2937',
-                  marginBottom: '20px',
-                  paddingBottom: '10px',
-                  borderBottom: '2px solid #f8f9fa',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '10px'
-                }}>
-                  <FileText size={18} style={{ color: '#4680ff' }} />
-                  Custom Data Fields
+            {selectedDataItem?.scheduled_call_at && selectedDataItem?.note && (
+              <React.Fragment>
+                <div
+                  style={{
+                    fontSize: "16px",
+                    fontWeight: 600,
+                    color: "#1f2937",
+                    marginBottom: "20px",
+                    paddingBottom: "10px",
+                    borderBottom: "2px solid #f8f9fa",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "10px",
+                  }}
+                >
+                  {/* <FileText size={18} style={{ color: '#4680ff' }} />
+                  Call Note */}
                 </div>
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-                  gap: '20px',
-                  marginBottom: '30px'
-                }}>
-                  {Object.entries(selectedDataItem.data).map(([key, value]) => (
-                    <div key={key} style={{
-                      background: '#f8f9fa',
-                      padding: '16px',
-                      borderRadius: '10px',
-                      transition: 'all 0.3s'
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
+                    gap: "20px",
+                    marginBottom: "30px",
+                  }}
+                >
+                  <div
+                    style={{
+                      background: "#f8f9fa",
+                      padding: "16px",
+                      borderRadius: "10px",
+                      transition: "all 0.3s",
                     }}
                     onMouseOver={(e) => {
-                      e.currentTarget.style.background = '#e5e7eb';
-                      e.currentTarget.style.transform = 'translateY(-2px)';
+                      e.currentTarget.style.background = "#e5e7eb";
+                      e.currentTarget.style.transform = "translateY(-2px)";
                     }}
                     onMouseOut={(e) => {
-                      e.currentTarget.style.background = '#f8f9fa';
-                      e.currentTarget.style.transform = 'translateY(0)';
-                    }}>
-                      <div style={{
-                        fontSize: '12px',
+                      e.currentTarget.style.background = "#f8f9fa";
+                      e.currentTarget.style.transform = "translateY(0)";
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: "12px",
                         fontWeight: 600,
-                        color: '#6b7280',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.5px',
-                        marginBottom: '6px'
-                      }}>{key.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())}</div>
-                      <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
-                        {value !== null && value !== undefined 
-                          ? (typeof value === 'object' 
-                              ? JSON.stringify(value) 
-                              : String(value))
-                          : 'N/A'}
-                      </div>
+                        color: "#6b7280",
+                        textTransform: "uppercase",
+                        letterSpacing: "0.5px",
+                        marginBottom: "6px",
+                      }}
+                    >
+                      Call Note
                     </div>
-                  ))}
+                    <div
+                      style={{
+                        fontSize: "15px",
+                        color: "#1f2937",
+                        fontWeight: 500,
+                      }}
+                    >
+                      {selectedDataItem.note}
+                    </div>
+                  </div>
                 </div>
-              </>
+              </React.Fragment>
             )}
 
+            {/* Custom Data Fields Section */}
+            {selectedDataItem.data &&
+              Object.keys(selectedDataItem.data).length > 0 && (
+                <>
+                  <div
+                    style={{
+                      fontSize: "16px",
+                      fontWeight: 600,
+                      color: "#1f2937",
+                      marginBottom: "20px",
+                      paddingBottom: "10px",
+                      borderBottom: "2px solid #f8f9fa",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "10px",
+                    }}
+                  >
+                    <FileText size={18} style={{ color: "#4680ff" }} />
+                    Custom Data Fields
+                  </div>
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns:
+                        "repeat(auto-fit, minmax(250px, 1fr))",
+                      gap: "20px",
+                      marginBottom: "30px",
+                    }}
+                  >
+                    {Object.entries(selectedDataItem.data).map(
+                      ([key, value]) => (
+                        <div
+                          key={key}
+                          style={{
+                            background: "#f8f9fa",
+                            padding: "16px",
+                            borderRadius: "10px",
+                            transition: "all 0.3s",
+                          }}
+                          onMouseOver={(e) => {
+                            e.currentTarget.style.background = "#e5e7eb";
+                            e.currentTarget.style.transform =
+                              "translateY(-2px)";
+                          }}
+                          onMouseOut={(e) => {
+                            e.currentTarget.style.background = "#f8f9fa";
+                            e.currentTarget.style.transform = "translateY(0)";
+                          }}
+                        >
+                          <div
+                            style={{
+                              fontSize: "12px",
+                              fontWeight: 600,
+                              color: "#6b7280",
+                              textTransform: "uppercase",
+                              letterSpacing: "0.5px",
+                              marginBottom: "6px",
+                            }}
+                          >
+                            {key
+                              .replace(/_/g, " ")
+                              .replace(/\b\w/g, (l) => l.toUpperCase())}
+                          </div>
+                          <div
+                            style={{
+                              fontSize: "15px",
+                              color: "#1f2937",
+                              fontWeight: 500,
+                            }}
+                          >
+                            {value !== null && value !== undefined
+                              ? typeof value === "object"
+                                ? JSON.stringify(value)
+                                : String(value)
+                              : "N/A"}
+                          </div>
+                        </div>
+                      )
+                    )}
+                  </div>
+                </>
+              )}
+
             {/* Call History Timeline */}
-            {getCallHistory(selectedDataItem.id).length > 0 && (
+            {/* {getCallHistory(selectedDataItem.id).length > 0 && (
               <>
                 <div style={{
                   fontSize: '16px',
@@ -3020,10 +3631,10 @@ const CrmProspectsManagement = () => {
                   })}
                 </div>
               </>
-            )}
+            )} */}
 
             {/* No Call History Message */}
-            {getCallHistory(selectedDataItem.id).length === 0 && (
+            {/* {getCallHistory(selectedDataItem.id).length === 0 && (
               <div style={{
                 marginBottom: '30px',
                 padding: '20px',
@@ -3036,40 +3647,42 @@ const CrmProspectsManagement = () => {
                   No call history available for this prospect
                 </div>
               </div>
-            )}
+            )} */}
 
             {/* Action Buttons */}
-            <div style={{
-              display: 'flex',
-              gap: '12px',
-              flexWrap: 'wrap',
-              paddingTop: '20px',
-              borderTop: '1px solid #e5e7eb'
-            }}>
+            <div
+              style={{
+                display: "flex",
+                gap: "12px",
+                flexWrap: "wrap",
+                paddingTop: "20px",
+                borderTop: "1px solid #e5e7eb",
+              }}
+            >
               <Button
                 variant="outline-secondary"
                 style={{
-                  padding: '10px 20px',
-                  borderRadius: '8px',
+                  padding: "10px 20px",
+                  borderRadius: "8px",
                   fontWeight: 500,
-                  fontSize: '14px',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  background: 'white',
-                  color: '#6b7280',
-                  border: '2px solid #e5e7eb'
+                  fontSize: "14px",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  background: "white",
+                  color: "#6b7280",
+                  border: "2px solid #e5e7eb",
                 }}
                 onClick={() => setShowViewModal(false)}
                 onMouseOver={(e) => {
-                  e.currentTarget.style.borderColor = '#4680ff';
-                  e.currentTarget.style.color = '#4680ff';
-                  e.currentTarget.style.background = '#f0f4ff';
+                  e.currentTarget.style.borderColor = "#4680ff";
+                  e.currentTarget.style.color = "#4680ff";
+                  e.currentTarget.style.background = "#f0f4ff";
                 }}
                 onMouseOut={(e) => {
-                  e.currentTarget.style.borderColor = '#e5e7eb';
-                  e.currentTarget.style.color = '#6b7280';
-                  e.currentTarget.style.background = 'white';
+                  e.currentTarget.style.borderColor = "#e5e7eb";
+                  e.currentTarget.style.color = "#6b7280";
+                  e.currentTarget.style.background = "white";
                 }}
               >
                 Close
@@ -3079,12 +3692,6 @@ const CrmProspectsManagement = () => {
         </Modal>
       )}
 
-
-
-
-
-
-
       {/* Delete Confirmation Modal */}
       <DeleteConfirmationModal
         show={showDeleteModal}
@@ -3093,7 +3700,9 @@ const CrmProspectsManagement = () => {
           setItemToDelete(null);
         }}
         onConfirm={confirmDelete}
-        itemName={itemToDelete ? `prospect entry #${itemToDelete.id}` : undefined}
+        itemName={
+          itemToDelete ? `prospect entry #${itemToDelete.id}` : undefined
+        }
         itemType="prospect entry"
         additionalInfo={
           itemToDelete ? (
@@ -3127,86 +3736,87 @@ const CrmProspectsManagement = () => {
         size="lg"
         formHtml={
           <>
-          <div className="mb-4">
-            <div className="d-flex align-items-center mb-3">
-              <FiFilter className="me-2 text-primary" />
-              <h6 className="mb-0">Step 1: Filter Your Prospects</h6>
+            <div className="mb-4">
+              <div className="d-flex align-items-center mb-3">
+                <FiFilter className="me-2 text-primary" />
+                <h6 className="mb-0">Step 1: Filter Your Prospects</h6>
+              </div>
+              <p className="text-muted small mb-3">
+                Choose which prospects to assign by filtering by tags and
+                campaigns.
+              </p>
+              <Row>
+                <Col md={6}>
+                  <Form.Group className="mb-3">
+                    <Form.Label>Filter by Tags</Form.Label>
+                    <CreatableSelect
+                      isMulti
+                      value={assignmentFilters.selectedTags}
+                      onChange={(selected) =>
+                        setAssignmentFilters((prev) => ({
+                          ...prev,
+                          selectedTags: selected || [],
+                        }))
+                      }
+                      options={availableTags}
+                      placeholder="Select tags to filter entries..."
+                      styles={{
+                        control: (base) => ({
+                          ...base,
+                          borderColor: "#ced4da",
+                          boxShadow: "none",
+                          fontSize: "14px",
+                        }),
+                      }}
+                    />
+                    <Form.Text className="text-muted">
+                      Only entries with these tags will be considered for
+                      assignment.
+                    </Form.Text>
+                  </Form.Group>
+                </Col>
+                <Col md={6}>
+                  <Form.Group className="mb-3">
+                    <Form.Label>Filter by Campaigns</Form.Label>
+                    <CreatableSelect
+                      isMulti
+                      value={assignmentFilters.selectedCampaigns}
+                      onChange={(selected) =>
+                        setAssignmentFilters((prev) => ({
+                          ...prev,
+                          selectedCampaigns: selected || [],
+                        }))
+                      }
+                      options={availableCampaigns}
+                      placeholder="Select campaigns to filter entries..."
+                      styles={{
+                        control: (base) => ({
+                          ...base,
+                          borderColor: "#ced4da",
+                          boxShadow: "none",
+                          fontSize: "14px",
+                        }),
+                      }}
+                    />
+                    <Form.Text className="text-muted">
+                      Only entries from these campaigns will be considered for
+                      assignment.
+                    </Form.Text>
+                  </Form.Group>
+                </Col>
+              </Row>
             </div>
-            <p className="text-muted small mb-3">
-              Choose which prospects to assign by filtering by tags and campaigns.
-            </p>
-            <Row>
-              <Col md={6}>
-                <Form.Group className="mb-3">
-                  <Form.Label>Filter by Tags</Form.Label>
-                  <CreatableSelect
-                    isMulti
-                    value={assignmentFilters.selectedTags}
-                    onChange={(selected) =>
-                      setAssignmentFilters((prev) => ({
-                        ...prev,
-                        selectedTags: selected || [],
-                      }))
-                    }
-                    options={availableTags}
-                    placeholder="Select tags to filter entries..."
-                    styles={{
-                      control: (base) => ({
-                        ...base,
-                        borderColor: "#ced4da",
-                        boxShadow: "none",
-                        fontSize: "14px",
-                      }),
-                    }}
-                  />
-                  <Form.Text className="text-muted">
-                    Only entries with these tags will be considered for
-                    assignment.
-                  </Form.Text>
-                </Form.Group>
-              </Col>
-              <Col md={6}>
-                <Form.Group className="mb-3">
-                  <Form.Label>Filter by Campaigns</Form.Label>
-                  <CreatableSelect
-                    isMulti
-                    value={assignmentFilters.selectedCampaigns}
-                    onChange={(selected) =>
-                      setAssignmentFilters((prev) => ({
-                        ...prev,
-                        selectedCampaigns: selected || [],
-                      }))
-                    }
-                    options={availableCampaigns}
-                    placeholder="Select campaigns to filter entries..."
-                    styles={{
-                      control: (base) => ({
-                        ...base,
-                        borderColor: "#ced4da",
-                        boxShadow: "none",
-                        fontSize: "14px",
-                      }),
-                    }}
-                  />
-                  <Form.Text className="text-muted">
-                    Only entries from these campaigns will be considered for
-                    assignment.
-                  </Form.Text>
-                </Form.Group>
-              </Col>
-            </Row>
-          </div>
 
-          <div className="mb-4">
-            <div className="d-flex align-items-center mb-3">
-              <FiDatabase className="me-2 text-info" />
-              <h6 className="mb-0">Step 2: Review Available Prospects</h6>
-            </div>
-            <p className="text-muted small mb-3">
-              Based on your filters, here's what's available for assignment.
-            </p>
+            <div className="mb-4">
+              <div className="d-flex align-items-center mb-3">
+                <FiDatabase className="me-2 text-info" />
+                <h6 className="mb-0">Step 2: Review Available Prospects</h6>
+              </div>
+              <p className="text-muted small mb-3">
+                Based on your filters, here's what's available for assignment.
+              </p>
 
-            {/* <div className="row">
+              {/* <div className="row">
               <div className="col-md-4">
                 <div className="card bg-light border-primary">
                   <div className="card-body text-center">
@@ -3238,215 +3848,213 @@ const CrmProspectsManagement = () => {
               </div>
             </div> */}
 
-            <Row>
-              <Col md={12} className="text-left">
-              <PageSummaryGrid
-              gridColumns={3}
-              cardHeading="h5"
-              gridTextAlign="center"
-              cards={[
-                {
-                  id: 'total-entries',
-                  title: 'Total Entries',
-                  value: assignmentCounts?.total || 0,
-                  description: 'Matching your filters'
-                },
-                {
-                  id: 'assigned-entries',
-                  title: 'Assigned Entries',
-                  value: assignmentCounts?.assigned || 0,
-                  description: 'In use by team members'
-                },
-                {
-                  id: 'available-entries',
-                  title: 'Available Entries',
-                  value: assignmentCounts?.unassigned || 0,
-                  description: 'Ready for assignment'
-                }
-              ]}
-            />
-              </Col>
-            </Row>
-
-
-          </div>
-
-          <div className="mb-4">
-            <div className="d-flex align-items-center mb-3">
-              <FiUsers className="me-2 text-success" />
-              <h6 className="mb-0">Step 3: Configure Assignment</h6>
+              <Row>
+                <Col md={12} className="text-left">
+                  <PageSummaryGrid
+                    gridColumns={3}
+                    cardHeading="h5"
+                    gridTextAlign="center"
+                    cards={[
+                      {
+                        id: "total-entries",
+                        title: "Total Entries",
+                        value: assignmentCounts?.total || 0,
+                        description: "Matching your filters",
+                      },
+                      {
+                        id: "assigned-entries",
+                        title: "Assigned Entries",
+                        value: assignmentCounts?.assigned || 0,
+                        description: "In use by team members",
+                      },
+                      {
+                        id: "available-entries",
+                        title: "Available Entries",
+                        value: assignmentCounts?.unassigned || 0,
+                        description: "Ready for assignment",
+                      },
+                    ]}
+                  />
+                </Col>
+              </Row>
             </div>
-            <p className="text-muted small mb-3">
-              You have{" "}
-              <strong>{assignmentCounts.unassigned.toLocaleString()}</strong>{" "}
-              prospects ready for assignment out of{" "}
-              <strong>{assignmentCounts.total.toLocaleString()}</strong> total
-              matching prospects.
-            </p>
 
-            <Form.Group className="mb-3">
-              <Form.Label>Target Campaigns *</Form.Label>
-              <CreatableSelect
-                isMulti
-                value={assignmentCampaign}
-                onChange={(selected) => setAssignmentCampaign(selected || [])}
-                options={availableCampaigns}
-                placeholder="Choose which campaigns to assign prospects to..."
-                styles={{
-                  control: (base) => ({
-                    ...base,
-                    borderColor: "#ced4da",
-                    boxShadow: "none",
-                    fontSize: "14px",
-                  }),
-                }}
-              />
-              <Form.Text className="text-muted">
-                <strong>Smart Distribution:</strong> Prospects will be
-                automatically distributed among users in the selected campaigns
-                based on their workload and availability.
-              </Form.Text>
-            </Form.Group>
-
-            <Form.Group className="mb-3">
-              <Form.Label>Assignment Quantity</Form.Label>
-              <Form.Control
-                type="number"
-                min="0"
-                max={assignmentCounts.unassigned}
-                value={totalEntriesToAssign}
-                onChange={(e) =>
-                  setTotalEntriesToAssign(parseInt(e.target.value) || 0)
-                }
-                placeholder="How many prospects to assign?"
-              />
-              <Form.Text className="text-muted">
-                <strong>Maximum:</strong>{" "}
-                {assignmentCounts.unassigned.toLocaleString()} prospects
-                available. Start with a smaller batch to test the assignment
-                process.
-              </Form.Text>
-            </Form.Group>
-
-            <Form.Group className="mb-3">
-              <Form.Label>Distribution Strategy</Form.Label>
-              <div>
-                <Form.Check
-                  type="radio"
-                  id="equal-distribution"
-                  name="assignmentDistribution"
-                  label="Auto-balance across campaigns"
-                  value="equal"
-                  checked={assignmentDistribution === "equal"}
-                  onChange={() => setAssignmentDistribution("equal")}
-                  className="mb-2"
-                />
-                <Form.Check
-                  type="radio"
-                  id="custom-distribution"
-                  name="assignmentDistribution"
-                  label="Custom allocation per campaign"
-                  value="custom"
-                  checked={assignmentDistribution === "custom"}
-                  onChange={() => setAssignmentDistribution("custom")}
-                />
+            <div className="mb-4">
+              <div className="d-flex align-items-center mb-3">
+                <FiUsers className="me-2 text-success" />
+                <h6 className="mb-0">Step 3: Configure Assignment</h6>
               </div>
-              <Form.Text className="text-muted">
-                <strong>Auto-balance:</strong> Entries are distributed evenly.{" "}
-                <strong>Custom:</strong> You specify exactly how many entries
-                each campaign gets.
-              </Form.Text>
-            </Form.Group>
+              <p className="text-muted small mb-3">
+                You have{" "}
+                <strong>{assignmentCounts.unassigned.toLocaleString()}</strong>{" "}
+                prospects ready for assignment out of{" "}
+                <strong>{assignmentCounts.total.toLocaleString()}</strong> total
+                matching prospects.
+              </p>
 
-            {assignmentDistribution === "custom" &&
-              assignmentCampaign.length > 0 && (
-                <Form.Group className="mb-3">
-                  <div className="d-flex justify-content-between align-items-center mb-2">
-                    <Form.Label className="mb-0">
-                      Custom Distribution
-                    </Form.Label>
-                    <Button
-                      variant="outline-secondary"
-                      size="sm"
-                      onClick={() => {
-                        const equalDistribution = Math.floor(
-                          totalEntriesToAssign / assignmentCampaign.length
-                        );
-                        const remainder =
-                          totalEntriesToAssign % assignmentCampaign.length;
-                        const newCustomDistribution: Record<string, number> =
-                          {};
+              <Form.Group className="mb-3">
+                <Form.Label>Target Campaigns *</Form.Label>
+                <CreatableSelect
+                  isMulti
+                  value={assignmentCampaign}
+                  onChange={(selected) => setAssignmentCampaign(selected || [])}
+                  options={availableCampaigns}
+                  placeholder="Choose which campaigns to assign prospects to..."
+                  styles={{
+                    control: (base) => ({
+                      ...base,
+                      borderColor: "#ced4da",
+                      boxShadow: "none",
+                      fontSize: "14px",
+                    }),
+                  }}
+                />
+                <Form.Text className="text-muted">
+                  <strong>Smart Distribution:</strong> Prospects will be
+                  automatically distributed among users in the selected
+                  campaigns based on their workload and availability.
+                </Form.Text>
+              </Form.Group>
 
-                        Array.from(assignmentCampaign).forEach(
-                          (campaign: any, index: number) => {
-                            newCustomDistribution[campaign.value] =
-                              equalDistribution + (index < remainder ? 1 : 0);
-                          }
-                        );
+              <Form.Group className="mb-3">
+                <Form.Label>Assignment Quantity</Form.Label>
+                <Form.Control
+                  type="number"
+                  min="0"
+                  max={assignmentCounts.unassigned}
+                  value={totalEntriesToAssign}
+                  onChange={(e) =>
+                    setTotalEntriesToAssign(parseInt(e.target.value) || 0)
+                  }
+                  placeholder="How many prospects to assign?"
+                />
+                <Form.Text className="text-muted">
+                  <strong>Maximum:</strong>{" "}
+                  {assignmentCounts.unassigned.toLocaleString()} prospects
+                  available. Start with a smaller batch to test the assignment
+                  process.
+                </Form.Text>
+              </Form.Group>
 
-                        setCustomDistribution(newCustomDistribution);
-                      }}
-                    >
-                      Auto-fill Equal
-                    </Button>
-                  </div>
-                  <div className="border rounded p-3 bg-light">
-                    <p className="small text-muted mb-3">
-                      Total to assign: <strong>{totalEntriesToAssign}</strong> |
-                      Allocated:{" "}
-                      <strong>
-                        {Object.values(customDistribution).reduce(
-                          (sum, count) => sum + count,
-                          0
-                        )}
-                      </strong>{" "}
-                      | Remaining:{" "}
-                      <strong>
-                        {totalEntriesToAssign -
-                          Object.values(customDistribution).reduce(
+              <Form.Group className="mb-3">
+                <Form.Label>Distribution Strategy</Form.Label>
+                <div>
+                  <Form.Check
+                    type="radio"
+                    id="equal-distribution"
+                    name="assignmentDistribution"
+                    label="Auto-balance across campaigns"
+                    value="equal"
+                    checked={assignmentDistribution === "equal"}
+                    onChange={() => setAssignmentDistribution("equal")}
+                    className="mb-2"
+                  />
+                  <Form.Check
+                    type="radio"
+                    id="custom-distribution"
+                    name="assignmentDistribution"
+                    label="Custom allocation per campaign"
+                    value="custom"
+                    checked={assignmentDistribution === "custom"}
+                    onChange={() => setAssignmentDistribution("custom")}
+                  />
+                </div>
+                <Form.Text className="text-muted">
+                  <strong>Auto-balance:</strong> Entries are distributed evenly.{" "}
+                  <strong>Custom:</strong> You specify exactly how many entries
+                  each campaign gets.
+                </Form.Text>
+              </Form.Group>
+
+              {assignmentDistribution === "custom" &&
+                assignmentCampaign.length > 0 && (
+                  <Form.Group className="mb-3">
+                    <div className="d-flex justify-content-between align-items-center mb-2">
+                      <Form.Label className="mb-0">
+                        Custom Distribution
+                      </Form.Label>
+                      <Button
+                        variant="outline-secondary"
+                        size="sm"
+                        onClick={() => {
+                          const equalDistribution = Math.floor(
+                            totalEntriesToAssign / assignmentCampaign.length
+                          );
+                          const remainder =
+                            totalEntriesToAssign % assignmentCampaign.length;
+                          const newCustomDistribution: Record<string, number> =
+                            {};
+
+                          Array.from(assignmentCampaign).forEach(
+                            (campaign: any, index: number) => {
+                              newCustomDistribution[campaign.value] =
+                                equalDistribution + (index < remainder ? 1 : 0);
+                            }
+                          );
+
+                          setCustomDistribution(newCustomDistribution);
+                        }}
+                      >
+                        Auto-fill Equal
+                      </Button>
+                    </div>
+                    <div className="border rounded p-3 bg-light">
+                      <p className="small text-muted mb-3">
+                        Total to assign: <strong>{totalEntriesToAssign}</strong>{" "}
+                        | Allocated:{" "}
+                        <strong>
+                          {Object.values(customDistribution).reduce(
                             (sum, count) => sum + count,
                             0
                           )}
-                      </strong>
-                    </p>
-                    {Array.from(assignmentCampaign).map((campaign: any) => (
-                      <div key={campaign.value} className="mb-2">
-                        <Row>
-                          <Col md={6}>
-                            <Form.Label className="small mb-0">
-                              {campaign.label}
-                            </Form.Label>
-                          </Col>
-                          <Col md={6}>
-                            <Form.Control
-                              type="number"
-                              min="0"
-                              max={totalEntriesToAssign}
-                              value={customDistribution[campaign.value] || 0}
-                              onChange={(e) =>
-                                setCustomDistribution((prev) => ({
-                                  ...prev,
-                                  [campaign.value]:
-                                    parseInt(e.target.value) || 0,
-                                }))
-                              }
-                              size="sm"
-                            />
-                          </Col>
-                        </Row>
-                      </div>
-                    ))}
-                  </div>
-                </Form.Group>
-              )}
+                        </strong>{" "}
+                        | Remaining:{" "}
+                        <strong>
+                          {totalEntriesToAssign -
+                            Object.values(customDistribution).reduce(
+                              (sum, count) => sum + count,
+                              0
+                            )}
+                        </strong>
+                      </p>
+                      {Array.from(assignmentCampaign).map((campaign: any) => (
+                        <div key={campaign.value} className="mb-2">
+                          <Row>
+                            <Col md={6}>
+                              <Form.Label className="small mb-0">
+                                {campaign.label}
+                              </Form.Label>
+                            </Col>
+                            <Col md={6}>
+                              <Form.Control
+                                type="number"
+                                min="0"
+                                max={totalEntriesToAssign}
+                                value={customDistribution[campaign.value] || 0}
+                                onChange={(e) =>
+                                  setCustomDistribution((prev) => ({
+                                    ...prev,
+                                    [campaign.value]:
+                                      parseInt(e.target.value) || 0,
+                                  }))
+                                }
+                                size="sm"
+                              />
+                            </Col>
+                          </Row>
+                        </div>
+                      ))}
+                    </div>
+                  </Form.Group>
+                )}
 
-            <Alert variant="info" className="mt-3">
-              <strong>Assignment Info:</strong> Prospects will be automatically
-              assigned to users within the selected campaigns based on their
-              campaign user extensions. The system will distribute prospects
-              equally among users in each campaign.
-            </Alert>
-          </div>
+              <Alert variant="info" className="mt-3">
+                <strong>Assignment Info:</strong> Prospects will be
+                automatically assigned to users within the selected campaigns
+                based on their campaign user extensions. The system will
+                distribute prospects equally among users in each campaign.
+              </Alert>
+            </div>
           </>
         }
         submitButtonText="OK"
@@ -3463,144 +4071,149 @@ const CrmProspectsManagement = () => {
         size="lg"
         formHtml={
           <>
-          <Row>
-            <Col md={6}>
-              <Form.Group className="mb-3">
-                <Form.Label>Disposition *</Form.Label>
-                <Form.Select
-                  value={afterCallData.disposition}
-                  onChange={(e) =>
-                    setAfterCallData({
-                      ...afterCallData,
-                      disposition: e.target.value,
-                    })
-                  }
-                >
-                  <option value="">Select Disposition</option>
-                  <option value="interested">Interested</option>
-                  <option value="not_interested">Not Interested</option>
-                  <option value="callback_requested">Call Back Requested</option>
-                  <option value="follow_up">Follow Up</option>
-                  <option value="do_not_call">Do Not Call</option>
-                  <option value="wrong_number">Wrong Number</option>
-                  <option value="spam">Spam</option>
-                </Form.Select>
-              </Form.Group>
-            </Col>
-            <Col md={6}>
-              <Form.Group className="mb-3">
-                <Form.Label>Call Status *</Form.Label>
-                <Form.Select
-                  value={afterCallData.callStatus}
-                  onChange={(e) =>
-                    setAfterCallData({
-                      ...afterCallData,
-                      callStatus: e.target.value,
-                    })
-                  }
-                >
-                  <option value="">Select Call Status</option>
-                  <option value="answered">Answered</option>
-                  <option value="no_answer">No Answer</option>
-                  <option value="busy">Busy</option>
-                  <option value="voicemail">Voicemail</option>
-                  <option value="disconnected">Disconnected</option>
-                  <option value="network_error">Network Error</option>
-                </Form.Select>
-              </Form.Group>
-            </Col>
-          </Row>
+            <Row>
+              <Col md={6}>
+                <Form.Group className="mb-3">
+                  <Form.Label>Disposition *</Form.Label>
+                  <Form.Select
+                    value={afterCallData.disposition}
+                    onChange={(e) =>
+                      setAfterCallData({
+                        ...afterCallData,
+                        disposition: e.target.value,
+                      })
+                    }
+                  >
+                    <option value="">Select Disposition</option>
+                    <option value="interested">Interested</option>
+                    <option value="not_interested">Not Interested</option>
+                    <option value="callback_requested">
+                      Call Back Requested
+                    </option>
+                    <option value="follow_up">Follow Up</option>
+                    <option value="do_not_call">Do Not Call</option>
+                    <option value="wrong_number">Wrong Number</option>
+                    <option value="spam">Spam</option>
+                  </Form.Select>
+                </Form.Group>
+              </Col>
+              <Col md={6}>
+                <Form.Group className="mb-3">
+                  <Form.Label>Call Status *</Form.Label>
+                  <Form.Select
+                    value={afterCallData.callStatus}
+                    onChange={(e) =>
+                      setAfterCallData({
+                        ...afterCallData,
+                        callStatus: e.target.value,
+                      })
+                    }
+                  >
+                    <option value="">Select Call Status</option>
+                    <option value="answered">Answered</option>
+                    <option value="no_answer">No Answer</option>
+                    <option value="busy">Busy</option>
+                    <option value="voicemail">Voicemail</option>
+                    <option value="disconnected">Disconnected</option>
+                    <option value="network_error">Network Error</option>
+                  </Form.Select>
+                </Form.Group>
+              </Col>
+            </Row>
 
-          <Form.Group className="mb-3">
-            <Form.Label>Call Comment *</Form.Label>
-            <Form.Control
-              as="textarea"
-              rows={4}
-              value={afterCallData.comment}
-              onChange={(e) =>
-                setAfterCallData({ ...afterCallData, comment: e.target.value })
-              }
-              placeholder="Enter call details, client response, and any important notes..."
-            />
-          </Form.Group>
-
-          <Form.Group className="mb-3">
-            <Form.Label>Generate Lead *</Form.Label>
-            <div className="d-flex gap-4">
-              <Form.Check
-                type="radio"
-                id="generate-lead-yes"
-                name="generateLead"
-                value="yes"
-                checked={afterCallData.generateLead === "yes"}
+            <Form.Group className="mb-3">
+              <Form.Label>Call Comment *</Form.Label>
+              <Form.Control
+                as="textarea"
+                rows={4}
+                value={afterCallData.comment}
                 onChange={(e) =>
                   setAfterCallData({
                     ...afterCallData,
-                    generateLead: e.target.value,
+                    comment: e.target.value,
                   })
                 }
-                label="Yes, generate lead"
+                placeholder="Enter call details, client response, and any important notes..."
               />
-              <Form.Check
-                type="radio"
-                id="generate-lead-no"
-                name="generateLead"
-                value="no"
-                checked={afterCallData.generateLead === "no"}
-                onChange={(e) =>
-                  setAfterCallData({
-                    ...afterCallData,
-                    generateLead: e.target.value,
-                  })
-                }
-                label="No, do not generate lead"
-              />
-            </div>
-            <Form.Text className="text-muted">
-              Select "Yes" if this call resulted in a qualified lead that should
-              be created in the CRM system.
-            </Form.Text>
-          </Form.Group>
+            </Form.Group>
 
-          <Row>
-            <Col md={6}>
-              <Form.Group className="mb-3">
-                <Form.Label>Schedule Next Call (Optional)</Form.Label>
-                <Form.Control
-                  type="date"
-                  value={afterCallData.nextCallDate}
+            <Form.Group className="mb-3">
+              <Form.Label>Generate Lead *</Form.Label>
+              <div className="d-flex gap-4">
+                <Form.Check
+                  type="radio"
+                  id="generate-lead-yes"
+                  name="generateLead"
+                  value="yes"
+                  checked={afterCallData.generateLead === "yes"}
                   onChange={(e) =>
                     setAfterCallData({
                       ...afterCallData,
-                      nextCallDate: e.target.value,
+                      generateLead: e.target.value,
                     })
                   }
-                  min={moment().format("YYYY-MM-DD")}
+                  label="Yes, generate lead"
                 />
-              </Form.Group>
-            </Col>
-            <Col md={6}>
-              <Form.Group className="mb-3">
-                <Form.Label>Time (Optional)</Form.Label>
-                <Form.Control
-                  type="time"
-                  value={afterCallData.nextCallTime}
+                <Form.Check
+                  type="radio"
+                  id="generate-lead-no"
+                  name="generateLead"
+                  value="no"
+                  checked={afterCallData.generateLead === "no"}
                   onChange={(e) =>
                     setAfterCallData({
                       ...afterCallData,
-                      nextCallTime: e.target.value,
+                      generateLead: e.target.value,
                     })
                   }
+                  label="No, do not generate lead"
                 />
-              </Form.Group>
-            </Col>
-          </Row>
+              </div>
+              <Form.Text className="text-muted">
+                Select "Yes" if this call resulted in a qualified lead that
+                should be created in the CRM system.
+              </Form.Text>
+            </Form.Group>
 
-          <Alert variant="info">
-            <strong>Note:</strong> This dialog will be used to record call
-            outcomes and schedule follow-up actions. All fields marked with *
-            are required.
-          </Alert>
+            <Row>
+              <Col md={6}>
+                <Form.Group className="mb-3">
+                  <Form.Label>Schedule Next Call (Optional)</Form.Label>
+                  <Form.Control
+                    type="date"
+                    value={afterCallData.nextCallDate}
+                    onChange={(e) =>
+                      setAfterCallData({
+                        ...afterCallData,
+                        nextCallDate: e.target.value,
+                      })
+                    }
+                    min={moment().format("YYYY-MM-DD")}
+                  />
+                </Form.Group>
+              </Col>
+              <Col md={6}>
+                <Form.Group className="mb-3">
+                  <Form.Label>Time (Optional)</Form.Label>
+                  <Form.Control
+                    type="time"
+                    value={afterCallData.nextCallTime}
+                    onChange={(e) =>
+                      setAfterCallData({
+                        ...afterCallData,
+                        nextCallTime: e.target.value,
+                      })
+                    }
+                  />
+                </Form.Group>
+              </Col>
+            </Row>
+
+            <Alert variant="info">
+              <strong>Note:</strong> This dialog will be used to record call
+              outcomes and schedule follow-up actions. All fields marked with *
+              are required.
+            </Alert>
           </>
         }
         submitButtonText="Save Call Data"
@@ -3617,71 +4230,71 @@ const CrmProspectsManagement = () => {
         size="lg"
         formHtml={
           <>
-          {selectedEntryForSchedule && (
-            <div className="mb-3">
-              <h6>Schedule Call For:</h6>
-              <div className="bg-light p-3 rounded">
-                <div>
-                  <strong>Name:</strong>{" "}
-                  {selectedEntryForSchedule.name || "N/A"}
-                </div>
-                <div>
-                  <strong>Phone:</strong>{" "}
-                  {selectedEntryForSchedule.phone || "N/A"}
-                </div>
-                <div>
-                  <strong>Email:</strong>{" "}
-                  {selectedEntryForSchedule.email || "N/A"}
+            {selectedEntryForSchedule && (
+              <div className="mb-3">
+                <h6>Schedule Call For:</h6>
+                <div className="bg-light p-3 rounded">
+                  <div>
+                    <strong>Name:</strong>{" "}
+                    {selectedEntryForSchedule.name || "N/A"}
+                  </div>
+                  <div>
+                    <strong>Phone:</strong>{" "}
+                    {selectedEntryForSchedule.phone || "N/A"}
+                  </div>
+                  <div>
+                    <strong>Email:</strong>{" "}
+                    {selectedEntryForSchedule.email || "N/A"}
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
 
-          <Row>
-            <Col md={6}>
-              <Form.Group className="mb-3">
-                <Form.Label>Date *</Form.Label>
-                <Form.Control
-                  type="date"
-                  value={scheduleData.date}
-                  onChange={(e) =>
-                    setScheduleData({ ...scheduleData, date: e.target.value })
-                  }
-                  min={moment().format("YYYY-MM-DD")}
-                />
-              </Form.Group>
-            </Col>
-            <Col md={6}>
-              <Form.Group className="mb-3">
-                <Form.Label>Time *</Form.Label>
-                <Form.Control
-                  type="time"
-                  value={scheduleData.time}
-                  onChange={(e) =>
-                    setScheduleData({ ...scheduleData, time: e.target.value })
-                  }
-                />
-              </Form.Group>
-            </Col>
-          </Row>
+            <Row>
+              <Col md={6}>
+                <Form.Group className="mb-3">
+                  <Form.Label>Date *</Form.Label>
+                  <Form.Control
+                    type="date"
+                    value={scheduleData.date}
+                    onChange={(e) =>
+                      setScheduleData({ ...scheduleData, date: e.target.value })
+                    }
+                    min={moment().format("YYYY-MM-DD")}
+                  />
+                </Form.Group>
+              </Col>
+              <Col md={6}>
+                <Form.Group className="mb-3">
+                  <Form.Label>Time *</Form.Label>
+                  <Form.Control
+                    type="time"
+                    value={scheduleData.time}
+                    onChange={(e) =>
+                      setScheduleData({ ...scheduleData, time: e.target.value })
+                    }
+                  />
+                </Form.Group>
+              </Col>
+            </Row>
 
-          <Form.Group className="mb-3">
-            <Form.Label>Notes (Optional)</Form.Label>
-            <Form.Control
-              as="textarea"
-              rows={3}
-              value={scheduleData.notes}
-              onChange={(e) =>
-                setScheduleData({ ...scheduleData, notes: e.target.value })
-              }
-              placeholder="Add any notes or reminders for this call..."
-            />
-          </Form.Group>
+            <Form.Group className="mb-3">
+              <Form.Label>Notes (Optional)</Form.Label>
+              <Form.Control
+                as="textarea"
+                rows={3}
+                value={scheduleData.notes}
+                onChange={(e) =>
+                  setScheduleData({ ...scheduleData, notes: e.target.value })
+                }
+                placeholder="Add any notes or reminders for this call..."
+              />
+            </Form.Group>
 
-          <Alert variant="info">
-            <strong>Note:</strong> The call will be scheduled and you'll receive
-            a reminder at the selected time.
-          </Alert>
+            <Alert variant="info">
+              <strong>Note:</strong> The call will be scheduled and you'll
+              receive a reminder at the selected time.
+            </Alert>
           </>
         }
         submitButtonText="Schedule Call"
@@ -3689,12 +4302,6 @@ const CrmProspectsManagement = () => {
         onSubmit={() => handleScheduleSubmit()}
         onCancel={() => handleScheduleModalClose()}
       />
-
-
-
-
-
-      
 
       <FormModal
         show={showHistoryModal}
@@ -3704,305 +4311,308 @@ const CrmProspectsManagement = () => {
         size="lg"
         formHtml={
           <>
-           <div className="mb-4">
-            <div className="d-flex justify-content-between align-items-center">
-              <div>
-                <h5 className="mb-1">System Activity Log</h5>
-                <p className="text-muted mb-0">
-                  Track all user activities including CSV uploads, data
-                  assignments, and campaign management.
-                </p>
-              </div>
-              <div className="text-end">
-                <Badge bg="info" className="me-2">
-                  {historyPagination.total} Total Activities
-                </Badge>
-                <Badge bg="secondary">
-                  Page {historyPagination.current_page} of{" "}
-                  {historyPagination.last_page}
-                </Badge>
-              </div>
-            </div>
-          </div>
-
-          {historyLoading ? (
-            <div className="text-center py-5">
-              <Spinner animation="border" variant="primary" />
-              <p className="mt-3 text-muted">Loading activity history...</p>
-            </div>
-          ) : historyData.length === 0 ? (
-            <div className="text-center py-5">
-              <FiClock size={48} className="text-muted mb-3" />
-              <h6 className="text-muted">No Activity Found</h6>
-              <p className="text-muted">
-                No activities have been recorded yet.
-              </p>
-            </div>
-          ) : (
-            <div className="timeline ">
-              {historyData.map((activity, index) => {
-                const getActivityIcon = (action: string) => {
-                  switch (action) {
-                    case "upload":
-                      return <FiUpload size={18} className="text-white" />;
-                    case "assign":
-                      return <FiUsers size={18} className="text-white" />;
-                    case "schedule_call":
-                    case "reschedule_call":
-                      return <FiCalendar size={18} className="text-white" />;
-                    case "cancel_call":
-                    case "unschedule_call":
-                      return <FiX size={18} className="text-white" />;
-                    default:
-                      return <FiUser size={18} className="text-white" />;
-                  }
-                };
-
-                const getActivityColor = (action: string) => {
-                  switch (action) {
-                    case "upload":
-                      return "primary";
-                    case "assign":
-                      return "success";
-                    case "schedule_call":
-                    case "reschedule_call":
-                      return "info";
-                    case "cancel_call":
-                    case "unschedule_call":
-                      return "warning";
-                    default:
-                      return "secondary";
-                  }
-                };
-
-                const formatActivityDetails = (activity: any) => {
-                  const details = activity.details || {};
-                  switch (activity.action) {
-                    case "upload":
-                      const campaignNames =
-                        details.campaign_ids
-                          ?.map(
-                            (id: number) =>
-                              campaignsById[id] || `Campaign #${id}`
-                          )
-                          .join(", ") || "No campaigns";
-                      const tags = details.tags?.join(", ") || "No tags";
-                      return (
-                        <div>
-                          <div className="mb-1">
-                            <strong>
-                              Uploaded {activity.total_records || 0} entries
-                            </strong>
-                          </div>
-                          <div className="small text-muted">
-                            <div>
-                              <strong>Campaigns:</strong> {campaignNames}
-                            </div>
-                            <div>
-                              <strong>Tags:</strong> {tags}
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    case "assign":
-                      return (
-                        <div>
-                          <div className="mb-1">
-                            <strong>
-                              Assigned {activity.total_records || 0} entries
-                            </strong>
-                          </div>
-                          <div className="small text-muted">
-                            <strong>To:</strong>{" "}
-                            {getNameByExtension(activity.user_extension_done_to) || "Campaign team"}
-                          </div>
-                        </div>
-                      );
-                    case "schedule_call":
-                      return (
-                        <div>
-                          <div className="mb-1">
-                            <strong>Scheduled call</strong>
-                          </div>
-                          <div className="small text-muted">
-                            <div>
-                              <strong>Phone:</strong> {details.phone || "N/A"}
-                            </div>
-                            <div>
-                              <strong>Time:</strong>{" "}
-                              {moment(details.scheduled_call_at).format(
-                                "MMM DD, YYYY HH:mm"
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    case "reschedule_call":
-                      return (
-                        <div>
-                          <div className="mb-1">
-                            <strong>Rescheduled call</strong>
-                          </div>
-                          <div className="small text-muted">
-                            <div>
-                              <strong>Phone:</strong> {details.phone || "N/A"}
-                            </div>
-                            <div>
-                              <strong>From:</strong>{" "}
-                              {moment(details.old_scheduled_call_at).format(
-                                "MMM DD, HH:mm"
-                              )}
-                            </div>
-                            <div>
-                              <strong>To:</strong>{" "}
-                              {moment(details.new_scheduled_call_at).format(
-                                "MMM DD, HH:mm"
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    case "cancel_call":
-                    case "unschedule_call":
-                      return (
-                        <div>
-                          <div className="mb-1">
-                            <strong>Cancelled call</strong>
-                          </div>
-                          <div className="small text-muted">
-                            <div>
-                              <strong>Phone:</strong> {details.phone || "N/A"}
-                            </div>
-                            <div>
-                              <strong>Was scheduled:</strong>{" "}
-                              {moment(
-                                details.cancelled_scheduled_call_at ||
-                                  details.unscheduled_call_at
-                              ).format("MMM DD, HH:mm")}
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    default:
-                      return (
-                        <div>
-                          <div className="mb-1">
-                            <strong>
-                              {activity.action
-                                ?.replace("_", " ")
-                                .replace(/\b\w/g, (l: string) =>
-                                  l.toUpperCase()
-                                )}
-                            </strong>
-                          </div>
-                          <div className="small text-muted">
-                            {activity.details?.description ||
-                              "No details available"}
-                          </div>
-                        </div>
-                      );
-                  }
-                };
-
-                return (
-                  <div key={activity.id} className="timeline-item mb-4 ">
-                    <div className="d-flex">
-                      <div className="timeline-marker me-3">
-                        <div
-                          className={`bg-${getActivityColor(
-                            activity.action
-                          )} rounded-circle d-flex align-items-center justify-content-center shadow-sm`}
-                          style={{ width: "36px", height: "36px" }}
-                        >
-                          {getActivityIcon(activity.action)}
-                        </div>
-                      </div>
-                      <div className="timeline-content flex-grow-1">
-                        <div className="card border-0 shadow-sm">
-                          <div className="card-body p-3">
-                            <div className="d-flex justify-content-between align-items-start mb-2">
-                              <div className="flex-grow-1">
-                                <h6 className="mb-1 d-flex align-items-center">
-                                  <strong className="text-primary">
-                                    {getNameByExtension(activity.user_extension_done_by) ||
-                                      "System"}
-                                  </strong>
-                                  <Badge
-                                    bg={getActivityColor(activity.action)}
-                                    className="ms-2 small"
-                                  >
-                                    {activity.action
-                                      ?.replace("_", " ")
-                                      .replace(/\b\w/g, (l: string) =>
-                                        l.toUpperCase()
-                                      )}
-                                  </Badge>
-                                </h6>
-                                <div className="text-muted">
-                                  {formatActivityDetails(activity)}
-                                </div>
-                              </div>
-                              <div className="text-end">
-                                <small className="text-muted">
-                                  {moment(activity.created_at).format(
-                                    "MMM DD, YYYY"
-                                  )}
-                                </small>
-                                <br />
-                                <small className="text-muted">
-                                  {moment(activity.created_at).format(
-                                    "HH:mm:ss"
-                                  )}
-                                </small>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="timeline-line"></div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {/* Pagination */}
-          {!historyLoading &&
-            historyData.length > 0 &&
-            historyPagination.last_page > 1 && (
-              <div className="d-flex justify-content-center mt-4">
-                <div className="btn-group" role="group">
-                  <Button
-                    variant="outline-secondary"
-                    size="sm"
-                    disabled={historyPagination.current_page === 1}
-                    onClick={() =>
-                      fetchHistoryData(historyPagination.current_page - 1)
-                    }
-                  >
-                    Previous
-                  </Button>
-                  <Button variant="outline-secondary" size="sm" disabled>
-                    {historyPagination.current_page} /{" "}
+            <div className="mb-4">
+              <div className="d-flex justify-content-between align-items-center">
+                <div>
+                  <h5 className="mb-1">System Activity Log</h5>
+                  <p className="text-muted mb-0">
+                    Track all user activities including CSV uploads, data
+                    assignments, and campaign management.
+                  </p>
+                </div>
+                <div className="text-end">
+                  <Badge bg="info" className="me-2">
+                    {historyPagination.total} Total Activities
+                  </Badge>
+                  <Badge bg="secondary">
+                    Page {historyPagination.current_page} of{" "}
                     {historyPagination.last_page}
-                  </Button>
-                  <Button
-                    variant="outline-secondary"
-                    size="sm"
-                    disabled={
-                      historyPagination.current_page ===
-                      historyPagination.last_page
-                    }
-                    onClick={() =>
-                      fetchHistoryData(historyPagination.current_page + 1)
-                    }
-                  >
-                    Next
-                  </Button>
+                  </Badge>
                 </div>
               </div>
+            </div>
+
+            {historyLoading ? (
+              <div className="text-center py-5">
+                <Spinner animation="border" variant="primary" />
+                <p className="mt-3 text-muted">Loading activity history...</p>
+              </div>
+            ) : historyData.length === 0 ? (
+              <div className="text-center py-5">
+                <FiClock size={48} className="text-muted mb-3" />
+                <h6 className="text-muted">No Activity Found</h6>
+                <p className="text-muted">
+                  No activities have been recorded yet.
+                </p>
+              </div>
+            ) : (
+              <div className="timeline ">
+                {historyData.map((activity, index) => {
+                  const getActivityIcon = (action: string) => {
+                    switch (action) {
+                      case "upload":
+                        return <FiUpload size={18} className="text-white" />;
+                      case "assign":
+                        return <FiUsers size={18} className="text-white" />;
+                      case "schedule_call":
+                      case "reschedule_call":
+                        return <FiCalendar size={18} className="text-white" />;
+                      case "cancel_call":
+                      case "unschedule_call":
+                        return <FiX size={18} className="text-white" />;
+                      default:
+                        return <FiUser size={18} className="text-white" />;
+                    }
+                  };
+
+                  const getActivityColor = (action: string) => {
+                    switch (action) {
+                      case "upload":
+                        return "primary";
+                      case "assign":
+                        return "success";
+                      case "schedule_call":
+                      case "reschedule_call":
+                        return "info";
+                      case "cancel_call":
+                      case "unschedule_call":
+                        return "warning";
+                      default:
+                        return "secondary";
+                    }
+                  };
+
+                  const formatActivityDetails = (activity: any) => {
+                    const details = activity.details || {};
+                    switch (activity.action) {
+                      case "upload":
+                        const campaignNames =
+                          details.campaign_ids
+                            ?.map(
+                              (id: number) =>
+                                campaignsById[id] || `Campaign #${id}`
+                            )
+                            .join(", ") || "No campaigns";
+                        const tags = details.tags?.join(", ") || "No tags";
+                        return (
+                          <div>
+                            <div className="mb-1">
+                              <strong>
+                                Uploaded {activity.total_records || 0} entries
+                              </strong>
+                            </div>
+                            <div className="small text-muted">
+                              <div>
+                                <strong>Campaigns:</strong> {campaignNames}
+                              </div>
+                              <div>
+                                <strong>Tags:</strong> {tags}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      case "assign":
+                        return (
+                          <div>
+                            <div className="mb-1">
+                              <strong>
+                                Assigned {activity.total_records || 0} entries
+                              </strong>
+                            </div>
+                            <div className="small text-muted">
+                              <strong>To:</strong>{" "}
+                              {getNameByExtension(
+                                activity.user_extension_done_to
+                              ) || "Campaign team"}
+                            </div>
+                          </div>
+                        );
+                      case "schedule_call":
+                        return (
+                          <div>
+                            <div className="mb-1">
+                              <strong>Scheduled call</strong>
+                            </div>
+                            <div className="small text-muted">
+                              <div>
+                                <strong>Phone:</strong> {details.phone || "N/A"}
+                              </div>
+                              <div>
+                                <strong>Time:</strong>{" "}
+                                {moment(details.scheduled_call_at).format(
+                                  "MMM DD, YYYY HH:mm"
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      case "reschedule_call":
+                        return (
+                          <div>
+                            <div className="mb-1">
+                              <strong>Rescheduled call</strong>
+                            </div>
+                            <div className="small text-muted">
+                              <div>
+                                <strong>Phone:</strong> {details.phone || "N/A"}
+                              </div>
+                              <div>
+                                <strong>From:</strong>{" "}
+                                {moment(details.old_scheduled_call_at).format(
+                                  "MMM DD, HH:mm"
+                                )}
+                              </div>
+                              <div>
+                                <strong>To:</strong>{" "}
+                                {moment(details.new_scheduled_call_at).format(
+                                  "MMM DD, HH:mm"
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      case "cancel_call":
+                      case "unschedule_call":
+                        return (
+                          <div>
+                            <div className="mb-1">
+                              <strong>Cancelled call</strong>
+                            </div>
+                            <div className="small text-muted">
+                              <div>
+                                <strong>Phone:</strong> {details.phone || "N/A"}
+                              </div>
+                              <div>
+                                <strong>Was scheduled:</strong>{" "}
+                                {moment(
+                                  details.cancelled_scheduled_call_at ||
+                                    details.unscheduled_call_at
+                                ).format("MMM DD, HH:mm")}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      default:
+                        return (
+                          <div>
+                            <div className="mb-1">
+                              <strong>
+                                {activity.action
+                                  ?.replace("_", " ")
+                                  .replace(/\b\w/g, (l: string) =>
+                                    l.toUpperCase()
+                                  )}
+                              </strong>
+                            </div>
+                            <div className="small text-muted">
+                              {activity.details?.description ||
+                                "No details available"}
+                            </div>
+                          </div>
+                        );
+                    }
+                  };
+
+                  return (
+                    <div key={activity.id} className="timeline-item mb-4 ">
+                      <div className="d-flex">
+                        <div className="timeline-marker me-3">
+                          <div
+                            className={`bg-${getActivityColor(
+                              activity.action
+                            )} rounded-circle d-flex align-items-center justify-content-center shadow-sm`}
+                            style={{ width: "36px", height: "36px" }}
+                          >
+                            {getActivityIcon(activity.action)}
+                          </div>
+                        </div>
+                        <div className="timeline-content flex-grow-1">
+                          <div className="card border-0 shadow-sm">
+                            <div className="card-body p-3">
+                              <div className="d-flex justify-content-between align-items-start mb-2">
+                                <div className="flex-grow-1">
+                                  <h6 className="mb-1 d-flex align-items-center">
+                                    <strong className="text-primary">
+                                      {getNameByExtension(
+                                        activity.user_extension_done_by
+                                      ) || "System"}
+                                    </strong>
+                                    <Badge
+                                      bg={getActivityColor(activity.action)}
+                                      className="ms-2 small"
+                                    >
+                                      {activity.action
+                                        ?.replace("_", " ")
+                                        .replace(/\b\w/g, (l: string) =>
+                                          l.toUpperCase()
+                                        )}
+                                    </Badge>
+                                  </h6>
+                                  <div className="text-muted">
+                                    {formatActivityDetails(activity)}
+                                  </div>
+                                </div>
+                                <div className="text-end">
+                                  <small className="text-muted">
+                                    {moment(activity.created_at).format(
+                                      "MMM DD, YYYY"
+                                    )}
+                                  </small>
+                                  <br />
+                                  <small className="text-muted">
+                                    {moment(activity.created_at).format(
+                                      "HH:mm:ss"
+                                    )}
+                                  </small>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="timeline-line"></div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             )}
+
+            {/* Pagination */}
+            {!historyLoading &&
+              historyData.length > 0 &&
+              historyPagination.last_page > 1 && (
+                <div className="d-flex justify-content-center mt-4">
+                  <div className="btn-group" role="group">
+                    <Button
+                      variant="outline-secondary"
+                      size="sm"
+                      disabled={historyPagination.current_page === 1}
+                      onClick={() =>
+                        fetchHistoryData(historyPagination.current_page - 1)
+                      }
+                    >
+                      Previous
+                    </Button>
+                    <Button variant="outline-secondary" size="sm" disabled>
+                      {historyPagination.current_page} /{" "}
+                      {historyPagination.last_page}
+                    </Button>
+                    <Button
+                      variant="outline-secondary"
+                      size="sm"
+                      disabled={
+                        historyPagination.current_page ===
+                        historyPagination.last_page
+                      }
+                      onClick={() =>
+                        fetchHistoryData(historyPagination.current_page + 1)
+                      }
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              )}
           </>
         }
         submitButtonText="Close"
@@ -4010,10 +4620,6 @@ const CrmProspectsManagement = () => {
         onSubmit={() => setShowHistoryModal(false)}
         onCancel={() => setShowHistoryModal(false)}
       />
-
-
-
-
 
       {/* Bulk Delete Modal */}
       <Modal
@@ -4056,10 +4662,6 @@ const CrmProspectsManagement = () => {
       />
     </React.Fragment>
   );
-
-
-    
-   
 };
 
 CrmProspectsManagement.getLayout = (page: ReactElement) => {

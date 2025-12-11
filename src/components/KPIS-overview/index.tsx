@@ -54,7 +54,7 @@ const KPIOverview: React.FC<KPIOverviewProps> = ({ title, items }) => {
                   <h2 className="mb-2 fw-bold text-end" style={{ fontSize: '1.75rem' }}>
                     {item.value}
                   </h2>
-                  {item.trend && (
+                  {item.trend ? (
                     <div className="d-flex align-items-center justify-content-end mt-2">
                       {item.trend.isPositive && (
                         <TrendingUp 
@@ -75,6 +75,9 @@ const KPIOverview: React.FC<KPIOverviewProps> = ({ title, items }) => {
                       >
                         {item.trend.label}
                       </span>
+                    </div>
+                  ) : (
+                    <div className="d-flex align-items-center justify-content-end mt-2" style={{ minHeight: '20px' }}>
                     </div>
                   )}
                 </Card.Body>
@@ -101,7 +104,7 @@ const KPIOverview: React.FC<KPIOverviewProps> = ({ title, items }) => {
                   <h2 className="mb-2 fw-bold text-end" style={{ fontSize: '1.75rem' }}>
                     {item.value}
                   </h2>
-                  {item.trend && (
+                  {item.trend ? (
                     <div className="d-flex align-items-center justify-content-end mt-2">
                       {item.trend.isPositive && (
                         <TrendingUp 
@@ -122,6 +125,9 @@ const KPIOverview: React.FC<KPIOverviewProps> = ({ title, items }) => {
                       >
                         {item.trend.label}
                       </span>
+                    </div>
+                  ) : (
+                    <div className="d-flex align-items-center justify-content-end mt-2" style={{ minHeight: '20px' }}>
                     </div>
                   )}
                 </Card.Body>

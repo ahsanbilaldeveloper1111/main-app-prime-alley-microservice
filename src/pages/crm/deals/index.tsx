@@ -967,15 +967,15 @@ const CrmDeals = () => {
       name: deal.name || '',
       company: deal.company_name || '',
       industry: deal.industry || '',
-      stage: deal.stage?.name || 'New',
+      stage: deal.stage?.name || 'No Stage',
       dealType: deal.deal_type || '',
       value: deal.net_value || deal.grand_total || '0',
       currency: deal.currency || 'USD',
       probability: deal.probability || 0,
       closeDate: deal.expected_close_date ? new Date(deal.expected_close_date).toLocaleDateString() : '',
-      owner: extensions.find((ext: any) => ext?.id == deal?.assigned_to || ext?.extension == deal?.assigned_to)?.display_name || 
-              extensions.find((ext: any) => ext?.id == deal?.assigned_to || ext?.extension == deal?.assigned_to)?.name || 
-              deal.assigned_to || '',
+      owner: extensions.find((ext: any) => ext?.id == deal?.created_by || ext?.extension == deal?.created_by)?.display_name || 
+              extensions.find((ext: any) => ext?.id == deal?.created_by || ext?.extension == deal?.created_by)?.name || 
+              deal.created_by || '',
       assignedUser: extensions.find((ext: any) => ext?.id == deal?.assigned_to || ext?.extension == deal?.assigned_to)?.display_name || 
                     extensions.find((ext: any) => ext?.id == deal?.assigned_to || ext?.extension == deal?.assigned_to)?.name || 
                     deal.assigned_to || '',
@@ -1006,7 +1006,7 @@ const CrmDeals = () => {
     // Stage distribution
     const stageCounts: Record<string, number> = {};
     transformedDeals.forEach(d => {
-      const stage = d.stage || 'New';
+      const stage = d.stage || 'No Stage';
       stageCounts[stage] = (stageCounts[stage] || 0) + 1;
     });
     

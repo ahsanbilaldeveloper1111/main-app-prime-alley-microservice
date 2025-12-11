@@ -677,23 +677,13 @@ const CrmReports = () => {
                   icon: <Users size={24} />,
                   iconColor: '#4F46E5',
                   label: 'TOTAL LEADS',
-                  value: (leadOverview?.total_leads || leadConversion?.total_leads || 0).toLocaleString(),
-                  trend: {
-                    value: 'vs last month',
-                    isPositive: true,
-                    label: ''
-                  }
+                  value: (leadOverview?.total_leads || leadConversion?.total_leads || 0).toLocaleString()
                 },
                 {
                   icon: <UserPlus size={24} />,
                   iconColor: '#10b981',
                   label: 'NEW LEADS',
-                  value: (leadOverview?.new_leads || 0).toLocaleString(),
-                  trend: {
-                    value: 'this week',
-                    isPositive: true,
-                    label: ''
-                  }
+                  value: (leadOverview?.new_leads || 0).toLocaleString()
                 },
                 {
                   icon: <UserCheck size={24} />,
@@ -710,12 +700,7 @@ const CrmReports = () => {
                   icon: <AlertCircle size={24} />,
                   iconColor: '#3b82f6',
                   label: 'UNASSIGNED',
-                  value: (leadOverview?.unassigned_leads || 0).toLocaleString(),
-                  trend: {
-                    value: 'needs assignment',
-                    isPositive: false,
-                    label: ''
-                  }
+                  value: (leadOverview?.unassigned_leads || 0).toLocaleString()
                 },
                 {
                   icon: <Handshake size={24} />,
@@ -1083,10 +1068,7 @@ const CrmReports = () => {
                           return `$${usdValue.toFixed(2)}`;
                         })()}
                       </h2>
-                      <div className="d-flex align-items-center justify-content-end mt-2">
-                        <span className="text-muted small" style={{ fontSize: '0.8rem' }}>
-                          vs last month
-                        </span>
+                      <div className="d-flex align-items-center justify-content-end mt-2" style={{ minHeight: '20px' }}>
                       </div>
                     </Card.Body>
                   </Card>
@@ -1115,10 +1097,7 @@ const CrmReports = () => {
                           return `$${usdValue.toFixed(2)}`;
                         })()}
                       </h2>
-                      <div className="d-flex align-items-center justify-content-end mt-2">
-                        <span className="text-muted small" style={{ fontSize: '0.8rem' }}>
-                          vs last month
-                        </span>
+                      <div className="d-flex align-items-center justify-content-end mt-2" style={{ minHeight: '20px' }}>
                       </div>
                     </Card.Body>
                   </Card>
@@ -1141,10 +1120,7 @@ const CrmReports = () => {
                       <h2 className="mb-2 fw-bold text-end" style={{ fontSize: '1.75rem' }}>
                         {dealConversion?.total_deals || 0}
                       </h2>
-                      <div className="d-flex align-items-center justify-content-end mt-2">
-                        <span className="text-muted small" style={{ fontSize: '0.8rem' }}>
-                          growth
-                        </span>
+                      <div className="d-flex align-items-center justify-content-end mt-2" style={{ minHeight: '20px' }}>
                       </div>
                     </Card.Body>
                   </Card>
@@ -1165,10 +1141,7 @@ const CrmReports = () => {
                       <h2 className="mb-2 fw-bold text-end" style={{ fontSize: '1.75rem' }}>
                         {dealConversion?.total_deals || 0}
                       </h2>
-                      <div className="d-flex align-items-center justify-content-end mt-2">
-                        <span className="text-muted small" style={{ fontSize: '0.8rem' }}>
-                          growth
-                        </span>
+                      <div className="d-flex align-items-center justify-content-end mt-2" style={{ minHeight: '20px' }}>
                       </div>
                     </Card.Body>
                   </Card>
@@ -1191,10 +1164,7 @@ const CrmReports = () => {
                       <h2 className="mb-2 fw-bold text-end" style={{ fontSize: '1.75rem' }}>
                         {dealConversion?.converted_to_orders || 0}
                       </h2>
-                      <div className="d-flex align-items-center justify-content-end mt-2">
-                        <span className="text-muted small" style={{ fontSize: '0.8rem' }}>
-                          conversion
-                        </span>
+                      <div className="d-flex align-items-center justify-content-end mt-2" style={{ minHeight: '20px' }}>
                       </div>
                     </Card.Body>
                   </Card>
@@ -1215,10 +1185,7 @@ const CrmReports = () => {
                       <h2 className="mb-2 fw-bold text-end" style={{ fontSize: '1.75rem' }}>
                         {dealConversion?.converted_to_orders || 0}
                       </h2>
-                      <div className="d-flex align-items-center justify-content-end mt-2">
-                        <span className="text-muted small" style={{ fontSize: '0.8rem' }}>
-                          conversion
-                        </span>
+                      <div className="d-flex align-items-center justify-content-end mt-2" style={{ minHeight: '20px' }}>
                       </div>
                     </Card.Body>
                   </Card>
@@ -1649,9 +1616,7 @@ const CrmReports = () => {
                       <h2 className="mb-2 fw-bold text-end" style={{ fontSize: '1.75rem' }}>
                         {orderSummary?.total_orders?.toLocaleString() || 0}
                       </h2>
-                      <div className="d-flex align-items-center justify-content-end mt-2">
-                        <TrendingUp size={16} className="text-success" style={{ marginRight: '0.25rem' }} />
-                        <span className="text-muted small" style={{ fontSize: '0.8rem' }}>vs last month</span>
+                      <div className="d-flex align-items-center justify-content-end mt-2" style={{ minHeight: '20px' }}>
                       </div>
                     </Card.Body>
                   </Card>
@@ -1672,9 +1637,7 @@ const CrmReports = () => {
                       <h2 className="mb-2 fw-bold text-end" style={{ fontSize: '1.75rem' }}>
                         {orderSummary?.total_orders?.toLocaleString() || 0}
                       </h2>
-                      <div className="d-flex align-items-center justify-content-end mt-2">
-                        <TrendingUp size={16} className="text-success" style={{ marginRight: '0.25rem' }} />
-                        <span className="text-muted small" style={{ fontSize: '0.8rem' }}>vs last month</span>
+                      <div className="d-flex align-items-center justify-content-end mt-2" style={{ minHeight: '20px' }}>
                       </div>
                     </Card.Body>
                   </Card>
@@ -1747,9 +1710,7 @@ const CrmReports = () => {
                       <h2 className="mb-2 fw-bold text-end" style={{ fontSize: '1.75rem' }}>
                         {orderStatus.find(s => s.status === 'Approved')?.count || 0}
                       </h2>
-                      <div className="d-flex align-items-center justify-content-end mt-2">
-                        <TrendingUp size={16} className="text-success" style={{ marginRight: '0.25rem' }} />
-                        <span className="text-muted small" style={{ fontSize: '0.8rem' }}>approval rate</span>
+                      <div className="d-flex align-items-center justify-content-end mt-2" style={{ minHeight: '20px' }}>
                       </div>
                     </Card.Body>
                   </Card>
@@ -1770,9 +1731,7 @@ const CrmReports = () => {
                       <h2 className="mb-2 fw-bold text-end" style={{ fontSize: '1.75rem' }}>
                         {orderStatus.find(s => s.status === 'Approved')?.count || 0}
                       </h2>
-                      <div className="d-flex align-items-center justify-content-end mt-2">
-                        <TrendingUp size={16} className="text-success" style={{ marginRight: '0.25rem' }} />
-                        <span className="text-muted small" style={{ fontSize: '0.8rem' }}>approval rate</span>
+                      <div className="d-flex align-items-center justify-content-end mt-2" style={{ minHeight: '20px' }}>
                       </div>
                     </Card.Body>
                   </Card>
@@ -1800,9 +1759,7 @@ const CrmReports = () => {
                           return `$${usdValue.toFixed(2)}`;
                         })()}
                       </h2>
-                      <div className="d-flex align-items-center justify-content-end mt-2">
-                        <TrendingUp size={16} className="text-success" style={{ marginRight: '0.25rem' }} />
-                        <span className="text-muted small" style={{ fontSize: '0.8rem' }}>growth</span>
+                      <div className="d-flex align-items-center justify-content-end mt-2" style={{ minHeight: '20px' }}>
                       </div>
                     </Card.Body>
                   </Card>
@@ -1828,9 +1785,7 @@ const CrmReports = () => {
                           return `$${usdValue.toFixed(2)}`;
                         })()}
                       </h2>
-                      <div className="d-flex align-items-center justify-content-end mt-2">
-                        <TrendingUp size={16} className="text-success" style={{ marginRight: '0.25rem' }} />
-                        <span className="text-muted small" style={{ fontSize: '0.8rem' }}>growth</span>
+                      <div className="d-flex align-items-center justify-content-end mt-2" style={{ minHeight: '20px' }}>
                       </div>
                     </Card.Body>
                   </Card>
@@ -1857,9 +1812,7 @@ const CrmReports = () => {
                           return `$${usdAvg.toFixed(2)}`;
                         })()}
                       </h2>
-                      <div className="d-flex align-items-center justify-content-end mt-2">
-                        <TrendingUp size={16} className="text-success" style={{ marginRight: '0.25rem' }} />
-                        <span className="text-muted small" style={{ fontSize: '0.8rem' }}>vs last month</span>
+                      <div className="d-flex align-items-center justify-content-end mt-2" style={{ minHeight: '20px' }}>
                       </div>
                     </Card.Body>
                   </Card>
@@ -1884,9 +1837,7 @@ const CrmReports = () => {
                           return `$${usdAvg.toFixed(2)}`;
                         })()}
                       </h2>
-                      <div className="d-flex align-items-center justify-content-end mt-2">
-                        <TrendingUp size={16} className="text-success" style={{ marginRight: '0.25rem' }} />
-                        <span className="text-muted small" style={{ fontSize: '0.8rem' }}>vs last month</span>
+                      <div className="d-flex align-items-center justify-content-end mt-2" style={{ minHeight: '20px' }}>
                       </div>
                     </Card.Body>
                   </Card>

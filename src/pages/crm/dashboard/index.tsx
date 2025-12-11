@@ -27,6 +27,7 @@ import {
   ShoppingBag,
   TrendingUp,
   Eye,
+  Calendar,
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "react-toastify";
@@ -57,9 +58,10 @@ interface KPICardData {
   isPositive?: boolean;
   icon: React.ReactNode;
   color: string;
+  monthlyValue?: number;
 }
 
-const KPICard: React.FC<KPICardData> = ({ title, value, change, isPositive, icon, color }) => {
+const KPICard: React.FC<KPICardData> = ({ title, value, change, isPositive, icon, color, monthlyValue }) => {
   return (
     <Card
       className="h-100"
@@ -81,6 +83,15 @@ const KPICard: React.FC<KPICardData> = ({ title, value, change, isPositive, icon
         </div>
         <h3 className="mb-1">{value}</h3>
         <p className="text-muted mb-0 small">{title}</p>
+        {monthlyValue !== undefined && (
+          <div className="mt-3 pt-3 border-top d-flex align-items-center gap-2">
+            <Calendar size={16} className={`text-${color}`} />
+            <div>
+              <span className="text-muted small">This Month: </span>
+              <span className={`fw-semibold text-${color}`}>{monthlyValue}</span>
+            </div>
+          </div>
+        )}
       </Card.Body>
     </Card>
   );
@@ -132,10 +143,7 @@ const CrmDashboard = () => {
   const [dealsByStage, setDealsByStage] = useState<any[]>([]);
   const [ordersByStage, setOrdersByStage] = useState<any[]>([]);
   
-  // Totals
-  const [totalLeads, setTotalLeads] = useState(0);
-  const [totalDeals, setTotalDeals] = useState(0);
-  const [totalOrders, setTotalOrders] = useState(0);
+  // Conversion percentages
   const [leadToDealPercent, setLeadToDealPercent] = useState(0);
   const [dealToOrderPercent, setDealToOrderPercent] = useState(0);
 
@@ -159,12 +167,6 @@ const CrmDashboard = () => {
       ]);
       console.log("ZEZEZE", dashboard);
       setDashboardData(dashboard as CrmDashboardData);
-
-      // Set totals from API stats
-      const stats = (dashboard as CrmDashboardData)?.stats;
-      setTotalLeads(stats?.leads?.total || 0);
-      setTotalDeals(stats?.deals?.total || 0);
-      setTotalOrders(stats?.orders?.total || 0);
 
       // Set conversion percentages from API
       const conversionStats = (dashboard as CrmDashboardData)?.conversion_stats?.last_30_days;
@@ -247,33 +249,38 @@ const CrmDashboard = () => {
     );
   }
 
+  const stats = dashboardData?.stats;
+  
   const kpiData: KPICardData[] = [
     {
-      title: "Total Leads",
-      value: totalLeads.toString(),
+      title: "Total Leads (All Time)",
+      value: (stats?.leads?.total || 0).toString(),
       icon: <Target size={24} />,
       color: "primary",
+      monthlyValue: stats?.leads?.this_month,
     },
     {
-      title: "Total Deals",
-      value: totalDeals.toString(),
+      title: "Total Deals (All Time)",
+      value: (stats?.deals?.total || 0).toString(),
       icon: <Handshake size={24} />,
       color: "success",
+      monthlyValue: stats?.deals?.this_month,
     },
     {
-      title: "Total Orders",
-      value: totalOrders.toString(),
+      title: "Total Orders (All Time)",
+      value: (stats?.orders?.total || 0).toString(),
       icon: <ShoppingBag size={24} />,
       color: "info",
+      monthlyValue: stats?.orders?.this_month,
     },
     {
-      title: "Lead to Deal Conversion",
+      title: "Lead to Deal Conversion (Past 30 Days)",
       value: `${leadToDealPercent}%`,
       icon: <TrendingUp size={24} />,
       color: "warning",
     },
     {
-      title: "Deal to Order Conversion",
+      title: "Deal to Order Conversion (Past 30 Days)",
       value: `${dealToOrderPercent}%`,
       icon: <TrendingUp size={24} />,
       color: "secondary",
@@ -701,7 +708,7 @@ const CrmDashboard = () => {
                         </h6>
                           <div className="d-flex flex-wrap align-items-center gap-2 mb-2">
                             <small className="text-muted">
-                              {moment(deal.created_at).format("MMM DD, YYYY")}
+                              Created: {moment(deal.created_at).format("MMM DD, YYYY")}
                             </small>
                             {deal.grand_total && (
                               <small className="text-muted">
@@ -780,7 +787,7 @@ const CrmDashboard = () => {
                           </h6>
                           <div className="d-flex flex-wrap align-items-center gap-2 mb-2">
                             <small className="text-muted">
-                              {moment(order.created_at).format("MMM DD, YYYY")}
+                              Creted: {moment(order.created_at).format("MMM DD, YYYY")}
                             </small>
                             {order.final_amount && (
                               <small className="text-muted">
@@ -796,7 +803,7 @@ const CrmDashboard = () => {
                                 textTransform: "uppercase",
                               }}
                             >
-                              {order.stage?.name || order.status || "No Stage"}
+                              {order.stage?.name || "No Stage"}
                             </Badge>
                   </div>
                         </div>

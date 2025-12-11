@@ -658,6 +658,8 @@ export interface CrmDataItem {
   campaign_id: number | null;
   created_at: string;
   updated_at: string;
+  scheduled_call_at?: string | null;
+  note?: string | null;
 }
 
 export interface CrmDataPagination {
@@ -1218,7 +1220,8 @@ export const createCampaignField = async (
 export const scheduleCall = async (
   crmDataId: number,
   scheduledCallAt: string,
-  userExtension: string
+  userExtension: string,
+  notes?: string
 ): Promise<{
   success: boolean;
   message: string;
@@ -1230,6 +1233,7 @@ export const scheduleCall = async (
       {
         scheduled_call_at: scheduledCallAt,
         user_extension: userExtension,
+        note: notes,
       }
     );
 
