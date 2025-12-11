@@ -270,6 +270,16 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
           icon: <Phone size={16} />,
           permission: PERMISSIONS.VIEW_CALL_RECORDINGS,
           url: '/call-recordings'
+        },
+        {
+          id: 'call-reports',
+          key: 'call-reports',
+          permission: PERMISSIONS.REPORTS_SERVICES,
+          icon: <ChartNoAxesCombined size={20} />,
+          color: MENU_COLORS.REPORTS,
+          title: MENU_LABELS.REPORTS,
+          label: MENU_LABELS.REPORTS,
+          url: '/reports',
         }
       ].filter(item => !item.permission || hasPermission(item.permission))
     },
