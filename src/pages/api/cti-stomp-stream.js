@@ -3,7 +3,7 @@ import { Client } from '@stomp/stompjs';
 
 // Connection pool to reuse STOMP connections
 const connectionPool = new Map();
-const CONNECTION_TIMEOUT = 50000; // 15 minutes
+const CONNECTION_TIMEOUT = 9000000; // 2.5 hours
 const KEEP_ALIVE_INTERVAL = 4000; // 30 seconds
 
 // Track which connections have subscriptions set up
