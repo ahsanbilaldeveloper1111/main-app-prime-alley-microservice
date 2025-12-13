@@ -69,7 +69,7 @@ const LiveCallDashboard = () => {
     syncPersistedCallStates,
     getActiveCallIdsFromLocalStorage,
     getAllCallIds
-  } = useCtiStomp()
+  } = useCtiStomp('/ws', undefined, 'liveView')
 
   const [loading, setLoading] = useState(true)
   const [hover, setHover] = useState<string | null>(null)

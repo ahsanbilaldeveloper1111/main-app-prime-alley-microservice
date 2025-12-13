@@ -3,19 +3,54 @@ import { Client } from '@stomp/stompjs';
 
 // Connection pool to reuse STOMP connections
 const connectionPool = new Map();
-const CONNECTION_TIMEOUT = 9000000; // 2.5 hours
-const KEEP_ALIVE_INTERVAL = 4000; // 30 seconds
+// TEST MODE: Set to 2 minutes (120000ms) for local testing
+// PRODUCTION: Set to 2.5 hours (9000000ms) - backend token expires in 3 hours
+const CONNECTION_TIMEOUT = 9000000;//process.env.NODE_ENV === 'development' ? 120000 : 9000000; // 2 min (test) or 2.5 hours (prod)
+const KEEP_ALIVE_INTERVAL = 4000; // 4 seconds
 
 // Track which connections have subscriptions set up
 const subscriptionsSetup = new Set();
+
+// Track subscriptions per connection for proper cleanup
+const connectionSubscriptions = new Map(); // connectionKey -> [sub1, sub2, sub3]
+
+// Clean up subscriptions for a connection
+const cleanupSubscriptions = (connectionKey) => {
+  const subscriptions = connectionSubscriptions.get(connectionKey) || [];
+  if (subscriptions.length > 0) {
+    console.log(`🧹 Cleaning up ${subscriptions.length} subscription(s) for ${connectionKey}`);
+  }
+  subscriptions.forEach((sub, index) => {
+    try {
+      if (sub && typeof sub.unsubscribe === 'function') {
+        sub.unsubscribe();
+        console.log(`  ✅ Unsubscribed subscription ${index + 1} for ${connectionKey}`);
+      }
+    } catch (err) {
+      console.error(`  ❌ Error unsubscribing subscription ${index + 1} for ${connectionKey}:`, err);
+    }
+  });
+  connectionSubscriptions.delete(connectionKey);
+  subscriptionsSetup.delete(connectionKey);
+};
 
 // Clean up stale connections
 const cleanupStaleConnections = () => {
   const now = Date.now();
   for (const [key, connection] of connectionPool.entries()) {
-    if (now - connection.lastUsed > CONNECTION_TIMEOUT) {
+    const age = now - connection.lastUsed;
+    if (age > CONNECTION_TIMEOUT) {
+      const ageMinutes = Math.floor(age / 60000);
+      const timeoutMinutes = Math.floor(CONNECTION_TIMEOUT / 60000);
+      console.log(`🧹 Cleaning up stale connection: ${key} (age: ${ageMinutes}min, timeout: ${timeoutMinutes}min)`);
+      // Unsubscribe before deactivating to prevent orphaned subscriptions on backend
+      cleanupSubscriptions(key);
       if (connection.client && connection.client.connected) {
-        connection.client.deactivate();
+        try {
+          connection.client.deactivate();
+        } catch (err) {
+          console.error('Error deactivating client:', err);
+        }
       }
       connectionPool.delete(key);
     }
@@ -23,7 +58,10 @@ const cleanupStaleConnections = () => {
 };
 
 // Set up periodic cleanup
-setInterval(cleanupStaleConnections, 60000); // Every minute
+// TEST MODE: Check every 10 seconds for faster testing
+// PRODUCTION: Check every 60 seconds
+const CLEANUP_INTERVAL = process.env.NODE_ENV === 'development' ? 10000 : 60000;
+setInterval(cleanupStaleConnections, CLEANUP_INTERVAL);
 
 // Store SSE response streams for each connection
 const sseStreams = new Map();
@@ -31,12 +69,50 @@ const sseStreams = new Map();
 // Track reconnection attempts to prevent multiple simultaneous reconnections
 const reconnectingConnections = new Set();
 
+// Track backoff per connection to avoid reconnect thrashing
+const reconnectBackoffMs = new Map(); // connectionKey -> ms (starts 1s, caps 10s)
+
+// Track connections that need a fresh JWT before reconnecting
+const authRequiredConnections = new Set();
+
+// Simple auth error detector (mirrors frontend POC patterns)
+const looksLikeAuthError = (message = '', body = '', reason = '') => {
+  const s = `${message} ${body} ${reason}`.toLowerCase();
+  return (
+    s.includes('unauthorized') ||
+    s.includes('expired') ||
+    (s.includes('jwt') && (s.includes('invalid') || s.includes('exp'))) ||
+    s.includes('authentication failed') ||
+    (s.includes('auth') && s.includes('fail')) ||
+    (s.includes('token') && (s.includes('invalid') || s.includes('expired')))
+  );
+};
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+const getBackoff = (connectionKey) => reconnectBackoffMs.get(connectionKey) || 1000;
+const bumpBackoff = (connectionKey) => {
+  const next = Math.min(getBackoff(connectionKey) * 2, 10000);
+  reconnectBackoffMs.set(connectionKey, next);
+  return next;
+};
+const resetBackoff = (connectionKey) => reconnectBackoffMs.set(connectionKey, 1000);
+
 // Optimized subscription setup
 const setupSubscriptions = (client, connectionKey) => {
-  // Always set up subscriptions - even if they were set up before, they might have been lost
-  // during reconnection. The STOMP client will handle duplicate subscriptions gracefully.
+  // Prevent duplicate subscriptions for the same connectionKey
+  if (subscriptionsSetup.has(connectionKey)) {
+    console.log('✅ Subscriptions already set up for connection:', connectionKey);
+    return;
+  }
+
+  // Clean up any existing subscriptions first (defensive)
+  cleanupSubscriptions(connectionKey);
+
   console.log('Setting up STOMP subscriptions for connection:', connectionKey);
-  const streams = sseStreams.get(connectionKey) || [];
+
+  const subscriptions = [];
+
   
   // Subscribe to complete-state
   const sub1 = client.subscribe('/user/topic/complete-state', (message) => {
@@ -134,7 +210,10 @@ const setupSubscriptions = (client, connectionKey) => {
       console.error('Error parsing call-events payload:', err);
     }
   });
-
+  
+  // Store all subscriptions for this connection
+  subscriptions.push(sub1, sub2, sub3);
+  connectionSubscriptions.set(connectionKey, subscriptions);
   
   // Mark subscriptions as set up
   subscriptionsSetup.add(connectionKey);
@@ -145,7 +224,7 @@ const setupSubscriptions = (client, connectionKey) => {
 
 // Handle POST requests for publishing STOMP messages
 const handlePublishMessage = (req, res) => {
-  const { token, userAddress, destination, body } = req.body;
+  const { token, userAddress, destination, body, screenId = 'default' } = req.body;
   
   if (!token || !userAddress || !destination) {
     return res.status(400).json({ 
@@ -154,8 +233,8 @@ const handlePublishMessage = (req, res) => {
     });
   }
   
-  const connectionKey = `${userAddress}-${token.substring(0, 20)}`;
-  const existingConnection = connectionPool.get(connectionKey);
+  const connectionKey = `${userAddress}:${screenId}`;
+  let existingConnection = connectionPool.get(connectionKey);
   
   if (!existingConnection || !existingConnection.client || !existingConnection.client.connected) {
     return res.status(400).json({ 
@@ -196,7 +275,7 @@ export default function handler(req, res) {
   }
 
   // Get parameters from query string
-  const { token, userAddress } = req.query;
+  const { token, userAddress, screenId = 'default' } = req.query;
   
   // Check if CTI server URL is configured
   if (!process.env.NEXT_PUBLIC_PRIVATE_CTI_SOCKET_URL) {
@@ -230,10 +309,10 @@ export default function handler(req, res) {
     'X-Accel-Buffering': 'no'
   });
 
-  const connectionKey = `${userAddress}-${token.substring(0, 20)}`;
+  const connectionKey = `${userAddress}:${screenId}`;
   
   // Check connection pool for existing connection
-  const existingConnection = connectionPool.get(connectionKey);
+  let existingConnection = connectionPool.get(connectionKey);
   
   // Add this SSE stream to the connection's stream list BEFORE setting up subscriptions
   if (!sseStreams.has(connectionKey)) {
@@ -259,14 +338,30 @@ export default function handler(req, res) {
     }
   }, KEEP_ALIVE_INTERVAL);
 
+  // If the token changed for this screen, restart the STOMP connection so CONNECT uses the latest JWT
+  if (existingConnection && existingConnection.token && existingConnection.token !== token) {
+    console.log(`🔄 Token changed for ${connectionKey}; restarting STOMP connection with fresh JWT`);
+    authRequiredConnections.delete(connectionKey);
+    reconnectingConnections.delete(connectionKey);
+    try {
+      cleanupSubscriptions(connectionKey);
+      if (existingConnection.client && existingConnection.client.connected) {
+        existingConnection.client.deactivate();
+      }
+    } catch (err) {
+      console.error('Error restarting client for fresh JWT:', err);
+    }
+    connectionPool.delete(connectionKey);
+    existingConnection = null;
+  }
+
   // If we have an existing STOMP client, use it
   if (existingConnection && existingConnection.client && existingConnection.client.connected) {
     console.log('🔄 Reusing existing STOMP connection for user:', userAddress);
     existingConnection.lastUsed = Date.now();
     
     // Always ensure subscriptions are set up for reused connections
-    // Clear the flag first to force fresh subscription setup
-    subscriptionsSetup.delete(connectionKey);
+    // setupSubscriptions will clean up old subscriptions first if needed
     console.log('📡 Setting up subscriptions for reused connection:', connectionKey);
     setupSubscriptions(existingConnection.client, connectionKey);
     
@@ -298,6 +393,21 @@ export default function handler(req, res) {
       }
       if (streams.length === 0) {
         sseStreams.delete(connectionKey);
+        // If no more SSE streams, clean up subscriptions and connection
+        // This prevents orphaned subscriptions on the backend
+       cleanupSubscriptions(connectionKey);
+        let existingConnection = connectionPool.get(connectionKey);
+        if (existingConnection && existingConnection.client) {
+          try {
+            if (existingConnection.client.connected) {
+              existingConnection.client.deactivate();
+            }
+          } catch (err) {
+            console.error('Error deactivating client during cleanup:', err);
+          }
+        }
+        connectionPool.delete(connectionKey);
+        reconnectingConnections.delete(connectionKey);
       }
     };
     
@@ -388,7 +498,7 @@ export default function handler(req, res) {
       heartbeatIncoming: 4000,  // Expect heartbeat from server every 10 seconds
       heartbeatOutgoing: 4000,  // Send heartbeat to server every 10 seconds
       // Automatic reconnection configuration
-      reconnectDelay: 5000,      // Wait 5 seconds before reconnecting
+      reconnectDelay: 0,         // We handle reconnect manually (with backoff)
       connectionTimeout: 10000,  // Connection timeout
       // Don't automatically deactivate on close - we'll handle reconnection manually
       forceBinaryWSFrames: false,
@@ -399,6 +509,9 @@ export default function handler(req, res) {
       onConnect: (frame) => {
         console.log('STOMP Connected successfully for user:', userAddress);
         clearTimeout(connectionTimeout);
+        // Successful connect: reset backoff and clear auth-required state
+        resetBackoff(connectionKey);
+        authRequiredConnections.delete(connectionKey);
         
         // Clear reconnection flag if it was set
         reconnectingConnections.delete(connectionKey);
@@ -411,7 +524,8 @@ export default function handler(req, res) {
         connectionPool.set(connectionKey, {
           client,
           lastUsed: Date.now(),
-          userAddress
+          userAddress,
+          token
         });
         
         // Set up subscriptions (this will use the streams already added)
@@ -448,244 +562,164 @@ export default function handler(req, res) {
         
         console.log('📡 STOMP subscriptions established');
       },
-      onStompError: (frame) => {
+      onStompError: async (frame) => {
         console.error('STOMP Error:', frame);
+        const msg = frame?.headers?.message || 'STOMP error';
+        const body = frame?.body || '';
+        const isAuth = looksLikeAuthError(msg, body);
+
         const streams = sseStreams.get(connectionKey) || [];
-        streams.forEach(stream => {
-          if (!stream.destroyed && !stream.closed) {
-            try {
-              stream.write(`data: ${JSON.stringify({ type: 'stomp_error', message: frame.headers.message || 'STOMP error' })}\n\n`);
-              if (stream.flush) {
-                stream.flush();
-              }
-            } catch (err) {
-              console.error('Error writing STOMP error to stream:', err);
-            }
-          }
-        });
-        
-        // Attempt to reconnect like a fresh page
-        if (streams.length > 0) {
-          // Check if already reconnecting to avoid multiple simultaneous attempts
-          if (reconnectingConnections.has(connectionKey)) {
-            console.log(`⚠️ Reconnection already in progress for: ${connectionKey}`);
-            return;
-          }
-          
-          console.log(`🔄 STOMP error occurred, will attempt to reconnect like a fresh page...`);
-          
-          // Mark as reconnecting
-          reconnectingConnections.add(connectionKey);
-          
-          // Remove from connection pool
-          const existingConnection = connectionPool.get(connectionKey);
-          if (existingConnection && existingConnection.client === client) {
+
+        if (isAuth) {
+          // Mark connection as requiring a fresh JWT and stop reconnect thrash
+          authRequiredConnections.add(connectionKey);
+
+          // Clean up and drop the current client so we don't loop with an expired token
+          try { cleanupSubscriptions(connectionKey); } catch {}
+          try { await client.deactivate(); } catch {}
+
+          if (connectionPool.has(connectionKey)) {
             connectionPool.delete(connectionKey);
-            subscriptionsSetup.delete(connectionKey);
-            if (client) {
-              try {
-                client.deactivate();
-              } catch (err) {
-                console.error('Error deactivating client:', err);
-              }
-            }
           }
-          
-          // Notify streams about reconnection
+          reconnectingConnections.delete(connectionKey);
+
+          // Notify clients to refresh token and re-open SSE (or hit this endpoint again with a fresh token)
           streams.forEach(stream => {
             if (!stream.destroyed && !stream.closed) {
               try {
-                stream.write(`data: ${JSON.stringify({ 
-                  type: 'connection', 
-                  status: 'reconnecting', 
-                  message: 'Reconnecting to CTI server after STOMP error...', 
+                stream.write(`data: ${JSON.stringify({
+                  type: 'connection',
+                  status: 'auth_required',
+                  message: 'Authentication expired/invalid. Refresh JWT and reconnect.',
                   preserveState: true
-                })}\n\n`);
-                if (stream.flush) {
-                  stream.flush();
-                }
+                })}
+
+`);
+                if (stream.flush) stream.flush();
               } catch (err) {
-                console.error('Error writing reconnect message to stream:', err);
+                console.error('Error writing auth_required to stream:', err);
               }
             }
           });
-          
-          // Attempt to reconnect after a delay - reset and try all connection attempts
-          setTimeout(() => {
-            const currentStreams = sseStreams.get(connectionKey) || [];
-            if (currentStreams.length > 0 && !connectionPool.has(connectionKey)) {
-              console.log(`🔄 Attempting to reconnect after STOMP error for connection: ${connectionKey}`);
-              // Reset connection attempt counter for reconnection (like a fresh page)
-              currentAttempt = 0;
-              // Create a new client and try all connection attempts
-              tryConnection(connectionAttempts[0]);
-            } else {
-              console.log('⚠️ No active streams or connection already exists, skipping reconnection');
-              reconnectingConnections.delete(connectionKey);
-            }
-          }, 3000);
+
+          return;
         }
-      },
-      onWebSocketError: (error) => {
-        console.error('WebSocket Error:', error.message);
-        
-        // Try next connection attempt
-        currentAttempt++;
-        if (currentAttempt < connectionAttempts.length) {
-          console.log(`❌ Connection failed, trying next attempt...`);
-          setTimeout(() => {
-            if (client) {
-              try {
-                client.deactivate();
-              } catch (err) {
-                console.error('Error deactivating client:', err);
-              }
+
+        // Non-auth errors: report and let onWebSocketClose drive reconnection
+        streams.forEach(stream => {
+          if (!stream.destroyed && !stream.closed) {
+            try {
+              stream.write(`data: ${JSON.stringify({ type: 'stomp_error', message: msg })}
+
+`);
+              if (stream.flush) stream.flush();
+            } catch (err) {
+              console.error('Error writing stomp_error to stream:', err);
             }
-            tryConnection(connectionAttempts[currentAttempt]);
-          }, 1000);
-        } else {
-          console.error('❌ All connection attempts failed, will retry like a fresh page...');
-          
-          const streams = sseStreams.get(connectionKey) || [];
-          
-          // If there are active streams, attempt to reconnect like a fresh page
-          if (streams.length > 0) {
-            // Check if already reconnecting to avoid multiple simultaneous attempts
-            if (reconnectingConnections.has(connectionKey)) {
-              console.log(`⚠️ Reconnection already in progress for: ${connectionKey}`);
-              return;
-            }
-            
-            // Mark as reconnecting
-            reconnectingConnections.add(connectionKey);
-            
-            // Remove from connection pool
-            const existingConnection = connectionPool.get(connectionKey);
-            if (existingConnection && existingConnection.client === client) {
-              connectionPool.delete(connectionKey);
-              subscriptionsSetup.delete(connectionKey);
-            }
-            
-            // Notify streams about reconnection
-            streams.forEach(stream => {
-              if (!stream.destroyed && !stream.closed) {
-                try {
-                  stream.write(`data: ${JSON.stringify({ 
-                    type: 'connection', 
-                    status: 'reconnecting', 
-                    message: 'Reconnecting to CTI server after connection error...', 
-                    preserveState: true
-                  })}\n\n`);
-                  if (stream.flush) {
-                    stream.flush();
-                  }
-                } catch (err) {
-                  console.error('Error writing reconnect message to stream:', err);
-                }
-              }
-            });
-            
-            // Attempt to reconnect after a delay - reset and try all connection attempts like a fresh page
-            setTimeout(() => {
-              const currentStreams = sseStreams.get(connectionKey) || [];
-              if (currentStreams.length > 0 && !connectionPool.has(connectionKey)) {
-                console.log(`🔄 Attempting to reconnect after all connection attempts failed for: ${connectionKey}`);
-                // Reset connection attempt counter for reconnection (like a fresh page)
-                currentAttempt = 0;
-                // Create a new client and try all connection attempts again
-                tryConnection(connectionAttempts[0]);
-              } else {
-                console.log('⚠️ No active streams or connection already exists, skipping reconnection');
-                reconnectingConnections.delete(connectionKey);
-              }
-            }, 3000);
-          } else {
-            // No active streams, just clean up
-            clearTimeout(connectionTimeout);
-            clearInterval(keepAlive);
-            reconnectingConnections.delete(connectionKey);
-            
-            streams.forEach(stream => {
-              if (!stream.destroyed && !stream.closed) {
-                try {
-                  stream.write(`data: ${JSON.stringify({ 
-                    type: 'error', 
-                    status: 'error', 
-                    message: `All WebSocket connection attempts failed`, 
-                    details: `Tried ${connectionAttempts.length} different URLs. Please check if the CTI server is running and accessible.`
-                  })}\n\n`);
-                } catch (err) {
-                  console.error('Error writing error message to stream:', err);
-                }
-              }
-            });
           }
-        }
+        });
+
+        console.error(`STOMP Error details: ${msg}`);
       },
       onWebSocketClose: (event) => {
         console.log('WebSocket closed:', event);
         
+        // Clean up subscriptions when WebSocket closes to prevent orphaned subscriptions
+        cleanupSubscriptions(connectionKey);
+        
         // Remove from connection pool if it was closed
-        const existingConnection = connectionPool.get(connectionKey);
+        let existingConnection = connectionPool.get(connectionKey);
         if (existingConnection && existingConnection.client === client) {
           connectionPool.delete(connectionKey);
-          subscriptionsSetup.delete(connectionKey);
         }
         
         const streams = sseStreams.get(connectionKey) || [];
-        
-        // If there are active streams, always attempt to reconnect (even for code 1000)
-        // This ensures the connection stays alive as long as the user is on the page
+
+        // Detect auth-related closes (expired/invalid JWT). In this case, do NOT auto-reconnect with the same token.
+        const isAuthClose =
+          event?.code === 1008 ||
+          event?.code === 1002 ||
+          looksLikeAuthError('', '', event?.reason || '');
+
         if (streams.length > 0) {
-          // Check if already reconnecting to avoid multiple simultaneous attempts
+          if (isAuthClose) {
+            authRequiredConnections.add(connectionKey);
+            reconnectingConnections.delete(connectionKey);
+
+            streams.forEach(stream => {
+              if (!stream.destroyed && !stream.closed) {
+                try {
+                  stream.write(`data: ${JSON.stringify({
+                    type: 'connection',
+                    status: 'auth_required',
+                    message: 'Authentication expired/invalid. Refresh JWT and reconnect.',
+                    code: event.code,
+                    reason: event.reason,
+                    preserveState: true
+                  })}\n\n`);
+                  if (stream.flush) stream.flush();
+                } catch (err) {
+                  console.error('Error writing auth_required message to stream:', err);
+                }
+              }
+            });
+
+            return;
+          }
+
+          // If auth refresh is required, wait until a new SSE call arrives with a fresh token.
+          if (authRequiredConnections.has(connectionKey)) {
+            console.log(`⚠️ Auth refresh required for ${connectionKey}; skipping auto-reconnect.`);
+            return;
+          }
+
+          // Avoid multiple simultaneous attempts
           if (reconnectingConnections.has(connectionKey)) {
             console.log(`⚠️ Reconnection already in progress for: ${connectionKey}`);
             return;
           }
-          
-          console.log(`🔄 WebSocket closed (code: ${event.code}), will attempt to reconnect like a fresh page...`);
-          
-          // Mark as reconnecting
+
+          console.log(`🔄 WebSocket closed (code: ${event.code}), scheduling reconnect...`);
+
           reconnectingConnections.add(connectionKey);
-          
+
+          const delay = getBackoff(connectionKey);
+
           // Notify streams about reconnection (use 'reconnecting' status to preserve state)
           streams.forEach(stream => {
             if (!stream.destroyed && !stream.closed) {
               try {
-                stream.write(`data: ${JSON.stringify({ 
-                  type: 'connection', 
-                  status: 'reconnecting', 
-                  message: 'Reconnecting to CTI server...', 
-                  code: event.code, 
+                stream.write(`data: ${JSON.stringify({
+                  type: 'connection',
+                  status: 'reconnecting',
+                  message: 'Reconnecting to CTI server...',
+                  code: event.code,
                   reason: event.reason,
-                  preserveState: true  // Signal to client to preserve existing state
+                  preserveState: true,
+                  retryInMs: delay
                 })}\n\n`);
-                if (stream.flush) {
-                  stream.flush();
-                }
+                if (stream.flush) stream.flush();
               } catch (err) {
                 console.error('Error writing reconnect message to stream:', err);
               }
             }
           });
-          
-          // Attempt to reconnect after a delay - reset and try all connection attempts like a fresh page
+
+          // Exponential backoff for next attempt if this one fails again
+          bumpBackoff(connectionKey);
+
           setTimeout(() => {
-            // Check if there are still active streams before reconnecting
             const currentStreams = sseStreams.get(connectionKey) || [];
-            if (currentStreams.length > 0 && !connectionPool.has(connectionKey)) {
-              console.log(`🔄 Attempting to reconnect WebSocket for connection: ${connectionKey} (like a fresh page)`);
-              // Reset connection attempt counter for reconnection (like a fresh page)
+            if (currentStreams.length > 0 && !connectionPool.has(connectionKey) && !authRequiredConnections.has(connectionKey)) {
+              console.log(`🔄 Attempting to reconnect WebSocket for connection: ${connectionKey} (fresh attempt)`);
               currentAttempt = 0;
-              // Create a new client and try all connection attempts again
               tryConnection(connectionAttempts[0]);
             } else {
-              console.log('⚠️ No active streams or connection already exists, skipping reconnection');
+              console.log('⚠️ No active streams, auth required, or connection already exists; skipping reconnection');
               reconnectingConnections.delete(connectionKey);
             }
-          }, 3000); // Wait 3 seconds before reconnecting
-        }
-      }
+          }, delay);
+        }      }
     });
 
     // Activate the client
@@ -706,6 +740,21 @@ export default function handler(req, res) {
     }
     if (streams.length === 0) {
       sseStreams.delete(connectionKey);
+      // If no more SSE streams, clean up subscriptions and connection
+      // This prevents orphaned subscriptions on the backend
+      cleanupSubscriptions(connectionKey);
+      let existingConnection = connectionPool.get(connectionKey);
+      if (existingConnection && existingConnection.client) {
+        try {
+          if (existingConnection.client.connected) {
+            existingConnection.client.deactivate();
+          }
+        } catch (err) {
+          console.error('Error deactivating client during cleanup:', err);
+        }
+      }
+      connectionPool.delete(connectionKey);
+      reconnectingConnections.delete(connectionKey);
     }
   };
 
