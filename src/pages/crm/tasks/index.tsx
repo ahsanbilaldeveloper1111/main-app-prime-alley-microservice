@@ -1246,6 +1246,8 @@ const CrmTasks = () => {
           company_name: '',
           due_date: '',
           notes: [],
+          time: '',
+          status: 'pending',
         });
         setSelectedUserExtension(null);
       }} size="lg" centered>
@@ -1464,6 +1466,8 @@ const CrmTasks = () => {
                 company_name: '',
                 due_date: '',
                 notes: [],
+                time: '',
+                status: 'pending',
               });
               setSelectedUserExtension(null);
             }}>
