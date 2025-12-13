@@ -57,8 +57,9 @@ const generateInstanceId = () => {
  * @param wsPath - WebSocket path (default: '/ws')
  * @param instanceId - Optional unique instance ID. If not provided, one will be auto-generated.
  *                     Each hook instance gets a unique ID to ensure isolation between pages.
+ * @param screenId - Optional screen ID to identify the page/component (e.g., 'liveView', 'dialer')
  */
-export default function useCtiStomp(wsPath = '/ws', instanceId?: string) {
+export default function useCtiStomp(wsPath = '/ws', instanceId?: string, screenId?: string) {
   // Generate unique instance ID if not provided
   // This ensures each page/component gets its own isolated connection
   const instanceIdRef = useRef<string>(instanceId || generateInstanceId());
@@ -83,6 +84,7 @@ export default function useCtiStomp(wsPath = '/ws', instanceId?: string) {
   const eventSourceRef = useRef<EventSource | null>(null);
   const tokenRef = useRef<string | null>(null);
   const userAddressRef = useRef<string | null>(null);
+  const screenIdRef = useRef<string | undefined>(screenId);
   const isConnectingRef = useRef(false);
   const isInitializedRef = useRef(false);
   const connectionStartTimeRef = useRef<number | null>(null);
@@ -571,7 +573,8 @@ export default function useCtiStomp(wsPath = '/ws', instanceId?: string) {
         token: tokenRef.current,
         userAddress: userAddressRef.current,
         destination,
-        body
+        body,
+        screenId: screenIdRef.current || 'default' // Include screenId in POST request
       });
 
       return response.data.success === true;
@@ -728,6 +731,9 @@ export default function useCtiStomp(wsPath = '/ws', instanceId?: string) {
       params.append('token', token);
       params.append('userAddress', userAddress);
       params.append('instanceId', currentInstanceId); // Add instance ID for debugging
+      if (screenIdRef.current) {
+        params.append('screenId', screenIdRef.current); // Add screenId to identify the page/component
+      }
       const sseUrl = `/api/cti-stomp-stream?${params.toString()}`;
       
       console.log(`[${currentInstanceId}] Creating fresh SSE connection...`);

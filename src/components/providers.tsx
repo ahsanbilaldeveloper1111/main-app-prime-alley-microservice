@@ -6,7 +6,7 @@ import { ReactNode } from 'react';
 import { TokenServiceProvider } from './TokenServiceProvider';
 import SessionHandler from './SessionHandler';
 import { TmsSessionProvider } from '../contexts/TmsSessionContext';
-import { FirebaseNotificationProvider } from './FirebaseNotificationProvider';
+// import { FirebaseNotificationProvider } from './FirebaseNotificationProvider'; // Disabled Firebase notifications
 import { NotificationProvider } from '../contexts/NotificationContext';
 
 interface ProvidersProps {
@@ -19,7 +19,7 @@ export default function Providers({ children, store }: ProvidersProps) {
     <SessionProvider>
       <TmsSessionProvider>
         <NotificationProvider>
-          <FirebaseNotificationProvider>
+          {/* <FirebaseNotificationProvider> */}
             <TokenServiceProvider>
               <SessionHandler>
                 {store ? (
@@ -31,7 +31,7 @@ export default function Providers({ children, store }: ProvidersProps) {
                 )}
               </SessionHandler>
             </TokenServiceProvider>
-          </FirebaseNotificationProvider>
+          {/* </FirebaseNotificationProvider> */}
         </NotificationProvider>
       </TmsSessionProvider>
     </SessionProvider>

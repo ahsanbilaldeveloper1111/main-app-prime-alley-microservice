@@ -35,7 +35,7 @@ export const routePermissions: RoutePermission[] = [
     },
 
 
-    {path: '/reports',permissions: [PERMISSIONS.REPORTS_SERVICES]},
+   // {path: '/reports',permissions: [PERMISSIONS.REPORTS_SERVICES]},
     {path: '/billing',permissions: [PERMISSIONS.REPORTS_SERVICES]},
     {path: '/reseller',permissions: [PERMISSIONS.REPORTS_SERVICES]},
     {path: '/vendor',permissions: [PERMISSIONS.REPORTS_SERVICES]},
@@ -129,8 +129,12 @@ export const routePermissions: RoutePermission[] = [
     //call reports services start
     {
         path: '/call-reports',
-        permissions: [PERMISSIONS.REPORTS_SERVICES],
+        permissions: [PERMISSIONS.VIEW_CALL_REPORTS],
         children: [
+            {
+                path: '/',
+                permissions: [PERMISSIONS.VIEW_CALL_REPORTS]
+            },
             {
                 path: '/stats/country',
                 permissions: ['call-reports-by-statistics-reports']

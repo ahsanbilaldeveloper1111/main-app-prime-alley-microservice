@@ -1,4 +1,5 @@
-import { getFCMToken, setupOnMessageListener } from '@config/firebase';
+// Firebase notification imports disabled - notifications are disabled
+// import { getFCMToken, setupOnMessageListener } from '@config/firebase';
 
 export interface FCMTokenResponse {
   success: boolean;
@@ -65,68 +66,76 @@ class FCMService {
 
   /**
    * Get FCM token, with caching
+   * DISABLED: Firebase notifications are disabled
    */
   async getToken(forceRefresh: boolean = false): Promise<FCMTokenResponse> {
-    if (!this.vapidKey) {
-      return {
-        success: false,
-        token: null,
-        error: 'VAPID key is not configured',
-      };
-    }
-
-    // Check permission first
-    const permission = await this.requestPermission();
+    // Firebase notifications disabled - return error immediately
+    return {
+      success: false,
+      token: null,
+      error: 'Firebase notifications are disabled',
+    };
     
-    if (permission !== 'granted') {
-      return {
-        success: false,
-        token: null,
-        error: `Notification permission is ${permission}`,
-      };
-    }
+    // if (!this.vapidKey) {
+    //   return {
+    //     success: false,
+    //     token: null,
+    //     error: 'VAPID key is not configured',
+    //   };
+    // }
 
-    // Return cached token if available and not forcing refresh
-    if (this.tokenCache && !forceRefresh) {
-      return {
-        success: true,
-        token: this.tokenCache,
-      };
-    }
+    // // Check permission first
+    // const permission = await this.requestPermission();
+    // 
+    // if (permission !== 'granted') {
+    //   return {
+    //     success: false,
+    //     token: null,
+    //     error: `Notification permission is ${permission}`,
+    //   };
+    // }
 
-    // Ensure service worker is ready
-    if ('serviceWorker' in navigator) {
-      try {
-        await navigator.serviceWorker.ready;
-      } catch (error) {
-        // Service worker not ready
-      }
-    }
+    // // Return cached token if available and not forcing refresh
+    // if (this.tokenCache && !forceRefresh) {
+    //   return {
+    //     success: true,
+    //     token: this.tokenCache,
+    //   };
+    // }
 
-    try {
-      const token = await getFCMToken(this.vapidKey);
-      if (token) {
-        this.tokenCache = token;
-        this.notifyTokenListeners(token);
-        return {
-          success: true,
-          token,
-        };
-      } else {
-        return {
-          success: false,
-          token: null,
-          error: 'Failed to generate FCM token',
-        };
-      }
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      return {
-        success: false,
-        token: null,
-        error: errorMessage,
-      };
-    }
+    // // Ensure service worker is ready
+    // if ('serviceWorker' in navigator) {
+    //   try {
+    //     await navigator.serviceWorker.ready;
+    //   } catch (error) {
+    //     // Service worker not ready
+    //   }
+    // }
+
+    // try {
+    //   const token = await getFCMToken(this.vapidKey);
+    //   if (token) {
+    //     this.tokenCache = token;
+    //     this.notifyTokenListeners(token);
+    //     return {
+    //       success: true,
+    //       token,
+    //     };
+    //   } else {
+    //     return {
+    //       success: false,
+    //       token: null,
+    //       error: 'Failed to generate FCM token',
+    //     };
+    //   }
+    // } catch (error) {
+    //   const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    //   return {
+    //     success: false,
+    //     token: null,
+    //     error: errorMessage,
+    //   };
+    // }
   }
 
   /**
@@ -166,20 +175,24 @@ class FCMService {
 
   /**
    * Set up foreground message listener (continuous - handles multiple messages)
+   * DISABLED: Firebase notifications are disabled
    */
   async setupForegroundMessageListener(
     onMessage: (payload: NotificationPayload) => void
   ): Promise<void> {
-    try {
-      // Set up continuous listener that will call onMessage for each notification received
-      await setupOnMessageListener((payload) => {
-        if (payload) {
-          onMessage(payload);
-        }
-      });
-    } catch (error) {
-      console.error('[FCM Service] Error setting up foreground message listener:', error);
-    }
+    // Firebase notifications disabled - do nothing
+    return;
+    
+    // try {
+    //   // Set up continuous listener that will call onMessage for each notification received
+    //   await setupOnMessageListener((payload) => {
+    //     if (payload) {
+    //       onMessage(payload);
+    //     }
+    //   });
+    // } catch (error) {
+    //   console.error('[FCM Service] Error setting up foreground message listener:', error);
+    // }
   }
 
   /**

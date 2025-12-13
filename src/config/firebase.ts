@@ -1,5 +1,7 @@
 import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
-import { getMessaging, getToken, onMessage, Messaging, isSupported } from 'firebase/messaging';
+// Firebase messaging imports disabled - notifications are disabled
+// import { getMessaging, getToken, onMessage, Messaging, isSupported } from 'firebase/messaging';
+import type { Messaging } from 'firebase/messaging';
 
 // Firebase configuration interface
 interface FirebaseConfig {
@@ -67,44 +69,48 @@ export const initializeFirebase = (): FirebaseApp | null => {
 };
 
 // Get Firebase Messaging instance
+// DISABLED: Firebase notifications are disabled
 export const getFirebaseMessaging = async (): Promise<Messaging | null> => {
+  // Firebase notifications disabled - return null immediately
+  return null;
+  
   // Return existing messaging instance if available
-  if (messaging) {
-    return messaging;
-  }
+  // if (messaging) {
+  //   return messaging;
+  // }
 
   // Check if we're in the browser
-  if (typeof window === 'undefined') {
-    return null;
-  }
+  // if (typeof window === 'undefined') {
+  //   return null;
+  // }
 
   // Check if messaging is supported
-  const supported = await isSupported();
-  if (!supported) {
-    return null;
-  }
+  // const supported = await isSupported();
+  // if (!supported) {
+  //   return null;
+  // }
 
   // Wait for service worker to be ready (required for FCM)
-  if ('serviceWorker' in navigator) {
-    try {
-      await navigator.serviceWorker.ready;
-    } catch (error) {
-      // Service worker not ready, but continuing
-    }
-  }
+  // if ('serviceWorker' in navigator) {
+  //   try {
+  //     await navigator.serviceWorker.ready;
+  //   } catch (error) {
+  //     // Service worker not ready, but continuing
+  //   }
+  // }
 
   // Initialize Firebase app if not already initialized
-  const app = initializeFirebase();
-  if (!app) {
-    return null;
-  }
+  // const app = initializeFirebase();
+  // if (!app) {
+  //   return null;
+  // }
 
-  try {
-    messaging = getMessaging(app);
-    return messaging;
-  } catch (error) {
-    return null;
-  }
+  // try {
+  //   messaging = getMessaging(app);
+  //   return messaging;
+  // } catch (error) {
+  //   return null;
+  // }
 };
 
 // Helper function to safely get service worker registration with pushManager
@@ -139,76 +145,84 @@ const getServiceWorkerWithPushManager = async (): Promise<ServiceWorkerRegistrat
 };
 
 // Get FCM token
+// DISABLED: Firebase notifications are disabled
 export const getFCMToken = async (vapidKey: string): Promise<string | null> => {
-  try {
-    const messagingInstance = await getFirebaseMessaging();
-    if (!messagingInstance) {
-      return null;
-    }
+  // Firebase notifications disabled - return null immediately
+  return null;
+  
+  // try {
+  //   const messagingInstance = await getFirebaseMessaging();
+  //   if (!messagingInstance) {
+  //     return null;
+  //   }
 
-    // Get service worker registration with pushManager
-    const serviceWorkerRegistration = await getServiceWorkerWithPushManager();
+  //   // Get service worker registration with pushManager
+  //   const serviceWorkerRegistration = await getServiceWorkerWithPushManager();
 
-    // Build token options - only include serviceWorkerRegistration if valid
-    const tokenOptions: { vapidKey: string; serviceWorkerRegistration?: ServiceWorkerRegistration } = {
-      vapidKey: vapidKey,
-      ...(serviceWorkerRegistration && { serviceWorkerRegistration }),
-    };
+  //   // Build token options - only include serviceWorkerRegistration if valid
+  //   const tokenOptions: { vapidKey: string; serviceWorkerRegistration?: ServiceWorkerRegistration } = {
+  //     vapidKey: vapidKey,
+  //     ...(serviceWorkerRegistration && { serviceWorkerRegistration }),
+  //   };
 
-    // Try to get token
-    const token = await getToken(messagingInstance, tokenOptions);
-    return token || null;
-  } catch (error: unknown) {
-    // If error is related to pushManager and we had a serviceWorkerRegistration, try without it
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    if (errorMessage.includes('pushManager')) {
-      try {
-        const messagingInstance = await getFirebaseMessaging();
-        if (messagingInstance) {
-          const token = await getToken(messagingInstance, { vapidKey: vapidKey });
-          return token || null;
-        }
-      } catch {
-        // Still failed
-      }
-    }
-    return null;
-  }
+  //   // Try to get token
+  //   const token = await getToken(messagingInstance, tokenOptions);
+  //   return token || null;
+  // } catch (error: unknown) {
+  //   // If error is related to pushManager and we had a serviceWorkerRegistration, try without it
+  //   const errorMessage = error instanceof Error ? error.message : String(error);
+  //   if (errorMessage.includes('pushManager')) {
+  //     try {
+  //       const messagingInstance = await getFirebaseMessaging();
+  //       if (messagingInstance) {
+  //         const token = await getToken(messagingInstance, { vapidKey: vapidKey });
+  //         return token || null;
+  //       }
+  //     } catch {
+  //       // Still failed
+  //     }
+  //   }
+  //   return null;
+  // }
 };
 
 // Set up continuous listener for foreground messages
+// DISABLED: Firebase notifications are disabled
 // This uses a singleton pattern to ensure only one listener exists across page navigations
 export const setupOnMessageListener = async (
   callback: (payload: any) => void
 ): Promise<void> => {
-  try {
-    // Store the callback - this allows updating the callback without replacing the listener
-    messageListenerCallback = callback;
-    
-    // Only set up the listener once - it will persist across page navigations
-    if (isListenerSetup) {
-      console.log('[Firebase] Message listener already set up, callback updated');
-      return;
-    }
+  // Firebase notifications disabled - do nothing
+  return;
+  
+  // try {
+  //   // Store the callback - this allows updating the callback without replacing the listener
+  //   messageListenerCallback = callback;
+  //   
+  //   // Only set up the listener once - it will persist across page navigations
+  //   if (isListenerSetup) {
+  //     console.log('[Firebase] Message listener already set up, callback updated');
+  //     return;
+  //   }
 
-    const messagingInstance = await getFirebaseMessaging();
-    if (!messagingInstance) {
-      console.error('[Firebase] Messaging instance not available');
-      return;
-    }
+  //   const messagingInstance = await getFirebaseMessaging();
+  //   if (!messagingInstance) {
+  //     console.error('[Firebase] Messaging instance not available');
+  //     return;
+  //   }
 
-    // Set up the listener once - it will call the current callback
-    onMessage(messagingInstance, (payload) => {
-      if (messageListenerCallback) {
-        messageListenerCallback(payload);
-      }
-    });
-    
-    isListenerSetup = true;
-    //console.log('[Firebase] Message listener set up successfully');
-  } catch (error) {
-    console.error('[Firebase] Error setting up message listener:', error);
-  }
+  //   // Set up the listener once - it will call the current callback
+  //   onMessage(messagingInstance, (payload) => {
+  //     if (messageListenerCallback) {
+  //       messageListenerCallback(payload);
+  //     }
+  //   });
+  //   
+  //   isListenerSetup = true;
+  //   //console.log('[Firebase] Message listener set up successfully');
+  // } catch (error) {
+  //   console.error('[Firebase] Error setting up message listener:', error);
+  // }
 };
 
 // Reset listener (useful for testing or cleanup)
@@ -218,20 +232,24 @@ export const resetMessageListener = (): void => {
 };
 
 // Legacy function for backward compatibility (deprecated - only handles one message)
+// DISABLED: Firebase notifications are disabled
 export const onMessageListener = (): Promise<any> => {
-  return new Promise((resolve) => {
-    getFirebaseMessaging()
-      .then((messagingInstance) => {
-        if (messagingInstance) {
-          onMessage(messagingInstance, (payload) => {
-            resolve(payload);
-          });
-        }
-      })
-      .catch((error) => {
-        resolve(null);
-      });
-  });
+  // Firebase notifications disabled - return null immediately
+  return Promise.resolve(null);
+  
+  // return new Promise((resolve) => {
+  //   getFirebaseMessaging()
+  //     .then((messagingInstance) => {
+  //       if (messagingInstance) {
+  //         onMessage(messagingInstance, (payload) => {
+  //           resolve(payload);
+  //         });
+  //       }
+  //     })
+  //     .catch((error) => {
+  //       resolve(null);
+  //     });
+  // });
 };
 
 // Export Firebase app instance

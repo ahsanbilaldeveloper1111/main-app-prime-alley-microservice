@@ -34,7 +34,7 @@ const CtiDialer = () => {
     isInitialized,
     userAddress,
     eventLog
-  } = useCtiStomp()
+  } = useCtiStomp('/ws', undefined, 'dialer')
 
   // Simplified state
   const [dialedNumber, setDialedNumber] = useState('')

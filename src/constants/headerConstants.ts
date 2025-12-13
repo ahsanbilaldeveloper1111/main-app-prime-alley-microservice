@@ -34,6 +34,7 @@ export const HEADER_CONSTANTS = {
     CALL_RECORDINGS: 'Call Recordings',
 
     REPORTS: 'Reports',
+    CALL_REPORTS: 'Call Reports',
     AI_INSIGHTS: 'AI Insights',
     LIVE_CALLS: 'Live Calls',
     TICKETS: 'Tickets',
@@ -270,6 +271,7 @@ MENU_COLORS: {
     VIEW_CALL_DASHBOARD: 'dashboard-call-logs',
     VIEW_CALL_LOGS: 'view-call-logs',
     VIEW_CALL_RECORDINGS: 'view-call-recordings',
+    VIEW_CALL_REPORTS: 'view-call-reports',
 
     REPORTS_SERVICES: 'reports-services',
 

@@ -6,8 +6,7 @@ import GenericListPage from '@components/GenericListPage';
 import { ListCallLogs, ExportCallLogs, DownloadStreamingExport } from '@utils/calls';
 import { GetHierarchyData } from '@utils/users';
 import { Column } from '@components/CustomDataTable';
-import { Button, Modal, Row } from 'react-bootstrap';
-import { Col } from 'react-bootstrap';
+import { Row, Col, Form } from 'react-bootstrap';
 import { toast } from 'react-toastify';
 import { useTokenService } from 'src/hooks/useTokenService';
 import { useSession } from 'next-auth/react';
@@ -26,6 +25,8 @@ import '@assets/scss/common.scss';
 import { convertUTCToUserTimezone, convertUTCTimeToUserTimezone, convertUTCSeparateDateTimeToUserTime, convertUTCSeparateDateTimeToUserDate, formatDuration, GlobalDateFormat, GlobalTimeFormat,formatDateTimeToLocal, GlobalDateTimeFormat } from '@utils/Helper';
 import { ModuleSlug } from '@utils/Helper';
 import { useHierarchyData } from '@components/filters/useHierarchyData';
+import BarFilters from '@components/BarFilters';
+import SelectBox from '@components/SelectBox';
 
 
 interface Summary {
@@ -81,6 +82,8 @@ const CallLogs = () => {
 
     const [refreshKey, setRefreshKey] = useState<number>(0);
     const [currentFilters, setCurrentFilters] = useState({});
+    const [pendingFilters, setPendingFilters] = useState({});
+    const [searchValue, setSearchValue] = useState<string>('');
     const [summary, setSummary] = useState<Summary>({
         users: 0,
         extensions: 0,
@@ -88,7 +91,12 @@ const CallLogs = () => {
         outbound: 0
     });
 
-    const {hierarchyDataUsers} = useHierarchyData(ModuleSlug.CALL_LOGS);
+    const {
+        hierarchyDataUsers,
+        hierarchyDataDepartments,
+        hierarchyDataExtensions,
+        loading: hierarchyLoading
+    } = useHierarchyData(ModuleSlug.CALL_LOGS);
     const [totalUsers, setTotalUsers] = useState(0);
     useEffect(() => {
         setTotalUsers(hierarchyDataUsers.length);
@@ -202,7 +210,7 @@ const CallLogs = () => {
 
                     
 
-                    <div className="action-buttons">
+                    {/* <div className="action-buttons">
 
                     {showDateRange && (
                             <>
@@ -212,14 +220,10 @@ const CallLogs = () => {
                           
                             </>
                           )}
-                    {/* <div className="search-container">
-                            <i className="fas fa-search search-icon"></i>
-                            <input type="text" className="search-bar" placeholder="Search call logs..." onChange={(e) => handleFiltersChange({...currentFilters, search: e.target.value})}/>
-                        </div> */}
                     
                         <CallLogsFilters onFiltersChange={handleFiltersChange} onExport={handleExport} moduleSlug={ModuleSlug.CALL_LOGS} />
                     
-                    </div>
+                    </div> */}
 
 
 
@@ -233,6 +237,210 @@ const CallLogs = () => {
 
            
             <PageSummaryGrid cards={summaryCards} />
+
+            <BarFilters
+                searchValue={searchValue}
+                onSearchChange={(value) => setSearchValue(value)}
+                onSearch={() => {
+                    const filtersWithSearch = { ...pendingFilters, search: searchValue };
+                    setPendingFilters(filtersWithSearch);
+                    setCurrentFilters(filtersWithSearch);
+                    handleFiltersChange(filtersWithSearch);
+                }}
+                leftContent={
+                    <>
+                        {showDateRange && (
+                            <p className="mb-0">
+                                Date Range: <span className="status-badge primary">{formatDateTimeToLocal(startDateTime, GlobalDateTimeFormat)}</span> to <span className="status-badge primary">{formatDateTimeToLocal(endDateTime, GlobalDateTimeFormat)}</span>
+                            </p>
+                        )}
+                    </>
+                }
+                searchPlaceholder="Search call logs..."
+                showSearch={false}
+                filters={pendingFilters}
+                onSubmit={() => {
+                    setCurrentFilters(pendingFilters);
+                    handleFiltersChange(pendingFilters);
+                }}
+                onReset={() => {
+                    setPendingFilters({});
+                    setCurrentFilters({});
+                    setSearchValue('');
+                    handleFiltersChange({});
+                }}
+                filterContent={
+                    <>
+                        {/* Call Direction */}
+                        <Col md={4}>
+                            <Form.Group>
+                                <Form.Label>Call Direction</Form.Label>
+                                <SelectBox
+                                    isSearchable={false}
+                                    value={(pendingFilters as any)?.call_direction || null}
+                                    onChange={(value) => {
+                                        setPendingFilters({ ...pendingFilters, call_direction: value as string || '' });
+                                    }}
+                                    options={[
+                                        { value: 'OUTGOING', label: 'Outgoing' },
+                                        { value: 'INCOMING', label: 'Incoming' },
+                                        { value: 'Both', label: 'Both' }
+                                    ]}
+                                    placeholder="Select call direction"
+                                />
+                            </Form.Group>
+                        </Col>
+
+                        {/* Call Status */}
+                        <Col md={4}>
+                            <Form.Group>
+                                <Form.Label>Call Status</Form.Label>
+                                <SelectBox
+                                    isSearchable={false}
+                                    value={(pendingFilters as any)?.call_status || null}
+                                    onChange={(value) => {
+                                        setPendingFilters({ ...pendingFilters, call_status: value as string || '' });
+                                    }}
+                                    options={[
+                                        { value: 'Answered', label: 'Answered' },
+                                        { value: 'Not Answered', label: 'Not Answered' },
+                                        { value: 'Both', label: 'Both' }
+                                    ]}
+                                    placeholder="Select call status"
+                                />
+                            </Form.Group>
+                        </Col>
+
+                        {/* Called Numbers */}
+                        <Col md={4}>
+                            <Form.Group>
+                                <Form.Label>Called Numbers</Form.Label>
+                                <Form.Control
+                                    type="text"
+                                    placeholder="Enter called numbers (comma separated)"
+                                    value={((pendingFilters as any)?.called_numbers || []).join(', ')}
+                                    onChange={(e) => {
+                                        const values = e.target.value.split(',').map(v => v.trim()).filter(v => v);
+                                        setPendingFilters({ ...pendingFilters, called_numbers: values });
+                                    }}
+                                />
+                            </Form.Group>
+                        </Col>
+
+                        {/* Extension */}
+                        <Col md={4}>
+                            <Form.Group>
+                                <Form.Label>Extension</Form.Label>
+                                <SelectBox
+                                    isMulti
+                                    isSearchable={true}
+                                    isDisabled={hierarchyLoading}
+                                    value={(pendingFilters as any)?.extension_number?.length > 0 ? (pendingFilters as any)?.extension_number : null}
+                                    onChange={(value) => {
+                                        setPendingFilters({ ...pendingFilters, extension_number: value ? (value as string[]) : [] });
+                                    }}
+                                    options={(hierarchyDataExtensions as any)?.map((ext: any) => ({
+                                        value: ext.id,
+                                        label: ext.name
+                                    })) || []}
+                                    placeholder="Select extensions"
+                                />
+                            </Form.Group>
+                        </Col>
+
+                        {/* Traffic Type */}
+                        <Col md={4}>
+                            <Form.Group>
+                                <Form.Label>Traffic Type</Form.Label>
+                                <SelectBox
+                                    isSearchable={false}
+                                    value={(pendingFilters as any)?.traffic_type || null}
+                                    onChange={(value) => {
+                                        setPendingFilters({ ...pendingFilters, traffic_type: value as string || '' });
+                                    }}
+                                    options={[
+                                        { value: '', label: 'All' },
+                                        { value: 'internal', label: 'Internal' },
+                                        { value: 'external', label: 'External' }
+                                    ]}
+                                    placeholder="Select traffic type"
+                                />
+                            </Form.Group>
+                        </Col>
+
+                        {/* Destination Type */}
+                        <Col md={4}>
+                            <Form.Group>
+                                <Form.Label>Destination Type</Form.Label>
+                                <SelectBox
+                                    isSearchable={false}
+                                    value={(pendingFilters as any)?.destination_type || null}
+                                    onChange={(value) => {
+                                        setPendingFilters({ ...pendingFilters, destination_type: value as string || '' });
+                                    }}
+                                    options={[
+                                        { value: '', label: 'All' },
+                                        { value: 'local', label: 'Local' },
+                                        { value: 'national', label: 'National' },
+                                        { value: 'international', label: 'International' }
+                                    ]}
+                                    placeholder="Select destination type"
+                                />
+                            </Form.Group>
+                        </Col>
+
+                        {/* Departments */}
+                        <Col md={4}>
+                            <Form.Group>
+                                <Form.Label>Departments</Form.Label>
+                                <SelectBox
+                                    isMulti
+                                    isSearchable={true}
+                                    isDisabled={hierarchyLoading}
+                                    value={(pendingFilters as any)?.department?.length > 0 ? (pendingFilters as any)?.department : null}
+                                    onChange={(value) => {
+                                        setPendingFilters({ ...pendingFilters, department: value ? (value as string[]) : [] });
+                                    }}
+                                    options={(hierarchyDataDepartments as any)?.map((dept: any) => ({
+                                        value: dept.id,
+                                        label: dept.name
+                                    })) || []}
+                                    placeholder="Select departments"
+                                />
+                            </Form.Group>
+                        </Col>
+
+                        {/* Date Range - Start */}
+                        <Col md={4}>
+                            <Form.Group>
+                                <Form.Label>Start Date Time</Form.Label>
+                                <Form.Control
+                                    type="datetime-local"
+                                    value={(pendingFilters as any)?.start_datetime || ''}
+                                    onChange={(e) => {
+                                        setPendingFilters({ ...pendingFilters, start_datetime: e.target.value });
+                                    }}
+                                />
+                            </Form.Group>
+                        </Col>
+
+                        {/* Date Range - End */}
+                        <Col md={4}>
+                            <Form.Group>
+                                <Form.Label>End Date Time</Form.Label>
+                                <Form.Control
+                                    type="datetime-local"
+                                    value={(pendingFilters as any)?.end_datetime || ''}
+                                    min={(pendingFilters as any)?.start_datetime || ''}
+                                    onChange={(e) => {
+                                        setPendingFilters({ ...pendingFilters, end_datetime: e.target.value });
+                                    }}
+                                />
+                            </Form.Group>
+                        </Col>
+                    </>
+                }
+            />
 
             {session?.user?.permissions?.includes('list-call-logs') && (
                  <GenericListPage

@@ -2,7 +2,7 @@ import '@assets/scss/datatable-style.scss';
 
 import React, { ReactElement, useEffect, useState, useCallback, useRef } from 'react';
 import { io, Socket } from "socket.io-client";
-import { Col, Button, Card, Modal, Row } from 'react-bootstrap';
+import { Col, Button, Card, Modal, Row, Form } from 'react-bootstrap';
 import { useTokenService } from 'src/hooks/useTokenService';
 import { useSession } from 'next-auth/react';
 import type { NextPage } from 'next';
@@ -14,6 +14,8 @@ import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
 import GenericListPage from '@components/GenericListPage';
 import CallRecordingsFilters from '@components/filters/CallRecordingFilter';
+import BarFilters from '@components/BarFilters';
+import { useHierarchyData } from '@components/filters/useHierarchyData';
 import AnimatedNumber from '@components/AnimatedNumber';
 import StatCard from '@components/StatCard';
 import ChartBar from '@components/ChartBar';
@@ -23,6 +25,7 @@ import CustomDataTable from '@components/CustomDataTable';
 import AudioPlayer, { AudioPlayerRef } from '@components/AudioPlayer';
 import EmptyState from '@components/EmptyState';
 import { ModuleSlug } from '@utils/Helper';
+import SelectBox from '@components/SelectBox';
 
 
 import '@assets/scss/common.scss';
@@ -100,6 +103,15 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
   // State declarations
   const [refreshKey, setRefreshKey] = useState<number>(0);
   const [currentFilters, setCurrentFilters] = useState({});
+  const [appliedFilters, setAppliedFilters] = useState({}); // Filters that trigger API calls
+  const [searchValue, setSearchValue] = useState<string>('');
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState<boolean>(false);
+  
+  // Use hierarchy data hook
+  const { 
+    hierarchyDataExtensions,
+    loading: hierarchyLoading
+  } = useHierarchyData(ModuleSlug.CALL_RECORDINGS);
   const [callDurationBarChartModal, setCallDurationBarChartModal] = useState(false);
   const [currentChartData, setCurrentChartData] = useState<{ series: any[]; categories: string[] } | null>(null);
   const [chartLoading, setChartLoading] = useState(true);
@@ -402,7 +414,7 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
   const fetchCallLogsOriginal = useCallback(async (page = 1, perPage = 15, search = "") => {
     setShowPageLoader(true);
     const response = await ListCallLogs(
-      { page, perPage, search, filters: currentFilters, reportType: 'recordings', moduleSlug: ModuleSlug.CALL_RECORDINGS },
+      { page, perPage, search, filters: appliedFilters, reportType: 'recordings', moduleSlug: ModuleSlug.CALL_RECORDINGS },
       'call-logs/recordings'
     ).finally(() => {
       setShowPageLoader(false);
@@ -549,7 +561,7 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
     }
 
     return response;
-  }, [currentFilters]);
+  }, [appliedFilters]);
 
   // Wrapper function that handles modified data
   const fetchCallLogs = useCallback(async (page = 1, perPage = 15, search = "") => {
@@ -587,6 +599,9 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
 
   const handleFiltersChange = (filters: any) => {
     setCurrentFilters(filters);
+    setAppliedFilters(filters); // Update applied filters to trigger API
+    // Trigger refresh for GenericListPage to fetch new data
+    setRefreshKey((prev) => prev + 1);
     
     // Clear chart data when filters are cleared
     if (!filters || Object.keys(filters).length === 0) {
@@ -647,7 +662,7 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
       if (exportType === 'excel') {
        
         await DownloadStreamingExport(
-          { filters: currentFilters, isExport: true, exportType, moduleSlug: ModuleSlug.CALL_RECORDINGS},
+          { filters: appliedFilters, isExport: true, exportType, moduleSlug: ModuleSlug.CALL_RECORDINGS},
           'call-logs/recordings',
           'recordings'
         ).finally(() => {
@@ -845,33 +860,8 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
     }
   };
 
-  // Effects
-  useEffect(() => {
-    const fetchHierarchyData = async () => {
-      const hierarchyData = await GetHierarchyData(ModuleSlug.CALL_RECORDINGS);
-      
-      const extensions = hierarchyData?.extensions;
-      if (extensions && Array.isArray(extensions)) {
-        // Extract IDs from extensions array where each object has {id, name}
-        const extensionIds = extensions.map(ext => ext.id).filter(id => id !== undefined);
-        setSocketExtensions(extensionIds);
-      }
-    };
-    fetchHierarchyData();
-  }, []);
-
-  // Load initial data
-  useEffect(() => {
-    const loadInitialData = async () => {
-      try {
-        const response = await fetchCallLogsOriginal(1, 15, '');
-        // Data is already set in fetchCallLogsOriginal
-      } catch (error) {
-        console.error('Error loading initial data:', error);
-      }
-    };
-    loadInitialData();
-  }, [currentFilters]);
+  // Initial data load is handled by GenericListPage component automatically
+  // No need for manual useEffect here to avoid double API calls
 
 
 
@@ -994,15 +984,6 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
                           
                             </>
                           )}
-
-
-
-                    {/* <div className="search-container">
-                            <i className="fas fa-search search-icon"></i>
-                            <input type="text" className="search-bar" placeholder="Search call recordings..." onChange={(e) => handleFiltersChange({...currentFilters, search: e.target.value})}/>
-                        </div> */}
-                        <CallRecordingsFilters onFiltersChange={handleFiltersChange} onExport={handleExport} moduleSlug={ModuleSlug.CALL_RECORDINGS} />
-                       
                     
                     </div>
 
@@ -1084,20 +1065,130 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
         </Col>
       </Row>
 
-      {/* Data Table */}
-      {/* <CustomDataTable
-        columns={columns}
-        data={tableData}
-        title="Call Recordings"
-        loading={false}
-        defaultPageSize={15}
+      
+
+      <BarFilters
+        searchValue={searchValue}
+        onSearchChange={(value) => setSearchValue(value)}
+        onSearch={() => {
+          handleFiltersChange({ ...currentFilters, search: searchValue });
+        }}
+        leftContent={
+          <>
+          {showDateRange && (
+                                      <>
+                                      <p className="mb-0">
+                                      Date Range : <span className="status-badge primary">
+                                        {formatDateTimeToLocal(startDateTime, GlobalDateTimeFormat)}
+                                      </span> to <span className="status-badge primary">
+                                        {formatDateTimeToLocal(endDateTime, GlobalDateTimeFormat)}
+                                        </span>
+                    </p>
+                  </>
+                )}
+              </>
+            }
         searchPlaceholder="Search call recordings..."
-        serverSide={false}
-        paginationInfo={paginationInfo}
         showSearch={false}
-        pagination={true}
-        showPageSizeSelector={true}
-      /> */}
+        filters={currentFilters}
+        onSubmit={() => {
+          handleFiltersChange(currentFilters);
+        }}
+        onReset={() => {
+          setCurrentFilters({});
+          setAppliedFilters({});
+          handleFiltersChange({});
+        }}
+        filterContent={
+          <>
+            {/* Call Direction */}
+            <Col md={4}>
+                <Form.Group>
+                  <Form.Label>Call Direction</Form.Label>
+                  <SelectBox
+                    isSearchable={false}
+                    value={(currentFilters as any)?.call_direction || null}
+                    onChange={(value) => {
+                      setCurrentFilters({ ...currentFilters, call_direction: value as string || '' });
+                    }}
+                    options={[
+                      { value: 'OUTGOING', label: 'Outgoing' },
+                      { value: 'INCOMING', label: 'Incoming' },
+                      { value: 'Both', label: 'Both' }
+                    ]}
+                    placeholder="Select call direction"
+                  />
+                </Form.Group>
+              </Col>
+
+              {/* Extension */}
+              <Col md={4}>
+                <Form.Group>
+                  <Form.Label>Extension</Form.Label>
+                  <SelectBox
+                    isMulti
+                    isSearchable={true}
+                    isDisabled={hierarchyLoading}
+                    value={(currentFilters as any)?.extension_number?.length > 0 ? (currentFilters as any)?.extension_number : null}
+                    onChange={(value) => {
+                      setCurrentFilters({ ...currentFilters, extension_number: value ? (value as string[]) : [] });
+                    }}
+                    options={(hierarchyDataExtensions as any)?.map((ext: any) => ({
+                      value: ext.id,
+                      label: ext.name
+                    })) || []}
+                    placeholder="Select extensions"
+                  />
+                </Form.Group>
+              </Col>
+
+              {/* Remote Party Number */}
+              <Col md={4}>
+                <Form.Group>
+                  <Form.Label>Remote Party Numbers</Form.Label>
+                  <Form.Control
+                    type="text"
+                    placeholder="Enter remote party numbers (comma separated)"
+                    value={((currentFilters as any)?.remote_party_number || []).join(', ')}
+                    onChange={(e) => {
+                      const values = e.target.value.split(',').map(v => v.trim()).filter(v => v);
+                      setCurrentFilters({ ...currentFilters, remote_party_number: values });
+                    }}
+                  />
+                </Form.Group>
+            </Col>
+
+            {/* Date Range */}
+            <Col md={4}>
+                <Form.Group>
+                  <Form.Label>Start Date</Form.Label>
+                  <Form.Control
+                    type="date"
+                    value={(currentFilters as any)?.start_date || ''}
+                    onChange={(e) => {
+                      setCurrentFilters({ ...currentFilters, start_date: e.target.value });
+                    }}
+                  />
+                </Form.Group>
+              </Col>
+
+              <Col md={4}>
+                <Form.Group>
+                  <Form.Label>End Date</Form.Label>
+                  <Form.Control
+                    type="date"
+                    value={(currentFilters as any)?.end_date || ''}
+                    min={(currentFilters as any)?.start_date || ''}
+                    onChange={(e) => {
+                      setCurrentFilters({ ...currentFilters, end_date: e.target.value });
+                    }}
+                  />
+                </Form.Group>
+            </Col>
+          </>
+        }
+        
+      />
 
 {session?.user?.permissions?.includes('list-call-recordings') && (
                  <GenericListPage
@@ -1106,7 +1197,7 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
                  title="Call Logs"
                  searchPlaceholder="Search call logs..."
                  defaultPageSize={15}
-                 filters={currentFilters}
+                 filters={appliedFilters}
                  refreshKey={refreshKey}
                  search={false}
                  tableStyle='table-style-2'
