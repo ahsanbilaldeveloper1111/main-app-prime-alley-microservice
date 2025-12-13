@@ -17,10 +17,13 @@ import {
   markLeadLost,
   getStages,
   createLeadFollowUp,
+  updateLeadFollowUp,
   deleteLeadFollowUp,
   createMeeting,
+  updateMeeting,
   deleteMeeting,
   restoreLead,
+  updateLead,
 } from "@utils/crm";
 import { GetHierarchyData } from "@utils/users";
 import {
@@ -308,6 +311,7 @@ const CrmLeads = () => {
 
   // Follow-up Modal
   const [showAddFollowupModal, setShowAddFollowupModal] = useState(false);
+  const [followUpIdToEdit, setFollowUpIdToEdit] = useState<number | null>(null);
   const [followupData, setFollowupData] = useState({
     leadId: null as number | null,
     leadName: "",
@@ -322,6 +326,7 @@ const CrmLeads = () => {
 
   // Meeting Modal
   const [showAddMeetingModal, setShowAddMeetingModal] = useState(false);
+  const [meetingIdToEdit, setMeetingIdToEdit] = useState<number | null>(null);
   const [meetingData, setMeetingData] = useState({
     leadId: null as number | null,
     leadName: "",
@@ -334,6 +339,14 @@ const CrmLeads = () => {
   });
   const [meetingAttendees, setMeetingAttendees] = useState<readonly any[]>([]);
   const [loadingMeeting, setLoadingMeeting] = useState(false);
+
+  // Change Stage Modal
+  const [showChangeStageModal, setShowChangeStageModal] = useState(false);
+  const [leadToChangeStage, setLeadToChangeStage] = useState<any>(null);
+  const [selectedStageId, setSelectedStageId] = useState<number | null>(null);
+  const [loadingChangeStage, setLoadingChangeStage] = useState(false);
+  const [leadStages, setLeadStages] = useState<any[]>([]);
+
   const [selectedLeadsColumns, setSelectedLeadsColumns] = useState<string[]>(
     () => {
       const saved = localStorage.getItem("leadsSelectedColumns");
@@ -987,6 +1000,43 @@ const CrmLeads = () => {
     setShowMarkLostModal(true);
   }, []);
 
+  // Handle change stage
+  const handleChangeStage = useCallback(async (lead: any) => {
+    setLeadToChangeStage(lead);
+    setSelectedStageId(lead.stage_id || null);
+    try {
+      // Fetch only lead stages
+      const stagesData = await getStages("lead");
+      setLeadStages(stagesData || []);
+      setShowChangeStageModal(true);
+    } catch (error) {
+      console.error("Failed to fetch lead stages:", error);
+      toast.error("Failed to load lead stages");
+    }
+  }, []);
+
+  const handleChangeStageSubmit = useCallback(async () => {
+    if (!leadToChangeStage || !selectedStageId) return;
+
+    try {
+      setLoadingChangeStage(true);
+      await updateLead(leadToChangeStage.id, {
+        stage_id: selectedStageId,
+      });
+      setShowChangeStageModal(false);
+      setLeadToChangeStage(null);
+      setSelectedStageId(null);
+      toast.success("Lead stage updated successfully!");
+      // Refresh the list
+      setRefreshKey((oldKey) => oldKey + 1);
+    } catch (error) {
+      console.error("Failed to update lead stage:", error);
+      toast.error("Failed to update lead stage");
+    } finally {
+      setLoadingChangeStage(false);
+    }
+  }, [leadToChangeStage, selectedStageId]);
+
   const [showSuccessfulModal, setShowSuccessfulModal] = useState(false);
   const [successModalTitle, setSuccessModalTitle] = useState("");
   const [successModalDescription, setSuccessModalDescription] = useState("");
@@ -1078,6 +1128,7 @@ const CrmLeads = () => {
 
       // Reset form and close modal
       setShowAddFollowupModal(false);
+      setFollowUpIdToEdit(null);
       setFollowupData({
         leadId: null,
         leadName: "",
@@ -1097,6 +1148,82 @@ const CrmLeads = () => {
       setLoadingFollowUp(false);
     }
   }, [followupData, session, viewingLead, handleViewLead]);
+
+  // Handle follow-up update
+  const handleUpdateFollowUp = useCallback(async () => {
+    if (!followUpIdToEdit || !followupData.leadId || !followupData.followUpDate) return;
+
+    setLoadingFollowUp(true);
+    try {
+      const payload: any = {
+        follow_up_date: followupData.followUpDate,
+        follow_up_status: followupData.followUpStatus,
+        communication_channel: followupData.communicationChannel,
+        notes: followupData.notes,
+        user_extension:
+          followupData.userExtension ||
+          (session?.user as any)?.extension ||
+          "admin",
+      };
+
+      if (
+        followupData.communicationChannel === "Other" &&
+        followupData.communicationChannelOther
+      ) {
+        payload.communication_channel_other =
+          followupData.communicationChannelOther;
+      }
+
+      await updateLeadFollowUp(followupData.leadId, followUpIdToEdit, payload);
+
+      // Refresh lead data
+      if (viewingLead?.id === followupData.leadId) {
+        await handleViewLead(followupData.leadId);
+      }
+
+      // Reset form and close modal
+      setShowAddFollowupModal(false);
+      setFollowUpIdToEdit(null);
+      setFollowupData({
+        leadId: null,
+        leadName: "",
+        followUpDate: "",
+        followUpStatus: "Pending",
+        communicationChannel: "Phone Call",
+        communicationChannelOther: "",
+        notes: "",
+        userExtension: "",
+      });
+
+      // Refresh leads list
+      setRefreshKey((oldKey) => oldKey + 1);
+    } catch (error) {
+      console.error("Failed to update follow-up:", error);
+    } finally {
+      setLoadingFollowUp(false);
+    }
+  }, [followUpIdToEdit, followupData, session, viewingLead, handleViewLead]);
+
+  // Handle edit follow-up click
+  const handleEditFollowUp = useCallback((followUp: any) => {
+    // Format date for input (YYYY-MM-DD)
+    const followUpDate = followUp.follow_up_date
+      ? new Date(followUp.follow_up_date).toISOString().split("T")[0]
+      : "";
+
+    setFollowUpIdToEdit(followUp.id);
+    setFollowupData({
+      leadId: viewingLead?.id || null,
+      leadName: viewingLead?.name || "",
+      followUpDate: followUpDate,
+      followUpStatus: followUp.follow_up_status || "Pending",
+      communicationChannel: followUp.communication_channel || "Phone Call",
+      communicationChannelOther: followUp.communication_channel_other || "",
+      notes: followUp.notes || "",
+      userExtension: followUp.user_extension || (session?.user as any)?.extension || "admin",
+    });
+    setShowAddFollowupModal(true);
+  }, [viewingLead, session]);
 
   // Handle follow-up deletion
   const handleDeleteFollowUp = useCallback(
@@ -1170,6 +1297,7 @@ const CrmLeads = () => {
 
       // Reset form and close modal
       setShowAddMeetingModal(false);
+      setMeetingIdToEdit(null);
       setMeetingData({
         leadId: null,
         leadName: "",
@@ -1189,7 +1317,112 @@ const CrmLeads = () => {
     } finally {
       setLoadingMeeting(false);
     }
-  }, [meetingData, session, viewingLead, handleViewLead]);
+  }, [meetingData, meetingAttendees, session, viewingLead, handleViewLead]);
+
+  // Handle meeting update
+  const handleUpdateMeeting = useCallback(async () => {
+    if (
+      !meetingIdToEdit ||
+      !meetingData.meetingName ||
+      !meetingData.meetingDate ||
+      !meetingData.meetingTime
+    )
+      return;
+
+    setLoadingMeeting(true);
+    try {
+      const payload: any = {
+        name: meetingData.meetingName,
+        meeting_type: meetingData.meetingType,
+        meeting_date: meetingData.meetingDate,
+        meeting_time: meetingData.meetingTime,
+        extensions:
+          meetingAttendees.length > 0
+            ? meetingAttendees.map((user: any) => user.value)
+            : [],
+      };
+
+      if (meetingData.meetingOutcome) {
+        payload.meeting_outcome = meetingData.meetingOutcome;
+      }
+
+      await updateMeeting(meetingIdToEdit!, payload);
+
+      // Refresh lead data
+      if (viewingLead?.id === meetingData.leadId && meetingData.leadId) {
+        await handleViewLead(meetingData.leadId);
+      }
+
+      // Reset form and close modal
+      setShowAddMeetingModal(false);
+      setMeetingIdToEdit(null);
+      setMeetingData({
+        leadId: null,
+        leadName: "",
+        meetingName: "",
+        meetingType: "Online",
+        meetingDate: "",
+        meetingTime: "",
+        meetingOutcome: "",
+        extensions: [],
+      });
+      setMeetingAttendees([]);
+
+      // Refresh leads list
+      setRefreshKey((oldKey) => oldKey + 1);
+    } catch (error) {
+      console.error("Failed to update meeting:", error);
+    } finally {
+      setLoadingMeeting(false);
+    }
+  }, [meetingIdToEdit, meetingData, meetingAttendees, viewingLead, handleViewLead]);
+
+  // Handle edit meeting click
+  const handleEditMeeting = useCallback((meeting: any) => {
+    // Format date for input (YYYY-MM-DD)
+    const meetingDate = meeting.meeting_date
+      ? new Date(meeting.meeting_date).toISOString().split("T")[0]
+      : "";
+
+    // Format time for input (HH:MM)
+    const meetingTime = meeting.meeting_time || "";
+
+    // Set attendees from meeting extensions
+    // meeting.extensions is an array of objects with 'extension' property (e.g., { extension: "511", ... })
+    const meetingExtensionStrings = meeting.extensions && Array.isArray(meeting.extensions)
+      ? meeting.extensions.map((extObj: any) => extObj.extension || String(extObj.id))
+      : [];
+    
+    const attendees = meetingExtensionStrings.length > 0
+      ? extensions
+          .filter((ext: any) => {
+            // Match by extension string or ID (convert to string for comparison)
+            const extExtension = String(ext.extension || "");
+            const extId = String(ext.id || "");
+            return meetingExtensionStrings.some((meetingExt: string) => 
+              meetingExt === extExtension || meetingExt === extId
+            );
+          })
+          .map((ext: any) => ({
+            value: ext.id || ext.extension,
+            label: ext.display_name || ext.name || ext.id || ext.extension,
+          }))
+      : [];
+
+    setMeetingIdToEdit(meeting.id);
+    setMeetingData({
+      leadId: viewingLead?.id || null,
+      leadName: viewingLead?.name || "",
+      meetingName: meeting.name || "",
+      meetingType: meeting.meeting_type || "Online",
+      meetingDate: meetingDate,
+      meetingTime: meetingTime,
+      meetingOutcome: meeting.meeting_outcome || "",
+      extensions: meetingExtensionStrings, // Store extension strings, not objects
+    });
+    setMeetingAttendees(attendees);
+    setShowAddMeetingModal(true);
+  }, [viewingLead, extensions]);
 
   // Handle meeting deletion
   const handleDeleteMeeting = useCallback(
@@ -1453,15 +1686,15 @@ const CrmLeads = () => {
               <Col lg={3} md={6} className="mb-3">
                 <KPICard
                   title="Qualified Leads"
-                  value={analyticsData.qualified.toString()}
+                  value={summaryTiles?.qualified_leads?.toString() || "0"}
                   icon={<CheckCircle size={24} />}
                   color="success"
                 />
               </Col>
               <Col lg={3} md={6} className="mb-3">
                 <KPICard
-                  title="Hot Leads"
-                  value={analyticsData.hot.toString()}
+                  title="New Leads"
+                  value={summaryTiles?.new_leads?.toString() || "0"}
                   icon={<TrendingUp size={24} />}
                   color="danger"
                 />
@@ -1956,7 +2189,7 @@ const CrmLeads = () => {
                       </th>
                     )}
                     {selectedLeadsColumns.includes("followUps") && (
-                      <th className="col-followUps">Follow-ups</th>
+                      <th className="col-followUps">Follow-up Date</th>
                     )}
                     {selectedLeadsColumns.includes("assignedUser") && (
                       <th
@@ -2089,9 +2322,23 @@ const CrmLeads = () => {
                         )}
                         {selectedLeadsColumns.includes("followUps") && (
                           <td className="col-followUps text-center">
-                            <Badge bg="primary" pill>
-                              {lead.followUps?.length || 0}
-                            </Badge>
+                            {(() => {
+                              const followUps = lead.followUps || [];
+                              if (followUps.length === 0) {
+                                return "-";
+                              }
+                              // Sort by follow_up_date and get the earliest one
+                              const sortedFollowUps = [...followUps].sort((a, b) => {
+                                const dateA = a.follow_up_date ? new Date(a.follow_up_date).getTime() : Infinity;
+                                const dateB = b.follow_up_date ? new Date(b.follow_up_date).getTime() : Infinity;
+                                return dateA - dateB;
+                              });
+                              const earliestFollowUp = sortedFollowUps[0];
+                              if (earliestFollowUp?.follow_up_date) {
+                                return new Date(earliestFollowUp.follow_up_date).toLocaleDateString('en-GB');
+                              }
+                              return "-";
+                            })()}
                           </td>
                         )}
                         {selectedLeadsColumns.includes("assignedUser") && (
@@ -2209,6 +2456,18 @@ const CrmLeads = () => {
                                       <MoreVertical size={16} />
                                     </Dropdown.Toggle>
                                     <Dropdown.Menu align="end">
+                                      {session?.user?.permissions?.includes(
+                                        "edit-crm-leads"
+                                      ) && (
+                                        <Dropdown.Item
+                                          onClick={() =>
+                                            handleChangeStage(lead.rawData || lead)
+                                          }
+                                        >
+                                          <GitBranch size={14} className="me-2" />
+                                          Change Stage
+                                        </Dropdown.Item>
+                                      )}
                                       {session?.user?.permissions?.includes(
                                         "mark-as-lost-crm-leads"
                                       ) && (
@@ -2684,56 +2943,7 @@ const CrmLeads = () => {
                       </Badge>
                     </div>
                   </div>
-                  <div
-                    style={{
-                      background: "#f8f9fa",
-                      padding: "16px",
-                      borderRadius: "10px",
-                      transition: "all 0.3s",
-                    }}
-                    onMouseOver={(e) => {
-                      e.currentTarget.style.background = "#e5e7eb";
-                      e.currentTarget.style.transform = "translateY(-2px)";
-                    }}
-                    onMouseOut={(e) => {
-                      e.currentTarget.style.background = "#f8f9fa";
-                      e.currentTarget.style.transform = "translateY(0)";
-                    }}
-                  >
-                    <div
-                      style={{
-                        fontSize: "12px",
-                        fontWeight: 600,
-                        color: "#6b7280",
-                        textTransform: "uppercase",
-                        letterSpacing: "0.5px",
-                        marginBottom: "6px",
-                      }}
-                    >
-                      Status
-                    </div>
-                    <div
-                      style={{
-                        fontSize: "15px",
-                        color: "#1f2937",
-                        fontWeight: 500,
-                      }}
-                    >
-                      <Badge
-                        bg={
-                          viewingLead.is_lost
-                            ? "danger"
-                            : viewingLead.status === "new"
-                            ? "primary"
-                            : "success"
-                        }
-                      >
-                        {viewingLead.is_lost
-                          ? "Lost"
-                          : viewingLead.status || "N/A"}
-                      </Badge>
-                    </div>
-                  </div>
+                
                   <div
                     style={{
                       background: "#f8f9fa",
@@ -2835,7 +3045,7 @@ const CrmLeads = () => {
                         }}
                       />
                       {viewingLead.created_at
-                        ? new Date(viewingLead.created_at).toLocaleDateString()
+                        ? new Date(viewingLead.created_at).toLocaleDateString('en-GB')
                         : "N/A"}
                     </div>
                   </div>
@@ -3612,7 +3822,7 @@ const CrmLeads = () => {
                             />
                             {new Date(
                               viewingLead.crm_data.created_at
-                            ).toLocaleDateString()}
+                            ).toLocaleDateString('en-GB')}
                           </div>
                         </div>
                       )}
@@ -3942,25 +4152,40 @@ const CrmLeads = () => {
                                     </div>
                                   )}
                                 </div>
-                                {session?.user?.permissions?.includes(
-                                  "delete-follow-up-crm-leads"
-                                ) && (
-                                  <Button
-                                    variant="link"
-                                    size="sm"
-                                    className="p-1 text-danger"
-                                    title="Delete"
-                                    onClick={() =>
-                                      handleDeleteFollowUp(
-                                        viewingLead.id,
-                                        followUp.id,
-                                        viewingLead.name
-                                      )
-                                    }
-                                  >
-                                    <Trash2 size={16} />
-                                  </Button>
-                                )}
+                                <div className="d-flex gap-1">
+                                  {session?.user?.permissions?.includes(
+                                    "add-follow-up-crm-leads"
+                                  ) && (
+                                    <Button
+                                      variant="link"
+                                      size="sm"
+                                      className="p-1"
+                                      title="Edit"
+                                      onClick={() => handleEditFollowUp(followUp)}
+                                    >
+                                      <Edit size={16} />
+                                    </Button>
+                                  )}
+                                  {session?.user?.permissions?.includes(
+                                    "delete-follow-up-crm-leads"
+                                  ) && (
+                                    <Button
+                                      variant="link"
+                                      size="sm"
+                                      className="p-1 text-danger"
+                                      title="Delete"
+                                      onClick={() =>
+                                        handleDeleteFollowUp(
+                                          viewingLead.id,
+                                          followUp.id,
+                                          viewingLead.name
+                                        )
+                                      }
+                                    >
+                                      <Trash2 size={16} />
+                                    </Button>
+                                  )}
+                                </div>
                               </div>
                             </div>
                           )
@@ -4191,24 +4416,39 @@ const CrmLeads = () => {
                                     </div>
                                   )}
                                 </div>
-                                {session?.user?.permissions?.includes(
-                                  "delete-meeting-crm-leads"
-                                ) && (
-                                  <Button
-                                    variant="link"
-                                    size="sm"
-                                    className="p-1 text-danger"
-                                    title="Delete"
-                                    onClick={() =>
-                                      handleDeleteMeeting(
-                                        meeting.id,
-                                        meeting.name
-                                      )
-                                    }
-                                  >
-                                    <Trash2 size={16} />
-                                  </Button>
-                                )}
+                                <div className="d-flex gap-1">
+                                  {session?.user?.permissions?.includes(
+                                    "add-meeting-crm-leads"
+                                  ) && (
+                                    <Button
+                                      variant="link"
+                                      size="sm"
+                                      className="p-1"
+                                      title="Edit"
+                                      onClick={() => handleEditMeeting(meeting)}
+                                    >
+                                      <Edit size={16} />
+                                    </Button>
+                                  )}
+                                  {session?.user?.permissions?.includes(
+                                    "delete-meeting-crm-leads"
+                                  ) && (
+                                    <Button
+                                      variant="link"
+                                      size="sm"
+                                      className="p-1 text-danger"
+                                      title="Delete"
+                                      onClick={() =>
+                                        handleDeleteMeeting(
+                                          meeting.id,
+                                          meeting.name
+                                        )
+                                      }
+                                    >
+                                      <Trash2 size={16} />
+                                    </Button>
+                                  )}
+                                </div>
                               </div>
                             </div>
                           )
@@ -4974,11 +5214,12 @@ const CrmLeads = () => {
         </Modal>
       )}
 
-      {/* Add Follow-up Modal */}
+      {/* Add/Edit Follow-up Modal */}
       <Modal
         show={showAddFollowupModal}
         onHide={() => {
           setShowAddFollowupModal(false);
+          setFollowUpIdToEdit(null);
           setFollowupData({
             leadId: null,
             leadName: "",
@@ -4999,7 +5240,7 @@ const CrmLeads = () => {
         >
           <Modal.Title className="d-flex align-items-center">
             <Calendar size={24} className="me-2" />
-            Add Follow up Activity
+            {followUpIdToEdit ? "Update Follow up Activity" : "Add Follow up Activity"}
           </Modal.Title>
         </Modal.Header>
         <Modal.Body className="p-4">
@@ -5028,7 +5269,7 @@ const CrmLeads = () => {
                         followUpDate: e.target.value,
                       })
                     }
-                    min={new Date().toISOString().split("T")[0]}
+                    min={followUpIdToEdit ? undefined : new Date().toISOString().split("T")[0]}
                     required
                   />
                 </Form.Group>
@@ -5157,6 +5398,7 @@ const CrmLeads = () => {
             variant="outline-secondary"
             onClick={() => {
               setShowAddFollowupModal(false);
+              setFollowUpIdToEdit(null);
               setFollowupData({
                 leadId: null,
                 leadName: "",
@@ -5175,7 +5417,7 @@ const CrmLeads = () => {
           <Button
             variant="primary"
             disabled={!followupData.followUpDate || loadingFollowUp}
-            onClick={handleCreateFollowUp}
+            onClick={followUpIdToEdit ? handleUpdateFollowUp : handleCreateFollowUp}
           >
             {loadingFollowUp ? (
               <>
@@ -5183,23 +5425,24 @@ const CrmLeads = () => {
                   className="spinner-border spinner-border-sm me-1"
                   role="status"
                 />
-                Adding...
+                {followUpIdToEdit ? "Updating..." : "Adding..."}
               </>
             ) : (
               <>
                 <Plus size={16} className="me-1" />
-                Add Follow up
+                {followUpIdToEdit ? "Update Follow up" : "Add Follow up"}
               </>
             )}
           </Button>
         </Modal.Footer>
       </Modal>
 
-      {/* Add Meeting Modal */}
+      {/* Add/Edit Meeting Modal */}
       <Modal
         show={showAddMeetingModal}
         onHide={() => {
           setShowAddMeetingModal(false);
+          setMeetingIdToEdit(null);
           setMeetingData({
             leadId: null,
             leadName: "",
@@ -5221,7 +5464,7 @@ const CrmLeads = () => {
         >
           <Modal.Title className="d-flex align-items-center">
             <Users size={24} className="me-2" />
-            Schedule Meeting
+            {meetingIdToEdit ? "Update Meeting" : "Schedule Meeting"}
           </Modal.Title>
         </Modal.Header>
         <Modal.Body className="p-4">
@@ -5302,7 +5545,7 @@ const CrmLeads = () => {
                         meetingDate: e.target.value,
                       })
                     }
-                    min={new Date().toISOString().split("T")[0]}
+                    min={meetingIdToEdit ? undefined : new Date().toISOString().split("T")[0]}
                     required
                   />
                 </Form.Group>
@@ -5417,6 +5660,7 @@ const CrmLeads = () => {
             variant="outline-secondary"
             onClick={() => {
               setShowAddMeetingModal(false);
+              setMeetingIdToEdit(null);
               setMeetingData({
                 leadId: null,
                 leadName: "",
@@ -5442,7 +5686,7 @@ const CrmLeads = () => {
               !meetingData.meetingTime ||
               loadingMeeting
             }
-            onClick={handleCreateMeeting}
+            onClick={meetingIdToEdit ? handleUpdateMeeting : handleCreateMeeting}
           >
             {loadingMeeting ? (
               <>
@@ -5450,12 +5694,100 @@ const CrmLeads = () => {
                   className="spinner-border spinner-border-sm me-1"
                   role="status"
                 />
-                Scheduling...
+                {meetingIdToEdit ? "Updating..." : "Scheduling..."}
               </>
             ) : (
               <>
                 <Calendar size={16} className="me-1" />
-                Schedule Meeting
+                {meetingIdToEdit ? "Update Meeting" : "Schedule Meeting"}
+              </>
+            )}
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
+      {/* Change Stage Modal */}
+      <Modal
+        show={showChangeStageModal}
+        onHide={() => {
+          setShowChangeStageModal(false);
+          setLeadToChangeStage(null);
+          setSelectedStageId(null);
+        }}
+        centered
+      >
+        <Modal.Header closeButton>
+          <Modal.Title className="d-flex align-items-center">
+            <GitBranch size={20} className="me-2" />
+            Change Lead Stage
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body className="p-4">
+          {leadToChangeStage && (
+            <div className="mb-3">
+              <p className="mb-1">
+                <strong>Lead:</strong> {leadToChangeStage.name}
+              </p>
+              {leadToChangeStage.stage && (
+                <p className="mb-0 text-muted">
+                  <strong>Current Stage:</strong> {leadToChangeStage.stage.name}
+                </p>
+              )}
+            </div>
+          )}
+          <Form.Group className="mb-3">
+            <Form.Label>
+              Select Stage <span className="text-danger">*</span>
+            </Form.Label>
+            <Form.Select
+              value={selectedStageId || ""}
+              onChange={(e) => setSelectedStageId(Number(e.target.value))}
+            >
+              <option value="">Select a stage</option>
+              {leadStages
+                .filter((stage) => stage.type === "lead" && stage.active)
+                .sort((a, b) => a.sequence - b.sequence)
+                .map((stage) => (
+                  <option key={stage.id} value={stage.id}>
+                    {stage.name}
+                  </option>
+                ))}
+            </Form.Select>
+            <Form.Text className="text-muted">
+              Choose the new stage for this lead
+            </Form.Text>
+          </Form.Group>
+        </Modal.Body>
+        <Modal.Footer className="border-top bg-light">
+          <Button
+            variant="outline-secondary"
+            onClick={() => {
+              setShowChangeStageModal(false);
+              setLeadToChangeStage(null);
+              setSelectedStageId(null);
+            }}
+          >
+            <X size={16} className="me-1" />
+            Cancel
+          </Button>
+          <Button
+            variant="primary"
+            disabled={!selectedStageId || loadingChangeStage}
+            onClick={handleChangeStageSubmit}
+          >
+            {loadingChangeStage ? (
+              <>
+                <span
+                  className="spinner-border spinner-border-sm me-2"
+                  role="status"
+                  aria-hidden="true"
+                ></span>
+                Updating...
+              </>
+            ) : (
+              <>
+                <CheckCircle size={16} className="me-1" />
+                Update Stage
               </>
             )}
           </Button>

@@ -19,6 +19,7 @@ import {
   deleteDealAttachment,
   downloadDealAttachment,
   createMeeting,
+  updateMeeting,
   deleteMeeting,
   markDealLost,
   getLead,
@@ -307,6 +308,7 @@ const CrmDeals = () => {
   
   // Meeting Modal
   const [showAddMeetingModal, setShowAddMeetingModal] = useState(false);
+  const [meetingIdToEdit, setMeetingIdToEdit] = useState<number | null>(null);
   const [meetingData, setMeetingData] = useState({
     dealId: null as number | null,
     dealName: '',
@@ -343,6 +345,8 @@ const CrmDeals = () => {
   const [dealsFilters, setDealsFilters] = useState({
     assignedTo: null as string | null,
     stage: null as string | null,
+    followUpDateFrom: null as string | null,
+    followUpDateTo: null as string | null,
   });
 
   // Fetch stages and extensions on component mount
@@ -382,6 +386,12 @@ const CrmDeals = () => {
         }
         if (currentFilters.include_archived !== undefined) {
           params.include_archived = currentFilters.include_archived;
+        }
+        if (currentFilters.follow_up_date_from) {
+          params.follow_up_date_from = currentFilters.follow_up_date_from;
+        }
+        if (currentFilters.follow_up_date_to) {
+          params.follow_up_date_to = currentFilters.follow_up_date_to;
         }
 
         const response: any = await getDeals(params);
@@ -602,6 +612,24 @@ const CrmDeals = () => {
         }
       }
       
+      // Handle follow_up_date_from filter
+      if ('follow_up_date_from' in filters) {
+        if (filters.follow_up_date_from) {
+          newFilters.follow_up_date_from = filters.follow_up_date_from;
+        } else {
+          delete newFilters.follow_up_date_from;
+        }
+      }
+      
+      // Handle follow_up_date_to filter
+      if ('follow_up_date_to' in filters) {
+        if (filters.follow_up_date_to) {
+          newFilters.follow_up_date_to = filters.follow_up_date_to;
+        } else {
+          delete newFilters.follow_up_date_to;
+        }
+      }
+      
       return newFilters;
     });
     setRefreshKey((prev) => prev + 1);
@@ -710,6 +738,7 @@ const CrmDeals = () => {
       
       // Reset form and close modal
       setShowAddMeetingModal(false);
+      setMeetingIdToEdit(null);
       setMeetingData({
         dealId: null,
         dealName: '',
@@ -729,7 +758,103 @@ const CrmDeals = () => {
     } finally {
       setLoadingMeeting(false);
     }
-  }, [meetingData, session, viewingDeal, handleViewDeal]);
+  }, [meetingData, meetingAttendees, session, viewingDeal, handleViewDeal]);
+
+  // Handle meeting update
+  const handleUpdateMeeting = useCallback(async () => {
+    if (!meetingIdToEdit || !meetingData.meetingName || !meetingData.meetingDate || !meetingData.meetingTime) return;
+    
+    setLoadingMeeting(true);
+    try {
+      const payload: any = {
+        name: meetingData.meetingName,
+        meeting_type: meetingData.meetingType,
+        meeting_date: meetingData.meetingDate,
+        meeting_time: meetingData.meetingTime,
+        extensions: meetingAttendees.length > 0 ? meetingAttendees.map((user: any) => user.value) : [],
+      };
+      
+      if (meetingData.meetingOutcome) {
+        payload.meeting_outcome = meetingData.meetingOutcome;
+      }
+      
+      await updateMeeting(meetingIdToEdit, payload);
+      
+      // Refresh deal data
+      if (viewingDeal?.id === meetingData.dealId && meetingData.dealId) {
+        await handleViewDeal(meetingData.dealId);
+      }
+      
+      // Reset form and close modal
+      setShowAddMeetingModal(false);
+      setMeetingIdToEdit(null);
+      setMeetingData({
+        dealId: null,
+        dealName: '',
+        meetingName: '',
+        meetingType: 'Online',
+        meetingDate: '',
+        meetingTime: '',
+        meetingOutcome: '',
+        extensions: [],
+      });
+      setMeetingAttendees([]);
+      
+      // Refresh deals list
+      setRefreshKey((oldKey) => oldKey + 1);
+    } catch (error) {
+      console.error("Failed to update meeting:", error);
+    } finally {
+      setLoadingMeeting(false);
+    }
+  }, [meetingIdToEdit, meetingData, meetingAttendees, viewingDeal, handleViewDeal]);
+
+  // Handle edit meeting click
+  const handleEditMeeting = useCallback((meeting: any) => {
+    // Format date for input (YYYY-MM-DD)
+    const meetingDate = meeting.meeting_date
+      ? new Date(meeting.meeting_date).toISOString().split("T")[0]
+      : "";
+
+    // Format time for input (HH:MM)
+    const meetingTime = meeting.meeting_time || "";
+
+    // Set attendees from meeting extensions
+    // meeting.extensions is an array of objects with 'extension' property (e.g., { extension: "511", ... })
+    const meetingExtensionStrings = meeting.extensions && Array.isArray(meeting.extensions)
+      ? meeting.extensions.map((extObj: any) => extObj.extension || String(extObj.id))
+      : [];
+    
+    const attendees = meetingExtensionStrings.length > 0
+      ? extensions
+          .filter((ext: any) => {
+            // Match by extension string or ID (convert to string for comparison)
+            const extExtension = String(ext.extension || "");
+            const extId = String(ext.id || "");
+            return meetingExtensionStrings.some((meetingExt: string) => 
+              meetingExt === extExtension || meetingExt === extId
+            );
+          })
+          .map((ext: any) => ({
+            value: ext.id || ext.extension,
+            label: ext.display_name || ext.name || ext.id || ext.extension,
+          }))
+      : [];
+
+    setMeetingIdToEdit(meeting.id);
+    setMeetingData({
+      dealId: viewingDeal?.id || null,
+      dealName: viewingDeal?.name || "",
+      meetingName: meeting.name || "",
+      meetingType: meeting.meeting_type || "Online",
+      meetingDate: meetingDate,
+      meetingTime: meetingTime,
+      meetingOutcome: meeting.meeting_outcome || "",
+      extensions: meetingExtensionStrings, // Store extension strings, not objects
+    });
+    setMeetingAttendees(attendees);
+    setShowAddMeetingModal(true);
+  }, [viewingDeal, extensions]);
 
   // Handle meeting deletion
   const handleDeleteMeeting = useCallback((meetingId: number, meetingName?: string) => {
@@ -973,6 +1098,7 @@ const CrmDeals = () => {
       currency: deal.currency || 'USD',
       probability: deal.probability || 0,
       closeDate: deal.expected_close_date ? new Date(deal.expected_close_date).toLocaleDateString() : '',
+      followUpDate: deal.follow_up_date ? new Date(deal.follow_up_date).toLocaleDateString() : '',
       owner: extensions.find((ext: any) => ext?.id == deal?.created_by || ext?.extension == deal?.created_by)?.display_name || 
               extensions.find((ext: any) => ext?.id == deal?.created_by || ext?.extension == deal?.created_by)?.name || 
               deal.created_by || '',
@@ -1128,14 +1254,14 @@ const CrmDeals = () => {
               <BarChart3 size={16} className="me-2" />
               {showDealsAnalytics ? 'Hide Analytics' : 'Show Analytics'}
             </Button>
-            {session?.user?.permissions?.includes('add-crm-deals') && (
+            {/* {session?.user?.permissions?.includes('add-crm-deals') && (
               <Link href="/crm/deals/create">
                 <Button variant="primary">
                   <Plus size={16} className="me-2" />
                   Add Deal
                 </Button>
               </Link>
-            )}
+            )} */}
           </div>
         </div>
 
@@ -1285,7 +1411,9 @@ const CrmDeals = () => {
           onToggleAdvancedFilters={() => setShowAdvancedFilters(!showAdvancedFilters)}
           advancedFilterCount={
             (dealsFilters.assignedTo !== null ? 1 : 0) +
-            (dealsFilters.stage !== null ? 1 : 0)
+            (dealsFilters.stage !== null ? 1 : 0) +
+            (dealsFilters.followUpDateFrom !== null ? 1 : 0) +
+            (dealsFilters.followUpDateTo !== null ? 1 : 0)
           }
         />
 
@@ -1359,6 +1487,40 @@ const CrmDeals = () => {
                   />
                 </Col>
                 <Col md={4}>
+                  <Form.Label className="small fw-bold mb-2">Follow-up Date From</Form.Label>
+                  <Form.Control
+                    type="date"
+                    value={dealsFilters.followUpDateFrom || ''}
+                    onChange={(e) => {
+                      const dateValue = e.target.value || null;
+                      setDealsFilters(prev => ({
+                        ...prev,
+                        followUpDateFrom: dateValue
+                      }));
+                      handleFiltersChange({
+                        follow_up_date_from: dateValue || null
+                      });
+                    }}
+                  />
+                </Col>
+                <Col md={4}>
+                  <Form.Label className="small fw-bold mb-2">Follow-up Date To</Form.Label>
+                  <Form.Control
+                    type="date"
+                    value={dealsFilters.followUpDateTo || ''}
+                    onChange={(e) => {
+                      const dateValue = e.target.value || null;
+                      setDealsFilters(prev => ({
+                        ...prev,
+                        followUpDateTo: dateValue
+                      }));
+                      handleFiltersChange({
+                        follow_up_date_to: dateValue || null
+                      });
+                    }}
+                  />
+                </Col>
+                <Col md={4}>
                   <div className="d-flex gap-2">
                     <Button
                       variant="outline-secondary"
@@ -1367,6 +1529,8 @@ const CrmDeals = () => {
                         setDealsFilters({
                           assignedTo: null,
                           stage: null,
+                          followUpDateFrom: null,
+                          followUpDateTo: null,
                         });
                         setCurrentFilters({});
                         setActiveFilter('all');
@@ -1401,6 +1565,7 @@ const CrmDeals = () => {
                 { key: 'industry', label: 'Industry' },
                 { key: 'assignedUser', label: 'Assigned To' },
                 { key: 'closeDate', label: 'Close Date' },
+                { key: 'followUpDate', label: 'Follow-up Date' },
                 { key: 'created', label: 'Created' }
               ].map((col) => (
                 <Dropdown.Item key={col.key} as="div">
@@ -1423,7 +1588,7 @@ const CrmDeals = () => {
               ))}
               <Dropdown.Divider />
               <Dropdown.Item onClick={() => {
-                const allCols = ['name', 'company', 'value', 'stage', 'dealType', 'owner', 'industry', 'assignedUser', 'closeDate', 'created'];
+                const allCols = ['name', 'company', 'value', 'stage', 'dealType', 'owner', 'industry', 'assignedUser', 'closeDate', 'followUpDate', 'created'];
                 setSelectedDealsColumns(allCols);
                 localStorage.setItem('dealsSelectedColumns', JSON.stringify(allCols));
               }}>
@@ -1493,6 +1658,14 @@ const CrmDeals = () => {
                         onClick={() => handleSort('closeDate', dealsPagination, setDealsPagination)}
                       >
                         Expected Close {renderSortIcon('closeDate', dealsPagination)}
+                      </th>
+                    )}
+                    {selectedDealsColumns.includes('followUpDate') && (
+                      <th 
+                        style={{ cursor: 'pointer', userSelect: 'none' }}
+                        onClick={() => handleSort('followUpDate', dealsPagination, setDealsPagination)}
+                      >
+                        Follow-up Date {renderSortIcon('followUpDate', dealsPagination)}
                       </th>
                     )}
                     {selectedDealsColumns.includes('owner') && (
@@ -1579,6 +1752,9 @@ const CrmDeals = () => {
                         )}
                         {selectedDealsColumns.includes('closeDate') && (
                           <td>{deal.closeDate || '-'}</td>
+                        )}
+                        {selectedDealsColumns.includes('followUpDate') && (
+                          <td>{deal.followUpDate || '-'}</td>
                         )}
                         {selectedDealsColumns.includes('owner') && (
                           <td>{deal.owner || '-'}</td>
@@ -1965,7 +2141,7 @@ const CrmDeals = () => {
                     }}>Created Date</div>
                     <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
                       <Calendar size={14} style={{ color: '#4680ff', marginRight: '6px', display: 'inline' }} />
-                      {viewingDeal.created_at ? new Date(viewingDeal.created_at).toLocaleDateString() : 'N/A'}
+                      {viewingDeal.created_at ? new Date(viewingDeal.created_at).toLocaleDateString('en-GB') : 'N/A'}
                     </div>
                   </div>
                 </div>
@@ -2855,17 +3031,30 @@ const CrmDeals = () => {
                                 </div>
                               )}
                             </div>
-                            {session?.user?.permissions?.includes('delete-meeting-crm-deals') && (
-                            <Button
-                              variant="link"
-                              size="sm"
-                              className="p-1 text-danger"
-                              title="Delete"
-                              onClick={() => handleDeleteMeeting(meeting.id, meeting.name)}
-                            >
-                              <Trash2 size={16} />
-                            </Button>
-                            )}
+                            <div className="d-flex gap-1">
+                              {session?.user?.permissions?.includes('add-meeting-crm-deals') && (
+                                <Button
+                                  variant="link"
+                                  size="sm"
+                                  className="p-1"
+                                  title="Edit"
+                                  onClick={() => handleEditMeeting(meeting)}
+                                >
+                                  <Edit size={16} />
+                                </Button>
+                              )}
+                              {session?.user?.permissions?.includes('delete-meeting-crm-deals') && (
+                                <Button
+                                  variant="link"
+                                  size="sm"
+                                  className="p-1 text-danger"
+                                  title="Delete"
+                                  onClick={() => handleDeleteMeeting(meeting.id, meeting.name)}
+                                >
+                                  <Trash2 size={16} />
+                                </Button>
+                              )}
+                            </div>
                           </div>
                         </div>
                       ))}
@@ -3497,11 +3686,12 @@ const CrmDeals = () => {
         </Modal>
       )}
 
-      {/* Add Meeting Modal */}
+      {/* Add/Edit Meeting Modal */}
       <Modal 
         show={showAddMeetingModal} 
         onHide={() => {
           setShowAddMeetingModal(false);
+          setMeetingIdToEdit(null);
           setMeetingData({
             dealId: null,
             dealName: '',
@@ -3520,7 +3710,7 @@ const CrmDeals = () => {
         <Modal.Header closeButton style={{ color: 'black', borderBottom: '1px solid #ccc' }}>
           <Modal.Title className="d-flex align-items-center">
             <Users size={24} className="me-2" />
-            Schedule Meeting
+            {meetingIdToEdit ? "Update Meeting" : "Schedule Meeting"}
           </Modal.Title>
         </Modal.Header>
         <Modal.Body className="p-4">
@@ -3575,7 +3765,7 @@ const CrmDeals = () => {
                     type="date"
                     value={meetingData.meetingDate}
                     onChange={(e) => setMeetingData({ ...meetingData, meetingDate: e.target.value })}
-                    min={new Date().toISOString().split('T')[0]}
+                    min={meetingIdToEdit ? undefined : new Date().toISOString().split('T')[0]}
                     required
                   />
                 </Form.Group>
@@ -3649,6 +3839,7 @@ const CrmDeals = () => {
             variant="outline-secondary" 
             onClick={() => {
               setShowAddMeetingModal(false);
+              setMeetingIdToEdit(null);
               setMeetingData({
                 dealId: null,
                 dealName: '',
@@ -3674,17 +3865,17 @@ const CrmDeals = () => {
               !meetingData.meetingTime ||
               loadingMeeting
             }
-            onClick={handleCreateMeeting}
+            onClick={meetingIdToEdit ? handleUpdateMeeting : handleCreateMeeting}
           >
             {loadingMeeting ? (
               <>
                 <div className="spinner-border spinner-border-sm me-1" role="status" />
-                Scheduling...
+                {meetingIdToEdit ? "Updating..." : "Scheduling..."}
               </>
             ) : (
               <>
                 <Calendar size={16} className="me-1" />
-                Schedule Meeting
+                {meetingIdToEdit ? "Update Meeting" : "Schedule Meeting"}
               </>
             )}
           </Button>

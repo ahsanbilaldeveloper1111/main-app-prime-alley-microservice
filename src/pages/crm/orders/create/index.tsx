@@ -93,7 +93,18 @@ const CreateOrder = () => {
 
           // Get the latest estimate (final one or most recent)
           const estimates = dealData.estimates || [];
-          const latestEstimate = estimates.find((e: any) => e.is_final) || estimates[estimates.length - 1];
+          // Sort estimates by created_at (descending) to get latest first, fallback to id if created_at is not available
+          const sortedEstimates = [...estimates].sort((a: any, b: any) => {
+            const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
+            const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
+            if (dateA !== dateB) {
+              return dateB - dateA; // Descending order (newest first)
+            }
+            // Fallback to id if dates are equal or missing
+            return (b.id || 0) - (a.id || 0);
+          });
+          // Find the latest estimate with is_final flag, or use the latest estimate overall
+          const latestEstimate = sortedEstimates.find((e: any) => e.is_final) || sortedEstimates[0];
           
           if (latestEstimate) {
             setSelectedEstimateId(latestEstimate.id);

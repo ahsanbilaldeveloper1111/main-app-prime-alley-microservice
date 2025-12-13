@@ -287,6 +287,8 @@ const CrmTasks = () => {
     email: '',
     company_name: '',
     due_date: '',
+    time: '',
+    status: 'pending' as 'pending' | 'completed' | 'failed',
     notes: [] as Array<{ note: string }>,
   });
   const [selectedUserExtension, setSelectedUserExtension] = useState<any>(null);
@@ -521,6 +523,8 @@ const CrmTasks = () => {
           email: taskFormData.email || undefined,
           company_name: taskFormData.company_name || undefined,
           due_date: taskFormData.due_date,
+          time: taskFormData.time || undefined,
+          status: taskFormData.status,
         });
       } else {
         await createTask({
@@ -532,6 +536,8 @@ const CrmTasks = () => {
           email: taskFormData.email || undefined,
           company_name: taskFormData.company_name || undefined,
           due_date: taskFormData.due_date,
+          time: taskFormData.time || undefined,
+          status: taskFormData.status,
           notes: taskFormData.notes.length > 0 ? taskFormData.notes : undefined,
         });
       }
@@ -546,6 +552,8 @@ const CrmTasks = () => {
         email: '',
         company_name: '',
         due_date: '',
+        time: '',
+        status: 'pending',
         notes: [],
       });
       setSelectedUserExtension(null);
@@ -784,6 +792,8 @@ const CrmTasks = () => {
                       email: '',
                       company_name: '',
                       due_date: '',
+                      time: '',
+                      status: 'pending',
                       notes: [],
                     });
                     setSelectedUserExtension(null);
@@ -982,7 +992,7 @@ const CrmTasks = () => {
                     ))}
                     <Dropdown.Divider />
                     <Dropdown.Item onClick={() => {
-                      const defaultCols = ['task', 'assignedTo', 'contact', 'company', 'urgency', 'dueDate'];
+                      const defaultCols = ['task', 'assignedTo', 'contact', 'company', 'urgency', 'status', 'dueDate'];
                       setSelectedColumns(defaultCols);
                       localStorage.setItem('tasksSelectedColumns', JSON.stringify(defaultCols));
                     }}>
@@ -1052,6 +1062,14 @@ const CrmTasks = () => {
                                   Urgency {renderSortIcon('urgency')}
                                 </th>
                               )}
+                              {selectedColumns.includes('status') && (
+                                <th 
+                                  style={{ cursor: 'pointer', userSelect: 'none' }}
+                                  onClick={() => handleSort('status')}
+                                >
+                                  Status {renderSortIcon('status')}
+                                </th>
+                              )}
                               {selectedColumns.includes('dueDate') && (
                                 <th 
                                   style={{ cursor: 'pointer', userSelect: 'none' }}
@@ -1118,6 +1136,14 @@ const CrmTasks = () => {
                                     {selectedColumns.includes('urgency') && (
                                       <td>{getUrgencyBadge(task.urgency)}</td>
                                     )}
+                                    {selectedColumns.includes('status') && (
+                                      <td>
+                                        {task.status === 'pending' && <Badge bg="warning">Pending</Badge>}
+                                        {task.status === 'completed' && <Badge bg="success">Completed</Badge>}
+                                        {task.status === 'failed' && <Badge bg="danger">Failed</Badge>}
+                                        {!task.status && <Badge bg="secondary">-</Badge>}
+                                      </td>
+                                    )}
                                     {selectedColumns.includes('dueDate') && (
                                       <td>
                                         <Badge 
@@ -1160,6 +1186,8 @@ const CrmTasks = () => {
                                                 email: task.email || '',
                                                 company_name: task.company_name || '',
                                                 due_date: task.due_date,
+                                                time: task.time || '',
+                                                status: task.status || 'pending',
                                                 notes: task.notes?.map(n => ({ note: n.note })) || [],
                                               });
                                               setSelectedUserExtension(findMatchingExtension(task.user_extension));
@@ -1325,6 +1353,31 @@ const CrmTasks = () => {
                     min={new Date().toISOString().split('T')[0]}
                     required
                   />
+                </Form.Group>
+              </Col>
+
+              <Col md={6}>
+                <Form.Group>
+                  <Form.Label>Time</Form.Label>
+                  <Form.Control
+                    type="time"
+                    value={taskFormData.time}
+                    onChange={(e) => setTaskFormData({ ...taskFormData, time: e.target.value })}
+                  />
+                </Form.Group>
+              </Col>
+
+              <Col md={6}>
+                <Form.Group>
+                  <Form.Label>Status</Form.Label>
+                  <Form.Select
+                    value={taskFormData.status}
+                    onChange={(e) => setTaskFormData({ ...taskFormData, status: e.target.value as 'pending' | 'completed' | 'failed' })}
+                  >
+                    <option value="pending">Pending</option>
+                    <option value="completed">Completed</option>
+                    <option value="failed">Failed</option>
+                  </Form.Select>
                 </Form.Group>
               </Col>
 
@@ -1551,6 +1604,47 @@ const CrmTasks = () => {
                 {viewingTask && new Date(viewingTask.due_date).toLocaleDateString()}
               </div>
             </div>
+            {viewingTask?.time && (
+              <div style={{
+                background: '#f8f9fa',
+                padding: '16px',
+                borderRadius: '10px',
+              }}>
+                <div style={{
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  color: '#6b7280',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px',
+                  marginBottom: '6px'
+                }}>Time</div>
+                <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                  <Clock size={14} style={{ color: '#4680ff', marginRight: '6px' }} />
+                  {viewingTask.time?.split('.')[0] || viewingTask.time}
+                </div>
+              </div>
+            )}
+            {viewingTask?.status && (
+              <div style={{
+                background: '#f8f9fa',
+                padding: '16px',
+                borderRadius: '10px',
+              }}>
+                <div style={{
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  color: '#6b7280',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px',
+                  marginBottom: '6px'
+                }}>Status</div>
+                <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                  {viewingTask.status === 'pending' && <Badge bg="warning">Pending</Badge>}
+                  {viewingTask.status === 'completed' && <Badge bg="success">Completed</Badge>}
+                  {viewingTask.status === 'failed' && <Badge bg="danger">Failed</Badge>}
+                </div>
+              </div>
+            )}
             {viewingTask?.company_name && (
               <div style={{
                 background: '#f8f9fa',
@@ -1723,6 +1817,8 @@ const CrmTasks = () => {
                   email: viewingTask.email || '',
                   company_name: viewingTask.company_name || '',
                   due_date: viewingTask.due_date,
+                  time: viewingTask.time || '',
+                  status: viewingTask.status || 'pending',
                   notes: viewingTask.notes?.map(n => ({ note: n.note })) || [],
                 });
                 setSelectedUserExtension(findMatchingExtension(viewingTask.user_extension));

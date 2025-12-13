@@ -26,7 +26,7 @@ import {
   Handshake,
   ShoppingBag,
   TrendingUp,
-  Eye,
+  Edit,
   Calendar,
 } from "lucide-react";
 import Link from "next/link";
@@ -644,9 +644,9 @@ const CrmDashboard = () => {
                         <Link
                           href={`/crm/leads/${lead.id}/edit`}
                           className="btn btn-sm btn-outline-secondary"
-                          title="View Details"
+                          title="Edit"
                         >
-                                    <Eye size={14} />
+                                    <Edit size={14} />
                         </Link>
                                 </td>
                               </tr>
@@ -731,9 +731,9 @@ const CrmDashboard = () => {
                       <Link
                           href={`/crm/deals/${deal.id}/edit`}
                         className="btn btn-sm btn-outline-secondary"
-                        title="View Details"
+                        title="Edit"
                       >
-                          <Eye size={14} />
+                          <Edit size={14} />
                       </Link>
                     </div>
                   ))
@@ -810,9 +810,9 @@ const CrmDashboard = () => {
                     <Link
                           href={`/crm/orders/${order.id}/edit`}
                           className="btn btn-sm btn-outline-secondary"
-                          title="View Details"
+                          title="Edit"
                     >
-                          <Eye size={14} />
+                          <Edit size={14} />
                     </Link>
                   </div>
                     ))

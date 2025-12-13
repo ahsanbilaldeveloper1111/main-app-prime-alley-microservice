@@ -1591,7 +1591,8 @@ const CrmCampaigns = () => {
               {showCampaignsAnalytics ? 'Hide Analytics' : 'Show Analytics'}
             </Button>
           )}
-          {session?.user?.permissions?.includes('add-crm-data-management') && (
+          {session?.user?.permissions?.includes('add-crm-data-management') && 
+           session?.user?.permissions?.includes('data-assignment-crm-data-management') && (
             <Button 
               variant="outline-primary"
               onClick={() => setShowUploadModal(true)}
@@ -1600,7 +1601,7 @@ const CrmCampaigns = () => {
               Upload CSV
             </Button>
           )}
-          {session?.user?.permissions?.includes('add-crm-data-management') && (
+          {session?.user?.permissions?.includes('data-assignment-crm-data-management') && (
             <Button 
               variant="outline-success"
               onClick={handleDataAssignment}
@@ -2725,7 +2726,8 @@ const CrmCampaigns = () => {
       />
 
       {/* Upload Modal */}
-      {session?.user?.permissions?.includes('add-crm-data-management') && (
+      {session?.user?.permissions?.includes('add-crm-data-management') && 
+       session?.user?.permissions?.includes('add-crm-data-management') && (
         <Modal show={showUploadModal} onHide={() => {
           setShowUploadModal(false);
           setSelectedFile(null);

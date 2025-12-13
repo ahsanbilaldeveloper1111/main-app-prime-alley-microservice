@@ -18,6 +18,7 @@ import { Button, Row, Col, Form, Card, Alert, Badge } from "react-bootstrap";
 import Select from "react-select";
 import PhoneInput from "react-phone-number-input";
 import { parsePhoneNumber } from "react-phone-number-input";
+import { useSession } from "next-auth/react";
 import "react-phone-number-input/style.css";
 import {
   FiSave,
@@ -26,7 +27,13 @@ import {
   FiTarget,
   FiPlus,
 } from "react-icons/fi";
-import { CheckCircle, ChevronLeft, ChevronRight, AlertCircle, X } from "lucide-react";
+import {
+  CheckCircle,
+  ChevronLeft,
+  ChevronRight,
+  AlertCircle,
+  X,
+} from "lucide-react";
 import Link from "next/link";
 import { toast } from "react-toastify";
 import { useRouter } from "next/router";
@@ -39,7 +46,7 @@ import ConfirmModal from "@pages/partial/ConfirmModal";
 import SuccessfulModal from "@pages/partial/SuccessfulModal";
 import PageSummaryGrid, { SummaryCard } from "@components/PageSummaryGrid";
 import DatatableActionButton from "@components/DatatableActionButton";
-import { ModuleSlug } from '@utils/Helper';
+import { ModuleSlug } from "@utils/Helper";
 
 const CreateLead = () => {
   const router = useRouter();
@@ -70,13 +77,15 @@ const CreateLead = () => {
     lead_potential: "",
     other_information: {} as Record<string, any>,
     campaign_field_values: {} as Record<string, any>,
-    contact_persons: [{
-      title: "",
-      name: "",
-      phone_country_code: "",
-      phone: "",
-      email: "",
-    }] as Array<{
+    contact_persons: [
+      {
+        title: "",
+        name: "",
+        phone_country_code: "",
+        phone: "",
+        email: "",
+      },
+    ] as Array<{
       title: string;
       name: string;
       phone_country_code: string;
@@ -87,10 +96,10 @@ const CreateLead = () => {
 
   const [stages, setStages] = useState<StageData[]>([]);
 
-
   const [extensions, setExtensions] = useState<any[]>([]);
-  const [extensionsOpportunities, setExtensionsOpportunities] = useState<any[]>([]);
-
+  const [extensionsOpportunities, setExtensionsOpportunities] = useState<any[]>(
+    []
+  );
 
   const [campaigns, setCampaigns] = useState<CampaignData[]>([]);
   const [crmData, setCrmData] = useState<CrmDataItem[]>([]);
@@ -105,18 +114,20 @@ const CreateLead = () => {
   const isInitialLoad = useRef(true);
 
   // Utility function to parse phone number in format "+92 3200654656" and extract country code
-  const parsePhoneNumberFormat = (phone: string): { countryCode: string; phoneNumber: string } => {
+  const parsePhoneNumberFormat = (
+    phone: string
+  ): { countryCode: string; phoneNumber: string } => {
     if (!phone) return { countryCode: "", phoneNumber: "" };
-    
+
     // Match pattern: +country_code space rest_of_number
     const match = phone.match(/^(\+\d{1,4})\s+(.+)$/);
     if (match) {
       return {
         countryCode: match[1], // e.g., "+92"
-        phoneNumber: match[2],  // e.g., "3200654656"
+        phoneNumber: match[2], // e.g., "3200654656"
       };
     }
-    
+
     // If no match, return original phone as phoneNumber
     return { countryCode: "", phoneNumber: phone };
   };
@@ -196,10 +207,13 @@ const CreateLead = () => {
 
           // Extract phone
           const phone = crmDataRecord.phone || crmDataRecord.data?.phone || "";
-          
+
           // Parse phone number to extract country code if in format "+92 3200654656"
           const parsedPhone = parsePhoneNumberFormat(phone);
-          const phoneCountryCode = parsedPhone.countryCode || crmDataRecord.data?.phone_country_code || "";
+          const phoneCountryCode =
+            parsedPhone.countryCode ||
+            crmDataRecord.data?.phone_country_code ||
+            "";
           const phoneNumber = parsedPhone.phoneNumber || phone;
 
           // Extract source from CRM data
@@ -210,8 +224,8 @@ const CreateLead = () => {
             "File Upload";
 
           // Extract user_extension from CRM data
-          const userExtension = crmDataRecord.user_extension 
-            ? String(crmDataRecord.user_extension) 
+          const userExtension = crmDataRecord.user_extension
+            ? String(crmDataRecord.user_extension)
             : null;
 
           // Pre-fill basic form fields
@@ -246,25 +260,28 @@ const CreateLead = () => {
             contact_phone_country_code: phoneCountryCode,
             // Add contact person to contact_persons array if we have name, phone, or email
             // Otherwise ensure at least one empty contact person exists
-            contact_persons: contactPersonName || phone || email
-              ? [
-                  {
-                    title: crmDataRecord.data?.contact_person_title || "",
-                    name: contactPersonName,
-                    phone_country_code: phoneCountryCode,
-                    phone: phoneNumber,
-                    email: email,
-                  },
-                ]
-              : prev.contact_persons.length > 0 
-                ? prev.contact_persons 
-                : [{
-                    title: "",
-                    name: "",
-                    phone_country_code: "",
-                    phone: "",
-                    email: "",
-                  }],
+            contact_persons:
+              contactPersonName || phone || email
+                ? [
+                    {
+                      title: crmDataRecord.data?.contact_person_title || "",
+                      name: contactPersonName,
+                      phone_country_code: phoneCountryCode,
+                      phone: phoneNumber,
+                      email: email,
+                    },
+                  ]
+                : prev.contact_persons.length > 0
+                ? prev.contact_persons
+                : [
+                    {
+                      title: "",
+                      name: "",
+                      phone_country_code: "",
+                      phone: "",
+                      email: "",
+                    },
+                  ],
           }));
         } catch (error) {
           console.error("Failed to fetch CRM data record:", error);
@@ -297,10 +314,14 @@ const CreateLead = () => {
                 selectedCrmData.data[field.field_name.toLowerCase()] ||
                 selectedCrmData.data[field.field_name.toUpperCase()] ||
                 // Also try with underscores replaced by spaces and vice versa
-                selectedCrmData.data[field.field_name.replace(/_/g, ' ')] ||
-                selectedCrmData.data[field.field_name.replace(/ /g, '_')] ||
-                selectedCrmData.data[field.field_name.replace(/_/g, ' ').toLowerCase()] ||
-                selectedCrmData.data[field.field_name.replace(/ /g, '_').toLowerCase()];
+                selectedCrmData.data[field.field_name.replace(/_/g, " ")] ||
+                selectedCrmData.data[field.field_name.replace(/ /g, "_")] ||
+                selectedCrmData.data[
+                  field.field_name.replace(/_/g, " ").toLowerCase()
+                ] ||
+                selectedCrmData.data[
+                  field.field_name.replace(/ /g, "_").toLowerCase()
+                ];
 
               if (
                 crmDataValue !== null &&
@@ -309,21 +330,27 @@ const CreateLead = () => {
               ) {
                 // For dropdown fields, check if the value matches one of the options
                 if (field.field_type === "dropdown" && field.field_options) {
-                  const optionValues = field.field_options?.map((opt: any) => 
-                    typeof opt === 'string' ? opt : opt.value || opt.label
-                  ) || [];
-                  const optionLabels = field.field_options?.map((opt: any) => 
-                    typeof opt === 'string' ? opt : opt.label || opt.value
-                  ) || [];
-                  
+                  const optionValues =
+                    field.field_options?.map((opt: any) =>
+                      typeof opt === "string" ? opt : opt.value || opt.label
+                    ) || [];
+                  const optionLabels =
+                    field.field_options?.map((opt: any) =>
+                      typeof opt === "string" ? opt : opt.label || opt.value
+                    ) || [];
+
                   // Check if CRM data value matches any option value or label
                   const stringValue = String(crmDataValue);
-                  const matchesOption = optionValues.some((opt: string) => 
-                    opt.toLowerCase() === stringValue.toLowerCase()
-                  ) || optionLabels.some((opt: string) => 
-                    opt.toLowerCase() === stringValue.toLowerCase()
-                  );
-                  
+                  const matchesOption =
+                    optionValues.some(
+                      (opt: string) =>
+                        opt.toLowerCase() === stringValue.toLowerCase()
+                    ) ||
+                    optionLabels.some(
+                      (opt: string) =>
+                        opt.toLowerCase() === stringValue.toLowerCase()
+                    );
+
                   if (matchesOption) {
                     preFilledFields[field.field_name] = stringValue;
                   }
@@ -351,7 +378,9 @@ const CreateLead = () => {
     fetchCampaignAndPreFill();
   }, [selectedCrmData]);
 
-  const opportunityRef = useRef<"lead" | "opportunity">(isOpportunity ? 'opportunity' : 'lead');
+  const opportunityRef = useRef<"lead" | "opportunity">(
+    isOpportunity ? "opportunity" : "lead"
+  );
   useEffect(() => {
     if (opportunityRef.current !== formData.type) {
       opportunityRef.current = formData.type;
@@ -370,14 +399,23 @@ const CreateLead = () => {
     }
   };
 
+  const { data: session } = useSession();
   const fetchExtensions = async () => {
     try {
       const hierarchyData = await GetHierarchyData(ModuleSlug.CRM_LEADS);
       if (hierarchyData?.extensions) {
         setExtensions(hierarchyData.extensions);
       }
+      if (!router.query.crm_data_id) {
+        setFormData((prev) => ({
+          ...formData,
+          user_extension: (session?.user as any)?.extension,
+        }));
+      }
 
-      const hierarchyDataOpportunities = await GetHierarchyData(ModuleSlug.CRM_OPPORTUNITIES);
+      const hierarchyDataOpportunities = await GetHierarchyData(
+        ModuleSlug.CRM_OPPORTUNITIES
+      );
       if (hierarchyDataOpportunities?.extensions) {
         setExtensionsOpportunities(hierarchyDataOpportunities.extensions);
       }
@@ -444,24 +482,24 @@ const CreateLead = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Validate required fields
     if (!formData.user_extension) {
       toast.error("Please select a user extension");
       return;
     }
-    
+
     if (!formData.name) {
       toast.error("Please enter lead name");
       return;
     }
-    
+
     // Validate at least one contact person exists
     if (!formData.contact_persons || formData.contact_persons.length === 0) {
       toast.error("Please add at least one contact person");
       return;
     }
-    
+
     setLoading(true);
 
     try {
@@ -470,25 +508,53 @@ const CreateLead = () => {
         name: formData.name,
         user_extension: formData.user_extension,
         ...(formData.stage_id && { stage_id: String(formData.stage_id) }),
-        ...(formData.campaign_id && { campaign_id: String(formData.campaign_id) }),
-        ...(formData.crm_data_id && { crm_data_id: String(formData.crm_data_id) }),
+        ...(formData.campaign_id && {
+          campaign_id: String(formData.campaign_id),
+        }),
+        ...(formData.crm_data_id && {
+          crm_data_id: String(formData.crm_data_id),
+        }),
         ...(formData.source && { source: formData.source }),
         ...(formData.description && { description: formData.description }),
         ...(formData.company_name && { company_name: formData.company_name }),
         ...(formData.industry && { industry: formData.industry }),
-        ...(formData.business_type && { business_type: formData.business_type }),
-        ...(formData.company_country && { company_country: formData.company_country }),
+        ...(formData.business_type && {
+          business_type: formData.business_type,
+        }),
+        ...(formData.company_country && {
+          company_country: formData.company_country,
+        }),
         ...(formData.company_city && { company_city: formData.company_city }),
-        ...(formData.company_location_other && { company_location_other: formData.company_location_other }),
+        ...(formData.company_location_other && {
+          company_location_other: formData.company_location_other,
+        }),
         ...(formData.company_size && { company_size: formData.company_size }),
-        ...(formData.contact_person_title && { contact_person_title: formData.contact_person_title }),
-        ...(formData.contact_person_name && { contact_person_name: formData.contact_person_name }),
-        ...(formData.contact_phone_country_code && { contact_phone_country_code: formData.contact_phone_country_code }),
-        ...(formData.contact_phone && { contact_phone: formData.contact_phone }),
-        ...(formData.lead_potential && { lead_potential: formData.lead_potential }),
-        ...(formData.other_information && Object.keys(formData.other_information).length > 0 && { other_information: formData.other_information }),
-        ...(formData.campaign_field_values && Object.keys(formData.campaign_field_values).length > 0 && { campaign_field_values: formData.campaign_field_values }),
-        ...(formData.contact_persons.length > 0 && { contact_persons: formData.contact_persons }),
+        ...(formData.contact_person_title && {
+          contact_person_title: formData.contact_person_title,
+        }),
+        ...(formData.contact_person_name && {
+          contact_person_name: formData.contact_person_name,
+        }),
+        ...(formData.contact_phone_country_code && {
+          contact_phone_country_code: formData.contact_phone_country_code,
+        }),
+        ...(formData.contact_phone && {
+          contact_phone: formData.contact_phone,
+        }),
+        ...(formData.lead_potential && {
+          lead_potential: formData.lead_potential,
+        }),
+        ...(formData.other_information &&
+          Object.keys(formData.other_information).length > 0 && {
+            other_information: formData.other_information,
+          }),
+        ...(formData.campaign_field_values &&
+          Object.keys(formData.campaign_field_values).length > 0 && {
+            campaign_field_values: formData.campaign_field_values,
+          }),
+        ...(formData.contact_persons.length > 0 && {
+          contact_persons: formData.contact_persons,
+        }),
       };
 
       await createLead(payload);
@@ -616,10 +682,11 @@ const CreateLead = () => {
 
       // Extract phone
       const phone = crmDataRecord.phone || crmDataRecord.data?.phone || "";
-      
+
       // Parse phone number to extract country code if in format "+92 3200654656"
       const parsedPhone = parsePhoneNumberFormat(phone);
-      const phoneCountryCode = parsedPhone.countryCode || crmDataRecord.data?.phone_country_code || "";
+      const phoneCountryCode =
+        parsedPhone.countryCode || crmDataRecord.data?.phone_country_code || "";
       const phoneNumber = parsedPhone.phoneNumber || phone;
 
       // Extract source from CRM data
@@ -630,8 +697,10 @@ const CreateLead = () => {
         "";
 
       // Extract user_extension from CRM data
-      const userExtension = crmDataRecord.user_extension 
-        ? String(crmDataRecord.user_extension) 
+      const userExtension = crmDataRecord.user_extension
+        ? String(crmDataRecord.user_extension)
+        : (session?.user as any)?.extension
+        ? (session?.user as any)?.extension
         : null;
 
       // Pre-fill form fields
@@ -663,28 +732,32 @@ const CreateLead = () => {
         // Pre-fill contact person fields
         contact_person_name: contactPersonName || prev.contact_person_name,
         contact_phone: phoneNumber || prev.contact_phone,
-        contact_phone_country_code: phoneCountryCode || prev.contact_phone_country_code,
+        contact_phone_country_code:
+          phoneCountryCode || prev.contact_phone_country_code,
         // Add contact person to contact_persons array if we have name, phone, or email
         // Otherwise ensure at least one empty contact person exists
-        contact_persons: contactPersonName || phone || email
-          ? [
-              {
-                title: crmDataRecord.data?.contact_person_title || "",
-                name: contactPersonName,
-                phone_country_code: phoneCountryCode,
-                phone: phoneNumber,
-                email: email,
-              },
-            ]
-          : prev.contact_persons.length > 0 
-            ? prev.contact_persons 
-            : [{
-                title: "",
-                name: "",
-                phone_country_code: "",
-                phone: "",
-                email: "",
-              }],
+        contact_persons:
+          contactPersonName || phone || email
+            ? [
+                {
+                  title: crmDataRecord.data?.contact_person_title || "",
+                  name: contactPersonName,
+                  phone_country_code: phoneCountryCode,
+                  phone: phoneNumber,
+                  email: email,
+                },
+              ]
+            : prev.contact_persons.length > 0
+            ? prev.contact_persons
+            : [
+                {
+                  title: "",
+                  name: "",
+                  phone_country_code: "",
+                  phone: "",
+                  email: "",
+                },
+              ],
       }));
 
       // Auto-select campaign if available
@@ -837,132 +910,210 @@ const CreateLead = () => {
                 <div className="mb-4">
                   <div className="d-flex align-items-center justify-content-between position-relative">
                     {/* Progress Line */}
-                    <div 
-                      className="position-absolute bg-light" 
-                      style={{ 
-                        left: '0', 
-                        right: '0', 
-                        top: '20px', 
-                        height: '2px', 
-                        zIndex: 0 
+                    <div
+                      className="position-absolute bg-light"
+                      style={{
+                        left: "0",
+                        right: "0",
+                        top: "20px",
+                        height: "2px",
+                        zIndex: 0,
                       }}
                     />
-                    <div 
-                      className="position-absolute bg-primary" 
-                      style={{ 
-                        left: '0', 
-                        top: '20px', 
-                        height: '2px', 
+                    <div
+                      className="position-absolute bg-primary"
+                      style={{
+                        left: "0",
+                        top: "20px",
+                        height: "2px",
                         width: `${(formStep / 3) * 100}%`,
                         zIndex: 0,
-                        transition: 'width 0.3s ease'
+                        transition: "width 0.3s ease",
                       }}
                     />
-                    
+
                     {/* Step 1 */}
-                    <div 
-                      className="text-center position-relative" 
-                      style={{ cursor: 'pointer', flex: 1 }}
+                    <div
+                      className="text-center position-relative"
+                      style={{ cursor: "pointer", flex: 1 }}
                       onClick={() => setFormStep(0)}
                     >
-                      <div 
-                        className={`rounded-circle d-flex align-items-center justify-content-center mx-auto ${formStep >= 0 ? 'bg-primary text-white' : 'bg-light text-muted'}`}
-                        style={{ width: '40px', height: '40px', zIndex: 1, position: 'relative' }}
+                      <div
+                        className={`rounded-circle d-flex align-items-center justify-content-center mx-auto ${
+                          formStep >= 0
+                            ? "bg-primary text-white"
+                            : "bg-light text-muted"
+                        }`}
+                        style={{
+                          width: "40px",
+                          height: "40px",
+                          zIndex: 1,
+                          position: "relative",
+                        }}
                       >
-                        {formStep > 0 ? <CheckCircle size={20} /> : '1'}
+                        {formStep > 0 ? <CheckCircle size={20} /> : "1"}
                       </div>
-                      <small className={`d-block mt-2 ${formStep === 0 ? 'fw-bold text-primary' : 'text-muted'}`}>Lead Info</small>
+                      <small
+                        className={`d-block mt-2 ${
+                          formStep === 0 ? "fw-bold text-primary" : "text-muted"
+                        }`}
+                      >
+                        Lead Info
+                      </small>
                     </div>
 
                     {/* Step 2 */}
-                    <div 
-                      className="text-center position-relative" 
-                      style={{ cursor: 'pointer', flex: 1 }}
+                    <div
+                      className="text-center position-relative"
+                      style={{ cursor: "pointer", flex: 1 }}
                       onClick={() => setFormStep(1)}
                     >
-                      <div 
-                        className={`rounded-circle d-flex align-items-center justify-content-center mx-auto ${formStep >= 1 ? 'bg-primary text-white' : 'bg-light text-muted'}`}
-                        style={{ width: '40px', height: '40px', zIndex: 1, position: 'relative' }}
+                      <div
+                        className={`rounded-circle d-flex align-items-center justify-content-center mx-auto ${
+                          formStep >= 1
+                            ? "bg-primary text-white"
+                            : "bg-light text-muted"
+                        }`}
+                        style={{
+                          width: "40px",
+                          height: "40px",
+                          zIndex: 1,
+                          position: "relative",
+                        }}
                       >
-                        {formStep > 1 ? <CheckCircle size={20} /> : '2'}
+                        {formStep > 1 ? <CheckCircle size={20} /> : "2"}
                       </div>
-                      <small className={`d-block mt-2 ${formStep === 1 ? 'fw-bold text-primary' : 'text-muted'}`}>Company Info</small>
+                      <small
+                        className={`d-block mt-2 ${
+                          formStep === 1 ? "fw-bold text-primary" : "text-muted"
+                        }`}
+                      >
+                        Company Info
+                      </small>
                     </div>
 
                     {/* Step 3 */}
-                    <div 
-                      className="text-center position-relative" 
-                      style={{ cursor: 'pointer', flex: 1 }}
+                    <div
+                      className="text-center position-relative"
+                      style={{ cursor: "pointer", flex: 1 }}
                       onClick={() => setFormStep(2)}
                     >
-                      <div 
-                        className={`rounded-circle d-flex align-items-center justify-content-center mx-auto ${formStep >= 2 ? 'bg-primary text-white' : 'bg-light text-muted'}`}
-                        style={{ width: '40px', height: '40px', zIndex: 1, position: 'relative' }}
+                      <div
+                        className={`rounded-circle d-flex align-items-center justify-content-center mx-auto ${
+                          formStep >= 2
+                            ? "bg-primary text-white"
+                            : "bg-light text-muted"
+                        }`}
+                        style={{
+                          width: "40px",
+                          height: "40px",
+                          zIndex: 1,
+                          position: "relative",
+                        }}
                       >
-                        {formStep > 2 ? <CheckCircle size={20} /> : '3'}
+                        {formStep > 2 ? <CheckCircle size={20} /> : "3"}
                       </div>
-                      <small className={`d-block mt-2 ${formStep === 2 ? 'fw-bold text-primary' : 'text-muted'}`}>Contact Persons</small>
+                      <small
+                        className={`d-block mt-2 ${
+                          formStep === 2 ? "fw-bold text-primary" : "text-muted"
+                        }`}
+                      >
+                        Contact Persons
+                      </small>
                     </div>
 
                     {/* Step 4 */}
-                    <div 
-                      className="text-center position-relative" 
-                      style={{ cursor: 'pointer', flex: 1 }}
+                    <div
+                      className="text-center position-relative"
+                      style={{ cursor: "pointer", flex: 1 }}
                       onClick={() => setFormStep(3)}
                     >
-                      <div 
-                        className={`rounded-circle d-flex align-items-center justify-content-center mx-auto ${formStep >= 3 ? 'bg-primary text-white' : 'bg-light text-muted'}`}
-                        style={{ width: '40px', height: '40px', zIndex: 1, position: 'relative' }}
+                      <div
+                        className={`rounded-circle d-flex align-items-center justify-content-center mx-auto ${
+                          formStep >= 3
+                            ? "bg-primary text-white"
+                            : "bg-light text-muted"
+                        }`}
+                        style={{
+                          width: "40px",
+                          height: "40px",
+                          zIndex: 1,
+                          position: "relative",
+                        }}
                       >
-                        {formStep > 3 ? <CheckCircle size={20} /> : '4'}
+                        {formStep > 3 ? <CheckCircle size={20} /> : "4"}
                       </div>
-                      <small className={`d-block mt-2 ${formStep === 3 ? 'fw-bold text-primary' : 'text-muted'}`}>Other Info</small>
+                      <small
+                        className={`d-block mt-2 ${
+                          formStep === 3 ? "fw-bold text-primary" : "text-muted"
+                        }`}
+                      >
+                        Other Info
+                      </small>
                     </div>
                   </div>
                 </div>
 
                 <Form onSubmit={handleSubmit}>
                   {/* Form Content Based on Step */}
-                  <div style={{ minHeight: '400px' }}>
+                  <div style={{ minHeight: "400px" }}>
                     {formStep === 0 && (
                       <Card className="border-0 bg-light">
                         <Card.Body>
-                          <h5 className="fw-bold mb-4 text-primary">LEAD INFORMATION</h5>
+                          <h5 className="fw-bold mb-4 text-primary">
+                            LEAD INFORMATION
+                          </h5>
                           <Row>
                             <Col md={6}>
                               <Form.Group className="mb-3">
-                                <Form.Label>Lead Name <span className="text-danger">*</span></Form.Label>
-                                <Form.Control 
-                                  type="text" 
+                                <Form.Label>
+                                  Lead Name{" "}
+                                  <span className="text-danger">*</span>
+                                </Form.Label>
+                                <Form.Control
+                                  type="text"
                                   value={formData.name}
-                                  onChange={(e) => handleInputChange("name", e.target.value)}
-                                  placeholder="Enter lead name" 
-                                  required 
+                                  onChange={(e) =>
+                                    handleInputChange("name", e.target.value)
+                                  }
+                                  placeholder="Enter lead name"
+                                  required
                                 />
                               </Form.Group>
                             </Col>
                             <Col md={6}>
                               <Form.Group className="mb-3">
-                                <Form.Label>User Extension <span className="text-danger">*</span></Form.Label>
+                                <Form.Label>
+                                  User Extension{" "}
+                                  <span className="text-danger">*</span>
+                                </Form.Label>
                                 {formData.type === "opportunity" ? (
                                   <Select
                                     value={
                                       formData.user_extension
                                         ? {
                                             value: formData.user_extension,
-                                            label: extensionsOpportunities.find(
-                                              (ext: any) => ext.id.toString() === formData.user_extension?.toString()
-                                            )?.display_name || "",
+                                            label:
+                                              extensionsOpportunities.find(
+                                                (ext: any) =>
+                                                  ext.id.toString() ===
+                                                  formData.user_extension?.toString()
+                                              )?.display_name || "",
                                           }
                                         : null
                                     }
                                     onChange={(selectedOption: any) => {
-                                      handleInputChange("user_extension", selectedOption?.value || null);
+                                      handleInputChange(
+                                        "user_extension",
+                                        selectedOption?.value || null
+                                      );
                                     }}
-                                    options={extensionsOpportunities.map((extension: any) => ({
-                                      value: extension.id,
-                                      label: extension.display_name,
-                                    }))}
+                                    options={extensionsOpportunities.map(
+                                      (extension: any) => ({
+                                        value: extension.id,
+                                        label: extension.display_name,
+                                      })
+                                    )}
                                     placeholder="Select User Extension"
                                     isClearable
                                     isSearchable
@@ -974,19 +1125,27 @@ const CreateLead = () => {
                                       formData.user_extension
                                         ? {
                                             value: formData.user_extension,
-                                            label: extensions.find(
-                                              (ext: any) => ext.id.toString() === formData.user_extension?.toString()
-                                            )?.display_name || "",
+                                            label:
+                                              extensions.find(
+                                                (ext: any) =>
+                                                  ext.id.toString() ===
+                                                  formData.user_extension?.toString()
+                                              )?.display_name || "",
                                           }
                                         : null
                                     }
                                     onChange={(selectedOption: any) => {
-                                      handleInputChange("user_extension", selectedOption?.value || null);
+                                      handleInputChange(
+                                        "user_extension",
+                                        selectedOption?.value || null
+                                      );
                                     }}
-                                    options={extensions.map((extension: any) => ({
-                                      value: extension.id,
-                                      label: extension.display_name,
-                                    }))}
+                                    options={extensions.map(
+                                      (extension: any) => ({
+                                        value: extension.id,
+                                        label: extension.display_name,
+                                      })
+                                    )}
                                     placeholder="Select User Extension"
                                     isClearable
                                     isSearchable
@@ -1001,7 +1160,12 @@ const CreateLead = () => {
                                 <Form.Select
                                   value={formData.stage_id || ""}
                                   onChange={(e) =>
-                                    handleInputChange("stage_id", e.target.value ? Number(e.target.value) : undefined)
+                                    handleInputChange(
+                                      "stage_id",
+                                      e.target.value
+                                        ? Number(e.target.value)
+                                        : undefined
+                                    )
                                   }
                                 >
                                   <option value="">Select a stage</option>
@@ -1019,7 +1183,9 @@ const CreateLead = () => {
                                 <Form.Control
                                   type="text"
                                   value={formData.source}
-                                  onChange={(e) => handleInputChange("source", e.target.value)}
+                                  onChange={(e) =>
+                                    handleInputChange("source", e.target.value)
+                                  }
                                   placeholder="e.g., LinkedIn, Website, Referral"
                                 />
                               </Form.Group>
@@ -1032,7 +1198,11 @@ const CreateLead = () => {
                                     formData.campaign_id
                                       ? {
                                           value: formData.campaign_id,
-                                          label: campaigns.find((c) => c.id === formData.campaign_id)?.name || "",
+                                          label:
+                                            campaigns.find(
+                                              (c) =>
+                                                c.id === formData.campaign_id
+                                            )?.name || "",
                                         }
                                       : null
                                   }
@@ -1049,22 +1219,38 @@ const CreateLead = () => {
                             </Col>
                             <Col md={6}>
                               <Form.Group className="mb-3">
-                                <Form.Label>CRM Data Attribution</Form.Label>
+                                <Form.Label>Prospect</Form.Label>
                                 <Select
+                                  isDisabled={!!router?.query?.crm_data_id}
                                   value={
                                     formData.crm_data_id
                                       ? {
                                           value: formData.crm_data_id,
-                                          label: `#${formData.crm_data_id} - ${crmData.find((d) => d.id === formData.crm_data_id)?.phone || "No Phone"}`,
+                                          label:
+                                            formData.crm_data_id ==
+                                            selectedCrmData?.id
+                                              ? `${
+                                                  selectedCrmData?.name ||
+                                                  "No Name"
+                                                }`
+                                              : `${
+                                                  crmData.find(
+                                                    (d) =>
+                                                      d.id ===
+                                                      formData.crm_data_id
+                                                  )?.name || "No Name"
+                                                }`,
                                         }
                                       : null
                                   }
                                   onChange={handleCrmDataChange}
                                   options={crmData.map((data) => ({
                                     value: data.id,
-                                    label: `#${data.id} - ${data.phone || "No Phone"}`,
+                                    label: `#${data.id} - ${
+                                      data.phone || "No Phone"
+                                    }`,
                                   }))}
-                                  placeholder="Select CRM data (Optional)"
+                                  placeholder="Select Prospect (Optional)"
                                   isClearable
                                   isSearchable
                                 />
@@ -1073,11 +1259,16 @@ const CreateLead = () => {
                             <Col md={12}>
                               <Form.Group className="mb-3">
                                 <Form.Label>Description</Form.Label>
-                                <Form.Control 
-                                  as="textarea" 
-                                  rows={3} 
+                                <Form.Control
+                                  as="textarea"
+                                  rows={3}
                                   value={formData.description}
-                                  onChange={(e) => handleInputChange("description", e.target.value)}
+                                  onChange={(e) =>
+                                    handleInputChange(
+                                      "description",
+                                      e.target.value
+                                    )
+                                  }
                                   placeholder="Enter lead description or notes"
                                 />
                               </Form.Group>
@@ -1090,28 +1281,51 @@ const CreateLead = () => {
                     {formStep === 1 && (
                       <Card className="border-0 bg-light">
                         <Card.Body>
-                          <h5 className="fw-bold mb-4 text-success">COMPANY INFORMATION</h5>
+                          <h5 className="fw-bold mb-4 text-success">
+                            COMPANY INFORMATION
+                          </h5>
                           <Row>
                             <Col md={6}>
                               <Form.Group className="mb-3">
                                 <Form.Label>Company Name</Form.Label>
-                                <Form.Control 
-                                  type="text" 
+                                <Form.Control
+                                  type="text"
                                   value={formData.company_name}
-                                  onChange={(e) => handleInputChange("company_name", e.target.value)}
-                                  placeholder="Enter company name" 
+                                  onChange={(e) =>
+                                    handleInputChange(
+                                      "company_name",
+                                      e.target.value
+                                    )
+                                  }
+                                  placeholder="Enter company name"
                                 />
                               </Form.Group>
                             </Col>
                             <Col md={6}>
                               <Form.Group className="mb-3">
                                 <Form.Label>Industry</Form.Label>
-                                <Form.Control
-                                  type="text"
+                                <Form.Select
                                   value={formData.industry}
-                                  onChange={(e) => handleInputChange("industry", e.target.value)}
-                                  placeholder="e.g., Technology, Finance, Healthcare"
-                                />
+                                  onChange={(e) =>
+                                    handleInputChange(
+                                      "industry",
+                                      e.target.value
+                                    )
+                                  }
+                                >
+                                  <option value="">Select Industry</option>
+                                  <option value="Technology">Technology</option>
+                                  <option value="Healthcare">Healthcare</option>
+                                  <option value="Finance">Finance</option>
+                                  <option value="Banking & Financial Services">Banking & Financial Services</option>
+                                  <option value="Manufacturing">Manufacturing</option>
+                                  <option value="Retail">Retail</option>
+                                  <option value="Education">Education</option>
+                                  <option value="Real Estate">Real Estate</option>
+                                  <option value="Telecommunications">Telecommunications</option>
+                                  <option value="Construction">Construction</option>
+                                  <option value="Other">Other</option>
+                                </Form.Select>
                               </Form.Group>
                             </Col>
                             <Col md={6}>
@@ -1119,13 +1333,26 @@ const CreateLead = () => {
                                 <Form.Label>Business Type</Form.Label>
                                 <Form.Select
                                   value={formData.business_type}
-                                  onChange={(e) => handleInputChange("business_type", e.target.value)}
+                                  onChange={(e) =>
+                                    handleInputChange(
+                                      "business_type",
+                                      e.target.value
+                                    )
+                                  }
                                 >
                                   <option value="">Select Type</option>
-                                  <option value="B2B">B2B (Business to Business)</option>
-                                  <option value="B2C">B2C (Business to Consumer)</option>
-                                  <option value="B2G">B2G (Business to Government)</option>
-                                  <option value="Non-profit / NGO">Non-profit / NGO</option>
+                                  <option value="B2B">
+                                    B2B (Business to Business)
+                                  </option>
+                                  <option value="B2C">
+                                    B2C (Business to Consumer)
+                                  </option>
+                                  <option value="B2G">
+                                    B2G (Business to Government)
+                                  </option>
+                                  <option value="Non-profit / NGO">
+                                    Non-profit / NGO
+                                  </option>
                                 </Form.Select>
                               </Form.Group>
                             </Col>
@@ -1135,7 +1362,12 @@ const CreateLead = () => {
                                 <Form.Control
                                   type="text"
                                   value={formData.company_country}
-                                  onChange={(e) => handleInputChange("company_country", e.target.value)}
+                                  onChange={(e) =>
+                                    handleInputChange(
+                                      "company_country",
+                                      e.target.value
+                                    )
+                                  }
                                   placeholder="Enter country"
                                 />
                               </Form.Group>
@@ -1146,7 +1378,12 @@ const CreateLead = () => {
                                 <Form.Control
                                   type="text"
                                   value={formData.company_city}
-                                  onChange={(e) => handleInputChange("company_city", e.target.value)}
+                                  onChange={(e) =>
+                                    handleInputChange(
+                                      "company_city",
+                                      e.target.value
+                                    )
+                                  }
                                   placeholder="Enter city"
                                 />
                               </Form.Group>
@@ -1156,14 +1393,29 @@ const CreateLead = () => {
                                 <Form.Label>Company Size</Form.Label>
                                 <Form.Select
                                   value={formData.company_size}
-                                  onChange={(e) => handleInputChange("company_size", e.target.value)}
+                                  onChange={(e) =>
+                                    handleInputChange(
+                                      "company_size",
+                                      e.target.value
+                                    )
+                                  }
                                 >
                                   <option value="">Select Size</option>
-                                  <option value="Micro (1-10 employees)">Micro (1-10 employees)</option>
-                                  <option value="Small (11-50 employees)">Small (11-50 employees)</option>
-                                  <option value="Medium (51-200 employees)">Medium (51-200 employees)</option>
-                                  <option value="Large (201-500 employees)">Large (201-500 employees)</option>
-                                  <option value="Enterprise (500+ employees)">Enterprise (500+ employees)</option>
+                                  <option value="Micro (1-10 employees)">
+                                    Micro (1-10 employees)
+                                  </option>
+                                  <option value="Small (11-50 employees)">
+                                    Small (11-50 employees)
+                                  </option>
+                                  <option value="Medium (51-200 employees)">
+                                    Medium (51-200 employees)
+                                  </option>
+                                  <option value="Large (201-500 employees)">
+                                    Large (201-500 employees)
+                                  </option>
+                                  <option value="Enterprise (500+ employees)">
+                                    Enterprise (500+ employees)
+                                  </option>
                                 </Form.Select>
                               </Form.Group>
                             </Col>
@@ -1173,7 +1425,12 @@ const CreateLead = () => {
                                 <Form.Control
                                   type="text"
                                   value={formData.company_location_other}
-                                  onChange={(e) => handleInputChange("company_location_other", e.target.value)}
+                                  onChange={(e) =>
+                                    handleInputChange(
+                                      "company_location_other",
+                                      e.target.value
+                                    )
+                                  }
                                   placeholder="Additional location information"
                                 />
                               </Form.Group>
@@ -1187,7 +1444,9 @@ const CreateLead = () => {
                       <Card className="border-0 bg-light">
                         <Card.Body>
                           <div className="d-flex justify-content-between align-items-center mb-4">
-                            <h5 className="fw-bold mb-0 text-warning">CONTACT PERSONS</h5>
+                            <h5 className="fw-bold mb-0 text-warning">
+                              CONTACT PERSONS
+                            </h5>
                             <Button
                               variant="outline-primary"
                               size="sm"
@@ -1201,12 +1460,16 @@ const CreateLead = () => {
                             <Card key={index} className="mb-3 border">
                               <Card.Body>
                                 <div className="d-flex justify-content-between align-items-center mb-3">
-                                  <h6 className="mb-0">Contact Person {index + 1}</h6>
+                                  <h6 className="mb-0">
+                                    Contact Person {index + 1}
+                                  </h6>
                                   <Button
                                     variant="outline-danger"
                                     size="sm"
                                     onClick={() => removeContactPerson(index)}
-                                    disabled={formData.contact_persons.length <= 1}
+                                    disabled={
+                                      formData.contact_persons.length <= 1
+                                    }
                                   >
                                     <X size={16} />
                                   </Button>
@@ -1217,7 +1480,13 @@ const CreateLead = () => {
                                       <Form.Label>Title</Form.Label>
                                       <Form.Select
                                         value={person.title}
-                                        onChange={(e) => updateContactPerson(index, "title", e.target.value)}
+                                        onChange={(e) =>
+                                          updateContactPerson(
+                                            index,
+                                            "title",
+                                            e.target.value
+                                          )
+                                        }
                                       >
                                         <option value="">Select Title</option>
                                         <option value="Mr.">Mr.</option>
@@ -1234,7 +1503,13 @@ const CreateLead = () => {
                                       <Form.Control
                                         type="text"
                                         value={person.name}
-                                        onChange={(e) => updateContactPerson(index, "name", e.target.value)}
+                                        onChange={(e) =>
+                                          updateContactPerson(
+                                            index,
+                                            "name",
+                                            e.target.value
+                                          )
+                                        }
                                         placeholder="Enter contact name"
                                       />
                                     </Form.Group>
@@ -1246,30 +1521,66 @@ const CreateLead = () => {
                                         <PhoneInput
                                           international
                                           defaultCountry="US"
-                                          value={person.phone_country_code && person.phone 
-                                            ? `${person.phone_country_code}${person.phone}` 
-                                            : person.phone || undefined}
+                                          value={
+                                            person.phone_country_code &&
+                                            person.phone
+                                              ? `${person.phone_country_code}${person.phone}`
+                                              : person.phone || undefined
+                                          }
                                           onChange={(value) => {
                                             if (value) {
                                               try {
                                                 // Parse the phone number to extract country code and national number
-                                                const phoneNumber = parsePhoneNumber(value);
+                                                const phoneNumber =
+                                                  parsePhoneNumber(value);
                                                 if (phoneNumber) {
-                                                  updateContactPerson(index, "phone_country_code", `+${phoneNumber.countryCallingCode}`);
-                                                  updateContactPerson(index, "phone", phoneNumber.nationalNumber);
+                                                  updateContactPerson(
+                                                    index,
+                                                    "phone_country_code",
+                                                    `+${phoneNumber.countryCallingCode}`
+                                                  );
+                                                  updateContactPerson(
+                                                    index,
+                                                    "phone",
+                                                    phoneNumber.nationalNumber
+                                                  );
                                                 } else {
                                                   // Fallback: store full number in phone field
-                                                  updateContactPerson(index, "phone_country_code", "");
-                                                  updateContactPerson(index, "phone", value);
+                                                  updateContactPerson(
+                                                    index,
+                                                    "phone_country_code",
+                                                    ""
+                                                  );
+                                                  updateContactPerson(
+                                                    index,
+                                                    "phone",
+                                                    value
+                                                  );
                                                 }
                                               } catch (error) {
                                                 // If parsing fails, store full number in phone field
-                                                updateContactPerson(index, "phone_country_code", "");
-                                                updateContactPerson(index, "phone", value);
+                                                updateContactPerson(
+                                                  index,
+                                                  "phone_country_code",
+                                                  ""
+                                                );
+                                                updateContactPerson(
+                                                  index,
+                                                  "phone",
+                                                  value
+                                                );
                                               }
                                             } else {
-                                              updateContactPerson(index, "phone_country_code", "");
-                                              updateContactPerson(index, "phone", "");
+                                              updateContactPerson(
+                                                index,
+                                                "phone_country_code",
+                                                ""
+                                              );
+                                              updateContactPerson(
+                                                index,
+                                                "phone",
+                                                ""
+                                              );
                                             }
                                           }}
                                           placeholder="Enter phone number"
@@ -1283,7 +1594,13 @@ const CreateLead = () => {
                                       <Form.Control
                                         type="email"
                                         value={person.email}
-                                        onChange={(e) => updateContactPerson(index, "email", e.target.value)}
+                                        onChange={(e) =>
+                                          updateContactPerson(
+                                            index,
+                                            "email",
+                                            e.target.value
+                                          )
+                                        }
                                         placeholder="Enter email address"
                                       />
                                     </Form.Group>
@@ -1299,77 +1616,96 @@ const CreateLead = () => {
                     {formStep === 3 && (
                       <Card className="border-0 bg-light">
                         <Card.Body>
-                          <h5 className="fw-bold mb-4 text-info">OTHER INFORMATION</h5>
+                          <h5 className="fw-bold mb-4 text-info">
+                            OTHER INFORMATION
+                          </h5>
                           <Row>
                             <Col md={6}>
                               <Form.Group className="mb-3">
                                 <Form.Label>Lead Potential</Form.Label>
                                 <Form.Select
                                   value={formData.lead_potential}
-                                  onChange={(e) => handleInputChange("lead_potential", e.target.value)}
+                                  onChange={(e) =>
+                                    handleInputChange(
+                                      "lead_potential",
+                                      e.target.value
+                                    )
+                                  }
                                 >
                                   <option value="">Select Potential</option>
                                   <option value="Hot">Hot</option>
                                   <option value="Warm">Warm</option>
                                   <option value="Cold">Cold</option>
                                 </Form.Select>
-                                <Form.Text className="text-muted">Likelihood of converting based on engagement</Form.Text>
+                                <Form.Text className="text-muted">
+                                  Likelihood of converting based on engagement
+                                </Form.Text>
                               </Form.Group>
                             </Col>
                           </Row>
 
                           {/* Campaign Custom Fields */}
-                          {selectedCampaign && selectedCampaign.fields && selectedCampaign.fields.length > 0 && (
-                            <div className="border-top pt-3 mt-4">
-                              <div className="d-flex align-items-center mb-3">
-                                <FiTarget className="me-2" />
-                                <h6 className="mb-0">Campaign Fields: {selectedCampaign.name}</h6>
-                                {selectedCrmData && (
-                                  <Badge bg="success" className="ms-2 small">
-                                    Auto-filled from CRM Data
-                                  </Badge>
-                                )}
+                          {selectedCampaign &&
+                            selectedCampaign.fields &&
+                            selectedCampaign.fields.length > 0 && (
+                              <div className="border-top pt-3 mt-4">
+                                <div className="d-flex align-items-center mb-3">
+                                  <FiTarget className="me-2" />
+                                  <h6 className="mb-0">
+                                    Campaign Fields: {selectedCampaign.name}
+                                  </h6>
+                                  {selectedCrmData && (
+                                    <Badge bg="success" className="ms-2 small">
+                                      Auto-filled from CRM Data
+                                    </Badge>
+                                  )}
+                                </div>
+                                <Row>
+                                  {selectedCampaign.fields.map(
+                                    (field, index) => (
+                                      <Col md={6} key={index} className="mb-3">
+                                        <Form.Group>
+                                          <Form.Label>
+                                            {field.field_name}
+                                          </Form.Label>
+                                          {renderCampaignField(field)}
+                                        </Form.Group>
+                                      </Col>
+                                    )
+                                  )}
+                                </Row>
                               </div>
-                              <Row>
-                                {selectedCampaign.fields.map((field, index) => (
-                                  <Col md={6} key={index} className="mb-3">
-                                    <Form.Group>
-                                      <Form.Label>{field.field_name}</Form.Label>
-                                      {renderCampaignField(field)}
-                                    </Form.Group>
-                                  </Col>
-                                ))}
-                              </Row>
-                            </div>
-                          )}
+                            )}
 
                           <div className="alert alert-success small mt-3">
                             <CheckCircle size={14} className="me-1" />
-                            All required fields are marked with <span className="text-danger">*</span>. Complete all sections to create the lead.
+                            All required fields are marked with{" "}
+                            <span className="text-danger">*</span>. Complete all
+                            sections to create the lead.
                           </div>
                         </Card.Body>
                       </Card>
                     )}
                   </div>
-                  
+
                   <div className="d-flex justify-content-between mt-4">
-                    <Button 
-                      variant="outline-secondary" 
+                    <Button
+                      variant="outline-secondary"
                       onClick={() => setFormStep(Math.max(0, formStep - 1))}
                       disabled={formStep === 0}
                     >
                       <ChevronLeft size={16} className="me-1" />
                       Back
                     </Button>
-                    <Link 
-                      href={isOpportunity ? "/crm/opportunities" : "/crm/leads"} 
+                    <Link
+                      href={isOpportunity ? "/crm/opportunities" : "/crm/leads"}
                       className="btn btn-secondary"
                     >
                       Cancel
                     </Link>
                     {formStep < 3 ? (
-                      <Button 
-                        variant="primary" 
+                      <Button
+                        variant="primary"
                         onClick={(e) => {
                           e.preventDefault();
                           setFormStep(Math.min(3, formStep + 1));
@@ -1379,7 +1715,7 @@ const CreateLead = () => {
                         <ChevronRight size={16} className="ms-1" />
                       </Button>
                     ) : (
-                      <Button 
+                      <Button
                         type="submit"
                         variant="success"
                         disabled={loading}

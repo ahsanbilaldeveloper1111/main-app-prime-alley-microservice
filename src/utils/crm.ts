@@ -36,6 +36,7 @@ export interface StageData {
   created_at: string;
   updated_at: string;
   type: "lead" | "lost_reason" | "deal" | "order";
+  probability: number;
 }
 
 export interface LostReasonData {
@@ -1738,12 +1739,15 @@ export interface CreateEstimatePayload {
 }
 
 export const createEstimate = async (
-  data: CreateEstimatePayload
+  data: CreateEstimatePayload,
+  showToast: boolean = true
 ): Promise<any> => {
   try {
     const response = await axiosInstance.post("/crm/create-estimate", data);
     const responseData: any = response.data?.data;
-    toast.success("Estimation chart saved successfully");
+    if (showToast) {
+      toast.success("Estimation chart saved successfully");
+    }
     return responseData || response.data;
   } catch (error: any) {
     toast.error(
@@ -2413,6 +2417,36 @@ export const createLeadFollowUp = async (
   }
 };
 
+export const updateLeadFollowUp = async (
+  leadId: number,
+  followUpId: number,
+  data: {
+    follow_up_date?: string;
+    follow_up_status?: string;
+    communication_channel?: string;
+    communication_channel_other?: string;
+    notes?: string;
+    user_extension?: string;
+  }
+): Promise<FollowUpData> => {
+  try {
+    const response = await axiosInstance.put(
+      `/crm/leads/${leadId}/follow-ups/${followUpId}`,
+      data
+    );
+    const responseData: any = response.data?.data;
+    toast.success("Follow-up updated successfully");
+    return responseData?.data || responseData || response.data;
+  } catch (error: any) {
+    toast.error(
+      error?.response?.data?.message ||
+        error?.message ||
+        "Failed to update follow-up"
+    );
+    throw error;
+  }
+};
+
 export const deleteLeadFollowUp = async (
   leadId: number,
   followUpId: number
@@ -2509,6 +2543,8 @@ export interface TaskData {
   email?: string;
   company_name?: string;
   due_date: string;
+  time?: string;
+  status?: "pending" | "completed" | "failed";
   notes?: TaskNote[];
   created_at?: string;
   updated_at?: string;
@@ -2559,6 +2595,8 @@ export const createTask = async (data: {
   email?: string;
   company_name?: string;
   due_date: string;
+  time?: string;
+  status?: "pending" | "completed" | "failed";
   notes?: Array<{ note: string }>;
 }): Promise<TaskData> => {
   try {
@@ -2587,6 +2625,8 @@ export const updateTask = async (
     email?: string;
     company_name?: string;
     due_date?: string;
+    time?: string;
+    status?: "pending" | "completed" | "failed";
   }
 ): Promise<TaskData> => {
   try {

@@ -850,13 +850,13 @@ const EditLead = () => {
                             </Col>
                             <Col md={6}>
                               <Form.Group className="mb-3">
-                                <Form.Label>CRM Data Attribution</Form.Label>
+                                <Form.Label>Prospect</Form.Label>
                                 <Select
                                   value={
                                     formData.crm_data_id
                                       ? {
                                           value: formData.crm_data_id,
-                                          label: `#${formData.crm_data_id} - ${crmData.find((d) => d.id === formData.crm_data_id)?.phone || "No Phone"}`,
+                                          label: `${crmData.find((d) => d.id === formData.crm_data_id)?.name || "No Name"}`,
                                         }
                                       : null
                                   }
@@ -867,7 +867,7 @@ const EditLead = () => {
                                     value: data.id,
                                     label: `#${data.id} - ${data.phone || "No Phone"}`,
                                   }))}
-                                  placeholder="Select CRM data (Optional)"
+                                  placeholder="Select Prospect (Optional)"
                                   isClearable
                                   isSearchable
                                 />
@@ -909,12 +909,23 @@ const EditLead = () => {
                             <Col md={6}>
                               <Form.Group className="mb-3">
                                 <Form.Label>Industry</Form.Label>
-                                <Form.Control
-                                  type="text"
+                                <Form.Select
                                   value={formData.industry}
                                   onChange={(e) => handleInputChange("industry", e.target.value)}
-                                  placeholder="e.g., Technology, Finance, Healthcare"
-                                />
+                                >
+                                  <option value="">Select Industry</option>
+                                  <option value="Technology">Technology</option>
+                                  <option value="Healthcare">Healthcare</option>
+                                  <option value="Finance">Finance</option>
+                                  <option value="Banking & Financial Services">Banking & Financial Services</option>
+                                  <option value="Manufacturing">Manufacturing</option>
+                                  <option value="Retail">Retail</option>
+                                  <option value="Education">Education</option>
+                                  <option value="Real Estate">Real Estate</option>
+                                  <option value="Telecommunications">Telecommunications</option>
+                                  <option value="Construction">Construction</option>
+                                  <option value="Other">Other</option>
+                                </Form.Select>
                               </Form.Group>
                             </Col>
                             <Col md={6}>

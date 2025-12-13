@@ -97,6 +97,7 @@ interface Stage {
   type: 'lead' | 'deal' | 'order' | 'lost_reason';
   created_at: string;
   updated_at: string;
+  probability: number;
 }
 
 // Filter Bar Component
@@ -211,6 +212,7 @@ const StagesManagement = () => {
     is_default: false,
     active: true,
     type: 'lead' as 'lead' | 'deal' | 'order' | 'lost_reason',
+    probability: 50,
   });
 
   const [currentFilters, setCurrentFilters] = useState({search: "", type: "" as string});
@@ -314,6 +316,7 @@ const StagesManagement = () => {
         is_default: false,
         active: true,
         type: 'lead' as 'lead' | 'deal' | 'order' | 'lost_reason',
+        probability: 50,
       });
       setShowSuccessfulModal(true);
       setSuccessModalTitle("Stage Created");
@@ -345,6 +348,7 @@ const StagesManagement = () => {
       is_default: false,
       active: true,
       type: 'lead' as 'lead' | 'deal' | 'order' | 'lost_reason',
+      probability: 50,
     });
   }
 
@@ -367,6 +371,7 @@ const StagesManagement = () => {
         is_default: false,
         active: true,
         type: 'lead' as 'lead' | 'deal' | 'order' | 'lost_reason',
+        probability: 50,
       });
       setShowSuccessfulModal(true);
       setSuccessModalTitle("Stage Updated");
@@ -414,10 +419,19 @@ const StagesManagement = () => {
   }, []);
 
   const handleInputChange = (field: string, value: any) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }));
+    setFormData(prev => {
+      const newData = {
+        ...prev,
+        [field]: value
+      };
+      
+      // If type changes to lost_reason, disable and set probability to 0
+      if (field === 'type' && value === 'lost_reason') {
+        newData.probability = 0;
+      }
+      
+      return newData;
+    });
   };
 
   const getStatusBadge = (stage: Stage) => {
@@ -537,6 +551,7 @@ const StagesManagement = () => {
                     is_default: props.is_default,
                     active: props.active,
                     type: props.type,
+                    probability: props.probability,
                   });
                   setShowUpdateModal(true);
                 },
@@ -1244,6 +1259,7 @@ const StagesManagement = () => {
                                         is_default: stage.is_default,
                                         active: stage.active,
                                         type: stage.type,
+                                        probability: stage.probability,
                                       });
                                       setShowUpdateModal(true);
                                     }}
@@ -1377,6 +1393,22 @@ const StagesManagement = () => {
               </Col> */}
             </Row>
 
+            <Row>
+              <Col md={6}>
+                <Form.Group className="mb-3">
+                  <Form.Label>Probability</Form.Label>
+                  <Form.Control
+                    type="number"
+                    value={formData.probability}
+                    onChange={(e) => handleInputChange("probability", parseInt(e.target.value) || 0)}
+                    min="0"
+                    max="100"
+                    disabled={formData.type === 'lost_reason'}
+                  />
+                </Form.Group>
+              </Col>
+            </Row>
+
 
             <Form.Group className="mb-3">
               <Form.Label>Description</Form.Label>
@@ -1462,6 +1494,22 @@ const StagesManagement = () => {
                     type="color"
                     value={formData.color}
                     onChange={(e) => handleInputChange("color", e.target.value)}
+                  />
+                </Form.Group>
+              </Col>
+            </Row>
+
+            <Row>
+              <Col md={6}>
+                <Form.Group className="mb-3">
+                  <Form.Label>Probability</Form.Label>
+                  <Form.Control
+                    type="number"
+                    value={formData.probability}
+                    onChange={(e) => handleInputChange("probability", parseInt(e.target.value) || 0)}
+                    min="0"
+                    max="100"
+                    disabled={formData.type === 'lost_reason'}
                   />
                 </Form.Group>
               </Col>
@@ -1753,6 +1801,7 @@ const StagesManagement = () => {
                       is_default: viewingStage.is_default,
                       active: viewingStage.active,
                       type: viewingStage.type,
+                      probability: viewingStage.probability,
                     });
                     setShowUpdateModal(true);
                   }}

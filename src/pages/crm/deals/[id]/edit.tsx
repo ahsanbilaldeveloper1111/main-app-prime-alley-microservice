@@ -241,7 +241,7 @@ const EditDeal = () => {
 
   const fetchExtensions = async () => {
     try {
-      const hierarchyData = await GetHierarchyData(ModuleSlug.CRM_LEADS);
+      const hierarchyData = await GetHierarchyData(ModuleSlug.CRM_DEALS);
       if (hierarchyData?.extensions) {
         setExtensions(hierarchyData.extensions);
       }
@@ -1002,6 +1002,7 @@ const EditDeal = () => {
                       <Form.Group className="mb-3">
                         <Form.Label>Special Discount (%)</Form.Label>
                         <Form.Control
+                          disabled={extensions?.length <= 1}
                           type="number"
                           min="0"
                           max="100"

@@ -1182,7 +1182,7 @@ const CrmProspectsManagement = () => {
           } failed validation`
         );
       } else {
-        toast.error("Upload completed but no records were processed");
+        toast.error("Upload completed but no prospects were processed");
       }
 
       setSelectedFile(null);
@@ -2048,7 +2048,7 @@ const CrmProspectsManagement = () => {
             <Row className="mb-2">
               <Col xl={3} lg={4} md={6} className="mb-3">
                 <KPICard
-                  title="Total Records"
+                  title="Total Prospects"
                   value={totalRecords}
                   icon={<Users size={24} />}
                   color="primary"
@@ -2091,7 +2091,7 @@ const CrmProspectsManagement = () => {
 
                   <Col xl={3} lg={4} md={6} className="mb-3">
                     <KPICard
-                      title="Assigned Entries"
+                      title="Assigned Prospects"
                       value={metrics.assigned_records}
                       icon={<UserPlus size={24} />}
                       color="primary"
@@ -2099,7 +2099,7 @@ const CrmProspectsManagement = () => {
                   </Col>
                   <Col xl={3} lg={4} md={6} className="mb-3">
                     <KPICard
-                      title="Unassigned Entries"
+                      title="Unassigned Prospects"
                       value={metrics.unassigned_records}
                       icon={<AlertCircleIcon size={24} />}
                       color="warning"
@@ -3759,7 +3759,7 @@ const CrmProspectsManagement = () => {
                         }))
                       }
                       options={availableTags}
-                      placeholder="Select tags to filter entries..."
+                      placeholder="Select tags to filter prospects..."
                       styles={{
                         control: (base) => ({
                           ...base,
@@ -3770,7 +3770,7 @@ const CrmProspectsManagement = () => {
                       }}
                     />
                     <Form.Text className="text-muted">
-                      Only entries with these tags will be considered for
+                      Only prospects with these tags will be considered for
                       assignment.
                     </Form.Text>
                   </Form.Group>
@@ -3788,7 +3788,7 @@ const CrmProspectsManagement = () => {
                         }))
                       }
                       options={availableCampaigns}
-                      placeholder="Select campaigns to filter entries..."
+                      placeholder="Select campaigns to filter prospects..."
                       styles={{
                         control: (base) => ({
                           ...base,
@@ -3799,7 +3799,7 @@ const CrmProspectsManagement = () => {
                       }}
                     />
                     <Form.Text className="text-muted">
-                      Only entries from these campaigns will be considered for
+                      Only prospects from these campaigns will be considered for
                       assignment.
                     </Form.Text>
                   </Form.Group>
@@ -3857,19 +3857,19 @@ const CrmProspectsManagement = () => {
                     cards={[
                       {
                         id: "total-entries",
-                        title: "Total Entries",
+                        title: "Total Prospects",
                         value: assignmentCounts?.total || 0,
                         description: "Matching your filters",
                       },
                       {
                         id: "assigned-entries",
-                        title: "Assigned Entries",
+                        title: "Assigned Prospects",
                         value: assignmentCounts?.assigned || 0,
                         description: "In use by team members",
                       },
                       {
                         id: "available-entries",
-                        title: "Available Entries",
+                        title: "Available Prospects",
                         value: assignmentCounts?.unassigned || 0,
                         description: "Ready for assignment",
                       },
@@ -3960,8 +3960,8 @@ const CrmProspectsManagement = () => {
                   />
                 </div>
                 <Form.Text className="text-muted">
-                  <strong>Auto-balance:</strong> Entries are distributed evenly.{" "}
-                  <strong>Custom:</strong> You specify exactly how many entries
+                  <strong>Auto-balance:</strong> Prospects are distributed evenly.{" "}
+                  <strong>Custom:</strong> You specify exactly how many prospects
                   each campaign gets.
                 </Form.Text>
               </Form.Group>
@@ -4398,7 +4398,7 @@ const CrmProspectsManagement = () => {
                           <div>
                             <div className="mb-1">
                               <strong>
-                                Uploaded {activity.total_records || 0} entries
+                                Uploaded {activity.total_records || 0} prospects
                               </strong>
                             </div>
                             <div className="small text-muted">
@@ -4416,7 +4416,7 @@ const CrmProspectsManagement = () => {
                           <div>
                             <div className="mb-1">
                               <strong>
-                                Assigned {activity.total_records || 0} entries
+                                Assigned {activity.total_records || 0} prospects
                               </strong>
                             </div>
                             <div className="small text-muted">
@@ -4635,7 +4635,7 @@ const CrmProspectsManagement = () => {
         <Modal.Body>
           <p>
             Are you sure you want to delete {selectedItems.length} selected
-            prospect entries?
+            prospects?
           </p>
           <div className="alert alert-warning">
             <strong>Warning:</strong> This action cannot be undone. All selected

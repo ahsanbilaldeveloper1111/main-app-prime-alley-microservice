@@ -192,7 +192,7 @@ const CreateDeal = () => {
 
   const fetchExtensions = async () => {
     try {
-      const hierarchyData = await GetHierarchyData(ModuleSlug.CRM_LEADS);
+      const hierarchyData = await GetHierarchyData(ModuleSlug.CRM_DEALS);
       if (hierarchyData?.extensions) {
         setExtensions(hierarchyData.extensions);
       }
@@ -205,6 +205,12 @@ const CreateDeal = () => {
     e.preventDefault();
     if (formStep < 4) {
       setFormStep(formStep + 1);
+      return;
+    }
+
+    // Validate that at least one product is added before creating deal
+    if (estimationItems.length === 0) {
+      toast.error("Please add at least one product to the estimation chart before creating the deal.");
       return;
     }
 
@@ -256,7 +262,6 @@ const CreateDeal = () => {
       const createdDeal = await createDeal(payload).then((res => res?.data));
       
       // Create/update estimation chart separately if items exist
-      console.log("RARARA", createdDeal);
       if (estimationItems.length > 0 && createdDeal?.id) {
         try {
           const estimatePayload = {
@@ -276,7 +281,7 @@ const CreateDeal = () => {
             currency: formData.currency,
           };
 
-          await createEstimate(estimatePayload);
+          await createEstimate(estimatePayload, false);
         } catch (estimateError: any) {
           console.error("Failed to create estimate:", estimateError);
           // Don't fail the whole operation if estimate creation fails
@@ -284,7 +289,7 @@ const CreateDeal = () => {
         }
       }
       
-      toast.success("Deal created successfully!");
+      // toast.success("Deal created successfully!");
       router.push("/crm/deals");
     } catch (error: any) {
       console.error("Failed to create deal:", error);
@@ -863,6 +868,18 @@ const CreateDeal = () => {
               <Card className="mb-3 border-0 bg-light">
                 <Card.Body>
                   <h5 className="fw-bold mb-4 text-success">ESTIMATION CHART</h5>
+                  
+                  {/* Warning message if no products */}
+                  {estimationItems.length === 0 && (
+                    <Card className="mb-3 border-warning bg-warning bg-opacity-10">
+                      <Card.Body className="py-2">
+                        <div className="d-flex align-items-center gap-2 text-warning">
+                          <strong>⚠️ Required:</strong>
+                          <span>Please add at least one product to the estimation chart before creating the deal.</span>
+                        </div>
+                      </Card.Body>
+                    </Card>
+                  )}
                   
                   {/* Deal-level settings */}
                   <Row className="mb-4">
@@ -1483,7 +1500,7 @@ const CreateDeal = () => {
                   Next <ChevronRight size={16} className="ms-1" />
                 </Button>
               ) : (
-                <Button variant="primary" type="submit" disabled={loading}>
+                <Button variant="primary" type="submit" disabled={loading || estimationItems.length === 0}>
                   {loading ? 'Creating...' : 'Create Deal'}
                 </Button>
               )}

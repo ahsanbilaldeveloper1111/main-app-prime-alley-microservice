@@ -1090,14 +1090,6 @@ const CrmOrders = () => {
               <BarChart3 size={16} className="me-2" />
               {showOrdersAnalytics ? 'Hide Analytics' : 'Show Analytics'}
             </Button>
-            {session?.user?.permissions?.includes('add-crm-orders') && (
-              <Link href="/crm/orders/create">
-                <Button variant="primary">
-                  <Plus size={16} className="me-2" />
-                  Add Order
-                </Button>
-              </Link>
-            )}
           </div>
         </div>
 
@@ -2030,7 +2022,7 @@ const CrmOrders = () => {
                       marginBottom: '6px'
                     }}>Order Date</div>
                     <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
-                      {viewingOrder.order_date ? new Date(viewingOrder.order_date).toLocaleDateString() : 'N/A'}
+                      {viewingOrder.order_date ? new Date(viewingOrder.order_date).toLocaleDateString('en-GB') : 'N/A'}
                     </div>
                   </div>
                   <div style={{
@@ -2056,7 +2048,7 @@ const CrmOrders = () => {
                       marginBottom: '6px'
                     }}>Expected Delivery</div>
                     <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
-                      {viewingOrder.expected_delivery_date ? new Date(viewingOrder.expected_delivery_date).toLocaleDateString() : 'N/A'}
+                      {viewingOrder.expected_delivery_date ? new Date(viewingOrder.expected_delivery_date).toLocaleDateString('en-GB') : 'N/A'}
                     </div>
                   </div>
                 </div>
