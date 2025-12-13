@@ -3,6 +3,7 @@ import React, { ReactElement, useState } from 'react';
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
 import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/router';
 import ProtectedRoute from '@components/ProtectedRoute';
 import '@assets/scss/tabs.scss';
 import '@assets/scss/common.scss';
@@ -26,7 +27,9 @@ import { handleUserExport } from '@utils/controlhub/users/userExport';
 
 const Users = () => {
     const { data: session } = useSession();
+    const router = useRouter();
     const [activeTab, setActiveTab] = useState('overview');
+    const roleId = router.query.role_id as string | undefined;
 
     // Use custom hooks
     const { baseColumns } = useUserColumns(session, []);
@@ -37,7 +40,7 @@ const Users = () => {
         summaryCards,
         fetchUsers,
         handleFiltersChange
-    } = useUsersData(session, baseColumns);
+    } = useUsersData(session, baseColumns, roleId);
     
     // Get columns with custom fields
     const { columns } = useUserColumns(session, customFieldColumns);
@@ -102,6 +105,7 @@ const Users = () => {
                                 fetchUsers={fetchUsers}
                                 customFieldColumns={customFieldColumns}
                                 currentFilters={currentFilters}
+                                handleFiltersChange={handleFiltersChange}
                                 hasListPermission={session?.user?.permissions?.includes('list-users') || false}
                                 growthChart={growthChart}
                                 departmentChart={departmentChart}

@@ -11,9 +11,15 @@ interface Summary {
     activeUsers: number;
 }
 
-export const useUsersData = (session: any, initialBaseColumns: Column[]) => {
+export const useUsersData = (session: any, initialBaseColumns: Column[], roleId?: string) => {
     const [customFieldColumns, setCustomFieldColumns] = useState<Column[]>([]);
-    const [currentFilters, setCurrentFilters] = useState({});
+    const [currentFilters, setCurrentFilters] = useState<Record<string, any>>(() => {
+        const filters: Record<string, any> = {};
+        if (roleId) {
+            filters.role_id = roleId;
+        }
+        return filters;
+    });
     const [summary, setSummary] = useState<Summary>({
         users: 0,
         departments: 0,
@@ -24,7 +30,11 @@ export const useUsersData = (session: any, initialBaseColumns: Column[]) => {
 
     const fetchUsers = useCallback(
         async (page = 1, perPage = 15, search = "") => {
-            const response = await getAllUsers({ page, perPage, search, filters: currentFilters });
+            const filters = { ...currentFilters };
+            if (roleId) {
+                filters.role_id = roleId;
+            }
+            const response = await getAllUsers({ page, perPage, search, filters });
             
             // TEMPORARILY COMMENTED OUT: Derive dynamic custom-field columns from the returned rows
             // This is commented out to debug multiple API calls issue
@@ -76,7 +86,7 @@ export const useUsersData = (session: any, initialBaseColumns: Column[]) => {
             });
             return response;
         },
-        [session, currentFilters, initialBaseColumns]
+        [session, currentFilters, initialBaseColumns, roleId]
     );
 
     const handleFiltersChange = (filters: any) => {

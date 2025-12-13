@@ -624,3 +624,18 @@ export const GetCompanies = async () => {
     throw error;
   }
 }
+
+export const SyncBillingCompanies = async () => {
+  try {
+    const response = await axiosInstance.get(`users/syncBillingCompanies`);
+    if(response){
+      const responseData = response.data;
+      if(responseData.code === 200){
+        return responseData.data;
+      }
+    }
+  } catch (error) {
+    console.error('API Error:', error);
+    throw error;
+  }
+}

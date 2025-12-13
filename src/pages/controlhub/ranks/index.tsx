@@ -51,7 +51,16 @@ const Ranks = () => {
             { key: 'Name', name: 'name', selector: (row: any) => row.name, sortable: true },
 
             ...(session?.user?.is_admin === "1" ? [
-                { key: 'Company', name: 'company', selector: (row: any) => row.company, sortable: true }
+                { key: 'Company', name: 'company', selector: (row: any) => row.company, sortable: true },
+                { key: 'Assigned Users', name: 'Assigned Users', selector: (row: any) => row.user_assigned_count, sortable: true,
+                    cell: (props: any) => (
+                        <div>
+                            <span className="status-badge primary">
+                                {props.user_assigned_count}
+                            </span>
+                        </div>
+                    )
+                 }
             ] : []),
 
 
@@ -91,7 +100,21 @@ const Ranks = () => {
                                     icon: <FiTrash2 className="me-2" />,
                                     onClick: () => handleDeleteRank(props),
                                     className: 'text-danger'
-                                }] : [])
+                                }] : []),
+
+                                ...(session?.user?.is_admin == "1" ? [{
+                                    label: 'View Users',
+                                    icon: <FiEye className="me-2" />,
+                                    onClick: () => {
+                                        router.push({
+                                            pathname: '/controlhub/users',
+                                            query: { role_id: props.id }
+                                        });
+                                    },
+                                    className: 'action-view'
+                                }] : []),
+
+
                             ]}
                         />
                     )
