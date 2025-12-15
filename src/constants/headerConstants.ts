@@ -88,6 +88,7 @@ MENU_COLORS: {
     TASKS: 'Tasks',
     // Control Hub
     USER_DIRECTORY: 'User Directory',
+    TEAMS:'Teams',
     RANKS: 'Ranks',
     GROUPS: 'Groups',
     

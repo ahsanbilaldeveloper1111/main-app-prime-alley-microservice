@@ -3,15 +3,11 @@ import React, { ReactElement, useState, useCallback, useMemo, useEffect } from '
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
 import GenericListPage from '@components/GenericListPage';
-import { getAllRoles, ListRoles, updateRole,deleteRole,addRole,BulkDeleteRoles } from '@utils/roles';
+import { ListRoles, updateRole,deleteRole,addRole,BulkDeleteRoles, getUserTypes } from '@utils/roles';
 import { Column } from '@components/CustomDataTable';
-import { Button, Modal, Row } from 'react-bootstrap';
-import { Col } from 'react-bootstrap';
-import RolesFilters from '@components/filters/RolesFilters';
+import { Button, Row, Col, Form } from 'react-bootstrap';
 import { toast } from 'react-toastify';
-import { useTokenService } from 'src/hooks/useTokenService';
 import { useSession } from 'next-auth/react';
-import Link from 'next/link';
 import { useRouter } from 'next/router';
 
 import '@assets/scss/common.scss';
@@ -24,7 +20,7 @@ import DatatableActionButton from '@components/DatatableActionButton';
 
 
 const Ranks = () => {
-    const { data:session, status } = useSession();
+    const { data: session } = useSession();
     const router = useRouter();
     
     // We don't need the redirect effect anymore since we're showing the message on page
@@ -49,6 +45,17 @@ const Ranks = () => {
     const columns = useMemo((): Column[] => {
         return [
             { key: 'Name', name: 'name', selector: (row: any) => row.name, sortable: true },
+            { key: 'User Type', name: 'User Type', selector: (row: any) => row.user_type, sortable: true,
+                cell: (props: any) => (
+                    <div>
+                        {props?.user_type?.name && (
+                        <span className="status-badge info">
+                                {props?.user_type?.name}
+                            </span>
+                        )}
+                    </div>
+                )
+             },
 
             ...(session?.user?.is_admin === "1" ? [
                 { key: 'Company', name: 'company', selector: (row: any) => row.company, sortable: true },
@@ -147,20 +154,41 @@ const Ranks = () => {
 
     const [selectedRank, setSelectedRank] = useState<any>(null);
     const [selectedRankName, setSelectedRankName] = useState<any>(null);
+    const [selectedRankUserTypeId, setSelectedRankUserTypeId] = useState<number | null>(null);
     const [showEditRankModal, setShowEditRankModal] = useState<boolean>(false);
+    const [userTypes, setUserTypes] = useState<any[]>([]);
+    const [isLoadingUserTypes, setIsLoadingUserTypes] = useState<boolean>(false);
 
-    const handleEditRank = (props: any) => {
+    // Fetch user types
+    const fetchUserTypes = useCallback(async () => {
+        if (userTypes.length > 0) return; // Already loaded
+        setIsLoadingUserTypes(true);
+        try {
+            const types = await getUserTypes();
+            setUserTypes(types || []);
+        } catch (error) {
+            console.error('Error fetching user types:', error);
+        } finally {
+            setIsLoadingUserTypes(false);
+        }
+    }, [userTypes.length]);
+
+    const handleEditRank = async (props: any) => {
         setSelectedRank(props.id);
         setSelectedRankName(props.name);
+        // Set user_type_id if available in props
+        setSelectedRankUserTypeId(props.user_type_id || null);
+        await fetchUserTypes();
         setShowEditRankModal(true);
     };
 
     const handleSubmitEditRank = async () => {
         //console.log('Submit edit rank:', selectedRank, selectedRankName);
-        const response = await updateRole(selectedRank, selectedRankName);
+        const response = await updateRole(selectedRank, selectedRankName, selectedRankUserTypeId);
         if(response){
             setSelectedRank(null);
             setSelectedRankName(null);
+            setSelectedRankUserTypeId(null);
             setShowEditRankModal(false);
             setSuccessModalTitle('Rank Updated');
             setSuccessModalDescription('The rank has been updated successfully');
@@ -244,11 +272,18 @@ const Ranks = () => {
 
     const [showCreateRankModal, setShowCreateRankModal] = useState<boolean>(false);
     const [newRankName, setNewRankName] = useState<string>("");
+    const [newRankUserTypeId, setNewRankUserTypeId] = useState<number | null>(null);
+
+    const handleOpenCreateRankModal = async () => {
+        await fetchUserTypes();
+        setShowCreateRankModal(true);
+    };
 
     const handleSubmitCreateRank = async () => {
-        const response = await addRole(newRankName);
+        const response = await addRole(newRankName, newRankUserTypeId);
         if(response){
             setNewRankName("");
+            setNewRankUserTypeId(null);
             setShowCreateRankModal(false);
             setSuccessModalTitle('Rank Created');
             setSuccessModalDescription('The rank has been created successfully');
@@ -285,7 +320,7 @@ const Ranks = () => {
                     
                     {/* <RolesFilters onFiltersChange={handleFiltersChange} onExport={handleExport} /> */}
                     {session?.user?.permissions?.includes('add-ranks') && (
-                        <Button variant="primary"  onClick={() => setShowCreateRankModal(true)}>Add Rank</Button>
+                        <Button variant="primary"  onClick={handleOpenCreateRankModal}>Add Rank</Button>
                     )}
                     </div>
 
@@ -336,7 +371,10 @@ const Ranks = () => {
 
             <FormModal
                 show={showEditRankModal}
-                onHide={() => setShowEditRankModal(false)}
+                onHide={() => {
+                    setShowEditRankModal(false);
+                    setSelectedRankUserTypeId(null);
+                }}
                 title="Edit Rank"
                 desc="Please fill in the details below to edit the rank."
                 formHtml={
@@ -346,12 +384,32 @@ const Ranks = () => {
                             <input className="form-control" type="text" value={selectedRankName} onChange={(e) => setSelectedRankName(e.target.value)} />
                             <p className="text-muted mt-2 small">Change the name of an existing rank to better reflect its role or purpose in the system</p>
                         </div>
+                        <div className="form-group mb-3">
+                            <label htmlFor="editRankUserType" className="form-label">User Type</label>
+                            <Form.Select
+                                id="editRankUserType"
+                                value={selectedRankUserTypeId || ''}
+                                onChange={(e) => setSelectedRankUserTypeId(e.target.value ? Number.parseInt(e.target.value, 10) : null)}
+                                disabled={isLoadingUserTypes}
+                            >
+                                <option value="">-- Select User Type (Optional) --</option>
+                                {userTypes.map((type) => (
+                                    <option key={type.id} value={type.id}>
+                                        {type.name}
+                                    </option>
+                                ))}
+                            </Form.Select>
+                            <p className="text-muted mt-2 small">Select a user type for this rank. Leave empty to remove user type assignment.</p>
+                        </div>
                     </>
                 }
                 submitButtonText="Save changes"
                 cancelButtonText="Cancel"
                 onSubmit={handleSubmitEditRank}
-                onCancel={() => setShowEditRankModal(false)}
+                onCancel={() => {
+                    setShowEditRankModal(false);
+                    setSelectedRankUserTypeId(null);
+                }}
             />
 
            
@@ -372,7 +430,10 @@ const Ranks = () => {
 
             <FormModal
                 show={showCreateRankModal}
-                onHide={() => setShowCreateRankModal(false)}
+                onHide={() => {
+                    setShowCreateRankModal(false);
+                    setNewRankUserTypeId(null);
+                }}
                 title="New Rank"
                 desc="Please fill in the details below to create a new rank."
                 formHtml={
@@ -382,12 +443,32 @@ const Ranks = () => {
                             <input type="text" className="form-control" id="newRankName"  value={newRankName} onChange={(e) => setNewRankName(e.target.value)} placeholder="Rank Name" />
                             <p className="text-muted mt-2 small">Enter the name of the rank you want to create. This will be used to identify the rank in the system.</p>
                         </div>
+                        <div className="form-group mb-3">
+                            <label htmlFor="newRankUserType" className="form-label">User Type</label>
+                            <Form.Select
+                                id="newRankUserType"
+                                value={newRankUserTypeId || ''}
+                                onChange={(e) => setNewRankUserTypeId(e.target.value ? Number.parseInt(e.target.value, 10) : null)}
+                                disabled={isLoadingUserTypes}
+                            >
+                                <option value="">-- Select User Type (Optional) --</option>
+                                {userTypes.map((type) => (
+                                    <option key={type.id} value={type.id}>
+                                        {type.name}
+                                    </option>
+                                ))}
+                            </Form.Select>
+                            <p className="text-muted mt-2 small">Optionally select a user type for this rank.</p>
+                        </div>
                     </>
                 }
                 submitButtonText="Create"
                 cancelButtonText="Cancel"
                 onSubmit={handleSubmitCreateRank}
-                onCancel={() => setShowCreateRankModal(false)}
+                onCancel={() => {
+                    setShowCreateRankModal(false);
+                    setNewRankUserTypeId(null);
+                }}
             />
 
             <ConfirmModal

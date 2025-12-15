@@ -33,6 +33,7 @@ const ViewRolePermission = () => {
     const [roleName,setRoleName] = useState<string>('');
     const [rolePermissions,setRolePermissions] = useState<PermissionGroup[]>([]);
     const [searchTerm, setSearchTerm] = useState<string>('');
+    const [selectedAction, setSelectedAction] = useState<string>('all');
 
     useEffect(() => {
         if (id) {
@@ -46,19 +47,25 @@ const ViewRolePermission = () => {
         setRolePermissions(role.permissions);
     }
 
-    // Filter permissions based on search term and separate special/non-special
+    // Filter permissions based on search term and action filter
     const filteredPermissions = rolePermissions.filter((group: PermissionGroup) => {
         const groupMatches = group.group.toLowerCase().includes(searchTerm.toLowerCase());
-        const permissionMatches = group.permissions.some((perm: Permission) => 
-            perm.name.toLowerCase().includes(searchTerm.toLowerCase())
-        );
+        const permissionMatches = group.permissions.some((perm: Permission) => {
+            const matchesSearch = perm.name.toLowerCase().includes(searchTerm.toLowerCase());
+            const matchesAction = selectedAction === 'all' || 
+                perm.name.toLowerCase().includes(selectedAction.toLowerCase());
+            return matchesSearch && matchesAction;
+        });
         return groupMatches || permissionMatches;
     }).map((group: PermissionGroup) => ({
         ...group,
-        permissions: group.permissions.filter((perm: Permission) => 
-            perm.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            group.group.toLowerCase().includes(searchTerm.toLowerCase())
-        )
+        permissions: group.permissions.filter((perm: Permission) => {
+            const matchesSearch = perm.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                group.group.toLowerCase().includes(searchTerm.toLowerCase());
+            const matchesAction = selectedAction === 'all' || 
+                perm.name.toLowerCase().includes(selectedAction.toLowerCase());
+            return matchesSearch && matchesAction;
+        })
     }));
 
     // Separate permissions into special and non-special
@@ -100,6 +107,56 @@ const ViewRolePermission = () => {
                   </Row>
                 </div>
             </Col>
+            </Row>
+
+            <Row className="mb-3">
+                <Col md={12}>
+                    <div className="d-flex align-items-center gap-2 flex-wrap">
+                        <span className="fw-semibold">Filter by Action:</span>
+                        <Button
+                            variant={selectedAction === 'all' ? 'primary' : 'outline-primary'}
+                            size="sm"
+                            onClick={() => setSelectedAction('all')}
+                        >
+                            All
+                        </Button>
+                        <Button
+                            variant={selectedAction === 'view' ? 'primary' : 'outline-primary'}
+                            size="sm"
+                            onClick={() => setSelectedAction('view')}
+                        >
+                            View
+                        </Button>
+                        <Button
+                            variant={selectedAction === 'add' ? 'primary' : 'outline-primary'}
+                            size="sm"
+                            onClick={() => setSelectedAction('add')}
+                        >
+                            Add
+                        </Button>
+                        <Button
+                            variant={selectedAction === 'edit' ? 'primary' : 'outline-primary'}
+                            size="sm"
+                            onClick={() => setSelectedAction('edit')}
+                        >
+                            Edit
+                        </Button>
+                        <Button
+                            variant={selectedAction === 'delete' ? 'primary' : 'outline-primary'}
+                            size="sm"
+                            onClick={() => setSelectedAction('delete')}
+                        >
+                            Delete
+                        </Button>
+                        <Button
+                            variant={selectedAction === 'update' ? 'primary' : 'outline-primary'}
+                            size="sm"
+                            onClick={() => setSelectedAction('update')}
+                        >
+                            Update
+                        </Button>
+                    </div>
+                </Col>
             </Row>
 
            

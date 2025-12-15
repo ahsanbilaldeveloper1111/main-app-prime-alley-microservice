@@ -105,6 +105,10 @@ export const routePermissions: RoutePermission[] = [
                 path: '/groups',
                 permissions: ['view-groups']
             },
+            {
+                path: '/teams',
+                permissions: ['view-users']
+            },
         ]
     },
     
