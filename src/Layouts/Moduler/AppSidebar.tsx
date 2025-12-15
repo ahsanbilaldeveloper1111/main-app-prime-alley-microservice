@@ -618,7 +618,7 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
           id: 'controlhub-teams',
           title: HEADER_CONSTANTS.SUBMENU_LABELS.TEAMS,
           icon: <Boxes size={16} />,
-          permission: PERMISSIONS.VIEW_USERS,
+          permission: PERMISSIONS.VIEW_TEAMS,
           url: '/controlhub/teams'
         },
         {

@@ -79,7 +79,7 @@ export const routePermissions: RoutePermission[] = [
         children: [
             {
                 path: '/ranks',
-                permissions: ['view-ranks'],
+                permissions: [PERMISSIONS.VIEW_RANKS],
                 children: [
                     {
                         path: '/permissions',
@@ -93,7 +93,7 @@ export const routePermissions: RoutePermission[] = [
             },
             {
                 path: '/users',
-                permissions: ['view-users'],
+                permissions: [PERMISSIONS.VIEW_USERS],
                 children: [
                     {
                         path: '/',
@@ -103,11 +103,11 @@ export const routePermissions: RoutePermission[] = [
             },
             {
                 path: '/groups',
-                permissions: ['view-groups']
+                permissions: [PERMISSIONS.VIEW_GROUPS]
             },
             {
                 path: '/teams',
-                permissions: ['view-users']
+                permissions: [PERMISSIONS.VIEW_TEAMS]
             },
         ]
     },

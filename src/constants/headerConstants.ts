@@ -260,6 +260,7 @@ MENU_COLORS: {
   PERMISSIONS: {
     CONTROL_HUB_SERVICES: 'control-hub-services',
     VIEW_USERS: 'view-users',
+    VIEW_TEAMS: 'view-teams',
     VIEW_RANKS: 'view-ranks',
     VIEW_GROUPS: 'view-groups',
 
