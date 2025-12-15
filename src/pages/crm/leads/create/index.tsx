@@ -46,7 +46,7 @@ import ConfirmModal from "@pages/partial/ConfirmModal";
 import SuccessfulModal from "@pages/partial/SuccessfulModal";
 import PageSummaryGrid, { SummaryCard } from "@components/PageSummaryGrid";
 import DatatableActionButton from "@components/DatatableActionButton";
-import { ModuleSlug } from "@utils/Helper";
+import { ModuleSlug, checkRequiredFields } from "@utils/Helper";
 
 const CreateLead = () => {
   const router = useRouter();
@@ -483,20 +483,31 @@ const CreateLead = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validate required fields
-    if (!formData.user_extension) {
-      toast.error("Please select a user extension");
+    // Validate all required fields using checkRequiredFields
+    const requiredFields = [
+      { field: "name" as const, name: "Lead Name" },
+      { field: "user_extension" as const, name: "User" },
+      { field: "stage_id" as const, name: "Stage" },
+    ];
+
+    if (!checkRequiredFields(formData, requiredFields)) {
       return;
     }
 
-    if (!formData.name) {
-      toast.error("Please enter lead name");
-      return;
-    }
-
-    // Validate at least one contact person exists
+    // Validate at least one contact person exists and has name or phone
     if (!formData.contact_persons || formData.contact_persons.length === 0) {
       toast.error("Please add at least one contact person");
+      return;
+    }
+
+    const hasValidContact = formData.contact_persons.some(
+      (person) => person.name || person.phone
+    );
+
+    if (!hasValidContact) {
+      toast.error(
+        "Please provide at least name or phone for one contact person"
+      );
       return;
     }
 
@@ -507,7 +518,7 @@ const CreateLead = () => {
       const payload: any = {
         name: formData.name,
         user_extension: formData.user_extension,
-        ...(formData.stage_id && { stage_id: String(formData.stage_id) }),
+        stage_id: String(formData.stage_id),
         ...(formData.campaign_id && {
           campaign_id: String(formData.campaign_id),
         }),
@@ -577,6 +588,82 @@ const CreateLead = () => {
       ...prev,
       [field]: value,
     }));
+  };
+
+  // Validation functions for each step
+  const validateStep0 = (): boolean => {
+    const requiredFields = [
+      { field: "name" as const, name: "Lead Name" },
+      { field: "user_extension" as const, name: "User" },
+      { field: "stage_id" as const, name: "Stage" },
+    ];
+    return checkRequiredFields(formData, requiredFields);
+  };
+
+  const validateStep1 = (): boolean => {
+    // Step 1 (Company Info) has no required fields
+    return true;
+  };
+
+  const validateStep2 = (): boolean => {
+    // Validate that at least one contact person exists and has name or phone
+    if (!formData.contact_persons || formData.contact_persons.length === 0) {
+      toast.error("Please add at least one contact person");
+      return false;
+    }
+
+    // Check if at least one contact person has email or phone
+    let hasValidContact = formData.contact_persons.every(
+      (person) => person.email || person.phone
+    );
+    
+    // Validate email format for each contact person that has an email
+    for (const person of formData.contact_persons) {
+      if (person.email) {
+        const isValidEmail = checkRequiredFields({ email: person.email }, [
+          { field: "email", name: "Email", type: "email" },
+        ]);
+        if (!isValidEmail) {
+          return false;
+        }
+      }
+    }
+    
+    if (!hasValidContact) {
+      toast.error(
+        "Please provide at least email or phone for each contact person"
+      );
+      return false;
+    }
+
+    return true;
+  };
+
+  const validateStep3 = (): boolean => {
+    // Step 3 (Other Info) has no required fields
+    return true;
+  };
+
+  const validateCurrentStep = (): boolean => {
+    switch (formStep) {
+      case 0:
+        return validateStep0();
+      case 1:
+        return validateStep1();
+      case 2:
+        return validateStep2();
+      case 3:
+        return validateStep3();
+      default:
+        return true;
+    }
+  };
+
+  const handleNextStep = (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (validateCurrentStep()) {
+      setFormStep(Math.min(3, formStep + 1));
+    }
   };
 
   const handleCampaignChange = async (selectedOption: any) => {
@@ -871,18 +958,20 @@ const CreateLead = () => {
       <BreadcrumbItem
         mainTitle="CRM"
         mainLink="/crm/dashboard"
-        subTitle={isOpportunity ? "Create Opportunity" : "Create Lead"}
+        subTitle={
+          router?.query?.crm_data_id ? "Convert to Lead" : "Create Lead"
+        }
       />
 
       <PageHeader
-        title={isOpportunity ? "Create Opportunity" : "Create Lead"}
+        title={router?.query?.crm_data_id ? "Convert to Lead" : "Create Lead"}
         buttons={
           <Link
-            href={isOpportunity ? "/crm/opportunities" : "/crm/leads"}
+            href={router?.query?.crm_data_id ? "/crm/data" : "/crm/leads"}
             className="btn btn-primary"
           >
             <FiArrowLeft className="me-2" />
-            Back to {isOpportunity ? "Opportunities" : "Leads"}
+            Back to {router?.query?.crm_data_id ? "Prospects" : "Leads"}
           </Link>
         }
       />
@@ -900,7 +989,8 @@ const CreateLead = () => {
                   {selectedCrmData && (
                     <Badge bg="info" className="d-flex align-items-center">
                       <FiDatabase className="me-1" size={14} />
-                      Pre-filled from CRM Data #{selectedCrmData.id}
+                      Pre-filled from Prospect:{" "}
+                      {selectedCrmData?.name || `#${selectedCrmData?.id}`}
                     </Badge>
                   )}
                 </div>
@@ -1084,7 +1174,7 @@ const CreateLead = () => {
                             <Col md={6}>
                               <Form.Group className="mb-3">
                                 <Form.Label>
-                                  User Extension{" "}
+                                  Assigned To{" "}
                                   <span className="text-danger">*</span>
                                 </Form.Label>
                                 {formData.type === "opportunity" ? (
@@ -1114,7 +1204,7 @@ const CreateLead = () => {
                                         label: extension.display_name,
                                       })
                                     )}
-                                    placeholder="Select User Extension"
+                                    placeholder="Select User"
                                     isClearable
                                     isSearchable
                                     required
@@ -1146,7 +1236,7 @@ const CreateLead = () => {
                                         label: extension.display_name,
                                       })
                                     )}
-                                    placeholder="Select User Extension"
+                                    placeholder="Select User"
                                     isClearable
                                     isSearchable
                                     required
@@ -1156,7 +1246,9 @@ const CreateLead = () => {
                             </Col>
                             <Col md={6}>
                               <Form.Group className="mb-3">
-                                <Form.Label>Stage</Form.Label>
+                                <Form.Label>
+                                  Stage <span className="text-danger">*</span>
+                                </Form.Label>
                                 <Form.Select
                                   value={formData.stage_id || ""}
                                   onChange={(e) =>
@@ -1167,6 +1259,7 @@ const CreateLead = () => {
                                         : undefined
                                     )
                                   }
+                                  required
                                 >
                                   <option value="">Select a stage</option>
                                   {stages.map((stage) => (
@@ -1317,13 +1410,23 @@ const CreateLead = () => {
                                   <option value="Technology">Technology</option>
                                   <option value="Healthcare">Healthcare</option>
                                   <option value="Finance">Finance</option>
-                                  <option value="Banking & Financial Services">Banking & Financial Services</option>
-                                  <option value="Manufacturing">Manufacturing</option>
+                                  <option value="Banking & Financial Services">
+                                    Banking & Financial Services
+                                  </option>
+                                  <option value="Manufacturing">
+                                    Manufacturing
+                                  </option>
                                   <option value="Retail">Retail</option>
                                   <option value="Education">Education</option>
-                                  <option value="Real Estate">Real Estate</option>
-                                  <option value="Telecommunications">Telecommunications</option>
-                                  <option value="Construction">Construction</option>
+                                  <option value="Real Estate">
+                                    Real Estate
+                                  </option>
+                                  <option value="Telecommunications">
+                                    Telecommunications
+                                  </option>
+                                  <option value="Construction">
+                                    Construction
+                                  </option>
                                   <option value="Other">Other</option>
                                 </Form.Select>
                               </Form.Group>
@@ -1421,7 +1524,9 @@ const CreateLead = () => {
                             </Col>
                             <Col md={12}>
                               <Form.Group className="mb-3">
-                                <Form.Label>Company Location Other</Form.Label>
+                                <Form.Label>
+                                  Additional Location Information
+                                </Form.Label>
                                 <Form.Control
                                   type="text"
                                   value={formData.company_location_other}
@@ -1652,11 +1757,11 @@ const CreateLead = () => {
                                 <div className="d-flex align-items-center mb-3">
                                   <FiTarget className="me-2" />
                                   <h6 className="mb-0">
-                                    Campaign Fields: {selectedCampaign.name}
+                                    Custom Campaign Fields: {selectedCampaign.name}
                                   </h6>
                                   {selectedCrmData && (
                                     <Badge bg="success" className="ms-2 small">
-                                      Auto-filled from CRM Data
+                                      Auto-filled from Prospect
                                     </Badge>
                                   )}
                                 </div>
@@ -1704,13 +1809,7 @@ const CreateLead = () => {
                       Cancel
                     </Link>
                     {formStep < 3 ? (
-                      <Button
-                        variant="primary"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          setFormStep(Math.min(3, formStep + 1));
-                        }}
-                      >
+                      <Button variant="primary" onClick={handleNextStep}>
                         Next
                         <ChevronRight size={16} className="ms-1" />
                       </Button>

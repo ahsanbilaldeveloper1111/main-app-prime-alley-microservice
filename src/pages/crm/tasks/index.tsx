@@ -1,4 +1,5 @@
 import "@assets/scss/datatable-style.scss";
+import moment from "moment";
 import { useRouter } from 'next/router';
 import React, {
   ReactElement,
@@ -145,7 +146,7 @@ const KPICard: React.FC<KPICardData> = ({ title, value, change, isPositive, icon
 
 // Filter Bar Component
 interface FilterBarProps {
-  quickFilters: { id: string; label: string; variant?: string; color?: string; activeColor?: string; icon?: React.ReactNode }[];
+  quickFilters: { id: string; label: string; variant?: string; color?: string; icon?: React.ReactNode }[];
   activeFilter: string;
   onFilterChange: (filterId: string) => void;
   searchValue: string;
@@ -177,21 +178,20 @@ const FilterBar: React.FC<FilterBarProps> = ({
           <div className="d-flex gap-2 flex-wrap align-items-center flex-grow-1">
             {quickFilters.map(filter => {
               const isActive = activeFilter === filter.id;
-              const hasCustomColor = filter.color || filter.activeColor;
+              const hasCustomColor = filter.color;
 
               // Determine button styles
               const buttonStyle: React.CSSProperties = {};
               if (hasCustomColor) {
                 if (isActive) {
-                  const bgColor = filter.activeColor || filter.color;
-                  buttonStyle.background = '#fff';
+                  const bgColor = filter.color;
+                  buttonStyle.background = bgColor;
                   buttonStyle.borderColor = bgColor;
-                  buttonStyle.color = bgColor;
+                  buttonStyle.color = "#fff";
                 } else {
                   buttonStyle.background = '#fff';
                   buttonStyle.borderColor = filter.color;
                   buttonStyle.color = filter.color;
-                  buttonStyle.opacity = '0.7';
                 }
               }
 
@@ -908,10 +908,10 @@ const CrmTasks = () => {
               {/* Filter Bar */}
               <FilterBar
                 quickFilters={[
-                  { id: 'all', label: 'All Tasks', color: '#6c757d', activeColor: '#0d6efd', icon: <CheckCircle size={16} /> },
-                  { id: 'med-urgency', label: 'Medium Priority', color: '#ffc107', activeColor: '#ffc107', icon: <Clock size={16} /> },
-                  { id: 'high-urgency', label: 'High Priority', color: '#dc3545', activeColor: '#dc3545', icon: <AlertCircle size={16} /> },
-                  { id: 'overdue', label: 'Overdue', color: '#dc3545', activeColor: '#dc3545', icon: <Activity size={16} /> },
+                  { id: 'all', label: 'All Tasks', color: '#6c757d', icon: <CheckCircle size={16} /> },
+                  { id: 'med-urgency', label: 'Medium Priority', color: '#ffc107', icon: <Clock size={16} /> },
+                  { id: 'high-urgency', label: 'High Priority', color: '#dc3545', icon: <AlertCircle size={16} /> },
+                  { id: 'overdue', label: 'Overdue', color: '#dc3545', icon: <Activity size={16} /> },
                 ]}
                 activeFilter={activeFilter}
                 onFilterChange={(filterId) => {
@@ -1150,7 +1150,7 @@ const CrmTasks = () => {
                                           bg={isOverdue ? 'danger' : 'info'} 
                                           className="bg-opacity-10 text-dark"
                                         >
-                                          {new Date(task.due_date).toLocaleDateString()}
+                                          {moment(task.due_date).format('MMM DD, YYYY')}
                                           {isOverdue && <span className="ms-1 fw-bold">(Overdue)</span>}
                                         </Badge>
                                       </td>
@@ -1605,7 +1605,7 @@ const CrmTasks = () => {
               }}>Due Date</div>
               <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
                 <Calendar size={14} style={{ color: '#4680ff', marginRight: '6px' }} />
-                {viewingTask && new Date(viewingTask.due_date).toLocaleDateString()}
+                {viewingTask && viewingTask.due_date ? moment(viewingTask.due_date).format('MMM DD, YYYY') : 'N/A'}
               </div>
             </div>
             {viewingTask?.time && (

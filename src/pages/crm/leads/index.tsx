@@ -1,4 +1,5 @@
 import "@assets/scss/datatable-style.scss";
+import parsePhoneNumber from "libphonenumber-js";
 import { useRouter } from "next/router";
 import React, {
   ReactElement,
@@ -39,7 +40,7 @@ import {
   Modal,
 } from "react-bootstrap";
 import Select from "react-select";
-import { ModuleSlug } from "@utils/Helper";
+import { ModuleSlug, formatDateForTable } from "@utils/Helper";
 import {
   Target,
   CheckCircle,
@@ -98,6 +99,150 @@ import FormModal from "../../partial/FormModal";
 import SuccessfulModal from "@pages/partial/SuccessfulModal";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import { useSession } from "next-auth/react";
+
+// Phone Container Component (with Badge for tables)
+const PhoneContainer = ({ phone }: { phone: string }) => {
+  const parsePhone = useCallback((phone: string) => {
+    if (!phone)
+      return {
+        phone: "N/A",
+        countryCode: "",
+      };
+    try {
+      const parsedPhone = parsePhoneNumber(phone);
+      return {
+        phone: parsedPhone?.formatInternational() || phone,
+        countryCode: parsedPhone?.country || "",
+      };
+    } catch (e) {
+      console.error(e);
+      return {
+        phone: phone,
+        countryCode: "",
+      };
+    }
+  }, []);
+  const getFlagImgSrc = useCallback((countryCode: string) => {
+    return `https://flagcdn.com/w20/${countryCode.toLowerCase()}.png`;
+  }, []);
+  const phoneNumber = useMemo(() => {
+    return phone
+      ? parsePhone(phone)
+      : {
+          phone: "N/A",
+          countryCode: "",
+        };
+  }, [phone, parsePhone]);
+
+  const flagImgSrc = getFlagImgSrc(phoneNumber.countryCode);
+  return (
+    <Badge bg="info" className="bg-opacity-10 text-dark">
+      <div className="d-flex align-items-center gap-2">
+        {phoneNumber?.countryCode && (
+          <img src={flagImgSrc} alt={phoneNumber.countryCode} />
+        )}
+        {phoneNumber.phone}
+      </div>
+    </Badge>
+  );
+};
+
+// Phone Display Component (without Badge for view dialogs)
+const PhoneDisplay = ({ phone }: { phone: string }) => {
+  const parsePhone = useCallback((phone: string) => {
+    if (!phone)
+      return {
+        phone: "N/A",
+        countryCode: "",
+      };
+    try {
+      const parsedPhone = parsePhoneNumber(phone);
+      return {
+        phone: parsedPhone?.formatInternational() || phone,
+        countryCode: parsedPhone?.country || "",
+      };
+    } catch (e) {
+      console.error(e);
+      return {
+        phone: phone,
+        countryCode: "",
+      };
+    }
+  }, []);
+  const getFlagImgSrc = useCallback((countryCode: string) => {
+    return `https://flagcdn.com/w20/${countryCode.toLowerCase()}.png`;
+  }, []);
+  const phoneNumber = useMemo(() => {
+    return phone
+      ? parsePhone(phone)
+      : {
+          phone: "N/A",
+          countryCode: "",
+        };
+  }, [phone, parsePhone]);
+
+  const flagImgSrc = getFlagImgSrc(phoneNumber.countryCode);
+  return (
+    <div className="d-flex align-items-center gap-2">
+      {phoneNumber?.countryCode && (
+        <img src={flagImgSrc} alt={phoneNumber.countryCode} />
+      )}
+      {phoneNumber.phone}
+    </div>
+  );
+};
+
+// Helper function to get initials from name (first two words, first two letters, only a-z)
+const getInitials = (name: string): string => {
+  if (!name) return "NA";
+
+  // Split by spaces and take up to first two words
+  const words = name.trim().split(/\s+/).slice(0, 2);
+
+  // Check if we have two words and the second word has at least one letter
+  const hasSecondWord = words.length >= 2;
+  const secondWordHasLetter = hasSecondWord && /[a-z]/i.test(words[1]);
+
+  if (hasSecondWord && secondWordHasLetter) {
+    // First letter of first two words
+    const firstLetter1 = words[0].match(/[a-z]/i)?.[0];
+    const firstLetter2 = words[1].match(/[a-z]/i)?.[0];
+
+    if (firstLetter1 && firstLetter2) {
+      return (firstLetter1 + firstLetter2).toUpperCase();
+    }
+  }
+
+  // If no second word or second word is only numbers, use first two letters of first word
+  if (words[0]) {
+    const letters = words[0].match(/[a-z]/gi) || [];
+    if (letters.length >= 2) {
+      return (letters[0] + letters[1]).toUpperCase();
+    } else if (letters.length === 1) {
+      return letters[0].toUpperCase();
+    }
+  }
+
+  return "NA";
+};
+
+// Helper function to generate a random background color based on name
+const getRandomColor = (name: string): string => {
+  if (!name) return "#6c757d";
+
+  // Generate a consistent color based on the name
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = (name?.codePointAt(i) || 0) + ((hash << 5) - hash);
+  }
+
+  // Generate a color with good contrast (avoid too light colors)
+  const hue = Math.abs(hash) % 360;
+  const saturation = 50 + (Math.abs(hash) % 30); // 50-80%
+  const lightness = 40 + (Math.abs(hash) % 20); // 40-60%
+
+  return `hsla(${hue}, ${saturation}%, ${lightness}%, 0.6)`;
+};
 
 // KPI Card Component
 interface KPICardData {
@@ -171,7 +316,6 @@ interface FilterBarProps {
     count: number;
     variant?: string;
     color?: string;
-    activeColor?: string;
     icon?: React.ReactNode;
   }[];
   activeFilter: string;
@@ -204,19 +348,18 @@ const FilterBar: React.FC<FilterBarProps> = ({
           <div className="d-flex gap-2 flex-wrap align-items-center flex-grow-1">
             {quickFilters.map((filter) => {
               const isActive = activeFilter === filter.id;
-              const hasCustomColor = filter.color || filter.activeColor;
+              const hasCustomColor = filter.color;
               const buttonStyle: React.CSSProperties = {};
               if (hasCustomColor) {
                 if (isActive) {
-                  const bgColor = filter.activeColor || filter.color;
-                  buttonStyle.background = "#fff";
+                  const bgColor = filter.color;
+                  buttonStyle.background = bgColor;
                   buttonStyle.borderColor = bgColor;
-                  buttonStyle.color = bgColor;
+                  buttonStyle.color = "#fff";
                 } else {
                   buttonStyle.background = "#fff";
                   buttonStyle.borderColor = filter.color;
                   buttonStyle.color = filter.color;
-                  buttonStyle.opacity = "0.7";
                 }
               }
 
@@ -864,6 +1007,7 @@ const CrmLeads = () => {
       company: lead.company_name || "",
       industry: lead.industry || "",
       stage: lead.stage?.name || (lead.stage_id ? "Unknown" : "New"),
+      stageColor: lead.stage?.color || "grey",
       leadPotential: lead.lead_potential || "Warm",
       assignedUser:
         extensions.find(
@@ -878,12 +1022,8 @@ const CrmLeads = () => {
         )?.name ||
         lead.user_extension ||
         "",
-      created: lead.created_at
-        ? new Date(lead.created_at).toLocaleDateString()
-        : "",
-      lastActivity: lead.last_activity_at
-        ? new Date(lead.last_activity_at).toLocaleDateString()
-        : "",
+      created: formatDateForTable(lead.created_at),
+      lastActivity: formatDateForTable(lead.last_activity_at),
       followUps: lead.follow_ups || [],
       meetings: lead.meetings || [],
       source: lead.source || "",
@@ -1151,7 +1291,8 @@ const CrmLeads = () => {
 
   // Handle follow-up update
   const handleUpdateFollowUp = useCallback(async () => {
-    if (!followUpIdToEdit || !followupData.leadId || !followupData.followUpDate) return;
+    if (!followUpIdToEdit || !followupData.leadId || !followupData.followUpDate)
+      return;
 
     setLoadingFollowUp(true);
     try {
@@ -1205,25 +1346,31 @@ const CrmLeads = () => {
   }, [followUpIdToEdit, followupData, session, viewingLead, handleViewLead]);
 
   // Handle edit follow-up click
-  const handleEditFollowUp = useCallback((followUp: any) => {
-    // Format date for input (YYYY-MM-DD)
-    const followUpDate = followUp.follow_up_date
-      ? new Date(followUp.follow_up_date).toISOString().split("T")[0]
-      : "";
+  const handleEditFollowUp = useCallback(
+    (followUp: any) => {
+      // Format date for input (YYYY-MM-DD)
+      const followUpDate = followUp.follow_up_date
+        ? new Date(followUp.follow_up_date).toISOString().split("T")[0]
+        : "";
 
-    setFollowUpIdToEdit(followUp.id);
-    setFollowupData({
-      leadId: viewingLead?.id || null,
-      leadName: viewingLead?.name || "",
-      followUpDate: followUpDate,
-      followUpStatus: followUp.follow_up_status || "Pending",
-      communicationChannel: followUp.communication_channel || "Phone Call",
-      communicationChannelOther: followUp.communication_channel_other || "",
-      notes: followUp.notes || "",
-      userExtension: followUp.user_extension || (session?.user as any)?.extension || "admin",
-    });
-    setShowAddFollowupModal(true);
-  }, [viewingLead, session]);
+      setFollowUpIdToEdit(followUp.id);
+      setFollowupData({
+        leadId: viewingLead?.id || null,
+        leadName: viewingLead?.name || "",
+        followUpDate: followUpDate,
+        followUpStatus: followUp.follow_up_status || "Pending",
+        communicationChannel: followUp.communication_channel || "Phone Call",
+        communicationChannelOther: followUp.communication_channel_other || "",
+        notes: followUp.notes || "",
+        userExtension:
+          followUp.user_extension ||
+          (session?.user as any)?.extension ||
+          "admin",
+      });
+      setShowAddFollowupModal(true);
+    },
+    [viewingLead, session]
+  );
 
   // Handle follow-up deletion
   const handleDeleteFollowUp = useCallback(
@@ -1375,54 +1522,68 @@ const CrmLeads = () => {
     } finally {
       setLoadingMeeting(false);
     }
-  }, [meetingIdToEdit, meetingData, meetingAttendees, viewingLead, handleViewLead]);
+  }, [
+    meetingIdToEdit,
+    meetingData,
+    meetingAttendees,
+    viewingLead,
+    handleViewLead,
+  ]);
 
   // Handle edit meeting click
-  const handleEditMeeting = useCallback((meeting: any) => {
-    // Format date for input (YYYY-MM-DD)
-    const meetingDate = meeting.meeting_date
-      ? new Date(meeting.meeting_date).toISOString().split("T")[0]
-      : "";
+  const handleEditMeeting = useCallback(
+    (meeting: any) => {
+      // Format date for input (YYYY-MM-DD)
+      const meetingDate = meeting.meeting_date
+        ? new Date(meeting.meeting_date).toISOString().split("T")[0]
+        : "";
 
-    // Format time for input (HH:MM)
-    const meetingTime = meeting.meeting_time || "";
+      // Format time for input (HH:MM)
+      const meetingTime = meeting.meeting_time || "";
 
-    // Set attendees from meeting extensions
-    // meeting.extensions is an array of objects with 'extension' property (e.g., { extension: "511", ... })
-    const meetingExtensionStrings = meeting.extensions && Array.isArray(meeting.extensions)
-      ? meeting.extensions.map((extObj: any) => extObj.extension || String(extObj.id))
-      : [];
-    
-    const attendees = meetingExtensionStrings.length > 0
-      ? extensions
-          .filter((ext: any) => {
-            // Match by extension string or ID (convert to string for comparison)
-            const extExtension = String(ext.extension || "");
-            const extId = String(ext.id || "");
-            return meetingExtensionStrings.some((meetingExt: string) => 
-              meetingExt === extExtension || meetingExt === extId
-            );
-          })
-          .map((ext: any) => ({
-            value: ext.id || ext.extension,
-            label: ext.display_name || ext.name || ext.id || ext.extension,
-          }))
-      : [];
+      // Set attendees from meeting extensions
+      // meeting.extensions is an array of objects with 'extension' property (e.g., { extension: "511", ... })
+      const meetingExtensionStrings =
+        meeting.extensions && Array.isArray(meeting.extensions)
+          ? meeting.extensions.map(
+              (extObj: any) => extObj.extension || String(extObj.id)
+            )
+          : [];
 
-    setMeetingIdToEdit(meeting.id);
-    setMeetingData({
-      leadId: viewingLead?.id || null,
-      leadName: viewingLead?.name || "",
-      meetingName: meeting.name || "",
-      meetingType: meeting.meeting_type || "Online",
-      meetingDate: meetingDate,
-      meetingTime: meetingTime,
-      meetingOutcome: meeting.meeting_outcome || "",
-      extensions: meetingExtensionStrings, // Store extension strings, not objects
-    });
-    setMeetingAttendees(attendees);
-    setShowAddMeetingModal(true);
-  }, [viewingLead, extensions]);
+      const attendees =
+        meetingExtensionStrings.length > 0
+          ? extensions
+              .filter((ext: any) => {
+                // Match by extension string or ID (convert to string for comparison)
+                const extExtension = String(ext.extension || "");
+                const extId = String(ext.id || "");
+                return meetingExtensionStrings.some(
+                  (meetingExt: string) =>
+                    meetingExt === extExtension || meetingExt === extId
+                );
+              })
+              .map((ext: any) => ({
+                value: ext.id || ext.extension,
+                label: ext.display_name || ext.name || ext.id || ext.extension,
+              }))
+          : [];
+
+      setMeetingIdToEdit(meeting.id);
+      setMeetingData({
+        leadId: viewingLead?.id || null,
+        leadName: viewingLead?.name || "",
+        meetingName: meeting.name || "",
+        meetingType: meeting.meeting_type || "Online",
+        meetingDate: meetingDate,
+        meetingTime: meetingTime,
+        meetingOutcome: meeting.meeting_outcome || "",
+        extensions: meetingExtensionStrings, // Store extension strings, not objects
+      });
+      setMeetingAttendees(attendees);
+      setShowAddMeetingModal(true);
+    },
+    [viewingLead, extensions]
+  );
 
   // Handle meeting deletion
   const handleDeleteMeeting = useCallback(
@@ -1796,8 +1957,7 @@ const CrmLeads = () => {
               id: "all",
               label: "All Leads",
               count: filterCounts.all,
-              color: "#6c757d",
-              activeColor: "#0d6efd",
+              color: "#0d6efd",
               icon: <Users size={16} />,
             },
             ...stages.slice(0, 5).map((stage: any) => ({
@@ -1805,7 +1965,6 @@ const CrmLeads = () => {
               label: stage.name,
               count: filterCounts[stage.id] || 0,
               color: stage.color || "#6c757d",
-              activeColor: "#0d6efd",
               icon: <Layers size={16} />,
             })),
             {
@@ -1813,7 +1972,6 @@ const CrmLeads = () => {
               label: "Lost",
               count: filterCounts.lost || 0,
               color: "#fd7e14",
-              activeColor: "#fd7e14",
               icon: <X size={16} />,
             },
             {
@@ -1821,7 +1979,6 @@ const CrmLeads = () => {
               label: "Deleted",
               count: filterCounts.deleted || 0,
               color: "#dc3545",
-              activeColor: "#dc3545",
               icon: <Trash2 size={16} />,
             },
           ]}
@@ -2145,7 +2302,7 @@ const CrmLeads = () => {
                     {selectedLeadsColumns.includes("phone") && (
                       <th
                         className="col-phone"
-                        style={{ cursor: "pointer", userSelect: "none" }}
+                        style={{ cursor: "pointer", userSelect: "none", textAlign: "center" }}
                         onClick={() =>
                           handleSort(
                             "phone",
@@ -2258,14 +2415,39 @@ const CrmLeads = () => {
                       <tr key={lead.id}>
                         {selectedLeadsColumns.includes("name") && (
                           <td className="col-name fw-semibold">
-                            <p
-                              className=" overflow-hidden whitespace-nowrap"
-                              style={{
-                                textOverflow: "ellipsis",
-                              }}
-                            >
-                              {lead.name}
-                            </p>
+                            <div className="d-flex align-items-center gap-2">
+                              {lead.name ? (
+                                <>
+                                  <div
+                                    style={{
+                                      width: "30px",
+                                      height: "30px",
+                                      borderRadius: "50%",
+                                      backgroundColor: getRandomColor(lead.name),
+                                      color: "#fff",
+                                      display: "flex",
+                                      alignItems: "center",
+                                      justifyContent: "center",
+                                      fontSize: "10px",
+                                      fontWeight: "600",
+                                      flexShrink: 0,
+                                    }}
+                                  >
+                                    {getInitials(lead.name)}
+                                  </div>
+                                  <p
+                                    className="overflow-hidden whitespace-nowrap mb-0"
+                                    style={{
+                                      textOverflow: "ellipsis",
+                                    }}
+                                  >
+                                    {lead.name}
+                                  </p>
+                                </>
+                              ) : (
+                                "N/A"
+                              )}
+                            </div>
                           </td>
                         )}
                         {selectedLeadsColumns.includes("company") && (
@@ -2286,23 +2468,24 @@ const CrmLeads = () => {
                           <td className="col-email">{lead.email || "-"}</td>
                         )}
                         {selectedLeadsColumns.includes("phone") && (
-                          <td className="col-phone">{lead.phone || "-"}</td>
+                          <td className="col-phone" style={{ textAlign: "center" }}>
+                            {lead.phone ? (
+                              <PhoneContainer phone={lead.phone} />
+                            ) : (
+                              "-"
+                            )}
+                          </td>
                         )}
                         {selectedLeadsColumns.includes("stage") && (
                           <td className="col-stage">
-                            <Badge
-                              bg={
-                                lead.stage?.toLowerCase().includes("qualified")
-                                  ? "success"
-                                  : lead.stage
-                                      ?.toLowerCase()
-                                      .includes("contacted")
-                                  ? "info"
-                                  : "secondary"
-                              }
+                            <span
+                              style={{
+                                backgroundColor: lead?.stageColor || "grey",
+                              }}
+                              className="badge"
                             >
                               {lead.stage}
-                            </Badge>
+                            </span>
                           </td>
                         )}
                         {selectedLeadsColumns.includes("leadPotential") && (
@@ -2328,14 +2511,22 @@ const CrmLeads = () => {
                                 return "-";
                               }
                               // Sort by follow_up_date and get the earliest one
-                              const sortedFollowUps = [...followUps].sort((a, b) => {
-                                const dateA = a.follow_up_date ? new Date(a.follow_up_date).getTime() : Infinity;
-                                const dateB = b.follow_up_date ? new Date(b.follow_up_date).getTime() : Infinity;
-                                return dateA - dateB;
-                              });
+                              const sortedFollowUps = [...followUps].sort(
+                                (a, b) => {
+                                  const dateA = a.follow_up_date
+                                    ? new Date(a.follow_up_date).getTime()
+                                    : Infinity;
+                                  const dateB = b.follow_up_date
+                                    ? new Date(b.follow_up_date).getTime()
+                                    : Infinity;
+                                  return dateA - dateB;
+                                }
+                              );
                               const earliestFollowUp = sortedFollowUps[0];
                               if (earliestFollowUp?.follow_up_date) {
-                                return new Date(earliestFollowUp.follow_up_date).toLocaleDateString('en-GB');
+                                return formatDateForTable(
+                                  earliestFollowUp.follow_up_date
+                                );
                               }
                               return "-";
                             })()}
@@ -2461,10 +2652,15 @@ const CrmLeads = () => {
                                       ) && (
                                         <Dropdown.Item
                                           onClick={() =>
-                                            handleChangeStage(lead.rawData || lead)
+                                            handleChangeStage(
+                                              lead.rawData || lead
+                                            )
                                           }
                                         >
-                                          <GitBranch size={14} className="me-2" />
+                                          <GitBranch
+                                            size={14}
+                                            className="me-2"
+                                          />
                                           Change Stage
                                         </Dropdown.Item>
                                       )}
@@ -2943,7 +3139,7 @@ const CrmLeads = () => {
                       </Badge>
                     </div>
                   </div>
-                
+
                   <div
                     style={{
                       background: "#f8f9fa",
@@ -3045,7 +3241,7 @@ const CrmLeads = () => {
                         }}
                       />
                       {viewingLead.created_at
-                        ? new Date(viewingLead.created_at).toLocaleDateString('en-GB')
+                        ? formatDateForTable(viewingLead.created_at)
                         : "N/A"}
                     </div>
                   </div>
@@ -3381,14 +3577,13 @@ const CrmLeads = () => {
                                 <div
                                   style={{ fontSize: "13px", color: "#6b7280" }}
                                 >
-                                  <Phone
-                                    size={12}
-                                    style={{
-                                      marginRight: "6px",
-                                      display: "inline",
-                                    }}
+                                  <PhoneDisplay
+                                    phone={
+                                      person.phone_country_code && person.phone
+                                        ? `${person.phone_country_code}${person.phone}`
+                                        : person.phone
+                                    }
                                   />
-                                  {person.phone_country_code} {person.phone}
                                 </div>
                               )}
                             </div>
@@ -3670,18 +3865,14 @@ const CrmLeads = () => {
                               fontWeight: 500,
                             }}
                           >
-                            <Phone
-                              size={14}
-                              style={{
-                                color: "#4680ff",
-                                marginRight: "6px",
-                                display: "inline",
-                              }}
+                            <PhoneDisplay
+                              phone={
+                                viewingLead.crm_data.phone ||
+                                (viewingLead.crm_data.data &&
+                                  viewingLead.crm_data.data.phone) ||
+                                ""
+                              }
                             />
-                            {viewingLead.crm_data.phone ||
-                              (viewingLead.crm_data.data &&
-                                viewingLead.crm_data.data.phone) ||
-                              "N/A"}
                           </div>
                         </div>
                       )}
@@ -3820,9 +4011,9 @@ const CrmLeads = () => {
                                 display: "inline",
                               }}
                             />
-                            {new Date(
+                            {formatDateForTable(
                               viewingLead.crm_data.created_at
-                            ).toLocaleDateString('en-GB')}
+                            )}
                           </div>
                         </div>
                       )}
@@ -4109,9 +4300,9 @@ const CrmLeads = () => {
                                     }}
                                   >
                                     {followUp.follow_up_date
-                                      ? new Date(
+                                      ? formatDateForTable(
                                           followUp.follow_up_date
-                                        ).toLocaleDateString()
+                                        )
                                       : "N/A"}{" "}
                                     -{" "}
                                     {followUp.communication_channel === "Other"
@@ -4161,7 +4352,9 @@ const CrmLeads = () => {
                                       size="sm"
                                       className="p-1"
                                       title="Edit"
-                                      onClick={() => handleEditFollowUp(followUp)}
+                                      onClick={() =>
+                                        handleEditFollowUp(followUp)
+                                      }
                                     >
                                       <Edit size={16} />
                                     </Button>
@@ -4378,9 +4571,7 @@ const CrmLeads = () => {
                                     }}
                                   >
                                     {meeting.meeting_date
-                                      ? new Date(
-                                          meeting.meeting_date
-                                        ).toLocaleDateString()
+                                      ? formatDateForTable(meeting.meeting_date)
                                       : "N/A"}{" "}
                                     {meeting.meeting_time || ""} -{" "}
                                     {meeting.meeting_type}
@@ -5240,7 +5431,9 @@ const CrmLeads = () => {
         >
           <Modal.Title className="d-flex align-items-center">
             <Calendar size={24} className="me-2" />
-            {followUpIdToEdit ? "Update Follow up Activity" : "Add Follow up Activity"}
+            {followUpIdToEdit
+              ? "Update Follow up Activity"
+              : "Add Follow up Activity"}
           </Modal.Title>
         </Modal.Header>
         <Modal.Body className="p-4">
@@ -5269,7 +5462,11 @@ const CrmLeads = () => {
                         followUpDate: e.target.value,
                       })
                     }
-                    min={followUpIdToEdit ? undefined : new Date().toISOString().split("T")[0]}
+                    min={
+                      followUpIdToEdit
+                        ? undefined
+                        : new Date().toISOString().split("T")[0]
+                    }
                     required
                   />
                 </Form.Group>
@@ -5417,7 +5614,9 @@ const CrmLeads = () => {
           <Button
             variant="primary"
             disabled={!followupData.followUpDate || loadingFollowUp}
-            onClick={followUpIdToEdit ? handleUpdateFollowUp : handleCreateFollowUp}
+            onClick={
+              followUpIdToEdit ? handleUpdateFollowUp : handleCreateFollowUp
+            }
           >
             {loadingFollowUp ? (
               <>
@@ -5545,7 +5744,11 @@ const CrmLeads = () => {
                         meetingDate: e.target.value,
                       })
                     }
-                    min={meetingIdToEdit ? undefined : new Date().toISOString().split("T")[0]}
+                    min={
+                      meetingIdToEdit
+                        ? undefined
+                        : new Date().toISOString().split("T")[0]
+                    }
                     required
                   />
                 </Form.Group>
@@ -5686,7 +5889,9 @@ const CrmLeads = () => {
               !meetingData.meetingTime ||
               loadingMeeting
             }
-            onClick={meetingIdToEdit ? handleUpdateMeeting : handleCreateMeeting}
+            onClick={
+              meetingIdToEdit ? handleUpdateMeeting : handleCreateMeeting
+            }
           >
             {loadingMeeting ? (
               <>

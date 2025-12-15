@@ -23,8 +23,9 @@ import { useSession } from "next-auth/react";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
-import { ModuleSlug } from '@utils/Helper';
+import { ModuleSlug, checkRequiredFields } from '@utils/Helper';
 import { convertCurrency, formatCurrency } from '@utils/currency';
+import { GetHierarchyData } from "@utils/users";
 
 interface OrderItem {
   id?: number;
@@ -82,6 +83,22 @@ const EditOrder = () => {
     fetchProducts();
   }, []);
 
+  const [extensions, setExtensions] = useState<any[]>([]);
+
+  const fetchExtensions = async () => {
+    try {
+      const hierarchyData = await GetHierarchyData(ModuleSlug.CRM_ORDERS);
+      if (hierarchyData?.extensions) {
+        setExtensions(hierarchyData.extensions);
+      }
+    } catch (error) {
+      console.error("Failed to fetch extensions:", error);
+    }
+  };
+
+  useEffect(() => {
+    fetchExtensions();
+  }, []);
   useEffect(() => {
     const fetchOrderData = async () => {
       if (!router.isReady || !id || isInitialLoad.current === false) return;
@@ -221,6 +238,53 @@ const EditOrder = () => {
     };
   };
 
+  // Validation functions for each step
+  const validateStep0 = (): boolean => {
+    const requiredFields = [
+      { field: 'customer_name' as const, name: 'Customer Name' },
+      { field: 'customer_email' as const, name: 'Customer Email', type: 'email' },
+      { field: 'customer_phone' as const, name: 'Customer Phone' },
+      { field: 'order_date' as const, name: 'Order Date' },
+      { field: 'order_stage_id' as const, name: 'Stage' },
+      { field: 'currency' as const, name: 'Currency' },
+    ];
+    return checkRequiredFields(formData, requiredFields);
+  };
+
+  const validateStep1 = (): boolean => {
+    // Validate that at least one item exists
+    if (!formData.items || formData.items.length === 0) {
+      toast.error('Please add at least one item to the order');
+      return false;
+    }
+    return true;
+  };
+
+  const validateStep2 = (): boolean => {
+    // Step 2 (Review) has no required fields
+    return true;
+  };
+
+  const validateCurrentStep = (): boolean => {
+    switch (formStep) {
+      case 0:
+        return validateStep0();
+      case 1:
+        return validateStep1();
+      case 2:
+        return validateStep2();
+      default:
+        return true;
+    }
+  };
+
+  const handleNextStep = (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (validateCurrentStep()) {
+      setFormStep(Math.min(2, formStep + 1));
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (formStep < 2) {
@@ -229,6 +293,15 @@ const EditOrder = () => {
     }
 
     if (!id) return;
+
+    // Validate all required fields before submission
+    if (!validateStep0()) {
+      return;
+    }
+
+    if (!validateStep1()) {
+      return;
+    }
 
     setLoading(true);
     try {
@@ -245,7 +318,7 @@ const EditOrder = () => {
         customer_address: formData.customer_address || "",
         order_date: formData.order_date,
         expected_delivery_date: formData.expected_delivery_date || "",
-        order_stage_id: formData.order_stage_id ? String(formData.order_stage_id) : undefined,
+        order_stage_id: String(formData.order_stage_id),
         notes: formData.notes || "",
         tax_amount: totals.taxAmount.toFixed(2),
         discount_amount: totals.totalDiscount.toFixed(2),
@@ -617,7 +690,7 @@ const EditOrder = () => {
                         </Form.Select>
                       </Form.Group>
                     </Col>
-                    <Col md={4}>
+                    {extensions?.length > 1 && <Col md={4}>
                       <Form.Group className="mb-3">
                         <Form.Label>Special Discount (%)</Form.Label>
                         <Form.Control
@@ -630,7 +703,7 @@ const EditOrder = () => {
                           placeholder="0"
                         />
                       </Form.Group>
-                    </Col>
+                    </Col>}
                   </Row>
 
                   {/* Add Item Button */}
@@ -1327,10 +1400,7 @@ const EditOrder = () => {
               {formStep < 2 ? (
                 <Button 
                   variant="primary"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    setFormStep(formStep + 1);
-                  }}
+                  onClick={handleNextStep}
                 >
                   Next <ChevronRight size={16} className="ms-1" />
                 </Button>

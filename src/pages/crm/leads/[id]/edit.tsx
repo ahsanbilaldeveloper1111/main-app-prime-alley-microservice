@@ -34,7 +34,7 @@ import { useRouter } from "next/router";
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import PageHeader from "@components/PageHeader";
-import { ModuleSlug } from '@utils/Helper';
+import { ModuleSlug, checkRequiredFields } from '@utils/Helper';
 
 const EditLead = () => {
   const router = useRouter();
@@ -363,6 +363,80 @@ const EditLead = () => {
     }));
   };
 
+  // Validation functions for each step
+  const validateStep0 = (): boolean => {
+    const requiredFields = [
+      { field: 'name' as const, name: 'Lead Name' },
+      { field: 'user_extension' as const, name: 'User Extension' },
+      { field: 'stage_id' as const, name: 'Stage' },
+    ];
+    return checkRequiredFields(formData, requiredFields);
+  };
+
+  const validateStep1 = (): boolean => {
+    // Step 1 (Company Info) has no required fields
+    return true;
+  };
+
+  const validateStep2 = (): boolean => {
+    // Validate that at least one contact person exists and has name or phone
+    if (!formData.contact_persons || formData.contact_persons.length === 0) {
+      toast.error('Please add at least one contact person');
+      return false;
+    }
+
+    // Check if at least one contact person has name or phone
+    const hasValidContact = formData.contact_persons.some(
+      (person) => person.name || person.phone
+    );
+
+    if (!hasValidContact) {
+      toast.error('Please provide at least name or phone for one contact person');
+      return false;
+    }
+
+    // Validate email format for each contact person that has an email
+    for (const person of formData.contact_persons) {
+      if (person.email) {
+        const isValidEmail = checkRequiredFields({ email: person.email }, [
+          { field: "email", name: "Email", type: "email" },
+        ]);
+        if (!isValidEmail) {
+          return false;
+        }
+      }
+    }
+
+    return true;
+  };
+
+  const validateStep3 = (): boolean => {
+    // Step 3 (Other Info) has no required fields
+    return true;
+  };
+
+  const validateCurrentStep = (): boolean => {
+    switch (formStep) {
+      case 0:
+        return validateStep0();
+      case 1:
+        return validateStep1();
+      case 2:
+        return validateStep2();
+      case 3:
+        return validateStep3();
+      default:
+        return true;
+    }
+  };
+
+  const handleNextStep = (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (validateCurrentStep()) {
+      setFormStep(Math.min(3, formStep + 1));
+    }
+  };
+
   const handleCampaignChange = async (selectedOption: any) => {
     const campaignId = selectedOption?.value;
 
@@ -435,20 +509,29 @@ const EditLead = () => {
       return;
     }
     
-    // Validate required fields
-    if (!formData.user_extension) {
-      toast.error("Please select a user extension");
+    // Validate all required fields using checkRequiredFields
+    const requiredFields = [
+      { field: 'name' as const, name: 'Lead Name' },
+      { field: 'user_extension' as const, name: 'User Extension' },
+      { field: 'stage_id' as const, name: 'Stage' },
+    ];
+
+    if (!checkRequiredFields(formData, requiredFields)) {
       return;
     }
-    
-    if (!formData.name) {
-      toast.error("Please enter lead name");
-      return;
-    }
-    
-    // Validate at least one contact person exists
+
+    // Validate at least one contact person exists and has name or phone
     if (!formData.contact_persons || formData.contact_persons.length === 0) {
       toast.error("Please add at least one contact person");
+      return;
+    }
+
+    const hasValidContact = formData.contact_persons.some(
+      (person) => person.name || person.phone
+    );
+
+    if (!hasValidContact) {
+      toast.error("Please provide at least name or phone for one contact person");
       return;
     }
     
@@ -459,7 +542,7 @@ const EditLead = () => {
       const payload: any = {
         name: formData.name,
         user_extension: formData.user_extension ? String(formData.user_extension) : null,
-        ...(formData.stage_id && { stage_id: String(formData.stage_id) }),
+        stage_id: String(formData.stage_id),
         ...(formData.campaign_id && { campaign_id: String(formData.campaign_id) }),
         ...(formData.crm_data_id && { crm_data_id: String(formData.crm_data_id) }),
         ...(formData.source && { source: formData.source }),
@@ -624,7 +707,7 @@ const EditLead = () => {
                   {selectedCrmData && (
                     <Badge bg="info" className="d-flex align-items-center">
                       <FiDatabase className="me-1" size={14} />
-                      Pre-filled from CRM Data #{selectedCrmData.id}
+                      Pre-filled from Prospect: {selectedCrmData?.name || `#${selectedCrmData?.id}`}
                     </Badge>
                   )}
                 </div>
@@ -798,12 +881,15 @@ const EditLead = () => {
                             </Col>
                             <Col md={6}>
                               <Form.Group className="mb-3">
-                                <Form.Label>Stage</Form.Label>
+                                <Form.Label>
+                                  Stage <span className="text-danger">*</span>
+                                </Form.Label>
                                 <Form.Select
                                   value={formData.stage_id || ""}
                                   onChange={(e) =>
                                     handleInputChange("stage_id", e.target.value ? Number(e.target.value) : undefined)
                                   }
+                                  required
                                 >
                                   <option value="">Select a stage</option>
                                   {stages.map((stage) => (
@@ -983,7 +1069,7 @@ const EditLead = () => {
                             </Col>
                             <Col md={12}>
                               <Form.Group className="mb-3">
-                                <Form.Label>Company Location Other</Form.Label>
+                                <Form.Label>Additional Location Information</Form.Label>
                                 <Form.Control
                                   type="text"
                                   value={formData.company_location_other}
@@ -1137,10 +1223,10 @@ const EditLead = () => {
                             <div className="border-top pt-3 mt-4">
                               <div className="d-flex align-items-center mb-3">
                                 <FiTarget className="me-2" />
-                                <h6 className="mb-0">Campaign Fields: {selectedCampaign.name}</h6>
+                                <h6 className="mb-0">Custom Campaign Fields: {selectedCampaign.name}</h6>
                                 {selectedCrmData && (
                                   <Badge bg="success" className="ms-2 small">
-                                    Auto-filled from CRM Data
+                                    Auto-filled from Prospect
                                   </Badge>
                                 )}
                               </div>
@@ -1184,10 +1270,7 @@ const EditLead = () => {
                     {formStep < 3 ? (
                       <Button 
                         variant="primary" 
-                        onClick={(e) => {
-                          e.preventDefault();
-                          setFormStep(Math.min(3, formStep + 1));
-                        }}
+                        onClick={handleNextStep}
                       >
                         Next
                         <ChevronRight size={16} className="ms-1" />
