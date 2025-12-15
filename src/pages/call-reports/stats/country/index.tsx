@@ -5,12 +5,15 @@ import BreadcrumbItem from '@common/BreadcrumbItem';
 import GenericListPage from '@components/GenericListPage';
 import { ListCallLogs, ExportCallLogs, DownloadStreamingExport } from '@utils/calls';
 import { Column } from '@components/CustomDataTable';
-import { Button, Modal, Row, Tab, Tabs } from 'react-bootstrap';
+import { Button, Modal, Row, Tab, Tabs, Form } from 'react-bootstrap';
 import { Col } from 'react-bootstrap';
 import { toast } from 'react-toastify';
 import { useTokenService } from 'src/hooks/useTokenService';
 import { useSession } from 'next-auth/react';
 import CallLogsFilters from '@components/filters/CallLogsFilters';
+import BarFilters from '@components/BarFilters';
+import SelectBox from '@components/SelectBox';
+import { useHierarchyData } from '@components/filters/useHierarchyData';
 import AnimatedNumber from '@components/AnimatedNumber';
 import ChartBar from '@components/ChartBar';
 import ChartDonut from '@components/ChartDonut';
@@ -74,11 +77,24 @@ const CallStatsCountry = () => {
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('calls_chart');
   const [refreshKey, setRefreshKey] = useState<number>(0);
-  const [currentFilters, setCurrentFilters] = useState({
+  const [currentFilters, setCurrentFilters] = useState<Record<string, any>>({
     is_incoming_only: 'false'
   });
+  const [pendingFilters, setPendingFilters] = useState({});
   const [dataLoaded, setDataLoaded] = useState(false);
   const [filtersReady, setFiltersReady] = useState(false);
+  
+  const {
+    hierarchyDataUsers,
+    hierarchyDataDepartments,
+    hierarchyDataExtensions,
+    loading: hierarchyLoading
+  } = useHierarchyData(ModuleSlug.CALL_REPORTS);
+  
+  // Use ref to track if initial fetch has been done
+  const initialFetchDone = React.useRef(false);
+  // Use ref to track last filters used for charts to prevent unnecessary refetches
+  const lastChartFilters = React.useRef<string>('');
   const [summary, setSummary] = useState<Summary>({
     total_calls: 0,
     answered_calls: 0,
@@ -193,137 +209,152 @@ const CallStatsCountry = () => {
     }
     
     if ((filtersChanged && filtersReady) || isCompletelyCleared) {
+      // Reset chart filters ref to allow chart refetch
+      lastChartFilters.current = '';
       setRefreshKey(prev => prev + 1);
     }
   };
 
   useEffect(() => {
-    if (filtersReady && session) {
+    if (filtersReady && session && !initialFetchDone.current) {
+      initialFetchDone.current = true;
       fetchCallLogs(1, 15, "");
+    }
+  }, [filtersReady, session]);
+  
+  // Separate useEffect for chart data when filters change
+  useEffect(() => {
+    if (filtersReady && session && initialFetchDone.current) {
+      // Check if filters have actually changed
+      const currentFiltersString = JSON.stringify(currentFilters);
+      const filtersChanged = lastChartFilters.current !== currentFiltersString;
       
-      // Fetch chart data
-      const fetchCharts = async () => {
-        setChartLoading(true);
-        try {
-          const response = await ListCallLogs({ 
-            page: 1, 
-            perPage: 15, 
-            search: "", 
-            filters: currentFilters, 
-            reportType: 'chartCountry',
-            moduleSlug: ModuleSlug.CALL_REPORTS
-
-          }, 'call-logs/stats/country/chart');
-          
-          const chartData = response?.chart_data;
-          
-          if(chartData && Array.isArray(chartData) && chartData.length > 0) {
-            const newChartData: ChartData = {
-              country: [],
-              answered_calls: [],
-              unanswered_calls: [],
-              total_calls: [],
-              max_ring_time: [],
-              avg_ring_time: [],
-              min_ring_time: [],
-              min_cost: [],
-              avg_cost: [],
-              max_cost: [],
-              min_duration: [],
-              avg_duration: [],
-              max_duration: [],
-            };
+      if (filtersChanged) {
+        lastChartFilters.current = currentFiltersString;
+        
+        // Fetch chart data
+        const fetchCharts = async () => {
+          setChartLoading(true);
+          try {
+            const response = await ListCallLogs({ 
+              page: 1, 
+              perPage: 15, 
+              search: "", 
+              filters: currentFilters, 
+              reportType: 'chartCountry',
+              moduleSlug: ModuleSlug.CALL_REPORTS
+            }, 'call-logs/stats/country/chart');
             
-            chartData.forEach((item: any) => {
-              if (item && item.label) {
-                newChartData.country.push(item.label);
-                newChartData.answered_calls.push(Number(item.answered_calls) || 0);
-                newChartData.unanswered_calls.push(Number(item.unanswered_calls) || 0);
-                newChartData.total_calls.push(Number(item.total_calls) || 0);
-                newChartData.max_ring_time.push(Number(item.max_ring_time) || 0);
-                newChartData.avg_ring_time.push(Number(item.avg_ring_time) || 0);
-                newChartData.min_ring_time.push(Number(item.min_ring_time) || 0);
-                newChartData.min_cost.push(Number(item.min_cost) || 0);
-                newChartData.avg_cost.push(Number(item.avg_cost) || 0);
-                newChartData.max_cost.push(Number(item.max_cost) || 0);
-                newChartData.min_duration.push(Number(item.min_duration) || 0);
-                newChartData.avg_duration.push(Number(item.avg_duration) || 0);
-                newChartData.max_duration.push(Number(item.max_duration) || 0);
-              }
-            });
+            const chartData = response?.chart_data;
             
-            const dataLength = newChartData.country.length;
-            
-            if (dataLength > 0 && 
-                newChartData.answered_calls.length === dataLength &&
-                newChartData.unanswered_calls.length === dataLength &&
-                newChartData.total_calls.length === dataLength) {
+            if(chartData && Array.isArray(chartData) && chartData.length > 0) {
+              const newChartData: ChartData = {
+                country: [],
+                answered_calls: [],
+                unanswered_calls: [],
+                total_calls: [],
+                max_ring_time: [],
+                avg_ring_time: [],
+                min_ring_time: [],
+                min_cost: [],
+                avg_cost: [],
+                max_cost: [],
+                min_duration: [],
+                avg_duration: [],
+                max_duration: [],
+              };
               
-              // Calls Chart
-              setChartCalls({
-                series: [
-                  { name: 'Total', data: newChartData.total_calls },
-                  { name: 'Answered', data: newChartData.answered_calls },
-                  { name: 'Unanswered', data: newChartData.unanswered_calls }
-                ],
-                categories: newChartData.country
+              chartData.forEach((item: any) => {
+                if (item && item.label) {
+                  newChartData.country.push(item.label);
+                  newChartData.answered_calls.push(Number(item.answered_calls) || 0);
+                  newChartData.unanswered_calls.push(Number(item.unanswered_calls) || 0);
+                  newChartData.total_calls.push(Number(item.total_calls) || 0);
+                  newChartData.max_ring_time.push(Number(item.max_ring_time) || 0);
+                  newChartData.avg_ring_time.push(Number(item.avg_ring_time) || 0);
+                  newChartData.min_ring_time.push(Number(item.min_ring_time) || 0);
+                  newChartData.min_cost.push(Number(item.min_cost) || 0);
+                  newChartData.avg_cost.push(Number(item.avg_cost) || 0);
+                  newChartData.max_cost.push(Number(item.max_cost) || 0);
+                  newChartData.min_duration.push(Number(item.min_duration) || 0);
+                  newChartData.avg_duration.push(Number(item.avg_duration) || 0);
+                  newChartData.max_duration.push(Number(item.max_duration) || 0);
+                }
               });
+              
+              const dataLength = newChartData.country.length;
+              
+              if (dataLength > 0 && 
+                  newChartData.answered_calls.length === dataLength &&
+                  newChartData.unanswered_calls.length === dataLength &&
+                  newChartData.total_calls.length === dataLength) {
+                
+                // Calls Chart
+                setChartCalls({
+                  series: [
+                    { name: 'Total', data: newChartData.total_calls },
+                    { name: 'Answered', data: newChartData.answered_calls },
+                    { name: 'Unanswered', data: newChartData.unanswered_calls }
+                  ],
+                  categories: newChartData.country
+                });
 
-              // Ring Time Chart
-              setChartRingTime({
-                series: [
-                  { name: 'Max Ring Time', data: newChartData.max_ring_time },
-                  { name: 'Avg Ring Time', data: newChartData.avg_ring_time },
-                  { name: 'Min Ring Time', data: newChartData.min_ring_time }
-                ],
-                categories: newChartData.country
-              });
+                // Ring Time Chart
+                setChartRingTime({
+                  series: [
+                    { name: 'Max Ring Time', data: newChartData.max_ring_time },
+                    { name: 'Avg Ring Time', data: newChartData.avg_ring_time },
+                    { name: 'Min Ring Time', data: newChartData.min_ring_time }
+                  ],
+                  categories: newChartData.country
+                });
 
-              // Cost Chart
-              setChartCost({
-                series: [
-                  { name: 'Max Cost', data: newChartData.max_cost },
-                  { name: 'Avg Cost', data: newChartData.avg_cost },
-                  { name: 'Min Cost', data: newChartData.min_cost }
-                ],
-                categories: newChartData.country
-              });
+                // Cost Chart
+                setChartCost({
+                  series: [
+                    { name: 'Max Cost', data: newChartData.max_cost },
+                    { name: 'Avg Cost', data: newChartData.avg_cost },
+                    { name: 'Min Cost', data: newChartData.min_cost }
+                  ],
+                  categories: newChartData.country
+                });
 
-              // Duration Chart
-              setChartDuration({
-                series: [
-                  { name: 'Max Duration', data: newChartData.max_duration },
-                  { name: 'Avg Duration', data: newChartData.avg_duration },
-                  { name: 'Min Duration', data: newChartData.min_duration }
-                ],
-                categories: newChartData.country
-              });
+                // Duration Chart
+                setChartDuration({
+                  series: [
+                    { name: 'Max Duration', data: newChartData.max_duration },
+                    { name: 'Avg Duration', data: newChartData.avg_duration },
+                    { name: 'Min Duration', data: newChartData.min_duration }
+                  ],
+                  categories: newChartData.country
+                });
+              } else {
+                setChartCalls(null);
+                setChartRingTime(null);
+                setChartCost(null);
+                setChartDuration(null);
+              }
             } else {
               setChartCalls(null);
               setChartRingTime(null);
               setChartCost(null);
               setChartDuration(null);
             }
-          } else {
+          } catch (error: unknown) {
+            console.error('Error fetching chart data:', error);
             setChartCalls(null);
             setChartRingTime(null);
             setChartCost(null);
             setChartDuration(null);
+          } finally {
+            setChartLoading(false);
           }
-        } catch (error: unknown) {
-          console.error('Error fetching chart data:', error);
-          setChartCalls(null);
-          setChartRingTime(null);
-          setChartCost(null);
-          setChartDuration(null);
-        } finally {
-          setChartLoading(false);
-        }
-      };
+        };
 
-      fetchCharts();
+        fetchCharts();
+      }
     }
-  }, [filtersReady, fetchCallLogs, session, currentFilters]);
+  }, [currentFilters, filtersReady, session]);
 
   // Fallback: if filters haven't been marked as ready after 1 second
   useEffect(() => {
@@ -394,12 +425,12 @@ const CallStatsCountry = () => {
                           
                             </>
                           )}
-                  <CallLogsFilters
+                  {/* <CallLogsFilters
                     onFiltersChange={handleFiltersChange} 
                     onExport={handleExport} 
                     isVisibleCallDirection={false} 
                     moduleSlug={ModuleSlug.CALL_REPORTS} 
-                  />
+                  /> */}
                 </div>
               </Col>
             </Row>
@@ -438,6 +469,8 @@ const CallStatsCountry = () => {
             ) : (
               <>
                 <PageSummaryGrid
+                  gridColumns={2}
+                  
                   cards={[
                     {
                       id: 'total-calls',
@@ -762,6 +795,191 @@ const CallStatsCountry = () => {
               </Col>
             </Row>
           ) : (
+            <>
+            <BarFilters
+            leftContent={
+              <>
+                {showDateRange && (
+                  <p className="mb-0">
+                    Date Range: <span className="status-badge primary">{formatDateTimeToLocal(startDateTime, GlobalDateTimeFormat)}</span> to <span className="status-badge primary">{formatDateTimeToLocal(endDateTime, GlobalDateTimeFormat)}</span>
+                  </p>
+                )}
+              </>
+            }
+              searchValue=""
+              onSearchChange={() => {}}
+              onSearch={() => {}}
+              searchPlaceholder="Search call stats..."
+              showSearch={false}
+              filters={pendingFilters}
+              onSubmit={() => {
+                setCurrentFilters(pendingFilters);
+                handleFiltersChange(pendingFilters);
+              }}
+              onReset={() => {
+                setPendingFilters({});
+                const resetFilters = { is_incoming_only: 'false' };
+                setCurrentFilters(resetFilters);
+                handleFiltersChange(resetFilters);
+              }}
+              filterContent={
+                <>
+                  
+
+                  {/* Call Status */}
+                  <Col md={4}>
+                    <Form.Group>
+                      <Form.Label>Call Status</Form.Label>
+                      <SelectBox
+                        isSearchable={false}
+                        value={(pendingFilters as any)?.call_status || null}
+                        onChange={(value) => {
+                          setPendingFilters({ ...pendingFilters, call_status: value as string || '' });
+                        }}
+                        options={[
+                          { value: 'Answered', label: 'Answered' },
+                          { value: 'Not Answered', label: 'Not Answered' },
+                          { value: 'Both', label: 'Both' }
+                        ]}
+                        placeholder="Select call status"
+                      />
+                    </Form.Group>
+                  </Col>
+
+                  {/* Called Numbers */}
+                  <Col md={4}>
+                    <Form.Group>
+                      <Form.Label>Called Numbers</Form.Label>
+                      <Form.Control
+                        type="text"
+                        placeholder="Enter called numbers (comma separated)"
+                        value={((pendingFilters as any)?.called_numbers || []).join(', ')}
+                        onChange={(e) => {
+                          const values = e.target.value.split(',').map(v => v.trim()).filter(v => v);
+                          setPendingFilters({ ...pendingFilters, called_numbers: values });
+                        }}
+                      />
+                    </Form.Group>
+                  </Col>
+
+                  {/* Extension */}
+                  <Col md={4}>
+                    <Form.Group>
+                      <Form.Label>Extension</Form.Label>
+                      <SelectBox
+                        isMulti
+                        isSearchable={true}
+                        isDisabled={hierarchyLoading}
+                        value={(pendingFilters as any)?.extension_number?.length > 0 ? (pendingFilters as any)?.extension_number : null}
+                        onChange={(value) => {
+                          setPendingFilters({ ...pendingFilters, extension_number: value ? (value as string[]) : [] });
+                        }}
+                        options={(hierarchyDataExtensions as any)?.map((ext: any) => ({
+                          value: ext.id,
+                          label: ext.name
+                        })) || []}
+                        placeholder="Select extensions"
+                      />
+                    </Form.Group>
+                  </Col>
+
+                  {/* Traffic Type */}
+                  <Col md={4}>
+                    <Form.Group>
+                      <Form.Label>Traffic Type</Form.Label>
+                      <SelectBox
+                        isSearchable={false}
+                        value={(pendingFilters as any)?.traffic_type || null}
+                        onChange={(value) => {
+                          setPendingFilters({ ...pendingFilters, traffic_type: value as string || '' });
+                        }}
+                        options={[
+                          { value: '', label: 'All' },
+                          { value: 'internal', label: 'Internal' },
+                          { value: 'external', label: 'External' }
+                        ]}
+                        placeholder="Select traffic type"
+                      />
+                    </Form.Group>
+                  </Col>
+
+                  {/* Destination Type */}
+                  <Col md={4}>
+                    <Form.Group>
+                      <Form.Label>Destination Type</Form.Label>
+                      <SelectBox
+                        isSearchable={false}
+                        value={(pendingFilters as any)?.destination_type || null}
+                        onChange={(value) => {
+                          setPendingFilters({ ...pendingFilters, destination_type: value as string || '' });
+                        }}
+                        options={[
+                          { value: '', label: 'All' },
+                          { value: 'local', label: 'Local' },
+                          { value: 'national', label: 'National' },
+                          { value: 'international', label: 'International' }
+                        ]}
+                        placeholder="Select destination type"
+                      />
+                    </Form.Group>
+                  </Col>
+
+                  {/* Departments */}
+                  <Col md={4}>
+                    <Form.Group>
+                      <Form.Label>Departments</Form.Label>
+                      <SelectBox
+                        isMulti
+                        isSearchable={true}
+                        isDisabled={hierarchyLoading}
+                        value={(pendingFilters as any)?.department?.length > 0 ? (pendingFilters as any)?.department : null}
+                        onChange={(value) => {
+                          setPendingFilters({ ...pendingFilters, department: value ? (value as string[]) : [] });
+                        }}
+                        options={(hierarchyDataDepartments as any)?.map((dept: any) => ({
+                          value: dept.id,
+                          label: dept.name
+                        })) || []}
+                        placeholder="Select departments"
+                      />
+                    </Form.Group>
+                  </Col>
+
+                  {/* Date Range - Start */}
+                  <Col md={4}>
+                    <Form.Group>
+                      <Form.Label>Start Date Time</Form.Label>
+                      <Form.Control
+                        type="datetime-local"
+                        value={(pendingFilters as any)?.start_datetime || ''}
+                        onChange={(e) => {
+                          setPendingFilters({ ...pendingFilters, start_datetime: e.target.value });
+                        }}
+                      />
+                    </Form.Group>
+                  </Col>
+
+                  {/* Date Range - End */}
+                  <Col md={4}>
+                    <Form.Group>
+                      <Form.Label>End Date Time</Form.Label>
+                      <Form.Control
+                        type="datetime-local"
+                        value={(pendingFilters as any)?.end_datetime || ''}
+                        min={(pendingFilters as any)?.start_datetime || ''}
+                        onChange={(e) => {
+                          setPendingFilters({ ...pendingFilters, end_datetime: e.target.value });
+                        }}
+                      />
+                    </Form.Group>
+                  </Col>
+                </>
+              }
+            />
+            
+
+
+
             <GenericListPage
               columns={columns}
               fetchData={fetchCallLogs}
@@ -774,6 +992,7 @@ const CallStatsCountry = () => {
               search={false}
               tableStyle='table-style-2'
             />
+            </>
           )}
         </>
       )}

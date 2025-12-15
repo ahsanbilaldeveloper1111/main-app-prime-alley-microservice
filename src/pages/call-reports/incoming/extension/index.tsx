@@ -6,12 +6,15 @@ import GenericListPage from '@components/GenericListPage';
 import { ListCallLogs, ExportCallLogs, DownloadStreamingExport } from '@utils/calls';
 import { GetHierarchyData } from '@utils/users';
 import { Column } from '@components/CustomDataTable';
-import { Button, Modal, Row, Tab, Tabs } from 'react-bootstrap';
+import { Button, Modal, Row, Tab, Tabs, Form } from 'react-bootstrap';
 import { Col } from 'react-bootstrap';
 import { toast } from 'react-toastify';
 import { useTokenService } from 'src/hooks/useTokenService';
 import { useSession } from 'next-auth/react';
 import CallLogsFilters from '@components/filters/CallLogsFilters';
+import BarFilters from '@components/BarFilters';
+import SelectBox from '@components/SelectBox';
+import { useHierarchyData } from '@components/filters/useHierarchyData';
 import AnimatedNumber from '@components/AnimatedNumber';
 import ChartBar from '@components/ChartBar';
 import ChartDonut from '@components/ChartDonut';
@@ -168,6 +171,7 @@ const CallIncomingExtension = () => {
     const [currentFilters, setCurrentFilters] = useState({
       is_incoming_only: 'true'
     });
+    const [pendingFilters, setPendingFilters] = useState({});
     
     // Debug current filters state
     useEffect(() => {
@@ -175,6 +179,16 @@ const CallIncomingExtension = () => {
     }, [currentFilters]);
     const [dataLoaded, setDataLoaded] = useState(false);
     const [filtersReady, setFiltersReady] = useState(false);
+    
+    // Use ref to track if initial fetch has been done
+    const initialFetchDone = React.useRef(false);
+    
+    const {
+      hierarchyDataUsers,
+      hierarchyDataDepartments,
+      hierarchyDataExtensions,
+      loading: hierarchyLoading
+    } = useHierarchyData(ModuleSlug.CALL_REPORTS);
     const [summary, setSummary] = useState<Summary>({
         total_calls: 0,
         answered_calls: 0,
@@ -274,10 +288,8 @@ const CallIncomingExtension = () => {
 
     // Trigger initial data fetch when filters become ready
     useEffect(() => {
-        console.log('Initial data fetch useEffect triggered:', { filtersReady, status, session });
-        if (filtersReady && status === 'authenticated' && session) {
-            console.log('Filters ready and session authenticated, triggering initial fetch');
-            console.log('DataLoaded before fetch:', dataLoaded);
+        if (filtersReady && status === 'authenticated' && session && !initialFetchDone.current) {
+            initialFetchDone.current = true;
             fetchCallLogs(1, 15, "");
         } else if (status === 'loading') {
             console.log('Session still loading, waiting...');
@@ -286,7 +298,7 @@ const CallIncomingExtension = () => {
         } else {
             console.log('Not ready for data fetch:', { filtersReady, status, hasSession: !!session });
         }
-    }, [filtersReady, fetchCallLogs, status, session]);
+    }, [filtersReady, status, session]);
     
     // Fallback: if filters haven't been marked as ready after 1 second, mark them as ready
     useEffect(() => {
@@ -596,12 +608,12 @@ const CallIncomingExtension = () => {
                           
                             </>
                           )}
-                  <CallLogsFilters
+                  {/* <CallLogsFilters
                     onFiltersChange={handleFiltersChange} 
                     onExport={handleExport} 
                     isVisibleCallDirection={false} 
                     moduleSlug={ModuleSlug.CALL_REPORTS} 
-                  />
+                  /> */}
                 </div>
               </Col>
             </Row>
@@ -614,6 +626,7 @@ const CallIncomingExtension = () => {
                 <Col md={6}>
                     <Row>
                         <PageSummaryGrid
+                            gridColumns={2}
                             cards={[
                                 {
                                     id: 'total-calls',
@@ -899,6 +912,190 @@ const CallIncomingExtension = () => {
             </Row>
 
             {session?.user?.permissions?.includes('list-call-logs') && (
+              <>
+            <BarFilters
+            leftContent={
+              <>
+                {showDateRange && (
+                  <p className="mb-0">
+                    Date Range: <span className="status-badge primary">{formatDateTimeToLocal(startDateTime, GlobalDateTimeFormat)}</span> to <span className="status-badge primary">{formatDateTimeToLocal(endDateTime, GlobalDateTimeFormat)}</span>
+                  </p>
+                )}
+              </>
+            }
+              searchValue=""
+              onSearchChange={() => {}}
+              onSearch={() => {}}
+              searchPlaceholder="Search call stats..."
+              showSearch={false}
+              filters={pendingFilters}
+              onSubmit={() => {
+                const filtersToApply = { ...pendingFilters, is_incoming_only: 'true' };
+                setCurrentFilters(filtersToApply);
+                handleFiltersChange(filtersToApply);
+              }}
+              onReset={() => {
+                setPendingFilters({});
+                const resetFilters = { is_incoming_only: 'true' };
+                setCurrentFilters(resetFilters);
+                handleFiltersChange(resetFilters);
+              }}
+              filterContent={
+                <>
+                  
+
+                  {/* Call Status */}
+                  <Col md={4}>
+                    <Form.Group>
+                      <Form.Label>Call Status</Form.Label>
+                      <SelectBox
+                        isSearchable={false}
+                        value={(pendingFilters as any)?.call_status || null}
+                        onChange={(value) => {
+                          setPendingFilters({ ...pendingFilters, call_status: value as string || '' });
+                        }}
+                        options={[
+                          { value: 'Answered', label: 'Answered' },
+                          { value: 'Not Answered', label: 'Not Answered' },
+                          { value: 'Both', label: 'Both' }
+                        ]}
+                        placeholder="Select call status"
+                      />
+                    </Form.Group>
+                  </Col>
+
+                  {/* Called Numbers */}
+                  <Col md={4}>
+                    <Form.Group>
+                      <Form.Label>Called Numbers</Form.Label>
+                      <Form.Control
+                        type="text"
+                        placeholder="Enter called numbers (comma separated)"
+                        value={((pendingFilters as any)?.called_numbers || []).join(', ')}
+                        onChange={(e) => {
+                          const values = e.target.value.split(',').map(v => v.trim()).filter(v => v);
+                          setPendingFilters({ ...pendingFilters, called_numbers: values });
+                        }}
+                      />
+                    </Form.Group>
+                  </Col>
+
+                  {/* Extension */}
+                  <Col md={4}>
+                    <Form.Group>
+                      <Form.Label>Extension</Form.Label>
+                      <SelectBox
+                        isMulti
+                        isSearchable={true}
+                        isDisabled={hierarchyLoading}
+                        value={(pendingFilters as any)?.extension_number?.length > 0 ? (pendingFilters as any)?.extension_number : null}
+                        onChange={(value) => {
+                          setPendingFilters({ ...pendingFilters, extension_number: value ? (value as string[]) : [] });
+                        }}
+                        options={(hierarchyDataExtensions as any)?.map((ext: any) => ({
+                          value: ext.id,
+                          label: ext.name
+                        })) || []}
+                        placeholder="Select extensions"
+                      />
+                    </Form.Group>
+                  </Col>
+
+                  {/* Traffic Type */}
+                  <Col md={4}>
+                    <Form.Group>
+                      <Form.Label>Traffic Type</Form.Label>
+                      <SelectBox
+                        isSearchable={false}
+                        value={(pendingFilters as any)?.traffic_type || null}
+                        onChange={(value) => {
+                          setPendingFilters({ ...pendingFilters, traffic_type: value as string || '' });
+                        }}
+                        options={[
+                          { value: '', label: 'All' },
+                          { value: 'internal', label: 'Internal' },
+                          { value: 'external', label: 'External' }
+                        ]}
+                        placeholder="Select traffic type"
+                      />
+                    </Form.Group>
+                  </Col>
+
+                  {/* Destination Type */}
+                  <Col md={4}>
+                    <Form.Group>
+                      <Form.Label>Destination Type</Form.Label>
+                      <SelectBox
+                        isSearchable={false}
+                        value={(pendingFilters as any)?.destination_type || null}
+                        onChange={(value) => {
+                          setPendingFilters({ ...pendingFilters, destination_type: value as string || '' });
+                        }}
+                        options={[
+                          { value: '', label: 'All' },
+                          { value: 'local', label: 'Local' },
+                          { value: 'national', label: 'National' },
+                          { value: 'international', label: 'International' }
+                        ]}
+                        placeholder="Select destination type"
+                      />
+                    </Form.Group>
+                  </Col>
+
+                  {/* Departments */}
+                  <Col md={4}>
+                    <Form.Group>
+                      <Form.Label>Departments</Form.Label>
+                      <SelectBox
+                        isMulti
+                        isSearchable={true}
+                        isDisabled={hierarchyLoading}
+                        value={(pendingFilters as any)?.department?.length > 0 ? (pendingFilters as any)?.department : null}
+                        onChange={(value) => {
+                          setPendingFilters({ ...pendingFilters, department: value ? (value as string[]) : [] });
+                        }}
+                        options={(hierarchyDataDepartments as any)?.map((dept: any) => ({
+                          value: dept.id,
+                          label: dept.name
+                        })) || []}
+                        placeholder="Select departments"
+                      />
+                    </Form.Group>
+                  </Col>
+
+                  {/* Date Range - Start */}
+                  <Col md={4}>
+                    <Form.Group>
+                      <Form.Label>Start Date Time</Form.Label>
+                      <Form.Control
+                        type="datetime-local"
+                        value={(pendingFilters as any)?.start_datetime || ''}
+                        onChange={(e) => {
+                          setPendingFilters({ ...pendingFilters, start_datetime: e.target.value });
+                        }}
+                      />
+                    </Form.Group>
+                  </Col>
+
+                  {/* Date Range - End */}
+                  <Col md={4}>
+                    <Form.Group>
+                      <Form.Label>End Date Time</Form.Label>
+                      <Form.Control
+                        type="datetime-local"
+                        value={(pendingFilters as any)?.end_datetime || ''}
+                        min={(pendingFilters as any)?.start_datetime || ''}
+                        onChange={(e) => {
+                          setPendingFilters({ ...pendingFilters, end_datetime: e.target.value });
+                        }}
+                      />
+                    </Form.Group>
+                  </Col>
+                </>
+              }
+            />
+            
+
                  <GenericListPage
                  columns={columns}
                  fetchData={fetchCallLogs}
@@ -910,6 +1107,7 @@ const CallIncomingExtension = () => {
                  tableStyle='table-style-2'
                  search={false} 
              />
+             </>
             )}
 
             {/* Chart Modal */}

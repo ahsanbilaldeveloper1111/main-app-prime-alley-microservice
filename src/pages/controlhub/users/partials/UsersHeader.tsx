@@ -2,6 +2,8 @@ import React from 'react';
 import { Row, Col, Button } from 'react-bootstrap';
 import { useSession } from 'next-auth/react';
 import UsersFilters from '@components/filters/UsersFilters';
+import { SyncBillingCompanies } from '@utils/users';
+import { toast } from 'react-toastify';
 
 interface UsersHeaderProps {
     currentFilters: any;
@@ -17,6 +19,13 @@ const UsersHeader: React.FC<UsersHeaderProps> = ({
     syncLdapUsers
 }) => {
     const { data: session } = useSession();
+
+    const syncBillingCompanies = async () => {
+        const response = await SyncBillingCompanies();
+        if(response){
+            toast.success('Billing companies synced successfully');
+        }
+    }
 
     return (
         <Row className="mb-3">
@@ -37,12 +46,19 @@ const UsersHeader: React.FC<UsersHeaderProps> = ({
                                         onChange={(e) => handleFiltersChange({...currentFilters, search: e.target.value})}
                                     />
                                 </div> */}
-                                <UsersFilters onFiltersChange={handleFiltersChange} onExport={handleExport} />
+                                {/* <UsersFilters onFiltersChange={handleFiltersChange} onExport={handleExport} /> */}
                                 {session?.user?.permissions?.includes('sync-ldap') && (
                                     <Button variant="primary" onClick={() => syncLdapUsers()}>
                                         Sync Users
                                     </Button>
                                 )}
+
+{session?.user?.is_admin == "1" && (
+                                    <Button variant="danger" onClick={() => syncBillingCompanies()}>
+                                        Sync Billing Companies
+                                    </Button>
+                                )}
+
                             </div>
                         </Col>
                     </Row>

@@ -761,7 +761,7 @@ export default function useCtiStomp(wsPath = '/ws', instanceId?: string, screenI
           reconnectionTimerRef.current = null;
         }
         
-        // Set up timer to reconnect after 15 minutes (900000ms)
+        // Set up timer to reconnect after 2.5 hours (9000000ms)
         reconnectionTimerRef.current = setTimeout(async () => {
           console.log(`[${currentInstanceId}] 🔄 15 minutes elapsed, fully closing connection and reconnecting with fresh token...`);
           
@@ -776,7 +776,7 @@ export default function useCtiStomp(wsPath = '/ws', instanceId?: string, screenI
           } else {
             setError('Failed to get fresh token for reconnection');
           }
-        }, 900000); // 15 minutes
+        }, 9000000); // 2.5hour
       };
 
       eventSource.onmessage = (event) => {

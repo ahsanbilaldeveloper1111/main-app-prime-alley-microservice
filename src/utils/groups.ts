@@ -151,3 +151,92 @@ export const updateGroup = async (id: string, name: string) => {
       throw error;
     }
   };
+
+  // Team Assignment Functions
+  export const addTeamsToGroup = async (group_id: number, team_ids: number[]): Promise<any | null> => {
+    try {
+      const response = await axiosInstance.post(
+        `groups/teams/add`,
+        {
+          group_id: group_id,
+          team_ids: team_ids
+        }
+      );
+      if(response.data){
+        const responseData = response.data;
+        if(responseData.status === "success" || responseData.code === 200){
+          toast.success('Teams added to group successfully');
+          return responseData.data;
+        }else{
+          toast.error(responseData.message || 'Failed to add teams to group');
+          return null;
+        } 
+      }else{
+        toast.error('Failed to add teams to group');
+        return null;
+      }
+    } catch (error) {
+      throw error;
+    }
+  };
+
+  export const removeTeamsFromGroup = async (group_id: number, team_ids: number[]): Promise<any | null> => {
+    try {
+      const response = await axiosInstance.post(
+        `groups/teams/remove`,
+        {
+          group_id: group_id,
+          team_ids: team_ids
+        }
+      );
+      if(response.data){
+        const responseData = response.data;
+        if(responseData.status === "success" || responseData.code === 200){
+          toast.success('Teams removed from group successfully');
+          return responseData.data;
+        }else{
+          toast.error(responseData.message || 'Failed to remove teams from group');
+          return null;
+        } 
+      }else{
+        toast.error('Failed to remove teams from group');
+        return null;
+      }
+    } catch (error) {
+      throw error;
+    }
+  };
+
+  export const getGroupTeams = async (group_id?: number, id?: number): Promise<any[]> => {
+    try {
+      const response = await axiosInstance.post(
+        `groups/teams/get`,
+        {
+          ...(group_id ? { group_id } : {}),
+          ...(id ? { id } : {})
+        }
+      );
+      if(response.data){
+        const responseData = response.data;
+        // Handle both response formats: status === "success" or code === 200
+        if(responseData.status === "success" || responseData.code === 200){
+          // If data has a teams property, return that, otherwise return data itself
+          if(responseData.data && responseData.data.teams && Array.isArray(responseData.data.teams)){
+            return responseData.data.teams;
+          } else if(responseData.data && Array.isArray(responseData.data)){
+            return responseData.data;
+          } else {
+            return [];
+          }
+        }else{
+          toast.error(responseData.message || 'Failed to fetch group teams');
+          return [];
+        } 
+      }else{
+        toast.error('Failed to fetch group teams');
+        return [];
+      }
+    } catch (error) {
+      throw error;
+    }
+  };

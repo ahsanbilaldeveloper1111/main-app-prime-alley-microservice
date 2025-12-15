@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useRef } from 'react';
 import GenericListPage from '@components/GenericListPage';
 import { Column } from '@components/CustomDataTable';
 
@@ -24,6 +24,23 @@ const UsersList: React.FC<UsersListProps> = ({
         return `users-table-${customFieldColumns.length}-${columnKeys}`;
     }, [customFieldColumns]);
 
+    // Use ref to track previous filters to maintain stable reference
+    const prevFiltersRef = useRef<any>(currentFilters || {});
+    const prevFiltersStringRef = useRef<string>('');
+    
+    // Memoize filters to prevent unnecessary re-renders when object reference changes but values are the same
+    const memoizedFilters = useMemo(() => {
+        const filtersString = JSON.stringify(currentFilters || {});
+        // Only update if the stringified filters actually changed
+        if (filtersString !== prevFiltersStringRef.current) {
+            prevFiltersStringRef.current = filtersString;
+            prevFiltersRef.current = currentFilters || {};
+            return currentFilters || {};
+        }
+        // Return the previous reference to maintain stability
+        return prevFiltersRef.current;
+    }, [currentFilters]);
+
     if (!hasPermission) {
         return null;
     }
@@ -36,10 +53,10 @@ const UsersList: React.FC<UsersListProps> = ({
             title="Users"
             searchPlaceholder="Search users..."
             defaultPageSize={15}
-            filters={currentFilters}
+            filters={memoizedFilters}
             rowClick={true}
             showCanvas={true}
-            search={true}
+            search={false}
             tableStyle="table-style-2"
         />
     );

@@ -49,7 +49,8 @@ import {
   NotebookTabs,
   HelpCircle,
   Info,
-  CircleQuestionMark
+  CircleQuestionMark,
+  Boxes
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -612,6 +613,13 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
           icon: <Users size={16} />,
           permission: PERMISSIONS.VIEW_USERS,
           url: '/controlhub/users'
+        },
+        {
+          id: 'controlhub-teams',
+          title: HEADER_CONSTANTS.SUBMENU_LABELS.TEAMS,
+          icon: <Boxes size={16} />,
+          permission: PERMISSIONS.VIEW_TEAMS,
+          url: '/controlhub/teams'
         },
         {
           id: 'controlhub-ranks',

@@ -72,7 +72,7 @@ export const getParentUsers = async () => {
       if(responseData.code === 200){
         return responseData.data;
       }else{
-        toast.error(responseData.message);
+        //toast.error(responseData.message);
         return false;
       }
     }else{
@@ -138,6 +138,86 @@ export const GetUserProfile = async (id: string, encrypt: boolean = true) => {
    
   } catch (error) {
     console.error('API Error:', error);
+    throw error;
+  }
+};
+
+export const getUserProfileData = async (user_id: string) => {
+  try {
+    const response = await axiosInstance.get(`users/profile/get`, {
+      params: { user_id }
+    });
+    if(response.data){
+      const responseData = response.data;
+      if(responseData.code === 200){
+        return responseData.data;
+      }else{
+        toast.error(responseData.message);
+        return null;
+      }
+    }
+    return null;
+  } catch (error) {
+    console.error('API Error:', error);
+    throw error;
+  }
+};
+
+export const updateUserProfile = async (user_id: string, profileData: any, profilePicture?: File) => {
+  try {
+    const formData = new FormData();
+    
+    // Append user_id
+    formData.append('user_id', user_id);
+    
+    // Append all profile fields
+    if (profileData.title) formData.append('title', profileData.title);
+    if (profileData.first_name) formData.append('first_name', profileData.first_name);
+    if (profileData.last_name) formData.append('last_name', profileData.last_name);
+    if (profileData.email) formData.append('email', profileData.email);
+    if (profileData.phone_number) formData.append('phone_number', profileData.phone_number);
+    if (profileData.gender) formData.append('gender', profileData.gender);
+    if (profileData.job_title) formData.append('job_title', profileData.job_title);
+    if (profileData.department) formData.append('department', profileData.department);
+    if (profileData.country) formData.append('country', profileData.country);
+    if (profileData.state) formData.append('state', profileData.state);
+    if (profileData.city) formData.append('city', profileData.city);
+    if (profileData.postal_code) formData.append('postal_code', profileData.postal_code);
+    if (profileData.address) formData.append('address', profileData.address);
+    if (profileData.timezone) formData.append('timezone', profileData.timezone);
+    if (profileData.service_type) formData.append('service_type', profileData.service_type);
+    if (profileData.language) formData.append('language', profileData.language);
+    if (profileData.user_consent !== undefined) formData.append('user_consent', profileData.user_consent.toString());
+    
+    // Append profile picture if provided
+    if (profilePicture) {
+      formData.append('profile_picture', profilePicture);
+    }
+
+    const response = await axiosInstance.post(
+      `users/profile/update`,
+      formData,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      }
+    );
+
+    if(response.data){
+      const responseData = response.data;
+      if(responseData.code === 200){
+        toast.success('Profile updated successfully');
+        return responseData.data;
+      }else{
+        toast.error(responseData.message);
+        return false;
+      }
+    }
+    return false;
+  } catch (error: any) {
+    console.error('API Error:', error);
+    toast.error(error?.response?.data?.message || 'Failed to update profile');
     throw error;
   }
 };
@@ -618,6 +698,21 @@ export const GetCompanies = async () => {
     }else{
       toast.error('Failed to get companies');
       return false;
+    }
+  } catch (error) {
+    console.error('API Error:', error);
+    throw error;
+  }
+}
+
+export const SyncBillingCompanies = async () => {
+  try {
+    const response = await axiosInstance.get(`users/syncBillingCompanies`);
+    if(response){
+      const responseData = response.data;
+      if(responseData.code === 200){
+        return responseData.data;
+      }
     }
   } catch (error) {
     console.error('API Error:', error);

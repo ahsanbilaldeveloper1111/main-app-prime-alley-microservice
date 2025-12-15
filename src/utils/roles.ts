@@ -67,19 +67,25 @@ export const getAllRoles = async () => {
     }
   };
 
-export const updateRole = async (id: string, name: string) => {
+export const updateRole = async (id: string, name: string, user_type_id?: number | null) => {
     try {
+        const payload: any = {
+          role_id: id,
+          name: name
+        };
+        
+        // Include user_type_id if provided (can be null to remove)
+        if (user_type_id !== undefined) {
+          payload.user_type_id = user_type_id;
+        }
         
       const response = await axiosInstance.post(
         `ranks/update`,
-        {
-          role_id: id,
-          name: name
-        }
+        payload
       );
       if(response.data){
         const responseData = response.data;
-        if(responseData.code == 200){
+        if(responseData.status === "success" || responseData.code == 200){
           toast.success('Rank updated successfully');
           return true;
         }else{
@@ -124,18 +130,24 @@ export const updateRole = async (id: string, name: string) => {
     }
   };
 
-  export const addRole = async (name: string) => {
+  export const addRole = async (name: string, user_type_id?: number | null) => {
     try {
+        const payload: any = {
+          name: name
+        };
+        
+        // Include user_type_id if provided
+        if (user_type_id !== undefined && user_type_id !== null) {
+          payload.user_type_id = user_type_id;
+        }
         
       const response = await axiosInstance.post(
         `ranks/add`,
-        {
-          name: name
-        }
+        payload
       );
       if(response.data){
         const responseData = response.data;
-        if(responseData.code == 200){
+        if(responseData.status === "success" || responseData.code == 200){
           toast.success('Rank created successfully');
           return true;
         }else{
@@ -248,6 +260,28 @@ export const updateRole = async (id: string, name: string) => {
       return response.data;
     } catch (error) {
       throw error;
+    }
+  };
+
+  // Get all user types
+  export const getUserTypes = async (): Promise<any[]> => {
+    try {
+      const response = await axiosInstance.get(`users/user-types/get`);
+      if(response.data){
+        const responseData = response.data;
+        if(responseData.status === "success" || responseData.code === 200){
+          return responseData.data || [];
+        }else{
+          toast.error(responseData.message || 'Failed to fetch user types');
+          return [];
+        }
+      }else{
+        toast.error('Failed to fetch user types');
+        return [];
+      }
+    } catch (error) {
+      console.error('Error fetching user types:', error);
+      return [];
     }
   };
 
