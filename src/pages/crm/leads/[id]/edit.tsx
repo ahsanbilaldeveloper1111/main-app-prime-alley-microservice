@@ -34,7 +34,7 @@ import { useRouter } from "next/router";
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import PageHeader from "@components/PageHeader";
-import { ModuleSlug, checkRequiredFields } from '@utils/Helper';
+import { ModuleSlug, ValidationType, checkRequiredFields } from '@utils/Helper';
 
 const EditLead = () => {
   const router = useRouter();
@@ -399,7 +399,7 @@ const EditLead = () => {
     for (const person of formData.contact_persons) {
       if (person.email) {
         const isValidEmail = checkRequiredFields({ email: person.email }, [
-          { field: "email", name: "Email", type: "email" },
+          { field: "email", name: "Email", type: ValidationType.EMAIL },
         ]);
         if (!isValidEmail) {
           return false;

@@ -25,7 +25,7 @@ import { useSession } from "next-auth/react";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
-import { ModuleSlug, checkRequiredFields } from '@utils/Helper';
+import { ModuleSlug, ValidationType, checkRequiredFields } from '@utils/Helper';
 import { convertCurrency, formatCurrency } from '@utils/currency';
 
 const CreateDeal = () => {
@@ -218,7 +218,7 @@ const CreateDeal = () => {
       { field: 'company_name' as const, name: 'Company Name' },
       { field: 'industry' as const, name: 'Industry' },
       { field: 'decision_maker_name' as const, name: 'Decision Maker Name' },
-      { field: 'decision_maker_email' as const, name: 'Decision Maker Email', type: 'email' },
+      { field: 'decision_maker_email' as const, name: 'Decision Maker Email', type: ValidationType.EMAIL },
       { field: 'decision_maker_phone' as const, name: 'Decision Maker Phone' },
     ];
     return checkRequiredFields(formData, requiredFields);

@@ -25,7 +25,7 @@ import { useSession } from "next-auth/react";
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import { convertCurrency, formatCurrency } from '@utils/currency';
-import { ModuleSlug, checkRequiredFields } from "@utils/Helper";
+import { ModuleSlug, ValidationType, checkRequiredFields } from "@utils/Helper";
 import { GetHierarchyData } from "@utils/users";
 
 interface OrderItem {
@@ -340,7 +340,7 @@ const CreateOrder = () => {
   const validateStep0 = (): boolean => {
     const requiredFields = [
       { field: 'customer_name' as const, name: 'Customer Name' },
-      { field: 'customer_email' as const, name: 'Customer Email', type: 'email' },
+      { field: 'customer_email' as const, name: 'Customer Email', type: ValidationType.EMAIL },
       { field: 'customer_phone' as const, name: 'Customer Phone' },
       { field: 'order_date' as const, name: 'Order Date' },
       { field: 'order_stage_id' as const, name: 'Stage' },

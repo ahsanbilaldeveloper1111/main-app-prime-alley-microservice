@@ -790,10 +790,12 @@ export const decodeAnalysisData = (
   }
 };
 
-type ValidationType = "email";
+export enum ValidationType {
+  EMAIL = "email",
+}
 
 const customErrorMessages: Record<ValidationType, (name: string) => string> = {
-  email: (name: string) => `${name} is not a valid email address`,
+  [ValidationType.EMAIL]: (name: string) => `${name} is not a valid email address`,
 };
 
 type validationRule<

@@ -46,7 +46,7 @@ import ConfirmModal from "@pages/partial/ConfirmModal";
 import SuccessfulModal from "@pages/partial/SuccessfulModal";
 import PageSummaryGrid, { SummaryCard } from "@components/PageSummaryGrid";
 import DatatableActionButton from "@components/DatatableActionButton";
-import { ModuleSlug, checkRequiredFields } from "@utils/Helper";
+import { ModuleSlug, ValidationType, checkRequiredFields } from "@utils/Helper";
 
 const CreateLead = () => {
   const router = useRouter();
@@ -621,7 +621,7 @@ const CreateLead = () => {
     for (const person of formData.contact_persons) {
       if (person.email) {
         const isValidEmail = checkRequiredFields({ email: person.email }, [
-          { field: "email", name: "Email", type: "email" },
+          { field: "email", name: "Email", type: ValidationType.EMAIL },
         ]);
         if (!isValidEmail) {
           return false;
