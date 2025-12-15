@@ -445,6 +445,8 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
                     <Card>
                         <Card.Header className="d-flex justify-content-between align-items-center">
                             <h5 className="mb-0">User Profile</h5>
+                            
+                            {session?.user?.permissions?.includes('update-profile-users') && (
                             <Button 
                                 variant="primary" 
                                 size="sm"
@@ -452,6 +454,8 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
                             >
                                 <i className="ti ti-edit me-1"></i>Edit Profile
                             </Button>
+                            )}
+
                         </Card.Header>
                         <Card.Body>
                             {isLoadingProfile ? (
