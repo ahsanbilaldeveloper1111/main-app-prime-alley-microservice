@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   LayoutDashboard, 
   Users,
@@ -53,6 +53,7 @@ import {
   Boxes
 } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/router';
 
 import { authAPI } from "@utils/api";
 import { useAuth } from "../../hooks/useAuth";
@@ -99,6 +100,7 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
   //const [expandedModules, setExpandedModules] = useState<string[]>(['ticketing']);
   const [expandedModules, setExpandedModules] = useState<string[]>([ 'billing']);
   const [expandedSubModules, setExpandedSubModules] = useState<string[]>([]);
+  const router = useRouter();
   
   // Get permissions hook for checking access
   const { hasPermission } = usePermissions();
@@ -697,6 +699,71 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
     //setSidebarOpen(false);
   };
 
+  // Automatically expand modules and sub-modules when route changes
+  useEffect(() => {
+    // Check if a sub-item or any of its nested children matches the current route
+    const isSubItemActive = (subItem: SubMenuItem): boolean => {
+      if (subItem.url && router.pathname === subItem.url) {
+        return true;
+      }
+      if (subItem.subItems && subItem.subItems.length > 0) {
+        return subItem.subItems.some(nestedItem => isSubItemActive(nestedItem));
+      }
+      return false;
+    };
+
+    // Check if a module has any active child
+    const hasActiveChild = (module: MainMenuItem): boolean => {
+      if (!module.subItems || module.subItems.length === 0) {
+        return false;
+      }
+      return module.subItems.some(subItem => isSubItemActive(subItem));
+    };
+
+    const modulesToExpand: string[] = [];
+    const subModulesToExpand: string[] = [];
+
+    mainMenuItems.forEach(module => {
+      if (hasActiveChild(module)) {
+        modulesToExpand.push(module.id);
+        
+        // Also expand sub-modules that have active children
+        if (module.subItems) {
+          module.subItems.forEach(subItem => {
+            if (isSubItemActive(subItem)) {
+              subModulesToExpand.push(subItem.id);
+            }
+          });
+        }
+      }
+    });
+
+    // Update expanded modules
+    if (modulesToExpand.length > 0) {
+      setExpandedModules(prev => {
+        const combined = [...prev, ...modulesToExpand];
+        const newExpanded = Array.from(new Set(combined));
+        // Only update state if there's an actual change to prevent infinite loops
+        const hasChange = newExpanded.length !== prev.length || 
+                         !newExpanded.every(id => prev.includes(id));
+        return hasChange ? newExpanded : prev;
+      });
+    }
+
+    // Update expanded sub-modules
+    if (subModulesToExpand.length > 0) {
+      setExpandedSubModules(prev => {
+        const combined = [...prev, ...subModulesToExpand];
+        const newExpanded = Array.from(new Set(combined));
+        // Only update state if there's an actual change to prevent infinite loops
+        const hasChange = newExpanded.length !== prev.length || 
+                         !newExpanded.every(id => prev.includes(id));
+        return hasChange ? newExpanded : prev;
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router.pathname]);
+
   const customStyles = `
     .sidebar-card {
       min-height: 100vh;
@@ -1118,7 +1185,9 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
                         {subItem.url !== '' ? (
                           <Link href={subItem.url || '/'}>
                             <button
-                              className={`sub-item ${expandedSubModules.includes(subItem.id) ? 'expanded' : ''}`}
+                              className={`sub-item 
+                                ${router.pathname === subItem.url ? 'active' : ''}
+                                ${expandedSubModules.includes(subItem.id) ? 'expanded' : ''}`}
                               onClick={() => toggleSubModule(subItem.id)}
                             >
                               <div style={{ display: 'flex', alignItems: 'center', flexGrow: 1 }}>

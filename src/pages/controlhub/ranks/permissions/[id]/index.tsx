@@ -17,6 +17,7 @@ interface Permission {
     description: string;
     module_id: number;
     is_special: string;
+    severity_level?: string;
 }
 
 interface PermissionGroup {
@@ -24,6 +25,23 @@ interface PermissionGroup {
     enableAll: boolean;
     permissions: Permission[];
 }
+
+// Helper function to get badge class based on severity level
+const getSeverityBadgeClass = (severityLevel: string): string => {
+    const level = severityLevel?.toLowerCase();
+    switch (level) {
+        case 'low':
+            return 'info';
+        case 'medium':
+            return 'primary';
+        case 'high':
+            return 'warning';
+        case 'critical':
+            return 'danger';
+        default:
+            return 'primary';
+    }
+};
 
 const ViewRolePermission = () => {
 
@@ -34,6 +52,7 @@ const ViewRolePermission = () => {
     const [rolePermissions,setRolePermissions] = useState<PermissionGroup[]>([]);
     const [searchTerm, setSearchTerm] = useState<string>('');
     const [selectedAction, setSelectedAction] = useState<string>('all');
+    const [selectedSeverityLevel, setSelectedSeverityLevel] = useState<string>('');
 
     useEffect(() => {
         if (id) {
@@ -47,14 +66,16 @@ const ViewRolePermission = () => {
         setRolePermissions(role.permissions);
     }
 
-    // Filter permissions based on search term and action filter
+    // Filter permissions based on search term, action filter, and severity level
     const filteredPermissions = rolePermissions.filter((group: PermissionGroup) => {
         const groupMatches = group.group.toLowerCase().includes(searchTerm.toLowerCase());
         const permissionMatches = group.permissions.some((perm: Permission) => {
             const matchesSearch = perm.name.toLowerCase().includes(searchTerm.toLowerCase());
             const matchesAction = selectedAction === 'all' || 
                 perm.name.toLowerCase().includes(selectedAction.toLowerCase());
-            return matchesSearch && matchesAction;
+            const matchesSeverity = selectedSeverityLevel === '' || 
+                perm.severity_level?.toLowerCase() === selectedSeverityLevel.toLowerCase();
+            return matchesSearch && matchesAction && matchesSeverity;
         });
         return groupMatches || permissionMatches;
     }).map((group: PermissionGroup) => ({
@@ -64,7 +85,9 @@ const ViewRolePermission = () => {
                 group.group.toLowerCase().includes(searchTerm.toLowerCase());
             const matchesAction = selectedAction === 'all' || 
                 perm.name.toLowerCase().includes(selectedAction.toLowerCase());
-            return matchesSearch && matchesAction;
+            const matchesSeverity = selectedSeverityLevel === '' || 
+                perm.severity_level?.toLowerCase() === selectedSeverityLevel.toLowerCase();
+            return matchesSearch && matchesAction && matchesSeverity;
         })
     }));
 
@@ -110,7 +133,7 @@ const ViewRolePermission = () => {
             </Row>
 
             <Row className="mb-3">
-                <Col md={12}>
+                <Col md={6}>
                     <div className="d-flex align-items-center gap-2 flex-wrap">
                         <span className="fw-semibold">Filter by Action:</span>
                         <Button
@@ -154,6 +177,46 @@ const ViewRolePermission = () => {
                             onClick={() => setSelectedAction('update')}
                         >
                             Update
+                        </Button>
+                    </div>
+                </Col>
+                <Col md={6}>
+                    <div className="d-flex align-items-center gap-2 flex-wrap justify-content-end">
+                        <span className="fw-semibold">Severity Level:</span>
+                        <Button 
+                            variant={selectedSeverityLevel === '' ? 'primary' : 'outline-primary'} 
+                            size="sm" 
+                            onClick={() => setSelectedSeverityLevel('')}
+                        >
+                            All
+                        </Button>
+                        <Button 
+                            variant={selectedSeverityLevel === 'Low' ? 'info' : 'outline-info'} 
+                            size="sm" 
+                            onClick={() => setSelectedSeverityLevel('Low')}
+                        >
+                            Low
+                        </Button>
+                        <Button 
+                            variant={selectedSeverityLevel === 'Medium' ? 'primary' : 'outline-primary'} 
+                            size="sm" 
+                            onClick={() => setSelectedSeverityLevel('Medium')}
+                        >
+                            Medium
+                        </Button>
+                        <Button 
+                            variant={selectedSeverityLevel === 'High' ? 'warning' : 'outline-warning'} 
+                            size="sm" 
+                            onClick={() => setSelectedSeverityLevel('High')}
+                        >
+                            High
+                        </Button>
+                        <Button 
+                            variant={selectedSeverityLevel === 'Critical' ? 'danger' : 'outline-danger'} 
+                            size="sm" 
+                            onClick={() => setSelectedSeverityLevel('Critical')}
+                        >
+                            Critical
                         </Button>
                     </div>
                 </Col>
@@ -203,6 +266,11 @@ const ViewRolePermission = () => {
                                                                                     readOnly
                                                                                     checked={perm.enabled}
                                                                                 />
+                                                                                {perm?.severity_level && perm?.severity_level !== "" && (
+                                                                                    <span className={`status-badge ${getSeverityBadgeClass(perm.severity_level)} ms-1 small`}>
+                                                                                        {perm?.severity_level}
+                                                                                    </span>
+                                                                                )}
                                                                             </div>
                                                                         </OverlayTrigger>
                                                                     </div>
@@ -237,6 +305,11 @@ const ViewRolePermission = () => {
                                                                                     readOnly
                                                                                     checked={perm.enabled}
                                                                                 />
+                                                                                {perm?.severity_level && perm?.severity_level !== "" && (
+                                                                                    <span className={`status-badge ${getSeverityBadgeClass(perm.severity_level)} ms-1 small`}>
+                                                                                        {perm?.severity_level}
+                                                                                    </span>
+                                                                                )}
                                                                             </div>
                                                                         </OverlayTrigger>
                                                                     </div>

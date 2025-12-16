@@ -33,6 +33,15 @@ const Teams = () => {
                 </div>
             )
         },
+        { key: 'assigned_user_count', name: 'Assigned Users', selector: (row: any) => row.assigned_user_count, sortable: true,
+            cell: (props: any) => (
+                <div>
+                    <span className="status-badge primary">
+                        {props.assigned_user_count}
+                    </span>
+                </div>
+            )
+         },
        
 
         ...(session?.user?.permissions?.includes('edit-teams') || session?.user?.permissions?.includes('delete-teams') || session?.user?.permissions?.includes('assign-users-to-teams') || session?.user?.permissions?.includes('assign-ranks-to-teams') ? [

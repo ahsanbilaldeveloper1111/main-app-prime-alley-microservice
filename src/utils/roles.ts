@@ -285,4 +285,80 @@ export const updateRole = async (id: string, name: string, user_type_id?: number
     }
   };
 
+  // Get all modules
+  export const getModules = async (): Promise<any[]> => {
+    try {
+      const response = await axiosInstance.get(`users/modules`);
+      if(response.data){
+        const responseData = response.data;
+        if(responseData.status === "success" || responseData.code === 200){
+          return responseData.data || [];
+        }else{
+          toast.error(responseData.message || 'Failed to fetch modules');
+          return [];
+        }
+      }else{
+        toast.error('Failed to fetch modules');
+        return [];
+      }
+    } catch (error) {
+      console.error('Error fetching modules:', error);
+      return [];
+    }
+  };
+
+  // Get permissions by module
+  export const getPermissionsByModule = async (moduleId: number): Promise<any[]> => {
+    try {
+      const response = await axiosInstance.get(`ranks/permissions-by-module`, {
+        params: {
+          module_id: moduleId
+        }
+      });
+      if(response.data){
+        const responseData = response.data;
+        if(responseData.status === "success" || responseData.code === 200){
+          return responseData.data || [];
+        }else{
+          toast.error(responseData.message || 'Failed to fetch permissions');
+          return [];
+        }
+      }else{
+        toast.error('Failed to fetch permissions');
+        return [];
+      }
+    } catch (error) {
+      console.error('Error fetching permissions by module:', error);
+      return [];
+    }
+  };
+
+  // Update severity level
+  export const updateSeverityLevel = async (permissionId: number, moduleId: number, severityLevel: string): Promise<boolean> => {
+    try {
+      const response = await axiosInstance.post(`ranks/update-severity-level`, {
+        permission_id: permissionId,
+        module_id: moduleId,
+        severity_level: severityLevel
+      });
+      if(response.data){
+        const responseData = response.data;
+        if(responseData.status === "success" || responseData.code === 200){
+          toast.success('Severity level updated successfully');
+          return true;
+        }else{
+          toast.error(responseData.message || 'Failed to update severity level');
+          return false;
+        }
+      }else{
+        toast.error('Failed to update severity level');
+        return false;
+      }
+    } catch (error) {
+      console.error('Error updating severity level:', error);
+      toast.error('Failed to update severity level');
+      return false;
+    }
+  };
+
   
