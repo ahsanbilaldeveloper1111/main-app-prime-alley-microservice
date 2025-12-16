@@ -1840,29 +1840,6 @@ const CrmCampaigns = () => {
                   isClearable
                 />
               </Col>
-              <Col md={4}>
-                <Form.Label className="small fw-bold mb-2">Tags</Form.Label>
-                <CreatableSelect
-                  isMulti
-                  options={availableTags}
-                  value={
-                    campaignFilters.tags && campaignFilters.tags.length > 0
-                      ? campaignFilters.tags.map((tagValue: string) => {
-                          const tag = availableTags.find((t: any) => t.value === tagValue);
-                          return tag ? { value: tagValue, label: tag.label } : { value: tagValue, label: tagValue };
-                        })
-                      : null
-                  }
-                  onChange={(selected) => {
-                    const tagValues = selected ? selected.map((s: any) => s.value) : null;
-                    setCampaignFilters(prev => ({ ...prev, tags: tagValues }));
-                    handleFiltersChange({ tags: tagValues || null });
-                  }}
-                  placeholder="Select or create tags..."
-                  styles={customSelectStyles}
-                  isClearable
-                />
-              </Col>
               <Col md={12}>
                 <div className="d-flex gap-2">
                   <Button 
