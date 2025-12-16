@@ -82,11 +82,11 @@ const Teams = () => {
                             </Button>
                         )}
                        
-                        {/* {session?.user?.permissions?.includes('add-modules-teams') && ( */}
+                        {session?.user?.permissions?.includes('add-modules-teams') && (
                             <Button variant="light" className="btn-action-style-2 p-1 text-warning" title="Assign Modules" onClick={() => handleAssignModules(props)}>
                                 <Package size={16} />
                             </Button>
-                        {/* )} */}
+                        )}
                         {session?.user?.permissions?.includes('delete-teams') && (
                             <Button variant="light" className="btn-action-style-2 p-1 text-danger" title="Delete" onClick={() => handleDeleteTeam(props)}>
                                 <Trash2 size={16} />
