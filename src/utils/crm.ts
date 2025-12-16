@@ -2770,6 +2770,7 @@ export interface LeadReportFilters {
   stage_id?: number;
   source?: string;
   owner?: string;
+  campaign_id?: number;
 }
 
 export const getLeadOverviewReport = async (filters?: LeadReportFilters): Promise<LeadOverviewReport> => {
@@ -2781,6 +2782,7 @@ export const getLeadOverviewReport = async (filters?: LeadReportFilters): Promis
     if (filters?.stage_id) params.stage_id = filters.stage_id;
     if (filters?.source) params.source = filters.source;
     if (filters?.owner) params.owner = filters.owner;
+    if (filters?.campaign_id) params.campaign_id = filters.campaign_id;
     
     const response = await axiosInstance.get("/crm/leads/reports/overview", { params });
     return extractData<LeadOverviewReport>(response.data);
@@ -2799,6 +2801,7 @@ export const getLeadSourceReport = async (filters?: LeadReportFilters): Promise<
     if (filters?.stage_id) params.stage_id = filters.stage_id;
     if (filters?.source) params.source = filters.source;
     if (filters?.owner) params.owner = filters.owner;
+    if (filters?.campaign_id) params.campaign_id = filters.campaign_id;
     
     const response = await axiosInstance.get("/crm/leads/reports/source", { params });
     const data = extractData<LeadSourceReport[]>(response.data);
@@ -2818,6 +2821,7 @@ export const getLeadAssignmentReport = async (filters?: LeadReportFilters): Prom
     if (filters?.stage_id) params.stage_id = filters.stage_id;
     if (filters?.source) params.source = filters.source;
     if (filters?.owner) params.owner = filters.owner;
+    if (filters?.campaign_id) params.campaign_id = filters.campaign_id;
     
     const response = await axiosInstance.get("/crm/leads/reports/assignment", { params });
     const data = extractData<LeadAssignmentReport[]>(response.data);
@@ -2837,6 +2841,7 @@ export const getLeadConversionReport = async (filters?: LeadReportFilters): Prom
     if (filters?.stage_id) params.stage_id = filters.stage_id;
     if (filters?.source) params.source = filters.source;
     if (filters?.owner) params.owner = filters.owner;
+    if (filters?.campaign_id) params.campaign_id = filters.campaign_id;
     
     const response = await axiosInstance.get("/crm/leads/reports/conversion", { params });
     return extractData<LeadConversionReport>(response.data);
@@ -2855,6 +2860,7 @@ export const getLeadStageDurationReport = async (filters?: LeadReportFilters): P
     if (filters?.stage_id) params.stage_id = filters.stage_id;
     if (filters?.source) params.source = filters.source;
     if (filters?.owner) params.owner = filters.owner;
+    if (filters?.campaign_id) params.campaign_id = filters.campaign_id;
     
     const response = await axiosInstance.get("/crm/leads/reports/stage-duration", { params });
     const data = extractData<LeadStageDurationReport[]>(response.data);
@@ -2928,6 +2934,7 @@ export interface DealReportFilters {
   stage_id?: number;
   currency?: string;
   owner?: string;
+  campaign_id?: number;
 }
 
 // Deal Reports API
@@ -2940,6 +2947,7 @@ export const getDealFunnelReport = async (filters?: DealReportFilters): Promise<
     if (filters?.stage_id) params.stage_id = filters.stage_id;
     if (filters?.currency) params.currency = filters.currency;
     if (filters?.owner) params.owner = filters.owner;
+    if (filters?.campaign_id) params.campaign_id = filters.campaign_id;
     
     const response = await axiosInstance.get("/crm/deals/reports/funnel", { params });
     const data = extractData<DealFunnelReport[]>(response.data);
@@ -2959,6 +2967,7 @@ export const getDealValueReport = async (filters?: DealReportFilters): Promise<D
     if (filters?.stage_id) params.stage_id = filters.stage_id;
     if (filters?.currency) params.currency = filters.currency;
     if (filters?.owner) params.owner = filters.owner;
+    if (filters?.campaign_id) params.campaign_id = filters.campaign_id;
     
     const response = await axiosInstance.get("/crm/deals/reports/value", { params });
     return extractData<DealValueReport>(response.data);
@@ -2977,6 +2986,7 @@ export const getDealStageDurationReport = async (filters?: DealReportFilters): P
     if (filters?.stage_id) params.stage_id = filters.stage_id;
     if (filters?.currency) params.currency = filters.currency;
     if (filters?.owner) params.owner = filters.owner;
+    if (filters?.campaign_id) params.campaign_id = filters.campaign_id;
     
     const response = await axiosInstance.get("/crm/deals/reports/stage-duration", { params });
     const data = extractData<DealStageDurationReport[]>(response.data);
@@ -2996,6 +3006,7 @@ export const getDealLostReasonReport = async (filters?: DealReportFilters): Prom
     if (filters?.stage_id) params.stage_id = filters.stage_id;
     if (filters?.currency) params.currency = filters.currency;
     if (filters?.owner) params.owner = filters.owner;
+    if (filters?.campaign_id) params.campaign_id = filters.campaign_id;
     
     const response = await axiosInstance.get("/crm/deals/reports/lost-reasons", { params });
     const data = extractData<DealLostReasonReport[]>(response.data);
@@ -3015,6 +3026,7 @@ export const getDealConversionReport = async (filters?: DealReportFilters): Prom
     if (filters?.stage_id) params.stage_id = filters.stage_id;
     if (filters?.currency) params.currency = filters.currency;
     if (filters?.owner) params.owner = filters.owner;
+    if (filters?.campaign_id) params.campaign_id = filters.campaign_id;
     
     const response = await axiosInstance.get("/crm/deals/reports/conversion", { params });
     return extractData<DealConversionReport>(response.data);
@@ -3083,6 +3095,7 @@ export interface OrderReportFilters {
   stage_id?: number;
   currency?: string;
   owner?: string;
+  campaign_id?: number;
 }
 
 // Order Reports API
@@ -3095,6 +3108,7 @@ export const getOrderSummaryReport = async (filters?: OrderReportFilters): Promi
     if (filters?.stage_id) params.stage_id = filters.stage_id;
     if (filters?.currency) params.currency = filters.currency;
     if (filters?.owner) params.owner = filters.owner;
+    if (filters?.campaign_id) params.campaign_id = filters.campaign_id;
     
     const response = await axiosInstance.get("/crm/orders/reports/summary", { params });
     return extractData<OrderSummaryReport>(response.data);
@@ -3113,6 +3127,7 @@ export const getOrderStatusReport = async (filters?: OrderReportFilters): Promis
     if (filters?.stage_id) params.stage_id = filters.stage_id;
     if (filters?.currency) params.currency = filters.currency;
     if (filters?.owner) params.owner = filters.owner;
+    if (filters?.campaign_id) params.campaign_id = filters.campaign_id;
     
     const response = await axiosInstance.get("/crm/orders/reports/status", { params });
     const data = extractData<OrderStatusReport[]>(response.data);
@@ -3132,6 +3147,7 @@ export const getOrderRevenueReport = async (filters?: OrderReportFilters): Promi
     if (filters?.stage_id) params.stage_id = filters.stage_id;
     if (filters?.currency) params.currency = filters.currency;
     if (filters?.owner) params.owner = filters.owner;
+    if (filters?.campaign_id) params.campaign_id = filters.campaign_id;
     
     const response = await axiosInstance.get("/crm/orders/reports/revenue", { params });
     return extractData<OrderRevenueReport>(response.data);
@@ -3150,6 +3166,7 @@ export const getOrderStageDurationReport = async (filters?: OrderReportFilters):
     if (filters?.stage_id) params.stage_id = filters.stage_id;
     if (filters?.currency) params.currency = filters.currency;
     if (filters?.owner) params.owner = filters.owner;
+    if (filters?.campaign_id) params.campaign_id = filters.campaign_id;
     
     const response = await axiosInstance.get("/crm/orders/reports/stage-duration", { params });
     const data = extractData<OrderStageDurationReport[]>(response.data);
@@ -3169,6 +3186,7 @@ export const getOrderCancellationReport = async (filters?: OrderReportFilters): 
     if (filters?.stage_id) params.stage_id = filters.stage_id;
     if (filters?.currency) params.currency = filters.currency;
     if (filters?.owner) params.owner = filters.owner;
+    if (filters?.campaign_id) params.campaign_id = filters.campaign_id;
     
     const response = await axiosInstance.get("/crm/orders/reports/cancellation", { params });
     const data = extractData<OrderCancellationReport[]>(response.data);

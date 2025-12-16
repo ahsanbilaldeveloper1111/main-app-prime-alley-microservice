@@ -491,6 +491,11 @@ const CrmProspectsManagement = () => {
   const [prospectsFilters, setProspectsFilters] = useState({
     assignedTo: null as string | null,
     campaigns: null as string[] | null,
+    nextCallScheduled: null as string | null,
+    nextCallDateFrom: null as string | null,
+    nextCallDateTo: null as string | null,
+    sourceFile: null as string | null,
+    tags: null as string[] | null,
   });
 
   // Column customization and pagination states
@@ -501,6 +506,7 @@ const CrmProspectsManagement = () => {
       : [
           "name",
           "phone",
+          "source",
           "user_extension",
           "campaign",
           "last_called_at",
@@ -731,6 +737,20 @@ const CrmProspectsManagement = () => {
   };
 
   const memoizedFilters = useMemo(() => currentFilters, [currentFilters]);
+
+  // Extract unique source_file values from dataList for creatable select
+  const uniqueSources = useMemo(() => {
+    const sources = new Set<string>();
+    dataList.forEach((item: any) => {
+      if (item.source_file && item.source_file.trim()) {
+        sources.add(item.source_file.trim());
+      }
+    });
+    return Array.from(sources).sort().map((source) => ({
+      value: source,
+      label: source,
+    }));
+  }, [dataList]);
 
   // Fetch extensions data
   useEffect(() => {
@@ -1083,6 +1103,26 @@ const CrmProspectsManagement = () => {
 
       if (memoizedFilters.has_tickets !== undefined) {
         params.has_tickets = memoizedFilters.has_tickets;
+      }
+
+      if (memoizedFilters.scheduled_call_status) {
+        params.scheduled_call_status = memoizedFilters.scheduled_call_status;
+      }
+
+      if (memoizedFilters.scheduled_call_from) {
+        params.scheduled_call_from = memoizedFilters.scheduled_call_from;
+      }
+
+      if (memoizedFilters.scheduled_call_to) {
+        params.scheduled_call_to = memoizedFilters.scheduled_call_to;
+      }
+
+      if (memoizedFilters.source_file) {
+        params.source_file = memoizedFilters.source_file;
+      }
+
+      if (memoizedFilters.tag_ids && memoizedFilters.tag_ids.length > 0) {
+        params.tag_ids = memoizedFilters.tag_ids;
       }
 
       params.module_slug = ModuleSlug.CRM_DATA_MANAGEMENT;
@@ -1756,6 +1796,21 @@ const CrmProspectsManagement = () => {
         ),
       },
       {
+        key: "source",
+        name: "Source",
+        selector: (row: any) => row.source_file,
+        sortable: true,
+        cell: (props: any) => (
+          <div>
+            {props.source_file ? (
+              <span className="status-badge secondary">{props.source_file}</span>
+            ) : (
+              <span className="text-muted">N/A</span>
+            )}
+          </div>
+        ),
+      },
+      {
         key: "user_extension",
         name: "Assigned To",
         selector: (row: any) => row.user_extension,
@@ -2279,6 +2334,12 @@ const CrmProspectsManagement = () => {
               (prospectsFilters.campaigns !== null &&
               prospectsFilters.campaigns.length > 0
                 ? 1
+                : 0) +
+              (prospectsFilters.nextCallScheduled !== null ? 1 : 0) +
+              (prospectsFilters.sourceFile !== null ? 1 : 0) +
+              (prospectsFilters.tags !== null &&
+              prospectsFilters.tags.length > 0
+                ? 1
                 : 0)
             }
           />
@@ -2332,11 +2393,13 @@ const CrmProspectsManagement = () => {
                           assignedTo: assignedToValue,
                         }));
                         // Update currentFilters for API call
-                        handleFiltersChange({
-                          user_extension: assignedToValue
-                            ? [assignedToValue]
-                            : null,
-                        });
+                        const newFilters = { ...currentFilters };
+                        if (assignedToValue) {
+                          newFilters.user_extension = [assignedToValue];
+                        } else {
+                          delete newFilters.user_extension;
+                        }
+                        handleFiltersChange(newFilters);
                         // Reset to all when assigned filter changes
                         setActiveFilter("all");
                       }}
@@ -2378,13 +2441,207 @@ const CrmProspectsManagement = () => {
                           campaigns: campaignValues,
                         }));
                         // Update currentFilters for API call
-                        handleFiltersChange({
-                          campaign_id: campaignValues || null,
-                        });
+                        const newFilters = { ...currentFilters };
+                        if (campaignValues && campaignValues.length > 0) {
+                          newFilters.campaign_id = campaignValues;
+                        } else {
+                          delete newFilters.campaign_id;
+                        }
+                        handleFiltersChange(newFilters);
                         // Reset to all when campaign filter changes
                         setActiveFilter("all");
                       }}
                       placeholder="Select campaigns..."
+                      styles={customSelectStyles}
+                      isClearable
+                    />
+                  </Col>
+                  <Col md={4}>
+                    <Form.Label className="small fw-bold mb-2">
+                      Next Call Scheduled
+                    </Form.Label>
+                    <Form.Select
+                      value={prospectsFilters.nextCallScheduled || ''}
+                      onChange={(e) => {
+                        const value = e.target.value || null;
+                        setProspectsFilters((prev) => ({
+                          ...prev,
+                          nextCallScheduled: value,
+                          nextCallDateFrom: null,
+                          nextCallDateTo: null,
+                        }));
+                        
+                        const now = moment();
+                        let newFilters: any = { ...currentFilters };
+                        
+                        if (value === 'today') {
+                          const today = now.format('YYYY-MM-DD');
+                          newFilters.scheduled_call_from = today;
+                          newFilters.scheduled_call_to = today;
+                          delete newFilters.scheduled_call_status;
+                        } else if (value === 'tomorrow') {
+                          const tomorrow = moment().add(1, 'day').format('YYYY-MM-DD');
+                          newFilters.scheduled_call_from = tomorrow;
+                          newFilters.scheduled_call_to = tomorrow;
+                          delete newFilters.scheduled_call_status;
+                        } else if (value === 'this_week') {
+                          const startOfWeek = moment().startOf('week').format('YYYY-MM-DD');
+                          const endOfWeek = moment().endOf('week').format('YYYY-MM-DD');
+                          newFilters.scheduled_call_from = startOfWeek;
+                          newFilters.scheduled_call_to = endOfWeek;
+                          delete newFilters.scheduled_call_status;
+                        } else if (value === 'next_week') {
+                          const nextWeekStart = moment().add(1, 'week').startOf('week').format('YYYY-MM-DD');
+                          const nextWeekEnd = moment().add(1, 'week').endOf('week').format('YYYY-MM-DD');
+                          newFilters.scheduled_call_from = nextWeekStart;
+                          newFilters.scheduled_call_to = nextWeekEnd;
+                          delete newFilters.scheduled_call_status;
+                        } else if (value === 'overdue') {
+                          newFilters.scheduled_call_status = 'overdue';
+                          delete newFilters.scheduled_call_from;
+                          delete newFilters.scheduled_call_to;
+                        } else if (value === 'custom') {
+                          // Custom date range - dates will be set separately
+                          // Keep existing scheduled_call_from and scheduled_call_to if they exist
+                        } else {
+                          // Clear scheduled call filters
+                          delete newFilters.scheduled_call_from;
+                          delete newFilters.scheduled_call_to;
+                          delete newFilters.scheduled_call_status;
+                        }
+                        
+                        handleFiltersChange(newFilters);
+                        setActiveFilter("all");
+                      }}
+                    >
+                      <option value="">Select option...</option>
+                      <option value="today">Today</option>
+                      <option value="tomorrow">Tomorrow</option>
+                      <option value="this_week">This Week</option>
+                      <option value="next_week">Next Week</option>
+                      <option value="overdue">Overdue Calls</option>
+                      <option value="custom">Custom Date Range</option>
+                    </Form.Select>
+                  </Col>
+                  {prospectsFilters.nextCallScheduled === 'custom' && (
+                    <>
+                      <Col md={4}>
+                        <Form.Label className="small fw-bold mb-2">
+                          Next Call Date From
+                        </Form.Label>
+                        <Form.Control
+                          type="date"
+                          value={prospectsFilters.nextCallDateFrom || ''}
+                          onChange={(e) => {
+                            const dateValue = e.target.value || null;
+                            setProspectsFilters((prev) => ({
+                              ...prev,
+                              nextCallDateFrom: dateValue,
+                            }));
+                            const newFilters = { ...currentFilters };
+                            if (dateValue) {
+                              newFilters.scheduled_call_from = dateValue;
+                            } else {
+                              delete newFilters.scheduled_call_from;
+                            }
+                            handleFiltersChange(newFilters);
+                          }}
+                        />
+                      </Col>
+                      <Col md={4}>
+                        <Form.Label className="small fw-bold mb-2">
+                          Next Call Date To
+                        </Form.Label>
+                        <Form.Control
+                          type="date"
+                          value={prospectsFilters.nextCallDateTo || ''}
+                          onChange={(e) => {
+                            const dateValue = e.target.value || null;
+                            setProspectsFilters((prev) => ({
+                              ...prev,
+                              nextCallDateTo: dateValue,
+                            }));
+                            const newFilters = { ...currentFilters };
+                            if (dateValue) {
+                              newFilters.scheduled_call_to = dateValue;
+                            } else {
+                              delete newFilters.scheduled_call_to;
+                            }
+                            handleFiltersChange(newFilters);
+                          }}
+                        />
+                      </Col>
+                    </>
+                  )}
+                  <Col md={4}>
+                    <Form.Label className="small fw-bold mb-2">
+                      Source Name
+                    </Form.Label>
+                    <CreatableSelect
+                      options={uniqueSources}
+                      value={
+                        prospectsFilters.sourceFile
+                          ? { value: prospectsFilters.sourceFile, label: prospectsFilters.sourceFile }
+                          : null
+                      }
+                      onChange={(selected) => {
+                        const sourceValue = selected ? selected.value : null;
+                        setProspectsFilters((prev) => ({
+                          ...prev,
+                          sourceFile: sourceValue,
+                        }));
+                        const newFilters = { ...currentFilters };
+                        if (sourceValue) {
+                          newFilters.source_file = sourceValue;
+                        } else {
+                          delete newFilters.source_file;
+                        }
+                        handleFiltersChange(newFilters);
+                        setActiveFilter("all");
+                      }}
+                      placeholder="Select or create source..."
+                      styles={customSelectStyles}
+                      isClearable
+                    />
+                  </Col>
+                  <Col md={4}>
+                    <Form.Label className="small fw-bold mb-2">
+                      Tags
+                    </Form.Label>
+                    <Select
+                      isMulti
+                      options={availableTags.map((tag) => ({
+                        value: tag.value,
+                        label: tag.label,
+                      }))}
+                      value={
+                        prospectsFilters.tags
+                          ? prospectsFilters.tags.map((tagValue: string) => {
+                              const tag = availableTags.find((t: any) => t.value === tagValue);
+                              return tag
+                                ? { value: tagValue, label: tag.label }
+                                : { value: tagValue, label: tagValue };
+                            })
+                          : null
+                      }
+                      onChange={(selected) => {
+                        const tagValues = selected
+                          ? selected.map((s: any) => s.value)
+                          : null;
+                        setProspectsFilters((prev) => ({
+                          ...prev,
+                          tags: tagValues,
+                        }));
+                        const newFilters = { ...currentFilters };
+                        if (tagValues && tagValues.length > 0) {
+                          newFilters.tags = tagValues;
+                        } else {
+                          delete newFilters.tags;
+                        }
+                        handleFiltersChange(newFilters);
+                        setActiveFilter("all");
+                      }}
+                      placeholder="Select tags..."
                       styles={customSelectStyles}
                       isClearable
                     />
@@ -2398,6 +2655,11 @@ const CrmProspectsManagement = () => {
                           setProspectsFilters({
                             assignedTo: null,
                             campaigns: null,
+                            nextCallScheduled: null,
+                            nextCallDateFrom: null,
+                            nextCallDateTo: null,
+                            sourceFile: null,
+                            tags: null,
                           });
                           setCurrentFilters({});
                           setActiveFilter("all");
@@ -2454,6 +2716,7 @@ const CrmProspectsManagement = () => {
               {[
                 { key: "name", label: "Name" },
                 { key: "phone", label: "Phone" },
+                { key: "source", label: "Source" },
                 { key: "user_extension", label: "Assigned To" },
                 { key: "campaign", label: "Campaign" },
                 { key: "last_called_at", label: "Last Called" },
@@ -2485,6 +2748,7 @@ const CrmProspectsManagement = () => {
                   setSelectedColumns([
                     "name",
                     "phone",
+                    "source",
                     "user_extension",
                     "campaign",
                     "last_called_at",
@@ -2502,6 +2766,7 @@ const CrmProspectsManagement = () => {
                   setSelectedColumns([
                     "name",
                     "phone",
+                    "source",
                     "user_extension",
                     "campaign",
                     "last_called_at",
@@ -2582,6 +2847,14 @@ const CrmProspectsManagement = () => {
                               onClick={() => handleSort("phone")}
                             >
                               Phone {renderSortIcon("phone")}
+                            </th>
+                          )}
+                          {selectedColumns.includes("source") && (
+                            <th
+                              style={{ cursor: "pointer", userSelect: "none" }}
+                              onClick={() => handleSort("source_file")}
+                            >
+                              Source {renderSortIcon("source_file")}
                             </th>
                           )}
                           {selectedColumns.includes("user_extension") && (
@@ -2786,6 +3059,20 @@ const CrmProspectsManagement = () => {
                                 {selectedColumns.includes("phone") && (
                                   <td>
                                     <PhoneContainer phone={item?.phone} />
+                                  </td>
+                                )}
+                                {selectedColumns.includes("source") && (
+                                  <td>
+                                    {(item as any).source_file ? (
+                                      <Badge
+                                        bg="secondary"
+                                        className="bg-opacity-10 text-dark"
+                                      >
+                                        {(item as any).source_file}
+                                      </Badge>
+                                    ) : (
+                                      <span className="text-muted">N/A</span>
+                                    )}
                                   </td>
                                 )}
                                 {selectedColumns.includes("user_extension") && (

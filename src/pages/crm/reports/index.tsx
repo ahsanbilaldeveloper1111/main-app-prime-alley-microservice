@@ -52,6 +52,7 @@ import {
   getOrderStageDurationReport,
   getOrderCancellationReport,
   getStages,
+  getCampaigns,
   type LeadOverviewReport,
   type LeadSourceReport,
   type LeadAssignmentReport,
@@ -70,11 +71,13 @@ import {
   type OrderStageDurationReport,
   type OrderCancellationReport,
   type OrderReportFilters,
-  type StageData
+  type StageData,
+  type CampaignData
 } from '@utils/crm';
 import { GetHierarchyData } from '@utils/users';
 import { ModuleSlug } from '@utils/Helper';
 import { usePermissions } from "@utils/permissionUtils";
+import moment from 'moment';
 
 const CrmReports = () => {
   const { PERMISSIONS } = HEADER_CONSTANTS;
@@ -97,28 +100,19 @@ const CrmReports = () => {
   // Reports Page States
   const [selectedReportModule, setSelectedReportModule] = useState(getInitialTab());
   const [showDatePicker, setShowDatePicker] = useState(false);
-  const [startDate, setStartDate] = useState(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
-  const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
+  const [startDate, setStartDate] = useState(moment().subtract(30, 'days').format('YYYY-MM-DD'));
+  const [endDate, setEndDate] = useState(moment().format('YYYY-MM-DD'));
 
-  // Filter States - Leads
-  const [selectedStageId, setSelectedStageId] = useState<string>('');
-  const [selectedSource, setSelectedSource] = useState<string>('');
+  // Unified Filter States
+  const [selectedDateRange, setSelectedDateRange] = useState<string>('this_month');
   const [selectedOwner, setSelectedOwner] = useState<string>('');
-  const [selectedDateRange, setSelectedDateRange] = useState<string>('30');
-
-  // Filter States - Deals
-  const [selectedDealCurrency, setSelectedDealCurrency] = useState<string>('');
-  const [selectedDealOwner, setSelectedDealOwner] = useState<string>('');
-  const [selectedDealDateRange, setSelectedDealDateRange] = useState<string>('30');
-
-  // Filter States - Orders
-  const [selectedOrderCurrency, setSelectedOrderCurrency] = useState<string>('');
-  const [selectedOrderOwner, setSelectedOrderOwner] = useState<string>('');
-  const [selectedOrderDateRange, setSelectedOrderDateRange] = useState<string>('30');
+  const [selectedCampaign, setSelectedCampaign] = useState<number | null>(null);
+  const [selectedStage, setSelectedStage] = useState<number | null>(null);
 
   // Filter Options Data
   const [stages, setStages] = useState<StageData[]>([]);
   const [users, setUsers] = useState<any[]>([]);
+  const [campaigns, setCampaigns] = useState<CampaignData[]>([]);
 
   // Lead Reports Data States
   const [leadOverview, setLeadOverview] = useState<LeadOverviewReport | null>(null);
@@ -172,17 +166,21 @@ const CrmReports = () => {
     }
   };
 
-  // Fetch stages and users based on selected report module
+  // Fetch stages, users, and campaigns based on selected report module
   useEffect(() => {
     const fetchFilterData = async () => {
       try {
-        const [stagesData, hierarchyData] = await Promise.all([
+        const [stagesData, hierarchyData, campaignsData] = await Promise.all([
           getStages(getStageType(selectedReportModule)),
-          GetHierarchyData(getModuleSlug(selectedReportModule))
+          GetHierarchyData(getModuleSlug(selectedReportModule)),
+          getCampaigns({ per_page: 1000, module_slug: ModuleSlug.CRM_CAMPAIGNS })
         ]);
         setStages(stagesData || []);
         if (hierarchyData?.extensions) {
           setUsers(hierarchyData.extensions);
+        }
+        if (campaignsData?.data) {
+          setCampaigns(campaignsData.data);
         }
       } catch (error) {
         console.error('Failed to fetch filter data:', error);
@@ -192,39 +190,39 @@ const CrmReports = () => {
   }, [selectedReportModule]);
 
   // Helper function to update dates based on date range selection
-  const handleDateRangeChange = (range: string, module: 'leads' | 'deals' | 'orders') => {
-    const today = new Date();
-    let newStartDate: Date;
+  const handleDateRangeChange = (range: string) => {
+    const today = moment();
+    let newStartDate: moment.Moment;
+    let newEndDate: moment.Moment = today.clone();
     
     if (range === 'custom') {
       // Keep current dates for custom
+      setSelectedDateRange('custom');
       return;
-    } else if (range === '7') {
-      newStartDate = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
-    } else if (range === '30') {
-      newStartDate = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
-    } else if (range === '90') {
-      newStartDate = new Date(today.getTime() - 90 * 24 * 60 * 60 * 1000);
+    } else if (range === 'this_week') {
+      newStartDate = today.clone().startOf('week');
+      newEndDate = today.clone().endOf('week');
+    } else if (range === 'this_month') {
+      newStartDate = today.clone().startOf('month');
+      newEndDate = today.clone().endOf('month');
+    } else if (range === 'last_month') {
+      newStartDate = today.clone().subtract(1, 'month').startOf('month');
+      newEndDate = today.clone().subtract(1, 'month').endOf('month');
     } else {
       return;
     }
     
-    const newStartDateStr = newStartDate.toISOString().split('T')[0];
-    const newEndDateStr = today.toISOString().split('T')[0];
-    
-    setStartDate(newStartDateStr);
-    setEndDate(newEndDateStr);
-    
-    if (module === 'leads') {
-      setSelectedDateRange(range);
-    } else if (module === 'deals') {
-      setSelectedDealDateRange(range);
-    } else if (module === 'orders') {
-      setSelectedOrderDateRange(range);
-    }
+    setStartDate(newStartDate.format('YYYY-MM-DD'));
+    setEndDate(newEndDate.format('YYYY-MM-DD'));
+    setSelectedDateRange(range);
   };
 
-  // Fetch reports only on module change or initial load
+  // Initialize date range on mount
+  useEffect(() => {
+    handleDateRangeChange('this_month');
+  }, []);
+
+  // Fetch reports only on module change
   useEffect(() => {
     if (selectedReportModule === 'leads') {
       fetchLeadReports();
@@ -233,6 +231,7 @@ const CrmReports = () => {
     } else if (selectedReportModule === 'orders') {
       fetchOrderReports();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedReportModule]);
 
   // Helper function to get user display name from extension
@@ -255,9 +254,9 @@ const CrmReports = () => {
         date_from: startDate,
         date_to: endDate,
         date_field: 'updated_at',
-        stage_id: selectedStageId ? Number.parseInt(selectedStageId, 10) : undefined,
-        source: selectedSource || undefined,
-        owner: selectedOwner || undefined
+        stage_id: selectedStage || undefined,
+        owner: selectedOwner || undefined,
+        campaign_id: selectedCampaign || undefined
       };
 
       const [overview, sources, assignments, conversion, stageDuration] = await Promise.all([
@@ -287,8 +286,9 @@ const CrmReports = () => {
         date_from: startDate,
         date_to: endDate,
         date_field: 'updated_at',
-        currency: selectedDealCurrency || undefined,
-        owner: selectedDealOwner || undefined
+        stage_id: selectedStage || undefined,
+        owner: selectedOwner || undefined,
+        campaign_id: selectedCampaign || undefined
       };
 
       const [funnel, value, stageDuration, lostReasons, conversion] = await Promise.all([
@@ -318,8 +318,9 @@ const CrmReports = () => {
         date_from: startDate,
         date_to: endDate,
         date_field: 'updated_at',
-        currency: selectedOrderCurrency || undefined,
-        owner: selectedOrderOwner || undefined
+        stage_id: selectedStage || undefined,
+        owner: selectedOwner || undefined,
+        campaign_id: selectedCampaign || undefined
       };
 
       const [summary, status, revenue, stageDuration, cancellations] = await Promise.all([
@@ -433,96 +434,9 @@ const CrmReports = () => {
             >
               <Calendar size={16} style={{ color: '#6b7280' }} />
               <span style={{ fontSize: '14px', color: '#1f2937', fontWeight: 500 }}>
-                {new Date(startDate).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })} - {new Date(endDate).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}
+                {moment(startDate).format('MMM D')} - {moment(endDate).format('MMM D')}
               </span>
             </button>
-            {showDatePicker && (
-              <div style={{
-                position: 'absolute',
-                top: '100%',
-                right: 0,
-                marginTop: '8px',
-                background: 'white',
-                border: '1px solid #e5e7eb',
-                borderRadius: '8px',
-                padding: '16px',
-                boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)',
-                zIndex: 1000,
-                minWidth: '320px'
-              }}>
-                <div style={{ marginBottom: '12px' }}>
-                  <label htmlFor="start-date-input" style={{ fontSize: '12px', color: '#6b7280', display: 'block', marginBottom: '4px' }}>Start Date</label>
-                  <input
-                    id="start-date-input"
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '6px',
-                      fontSize: '14px'
-                    }}
-                  />
-      </div>
-                <div style={{ marginBottom: '12px' }}>
-                  <label htmlFor="end-date-input" style={{ fontSize: '12px', color: '#6b7280', display: 'block', marginBottom: '4px' }}>End Date</label>
-                  <input
-                    id="end-date-input"
-                    type="date"
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '6px',
-                      fontSize: '14px'
-                    }}
-                  />
-                </div>
-                <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                  <button
-                    onClick={() => setShowDatePicker(false)}
-                  style={{
-                      padding: '6px 12px',
-                      background: 'white',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '6px',
-                      fontSize: '13px',
-                    cursor: 'pointer',
-                      color: '#374151'
-                    }}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowDatePicker(false);
-                      if (selectedReportModule === 'leads') {
-                        fetchLeadReports();
-                      } else if (selectedReportModule === 'deals') {
-                        fetchDealReports();
-                      } else if (selectedReportModule === 'orders') {
-                        fetchOrderReports();
-                      }
-                    }}
-                    style={{
-                      padding: '6px 12px',
-                      background: '#4F46E5',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '6px',
-                      fontSize: '13px',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    Apply
-                  </button>
-                    </div>
-                      </div>
-            )}
                     </div>
                   </div>
                 </div>
@@ -565,109 +479,142 @@ const CrmReports = () => {
         ))}
           </div>
 
+      {/* Unified Filters */}
+      <div style={{ padding: '24px 32px 0', background: '#f8f9fa' }}>
+        <Card className="border-0 shadow-sm mb-4">
+          <Card.Body>
+            <Row className="g-3 align-items-end">
+              <Col md={2}>
+                <Form.Label className="small fw-bold mb-2">Date Range</Form.Label>
+                <Form.Select 
+                  size="sm" 
+                  style={{ fontSize: '0.875rem' }}
+                  value={selectedDateRange}
+                  onChange={(e) => handleDateRangeChange(e.target.value)}
+                >
+                  <option value="this_week">This Week</option>
+                  <option value="this_month">This Month</option>
+                  <option value="last_month">Last Month</option>
+                  <option value="custom">Custom Range</option>
+                </Form.Select>
+              </Col>
+              {selectedDateRange === 'custom' && (
+                <>
+                  <Col md={2}>
+                    <Form.Label className="small fw-bold mb-2">From Date</Form.Label>
+                    <Form.Control
+                      type="date"
+                      size="sm"
+                      style={{ fontSize: '0.875rem' }}
+                      value={startDate}
+                      onChange={(e) => setStartDate(e.target.value)}
+                    />
+                  </Col>
+                  <Col md={2}>
+                    <Form.Label className="small fw-bold mb-2">To Date</Form.Label>
+                    <Form.Control
+                      type="date"
+                      size="sm"
+                      style={{ fontSize: '0.875rem' }}
+                      value={endDate}
+                      onChange={(e) => setEndDate(e.target.value)}
+                    />
+                  </Col>
+                </>
+              )}
+              <Col md={selectedDateRange === 'custom' ? 2 : 3}>
+                <Form.Label className="small fw-bold mb-2">Owner</Form.Label>
+                <Form.Select 
+                  size="sm" 
+                  style={{ fontSize: '0.875rem' }}
+                  value={selectedOwner}
+                  onChange={(e) => setSelectedOwner(e.target.value)}
+                >
+                  <option value="">All Owners</option>
+                  {users.map((user) => {
+                    const userId = user.id || user.extension || user;
+                    const userLabel = user.display_name || user.name || userId;
+                    return (
+                      <option key={userId} value={userId.toString()}>
+                        {userLabel}
+                      </option>
+                    );
+                  })}
+                </Form.Select>
+              </Col>
+              <Col md={selectedDateRange === 'custom' ? 2 : 3}>
+                <Form.Label className="small fw-bold mb-2">Campaign</Form.Label>
+                <Form.Select 
+                  size="sm" 
+                  style={{ fontSize: '0.875rem' }}
+                  value={selectedCampaign || ''}
+                  onChange={(e) => setSelectedCampaign(e.target.value ? Number.parseInt(e.target.value, 10) : null)}
+                >
+                  <option value="">All Campaigns</option>
+                  {campaigns.map((campaign) => (
+                    <option key={campaign.id} value={campaign.id.toString()}>{campaign.name}</option>
+                  ))}
+                </Form.Select>
+              </Col>
+              <Col md={selectedDateRange === 'custom' ? 2 : 3}>
+                <Form.Label className="small fw-bold mb-2">Stage</Form.Label>
+                <Form.Select 
+                  size="sm" 
+                  style={{ fontSize: '0.875rem' }}
+                  value={selectedStage || ''}
+                  onChange={(e) => setSelectedStage(e.target.value ? Number.parseInt(e.target.value, 10) : null)}
+                >
+                  <option value="">All Stages</option>
+                  {stages.map((stage) => (
+                    <option key={stage.id} value={stage.id.toString()}>{stage.name}</option>
+                  ))}
+                </Form.Select>
+              </Col>
+              <Col md={selectedDateRange === 'custom' ? 2 : 3}>
+                <div className="d-flex gap-2">
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    className="flex-grow-1"
+                    onClick={() => {
+                      if (selectedReportModule === 'leads') {
+                        fetchLeadReports();
+                      } else if (selectedReportModule === 'deals') {
+                        fetchDealReports();
+                      } else if (selectedReportModule === 'orders') {
+                        fetchOrderReports();
+                      }
+                    }}
+                    disabled={loading || dealLoading || orderLoading}
+                  >
+                    Apply
+                  </Button>
+                  <Button
+                    variant="outline-secondary"
+                    size="sm"
+                    onClick={() => {
+                      setSelectedDateRange('this_month');
+                      setSelectedOwner('');
+                      setSelectedCampaign(null);
+                      setSelectedStage(null);
+                      const thisMonthStart = moment().startOf('month');
+                      const thisMonthEnd = moment().endOf('month');
+                      setStartDate(thisMonthStart.format('YYYY-MM-DD'));
+                      setEndDate(thisMonthEnd.format('YYYY-MM-DD'));
+                    }}
+                  >
+                    Reset
+                  </Button>
+                </div>
+              </Col>
+            </Row>
+          </Card.Body>
+        </Card>
+      </div>
+
       {/* Lead Reports */}
       {selectedReportModule === 'leads' && canViewLeadsReports && (
-        <div style={{ padding: '24px 0px', background: '#f8f9fa' }}>
-          {/* Advanced Filters for Leads */}
-          <Card className="border-0 shadow-sm mb-4">
-            <Card.Body>
-              <Row className="g-3 align-items-end">
-                <Col md={2}>
-                  <Form.Label htmlFor="lead-source-select" className="small fw-bold mb-2">Lead Source</Form.Label>
-                  <Form.Select 
-                    id="lead-source-select" 
-                    size="sm" 
-                    style={{ fontSize: '0.875rem' }}
-                    value={selectedSource}
-                    onChange={(e) => setSelectedSource(e.target.value)}
-                  >
-                    <option value="">All Sources</option>
-                    {leadSources.map((source) => (
-                      <option key={source.source || 'unknown'} value={source.source || 'unknown'}>{source.source || 'Unknown'}</option>
-                    ))}
-                  </Form.Select>
-                </Col>
-                <Col md={2}>
-                  <Form.Label htmlFor="lead-stage-select" className="small fw-bold mb-2">Stage</Form.Label>
-                  <Form.Select 
-                    id="lead-stage-select" 
-                    size="sm" 
-                    style={{ fontSize: '0.875rem' }}
-                    value={selectedStageId}
-                    onChange={(e) => setSelectedStageId(e.target.value)}
-                  >
-                    <option value="">All Stages</option>
-                    {stages.map((stage) => (
-                      <option key={stage.id} value={stage.id.toString()}>{stage.name}</option>
-                    ))}
-                  </Form.Select>
-                </Col>
-                <Col md={2}>
-                  <Form.Label htmlFor="lead-date-range-select" className="small fw-bold mb-2">Date Range</Form.Label>
-                  <Form.Select 
-                    id="lead-date-range-select" 
-                    size="sm" 
-                    style={{ fontSize: '0.875rem' }}
-                    value={selectedDateRange}
-                    onChange={(e) => handleDateRangeChange(e.target.value, 'leads')}
-                  >
-                    <option value="7">Last 7 days</option>
-                    <option value="30">Last 30 days</option>
-                    <option value="90">Last 90 days</option>
-                    <option value="custom">Custom Range</option>
-                  </Form.Select>
-                </Col>
-                <Col md={2}>
-                  <Form.Label htmlFor="lead-owner-select" className="small fw-bold mb-2">Owner</Form.Label>
-                  <Form.Select 
-                    id="lead-owner-select" 
-                    size="sm" 
-                    style={{ fontSize: '0.875rem' }}
-                    value={selectedOwner}
-                    onChange={(e) => setSelectedOwner(e.target.value)}
-                  >
-                    <option value="">All Owners</option>
-                    {users.map((user) => {
-                      const userId = user.id || user.extension || user;
-                      const userLabel = user.display_name || user.name || userId;
-                      return (
-                        <option key={userId} value={userId.toString()}>
-                          {userLabel}
-                        </option>
-                      );
-                    })}
-                  </Form.Select>
-                </Col>
-                <Col md={2}>
-                  <div className="d-flex gap-2">
-                  <Button
-                      variant="primary"
-                    size="sm"
-                      className="flex-grow-1"
-                      onClick={() => fetchLeadReports()}
-                      disabled={loading}
-                    >
-                      Apply
-                  </Button>
-                    <Button
-                      variant="outline-secondary"
-                      size="sm"
-                      onClick={() => {
-                        setSelectedStageId('');
-                        setSelectedSource('');
-                        setSelectedOwner('');
-                        setSelectedDateRange('30');
-                        setStartDate(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
-                        setEndDate(new Date().toISOString().split('T')[0]);
-                      }}
-                    >
-                      Reset
-                    </Button>
-              </div>
-            </Col>
-              </Row>
-            </Card.Body>
-          </Card>
+        <div style={{ padding: '0 32px 24px', background: '#f8f9fa' }}>
 
             {/* Lead Overview KPIs */}
             <KPIOverview
@@ -946,98 +893,7 @@ const CrmReports = () => {
 
         {/* Deal Reports */}
         {selectedReportModule === 'deals' && canViewDealsReports && (
-          <div style={{ padding: '24px 0px', background: '#f8f9fa' }}>
-            {/* Advanced Filters for Deals */}
-            <Card className="border-0 shadow-sm mb-4">
-              <Card.Body>
-                <Row className="g-3 align-items-end">
-                  <Col md={2}>
-                    <Form.Label htmlFor="deal-currency-select" className="small fw-bold mb-2">Currency</Form.Label>
-                    <Form.Select 
-                      id="deal-currency-select" 
-                      size="sm" 
-                      style={{ fontSize: '0.875rem' }}
-                      value={selectedDealCurrency}
-                      onChange={(e) => setSelectedDealCurrency(e.target.value)}
-                    >
-                      <option value="">All Currencies</option>
-                      <option value="USD">USD</option>
-                      <option value="GBP">GBP</option>
-                      <option value="EUR">EUR</option>
-                      <option value="PKR">PKR</option>
-                      <option value="INR">INR</option>
-                      <option value="AUD">AUD</option>
-                      <option value="CAD">CAD</option>
-                      <option value="JPY">JPY</option>
-                      <option value="CNY">CNY</option>
-                      <option value="AED">AED</option>
-                    </Form.Select>
-                  </Col>
-                  <Col md={2}>
-                    <Form.Label htmlFor="deal-date-range-select" className="small fw-bold mb-2">Date Range</Form.Label>
-                    <Form.Select 
-                      id="deal-date-range-select" 
-                      size="sm" 
-                      style={{ fontSize: '0.875rem' }}
-                      value={selectedDealDateRange}
-                      onChange={(e) => handleDateRangeChange(e.target.value, 'deals')}
-                    >
-                      <option value="7">Last 7 days</option>
-                      <option value="30">Last 30 days</option>
-                      <option value="90">Last 90 days</option>
-                      <option value="custom">Custom Range</option>
-                    </Form.Select>
-                  </Col>
-                  <Col md={2}>
-                    <Form.Label htmlFor="deal-owner-select" className="small fw-bold mb-2">Owner</Form.Label>
-                    <Form.Select 
-                      id="deal-owner-select" 
-                      size="sm" 
-                      style={{ fontSize: '0.875rem' }}
-                      value={selectedDealOwner}
-                      onChange={(e) => setSelectedDealOwner(e.target.value)}
-                    >
-                      <option value="">All Owners</option>
-                      {users.map((user) => {
-                        const userId = user.id || user.extension || user;
-                        const userLabel = user.display_name || user.name || userId;
-                        return (
-                          <option key={userId} value={userId.toString()}>
-                            {userLabel}
-                          </option>
-                        );
-                      })}
-                    </Form.Select>
-                  </Col>
-                  <Col md={2}>
-                    <div className="d-flex gap-2">
-                      <Button
-                        variant="primary"
-                        size="sm"
-                        className="flex-grow-1"
-                        onClick={() => fetchDealReports()}
-                        disabled={dealLoading}
-                      >
-                        Apply
-                      </Button>
-                      <Button
-                        variant="outline-secondary"
-                        size="sm"
-                        onClick={() => {
-                          setSelectedDealCurrency('');
-                          setSelectedDealOwner('');
-                          setSelectedDealDateRange('30');
-                          setStartDate(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
-                          setEndDate(new Date().toISOString().split('T')[0]);
-                        }}
-                      >
-                        Reset
-                      </Button>
-                    </div>
-                  </Col>
-                </Row>
-              </Card.Body>
-            </Card>
+          <div style={{ padding: '0 32px 24px', background: '#f8f9fa' }}>
 
             {/* Deal Overview KPIs */}
             <div style={{ marginBottom: '24px' }}>
@@ -1502,98 +1358,7 @@ const CrmReports = () => {
 
         {/* Order Reports */}
         {selectedReportModule === 'orders' && canViewOrdersReports && (
-          <div style={{ padding: '24px 0px', background: '#f8f9fa' }}>
-            {/* Advanced Filters for Orders */}
-            <Card className="border-0 shadow-sm mb-4">
-              <Card.Body>
-                <Row className="g-3 align-items-end">
-                  <Col md={2}>
-                    <Form.Label htmlFor="order-currency-select" className="small fw-bold mb-2">Currency</Form.Label>
-                    <Form.Select 
-                      id="order-currency-select" 
-                      size="sm" 
-                      style={{ fontSize: '0.875rem' }}
-                      value={selectedOrderCurrency}
-                      onChange={(e) => setSelectedOrderCurrency(e.target.value)}
-                    >
-                      <option value="">All Currencies</option>
-                      <option value="USD">USD</option>
-                      <option value="GBP">GBP</option>
-                      <option value="EUR">EUR</option>
-                      <option value="PKR">PKR</option>
-                      <option value="INR">INR</option>
-                      <option value="AUD">AUD</option>
-                      <option value="CAD">CAD</option>
-                      <option value="JPY">JPY</option>
-                      <option value="CNY">CNY</option>
-                      <option value="AED">AED</option>
-                    </Form.Select>
-                  </Col>
-                  <Col md={2}>
-                    <Form.Label htmlFor="order-date-range-select" className="small fw-bold mb-2">Date Range</Form.Label>
-                    <Form.Select 
-                      id="order-date-range-select" 
-                      size="sm" 
-                      style={{ fontSize: '0.875rem' }}
-                      value={selectedOrderDateRange}
-                      onChange={(e) => handleDateRangeChange(e.target.value, 'orders')}
-                    >
-                      <option value="7">Last 7 days</option>
-                      <option value="30">Last 30 days</option>
-                      <option value="90">Last 90 days</option>
-                      <option value="custom">Custom Range</option>
-                    </Form.Select>
-                  </Col>
-                  <Col md={2}>
-                    <Form.Label htmlFor="order-owner-select" className="small fw-bold mb-2">Owner</Form.Label>
-                    <Form.Select 
-                      id="order-owner-select" 
-                      size="sm" 
-                      style={{ fontSize: '0.875rem' }}
-                      value={selectedOrderOwner}
-                      onChange={(e) => setSelectedOrderOwner(e.target.value)}
-                    >
-                      <option value="">All Owners</option>
-                      {users.map((user) => {
-                        const userId = user.id || user.extension || user;
-                        const userLabel = user.display_name || user.name || userId;
-                        return (
-                          <option key={userId} value={userId.toString()}>
-                            {userLabel}
-                          </option>
-                        );
-                      })}
-                    </Form.Select>
-                  </Col>
-                  <Col md={2}>
-                    <div className="d-flex gap-2">
-                      <Button
-                        variant="primary"
-                        size="sm"
-                        className="flex-grow-1"
-                        onClick={() => fetchOrderReports()}
-                        disabled={orderLoading}
-                      >
-                        Apply
-                      </Button>
-                      <Button
-                        variant="outline-secondary"
-                        size="sm"
-                        onClick={() => {
-                          setSelectedOrderCurrency('');
-                          setSelectedOrderOwner('');
-                          setSelectedOrderDateRange('30');
-                          setStartDate(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
-                          setEndDate(new Date().toISOString().split('T')[0]);
-                        }}
-                      >
-                        Reset
-                      </Button>
-                    </div>
-                  </Col>
-                </Row>
-              </Card.Body>
-            </Card>
+          <div style={{ padding: '0 32px 24px', background: '#f8f9fa' }}>
 
             {/* Order Overview KPIs */}
             <div style={{ marginBottom: '24px' }}>

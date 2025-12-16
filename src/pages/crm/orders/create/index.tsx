@@ -93,6 +93,10 @@ const CreateOrder = () => {
     standard_discount_percentage: "0",
     special_discount_percentage: "0",
     currency: "USD",
+    industry: "",
+    order_approval_status: "",
+    fulfillment_status: "",
+    payment_status: "",
     items: [] as OrderItem[],
   });
 
@@ -175,6 +179,7 @@ const CreateOrder = () => {
             customer_phone_country_code: phoneCountryCode,
             customer_address: "",
             currency: dealData.currency || "USD",
+            industry: dealData.industry || "",
             tax_percentage: latestEstimate?.tax_percentage || "0",
             standard_discount_percentage: latestEstimate?.standard_discount_percentage || "0",
             special_discount_percentage: latestEstimate?.special_discount_percentage || "0",
@@ -421,6 +426,10 @@ const CreateOrder = () => {
         total_amount: totals.grandTotal.toFixed(2),
         final_amount: totals.netValue.toFixed(2),
         currency: formData.currency,
+        industry: formData.industry || "",
+        order_approval_status: formData.order_approval_status || "",
+        fulfillment_status: formData.fulfillment_status || "",
+        payment_status: formData.payment_status || "",
         items: formData.items.map(item => ({
           product_id: String(item.product_id),
           product_name: item.product_name,
@@ -768,6 +777,73 @@ const CreateOrder = () => {
                           <option value="JPY">JPY</option>
                           <option value="CNY">CNY</option>
                           <option value="AED">AED</option>
+                        </Form.Select>
+                      </Form.Group>
+                    </Col>
+                    <Col md={6}>
+                      <Form.Group className="mb-3">
+                        <Form.Label>Industry</Form.Label>
+                        <Form.Select 
+                          value={formData.industry}
+                          onChange={(e) => setFormData({ ...formData, industry: e.target.value })}
+                        >
+                          <option value="">Select Industry</option>
+                          <option value="Technology">Technology</option>
+                          <option value="Healthcare">Healthcare</option>
+                          <option value="Finance">Finance</option>
+                          <option value="Banking & Financial Services">Banking & Financial Services</option>
+                          <option value="Manufacturing">Manufacturing</option>
+                          <option value="Retail">Retail</option>
+                          <option value="Education">Education</option>
+                          <option value="Real Estate">Real Estate</option>
+                          <option value="Telecommunications">Telecommunications</option>
+                          <option value="Construction">Construction</option>
+                          <option value="Other">Other</option>
+                        </Form.Select>
+                      </Form.Group>
+                    </Col>
+                    <Col md={6}>
+                      <Form.Group className="mb-3">
+                        <Form.Label>Order Approval Status</Form.Label>
+                        <Form.Select 
+                          value={formData.order_approval_status}
+                          onChange={(e) => setFormData({ ...formData, order_approval_status: e.target.value })}
+                        >
+                          <option value="">Not Set</option>
+                          <option value="pending">Pending</option>
+                          <option value="approved">Approved</option>
+                          <option value="rejected">Rejected</option>
+                        </Form.Select>
+                      </Form.Group>
+                    </Col>
+                    <Col md={6}>
+                      <Form.Group className="mb-3">
+                        <Form.Label>Fulfillment Status</Form.Label>
+                        <Form.Select 
+                          value={formData.fulfillment_status}
+                          onChange={(e) => setFormData({ ...formData, fulfillment_status: e.target.value })}
+                        >
+                          <option value="">Not Set</option>
+                          <option value="pending">Pending</option>
+                          <option value="in_progress">In Progress</option>
+                          <option value="completed">Completed</option>
+                          <option value="delivered">Delivered</option>
+                          <option value="cancelled">Cancelled</option>
+                        </Form.Select>
+                      </Form.Group>
+                    </Col>
+                    <Col md={6}>
+                      <Form.Group className="mb-3">
+                        <Form.Label>Payment Status</Form.Label>
+                        <Form.Select 
+                          value={formData.payment_status}
+                          onChange={(e) => setFormData({ ...formData, payment_status: e.target.value })}
+                        >
+                          <option value="">Not Set</option>
+                          <option value="unpaid">Unpaid</option>
+                          <option value="partial">Partial</option>
+                          <option value="paid">Paid</option>
+                          <option value="refunded">Refunded</option>
                         </Form.Select>
                       </Form.Group>
                     </Col>

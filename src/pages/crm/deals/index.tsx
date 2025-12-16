@@ -491,6 +491,12 @@ const CrmDeals = () => {
     stage: null as string | null,
     followUpDateFrom: null as string | null,
     followUpDateTo: null as string | null,
+    probabilityMin: null as string | null,
+    probabilityMax: null as string | null,
+    dealType: null as string | null,
+    industry: null as string | null,
+    expectedCloseDateFrom: null as string | null,
+    expectedCloseDateTo: null as string | null,
   });
 
   // Fetch stages and extensions on component mount
@@ -536,6 +542,24 @@ const CrmDeals = () => {
         }
         if (currentFilters.follow_up_date_to) {
           params.follow_up_date_to = currentFilters.follow_up_date_to;
+        }
+        if (currentFilters.probability_min) {
+          params.probability_min = currentFilters.probability_min;
+        }
+        if (currentFilters.probability_max) {
+          params.probability_max = currentFilters.probability_max;
+        }
+        if (currentFilters.deal_type) {
+          params.deal_type = currentFilters.deal_type;
+        }
+        if (currentFilters.industry) {
+          params.industry = currentFilters.industry;
+        }
+        if (currentFilters.expected_close_date_from) {
+          params.expected_close_date_from = currentFilters.expected_close_date_from;
+        }
+        if (currentFilters.expected_close_date_to) {
+          params.expected_close_date_to = currentFilters.expected_close_date_to;
         }
 
         const response: any = await getDeals(params);
@@ -771,6 +795,60 @@ const CrmDeals = () => {
           newFilters.follow_up_date_to = filters.follow_up_date_to;
         } else {
           delete newFilters.follow_up_date_to;
+        }
+      }
+      
+      // Handle probability_min filter
+      if ('probability_min' in filters) {
+        if (filters.probability_min) {
+          newFilters.probability_min = String(filters.probability_min);
+        } else {
+          delete newFilters.probability_min;
+        }
+      }
+      
+      // Handle probability_max filter
+      if ('probability_max' in filters) {
+        if (filters.probability_max) {
+          newFilters.probability_max = String(filters.probability_max);
+        } else {
+          delete newFilters.probability_max;
+        }
+      }
+      
+      // Handle deal_type filter
+      if ('deal_type' in filters) {
+        if (filters.deal_type) {
+          newFilters.deal_type = filters.deal_type;
+        } else {
+          delete newFilters.deal_type;
+        }
+      }
+      
+      // Handle industry filter
+      if ('industry' in filters) {
+        if (filters.industry) {
+          newFilters.industry = filters.industry;
+        } else {
+          delete newFilters.industry;
+        }
+      }
+      
+      // Handle expected_close_date_from filter
+      if ('expected_close_date_from' in filters) {
+        if (filters.expected_close_date_from) {
+          newFilters.expected_close_date_from = filters.expected_close_date_from;
+        } else {
+          delete newFilters.expected_close_date_from;
+        }
+      }
+      
+      // Handle expected_close_date_to filter
+      if ('expected_close_date_to' in filters) {
+        if (filters.expected_close_date_to) {
+          newFilters.expected_close_date_to = filters.expected_close_date_to;
+        } else {
+          delete newFilters.expected_close_date_to;
         }
       }
       
@@ -1241,7 +1319,7 @@ const CrmDeals = () => {
       dealType: deal.deal_type || '',
       value: deal.net_value || deal.grand_total || '0',
       currency: deal.currency || 'USD',
-      probability: deal.probability || 0,
+      probability: deal?.stage?.probability || 0,
       closeDate: formatDateForTable(deal.expected_close_date),
       followUpDate: formatDateForTable(deal.follow_up_date),
       owner: extensions.find((ext: any) => ext?.id == deal?.created_by || ext?.extension == deal?.created_by)?.display_name || 
@@ -1553,8 +1631,11 @@ const CrmDeals = () => {
           advancedFilterCount={
             (dealsFilters.assignedTo !== null ? 1 : 0) +
             (dealsFilters.stage !== null ? 1 : 0) +
-            (dealsFilters.followUpDateFrom !== null ? 1 : 0) +
-            (dealsFilters.followUpDateTo !== null ? 1 : 0)
+            (dealsFilters.followUpDateFrom !== null || dealsFilters.followUpDateTo !== null ? 1 : 0) +
+            (dealsFilters.probabilityMin !== null || dealsFilters.probabilityMax !== null ? 1 : 0) +
+            (dealsFilters.dealType !== null ? 1 : 0) +
+            (dealsFilters.industry !== null ? 1 : 0) +
+            (dealsFilters.expectedCloseDateFrom !== null || dealsFilters.expectedCloseDateTo !== null ? 1 : 0)
           }
         />
 
@@ -1662,6 +1743,131 @@ const CrmDeals = () => {
                   />
                 </Col>
                 <Col md={4}>
+                  <Form.Label className="small fw-bold mb-2">Probability Min (%)</Form.Label>
+                  <Form.Control
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={dealsFilters.probabilityMin || ''}
+                    onChange={(e) => {
+                      const value = e.target.value || null;
+                      setDealsFilters(prev => ({
+                        ...prev,
+                        probabilityMin: value
+                      }));
+                      handleFiltersChange({
+                        probability_min: value || null
+                      });
+                    }}
+                    placeholder="0"
+                  />
+                </Col>
+                <Col md={4}>
+                  <Form.Label className="small fw-bold mb-2">Probability Max (%)</Form.Label>
+                  <Form.Control
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={dealsFilters.probabilityMax || ''}
+                    onChange={(e) => {
+                      const value = e.target.value || null;
+                      setDealsFilters(prev => ({
+                        ...prev,
+                        probabilityMax: value
+                      }));
+                      handleFiltersChange({
+                        probability_max: value || null
+                      });
+                    }}
+                    placeholder="100"
+                  />
+                </Col>
+                <Col md={4}>
+                  <Form.Label className="small fw-bold mb-2">Deal Type</Form.Label>
+                  <Form.Select
+                    value={dealsFilters.dealType || ''}
+                    onChange={(e) => {
+                      const value = e.target.value || null;
+                      setDealsFilters(prev => ({
+                        ...prev,
+                        dealType: value
+                      }));
+                      handleFiltersChange({
+                        deal_type: value || null
+                      });
+                    }}
+                  >
+                    <option value="">Select Deal Type</option>
+                    <option value="new_sale">New Sale</option>
+                    <option value="renewal">Renewal</option>
+                    <option value="migration">Migration</option>
+                    <option value="upsell">Upsell</option>
+                  </Form.Select>
+                </Col>
+                <Col md={4}>
+                  <Form.Label className="small fw-bold mb-2">Industry</Form.Label>
+                  <Form.Select
+                    value={dealsFilters.industry || ''}
+                    onChange={(e) => {
+                      const value = e.target.value || null;
+                      setDealsFilters(prev => ({
+                        ...prev,
+                        industry: value
+                      }));
+                      handleFiltersChange({
+                        industry: value || null
+                      });
+                    }}
+                  >
+                    <option value="">Select Industry</option>
+                    <option value="Technology">Technology</option>
+                    <option value="Healthcare">Healthcare</option>
+                    <option value="Finance">Finance</option>
+                    <option value="Banking & Financial Services">Banking & Financial Services</option>
+                    <option value="Manufacturing">Manufacturing</option>
+                    <option value="Retail">Retail</option>
+                    <option value="Education">Education</option>
+                    <option value="Real Estate">Real Estate</option>
+                    <option value="Telecommunications">Telecommunications</option>
+                    <option value="Construction">Construction</option>
+                    <option value="Other">Other</option>
+                  </Form.Select>
+                </Col>
+                <Col md={4}>
+                  <Form.Label className="small fw-bold mb-2">Expected Close Date From</Form.Label>
+                  <Form.Control
+                    type="date"
+                    value={dealsFilters.expectedCloseDateFrom || ''}
+                    onChange={(e) => {
+                      const dateValue = e.target.value || null;
+                      setDealsFilters(prev => ({
+                        ...prev,
+                        expectedCloseDateFrom: dateValue
+                      }));
+                      handleFiltersChange({
+                        expected_close_date_from: dateValue || null
+                      });
+                    }}
+                  />
+                </Col>
+                <Col md={4}>
+                  <Form.Label className="small fw-bold mb-2">Expected Close Date To</Form.Label>
+                  <Form.Control
+                    type="date"
+                    value={dealsFilters.expectedCloseDateTo || ''}
+                    onChange={(e) => {
+                      const dateValue = e.target.value || null;
+                      setDealsFilters(prev => ({
+                        ...prev,
+                        expectedCloseDateTo: dateValue
+                      }));
+                      handleFiltersChange({
+                        expected_close_date_to: dateValue || null
+                      });
+                    }}
+                  />
+                </Col>
+                <Col md={4}>
                   <div className="d-flex gap-2">
                     <Button
                       variant="outline-secondary"
@@ -1672,6 +1878,12 @@ const CrmDeals = () => {
                           stage: null,
                           followUpDateFrom: null,
                           followUpDateTo: null,
+                          probabilityMin: null,
+                          probabilityMax: null,
+                          dealType: null,
+                          industry: null,
+                          expectedCloseDateFrom: null,
+                          expectedCloseDateTo: null,
                         });
                         setCurrentFilters({});
                         setActiveFilter('all');
@@ -2277,7 +2489,7 @@ const CrmDeals = () => {
                       marginBottom: '6px'
                     }}>Probability</div>
                     <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
-                      {viewingDeal.probability || 0}%
+                      {viewingDeal?.stage?.probability || 0}%
                     </div>
                   </div>
                   <div style={{

@@ -471,6 +471,14 @@ const CrmOrders = () => {
   const [ordersFilters, setOrdersFilters] = useState({
     assignedTo: null as string | null,
     stage: null as string | null,
+    industry: null as string | null,
+    orderValueMin: null as string | null,
+    orderValueMax: null as string | null,
+    orderApprovalStatus: null as string | null,
+    fulfillmentStatus: null as string | null,
+    paymentStatus: null as string | null,
+    dateFrom: null as string | null,
+    dateTo: null as string | null,
   });
 
   // Fetch stages and extensions on component mount
@@ -510,6 +518,33 @@ const CrmOrders = () => {
         }
         if (currentFilters.include_archived !== undefined) {
           params.include_archived = currentFilters.include_archived;
+        }
+        if (currentFilters.industry) {
+          params.industry = currentFilters.industry;
+        }
+        if (currentFilters.order_value_min) {
+          params.order_value_min = currentFilters.order_value_min;
+        }
+        if (currentFilters.order_value_max) {
+          params.order_value_max = currentFilters.order_value_max;
+        }
+        if (currentFilters.order_stage_id) {
+          params.order_stage_id = currentFilters.order_stage_id;
+        }
+        if (currentFilters.order_approval_status) {
+          params.order_approval_status = currentFilters.order_approval_status;
+        }
+        if (currentFilters.fulfillment_status) {
+          params.fulfillment_status = currentFilters.fulfillment_status;
+        }
+        if (currentFilters.payment_status) {
+          params.payment_status = currentFilters.payment_status;
+        }
+        if (currentFilters.date_from) {
+          params.date_from = currentFilters.date_from;
+        }
+        if (currentFilters.date_to) {
+          params.date_to = currentFilters.date_to;
         }
 
         const response: any = await getOrders(params);
@@ -753,6 +788,87 @@ const CrmOrders = () => {
           newFilters.include_archived = true;
         } else {
           delete newFilters.include_archived;
+        }
+      }
+      
+      // Handle industry filter
+      if ('industry' in filters) {
+        if (filters.industry) {
+          newFilters.industry = filters.industry;
+        } else {
+          delete newFilters.industry;
+        }
+      }
+      
+      // Handle order_value_min filter
+      if ('order_value_min' in filters) {
+        if (filters.order_value_min) {
+          newFilters.order_value_min = String(filters.order_value_min);
+        } else {
+          delete newFilters.order_value_min;
+        }
+      }
+      
+      // Handle order_value_max filter
+      if ('order_value_max' in filters) {
+        if (filters.order_value_max) {
+          newFilters.order_value_max = String(filters.order_value_max);
+        } else {
+          delete newFilters.order_value_max;
+        }
+      }
+      
+      // Handle order_stage_id filter (note: this is different from stage_id, it's order_stage_id)
+      if ('order_stage_id' in filters) {
+        if (filters.order_stage_id) {
+          newFilters.order_stage_id = String(filters.order_stage_id);
+        } else {
+          delete newFilters.order_stage_id;
+        }
+      }
+      
+      // Handle order_approval_status filter
+      if ('order_approval_status' in filters) {
+        if (filters.order_approval_status) {
+          newFilters.order_approval_status = filters.order_approval_status;
+        } else {
+          delete newFilters.order_approval_status;
+        }
+      }
+      
+      // Handle fulfillment_status filter
+      if ('fulfillment_status' in filters) {
+        if (filters.fulfillment_status) {
+          newFilters.fulfillment_status = filters.fulfillment_status;
+        } else {
+          delete newFilters.fulfillment_status;
+        }
+      }
+      
+      // Handle payment_status filter
+      if ('payment_status' in filters) {
+        if (filters.payment_status) {
+          newFilters.payment_status = filters.payment_status;
+        } else {
+          delete newFilters.payment_status;
+        }
+      }
+      
+      // Handle date_from filter
+      if ('date_from' in filters) {
+        if (filters.date_from) {
+          newFilters.date_from = filters.date_from;
+        } else {
+          delete newFilters.date_from;
+        }
+      }
+      
+      // Handle date_to filter
+      if ('date_to' in filters) {
+        if (filters.date_to) {
+          newFilters.date_to = filters.date_to;
+        } else {
+          delete newFilters.date_to;
         }
       }
       
@@ -1064,9 +1180,9 @@ const CrmOrders = () => {
       stageId: order.order_stage_id || null,
       value: order.final_amount || order.total_amount || '0',
       currency: order.currency || 'USD',
-      approvalStatus: order.order_approval_status || 'pending',
-      fulfillmentStatus: order.fulfillment_status || 'pending',
-      paymentStatus: order.payment_status || 'unpaid',
+      approvalStatus: order.order_approval_status || null,
+      fulfillmentStatus: order.fulfillment_status || null,
+      paymentStatus: order.payment_status || null,
       orderDate: formatDateForTable(order.order_date),
       assignedUser: extensions.find((ext: any) => ext?.id == order?.assigned_to || ext?.extension == order?.assigned_to)?.display_name || 
                     extensions.find((ext: any) => ext?.id == order?.assigned_to || ext?.extension == order?.assigned_to)?.name || 
@@ -1380,7 +1496,13 @@ const CrmOrders = () => {
           onToggleAdvancedFilters={() => setShowAdvancedFilters(!showAdvancedFilters)}
           advancedFilterCount={
             (ordersFilters.assignedTo !== null ? 1 : 0) +
-            (ordersFilters.stage !== null ? 1 : 0)
+            (ordersFilters.stage !== null ? 1 : 0) +
+            (ordersFilters.industry !== null ? 1 : 0) +
+            (ordersFilters.orderValueMin !== null || ordersFilters.orderValueMax !== null ? 1 : 0) +
+            (ordersFilters.orderApprovalStatus !== null ? 1 : 0) +
+            (ordersFilters.fulfillmentStatus !== null ? 1 : 0) +
+            (ordersFilters.paymentStatus !== null ? 1 : 0) +
+            (ordersFilters.dateFrom !== null || ordersFilters.dateTo !== null ? 1 : 0)
           }
         />
 
@@ -1423,7 +1545,7 @@ const CrmOrders = () => {
                   />
                 </Col>
                 <Col md={4}>
-                  <Form.Label className="small fw-bold mb-2">Stages</Form.Label>
+                  <Form.Label className="small fw-bold mb-2">Order Stage</Form.Label>
                   <Select
                     options={stages.map(s => ({ value: s.id.toString(), label: s.name }))}
                     value={ordersFilters.stage ? (() => {
@@ -1439,7 +1561,7 @@ const CrmOrders = () => {
                       }));
                       // Update currentFilters for API call
                       handleFiltersChange({ 
-                        stage_id: stageValue || null 
+                        order_stage_id: stageValue || null 
                       });
                       // Update activeFilter to match selected stage
                       if (stageValue) {
@@ -1454,6 +1576,175 @@ const CrmOrders = () => {
                   />
                 </Col>
                 <Col md={4}>
+                  <Form.Label className="small fw-bold mb-2">Industry</Form.Label>
+                  <Form.Select
+                    value={ordersFilters.industry || ''}
+                    onChange={(e) => {
+                      const value = e.target.value || null;
+                      setOrdersFilters(prev => ({
+                        ...prev,
+                        industry: value
+                      }));
+                      handleFiltersChange({
+                        industry: value || null
+                      });
+                    }}
+                  >
+                    <option value="">Select Industry</option>
+                    <option value="Technology">Technology</option>
+                    <option value="Healthcare">Healthcare</option>
+                    <option value="Finance">Finance</option>
+                    <option value="Banking & Financial Services">Banking & Financial Services</option>
+                    <option value="Manufacturing">Manufacturing</option>
+                    <option value="Retail">Retail</option>
+                    <option value="Education">Education</option>
+                    <option value="Real Estate">Real Estate</option>
+                    <option value="Telecommunications">Telecommunications</option>
+                    <option value="Construction">Construction</option>
+                    <option value="Other">Other</option>
+                  </Form.Select>
+                </Col>
+                <Col md={4}>
+                  <Form.Label className="small fw-bold mb-2">Order Value Min</Form.Label>
+                  <Form.Control
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={ordersFilters.orderValueMin || ''}
+                    onChange={(e) => {
+                      const value = e.target.value || null;
+                      setOrdersFilters(prev => ({
+                        ...prev,
+                        orderValueMin: value
+                      }));
+                      handleFiltersChange({
+                        order_value_min: value || null
+                      });
+                    }}
+                    placeholder="0.00"
+                  />
+                </Col>
+                <Col md={4}>
+                  <Form.Label className="small fw-bold mb-2">Order Value Max</Form.Label>
+                  <Form.Control
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={ordersFilters.orderValueMax || ''}
+                    onChange={(e) => {
+                      const value = e.target.value || null;
+                      setOrdersFilters(prev => ({
+                        ...prev,
+                        orderValueMax: value
+                      }));
+                      handleFiltersChange({
+                        order_value_max: value || null
+                      });
+                    }}
+                    placeholder="0.00"
+                  />
+                </Col>
+                <Col md={4}>
+                  <Form.Label className="small fw-bold mb-2">Order Approval Status</Form.Label>
+                  <Form.Select
+                    value={ordersFilters.orderApprovalStatus || ''}
+                    onChange={(e) => {
+                      const value = e.target.value || null;
+                      setOrdersFilters(prev => ({
+                        ...prev,
+                        orderApprovalStatus: value
+                      }));
+                      handleFiltersChange({
+                        order_approval_status: value || null
+                      });
+                    }}
+                  >
+                    <option value="">Select Status</option>
+                    <option value="pending">Pending</option>
+                    <option value="approved">Approved</option>
+                    <option value="rejected">Rejected</option>
+                  </Form.Select>
+                </Col>
+                <Col md={4}>
+                  <Form.Label className="small fw-bold mb-2">Fulfillment Status</Form.Label>
+                  <Form.Select
+                    value={ordersFilters.fulfillmentStatus || ''}
+                    onChange={(e) => {
+                      const value = e.target.value || null;
+                      setOrdersFilters(prev => ({
+                        ...prev,
+                        fulfillmentStatus: value
+                      }));
+                      handleFiltersChange({
+                        fulfillment_status: value || null
+                      });
+                    }}
+                  >
+                    <option value="">Select Status</option>
+                    <option value="pending">Pending</option>
+                    <option value="in_progress">In Progress</option>
+                    <option value="completed">Completed</option>
+                    <option value="delivered">Delivered</option>
+                    <option value="cancelled">Cancelled</option>
+                  </Form.Select>
+                </Col>
+                <Col md={4}>
+                  <Form.Label className="small fw-bold mb-2">Payment Status</Form.Label>
+                  <Form.Select
+                    value={ordersFilters.paymentStatus || ''}
+                    onChange={(e) => {
+                      const value = e.target.value || null;
+                      setOrdersFilters(prev => ({
+                        ...prev,
+                        paymentStatus: value
+                      }));
+                      handleFiltersChange({
+                        payment_status: value || null
+                      });
+                    }}
+                  >
+                    <option value="">Select Status</option>
+                    <option value="unpaid">Unpaid</option>
+                    <option value="partial">Partial</option>
+                    <option value="paid">Paid</option>
+                    <option value="refunded">Refunded</option>
+                  </Form.Select>
+                </Col>
+                <Col md={4}>
+                  <Form.Label className="small fw-bold mb-2">Date From</Form.Label>
+                  <Form.Control
+                    type="date"
+                    value={ordersFilters.dateFrom || ''}
+                    onChange={(e) => {
+                      const dateValue = e.target.value || null;
+                      setOrdersFilters(prev => ({
+                        ...prev,
+                        dateFrom: dateValue
+                      }));
+                      handleFiltersChange({
+                        date_from: dateValue || null
+                      });
+                    }}
+                  />
+                </Col>
+                <Col md={4}>
+                  <Form.Label className="small fw-bold mb-2">Date To</Form.Label>
+                  <Form.Control
+                    type="date"
+                    value={ordersFilters.dateTo || ''}
+                    onChange={(e) => {
+                      const dateValue = e.target.value || null;
+                      setOrdersFilters(prev => ({
+                        ...prev,
+                        dateTo: dateValue
+                      }));
+                      handleFiltersChange({
+                        date_to: dateValue || null
+                      });
+                    }}
+                  />
+                </Col>
+                <Col md={4}>
                   <div className="d-flex gap-2">
                     <Button
                       variant="outline-secondary"
@@ -1462,6 +1753,14 @@ const CrmOrders = () => {
                         setOrdersFilters({
                           assignedTo: null,
                           stage: null,
+                          industry: null,
+                          orderValueMin: null,
+                          orderValueMax: null,
+                          orderApprovalStatus: null,
+                          fulfillmentStatus: null,
+                          paymentStatus: null,
+                          dateFrom: null,
+                          dateTo: null,
                         });
                         setCurrentFilters({});
                         setActiveFilter('all');
@@ -2216,6 +2515,34 @@ const CrmOrders = () => {
                       {viewingOrder.expected_delivery_date ? formatDateForTable(viewingOrder.expected_delivery_date) : 'N/A'}
                     </div>
                   </div>
+                  {viewingOrder.industry && (
+                    <div style={{
+                      background: '#f8f9fa',
+                      padding: '16px',
+                      borderRadius: '10px',
+                      transition: 'all 0.3s'
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.background = '#e5e7eb';
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.background = '#f8f9fa';
+                      e.currentTarget.style.transform = 'translateY(0)';
+                    }}>
+                      <div style={{
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        color: '#6b7280',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px',
+                        marginBottom: '6px'
+                      }}>Industry</div>
+                      <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                        {viewingOrder.industry}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Customer Information */}
@@ -3502,7 +3829,6 @@ const CrmOrders = () => {
                   gap: '20px',
                   marginBottom: '30px'
                 }}>
-                  {viewingOrder.order_approval_status && (
                     <div style={{
                       background: '#f8f9fa',
                       padding: '16px',
@@ -3526,6 +3852,7 @@ const CrmOrders = () => {
                         marginBottom: '6px'
                       }}>Approval Status</div>
                       <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                      {viewingOrder.order_approval_status ? (
                         <Badge 
                           bg={
                             viewingOrder.order_approval_status?.toLowerCase() === 'approved' ? 'success' :
@@ -3535,10 +3862,11 @@ const CrmOrders = () => {
                         >
                           {viewingOrder.order_approval_status}
                         </Badge>
+                      ) : (
+                        <span className="text-muted">Not Set</span>
+                      )}
                       </div>
                     </div>
-                  )}
-                  {viewingOrder.fulfillment_status && (
                     <div style={{
                       background: '#f8f9fa',
                       padding: '16px',
@@ -3562,6 +3890,7 @@ const CrmOrders = () => {
                         marginBottom: '6px'
                       }}>Fulfillment Status</div>
                       <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                      {viewingOrder.fulfillment_status ? (
                         <Badge 
                           bg={
                             viewingOrder.fulfillment_status?.toLowerCase().includes('completed') || viewingOrder.fulfillment_status?.toLowerCase().includes('delivered') ? 'success' :
@@ -3571,10 +3900,11 @@ const CrmOrders = () => {
                         >
                           {viewingOrder.fulfillment_status}
                         </Badge>
+                      ) : (
+                        <span className="text-muted">Not Set</span>
+                      )}
                       </div>
                     </div>
-                  )}
-                  {viewingOrder.payment_status && (
                     <div style={{
                       background: '#f8f9fa',
                       padding: '16px',
@@ -3598,6 +3928,7 @@ const CrmOrders = () => {
                         marginBottom: '6px'
                       }}>Payment Status</div>
                       <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                      {viewingOrder.payment_status ? (
                         <Badge 
                           bg={
                             viewingOrder.payment_status?.toLowerCase() === 'paid' ? 'success' :
@@ -3607,9 +3938,11 @@ const CrmOrders = () => {
                         >
                           {viewingOrder.payment_status}
                         </Badge>
+                      ) : (
+                        <span className="text-muted">Not Set</span>
+                      )}
                       </div>
                     </div>
-                  )}
                   {viewingOrder.assigned_to && (
                     <div style={{
                       background: '#f8f9fa',

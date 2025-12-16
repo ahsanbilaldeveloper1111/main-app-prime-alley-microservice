@@ -241,7 +241,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
                 <Search size={16} />
               </Button>
             </InputGroup>
-            {/* <Button 
+            <Button 
               variant={showAdvancedFilters ? 'primary' : 'outline-secondary'}
               onClick={onToggleAdvancedFilters}
               className="d-flex align-items-center flex-shrink-0"
@@ -253,7 +253,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
                   {advancedFilterCount}
                 </Badge>
               )}
-            </Button> */}
+            </Button>
           </div>
         </div>
       </Card.Body>
@@ -287,6 +287,11 @@ const CrmCampaigns = () => {
   const [campaignsPagination, setCampaignsPagination] = useState({ currentPage: 1, rowsPerPage: 10, sortColumn: '', sortDirection: 'asc' as 'asc' | 'desc' });
   const [campaignFilters, setCampaignFilters] = useState({
     status: [] as string[],
+    dateFrom: null as string | null,
+    dateTo: null as string | null,
+    userExtensions: null as string[] | null,
+    hasUnassignedProspects: null as boolean | null,
+    tags: null as string[] | null,
   });
 
   // Modal states
@@ -641,7 +646,16 @@ const CrmCampaigns = () => {
 
   // Handle filter changes
   const handleFiltersChange = useCallback((filters: Record<string, any>) => {
-    setCurrentFilters(filters);
+    setCurrentFilters((prev) => {
+      const mergedFilters = { ...prev, ...filters };
+      // Clean up null/undefined values
+      for (const key in mergedFilters) {
+        if (mergedFilters[key] === null || mergedFilters[key] === undefined || (Array.isArray(mergedFilters[key]) && mergedFilters[key].length === 0)) {
+          delete mergedFilters[key];
+        }
+      }
+      return mergedFilters;
+    });
     setRefreshKey((prev) => prev + 1);
   }, []);
 
@@ -665,14 +679,44 @@ const CrmCampaigns = () => {
         // Combine with advanced filter status if any
         const combinedStatus = campaignFilters.status.length > 0 ? campaignFilters.status : statusFilter;
         
+        // Build filters object
+        const filters: Record<string, any> = {
+          ...memoizedFilters,
+        };
+        
+        // Add status filter
+        if (combinedStatus.length > 0) {
+          filters.status = combinedStatus.length === 1 ? combinedStatus[0] : combinedStatus;
+        }
+        
+        // Add date range filters
+        if (campaignFilters.dateFrom) {
+          filters.date_from = campaignFilters.dateFrom;
+        }
+        if (campaignFilters.dateTo) {
+          filters.date_to = campaignFilters.dateTo;
+        }
+        
+        // Add user extensions filter
+        if (campaignFilters.userExtensions && campaignFilters.userExtensions.length > 0) {
+          filters.user_extensions = campaignFilters.userExtensions;
+        }
+        
+        // Add unassigned prospects filter
+        if (campaignFilters.hasUnassignedProspects !== null) {
+          filters.has_unassigned_prospects = campaignFilters.hasUnassignedProspects;
+        }
+        
+        // Add tags filter (if supported)
+        if (campaignFilters.tags && campaignFilters.tags.length > 0) {
+          filters.tags = campaignFilters.tags;
+        }
+        
         const response = await getCampaigns({
           page: campaignsPagination.currentPage,
           per_page: campaignsPagination.rowsPerPage,
-          search: memoizedFilters.search || undefined,
-          filters: {
-            ...memoizedFilters,
-            status: combinedStatus,
-          },
+          search: memoizedFilters.search || campaignsSearch || undefined,
+          filters: filters,
           module_slug: ModuleSlug.CRM_CAMPAIGNS,
         });
         
@@ -693,7 +737,7 @@ const CrmCampaigns = () => {
     if (session?.user?.permissions?.includes('list-crm-campaigns')) {
       loadCampaigns();
     }
-  }, [refreshKey, campaignsPagination, memoizedFilters, campaignFilters, activeFilter, session]);
+  }, [refreshKey, campaignsPagination, memoizedFilters, campaignFilters, activeFilter, campaignsSearch, session]);
 
   // Modal handlers
   const handleCreateCampaign = useCallback(() => {
@@ -1672,24 +1716,41 @@ const CrmCampaigns = () => {
             { id: 'all', label: 'All Campaigns', color: '#6c757d', icon: <Megaphone size={16} /> },
             { id: 'active', label: 'Active', color: '#198754', icon: <TrendingUp size={16} /> },
             { id: 'inactive', label: 'Inactive', color: '#dc3545', icon: <AlertCircle size={16} /> },
+            { id: 'assigned', label: 'Assigned Records', color: '#0d6efd', icon: <UserPlus size={16} /> },
+            { id: 'unassigned', label: 'Unassigned Records', color: '#ffc107', icon: <AlertCircle size={16} /> },
           ]}
           activeFilter={activeFilter}
           onFilterChange={(filterId) => {
             setActiveFilter(filterId);
+            // Handle assigned/unassigned filters
+            if (filterId === 'assigned') {
+              setCampaignFilters(prev => ({ ...prev, hasUnassignedProspects: false }));
+            } else if (filterId === 'unassigned') {
+              setCampaignFilters(prev => ({ ...prev, hasUnassignedProspects: true }));
+            } else if (filterId !== 'assigned' && filterId !== 'unassigned') {
+              // Clear assigned/unassigned filter for status filters (all, active, inactive)
+              setCampaignFilters(prev => ({ ...prev, hasUnassignedProspects: null }));
+            }
             setCampaignsPagination({ ...campaignsPagination, currentPage: 1 });
             setRefreshKey(prev => prev + 1);
           }}
           searchValue={campaignsSearch}
           onSearchChange={(value) => setCampaignsSearch(value)}
           onSearch={() => {
-            handleFiltersChange({ ...currentFilters, search: campaignsSearch });
+            handleFiltersChange({ search: campaignsSearch });
             setCampaignsPagination({ ...campaignsPagination, currentPage: 1 });
             setRefreshKey(prev => prev + 1);
           }}
           searchPlaceholder="Search campaigns by name, description..."
           showAdvancedFilters={showAdvancedFilters}
           onToggleAdvancedFilters={() => setShowAdvancedFilters(!showAdvancedFilters)}
-          advancedFilterCount={campaignFilters.status.length}
+          advancedFilterCount={
+            (campaignFilters.status.length > 0 ? 1 : 0) +
+            (campaignFilters.dateFrom ? 1 : 0) +
+            (campaignFilters.dateTo ? 1 : 0) +
+            (campaignFilters.userExtensions && campaignFilters.userExtensions.length > 0 ? 1 : 0) +
+            (campaignFilters.tags && campaignFilters.tags.length > 0 ? 1 : 0)
+          }
         />
       )}
 
@@ -1726,20 +1787,102 @@ const CrmCampaigns = () => {
                   isClearable
                 />
               </Col>
-              <Col md={8}>
+              <Col md={4}>
+                <Form.Label className="small fw-bold mb-2">Date From</Form.Label>
+                <Form.Control
+                  type="date"
+                  value={campaignFilters.dateFrom || ''}
+                  onChange={(e) => {
+                    const dateValue = e.target.value || null;
+                    setCampaignFilters(prev => ({ ...prev, dateFrom: dateValue }));
+                    handleFiltersChange({ date_from: dateValue || null });
+                  }}
+                />
+              </Col>
+              <Col md={4}>
+                <Form.Label className="small fw-bold mb-2">Date To</Form.Label>
+                <Form.Control
+                  type="date"
+                  value={campaignFilters.dateTo || ''}
+                  onChange={(e) => {
+                    const dateValue = e.target.value || null;
+                    setCampaignFilters(prev => ({ ...prev, dateTo: dateValue }));
+                    handleFiltersChange({ date_to: dateValue || null });
+                  }}
+                />
+              </Col>
+              <Col md={4}>
+                <Form.Label className="small fw-bold mb-2">Campaign Users</Form.Label>
+                <Select
+                  isMulti
+                  options={extensions.map((extension: { id: string; display_name: string; name: string }) => ({
+                    value: extension.id,
+                    label: extension.display_name || extension.name || extension.id
+                  }))}
+                  value={
+                    campaignFilters.userExtensions && campaignFilters.userExtensions.length > 0
+                      ? campaignFilters.userExtensions.map((extId: string) => {
+                          const extension = extensions.find((ext: any) => ext.id == extId);
+                          return {
+                            value: extId,
+                            label: extension?.display_name || extension?.name || `Extension ${extId}`
+                          };
+                        })
+                      : null
+                  }
+                  onChange={(selected) => {
+                    const extValues = selected ? selected.map(s => s.value) : null;
+                    setCampaignFilters(prev => ({ ...prev, userExtensions: extValues }));
+                    handleFiltersChange({ user_extensions: extValues || null });
+                  }}
+                  placeholder="Select campaign users..."
+                  styles={customSelectStyles}
+                  isClearable
+                />
+              </Col>
+              <Col md={4}>
+                <Form.Label className="small fw-bold mb-2">Tags</Form.Label>
+                <CreatableSelect
+                  isMulti
+                  options={availableTags}
+                  value={
+                    campaignFilters.tags && campaignFilters.tags.length > 0
+                      ? campaignFilters.tags.map((tagValue: string) => {
+                          const tag = availableTags.find((t: any) => t.value === tagValue);
+                          return tag ? { value: tagValue, label: tag.label } : { value: tagValue, label: tagValue };
+                        })
+                      : null
+                  }
+                  onChange={(selected) => {
+                    const tagValues = selected ? selected.map((s: any) => s.value) : null;
+                    setCampaignFilters(prev => ({ ...prev, tags: tagValues }));
+                    handleFiltersChange({ tags: tagValues || null });
+                  }}
+                  placeholder="Select or create tags..."
+                  styles={customSelectStyles}
+                  isClearable
+                />
+              </Col>
+              <Col md={12}>
                 <div className="d-flex gap-2">
                   <Button 
                     variant="outline-secondary" 
                     onClick={() => {
                       setCampaignFilters({
                         status: [],
+                        dateFrom: null,
+                        dateTo: null,
+                        userExtensions: null,
+                        hasUnassignedProspects: null,
+                        tags: null,
                       });
                       setActiveFilter('all');
+                      setCurrentFilters({});
                       setCampaignsPagination({ ...campaignsPagination, currentPage: 1 });
                       setRefreshKey(prev => prev + 1);
                     }}
                   >
-                    Reset
+                    Reset All Filters
                   </Button>
                 </div>
               </Col>

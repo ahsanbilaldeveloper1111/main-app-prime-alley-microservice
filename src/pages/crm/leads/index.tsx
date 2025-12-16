@@ -25,6 +25,7 @@ import {
   deleteMeeting,
   restoreLead,
   updateLead,
+  getCampaigns,
 } from "@utils/crm";
 import { GetHierarchyData } from "@utils/users";
 import {
@@ -40,6 +41,7 @@ import {
   Modal,
 } from "react-bootstrap";
 import Select from "react-select";
+import CreatableSelect from "react-select/creatable";
 import { ModuleSlug, formatDateForTable } from "@utils/Helper";
 import {
   Target,
@@ -68,6 +70,7 @@ import {
   ChevronsRight,
   Mail,
   Phone,
+  ChartLine,
   Building2,
   User,
   History,
@@ -435,6 +438,7 @@ const CrmLeads = () => {
   const [stages, setStages] = useState<any[]>([]);
   const [lostReasons, setLostReasons] = useState<any[]>([]);
   const [extensions, setExtensions] = useState<any[]>([]);
+  const [campaigns, setCampaigns] = useState<any[]>([]);
   const [refreshKey, setRefreshKey] = useState(0);
   const [currentFilters, setCurrentFilters] = useState<Record<string, any>>({});
   const [leadsData, setLeadsData] = useState<any[]>([]);
@@ -517,6 +521,14 @@ const CrmLeads = () => {
   const [leadsFilters, setLeadsFilters] = useState({
     assignedTo: null as string | null,
     stage: null as string | null,
+    industry: null as string | null,
+    source: null as string | null,
+    leadPotential: null as string | null,
+    campaign: null as string | null,
+    leadScoreMin: null as string | null,
+    leadScoreMax: null as string | null,
+    dateFrom: null as string | null,
+    dateTo: null as string | null,
   });
 
   // Fetch stages and extensions on component mount
@@ -524,6 +536,7 @@ const CrmLeads = () => {
     fetchStages();
     fetchLostReasons();
     fetchExtensions(ModuleSlug.CRM_LEADS);
+    fetchCampaigns();
   }, []);
 
   // Fetch leads when filters or search change
@@ -549,6 +562,30 @@ const CrmLeads = () => {
         }
         if (currentFilters.assigned_to) {
           params.assigned_to = currentFilters.assigned_to;
+        }
+        if (currentFilters.industry) {
+          params.industry = currentFilters.industry;
+        }
+        if (currentFilters.source) {
+          params.source = currentFilters.source;
+        }
+        if (currentFilters.lead_potential) {
+          params.lead_potential = currentFilters.lead_potential;
+        }
+        if (currentFilters.campaign_id) {
+          params.campaign_id = currentFilters.campaign_id;
+        }
+        if (currentFilters.lead_score_min) {
+          params.lead_score_min = currentFilters.lead_score_min;
+        }
+        if (currentFilters.lead_score_max) {
+          params.lead_score_max = currentFilters.lead_score_max;
+        }
+        if (currentFilters.date_from) {
+          params.date_from = currentFilters.date_from;
+        }
+        if (currentFilters.date_to) {
+          params.date_to = currentFilters.date_to;
         }
         if (currentFilters.is_lost !== undefined) {
           params.is_lost = currentFilters.is_lost;
@@ -734,6 +771,78 @@ const CrmLeads = () => {
         }
       }
 
+      // Handle industry filter
+      if ("industry" in filters) {
+        if (filters.industry) {
+          newFilters.industry = filters.industry;
+        } else {
+          delete newFilters.industry;
+        }
+      }
+
+      // Handle source filter
+      if ("source" in filters) {
+        if (filters.source) {
+          newFilters.source = filters.source;
+        } else {
+          delete newFilters.source;
+        }
+      }
+
+      // Handle lead_potential filter
+      if ("lead_potential" in filters) {
+        if (filters.lead_potential) {
+          newFilters.lead_potential = filters.lead_potential;
+        } else {
+          delete newFilters.lead_potential;
+        }
+      }
+
+      // Handle campaign_id filter
+      if ("campaign_id" in filters) {
+        if (filters.campaign_id) {
+          newFilters.campaign_id = String(filters.campaign_id);
+        } else {
+          delete newFilters.campaign_id;
+        }
+      }
+
+      // Handle lead_score_min filter
+      if ("lead_score_min" in filters) {
+        if (filters.lead_score_min) {
+          newFilters.lead_score_min = String(filters.lead_score_min);
+        } else {
+          delete newFilters.lead_score_min;
+        }
+      }
+
+      // Handle lead_score_max filter
+      if ("lead_score_max" in filters) {
+        if (filters.lead_score_max) {
+          newFilters.lead_score_max = String(filters.lead_score_max);
+        } else {
+          delete newFilters.lead_score_max;
+        }
+      }
+
+      // Handle date_from filter
+      if ("date_from" in filters) {
+        if (filters.date_from) {
+          newFilters.date_from = filters.date_from;
+        } else {
+          delete newFilters.date_from;
+        }
+      }
+
+      // Handle date_to filter
+      if ("date_to" in filters) {
+        if (filters.date_to) {
+          newFilters.date_to = filters.date_to;
+        } else {
+          delete newFilters.date_to;
+        }
+      }
+
       return newFilters;
     });
     setRefreshKey((prev) => prev + 1);
@@ -765,6 +874,18 @@ const CrmLeads = () => {
       }
     } catch (error) {
       console.error("Failed to fetch extensions:", error);
+    }
+  };
+
+  const fetchCampaigns = async () => {
+    try {
+      const campaignsData = await getCampaigns({
+        per_page: 1000,
+        module_slug: ModuleSlug.CRM_CAMPAIGNS,
+      });
+      setCampaigns(campaignsData?.data || []);
+    } catch (error) {
+      console.error("Failed to fetch campaigns:", error);
     }
   };
 
@@ -1008,7 +1129,8 @@ const CrmLeads = () => {
       industry: lead.industry || "",
       stage: lead.stage?.name || (lead.stage_id ? "Unknown" : "New"),
       stageColor: lead.stage?.color || "grey",
-      leadPotential: lead.lead_potential || "Warm",
+      leadPotential: lead?.lead_potential || "Not Set",
+      lead_score: lead?.stage?.score || 0,
       assignedUser:
         extensions.find(
           (ext: any) =>
@@ -1693,6 +1815,20 @@ const CrmLeads = () => {
     return leadsData.map(transformLeadData);
   }, [leadsData, extensions]);
 
+  // Extract unique source values from leads data for creatable select
+  const uniqueSources = useMemo(() => {
+    const sources = new Set<string>();
+    leadsData.forEach((lead: any) => {
+      if (lead.source && lead.source.trim()) {
+        sources.add(lead.source.trim());
+      }
+    });
+    return Array.from(sources).sort().map((source) => ({
+      value: source,
+      label: source,
+    }));
+  }, [leadsData]);
+
   // Calculate filter counts (using summary_tiles if available, otherwise from data)
   const filterCounts = useMemo(() => {
     const transformed = leadsData.map(transformLeadData);
@@ -2004,7 +2140,13 @@ const CrmLeads = () => {
           }
           advancedFilterCount={
             (leadsFilters.assignedTo !== null ? 1 : 0) +
-            (leadsFilters.stage !== null ? 1 : 0)
+            (leadsFilters.stage !== null ? 1 : 0) +
+            (leadsFilters.industry !== null ? 1 : 0) +
+            (leadsFilters.source !== null ? 1 : 0) +
+            (leadsFilters.leadPotential !== null ? 1 : 0) +
+            (leadsFilters.campaign !== null ? 1 : 0) +
+            (leadsFilters.leadScoreMin !== null || leadsFilters.leadScoreMax !== null ? 1 : 0) +
+            (leadsFilters.dateFrom !== null || leadsFilters.dateTo !== null ? 1 : 0)
           }
         />
 
@@ -2103,17 +2245,224 @@ const CrmLeads = () => {
                   />
                 </Col>
                 <Col md={4}>
-                  <div className="d-flex gap-2">
-                    {/* <Button
-                      variant="primary"
-                      className="d-flex align-items-center justify-content-center"
-                      onClick={() => {
-                        setLeadsPagination({ ...leadsPagination, currentPage: 1 });
-                        setRefreshKey(prev => prev + 1);
+                  <Form.Label className="small fw-bold mb-2">Industry</Form.Label>
+                  <Select
+                    options={[
+                      { value: "Technology", label: "Technology" },
+                      { value: "Healthcare", label: "Healthcare" },
+                      { value: "Finance", label: "Finance" },
+                      {
+                        value: "Banking & Financial Services",
+                        label: "Banking & Financial Services",
+                      },
+                      { value: "Manufacturing", label: "Manufacturing" },
+                      { value: "Retail", label: "Retail" },
+                      { value: "Education", label: "Education" },
+                      { value: "Real Estate", label: "Real Estate" },
+                      {
+                        value: "Telecommunications",
+                        label: "Telecommunications",
+                      },
+                      { value: "Construction", label: "Construction" },
+                      { value: "Other", label: "Other" },
+                    ]}
+                    value={
+                      leadsFilters.industry
+                        ? {
+                            value: leadsFilters.industry,
+                            label: leadsFilters.industry,
+                          }
+                        : null
+                    }
+                    onChange={(selected) => {
+                      const industryValue = selected ? selected.value : null;
+                      setLeadsFilters((prev) => ({
+                        ...prev,
+                        industry: industryValue,
+                      }));
+                      handleFiltersChange({
+                        industry: industryValue || null,
+                      });
+                    }}
+                    placeholder="Select industry..."
+                    styles={customSelectStyles}
+                    isClearable
+                  />
+                </Col>
+                <Col md={4}>
+                  <Form.Label className="small fw-bold mb-2">Source</Form.Label>
+                  <CreatableSelect
+                    options={uniqueSources}
+                    value={
+                      leadsFilters.source
+                        ? {
+                            value: leadsFilters.source,
+                            label: leadsFilters.source,
+                          }
+                        : null
+                    }
+                    onChange={(selected) => {
+                      const sourceValue = selected ? selected.value : null;
+                      setLeadsFilters((prev) => ({
+                        ...prev,
+                        source: sourceValue,
+                      }));
+                      handleFiltersChange({
+                        source: sourceValue || null,
+                      });
+                    }}
+                    placeholder="Select or create source..."
+                    styles={customSelectStyles}
+                    isClearable
+                    formatCreateLabel={(inputValue) => `Create "${inputValue}"`}
+                  />
+                </Col>
+                <Col md={4}>
+                  <Form.Label className="small fw-bold mb-2">Lead Potential</Form.Label>
+                  <Select
+                    options={[
+                      { value: "Hot", label: "Hot" },
+                      { value: "Warm", label: "Warm" },
+                      { value: "Cold", label: "Cold" },
+                    ]}
+                    value={
+                      leadsFilters.leadPotential
+                        ? {
+                            value: leadsFilters.leadPotential,
+                            label: leadsFilters.leadPotential,
+                          }
+                        : null
+                    }
+                    onChange={(selected) => {
+                      const leadPotentialValue = selected ? selected.value : null;
+                      setLeadsFilters((prev) => ({
+                        ...prev,
+                        leadPotential: leadPotentialValue,
+                      }));
+                      handleFiltersChange({
+                        lead_potential: leadPotentialValue || null,
+                      });
+                    }}
+                    placeholder="Select lead potential..."
+                    styles={customSelectStyles}
+                    isClearable
+                  />
+                </Col>
+                <Col md={4}>
+                  <Form.Label className="small fw-bold mb-2">Campaign</Form.Label>
+                  <Select
+                    options={campaigns.map((campaign: any) => ({
+                      value: campaign.id.toString(),
+                      label: campaign.name,
+                    }))}
+                    value={
+                      leadsFilters.campaign
+                        ? (() => {
+                            const campaignId = leadsFilters.campaign;
+                            const campaign = campaigns.find(
+                              (c: any) => c.id.toString() === campaignId
+                            );
+                            return campaign
+                              ? { value: campaignId, label: campaign.name }
+                              : { value: campaignId, label: campaignId };
+                          })()
+                        : null
+                    }
+                    onChange={(selected) => {
+                      const campaignValue = selected ? selected.value : null;
+                      setLeadsFilters((prev) => ({
+                        ...prev,
+                        campaign: campaignValue,
+                      }));
+                      handleFiltersChange({
+                        campaign_id: campaignValue || null,
+                      });
+                    }}
+                    placeholder="Select campaign..."
+                    styles={customSelectStyles}
+                    isClearable
+                  />
+                </Col>
+                <Col md={6}>
+                  <Form.Label className="small fw-bold mb-2">Lead Score Range</Form.Label>
+                  <div className="d-flex gap-2 align-items-center">
+                    <Form.Control
+                      type="number"
+                      min="0"
+                      value={leadsFilters.leadScoreMin || ""}
+                      onChange={(e) => {
+                        const minValue = e.target.value || null;
+                        setLeadsFilters((prev) => ({
+                          ...prev,
+                          leadScoreMin: minValue,
+                        }));
+                        handleFiltersChange({
+                          lead_score_min: minValue || null,
+                        });
                       }}
-                    >
-                      Apply Filters
-                    </Button> */}
+                      placeholder="Min"
+                      style={{ flex: 1 }}
+                    />
+                    <span className="text-muted">to</span>
+                    <Form.Control
+                      type="number"
+                      min="0"
+                      value={leadsFilters.leadScoreMax || ""}
+                      onChange={(e) => {
+                        const maxValue = e.target.value || null;
+                        setLeadsFilters((prev) => ({
+                          ...prev,
+                          leadScoreMax: maxValue,
+                        }));
+                        handleFiltersChange({
+                          lead_score_max: maxValue || null,
+                        });
+                      }}
+                      placeholder="Max"
+                      style={{ flex: 1 }}
+                    />
+                  </div>
+                </Col>
+                <Col md={6}>
+                  <Form.Label className="small fw-bold mb-2">Date Range</Form.Label>
+                  <div className="d-flex gap-2 align-items-center">
+                    <Form.Control
+                      type="date"
+                      value={leadsFilters.dateFrom || ""}
+                      onChange={(e) => {
+                        const dateFromValue = e.target.value || null;
+                        setLeadsFilters((prev) => ({
+                          ...prev,
+                          dateFrom: dateFromValue,
+                        }));
+                        handleFiltersChange({
+                          date_from: dateFromValue || null,
+                        });
+                      }}
+                      placeholder="From"
+                      style={{ flex: 1 }}
+                    />
+                    <span className="text-muted">to</span>
+                    <Form.Control
+                      type="date"
+                      value={leadsFilters.dateTo || ""}
+                      onChange={(e) => {
+                        const dateToValue = e.target.value || null;
+                        setLeadsFilters((prev) => ({
+                          ...prev,
+                          dateTo: dateToValue,
+                        }));
+                        handleFiltersChange({
+                          date_to: dateToValue || null,
+                        });
+                      }}
+                      placeholder="To"
+                      style={{ flex: 1 }}
+                    />
+                  </div>
+                </Col>
+                <Col md={12}>
+                  <div className="d-flex gap-2">
                     <Button
                       variant="outline-secondary"
                       className="d-flex align-items-center justify-content-center"
@@ -2121,6 +2470,14 @@ const CrmLeads = () => {
                         setLeadsFilters({
                           assignedTo: null,
                           stage: null,
+                          industry: null,
+                          source: null,
+                          leadPotential: null,
+                          campaign: null,
+                          leadScoreMin: null,
+                          leadScoreMax: null,
+                          dateFrom: null,
+                          dateTo: null,
                         });
                         setCurrentFilters({});
                         setActiveFilter("all");
@@ -3243,6 +3600,53 @@ const CrmLeads = () => {
                       {viewingLead.created_at
                         ? formatDateForTable(viewingLead.created_at)
                         : "N/A"}
+                    </div>
+                  </div>
+                  <div
+                    style={{
+                      background: "#f8f9fa",
+                      padding: "16px",
+                      borderRadius: "10px",
+                      transition: "all 0.3s",
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.background = "#e5e7eb";
+                      e.currentTarget.style.transform = "translateY(-2px)";
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.background = "#f8f9fa";
+                      e.currentTarget.style.transform = "translateY(0)";
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: "12px",
+                        fontWeight: 600,
+                        color: "#6b7280",
+                        textTransform: "uppercase",
+                        letterSpacing: "0.5px",
+                        marginBottom: "6px",
+                      }}
+                    >
+                      Lead Score (Based on Stage)
+                    </div>
+                    <div
+                      style={{
+                        fontSize: "15px",
+                        color: "#1f2937",
+                        fontWeight: 500,
+                      }}
+                    >
+                      <ChartLine
+                        size={14}
+                        style={{
+                          color: "#4680ff",
+                          marginRight: "6px",
+                          display: "inline",
+                        }}
+                      />
+                      {viewingLead?.lead_score !== null ? `${viewingLead?.lead_score}%`  : 'Not Set'
+                        }
                     </div>
                   </div>
                 </div>
