@@ -17,6 +17,7 @@ interface Permission {
     description: string;
     module_id: number;
     is_special: string;
+    severity_level?: string;
 }
 
 interface PermissionGroup {
@@ -30,11 +31,29 @@ const EditRolePermission = () => {
     const router = useRouter();
     const { id } = router.query;
 
+    // Helper function to get badge class based on severity level
+    const getSeverityBadgeClass = (severityLevel: string): string => {
+        const level = severityLevel?.toLowerCase();
+        switch (level) {
+            case 'low':
+                return 'info';
+            case 'medium':
+                return 'primary';
+            case 'high':
+                return 'warning';
+            case 'critical':
+                return 'danger';
+            default:
+                return 'primary';
+        }
+    };
+
     const [roleName,setRoleName] = useState<string>('');
     const [rolePermissions,setRolePermissions] = useState<PermissionGroup[]>([]);
     const [permissions, setPermissions] = useState(null);
     const [searchTerm, setSearchTerm] = useState<string>('');
     const [selectedAction, setSelectedAction] = useState<string>('all');
+    const [selectedSeverityLevel, setSelectedSeverityLevel] = useState<string>('');
 
     useEffect(() => {
         if (id) {
@@ -49,14 +68,16 @@ const EditRolePermission = () => {
         setPermissions(role.permissions);
     }
 
-    // Filter permissions based on search term and action filter
+    // Filter permissions based on search term, action filter, and severity level
     const filteredPermissions = rolePermissions?.filter((group: PermissionGroup) => {
         const groupMatches = group.group.toLowerCase().includes(searchTerm.toLowerCase());
         const permissionMatches = group.permissions.some((perm: Permission) => {
             const matchesSearch = perm.name.toLowerCase().includes(searchTerm.toLowerCase());
             const matchesAction = selectedAction === 'all' || 
                 perm.name.toLowerCase().includes(selectedAction.toLowerCase());
-            return matchesSearch && matchesAction;
+            const matchesSeverity = selectedSeverityLevel === '' || 
+                perm.severity_level?.toLowerCase() === selectedSeverityLevel.toLowerCase();
+            return matchesSearch && matchesAction && matchesSeverity;
         });
         return groupMatches || permissionMatches;
     }).map((group: PermissionGroup) => ({
@@ -66,7 +87,9 @@ const EditRolePermission = () => {
                 group.group.toLowerCase().includes(searchTerm.toLowerCase());
             const matchesAction = selectedAction === 'all' || 
                 perm.name.toLowerCase().includes(selectedAction.toLowerCase());
-            return matchesSearch && matchesAction;
+            const matchesSeverity = selectedSeverityLevel === '' || 
+                perm.severity_level?.toLowerCase() === selectedSeverityLevel.toLowerCase();
+            return matchesSearch && matchesAction && matchesSeverity;
         })
     }));
 
@@ -226,7 +249,7 @@ const EditRolePermission = () => {
             </Row>
 
             <Row className="mb-3">
-                <Col md={12}>
+                <Col md={6}>
                     <div className="d-flex align-items-center gap-2 flex-wrap">
                         <span className="fw-semibold">Filter by Action:</span>
                         <Button
@@ -271,6 +294,16 @@ const EditRolePermission = () => {
                         >
                             Update
                         </Button>
+                    </div>
+                </Col>
+                <Col md={6}>
+                    <div className="d-flex align-items-center gap-2 flex-wrap justify-content-end">
+                        <span className="fw-semibold">Severity Level:</span>
+                        <Button variant="outline-primary" size="sm" onClick={() => setSelectedSeverityLevel('')}>All</Button>
+                        <Button variant="outline-info" size="sm" onClick={() => setSelectedSeverityLevel('Low')}>Low</Button>
+                        <Button variant="outline-primary" size="sm" onClick={() => setSelectedSeverityLevel('Medium')}>Medium</Button>
+                        <Button variant="outline-warning" size="sm" onClick={() => setSelectedSeverityLevel('High')}>High</Button>
+                        <Button variant="outline-danger" size="sm" onClick={() => setSelectedSeverityLevel('Critical')}>Critical</Button>
                     </div>
                 </Col>
             </Row>
@@ -328,6 +361,11 @@ const EditRolePermission = () => {
                                                                                         originalIndex
                                                                                     )}
                                                                                 />
+                                                                                {perm?.severity_level && perm?.severity_level !== "" && (
+                                                                                    <span className={`status-badge ${getSeverityBadgeClass(perm.severity_level)} ms-1 small`}>
+                                                                                        {perm?.severity_level}
+                                                                                    </span>
+                                                                                )}
                                                                             </div>
                                                                         </OverlayTrigger>
                                                                     </div>
@@ -368,6 +406,11 @@ const EditRolePermission = () => {
                                                                                         originalIndex
                                                                                     )}
                                                                                 />
+                                                                                {perm?.severity_level && perm?.severity_level !== "" && (
+                                                                                    <span className={`status-badge ${getSeverityBadgeClass(perm.severity_level)} ms-1 small`}>
+                                                                                        {perm?.severity_level}
+                                                                                    </span>
+                                                                                )}
                                                                             </div>
                                                                         </OverlayTrigger>
                                                                     </div>

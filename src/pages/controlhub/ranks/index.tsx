@@ -3,9 +3,9 @@ import React, { ReactElement, useState, useCallback, useMemo, useEffect } from '
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
 import GenericListPage from '@components/GenericListPage';
-import { ListRoles, updateRole,deleteRole,addRole,BulkDeleteRoles, getUserTypes } from '@utils/roles';
+import { ListRoles, updateRole,deleteRole,addRole,BulkDeleteRoles, getUserTypes, getModules, getPermissionsByModule, updateSeverityLevel } from '@utils/roles';
 import { Column } from '@components/CustomDataTable';
-import { Button, Row, Col, Form } from 'react-bootstrap';
+import { Button, Row, Col, Form, OverlayTrigger, Tooltip } from 'react-bootstrap';
 import { toast } from 'react-toastify';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
@@ -18,6 +18,24 @@ import ConfirmModal from '@pages/partial/ConfirmModal'
 import { FiEdit, FiTrash2, FiEye } from 'react-icons/fi';
 import DatatableActionButton from '@components/DatatableActionButton';
 
+// Helper function to get badge colors based on severity level
+const getSeverityBadgeColors = (severityLevel: string): { bg: string; text: string } => {
+    const level = severityLevel?.toLowerCase();
+    switch (level) {
+        case 'low':
+            return { bg: 'rgba(118, 118, 118, 0.15)', text: '#3a7bd5' }; // Light blue
+        case 'medium':
+            return { bg: 'rgba(31, 119, 219, 0.15)', text: '#2583f2' }; // Light blue
+        case 'high':
+            return { bg: 'rgba(248, 201, 16, 0.15)', text: '#f1c40f' }; // Light yellow
+        case 'critical':
+            return { bg: 'rgba(255, 25, 0, 0.15)', text: '#e74c3c' }; // Light red
+        case 'unassigned':
+            return { bg: 'rgba(118, 118, 118, 0.15)', text: '#767676' }; // Light gray
+        default:
+            return { bg: 'rgba(37, 131, 242, 0.15)', text: '#2583f2' };
+    }
+};
 
 const Ranks = () => {
     const { data: session } = useSession();
@@ -57,8 +75,71 @@ const Ranks = () => {
                 )
              },
 
+            { key: 'Severity Level', name: 'Severity Level', selector: (row: any) => row.severity_level, sortable: true,
+                cell: (props: any) => {
+                    const severityCounts = props.severity_counts || {};
+                    const severityLevels = ['Low', 'Medium', 'High', 'Critical'];
+                    
+                    return (
+                        <div className="d-flex align-items-center" style={{ marginLeft: '0' }}>
+                            {severityLevels.map((level, index) => {
+                                const count = severityCounts[level] || 0;
+                                
+                                const colors = getSeverityBadgeColors(level);
+                                
+                                return (
+                                    <OverlayTrigger
+                                        key={level}
+                                        placement="top"
+                                        overlay={<Tooltip id={`tooltip-${level}`}>{level}: {count}</Tooltip>}
+                                    >
+                                        <span 
+                                            className="position-relative d-inline-flex align-items-center justify-content-center"
+                                            style={{ 
+                                                minWidth: '32px',
+                                                height: '32px',
+                                                padding: '0 8px',
+                                                borderRadius: '16px',
+                                                marginLeft: index > 0 ? '-10px' : '0',
+                                                cursor: 'help',
+                                                border: '2px solid white',
+                                                backgroundColor: colors.bg,
+                                                color: colors.text,
+                                                fontSize: '11px',
+                                                fontWeight: '700',
+                                                zIndex: severityLevels.length - index,
+                                                boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                                                whiteSpace: 'nowrap'
+                                            }}
+                                        >
+                                            {level}
+                                            <span 
+                                                className="position-absolute top-0 end-0 translate-middle d-inline-flex align-items-center justify-content-center"
+                                                style={{
+                                                    backgroundColor: colors.bg,
+                                                    color: colors.text,
+                                                    fontSize: '10px',
+                                                    fontWeight: '600',
+                                                    width: '16px',
+                                                    height: '16px',
+                                                    borderRadius: '50%',
+                                                    border: '1.5px solid white',
+                                                    lineHeight: '1'
+                                                }}
+                                            >
+                                                {count}
+                                            </span>
+                                        </span>
+                                    </OverlayTrigger>
+                                );
+                            })}
+                        </div>
+                    );
+                }
+            },
+
             ...(session?.user?.is_admin === "1" ? [
-                { key: 'Company', name: 'company', selector: (row: any) => row.company, sortable: true },
+                { key: 'Company', name: 'Created By', selector: (row: any) => row.company, sortable: true },
                 { key: 'Assigned Users', name: 'Assigned Users', selector: (row: any) => row.user_assigned_count, sortable: true,
                     cell: (props: any) => (
                         <div>
@@ -274,6 +355,16 @@ const Ranks = () => {
     const [newRankName, setNewRankName] = useState<string>("");
     const [newRankUserTypeId, setNewRankUserTypeId] = useState<number | null>(null);
 
+    // Severity Level Modal State
+    const [showSeverityLevelModal, setShowSeverityLevelModal] = useState<boolean>(false);
+    const [modules, setModules] = useState<any[]>([]);
+    const [selectedModuleId, setSelectedModuleId] = useState<number | null>(null);
+    const [permissions, setPermissions] = useState<any[]>([]);
+    const [selectedPermissionId, setSelectedPermissionId] = useState<number | null>(null);
+    const [selectedSeverityLevel, setSelectedSeverityLevel] = useState<string>("");
+    const [isLoadingModules, setIsLoadingModules] = useState<boolean>(false);
+    const [isLoadingPermissions, setIsLoadingPermissions] = useState<boolean>(false);
+
     const handleOpenCreateRankModal = async () => {
         await fetchUserTypes();
         setShowCreateRankModal(true);
@@ -292,6 +383,59 @@ const Ranks = () => {
               console.log('Modal state updated:', true);
             }, 100);
             setRefreshKey(prev => prev + 1); // Trigger refresh
+        }
+    };
+
+    // Severity Level Modal Handlers
+    const handleOpenSeverityLevelModal = async () => {
+        setIsLoadingModules(true);
+        try {
+            const modulesData = await getModules();
+            setModules(modulesData || []);
+        } catch (error) {
+            console.error('Error fetching modules:', error);
+        } finally {
+            setIsLoadingModules(false);
+        }
+        setShowSeverityLevelModal(true);
+    };
+
+    const handleModuleChange = async (moduleId: number | null) => {
+        setSelectedModuleId(moduleId);
+        setSelectedPermissionId(null);
+        setPermissions([]);
+        
+        if (moduleId) {
+            setIsLoadingPermissions(true);
+            try {
+                const permissionsData = await getPermissionsByModule(moduleId);
+                setPermissions(permissionsData || []);
+            } catch (error) {
+                console.error('Error fetching permissions:', error);
+            } finally {
+                setIsLoadingPermissions(false);
+            }
+        }
+    };
+
+    const handleSubmitSeverityLevel = async () => {
+        if (!selectedPermissionId || !selectedModuleId || !selectedSeverityLevel) {
+            toast.error('Please select module, permission, and severity level');
+            return;
+        }
+
+        const response = await updateSeverityLevel(selectedPermissionId, selectedModuleId, selectedSeverityLevel);
+        if(response){
+            setSelectedModuleId(null);
+            setSelectedPermissionId(null);
+            setSelectedSeverityLevel("");
+            setPermissions([]);
+            setShowSeverityLevelModal(false);
+            setSuccessModalTitle('Severity Level Updated');
+            setSuccessModalDescription('The severity level has been updated successfully');
+            setTimeout(() => {
+              setShowSuccessfulModal(true);
+            }, 100);
         }
     };
 
@@ -321,6 +465,9 @@ const Ranks = () => {
                     {/* <RolesFilters onFiltersChange={handleFiltersChange} onExport={handleExport} /> */}
                     {session?.user?.permissions?.includes('add-ranks') && (
                         <Button variant="primary"  onClick={handleOpenCreateRankModal}>Add Rank</Button>
+                    )}
+                    {session?.user?.is_admin === "1" && (
+                        <Button variant="outline-primary" className="ms-2" onClick={handleOpenSeverityLevelModal}>Severity Level</Button>
                     )}
                     </div>
 
@@ -516,6 +663,88 @@ const Ranks = () => {
           title={successModalTitle}
           description={successModalDescription}
         />
+
+            <FormModal
+                show={showSeverityLevelModal}
+                onHide={() => {
+                    setShowSeverityLevelModal(false);
+                    setSelectedModuleId(null);
+                    setSelectedPermissionId(null);
+                    setSelectedSeverityLevel("");
+                    setPermissions([]);
+                }}
+                title="Update Severity Level"
+                desc="Please select module, permission, and severity level to update."
+                formHtml={
+                    <>
+                        <div className="form-group mb-3">
+                            <label htmlFor="severityModule" className="form-label">Module <span className="text-danger">*</span></label>
+                            <Form.Select
+                                id="severityModule"
+                                value={selectedModuleId || ''}
+                                onChange={(e) => handleModuleChange(e.target.value ? Number.parseInt(e.target.value, 10) : null)}
+                                disabled={isLoadingModules}
+                            >
+                                <option value="">-- Select Module --</option>
+                                {modules.map((module) => (
+                                    <option key={module.id} value={module.id}>
+                                        {module.name || module.title || `Module ${module.id}`}
+                                    </option>
+                                ))}
+                            </Form.Select>
+                            <p className="text-muted mt-2 small">Select a module to view its permissions</p>
+                        </div>
+                        <div className="form-group mb-3">
+                            <label htmlFor="severityPermission" className="form-label">Permission <span className="text-danger">*</span></label>
+                            <Form.Select
+                                id="severityPermission"
+                                value={selectedPermissionId || ''}
+                                onChange={(e) => setSelectedPermissionId(e.target.value ? Number.parseInt(e.target.value, 10) : null)}
+                                disabled={isLoadingPermissions || !selectedModuleId || permissions.length === 0}
+                            >
+                                <option value="">-- Select Permission --</option>
+                                {permissions.map((permission) => (
+                                    <option key={permission.id} value={permission.id}>
+                                        {permission.name || permission.title || `Permission ${permission.id}`}
+                                    </option>
+                                ))}
+                            </Form.Select>
+                            <p className="text-muted mt-2 small">
+                                {isLoadingPermissions ? 'Loading permissions...' : 
+                                 !selectedModuleId ? 'Please select a module first' :
+                                 permissions.length === 0 ? 'No permissions available for this module' :
+                                 'Select a permission to update its severity level'}
+                            </p>
+                        </div>
+                        <div className="form-group mb-3">
+                            <label htmlFor="severityLevel" className="form-label">Severity Level <span className="text-danger">*</span></label>
+                            <Form.Select
+                                id="severityLevel"
+                                value={selectedSeverityLevel}
+                                onChange={(e) => setSelectedSeverityLevel(e.target.value)}
+                                disabled={!selectedPermissionId}
+                            >
+                                <option value="">-- Select Severity Level --</option>
+                                <option value="Low">Low</option>
+                                <option value="Medium">Medium</option>
+                                <option value="High">High</option>
+                                <option value="Critical">Critical</option>
+                            </Form.Select>
+                            <p className="text-muted mt-2 small">Select the severity level for this permission</p>
+                        </div>
+                    </>
+                }
+                submitButtonText="Update Severity Level"
+                cancelButtonText="Cancel"
+                onSubmit={handleSubmitSeverityLevel}
+                onCancel={() => {
+                    setShowSeverityLevelModal(false);
+                    setSelectedModuleId(null);
+                    setSelectedPermissionId(null);
+                    setSelectedSeverityLevel("");
+                    setPermissions([]);
+                }}
+            />
         </React.Fragment>
     );
 };
