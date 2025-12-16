@@ -159,7 +159,7 @@ const KPICard: React.FC<KPICardData> = ({ title, value, change, isPositive, icon
 
 // Filter Bar Component
 interface FilterBarProps {
-  quickFilters: { id: string; label: string; variant?: string; color?: string; activeColor?: string; icon?: React.ReactNode }[];
+  quickFilters: { id: string; label: string; variant?: string; color?: string; icon?: React.ReactNode }[];
   activeFilter: string;
   onFilterChange: (filterId: string) => void;
   searchValue: string;
@@ -190,19 +190,18 @@ const FilterBar: React.FC<FilterBarProps> = ({
           <div className="d-flex gap-2 flex-wrap align-items-center flex-grow-1">
             {quickFilters.map(filter => {
               const isActive = activeFilter === filter.id;
-              const hasCustomColor = filter.color || filter.activeColor;
+              const hasCustomColor = filter.color;
               const buttonStyle: React.CSSProperties = {};
               if (hasCustomColor) {
+                const bgColor = filter.color;
                 if (isActive) {
-                  const bgColor = filter.activeColor || filter.color;
-                  buttonStyle.background = '#fff';
+                  buttonStyle.background = bgColor;
                   buttonStyle.borderColor = bgColor;
-                  buttonStyle.color = bgColor;
+                  buttonStyle.color = "#fff";
                 } else {
                   buttonStyle.background = '#fff';
                   buttonStyle.borderColor = filter.color;
                   buttonStyle.color = filter.color;
-                  buttonStyle.opacity = '0.7';
                 }
               }
 
@@ -1351,6 +1350,7 @@ const CrmCampaigns = () => {
           setRefreshKey((prev) => prev + 1);
         }
       }
+      setShowDataAssignmentModal(false);
     } catch (error: any) {
       console.error("Assignment error:", error);
       toast.error(error?.response?.data?.message || "Failed to assign data");
@@ -1669,9 +1669,9 @@ const CrmCampaigns = () => {
       {session?.user?.permissions?.includes('list-crm-campaigns') && (
         <FilterBar
           quickFilters={[
-            { id: 'all', label: 'All Campaigns', color: '#6c757d', activeColor: '#0d6efd', icon: <Megaphone size={16} /> },
-            { id: 'active', label: 'Active', color: '#198754', activeColor: '#0d6efd', icon: <TrendingUp size={16} /> },
-            { id: 'inactive', label: 'Inactive', color: '#dc3545', activeColor: '#0d6efd', icon: <AlertCircle size={16} /> },
+            { id: 'all', label: 'All Campaigns', color: '#6c757d', icon: <Megaphone size={16} /> },
+            { id: 'active', label: 'Active', color: '#198754', icon: <TrendingUp size={16} /> },
+            { id: 'inactive', label: 'Inactive', color: '#dc3545', icon: <AlertCircle size={16} /> },
           ]}
           activeFilter={activeFilter}
           onFilterChange={(filterId) => {

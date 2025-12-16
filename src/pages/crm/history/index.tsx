@@ -38,7 +38,7 @@ import { ModuleSlug } from "@utils/Helper";
 
 // Filter Bar Component
 interface FilterBarProps {
-  quickFilters: { id: string; label: string; count?: number; variant?: string; color?: string; activeColor?: string; icon?: React.ReactNode }[];
+  quickFilters: { id: string; label: string; count?: number; variant?: string; color?: string; icon?: React.ReactNode }[];
   activeFilter: string;
   onFilterChange: (filterId: string) => void;
   searchValue: string;
@@ -70,23 +70,23 @@ const FilterBar: React.FC<FilterBarProps> = ({
           <div className="d-flex gap-2 flex-wrap align-items-center flex-grow-1">
             {quickFilters.map(filter => {
               const isActive = activeFilter === filter.id;
-              const hasCustomColor = filter.color || filter.activeColor;
+              const hasCustomColor = filter.color;
 
               // Determine button styles
               const buttonStyle: React.CSSProperties = {};
               if (hasCustomColor) {
                 if (isActive) {
                   // Active state: use activeColor or fallback to color for background
-                  const bgColor = filter.activeColor || filter.color;
-                  buttonStyle.background = '#fff';
+                  const bgColor = filter.color;
+                  buttonStyle.background = bgColor;
                   buttonStyle.borderColor = bgColor;
-                  buttonStyle.color = bgColor;
+                  buttonStyle.color = "#fff";
                 } else {
                   // Inactive state: use color for background with reduced opacity
                   buttonStyle.background = '#fff';
                   buttonStyle.borderColor = filter.color;
                   buttonStyle.color = filter.color;
-                  buttonStyle.opacity = '0.7';
+                  
                 }
               }
 
@@ -983,28 +983,24 @@ const HistoryPage = () => {
             id: 'all',
             label: 'All Types',
             color: '#6c757d',
-            activeColor: '#0d6efd',
             icon: <Activity size={16} />
           },
           {
             id: 'leads',
             label: 'Leads',
             color: '#0d6efd',
-            activeColor: '#0d6efd',
             icon: <Target size={16} />
           },
           {
             id: 'deals',
             label: 'Deals',
             color: '#28a745',
-            activeColor: '#0d6efd',
             icon: <Handshake size={16} />
           },
           {
             id: 'orders',
             label: 'Orders',
             color: '#20c997',
-            activeColor: '#0d6efd',
             icon: <ShoppingBag size={16} />
           }
         ]}

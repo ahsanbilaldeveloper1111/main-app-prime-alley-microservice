@@ -13,6 +13,9 @@ const nextConfig: NextConfig = {
         style: 'compressed',
         sourceMap: false,
     },
+    turbopack: {
+  
+    },
     webpack: (config, { isServer, dev }) => {
         // Fix for Sass import tracing
         config.resolve.alias = {

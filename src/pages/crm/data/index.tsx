@@ -1,4 +1,6 @@
 import "@assets/scss/datatable-style.scss";
+import parsePhoneNumber from "libphonenumber-js";
+
 import React, {
   ReactElement,
   useState,
@@ -116,6 +118,54 @@ interface KPICardData {
   onClick?: () => void;
 }
 
+const PhoneContainer = ({ phone }: { phone: string }) => {
+  const parsePhone = useCallback((phone: string) => {
+    if (!phone)
+      return {
+        phone: "N/A",
+        countryCode: "",
+      };
+    try {
+      const parsedPhone = parsePhoneNumber(phone);
+      console.log("POPHSDF", parsedPhone);
+      return {
+        phone: parsedPhone?.formatInternational() || phone,
+        countryCode: parsedPhone?.country || "",
+      };
+    } catch (e) {
+      console.error(e);
+      return {
+        phone: phone,
+        countryCode: "",
+      };
+    }
+  }, []);
+  const getFlagImgSrc = useCallback((countryCode: string) => {
+    return `https://flagcdn.com/w20/${countryCode.toLowerCase()}.png`;
+  }, []);
+  const phoneNumber = useMemo(() => {
+    return phone
+      ? parsePhone(phone)
+      : {
+          phone: "N/A",
+          countryCode: "",
+        };
+  }, [phone]);
+
+  const flagImgSrc = getFlagImgSrc(phoneNumber.countryCode);
+  return (
+      <Badge bg="info" className="bg-opacity-10 text-dark">
+        <div className="d-flex align-items-center gap-2">
+          {phoneNumber?.countryCode && <img
+            src={flagImgSrc}
+            alt={phoneNumber.countryCode}
+          />}
+          {phoneNumber.phone}
+        </div>
+      </Badge>
+  );
+};
+
 const KPICard: React.FC<KPICardData> = ({
   title,
   value,
@@ -176,7 +226,6 @@ interface FilterBarProps {
     label: string;
     variant?: string;
     color?: string;
-    activeColor?: string;
     icon?: React.ReactNode;
   }[];
   activeFilter: string;
@@ -210,21 +259,20 @@ const FilterBar: React.FC<FilterBarProps> = ({
           <div className="d-flex gap-2 flex-wrap align-items-center flex-grow-1">
             {quickFilters.map((filter) => {
               const isActive = activeFilter === filter.id;
-              const hasCustomColor = filter.color || filter.activeColor;
+              const hasCustomColor = filter.color;
 
               // Determine button styles
               const buttonStyle: React.CSSProperties = {};
               if (hasCustomColor) {
                 if (isActive) {
-                  const bgColor = filter.activeColor || filter.color;
-                  buttonStyle.background = "#fff";
+                  const bgColor = filter.color;
+                  buttonStyle.background = bgColor;
                   buttonStyle.borderColor = bgColor;
-                  buttonStyle.color = bgColor;
+                  buttonStyle.color = "#fff";
                 } else {
                   buttonStyle.background = "#fff";
                   buttonStyle.borderColor = filter.color;
                   buttonStyle.color = filter.color;
-                  buttonStyle.opacity = "0.7";
                 }
               }
 
@@ -293,6 +341,58 @@ const FilterBar: React.FC<FilterBarProps> = ({
       </Card.Body>
     </Card>
   );
+};
+
+// Helper function to get initials from name (first two words, first two letters, only a-z)
+const getInitials = (name: string): string => {
+  if (!name) return "NA";
+
+  // Split by spaces and take up to first two words
+  const words = name.trim().split(/\s+/).slice(0, 2);
+
+  // Check if we have two words and the second word has at least one letter
+  const hasSecondWord = words.length >= 2;
+  const secondWordHasLetter = hasSecondWord && /[a-z]/i.test(words[1]);
+
+  if (hasSecondWord && secondWordHasLetter) {
+    // First letter of first two words
+    const firstLetter1 = words[0].match(/[a-z]/i)?.[0];
+    const firstLetter2 = words[1].match(/[a-z]/i)?.[0];
+    
+    if (firstLetter1 && firstLetter2) {
+      return (firstLetter1 + firstLetter2).toUpperCase();
+    }
+  }
+
+  // If no second word or second word is only numbers, use first two letters of first word
+  if (words[0]) {
+    const letters = words[0].match(/[a-z]/gi) || [];
+    if (letters.length >= 2) {
+      return (letters[0] + letters[1]).toUpperCase();
+    } else if (letters.length === 1) {
+      return letters[0].toUpperCase();
+    }
+  }
+
+  return "NA";
+};
+
+// Helper function to generate a random background color based on name
+const getRandomColor = (name: string): string => {
+  if (!name) return "#6c757d";
+
+  // Generate a consistent color based on the name
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = (name?.codePointAt(i) || 0) + ((hash << 5) - hash);
+  }
+
+  // Generate a color with good contrast (avoid too light colors)
+  const hue = Math.abs(hash) % 360;
+  const saturation = 50 + (Math.abs(hash) % 30); // 50-80%
+  const lightness = 40 + (Math.abs(hash) % 20); // 40-60%
+
+  return `hsla(${hue}, ${saturation}%, ${lightness}%, 0.6)`;
 };
 
 const CrmProspectsManagement = () => {
@@ -1155,7 +1255,7 @@ const CrmProspectsManagement = () => {
       // Show error messages for validation failures
       if (errors.length > 0) {
         errors.forEach((error: string) => {
-          toast.error(error);
+          toast.warn(error);
         });
       }
 
@@ -2016,7 +2116,7 @@ const CrmProspectsManagement = () => {
         <div>
           <h2 className="mb-1 fw-bold">Prospects</h2>
           <p className="text-muted mb-0">
-            Manage your prospects and schedule calls
+          Upload, manage, call, schedule, and convert your prospects into leads.
           </p>
         </div>
         <div className="d-flex flex-wrap gap-2">
@@ -2056,7 +2156,7 @@ const CrmProspectsManagement = () => {
               </Col>
               <Col xl={3} lg={4} md={6} className="mb-3">
                 <KPICard
-                  title="Scheduled"
+                  title="Prospects with Calls Scheduled"
                   value={metrics.scheduled_records}
                   icon={<Calendar size={24} />}
                   color="success"
@@ -2064,7 +2164,7 @@ const CrmProspectsManagement = () => {
               </Col>
               <Col xl={3} lg={4} md={6} className="mb-3">
                 <KPICard
-                  title="Not Scheduled"
+                  title="Prospects with No Calls Scheduled"
                   value={metrics.not_scheduled_records}
                   icon={<XCircle size={24} />}
                   color="secondary"
@@ -2072,7 +2172,7 @@ const CrmProspectsManagement = () => {
               </Col>
               <Col xl={3} lg={4} md={6} className="mb-3">
                 <KPICard
-                  title="Next Hour"
+                  title="Meetings in Next Hour"
                   value={metrics.scheduled_next_hour_records}
                   icon={<ClockIcon size={24} />}
                   color="info"
@@ -2082,7 +2182,7 @@ const CrmProspectsManagement = () => {
                 <>
                   <Col xl={3} lg={4} md={6} className="mb-3">
                     <KPICard
-                      title="Next 24h"
+                      title="Meetings in Next 24h"
                       value={metrics.scheduled_next_24_hours_records}
                       icon={<Calendar size={24} />}
                       color="warning"
@@ -2091,7 +2191,7 @@ const CrmProspectsManagement = () => {
 
                   <Col xl={3} lg={4} md={6} className="mb-3">
                     <KPICard
-                      title="Assigned Prospects"
+                      title=" Prospects Assigned to Team Members"
                       value={metrics.assigned_records}
                       icon={<UserPlus size={24} />}
                       color="primary"
@@ -2099,7 +2199,7 @@ const CrmProspectsManagement = () => {
                   </Col>
                   <Col xl={3} lg={4} md={6} className="mb-3">
                     <KPICard
-                      title="Unassigned Prospects"
+                      title="Prospects Not Assigned to Team Members"
                       value={metrics.unassigned_records}
                       icon={<AlertCircleIcon size={24} />}
                       color="warning"
@@ -2138,22 +2238,19 @@ const CrmProspectsManagement = () => {
               {
                 id: "all",
                 label: "All Prospects",
-                color: "#6c757d",
-                activeColor: "#0d6efd",
+                color: "#0d6efd",
                 icon: <Users size={16} />,
               },
               {
                 id: "scheduled",
                 label: "Scheduled",
                 color: "#20c997",
-                activeColor: "#20c997",
                 icon: <FiCalendar size={16} />,
               },
               {
                 id: "has_leads",
                 label: "Converted to Leads",
                 color: "#0dcaf0",
-                activeColor: "#0dcaf0",
                 icon: <FiTarget size={16} />,
               },
             ]}
@@ -2656,17 +2753,39 @@ const CrmProspectsManagement = () => {
                                 )}
                                 {selectedColumns.includes("name") && (
                                   <td className="fw-semibold">
-                                    {item.name || "N/A"}
+                                    <div className="d-flex align-items-center gap-2">
+                                      {item.name ? (
+                                        <>
+                                          <div
+                                            style={{
+                                              width: "30px",
+                                              height: "30px",
+                                              borderRadius: "50%",
+                                              backgroundColor: getRandomColor(
+                                                item.name
+                                              ),
+                                              color: "#fff",
+                                              display: "flex",
+                                              alignItems: "center",
+                                              justifyContent: "center",
+                                              fontSize: "10px",
+                                              fontWeight: "600",
+                                              flexShrink: 0,
+                                            }}
+                                          >
+                                            {getInitials(item.name)}
+                                          </div>
+                                          <span>{item.name}</span>
+                                        </>
+                                      ) : (
+                                        "N/A"
+                                      )}
+                                    </div>
                                   </td>
                                 )}
                                 {selectedColumns.includes("phone") && (
                                   <td>
-                                    <Badge
-                                      bg="info"
-                                      className="bg-opacity-10 text-dark"
-                                    >
-                                      {item.phone || "N/A"}
-                                    </Badge>
+                                    <PhoneContainer phone={item?.phone} />
                                   </td>
                                 )}
                                 {selectedColumns.includes("user_extension") && (
@@ -2674,8 +2793,17 @@ const CrmProspectsManagement = () => {
                                     {item.user_extension ? (
                                       <Badge
                                         bg="success"
-                                        className="bg-opacity-10 text-dark"
+                                        className="bg-opacity-10 text-dark d-flex align-items-center gap-1"
+                                        style={{
+                                        }}
                                       >
+                                        <span style={{
+                                          backgroundColor: '#1de9b6',
+                                          width: '5px',
+                                          height: '5px',
+                                          borderRadius: '50%',
+                                        }}>
+                                        </span>
                                         {extensions.find(
                                           (ext: any) =>
                                             ext.id.toString() ===
@@ -3960,9 +4088,9 @@ const CrmProspectsManagement = () => {
                   />
                 </div>
                 <Form.Text className="text-muted">
-                  <strong>Auto-balance:</strong> Prospects are distributed evenly.{" "}
-                  <strong>Custom:</strong> You specify exactly how many prospects
-                  each campaign gets.
+                  <strong>Auto-balance:</strong> Prospects are distributed
+                  evenly. <strong>Custom:</strong> You specify exactly how many
+                  prospects each campaign gets.
                 </Form.Text>
               </Form.Group>
 

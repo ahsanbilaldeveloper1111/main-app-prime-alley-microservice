@@ -1,4 +1,5 @@
 import "@assets/scss/datatable-style.scss";
+import parsePhoneNumber from "libphonenumber-js";
 import React, {
   ReactElement,
   useState,
@@ -38,7 +39,7 @@ import {
   Modal,
 } from "react-bootstrap";
 import Select from 'react-select';
-import { ModuleSlug } from "@utils/Helper";
+import { ModuleSlug, formatDateForTable } from "@utils/Helper";
 import {
   Target,
   CheckCircle,
@@ -108,6 +109,150 @@ import FormModal from "../../partial/FormModal";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import { useSession } from "next-auth/react";
 
+// Phone Container Component (with Badge for tables)
+const PhoneContainer = ({ phone }: { phone: string }) => {
+  const parsePhone = useCallback((phone: string) => {
+    if (!phone)
+      return {
+        phone: "N/A",
+        countryCode: "",
+      };
+    try {
+      const parsedPhone = parsePhoneNumber(phone);
+      return {
+        phone: parsedPhone?.formatInternational() || phone,
+        countryCode: parsedPhone?.country || "",
+      };
+    } catch (e) {
+      console.error(e);
+      return {
+        phone: phone,
+        countryCode: "",
+      };
+    }
+  }, []);
+  const getFlagImgSrc = useCallback((countryCode: string) => {
+    return `https://flagcdn.com/w20/${countryCode.toLowerCase()}.png`;
+  }, []);
+  const phoneNumber = useMemo(() => {
+    return phone
+      ? parsePhone(phone)
+      : {
+          phone: "N/A",
+          countryCode: "",
+        };
+  }, [phone, parsePhone]);
+
+  const flagImgSrc = getFlagImgSrc(phoneNumber.countryCode);
+  return (
+    <Badge bg="info" className="bg-opacity-10 text-dark">
+      <div className="d-flex align-items-center gap-2">
+        {phoneNumber?.countryCode && (
+          <img src={flagImgSrc} alt={phoneNumber.countryCode} />
+        )}
+        {phoneNumber.phone}
+      </div>
+    </Badge>
+  );
+};
+
+// Phone Display Component (without Badge for view dialogs)
+const PhoneDisplay = ({ phone }: { phone: string }) => {
+  const parsePhone = useCallback((phone: string) => {
+    if (!phone)
+      return {
+        phone: "N/A",
+        countryCode: "",
+      };
+    try {
+      const parsedPhone = parsePhoneNumber(phone);
+      return {
+        phone: parsedPhone?.formatInternational() || phone,
+        countryCode: parsedPhone?.country || "",
+      };
+    } catch (e) {
+      console.error(e);
+      return {
+        phone: phone,
+        countryCode: "",
+      };
+    }
+  }, []);
+  const getFlagImgSrc = useCallback((countryCode: string) => {
+    return `https://flagcdn.com/w20/${countryCode.toLowerCase()}.png`;
+  }, []);
+  const phoneNumber = useMemo(() => {
+    return phone
+      ? parsePhone(phone)
+      : {
+          phone: "N/A",
+          countryCode: "",
+        };
+  }, [phone, parsePhone]);
+
+  const flagImgSrc = getFlagImgSrc(phoneNumber.countryCode);
+  return (
+    <div className="d-flex align-items-center gap-2">
+      {phoneNumber?.countryCode && (
+        <img src={flagImgSrc} alt={phoneNumber.countryCode} />
+      )}
+      {phoneNumber.phone}
+    </div>
+  );
+};
+
+// Helper function to get initials from name (first two words, first two letters, only a-z)
+const getInitials = (name: string): string => {
+  if (!name) return "NA";
+
+  // Split by spaces and take up to first two words
+  const words = name.trim().split(/\s+/).slice(0, 2);
+
+  // Check if we have two words and the second word has at least one letter
+  const hasSecondWord = words.length >= 2;
+  const secondWordHasLetter = hasSecondWord && /[a-z]/i.test(words[1]);
+
+  if (hasSecondWord && secondWordHasLetter) {
+    // First letter of first two words
+    const firstLetter1 = words[0].match(/[a-z]/i)?.[0];
+    const firstLetter2 = words[1].match(/[a-z]/i)?.[0];
+
+    if (firstLetter1 && firstLetter2) {
+      return (firstLetter1 + firstLetter2).toUpperCase();
+    }
+  }
+
+  // If no second word or second word is only numbers, use first two letters of first word
+  if (words[0]) {
+    const letters = words[0].match(/[a-z]/gi) || [];
+    if (letters.length >= 2) {
+      return (letters[0] + letters[1]).toUpperCase();
+    } else if (letters.length === 1) {
+      return letters[0].toUpperCase();
+    }
+  }
+
+  return "NA";
+};
+
+// Helper function to generate a random background color based on name
+const getRandomColor = (name: string): string => {
+  if (!name) return "#6c757d";
+
+  // Generate a consistent color based on the name
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = (name?.codePointAt(i) || 0) + ((hash << 5) - hash);
+  }
+
+  // Generate a color with good contrast (avoid too light colors)
+  const hue = Math.abs(hash) % 360;
+  const saturation = 50 + (Math.abs(hash) % 30); // 50-80%
+  const lightness = 40 + (Math.abs(hash) % 20); // 40-60%
+
+  return `hsla(${hue}, ${saturation}%, ${lightness}%, 0.6)`;
+};
+
 // KPI Card Component
 interface KPICardData {
   title: string;
@@ -163,7 +308,7 @@ const KPICard: React.FC<KPICardData> = ({ title, value, change, isPositive, icon
 
 // Filter Bar Component
 interface FilterBarProps {
-  quickFilters: { id: string; label: string; count: number; variant?: string; color?: string; activeColor?: string; icon?: React.ReactNode }[];
+  quickFilters: { id: string; label: string; count: number; variant?: string; color?: string; icon?: React.ReactNode }[];
   activeFilter: string;
   onFilterChange: (filterId: string) => void;
   searchValue: string;
@@ -194,19 +339,18 @@ const FilterBar: React.FC<FilterBarProps> = ({
           <div className="d-flex gap-2 flex-wrap align-items-center flex-grow-1">
             {quickFilters.map(filter => {
               const isActive = activeFilter === filter.id;
-              const hasCustomColor = filter.color || filter.activeColor;
+              const hasCustomColor = filter.color;
               const buttonStyle: React.CSSProperties = {};
               if (hasCustomColor) {
                 if (isActive) {
-                  const bgColor = filter.activeColor || filter.color;
-                  buttonStyle.background = '#fff';
+                  const bgColor = filter.color;
+                  buttonStyle.background = bgColor;
                   buttonStyle.borderColor = bgColor;
-                  buttonStyle.color = bgColor;
+                  buttonStyle.color = "#fff";
                 } else {
                   buttonStyle.background = '#fff';
                   buttonStyle.borderColor = filter.color;
                   buttonStyle.color = filter.color;
-                  buttonStyle.opacity = '0.7';
                 }
               }
 
@@ -1093,19 +1237,20 @@ const CrmDeals = () => {
       company: deal.company_name || '',
       industry: deal.industry || '',
       stage: deal.stage?.name || 'No Stage',
+      stageColor: deal.stage?.color || 'grey',
       dealType: deal.deal_type || '',
       value: deal.net_value || deal.grand_total || '0',
       currency: deal.currency || 'USD',
       probability: deal.probability || 0,
-      closeDate: deal.expected_close_date ? new Date(deal.expected_close_date).toLocaleDateString() : '',
-      followUpDate: deal.follow_up_date ? new Date(deal.follow_up_date).toLocaleDateString() : '',
+      closeDate: formatDateForTable(deal.expected_close_date),
+      followUpDate: formatDateForTable(deal.follow_up_date),
       owner: extensions.find((ext: any) => ext?.id == deal?.created_by || ext?.extension == deal?.created_by)?.display_name || 
               extensions.find((ext: any) => ext?.id == deal?.created_by || ext?.extension == deal?.created_by)?.name || 
               deal.created_by || '',
       assignedUser: extensions.find((ext: any) => ext?.id == deal?.assigned_to || ext?.extension == deal?.assigned_to)?.display_name || 
                     extensions.find((ext: any) => ext?.id == deal?.assigned_to || ext?.extension == deal?.assigned_to)?.name || 
                     deal.assigned_to || '',
-      created: deal.created_at ? new Date(deal.created_at).toLocaleDateString() : '',
+      created: formatDateForTable(deal.created_at),
       riskLevel: deal.risk_level || '',
       negotiationBar: deal.negotiation_bar || 0,
       quotationSent: deal.quotation_sent || false,
@@ -1362,8 +1507,7 @@ const CrmDeals = () => {
               id: 'all',
               label: 'All Deals',
               count: filterCounts.all,
-              color: '#6c757d',
-              activeColor: '#0d6efd',
+              color: '#0d6efd',
               icon: <Users size={16} />
             },
             ...stages.slice(0, 5).map((stage: any) => ({
@@ -1371,7 +1515,6 @@ const CrmDeals = () => {
               label: stage.name,
               count: filterCounts[stage.id] || 0,
               color: stage.color || '#6c757d',
-              activeColor: '#0d6efd',
               icon: <Layers size={16} />
             })),
             {
@@ -1379,7 +1522,6 @@ const CrmDeals = () => {
               label: 'Lost',
               count: filterCounts.lost || 0,
               color: '#fd7e14',
-              activeColor: '#fd7e14',
               icon: <X size={16} />
             },
             {
@@ -1387,7 +1529,6 @@ const CrmDeals = () => {
               label: 'Deleted',
               count: filterCounts.deleted || 0,
               color: '#dc3545',
-              activeColor: '#dc3545',
               icon: <Trash2 size={16} />
             }
           ]}
@@ -1716,7 +1857,42 @@ const CrmDeals = () => {
                     ).map((deal) => (
                       <tr key={deal.id}>
                         {selectedDealsColumns.includes('name') && (
-                          <td className="fw-semibold"><div className="text-wrap">{deal.name}</div></td>
+                          <td className="fw-semibold">
+                            <div className="d-flex align-items-center gap-2">
+                              {deal.name ? (
+                                <>
+                                  <div
+                                    style={{
+                                      width: "30px",
+                                      height: "30px",
+                                      borderRadius: "50%",
+                                      backgroundColor: getRandomColor(deal.name),
+                                      color: "#fff",
+                                      display: "flex",
+                                      alignItems: "center",
+                                      justifyContent: "center",
+                                      fontSize: "10px",
+                                      fontWeight: "600",
+                                      flexShrink: 0,
+                                    }}
+                                  >
+                                    {getInitials(deal.name)}
+                                  </div>
+                                  <div
+                                    style={{
+                                      textOverflow: "ellipsis",
+                                      whiteSpace: "nowrap",
+                                      overflow: "hidden",
+                                    }}
+                                  >
+                                    {deal.name}
+                                  </div>
+                                </>
+                              ) : (
+                                "N/A"
+                              )}
+                            </div>
+                          </td>
                         )}
                         {selectedDealsColumns.includes('company') && (
                           <td>
@@ -1728,16 +1904,14 @@ const CrmDeals = () => {
                         )}
                         {selectedDealsColumns.includes('stage') && (
                           <td>
-                            <Badge 
-                              bg={
-                                deal.stage?.toLowerCase().includes('negotiation') ? 'warning' :
-                                deal.stage?.toLowerCase().includes('proposal') ? 'info' :
-                                deal.stage?.toLowerCase().includes('won') ? 'success' :
-                                'secondary'
-                              }
+                                  <span
+                              style={{
+                                backgroundColor: deal?.stageColor || "grey",
+                              }}
+                              className="badge"
                             >
-                              {deal.stage}
-                            </Badge>
+                              {deal?.stage} 
+                            </span>
                           </td>
                         )}
                         {selectedDealsColumns.includes('dealType') && (
@@ -2141,7 +2315,7 @@ const CrmDeals = () => {
                     }}>Created Date</div>
                     <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
                       <Calendar size={14} style={{ color: '#4680ff', marginRight: '6px', display: 'inline' }} />
-                      {viewingDeal.created_at ? new Date(viewingDeal.created_at).toLocaleDateString('en-GB') : 'N/A'}
+                      {viewingDeal.created_at ? formatDateForTable(viewingDeal.created_at) : 'N/A'}
                     </div>
                   </div>
                 </div>
@@ -2259,45 +2433,7 @@ const CrmDeals = () => {
                           {relatedLead.name}
                         </div>
                       </div>
-                      {relatedLead.stage && (
-                        <div style={{
-                          background: '#f8f9fa',
-                          padding: '16px',
-                          borderRadius: '10px',
-                          transition: 'all 0.3s'
-                        }}
-                        onMouseOver={(e) => {
-                          e.currentTarget.style.background = '#e5e7eb';
-                          e.currentTarget.style.transform = 'translateY(-2px)';
-                        }}
-                        onMouseOut={(e) => {
-                          e.currentTarget.style.background = '#f8f9fa';
-                          e.currentTarget.style.transform = 'translateY(0)';
-                        }}>
-                          <div style={{
-                            fontSize: '12px',
-                            fontWeight: 600,
-                            color: '#6b7280',
-                            textTransform: 'uppercase',
-                            letterSpacing: '0.5px',
-                            marginBottom: '6px'
-                          }}>Stage</div>
-                          <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
-                            <Badge 
-                              bg="primary"
-                              style={{
-                                padding: '6px 14px',
-                                borderRadius: '20px',
-                                fontSize: '12px',
-                                fontWeight: 600,
-                                backgroundColor: relatedLead.stage?.color || '#6c757d'
-                              }}
-                            >
-                              {relatedLead.stage?.name || 'Not assigned'}
-                            </Badge>
-                          </div>
-                        </div>
-                      )}
+                    
                       {relatedLead.lead_potential && (
                         <div style={{
                           background: '#f8f9fa',
@@ -2332,36 +2468,6 @@ const CrmDeals = () => {
                               }}
                             >
                               {relatedLead.lead_potential || 'N/A'}
-                            </Badge>
-                          </div>
-                        </div>
-                      )}
-                      {relatedLead.status && (
-                        <div style={{
-                          background: '#f8f9fa',
-                          padding: '16px',
-                          borderRadius: '10px',
-                          transition: 'all 0.3s'
-                        }}
-                        onMouseOver={(e) => {
-                          e.currentTarget.style.background = '#e5e7eb';
-                          e.currentTarget.style.transform = 'translateY(-2px)';
-                        }}
-                        onMouseOut={(e) => {
-                          e.currentTarget.style.background = '#f8f9fa';
-                          e.currentTarget.style.transform = 'translateY(0)';
-                        }}>
-                          <div style={{
-                            fontSize: '12px',
-                            fontWeight: 600,
-                            color: '#6b7280',
-                            textTransform: 'uppercase',
-                            letterSpacing: '0.5px',
-                            marginBottom: '6px'
-                          }}>Status</div>
-                          <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
-                            <Badge bg={relatedLead.is_lost ? 'danger' : relatedLead.status === 'new' ? 'primary' : 'success'}>
-                              {relatedLead.is_lost ? 'Lost' : relatedLead.status || 'N/A'}
                             </Badge>
                           </div>
                         </div>
@@ -2422,14 +2528,14 @@ const CrmDeals = () => {
                           }}>Created Date</div>
                           <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
                             <Calendar size={14} style={{ color: '#4680ff', marginRight: '6px', display: 'inline' }} />
-                            {relatedLead.created_at ? new Date(relatedLead.created_at).toLocaleDateString() : 'N/A'}
+                            {relatedLead.created_at ? formatDateForTable(relatedLead.created_at) : 'N/A'}
                           </div>
                         </div>
                       )}
                     </div>
 
                     {/* Lead Company Information */}
-                    {relatedLead.company_name && (
+                    {/* {relatedLead.company_name && (
                       <>
                         <div style={{
                           fontSize: '16px',
@@ -2592,7 +2698,7 @@ const CrmDeals = () => {
                           )}
                         </div>
                       </>
-                    )}
+                    )} */}
 
                     {/* Campaign Information */}
                     {relatedLead.campaign && (
@@ -2780,8 +2886,14 @@ const CrmDeals = () => {
                                 marginBottom: '6px'
                               }}>Phone</div>
                               <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
-                                <Phone size={14} style={{ color: '#4680ff', marginRight: '6px', display: 'inline' }} />
-                                {relatedLead.crm_data.phone || (relatedLead.crm_data.data && relatedLead.crm_data.data.phone) || 'N/A'}
+                                <PhoneDisplay
+                                  phone={
+                                    relatedLead.crm_data.phone ||
+                                    (relatedLead.crm_data.data &&
+                                      relatedLead.crm_data.data.phone) ||
+                                    ""
+                                  }
+                                />
                               </div>
                             </div>
                           )}
@@ -2867,7 +2979,7 @@ const CrmDeals = () => {
                               }}>Created At</div>
                               <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
                                 <Calendar size={14} style={{ color: '#4680ff', marginRight: '6px', display: 'inline' }} />
-                                {new Date(relatedLead.crm_data.created_at).toLocaleDateString()}
+                                {formatDateForTable(relatedLead.crm_data.created_at)}
                               </div>
                             </div>
                           )}
@@ -3015,7 +3127,7 @@ const CrmDeals = () => {
                                 {meeting.name}
                               </div>
                               <div style={{ fontSize: '12px', color: '#6b7280', fontWeight: 600, marginBottom: '4px' }}>
-                                {meeting.meeting_date ? new Date(meeting.meeting_date).toLocaleDateString() : 'N/A'} {meeting.meeting_time || ''} - {meeting.meeting_type}
+                                {meeting.meeting_date ? formatDateForTable(meeting.meeting_date) : 'N/A'} {meeting.meeting_time || ''} - {meeting.meeting_type}
                               </div>
                               {meeting.meeting_outcome && (
                                 <div style={{ fontSize: '14px', color: '#1f2937', marginBottom: '4px', fontWeight: 500 }}>
@@ -3569,7 +3681,7 @@ const CrmDeals = () => {
                   style={{ flex: 1 }}
                   disabled={uploadingFile}
                 />
-                <Button 
+                {/* <Button 
                   variant="primary" 
                   className="d-flex align-items-center gap-2"
                   disabled={uploadingFile}
@@ -3585,7 +3697,7 @@ const CrmDeals = () => {
                       Upload
                     </>
                   )}
-                </Button>
+                </Button> */}
               </div>
             </div>
 
@@ -3634,7 +3746,7 @@ const CrmDeals = () => {
                             <div className="flex-grow-1">
                               <div className="fw-semibold" style={{ fontSize: '14px' }}>{attachment.name}</div>
                               <div style={{ fontSize: '12px', color: '#6c757d' }}>
-                                {formatFileSize(attachment.file_size)} • {attachment.created_at ? new Date(attachment.created_at).toLocaleDateString() : 'N/A'}
+                                {formatFileSize(attachment.file_size)} • {attachment.created_at ? formatDateForTable(attachment.created_at) : 'N/A'}
                               </div>
                             </div>
                           </div>

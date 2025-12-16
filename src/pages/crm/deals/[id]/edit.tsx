@@ -25,7 +25,7 @@ import { useSession } from "next-auth/react";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
-import { ModuleSlug } from '@utils/Helper';
+import { ModuleSlug, ValidationType, checkRequiredFields } from '@utils/Helper';
 import { convertCurrency, formatCurrency } from '@utils/currency';
 
 const EditDeal = () => {
@@ -250,6 +250,74 @@ const EditDeal = () => {
     }
   };
 
+  // Validation functions for each step
+  const validateStep0 = (): boolean => {
+    const requiredFields = [
+      { field: 'name' as const, name: 'Deal Name' },
+      { field: 'stage_id' as const, name: 'Stage' },
+      { field: 'expected_close_date' as const, name: 'Expected Close Date' },
+      { field: 'assigned_to' as const, name: 'Assigned to' },
+      { field: 'currency' as const, name: 'Currency' },
+    ];
+    return checkRequiredFields(formData, requiredFields);
+  };
+
+  const validateStep1 = (): boolean => {
+    const requiredFields = [
+      { field: 'company_name' as const, name: 'Company Name' },
+      { field: 'industry' as const, name: 'Industry' },
+      { field: 'decision_maker_name' as const, name: 'Decision Maker Name' },
+      { field: 'decision_maker_email' as const, name: 'Decision Maker Email', type: ValidationType.EMAIL },
+      { field: 'decision_maker_phone' as const, name: 'Decision Maker Phone' },
+    ];
+    return checkRequiredFields(formData, requiredFields);
+  };
+
+  const validateStep2 = (): boolean => {
+    const requiredFields = [
+      { field: 'deal_type' as const, name: 'Deal Type' },
+      { field: 'contract_length' as const, name: 'Contract Length' },
+      { field: 'billing_model' as const, name: 'Billing Model' },
+      { field: 'payment_terms' as const, name: 'Payment Terms' },
+      { field: 'risk_level' as const, name: 'Risk Level' },
+    ];
+    return checkRequiredFields(formData, requiredFields);
+  };
+
+  const validateStep3 = (): boolean => {
+    // Step 3 (Progress & Notes) has no required fields
+    return true;
+  };
+
+  const validateStep4 = (): boolean => {
+    // Step 4 (Estimation) - items are optional for edit
+    return true;
+  };
+
+  const validateCurrentStep = (): boolean => {
+    switch (formStep) {
+      case 0:
+        return validateStep0();
+      case 1:
+        return validateStep1();
+      case 2:
+        return validateStep2();
+      case 3:
+        return validateStep3();
+      case 4:
+        return validateStep4();
+      default:
+        return true;
+    }
+  };
+
+  const handleNextStep = (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (validateCurrentStep()) {
+      setFormStep(Math.min(4, formStep + 1));
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (formStep < 4) {
@@ -259,11 +327,16 @@ const EditDeal = () => {
 
     if (!id) return;
 
+    // Validate all required fields before submission
+    if (!validateStep0() || !validateStep1() || !validateStep2()) {
+      return;
+    }
+
     setLoading(true);
     try {
       const payload: any = {
         name: formData.name,
-        stage_id: formData.stage_id,
+        stage_id: formData.stage_id ? String(formData.stage_id) : undefined,
         assigned_to: formData.assigned_to,
         expected_close_date: formData.expected_close_date,
         company_name: formData.company_name,
@@ -316,10 +389,10 @@ const EditDeal = () => {
           currency: formData.currency,
         };
 
-        await createEstimate(estimatePayload);
+        await createEstimate(estimatePayload, false);
       }
 
-      toast.success("Deal updated successfully!");
+      // toast.success("Deal updated successfully!");
       router.push("/crm/deals");
     } catch (error: any) {
       console.error("Failed to update deal:", error);
@@ -998,7 +1071,7 @@ const EditDeal = () => {
                         </Form.Select>
                       </Form.Group>
                     </Col>
-                    <Col md={4}>
+                    {extensions?.length > 1 && <Col md={4}>
                       <Form.Group className="mb-3">
                         <Form.Label>Special Discount (%)</Form.Label>
                         <Form.Control
@@ -1012,7 +1085,7 @@ const EditDeal = () => {
                           placeholder="0"
                         />
                       </Form.Group>
-                    </Col>
+                    </Col>}
                   </Row>
 
                   {/* Action Buttons */}
@@ -1720,10 +1793,7 @@ const EditDeal = () => {
               {formStep < 4 ? (
                 <Button 
                   variant="primary"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    setFormStep(formStep + 1);
-                  }}
+                  onClick={handleNextStep}
                 >
                   Next <ChevronRight size={16} className="ms-1" />
                 </Button>

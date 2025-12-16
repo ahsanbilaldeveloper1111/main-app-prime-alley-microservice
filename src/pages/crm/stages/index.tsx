@@ -102,7 +102,7 @@ interface Stage {
 
 // Filter Bar Component
 interface FilterBarProps {
-  quickFilters: { id: string; label: string; count: number; variant?: string; color?: string; activeColor?: string; icon?: React.ReactNode }[];
+  quickFilters: { id: string; label: string; count: number; variant?: string; color?: string; icon?: React.ReactNode }[];
   activeFilter: string;
   onFilterChange: (filterId: string) => void;
   searchValue: string;
@@ -133,19 +133,18 @@ const FilterBar: React.FC<FilterBarProps> = ({
           <div className="d-flex gap-2 flex-wrap align-items-center flex-grow-1">
             {quickFilters.map(filter => {
               const isActive = activeFilter === filter.id;
-              const hasCustomColor = filter.color || filter.activeColor;
+              const hasCustomColor = filter.color;
               const buttonStyle: React.CSSProperties = {};
               if (hasCustomColor) {
+                const bgColor = filter.color;
                 if (isActive) {
-                  const bgColor = filter.activeColor || filter.color;
-                  buttonStyle.background = '#fff';
+                  buttonStyle.background = bgColor;
                   buttonStyle.borderColor = bgColor;
-                  buttonStyle.color = bgColor;
+                  buttonStyle.color = "#fff";
                 } else {
                   buttonStyle.background = '#fff';
                   buttonStyle.borderColor = filter.color;
                   buttonStyle.color = filter.color;
-                  buttonStyle.opacity = '0.7';
                 }
               }
 
@@ -989,7 +988,6 @@ const StagesManagement = () => {
               label: 'All Types',
               count: filterCounts.all,
               color: '#6c757d',
-              activeColor: '#0d6efd',
               icon: <Layers size={16} />
             },
             {
@@ -997,7 +995,6 @@ const StagesManagement = () => {
               label: 'Lead',
               count: filterCounts.lead,
               color: '#0d6efd',
-              activeColor: '#0d6efd',
               icon: <Target size={16} />
             },
             {
@@ -1005,7 +1002,6 @@ const StagesManagement = () => {
               label: 'Deal',
               count: filterCounts.deal,
               color: '#ffc107',
-              activeColor: '#0d6efd',
               icon: <TrendingUp size={16} />
             },
             {
@@ -1013,7 +1009,6 @@ const StagesManagement = () => {
               label: 'Order',
               count: filterCounts.order,
               color: '#20c997',
-              activeColor: '#0d6efd',
               icon: <Layers size={16} />
             },
             {
@@ -1021,7 +1016,6 @@ const StagesManagement = () => {
               label: 'Lost Reason',
               count: filterCounts.lost_reason,
               color: '#dc3545',
-              activeColor: '#0d6efd',
               icon: <XCircle size={16} />
             },
             {
@@ -1029,7 +1023,6 @@ const StagesManagement = () => {
               label: 'Deleted',
               count: filterCounts.deleted || 0,
               color: '#dc3545',
-              activeColor: '#dc3545',
               icon: <Trash2 size={16} />
             }
           ]}

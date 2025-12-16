@@ -57,7 +57,6 @@ interface FilterBarProps {
     label: string;
     variant?: string;
     color?: string;
-    activeColor?: string;
     icon?: React.ReactNode;
   }[];
   activeFilter: string;
@@ -91,20 +90,19 @@ const FilterBar: React.FC<FilterBarProps> = ({
           <div className="d-flex gap-2 flex-wrap align-items-center flex-grow-1">
             {quickFilters.map((filter) => {
               const isActive = activeFilter === filter.id;
-              const hasCustomColor = filter.color || filter.activeColor;
+              const hasCustomColor = filter.color;
 
               const buttonStyle: React.CSSProperties = {};
               if (hasCustomColor) {
                 if (isActive) {
-                  const bgColor = filter.activeColor || filter.color;
-                  buttonStyle.background = "#fff";
+                  const bgColor = filter.color;
+                  buttonStyle.background = bgColor;
                   buttonStyle.borderColor = bgColor;
-                  buttonStyle.color = bgColor;
+                  buttonStyle.color = "#fff";
                 } else {
                   buttonStyle.background = "#fff";
                   buttonStyle.borderColor = filter.color;
                   buttonStyle.color = filter.color;
-                  buttonStyle.opacity = "0.7";
                 }
               }
 
@@ -514,21 +512,18 @@ const ProductsPage = () => {
         id: "all",
         label: "All Products",
         color: "#6c757d",
-        activeColor: "#0d6efd",
         icon: <Package size={16} />,
       },
       {
         id: "active",
         label: "Active",
         color: "#198754",
-        activeColor: "#0d6efd",
         icon: <CheckCircle size={16} />,
       },
       {
         id: "inactive",
         label: "Inactive",
         color: "#6c757d",
-        activeColor: "#0d6efd",
         icon: <X size={16} />,
       },
     ];
