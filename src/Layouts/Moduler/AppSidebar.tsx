@@ -624,19 +624,20 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
           url: '/controlhub/teams'
         },
         {
-          id: 'controlhub-ranks',
-          title: HEADER_CONSTANTS.SUBMENU_LABELS.RANKS,
-          icon: <Shield size={16} />,
-          permission: PERMISSIONS.VIEW_RANKS,
-          url: '/controlhub/ranks'
-        },
-        {
           id: 'controlhub-groups',
           title: HEADER_CONSTANTS.SUBMENU_LABELS.GROUPS,
           icon: <Group size={16} />,
           permission: PERMISSIONS.VIEW_GROUPS,
           url: '/controlhub/groups'
+        },
+        {
+          id: 'controlhub-ranks',
+          title: HEADER_CONSTANTS.SUBMENU_LABELS.RANKS,
+          icon: <Shield size={16} />,
+          permission: PERMISSIONS.VIEW_RANKS,
+          url: '/controlhub/ranks'
         }
+        
       ].filter(item => !item.permission || hasPermission(item.permission))
     },
 

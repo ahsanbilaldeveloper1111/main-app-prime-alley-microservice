@@ -204,14 +204,15 @@ export const updateTeam = async (team_id: number, name: string): Promise<boolean
     }
   };
 
-  export const assignUsersToTeam = async (team_id: number, user_ids: number[]): Promise<any | null> => {
+  export const assignUsersToTeam = async (team_id: number, user_ids: number[], owner_ids?: number[]): Promise<any | null> => {
     try {
         
       const response = await axiosInstance.post(
         `teams/assign-users`,
         {
           team_id: team_id,
-          user_ids: user_ids
+          user_ids: user_ids,
+          ...(owner_ids && owner_ids.length > 0 ? { owner_ids: owner_ids } : {})
         }
       );
       if(response.data){
@@ -264,7 +265,37 @@ export const updateTeam = async (team_id: number, name: string): Promise<boolean
     }
   };
 
-  export const getTeamUsers = async (team_id?: number, id?: number): Promise<any[]> => {
+  export const removeOwnersFromTeam = async (team_id: number, owner_ids: number[]): Promise<any | null> => {
+    try {
+        
+      const response = await axiosInstance.post(
+        `teams/remove-owners`,
+        {
+          team_id: team_id,
+          owner_ids: owner_ids
+        }
+      );
+      if(response.data){
+        const responseData = response.data;
+        // Handle both response formats: status === true or code === 200
+        if(responseData.status === true || responseData.code === 200){
+          toast.success('Owners removed from team successfully');
+          return responseData.data;
+        }else{
+          toast.error(responseData.message || 'Failed to remove owners from team');
+          return null;
+        } 
+      }else{
+        toast.error('Failed to remove owners from team');
+        return null;
+      }
+      
+    } catch (error) {
+      throw error;
+    }
+  };
+
+  export const getTeamUsers = async (team_id?: number, id?: number): Promise<any> => {
     try {
         
       const response = await axiosInstance.post(
@@ -278,21 +309,25 @@ export const updateTeam = async (team_id: number, name: string): Promise<boolean
         const responseData = response.data;
         // Handle both response formats: status === true or code === 200
         if(responseData.status === true || responseData.code === 200){
+          // New API response structure with team_member and team_owners
+          if(responseData.data && typeof responseData.data === 'object' && ('team_member' in responseData.data || 'team_owners' in responseData.data)){
+            return responseData.data;
+          }
           // If data has a users property, return that, otherwise return data itself
           if(responseData.data && responseData.data.users && Array.isArray(responseData.data.users)){
             return responseData.data.users;
           } else if(responseData.data && Array.isArray(responseData.data)){
             return responseData.data;
           } else {
-            return [];
+            return { team_member: [], team_owners: [] };
           }
         }else{
           toast.error(responseData.message || 'Failed to fetch team users');
-          return [];
+          return { team_member: [], team_owners: [] };
         } 
       }else{
         toast.error('Failed to fetch team users');
-        return [];
+        return { team_member: [], team_owners: [] };
       }
       
     } catch (error) {
@@ -401,6 +436,141 @@ export const updateTeam = async (team_id: number, name: string): Promise<boolean
       }
     } catch (error) {
       throw error;
+    }
+  };
+
+  // Module Assignment Functions
+  export const addModulesToTeam = async (team_id: number, module_ids: number[]): Promise<any | null> => {
+    try {
+      const response = await axiosInstance.post(
+        `teams/modules/add`,
+        {
+          team_id: team_id,
+          module_ids: module_ids
+        }
+      );
+      if(response.data){
+        const responseData = response.data;
+        // Handle both response formats: status === true or code === 200
+        if(responseData.status === true || responseData.code === 200 || responseData.status === "success"){
+          toast.success('Modules added to team successfully');
+          return responseData.data;
+        }else{
+          toast.error(responseData.message || 'Failed to add modules to team');
+          return null;
+        } 
+      }else{
+        toast.error('Failed to add modules to team');
+        return null;
+      }
+    } catch (error) {
+      console.error('Error adding modules to team:', error);
+      throw error;
+    }
+  };
+
+  export const updateTeamModules = async (team_id: number, module_ids: number[]): Promise<any | null> => {
+    try {
+      const response = await axiosInstance.post(
+        `teams/modules/update`,
+        {
+          team_id: team_id,
+          module_ids: module_ids
+        }
+      );
+      if(response.data){
+        const responseData = response.data;
+        // Handle both response formats: status === true or code === 200
+        if(responseData.status === true || responseData.code === 200 || responseData.status === "success"){
+          toast.success('Team modules updated successfully');
+          return responseData.data;
+        }else{
+          toast.error(responseData.message || 'Failed to update team modules');
+          return null;
+        } 
+      }else{
+        toast.error('Failed to update team modules');
+        return null;
+      }
+    } catch (error) {
+      console.error('Error updating team modules:', error);
+      throw error;
+    }
+  };
+
+  export const removeModulesFromTeam = async (team_id: number, module_ids: number[]): Promise<any | null> => {
+    try {
+      const response = await axiosInstance.post(
+        `teams/modules/remove`,
+        {
+          team_id: team_id,
+          module_ids: module_ids
+        }
+      );
+      if(response.data){
+        const responseData = response.data;
+        // Handle both response formats: status === true or code === 200
+        if(responseData.status === true || responseData.code === 200 || responseData.status === "success"){
+          toast.success('Modules removed from team successfully');
+          return responseData.data;
+        }else{
+          toast.error(responseData.message || 'Failed to remove modules from team');
+          return null;
+        } 
+      }else{
+        toast.error('Failed to remove modules from team');
+        return null;
+      }
+    } catch (error) {
+      console.error('Error removing modules from team:', error);
+      throw error;
+    }
+  };
+
+  export const getTeamModules = async (team_id: number): Promise<any[]> => {
+    try {
+      const response = await axiosInstance.post(
+        `teams/modules/get`,
+        {
+          team_id: team_id
+        }
+      );
+      if(response.data){
+        const responseData = response.data;
+        // Handle both response formats: status === true or code === 200
+        if(responseData.status === true || responseData.code === 200 || responseData.status === "success"){
+          // Check if data.team.modules exists (could be object or array)
+          if(responseData.data && responseData.data.team && responseData.data.team.modules){
+            const modules = responseData.data.team.modules;
+            // If modules is an array, return it
+            if(Array.isArray(modules)){
+              return modules;
+            }
+            // If modules is a single object, return it as an array with one item
+            if(modules && typeof modules === 'object' && modules.id){
+              return [modules];
+            }
+          }
+          // Fallback: check if data.modules exists (array)
+          if(responseData.data && responseData.data.modules && Array.isArray(responseData.data.modules)){
+            return responseData.data.modules;
+          }
+          // Fallback: check if data itself is an array
+          if(responseData.data && Array.isArray(responseData.data)){
+            return responseData.data;
+          }
+          return [];
+        }else{
+          toast.error(responseData.message || 'Failed to fetch team modules');
+          return [];
+        } 
+      }else{
+        toast.error('Failed to fetch team modules');
+        return [];
+      }
+    } catch (error) {
+      console.error('Error fetching team modules:', error);
+      return [];
     }
   };
 
