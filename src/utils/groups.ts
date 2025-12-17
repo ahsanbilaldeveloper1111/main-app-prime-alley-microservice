@@ -240,3 +240,92 @@ export const updateGroup = async (id: string, name: string) => {
       throw error;
     }
   };
+
+  // Module Assignment Functions
+  export const addModulesToGroup = async (group_id: number, module_ids: number[]): Promise<any | null> => {
+    try {
+      const response = await axiosInstance.post(
+        `groups/modules/add`,
+        {
+          group_id: group_id,
+          module_ids: module_ids
+        }
+      );
+      if(response.data){
+        const responseData = response.data;
+        if(responseData.status === "success" || responseData.code === 200){
+          toast.success('Modules added to group successfully');
+          return responseData.data;
+        }else{
+          toast.error(responseData.message || 'Failed to add modules to group');
+          return null;
+        } 
+      }else{
+        toast.error('Failed to add modules to group');
+        return null;
+      }
+    } catch (error) {
+      throw error;
+    }
+  };
+
+  export const removeModulesFromGroup = async (group_id: number, module_ids: number[]): Promise<any | null> => {
+    try {
+      const response = await axiosInstance.post(
+        `groups/modules/remove`,
+        {
+          group_id: group_id,
+          module_ids: module_ids
+        }
+      );
+      if(response.data){
+        const responseData = response.data;
+        if(responseData.status === "success" || responseData.code === 200){
+          toast.success('Modules removed from group successfully');
+          return responseData.data;
+        }else{
+          toast.error(responseData.message || 'Failed to remove modules from group');
+          return null;
+        } 
+      }else{
+        toast.error('Failed to remove modules from group');
+        return null;
+      }
+    } catch (error) {
+      throw error;
+    }
+  };
+
+  export const getGroupModules = async (group_id?: number, id?: number): Promise<any[]> => {
+    try {
+      const response = await axiosInstance.post(
+        `groups/modules/get`,
+        {
+          ...(group_id ? { group_id } : {}),
+          ...(id ? { id } : {})
+        }
+      );
+      if(response.data){
+        const responseData = response.data;
+        // Handle both response formats: status === "success" or code === 200
+        if(responseData.status === "success" || responseData.code === 200){
+          // If data has a modules property, return that, otherwise return data itself
+          if(responseData.data && responseData.data.modules && Array.isArray(responseData.data.modules)){
+            return responseData.data.modules;
+          } else if(responseData.data && Array.isArray(responseData.data)){
+            return responseData.data;
+          } else {
+            return [];
+          }
+        }else{
+          toast.error(responseData.message || 'Failed to fetch group modules');
+          return [];
+        } 
+      }else{
+        toast.error('Failed to fetch group modules');
+        return [];
+      }
+    } catch (error) {
+      throw error;
+    }
+  };

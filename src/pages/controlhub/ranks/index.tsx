@@ -17,6 +17,7 @@ import ConfirmModal from '@pages/partial/ConfirmModal'
 
 import { FiEdit, FiTrash2, FiEye } from 'react-icons/fi';
 import DatatableActionButton from '@components/DatatableActionButton';
+import { HEADER_CONSTANTS } from '@constants/headerConstants';
 
 // Helper function to get badge colors based on severity level
 const getSeverityBadgeColors = (severityLevel: string): { bg: string; text: string } => {
@@ -100,7 +101,7 @@ const Ranks = () => {
                                                 height: '32px',
                                                 padding: '0 8px',
                                                 borderRadius: '16px',
-                                                marginLeft: index > 0 ? '-10px' : '0',
+                                                marginLeft: '2px',
                                                 cursor: 'help',
                                                 border: '2px solid white',
                                                 backgroundColor: colors.bg,
@@ -441,7 +442,7 @@ const Ranks = () => {
 
     return (
         <React.Fragment>
-            <BreadcrumbItem mainTitle="Controlhub" mainLink="/controlhub/ranks" subTitle="Ranks" />
+            <BreadcrumbItem mainTitle="Controlhub" mainLink="/controlhub/ranks" subTitle={HEADER_CONSTANTS.SUBMENU_LABELS.RANKS} />
             
 
 <Row className="mb-3">
@@ -450,7 +451,7 @@ const Ranks = () => {
                 <Row className="d-flex justify-content-between align-items-center">
                     <Col md={4}>
                       
-                      <h2 className="mb-0">Ranks</h2>
+                      <h2 className="mb-0">{HEADER_CONSTANTS.SUBMENU_LABELS.RANKS}</h2>
                     </Col>
 
 

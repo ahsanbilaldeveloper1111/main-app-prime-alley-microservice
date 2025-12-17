@@ -98,60 +98,7 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
   if (!show) return null;
 
   return (
-    // <div id="action-modal" className="modal customModal" style={{display: 'flex'}}>
-    //   <div className="modal-content">
-    //     <span className="close-btn" id="action-close-btn" onClick={handleClose}>
-    //       <i className="fas fa-times"></i>
-    //     </span>
-    //     <h2 id="action-modal-title">{title}</h2>
-
-      
-    //     <p id="action-modal-text">
-    //       {description.replace('{targetName}', targetName)}
-    //     </p>
-        
-    //     {requireTextConfirmation && (
-    //       <div className="form-group mt-3">
-    //         <label htmlFor="confirmationInput" className="form-label">
-    //           {confirmationLabel}
-    //         </label>
-    //         <p className="text-muted small">
-    //           Type the word <b className="text-danger">{requiredConfirmationText}</b> to confirm
-    //         </p>
-    //         <input 
-    //           type="text" 
-    //           className="form-control" 
-    //           id="confirmationInput"
-    //           value={confirmationText}
-    //           onChange={(e) => setConfirmationText(e.target.value)}
-    //           placeholder={confirmationPlaceholder}
-    //         />
-    //       </div>
-    //     )}
-        
-    //     <div className="modal-footer">
-    //       {showCancelButton && (
-    //         <button 
-    //           className={`btn btn-${cancelButtonVariant}`} 
-    //           id="action-cancel-btn" 
-    //           style={{display: 'inline-block'}}
-    //           onClick={handleCancel}
-    //         >
-    //           {cancelButtonText}
-    //         </button>
-    //       )}
-    //       <button 
-    //         className={`btn btn-${confirmButtonVariant}`} 
-    //         id="action-confirm-btn" 
-    //         onClick={handleConfirm}
-    //         disabled={!isValidConfirmation}
-    //       >
-    //         {confirmButtonText}
-    //       </button>
-    //     </div>
-    //   </div>
-    // </div>
-
+   
     <Modal show={show} onHide={onHide} centered>
       <Modal.Header closeButton className="bg-light">
         <Modal.Title>

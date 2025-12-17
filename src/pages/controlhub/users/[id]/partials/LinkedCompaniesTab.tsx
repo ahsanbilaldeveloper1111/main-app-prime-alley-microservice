@@ -7,6 +7,7 @@ import FormModal from '@pages/partial/FormModal';
 import ConfirmModal from '@pages/partial/ConfirmModal';
 import { Module } from '@typings/controlhub/users';
 import { LinkCompany, UnlinkCompany } from '@utils/users';
+import { useModuleSelection } from '@hooks/useModuleSelection';
 
 interface LinkedCompaniesTabProps {
     linkedCompanies: any[];
@@ -33,27 +34,24 @@ const LinkedCompaniesTab: React.FC<LinkedCompaniesTabProps> = ({
     const [deleteLinkedCompanyId, setDeleteLinkedCompanyId] = useState<string | null>(null);
     const [selectedLinkedCompanies, setSelectedLinkedCompanies] = useState<string[]>([]);
     const [selectedCompanies, setSelectedCompanies] = useState<string[]>([]);
-    const [selectedModules, setSelectedModules] = useState<string[]>([]);
+
+    const {
+        selectedModules,
+        handleModuleChange,
+        moduleOptions,
+        moduleValue,
+        resetModules
+    } = useModuleSelection(session, []);
 
     const handleCloseAddLinkedCompanyModal = () => {
         setShowAddLinkedCompanyModal(false);
         setSelectedCompanies([]);
-        setSelectedModules([]);
+        resetModules();
     };
 
     const handleCompanyChange = (selectedOptions: MultiValue<{ value: string; label: string }>) => {
         const values = (selectedOptions || []).map((opt) => opt.value);
         setSelectedCompanies(values);
-    };
-
-    const handleModuleChange = (selectedOptions: MultiValue<{ value: string; label: string }>) => {
-        const values = (selectedOptions || []).map((opt) => opt.value);
-        if (values.includes('all')) {
-            const allModuleIds = filteredModules.map(module => module.id.toString());
-            setSelectedModules(allModuleIds);
-        } else {
-            setSelectedModules(values);
-        }
     };
 
     const handleSubmitAddLinkedCompany = async () => {
@@ -198,24 +196,8 @@ const LinkedCompaniesTab: React.FC<LinkedCompaniesTabProps> = ({
                                         onChange={(opts) => handleModuleChange(opts as MultiValue<{ value: string; label: string }>)}
                                         name="module"
                                         isMulti={true}
-                                        value={(() => {
-                                            const allModuleIds = filteredModules.map(module => module.id.toString());
-                                            const isAllSelected = allModuleIds.length > 0 && allModuleIds.every(id => selectedModules.includes(id));
-                                            if (isAllSelected) {
-                                                return [{ value: 'all', label: 'All Modules' }];
-                                            } else {
-                                                return filteredModules
-                                                    .filter((m) => selectedModules.includes(m.id.toString()))
-                                                    .map((m) => ({ value: m.id.toString(), label: `${m.name}` }));
-                                            }
-                                        })()}
-                                        options={[
-                                            { value: 'all', label: 'All Modules' },
-                                            ...filteredModules.map((module) => ({
-                                                value: module.id.toString(),
-                                                label: `${module.name}`
-                                            }))
-                                        ]}
+                                        value={moduleValue}
+                                        options={moduleOptions}
                                         placeholder="Select Module"
                                     />
                                     <p className="text-muted mt-2 small">
@@ -242,6 +224,7 @@ const LinkedCompaniesTab: React.FC<LinkedCompaniesTabProps> = ({
                                     )}
                                     <Button variant="primary" className="app-button" size="sm" onClick={() => {
                                         setShowAddLinkedCompanyModal(true);
+                                        resetModules();
                                     }}>Add Linked Company</Button>
                                 </div>
                             </h5>

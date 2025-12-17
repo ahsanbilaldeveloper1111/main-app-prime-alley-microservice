@@ -719,3 +719,30 @@ export const SyncBillingCompanies = async () => {
     throw error;
   }
 }
+
+export const getUserAccessLevelSummary = async (userId?: string, encFlag?: boolean) => {
+  try {
+    const response = await axiosInstance.post(
+      `users/userAccessLevelSummary`,
+      {
+        ...(userId ? { user_id: userId } : {}),
+        ...(encFlag !== undefined ? { encFlag } : {})
+      }
+    );
+    if(response.data){
+      const responseData = response.data;
+      if(responseData.status === "success" || responseData.code === 200){
+        return responseData.data;
+      }else{
+        toast.error(responseData.message || 'Failed to fetch user access level summary');
+        return null;
+      }
+    }else{
+      toast.error('Failed to fetch user access level summary');
+      return null;
+    }
+  } catch (error) {
+    console.error('API Error:', error);
+    throw error;
+  }
+}
