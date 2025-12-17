@@ -1826,7 +1826,7 @@ export const updateProduct = async (
   data: UpdateProductPayload
 ): Promise<CrmProduct> => {
   try {
-    const response = await axiosInstance.post("/crm/update-product", data);
+    const response = await axiosInstance.put("/crm/update-product", data);
     toast.success("Product updated successfully");
     return extractData<CrmProduct>(response.data);
   } catch (error: any) {
