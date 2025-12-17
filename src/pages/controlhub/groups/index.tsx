@@ -3,7 +3,7 @@ import React, { ReactElement, useState, useCallback, useMemo, useRef } from 'rea
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
 import GenericListPage from '@components/GenericListPage';
-import {ListGroups, updateGroup,deleteGroup,addGroup, addTeamsToGroup, removeTeamsFromGroup, getGroupTeams } from '@utils/groups';
+import {ListGroups, updateGroup,deleteGroup,addGroup, addTeamsToGroup, removeTeamsFromGroup, getGroupTeams, addModulesToGroup, removeModulesFromGroup, getGroupModules } from '@utils/groups';
 import { Column } from '@components/CustomDataTable';
 import { Button, Form, Modal, Row, Col, Card } from 'react-bootstrap';
 import { useSession } from 'next-auth/react';
@@ -11,10 +11,12 @@ import '@assets/scss/common.scss';
 import FormModal from "@pages/partial/FormModal";
 import SuccessfulModal from '@pages/partial/SuccessfulModal';
 import ConfirmModal from '@pages/partial/ConfirmModal';
-import { Edit, Info, Trash2, Users, UserPlus, UserMinus } from 'lucide-react';
+import { Edit, Info, Trash2, Users, UserPlus, UserMinus, Layers, PackageMinus, Boxes } from 'lucide-react';
 import Select, { MultiValue } from 'react-select';
 import { getAllTeams } from '@utils/teams';
 import { toast } from 'react-toastify';
+import { useModuleSelection } from '@hooks/useModuleSelection';
+import { Module } from '@typings/controlhub/users';
 
 
 
@@ -23,16 +25,65 @@ const Groups = () => {
    
     const columns: Column[] = [
         { key: 'Name', name: 'Name', selector: (row: any) => row.name, sortable: true },
-        { key: 'total_teams', name: 'Total Teams', selector: (row: any) => row.total_teams || 0, sortable: true,
+
+
+        // { key: 'total_module_assigned', name: 'Total Modules Assigned', selector: (row: any) => row.total_module_assigned || 0, sortable: true,
+        //     cell: (props: any) => (
+        //         <div>
+        //             <span className="status-badge primary">
+        //                 {props?.total_module_assigned || 0}
+        //             </span>
+        //         </div>
+        //     )
+        // },
+        { key: 'assigned_modules', name: 'Assigned Modules', selector: (row: any) => row.assigned_modules || [], sortable: false,
             cell: (props: any) => (
                 <div>
-                    <span className="status-badge primary">
-                        {props?.total_teams || 0}
-                    </span>
+                    {props?.assigned_modules && props.assigned_modules.length > 0 ? (
+                        <div className="d-flex flex-wrap gap-1">
+                            {props.assigned_modules.map((module: any) => (
+                                <span key={module.id} className="status-badge primary" title={module.slug || ''}>
+                                    {module.name || 'N/A'}
+                                </span>
+                            ))}
+                        </div>
+                    ) : (
+                        <span className="text-muted">No modules assigned</span>
+                    )}
                 </div>
             )
         },
-        { key: 'total_team_users', name: 'Total Team Users', selector: (row: any) => row.total_team_users || 0, sortable: true,
+        
+        // { key: 'total_teams', name: 'Total Teams', selector: (row: any) => row.total_teams || 0, sortable: true,
+        //     cell: (props: any) => (
+        //         <div>
+        //             <span className="status-badge primary">
+        //                 {props?.total_teams || 0}
+        //             </span>
+        //         </div>
+        //     )
+        // },
+
+        { key: 'assigned_teams', name: 'Assigned Teams', selector: (row: any) => row.assigned_teams || [], sortable: false,
+            cell: (props: any) => (
+                <div>
+                    {props?.assigned_teams && props.assigned_teams.length > 0 ? (
+                        <div className="d-flex flex-wrap gap-1">
+                            {props.assigned_teams.map((team: any) => (
+                                <span key={team.id} className="status-badge primary" title={team.name || 'N/A'}>
+                                    {team.name || 'N/A'}
+                                </span>
+                            ))}
+                        </div>
+                    ) : (
+                        <span className="text-muted">No teams assigned</span>
+                    )}
+                </div>
+            )
+        },
+
+
+        { key: 'total_team_users', name: 'Team Users', selector: (row: any) => row.total_team_users || 0, sortable: true,
             cell: (props: any) => (
                 <div>
                     <span className="status-badge primary">
@@ -41,7 +92,7 @@ const Groups = () => {
                 </div>
             )
         },
-        { key: 'total_team_owners', name: 'Total Team Owners', selector: (row: any) => row.total_team_owners || 0, sortable: true,
+        { key: 'total_team_owners', name: 'Team Owners', selector: (row: any) => row.total_team_owners || 0, sortable: true,
             cell: (props: any) => (
                 <div>
                     <span className="status-badge primary">
@@ -50,7 +101,8 @@ const Groups = () => {
                 </div>
             )
         },
-        ...(session?.user?.permissions?.includes('edit-groups') || session?.user?.permissions?.includes('delete-groups') ? [
+        
+        ...(session?.user?.permissions?.includes('edit-groups') || session?.user?.permissions?.includes('delete-groups') || session?.user?.permissions?.includes('assign-modules-groups') || session?.user?.permissions?.includes('remove-modules-groups') ? [
             {
                 key: 'Action',
                 name: 'Actions',
@@ -65,7 +117,12 @@ const Groups = () => {
                         )}
                         {(session?.user?.permissions?.includes('assign-teams-groups') || session?.user?.permissions?.includes('remove-teams-groups')) && (
                             <Button variant="light" className="btn-action-style-2 p-1 text-success" title="Assign Teams" onClick={() => handleAssignTeams(props)}>
-                                <UserPlus size={16} />
+                                <Boxes size={16} />
+                            </Button>
+                        )}
+                        {(session?.user?.permissions?.includes('assign-modules-groups') || session?.user?.permissions?.includes('remove-modules-groups')) && (
+                            <Button variant="light" className="btn-action-style-2 p-1 text-info" title="Assign Modules" onClick={() => handleAssignModules(props)}>
+                                <Layers size={16} />
                             </Button>
                         )}
                         {session?.user?.permissions?.includes('delete-groups') && (
@@ -325,6 +382,109 @@ const Groups = () => {
                 label: team.name || `Team ${team.id}`
             }));
     }, [allTeams, groupTeams]);
+
+    // Module Assignment State
+    const [showAssignModulesModal, setShowAssignModulesModal] = useState<boolean>(false);
+    const [groupModules, setGroupModules] = useState<Module[]>([]);
+    const [selectedModulesToRemove, setSelectedModulesToRemove] = useState<number[]>([]);
+    const [showRemoveModulesConfirmModal, setShowRemoveModulesConfirmModal] = useState<boolean>(false);
+    const [isLoadingGroupModules, setIsLoadingGroupModules] = useState<boolean>(false);
+
+    const {
+        selectedModules,
+        handleModuleChange,
+        moduleOptions,
+        moduleValue,
+        resetModules,
+        isLoadingModules
+    } = useModuleSelection(session, groupModules);
+
+    const handleAssignModules = async (props: any) => {
+        setSelectedGroup(props.id);
+        setSelectedGroupName(props.name);
+        setShowAssignModulesModal(true);
+        resetModules();
+        setSelectedModulesToRemove([]);
+        await fetchGroupModules(props.id);
+    };
+
+    const fetchGroupModules = async (groupId: number) => {
+        setIsLoadingGroupModules(true);
+        try {
+            const modules = await getGroupModules(groupId);
+            setGroupModules(modules || []);
+        } catch (error) {
+            console.error('Error fetching group modules:', error);
+            setGroupModules([]);
+        } finally {
+            setIsLoadingGroupModules(false);
+        }
+    };
+
+    const handleSubmitAssignModules = async () => {
+        if (selectedModules.length === 0) {
+            toast.error('Please select at least one module to assign');
+            return;
+        }
+
+        // Filter out 'all' if present and get actual module IDs
+        const moduleIds = selectedModules
+            .filter(id => id !== 'all')
+            .map(id => Number.parseInt(id, 10));
+        
+        if (moduleIds.length === 0) {
+            toast.error('Please select at least one module to assign');
+            return;
+        }
+
+        const selectedCount = moduleIds.length;
+        const response = await addModulesToGroup(selectedGroup, moduleIds);
+        
+        if (response) {
+            resetModules();
+            await fetchGroupModules(selectedGroup);
+            setRefreshKey(prev => prev + 1);
+        }
+    };
+
+    const handleSelectModuleToRemove = (moduleId: number) => {
+        setSelectedModulesToRemove(prev => 
+            prev.includes(moduleId) 
+                ? prev.filter(id => id !== moduleId)
+                : [...prev, moduleId]
+        );
+    };
+
+    const handleSelectAllModulesToRemove = () => {
+        const allModuleIds = groupModules.map(module => module.id);
+        setSelectedModulesToRemove(prev => 
+            prev.length === allModuleIds.length ? [] : allModuleIds
+        );
+    };
+
+    const handleConfirmRemoveModules = async () => {
+        if (selectedModulesToRemove.length === 0) {
+            toast.error('Please select at least one module to remove');
+            return;
+        }
+
+        const response = await removeModulesFromGroup(selectedGroup, selectedModulesToRemove);
+        if (response) {
+            setSelectedModulesToRemove([]);
+            setShowRemoveModulesConfirmModal(false);
+            await fetchGroupModules(selectedGroup);
+            setRefreshKey(prev => prev + 1);
+        }
+    };
+
+    const handleCloseAssignModulesModal = () => {
+        setShowAssignModulesModal(false);
+        resetModules();
+        setSelectedModulesToRemove([]);
+        setGroupModules([]);
+        setSelectedGroup(null);
+        setSelectedGroupName(null);
+    };
 
     return (
         <React.Fragment>
@@ -613,6 +773,7 @@ const Groups = () => {
                     setShowRemoveTeamsConfirmModal(false);
                     setSelectedTeamsToRemove([]);
                 }}
+                onCancel={()=>{setShowRemoveTeamsConfirmModal(false)}}
                 title="Remove Teams"
                 description={`Are you sure you want to remove ${selectedTeamsToRemove.length} team(s) from this group?`}
                 targetName={selectedTeamsToRemove.length === 1 
@@ -620,6 +781,160 @@ const Groups = () => {
                     : `${selectedTeamsToRemove.length} teams`}
                 onConfirm={handleConfirmRemoveTeams}
                 confirmButtonText="Remove Teams"
+                confirmButtonVariant="danger"
+                requireTextConfirmation={true}
+                requiredConfirmationText="remove"
+            />
+
+            {/* Assign Modules Modal */}
+            <Modal
+                show={showAssignModulesModal}
+                onHide={handleCloseAssignModulesModal}
+                size="lg"
+            >
+                <Modal.Header closeButton>
+                    <Modal.Title className="d-flex align-items-center gap-2">
+                        <Layers size={20} className="text-primary" />
+                        Assign Modules to Group
+                    </Modal.Title>
+                </Modal.Header>
+                <Modal.Body>
+                    <div className="mb-3">
+                        <h6 className="mb-2">Group: <strong>{selectedGroupName}</strong></h6>
+                    </div>
+
+                    <div className="form-group mb-4">
+                        <label htmlFor="assignModules" className="fw-semibold d-flex align-items-center gap-2 form-label">
+                            Select Modules to Assign
+                            <span className="text-muted ms-2" title="Search and select modules to assign to this group">
+                                <Info size={14} />
+                            </span>
+                        </label>
+                        <Select
+                            className="basic-single"
+                            classNamePrefix="select"
+                            isMulti
+                            options={moduleOptions}
+                            value={moduleValue}
+                            onChange={(opts) => handleModuleChange(opts as MultiValue<{ value: string; label: string }>)}
+                            placeholder="Select modules..."
+                            isClearable={true}
+                            isSearchable={true}
+                            isLoading={isLoadingModules}
+                        />
+                        <Form.Text className="text-muted d-flex align-items-center gap-1 form-text">
+                            <Info size={12} />
+                            <span style={{ fontSize: '0.813rem' }}>
+                                Select one or more modules to assign to this group. Modules already assigned to this group will not appear in the list.
+                            </span>
+                        </Form.Text>
+                    </div>
+
+                    <div className="mb-3">
+                        <div className="d-flex justify-content-between align-items-center mb-3">
+                            <h6 className="mb-0 d-flex align-items-center gap-2">
+                                <Layers size={18} />
+                                Currently Assigned Modules ({groupModules.length})
+                            </h6>
+                            {selectedModulesToRemove.length > 0 && (
+                                <Button
+                                    variant="outline-danger"
+                                    size="sm"
+                                    onClick={() => setShowRemoveModulesConfirmModal(true)}
+                                    disabled={!session?.user?.permissions?.includes('remove-modules-groups')}
+                                >
+                                    <PackageMinus size={14} className="me-1" />
+                                    Remove Selected ({selectedModulesToRemove.length})
+                                </Button>
+                            )}
+                        </div>
+                        {isLoadingGroupModules ? (
+                            <div className="text-center py-3">
+                                <small className="text-muted">Loading modules...</small>
+                            </div>
+                        ) : groupModules.length > 0 ? (
+                            <Card>
+                                <Card.Body className="p-0">
+                                
+                                        <table className="table table-hover table-sm mb-0 w-100">
+                                            <thead className="table-light">
+                                                <tr>
+                                                    <th style={{ width: '40px' }}>
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={groupModules.length > 0 && selectedModulesToRemove.length === groupModules.length}
+                                                            onChange={handleSelectAllModulesToRemove}
+                                                            title="Select All Modules"
+                                                        />
+                                                    </th>
+                                                    <th>Module Name</th>
+                                                    
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {groupModules.map((module) => (
+                                                    <tr key={module.id}>
+                                                        <td>
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={selectedModulesToRemove.includes(module.id)}
+                                                                onChange={() => handleSelectModuleToRemove(module.id)}
+                                                            />
+                                                        </td>
+                                                        <td>
+                                                            <div title={module.name || 'N/A'}>
+                                                                {module.name || 'N/A'}
+                                                            </div>
+                                                        </td>
+                                                       
+                                                        
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                   
+                                </Card.Body>
+                            </Card>
+                        ) : (
+                            <div className="text-center py-3 border rounded">
+                                <small className="text-muted">No modules assigned to this group yet.</small>
+                            </div>
+                        )}
+                    </div>
+                </Modal.Body>
+                <Modal.Footer>
+                    <Button variant="secondary" onClick={handleCloseAssignModulesModal}>
+                        Close
+                    </Button>
+                    <Button 
+                        variant="primary" 
+                        onClick={handleSubmitAssignModules}
+                        disabled={selectedModules.length === 0 || (selectedModules.length === 1 && selectedModules[0] === 'all' && moduleOptions.length <= 1)}
+                    >
+                        <Layers size={16} className="me-1" />
+                        Assign Selected Modules ({selectedModules.filter(id => id !== 'all').length})
+                    </Button>
+                </Modal.Footer>
+            </Modal>
+
+            {/* Remove Modules Confirmation Modal */}
+            <ConfirmModal
+                show={showRemoveModulesConfirmModal}
+                onHide={() => {
+                    setShowRemoveModulesConfirmModal(false);
+                    setSelectedModulesToRemove([]);
+                }}
+                onCancel={()=>{
+                    setShowRemoveModulesConfirmModal(false);
+                    setSelectedModulesToRemove([]);
+                }}
+                title="Remove Modules"
+                description={`Are you sure you want to remove ${selectedModulesToRemove.length} module(s) from this group?`}
+                targetName={selectedModulesToRemove.length === 1 
+                    ? groupModules.find(m => m.id === selectedModulesToRemove[0])?.name || 'this module'
+                    : `${selectedModulesToRemove.length} modules`}
+                onConfirm={handleConfirmRemoveModules}
+                confirmButtonText="Remove Modules"
                 confirmButtonVariant="danger"
                 requireTextConfirmation={true}
                 requiredConfirmationText="remove"

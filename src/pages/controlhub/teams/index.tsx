@@ -17,6 +17,7 @@ import Select, { MultiValue } from 'react-select';
 import { getParentUsers } from '@utils/users';
 import { getModules } from '@utils/roles';
 import { toast } from 'react-toastify';
+import { HEADER_CONSTANTS } from '@constants/headerConstants';
 
 
 
@@ -602,7 +603,7 @@ const Teams = () => {
 
     return (
         <React.Fragment>
-            <BreadcrumbItem mainTitle="Controlhub" mainLink="/controlhub/teams" subTitle="Teams" />
+            <BreadcrumbItem mainTitle="Controlhub" mainLink="/controlhub/teams" subTitle={HEADER_CONSTANTS.SUBMENU_LABELS.TEAMS} />
             
 
             <Row className="mb-3">
@@ -611,7 +612,7 @@ const Teams = () => {
                 <Row className="d-flex justify-content-between align-items-center">
                     <Col md={4}>
                       
-                      <h2 className="mb-0">Teams</h2>
+                      <h2 className="mb-0">{HEADER_CONSTANTS.SUBMENU_LABELS.TEAMS}</h2>
                     </Col>
 
 

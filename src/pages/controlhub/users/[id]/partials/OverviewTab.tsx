@@ -3,7 +3,7 @@ import { Card, Col, Row, Button, Form } from 'react-bootstrap';
 import FormModal from '@pages/partial/FormModal';
 import Select from 'react-select';
 import { User, Role, Group } from '@typings/controlhub/users';
-import { assignRoleToUser, assignGroupToUser, MarkAsCompanyAdmin, getUserProfileData, updateUserProfile } from '@utils/users';
+import { assignRoleToUser, assignGroupToUser, MarkAsCompanyAdmin, getUserProfileData, updateUserProfile, getUserAccessLevelSummary } from '@utils/users';
 import { Country, State, City } from 'country-state-city';
 import { languages as languagesData } from '@config/languages';
 
@@ -60,6 +60,8 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
     const [selectedCountryCode, setSelectedCountryCode] = useState<string>('');
     const [selectedStateCode, setSelectedStateCode] = useState<string>('');
     const [languages] = useState(languagesData);
+    const [accessLevelSummary, setAccessLevelSummary] = useState<any>(null);
+    const [isLoadingAccessSummary, setIsLoadingAccessSummary] = useState(false);
 
     const handleCloseChangeGroupModal = () => {
         setShowChangeGroupModal(false);
@@ -242,6 +244,25 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
             fetchProfileData();
         }
     }, [currentUser, countries]);
+
+    // Fetch user access level summary
+    React.useEffect(() => {
+        const fetchAccessSummary = async () => {
+            if (!currentUser?.id) return;
+            try {
+                setIsLoadingAccessSummary(true);
+                const data = await getUserAccessLevelSummary(currentUser.id.toString(), true);
+                if (data) {
+                    setAccessLevelSummary(data);
+                }
+            } catch (error) {
+                console.error('Error fetching access level summary:', error);
+            } finally {
+                setIsLoadingAccessSummary(false);
+            }
+        };
+        fetchAccessSummary();
+    }, [currentUser]);
 
     const handleCloseEditProfileModal = () => {
         setShowEditProfileModal(false);
@@ -537,6 +558,169 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
                             ) : (
                                 <div className="text-center py-4">
                                     <p className="text-muted">No profile data available</p>
+                                </div>
+                            )}
+                        </Card.Body>
+                    </Card>
+                </Col>
+            </Row>
+
+            {/* User Access Level Summary Section */}
+            <Row className="mt-3">
+                <Col md={12}>
+                    <Card>
+                        <Card.Header>
+                            <h5>Access Level Summary</h5>
+                        </Card.Header>
+                        <Card.Body>
+                            {isLoadingAccessSummary ? (
+                                <div className="text-center py-4">
+                                    <p className="text-muted">Loading access level summary...</p>
+                                </div>
+                            ) : accessLevelSummary ? (
+                                <Row>
+                                    {/* Group Information */}
+                                    {accessLevelSummary.group && (
+                                        <Col md={6} className="mb-4">
+                                            <h6 className="mb-3">Group</h6>
+                                            <div className="mb-2">
+                                                <strong>Name:</strong> {accessLevelSummary.group.name || 'N/A'}
+                                            </div>
+                                            {accessLevelSummary.group.modules && accessLevelSummary.group.modules.length > 0 && (
+                                                <div>
+                                                    <strong>Modules:</strong>
+                                                    <div className="mt-2">
+                                                        {accessLevelSummary.group.modules.map((module: any) => (
+                                                            <span key={module.id} className="status-badge primary me-2 mb-2 d-inline-block">
+                                                                {module.name}
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </Col>
+                                    )}
+
+                                    {/* Teams Information */}
+                                    {accessLevelSummary.teams && accessLevelSummary.teams.length > 0 && (
+                                        <Col md={6} className="mb-4">
+                                            <h6 className="mb-3">Teams ({accessLevelSummary.teams.length})</h6>
+                                            <div className="table-responsive">
+                                                <table className="table table-sm">
+                                                    <thead>
+                                                        <tr>
+                                                            <th>Team Name</th>
+                                                            <th>Modules</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {accessLevelSummary.teams.map((team: any) => (
+                                                            <tr key={team.id}>
+                                                                <td>{team.name || 'N/A'}</td>
+                                                                <td>
+                                                                    {team.modules && team.modules.length > 0 ? (
+                                                                        <div>
+                                                                            {team.modules.map((module: any) => (
+                                                                                <span key={module.id} className="status-badge primary me-1 mb-1 d-inline-block" style={{ fontSize: '0.75rem' }}>
+                                                                                    {module.name}
+                                                                                </span>
+                                                                            ))}
+                                                                        </div>
+                                                                    ) : (
+                                                                        <span className="text-muted">No modules</span>
+                                                                    )}
+                                                                </td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </Col>
+                                    )}
+
+                                    {/* Rank Permissions */}
+                                    {accessLevelSummary.rank_permissions && (
+                                        <Col md={12} className="mb-4">
+                                            <h6 className="mb-3">Rank Permissions</h6>
+                                            
+                                            {/* Roles */}
+                                            {accessLevelSummary.rank_permissions.roles && accessLevelSummary.rank_permissions.roles.length > 0 && (
+                                                <div className="mb-3">
+                                                    <strong>Roles:</strong>
+                                                    <div className="mt-2">
+                                                        {accessLevelSummary.rank_permissions.roles.map((role: any) => (
+                                                            <span key={role.id} className="status-badge info me-2 mb-2 d-inline-block">
+                                                                {role.name}
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Role Based Permissions */}
+                                            {accessLevelSummary.rank_permissions.role_based_permissions && accessLevelSummary.rank_permissions.role_based_permissions.length > 0 && (
+                                                <div className="mb-3">
+                                                    <strong>Role Based Permissions ({accessLevelSummary.rank_permissions.role_based_permissions.length}):</strong>
+                                                    <div className="mt-2">
+                                                        {accessLevelSummary.rank_permissions.role_based_permissions.map((permission: any) => (
+                                                            <div key={permission.id} className="mb-2 p-2 border rounded">
+                                                                <div><strong>{permission.name}</strong></div>
+                                                                <small className="text-muted">
+                                                                    {permission.module_name} • {permission.slug}
+                                                                </small>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Extended Permissions */}
+                                            {accessLevelSummary.rank_permissions.extended_permissions && accessLevelSummary.rank_permissions.extended_permissions.length > 0 && (
+                                                <div className="mb-3">
+                                                    <strong>Extended Permissions ({accessLevelSummary.rank_permissions.extended_permissions.length}):</strong>
+                                                    <div className="mt-2">
+                                                        {accessLevelSummary.rank_permissions.extended_permissions.map((permission: any) => (
+                                                            <div key={permission.id} className="mb-2 p-2 border rounded bg-light">
+                                                                <div><strong>{permission.name}</strong></div>
+                                                                <small className="text-muted">
+                                                                    {permission.module_name} • {permission.slug}
+                                                                </small>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Blocked Permissions */}
+                                            {accessLevelSummary.rank_permissions.blocked_permissions && accessLevelSummary.rank_permissions.blocked_permissions.length > 0 && (
+                                                <div className="mb-3">
+                                                    <strong>Blocked Permissions ({accessLevelSummary.rank_permissions.blocked_permissions.length}):</strong>
+                                                    <div className="mt-2">
+                                                        {accessLevelSummary.rank_permissions.blocked_permissions.map((permission: any) => (
+                                                            <div key={permission.id} className="mb-2 p-2 border rounded bg-danger bg-opacity-10">
+                                                                <div><strong>{permission.name}</strong></div>
+                                                                <small className="text-muted">
+                                                                    {permission.module_name} • {permission.slug}
+                                                                </small>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </Col>
+                                    )}
+
+                                    {!accessLevelSummary.group && (!accessLevelSummary.teams || accessLevelSummary.teams.length === 0) && (!accessLevelSummary.rank_permissions) && (
+                                        <Col md={12}>
+                                            <div className="text-center py-4">
+                                                <p className="text-muted">No access level information available</p>
+                                            </div>
+                                        </Col>
+                                    )}
+                                </Row>
+                            ) : (
+                                <div className="text-center py-4">
+                                    <p className="text-muted">No access level summary available</p>
                                 </div>
                             )}
                         </Card.Body>

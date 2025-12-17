@@ -87,10 +87,10 @@ MENU_COLORS: {
   SUBMENU_LABELS: {
     TASKS: 'Tasks',
     // Control Hub
-    USER_DIRECTORY: 'User Directory',
-    TEAMS:'Teams',
-    RANKS: 'Ranks',
-    GROUPS: 'Groups',
+    USER_DIRECTORY: 'User Management',
+    TEAMS:'Supervisor Teams',
+    RANKS: 'Ranks and Permissions',
+    GROUPS: 'Management Groups',
     
     // Sim Gateway
     GSM_DASHBOARD: 'Dashboard',

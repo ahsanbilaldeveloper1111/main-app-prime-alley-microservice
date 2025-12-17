@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-import { Card, Col, Row, Button, Modal } from 'react-bootstrap';
-import { useSession } from 'next-auth/react';
+import { Card, Col, Row, Button } from 'react-bootstrap';
 import { toast } from 'react-toastify';
 import Select, { MultiValue } from 'react-select';
 import AsyncSelect from 'react-select/async';
@@ -8,7 +7,7 @@ import FormModal from '@pages/partial/FormModal';
 import ConfirmModal from '@pages/partial/ConfirmModal';
 import { User, SelectOption, Module } from '@typings/controlhub/users';
 import { linkUsers, unlinkUsers, getParentUsers } from '@utils/users';
-import { ModuleSlug } from '@utils/Helper';
+import { useModuleSelection } from '@hooks/useModuleSelection';
 
 interface LinkedUsersTabProps {
     linkedUsers: any[];
@@ -35,13 +34,20 @@ const LinkedUsersTab: React.FC<LinkedUsersTabProps> = ({
     const [deleteLinkedUserData, setDeleteLinkedUserData] = useState<{ delinkedUser: number, moduleId: number } | null>(null);
     const [selectedLinkedUsers, setSelectedLinkedUsers] = useState<string[]>([]);
     const [selectedParentUsers, setSelectedParentUsers] = useState<string[]>([]);
-    const [selectedModules, setSelectedModules] = useState<string[]>([]);
     const [isParentUsersLoading, setIsParentUsersLoading] = useState(true);
+    
+    const {
+        selectedModules,
+        handleModuleChange,
+        moduleOptions,
+        moduleValue,
+        resetModules
+    } = useModuleSelection(session, []);
 
     const handleCloseAddLinkedUserModal = () => {
         setShowAddLinkedUserModal(false);
         setSelectedParentUsers([]);
-        setSelectedModules([]);
+        resetModules();
     };
 
     const handleLinkedUserChange = (selectedOptions: MultiValue<SelectOption>) => {
@@ -49,15 +55,6 @@ const LinkedUsersTab: React.FC<LinkedUsersTabProps> = ({
         setSelectedParentUsers(values);
     };
 
-    const handleModuleChange = (selectedOptions: MultiValue<{ value: string; label: string }>) => {
-        const values = (selectedOptions || []).map((opt) => opt.value);
-        if (values.includes('all')) {
-            const allModuleIds = filteredModules.map(module => module.id.toString());
-            setSelectedModules(allModuleIds);
-        } else {
-            setSelectedModules(values);
-        }
-    };
 
     const loadParentUserOptions = (inputValue: string): Promise<SelectOption[]> => {
         const trimmed = (inputValue || '').trim();
@@ -232,25 +229,8 @@ const LinkedUsersTab: React.FC<LinkedUsersTabProps> = ({
                                         onChange={(opts) => handleModuleChange(opts as MultiValue<{ value: string; label: string }>)}
                                         name="module"
                                         isMulti={true}
-                                        value={(() => {
-                                            const allModuleIds = filteredModules.map(module => module.id.toString());
-                                            const isAllSelected = allModuleIds.length > 0 && allModuleIds.every(id => selectedModules.includes(id));
-
-                                            if (isAllSelected) {
-                                                return [{ value: 'all', label: 'All Modules' }];
-                                            } else {
-                                                return filteredModules
-                                                    .filter((m) => selectedModules.includes(m.id.toString()))
-                                                    .map((m) => ({ value: m.id.toString(), label: `${m.name}` }));
-                                            }
-                                        })()}
-                                        options={[
-                                            { value: 'all', label: 'All Modules' },
-                                            ...filteredModules.map((module) => ({
-                                                value: module.id.toString(),
-                                                label: `${module.name}`
-                                            }))
-                                        ]}
+                                        value={moduleValue}
+                                        options={moduleOptions}
                                         placeholder="Select Module"
                                     />
                                     <p className="text-muted mt-2 small">
@@ -278,7 +258,7 @@ const LinkedUsersTab: React.FC<LinkedUsersTabProps> = ({
                                     <Button variant="primary" className="app-button" size="sm" onClick={() => {
                                         setShowAddLinkedUserModal(true);
                                         setSelectedParentUsers([]);
-                                        setSelectedModules([]);
+                                        resetModules();
                                     }}>Add Linked User</Button>
                                 </div>
                             </h5>
