@@ -79,6 +79,7 @@ const Groups = () => {
                         <span className="text-muted">No teams assigned</span>
                     )}
                 </div>
+                
             )
         },
 
