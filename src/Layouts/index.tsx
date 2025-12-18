@@ -173,9 +173,7 @@ const Layout = ({ children }: LayoutProps) => {
           <div className="ms-auto d-flex align-items-center gap-3">
 
           {session?.user?.permissions?.includes(PERMISSIONS.DIAL_CALL_CTI) && (
-            <Link href="/cti/dialer" target="_blank"> 
-              <Box size={20} />
-            </Link>
+            <PhoneCall size={18} className="text-primary" onClick={() => router.push('/cti/dialer')} />
           )}
 
           <Dropdown align="end" show={showNotificationDropdown} onToggle={(isOpen) => setShowNotificationDropdown(isOpen)}>

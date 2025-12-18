@@ -882,6 +882,44 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       top: 85px;
       padding-bottom:100px;
       transition: all 0.3s ease-in-out;
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .sidebar-content-wrapper {
+      display: flex;
+      flex-direction: column;
+      min-height: 100%;
+      flex: 1;
+    }
+    
+    .sidebar-top-section {
+      flex-shrink: 0;
+      padding-top: 0.75rem;
+      padding-bottom: 0.75rem;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    
+    .sidebar-middle-section {
+      flex-shrink: 0;
+      padding-top: 0.75rem;
+      padding-bottom: 0.75rem;
+    }
+    
+    .sidebar-bottom-section {
+      flex-shrink: 0;
+      margin-top: auto;
+      padding-top: 0.75rem;
+      border-top: 1px solid #e5e7eb;
+    }
+    
+    .section-heading {
+      padding: 0.5rem 2rem 0.75rem;
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #6b7280;
     }
     
     .sidebar-card.collapsed {
@@ -895,8 +933,12 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       display: none;
     }
 
+  .sidebar-card a {
+  text-decoration: none !important;
+}
+
     .module-header {
-      padding: 0rem 2rem;
+      padding: 0.2rem 2rem;
       cursor: pointer;
       transition: all 0.3s ease;
       border-left: 3px solid transparent;
@@ -904,12 +946,14 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       align-items: center;
       justify-content: space-between;
       font-weight: 600;
-      font-size: 0.8rem;
+      font-size: 0.72rem;
       background: transparent;
       border: none;
       width: 100%;
       text-align: left;
-      color: #495057;
+      color: #374151;
+      line-height: 1.5;
+      margin-left: 7px
     }
 
     .module-header:hover {
@@ -918,6 +962,9 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
 
     .module-header.expanded {
       /* background-color: #f8f9fa; */
+    }
+      .text-decoration-none {
+      text-decoration: none !important;
     }
 
     .module-icon-wrapper {
@@ -932,18 +979,18 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
     }
 
     .sub-item {
-          padding: 0.2rem 0rem 0.2rem 3rem;
-    transition: all 0.2s ease;
-    border-left: 3px solid transparent;
-    display: flex;
-    align-items: center;
-    background: transparent;
-    border: none;
-    width: 100%;
-    text-align: left;
-    color: #6c757d;
-    font-size: 0.75rem;
-   
+      padding: 0.5rem 2rem 0.5rem 3rem;
+      transition: all 0.2s ease;
+      border-left: 3px solid transparent;
+      display: flex;
+      align-items: center;
+      background: transparent;
+      border: none;
+      width: 100%;
+      text-align: left;
+      color: #6b7280;
+      font-size: 0.8125rem;
+      line-height: 1.5;
     }
 
     .sub-item:hover {
@@ -1145,7 +1192,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       <div 
         className={`sidebar-card sidebar-scrollbar ${!sidebarOpen ? 'collapsed' : ''}`}
       >
-        <div style={{ padding: 0 }}>
+        <div className="sidebar-content-wrapper" style={{ padding: 0 }}>
           {/* Header */}
           <div className="sidebar-header">
             <div style={{ display: 'flex', alignItems: 'center' }}>
@@ -1167,9 +1214,205 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
             </div>
           </div>
 
-          {/* Menu Items */}
-          <div style={{ padding: '0.5rem 0' }}>
-            {mainMenuItems.map((module, index) => (
+          {/* Top Section - Dashboard */}
+          <div className="sidebar-top-section">
+            <div className="section-heading">Dashboard</div>
+            {mainMenuItems.slice(0, 1).map((module, index) => (
+              <div key={module.id}>
+                {/* Module Header */}
+
+                {module.url !== '' ? (
+                  <Link className='text-decoration-none' style={{textDecoration: 'none'}} href={(BASE_URL || '') + (module.url || '/')}>
+                    <button
+                      className={`module-header ${expandedModules.includes(module.id) ? 'expanded' : ''}`}
+                      style={{
+                        borderLeftColor: expandedModules.includes(module.id) ? module.color : 'transparent'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', flexGrow: 1 }}>
+                        <div 
+                          className="module-icon-wrapper"
+                          style={{ backgroundColor: `${module.color}15` }}
+                        >
+                          {React.cloneElement(module.icon as React.ReactElement, { 
+                            style: { color: module.color }
+                          } as any)}
+                        </div>
+                        <span>{module.title}
+                        </span>
+                      </div>
+
+                      {module.subItems && module.subItems.length > 0 && (
+                      <span className={`chevron-icon ${expandedModules.includes(module.id) ? 'expanded' : ''}`}>
+                        {expandedModules.includes(module.id) ? (
+                          <ChevronDown size={18} />
+                        ) : (
+                          <ChevronRight size={18} />
+                        )}
+                      </span>
+                      )}
+                    </button>
+                  </Link>
+                ) : (
+                  <button
+                    className={`module-header ${expandedModules.includes(module.id) ? 'expanded' : ''}`}
+                    style={{
+                      borderLeftColor: expandedModules.includes(module.id) ? module.color : 'transparent'
+                    }}
+                    onClick={() => toggleModule(module.id)}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', flexGrow: 1 }}>
+                      <div 
+                        className="module-icon-wrapper"
+                        style={{ backgroundColor: `${module.color}15` }}
+                      >
+                        {React.cloneElement(module.icon as React.ReactElement, { 
+                          style: { color: module.color }
+                        } as any)}
+                      </div>
+                      <span>{module.title}</span>
+                    </div>
+                    <span className={`chevron-icon ${expandedModules.includes(module.id) ? 'expanded' : ''}`}>
+                      {expandedModules.includes(module.id) ? (
+                        <ChevronDown size={18} />
+                      ) : (
+                        <ChevronRight size={18} />
+                      )}
+                    </span>
+                  </button>
+                )}
+                {/* Sub Items */}
+                {expandedModules.includes(module.id) && module.subItems && (
+                  <div>
+                    {module.subItems.map((subItem: SubMenuItem) => (
+                      <div key={subItem.id}>
+                        {subItem.subItems && subItem.subItems.length > 0 ? (
+                          // This is a nested sub-module with children
+                          <>
+
+                          {subItem.url !== '' ? (
+                            <Link href={subItem.url || '/'}>
+                              <button
+                                className={`sub-module-header ${expandedSubModules.includes(subItem.id) ? 'expanded' : ''}`}
+                                onClick={() => toggleSubModule(subItem.id)}
+                              >
+                                <div style={{ display: 'flex', alignItems: 'center', flexGrow: 1 }}>
+                                  <span className="sub-item-icon">{subItem.icon}</span>
+                                  <span>{subItem.title}</span>
+                                </div>
+                                <span className={`chevron-icon ${expandedSubModules.includes(subItem.id) ? 'expanded' : ''}`}>
+                                  {expandedSubModules.includes(subItem.id) ? (
+                                    <ChevronDown size={16} />
+                                  ) : (
+                                    <ChevronRight size={16} />
+                                  )}
+                                </span>
+                              </button>
+                            </Link>
+                          ) : (
+                            <button
+                              className={`sub-module-header ${expandedSubModules.includes(subItem.id) ? 'expanded' : ''}`}
+                              onClick={() => toggleSubModule(subItem.id)}
+                            >
+                              <div style={{ display: 'flex', alignItems: 'center', flexGrow: 1 }}>
+                                <span className="sub-item-icon">{subItem.icon}</span>
+                                <span>{subItem.title}</span>
+                              </div>
+
+                              {subItem.subItems && subItem.subItems.length > 0 && (
+                              <span className={`chevron-icon ${expandedSubModules.includes(subItem.id) ? 'expanded' : ''}`}>
+                                {expandedSubModules.includes(subItem.id) ? (
+                                  <ChevronDown size={16} />
+                                ) : (
+                                  <ChevronRight size={16} />
+                                )}
+                              </span>
+                              )}
+                            </button>
+                          )}
+                        </>
+                      ) : (
+                        // Regular sub-item without children
+                        <>
+                        {subItem.url !== '' ? (
+                          <Link href={subItem.url || '/'}>
+                            <button
+                              className={`sub-item 
+                                ${router.pathname === subItem.url ? 'active' : ''}
+                                ${expandedSubModules.includes(subItem.id) ? 'expanded' : ''}`}
+                              onClick={() => toggleSubModule(subItem.id)}
+                            >
+                              <div style={{ display: 'flex', alignItems: 'center', flexGrow: 1 }}>
+                                <span className="sub-item-icon">{subItem.icon}</span>
+                                <span>{subItem.title}</span>
+                              </div>
+
+                              {subItem.subItems && subItem.subItems.length > 0 && (
+                              <span className={`chevron-icon ${expandedSubModules.includes(subItem.id) ? 'expanded' : ''}`}>
+                                {expandedSubModules.includes(subItem.id) ? (
+                                  <ChevronDown size={16} />
+                                ) : (
+                                  <ChevronRight size={16} />
+                                )}
+                              </span>
+                              )}
+                            </button>
+                          </Link>
+                        ) : (
+                          <button
+                            className={`sub-module-header ${expandedSubModules.includes(subItem.id) ? 'expanded' : ''}`}
+                            onClick={() => toggleSubModule(subItem.id)}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', flexGrow: 1 }}>
+                              <span className="sub-item-icon">{subItem.icon}</span>
+                              <span>{subItem.title}</span>
+                            </div>
+                            {subItem.subItems && subItem.subItems.length > 0 && (
+                            <span className={`chevron-icon ${expandedSubModules.includes(subItem.id) ? 'expanded' : ''}`}>
+                              {expandedSubModules.includes(subItem.id) ? (
+                                <ChevronDown size={16} />
+                              ) : (
+                                <ChevronRight size={16} />
+                              )}
+                            </span>
+                            )}
+                          </button>
+                        )}
+                      </>
+                    )}
+                            {/* Nested Sub Items */}
+                            {subItem.subItems && subItem.subItems.length > 0 && expandedSubModules.includes(subItem.id) && (
+                              <div>
+                                {subItem.subItems.map((nestedItem: SubMenuItem) => (
+                                  <Link key={nestedItem.id} href={nestedItem.url || '/'}>
+                                    <button
+                                      className={`nested-sub-item`}
+                                      onClick={() => handleSubItemClick(nestedItem.id)}
+                                    >
+                                      <span className="nested-sub-item-icon">{nestedItem.icon}</span>
+                                      <span>{nestedItem.title}</span>
+                                    </button>
+                                  </Link>
+                                ))}
+                              </div>
+                            )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Divider between modules */}
+                {index < mainMenuItems.slice(0, 1).length - 1 && (
+                  <div className="module-divider" />
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Middle Section - Main Menu Items */}
+          <div className="sidebar-middle-section">
+            <div className="section-heading">Services</div>
+            {mainMenuItems.slice(1, -2).map((module, index) => (
               <div key={module.id}>
                 {/* Module Header */}
 
@@ -1354,7 +1597,202 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
                 )}
 
                 {/* Divider between modules */}
-                {index < mainMenuItems.length - 1 && (
+                {index < mainMenuItems.slice(1, -2).length - 1 && (
+                  <div className="module-divider" />
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Bottom Section - Settings and Help Center */}
+          <div className="sidebar-bottom-section">
+            <div className="section-heading">System</div>
+            {mainMenuItems.slice(-2).map((module, index) => (
+              <div key={module.id}>
+                {/* Module Header */}
+
+                {module.url !== '' ? (
+                  <Link href={(BASE_URL || '') + (module.url || '/')}>
+                    <button
+                      className={`module-header ${expandedModules.includes(module.id) ? 'expanded' : ''}`}
+                      style={{
+                        borderLeftColor: expandedModules.includes(module.id) ? module.color : 'transparent'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', flexGrow: 1 }}>
+                        <div 
+                          className="module-icon-wrapper"
+                          style={{ backgroundColor: `${module.color}15` }}
+                        >
+                          {React.cloneElement(module.icon as React.ReactElement, { 
+                            style: { color: module.color }
+                          } as any)}
+                        </div>
+                        <span>{module.title}
+                        </span>
+                      </div>
+
+                      {module.subItems && module.subItems.length > 0 && (
+                      <span className={`chevron-icon ${expandedModules.includes(module.id) ? 'expanded' : ''}`}>
+                        {expandedModules.includes(module.id) ? (
+                          <ChevronDown size={18} />
+                        ) : (
+                          <ChevronRight size={18} />
+                        )}
+                      </span>
+                      )}
+                    </button>
+                  </Link>
+                ) : (
+                  <button
+                    className={`module-header ${expandedModules.includes(module.id) ? 'expanded' : ''}`}
+                    style={{
+                      borderLeftColor: expandedModules.includes(module.id) ? module.color : 'transparent'
+                    }}
+                    onClick={() => toggleModule(module.id)}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', flexGrow: 1 }}>
+                      <div 
+                        className="module-icon-wrapper"
+                        style={{ backgroundColor: `${module.color}15` }}
+                      >
+                        {React.cloneElement(module.icon as React.ReactElement, { 
+                          style: { color: module.color }
+                        } as any)}
+                      </div>
+                      <span>{module.title}</span>
+                    </div>
+                    <span className={`chevron-icon ${expandedModules.includes(module.id) ? 'expanded' : ''}`}>
+                      {expandedModules.includes(module.id) ? (
+                        <ChevronDown size={18} />
+                      ) : (
+                        <ChevronRight size={18} />
+                      )}
+                    </span>
+                  </button>
+                )}
+                {/* Sub Items */}
+                {expandedModules.includes(module.id) && module.subItems && (
+                  <div>
+                    {module.subItems.map((subItem: SubMenuItem) => (
+                      <div key={subItem.id}>
+                        {subItem.subItems && subItem.subItems.length > 0 ? (
+                          // This is a nested sub-module with children
+                          <>
+
+                          {subItem.url !== '' ? (
+                            <Link href={subItem.url || '/'}>
+                              <button
+                                className={`sub-module-header ${expandedSubModules.includes(subItem.id) ? 'expanded' : ''}`}
+                                onClick={() => toggleSubModule(subItem.id)}
+                              >
+                                <div style={{ display: 'flex', alignItems: 'center', flexGrow: 1 }}>
+                                  <span className="sub-item-icon">{subItem.icon}</span>
+                                  <span>{subItem.title}</span>
+                                </div>
+                                <span className={`chevron-icon ${expandedSubModules.includes(subItem.id) ? 'expanded' : ''}`}>
+                                  {expandedSubModules.includes(subItem.id) ? (
+                                    <ChevronDown size={16} />
+                                  ) : (
+                                    <ChevronRight size={16} />
+                                  )}
+                                </span>
+                              </button>
+                            </Link>
+                          ) : (
+                            <button
+                              className={`sub-module-header ${expandedSubModules.includes(subItem.id) ? 'expanded' : ''}`}
+                              onClick={() => toggleSubModule(subItem.id)}
+                            >
+                              <div style={{ display: 'flex', alignItems: 'center', flexGrow: 1 }}>
+                                <span className="sub-item-icon">{subItem.icon}</span>
+                                <span>{subItem.title}</span>
+                              </div>
+
+                              {subItem.subItems && subItem.subItems.length > 0 && (
+                              <span className={`chevron-icon ${expandedSubModules.includes(subItem.id) ? 'expanded' : ''}`}>
+                                {expandedSubModules.includes(subItem.id) ? (
+                                  <ChevronDown size={16} />
+                                ) : (
+                                  <ChevronRight size={16} />
+                                )}
+                              </span>
+                              )}
+                            </button>
+                          )}
+                        </>
+                      ) : (
+                        // Regular sub-item without children
+                        <>
+                        {subItem.url !== '' ? (
+                          <Link href={subItem.url || '/'}>
+                            <button
+                              className={`sub-item 
+                                ${router.pathname === subItem.url ? 'active' : ''}
+                                ${expandedSubModules.includes(subItem.id) ? 'expanded' : ''}`}
+                              onClick={() => toggleSubModule(subItem.id)}
+                            >
+                              <div style={{ display: 'flex', alignItems: 'center', flexGrow: 1 }}>
+                                <span className="sub-item-icon">{subItem.icon}</span>
+                                <span>{subItem.title}</span>
+                              </div>
+
+                              {subItem.subItems && subItem.subItems.length > 0 && (
+                              <span className={`chevron-icon ${expandedSubModules.includes(subItem.id) ? 'expanded' : ''}`}>
+                                {expandedSubModules.includes(subItem.id) ? (
+                                  <ChevronDown size={16} />
+                                ) : (
+                                  <ChevronRight size={16} />
+                                )}
+                              </span>
+                              )}
+                            </button>
+                          </Link>
+                        ) : (
+                          <button
+                            className={`sub-module-header ${expandedSubModules.includes(subItem.id) ? 'expanded' : ''}`}
+                            onClick={() => toggleSubModule(subItem.id)}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', flexGrow: 1 }}>
+                              <span className="sub-item-icon">{subItem.icon}</span>
+                              <span>{subItem.title}</span>
+                            </div>
+                            {subItem.subItems && subItem.subItems.length > 0 && (
+                            <span className={`chevron-icon ${expandedSubModules.includes(subItem.id) ? 'expanded' : ''}`}>
+                              {expandedSubModules.includes(subItem.id) ? (
+                                <ChevronDown size={16} />
+                              ) : (
+                                <ChevronRight size={16} />
+                              )}
+                            </span>
+                            )}
+                          </button>
+                        )}
+                      </>
+                    )}
+                            {/* Nested Sub Items */}
+                            {subItem.subItems && subItem.subItems.length > 0 && expandedSubModules.includes(subItem.id) && (
+                              <div>
+                                {subItem.subItems.map((nestedItem: SubMenuItem) => (
+                                  <Link key={nestedItem.id} href={nestedItem.url || '/'}>
+                                    <button
+                                      className={`nested-sub-item`}
+                                      onClick={() => handleSubItemClick(nestedItem.id)}
+                                    >
+                                      <span className="nested-sub-item-icon">{nestedItem.icon}</span>
+                                      <span>{nestedItem.title}</span>
+                                    </button>
+                                  </Link>
+                                ))}
+                              </div>
+                            )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Divider between modules */}
+                {index < mainMenuItems.slice(-2).length - 1 && (
                   <div className="module-divider" />
                 )}
               </div>

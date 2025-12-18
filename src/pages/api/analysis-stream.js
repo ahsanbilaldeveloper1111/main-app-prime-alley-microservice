@@ -52,10 +52,10 @@ export default function handler(req, res) {
 //  const analysisServerUrl = `${websocketProtocol}://${analysisServerHost}/ws/analysis/${uuid}/${date}/${localPartyNumber}/${ownerUsername}/${imagicle}/`;
 
   //New Analysis Server URL
-   const analysisServerUrl = `${websocketProtocol}://${analysisServerHost}/ws/analysis-v2/${uuid}/${date}/${localPartyNumber}/${ownerUsername}/${imagicle}/`;
+  //  const analysisServerUrl = `${websocketProtocol}://${analysisServerHost}/ws/analysis-v2/${uuid}/${date}/${localPartyNumber}/${ownerUsername}/${imagicle}/`;
   
   //ML Gateway Analysis Server URL
-  //  const analysisServerUrl = `${websocketProtocol}://${analysisServerHost}/ws/analysis/${uuid}/${date}/${localPartyNumber}/${ownerUsername}/${imagicle}/${callDuration}/${remotePartyNumber}/${callType}/${dateTime}/`;
+   const analysisServerUrl = `${websocketProtocol}://${analysisServerHost}/ws/analysis/${uuid}/${date}/${localPartyNumber}/${ownerUsername}/${imagicle}/${callDuration}/${remotePartyNumber}/${callType}/${dateTime}/`;
   
   console.log('Connecting to analysis server:', analysisServerUrl);
   
