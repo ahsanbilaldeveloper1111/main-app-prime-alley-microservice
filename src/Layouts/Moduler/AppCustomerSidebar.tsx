@@ -93,7 +93,7 @@ interface SidebarProps {
   setSidebarOpen: (open: boolean) => void;
 }
 
-const ApplicationSidebar: React.FC<SidebarProps> = ({ 
+const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({ 
   sidebarOpen, 
   setSidebarOpen
 }) => {
@@ -115,7 +115,31 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
       color: MENU_COLORS.DASHBOARD,
       title: MENU_LABELS.DASHBOARD,
       label: MENU_LABELS.DASHBOARD,
-      url: '/dashboard',
+      url: '/dashboards/manager',
+      // subItems: [
+      //   {
+      //     id: 'dashboard-supervisor-control',
+      //     title: 'Supervisor Control',
+      //     icon: <Ticket size={16} />,
+      //     permission: '',
+      //     url: '/supervisor-control'
+      //   },
+      //   {
+      //     id: 'dashboard-agent-visibility',
+      //     title: 'Agent Visibility',
+      //     icon: <Ticket size={16} />,
+      //     permission: '',
+      //     url: '/agent-visibility'
+      //   },
+      //   {
+      //     id: 'dashboard-finance-insights',
+      //     title: 'Finance Insights',
+      //     icon: <Ticket size={16} />,
+      //     permission: '',
+      //     url: '/finance-insights'
+      //   }
+
+      // ]
     },
     
     {
@@ -124,8 +148,8 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
       permission: PERMISSIONS.CRM_SERVICES,
       icon: <Briefcase size={20} />,
       color: MENU_COLORS.CRM,
-      title: MENU_LABELS.CRM,
-      label: MENU_LABELS.CRM,
+      title: "CRM and Sales",
+      label: "CRM and Sales",
       url: '',
       subItems: [
         {
@@ -163,13 +187,13 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
           permission: PERMISSIONS.VIEW_CRM_ORDERS,
           url: '/crm/orders'
         },
-        {
-          id: 'crm-products',
-          title: HEADER_CONSTANTS.SUBMENU_LABELS.PRODUCTS,
-          icon: <Package size={16} />,
-          permission: PERMISSIONS.VIEW_CRM_PRODUCTS,
-          url: '/crm/products'
-        },
+        // {
+        //   id: 'crm-products',
+        //   title: HEADER_CONSTANTS.SUBMENU_LABELS.PRODUCTS,
+        //   icon: <Package size={16} />,
+        //   permission: PERMISSIONS.VIEW_CRM_PRODUCTS,
+        //   url: '/crm/products'
+        // },
         // {
         //   id: 'crm-tasks',
         //   title: HEADER_CONSTANTS.SUBMENU_LABELS.TASKS,
@@ -177,21 +201,21 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
         //   permission: PERMISSIONS.VIEW_CRM_TASKS,
         //   url: '/crm/tasks'
         // },
-        {
-          id: 'crm-stages',
-          title: HEADER_CONSTANTS.SUBMENU_LABELS.STAGES,
-          icon: <BarChart3 size={16} />,
-          permission: PERMISSIONS.VIEW_CRM_STAGES,
-          url: '/crm/stages'
-        },
+        // {
+        //   id: 'crm-stages',
+        //   title: HEADER_CONSTANTS.SUBMENU_LABELS.STAGES,
+        //   icon: <BarChart3 size={16} />,
+        //   permission: PERMISSIONS.VIEW_CRM_STAGES,
+        //   url: '/crm/stages'
+        // },
       
-        {
-          id: 'crm-campaigns',
-          title: HEADER_CONSTANTS.SUBMENU_LABELS.CAMPAIGNS,
-          icon: <Megaphone size={16} />,
-          permission: PERMISSIONS.VIEW_CRM_CAMPAIGNS,
-          url: '/crm/campaigns'
-        },
+        // {
+        //   id: 'crm-campaigns',
+        //   title: HEADER_CONSTANTS.SUBMENU_LABELS.CAMPAIGNS,
+        //   icon: <Megaphone size={16} />,
+        //   permission: PERMISSIONS.VIEW_CRM_CAMPAIGNS,
+        //   url: '/crm/campaigns'
+        // },
         {
           id: 'crm-history',
           title: 'Activity Tracker',
@@ -199,13 +223,13 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
           permission: PERMISSIONS.VIEW_CRM_HISTORY,
           url: '/crm/history'
         },
-        {
-          id: 'crm-reports',
-          title: 'Reports',
-          icon: <BarChart3 size={16} />,
-          permission: PERMISSIONS.VIEW_CRM_REPORTS,
-          url: '/crm/reports'
-        }
+        // {
+        //   id: 'crm-reports',
+        //   title: 'Reports',
+        //   icon: <BarChart3 size={16} />,
+        //   permission: PERMISSIONS.VIEW_CRM_REPORTS,
+        //   url: '/crm/reports'
+        // }
       ].filter(item => !item.permission || hasPermission(item.permission))
     },
 
@@ -215,8 +239,8 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
       permission: PERMISSIONS.CTI_SERVICES,
       icon: <PhoneCall size={20} />,
       color: MENU_COLORS.LIVE_CALLS,
-      title: MENU_LABELS.LIVE_CALLS,
-      label: MENU_LABELS.LIVE_CALLS,
+      title: "Live Wallboards",
+      label: "Live Wallboards",
       url: '',
       subItems: [
         {
@@ -233,13 +257,13 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
           permission: PERMISSIONS.CTI_MONITORING,
           url: '/cti/monitoring'
         },
-        {
-          id: 'live-calls-dialer',
-          title: HEADER_CONSTANTS.SUBMENU_LABELS.DIALER,
-          icon: <Phone size={16} />,
-          permission: PERMISSIONS.DIAL_CALL_CTI,
-          url: '/cti/dialer'
-        }
+        // {
+        //   id: 'live-calls-dialer',
+        //   title: HEADER_CONSTANTS.SUBMENU_LABELS.DIALER,
+        //   icon: <Phone size={16} />,
+        //   permission: PERMISSIONS.DIAL_CALL_CTI,
+        //   url: '/cti/dialer'
+        // }
       ].filter(item => !item.permission || hasPermission(item.permission))
     },
 
@@ -249,13 +273,13 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
       permission: PERMISSIONS.CALL_HISTORY_SERVICES,
       icon: <History size={20} />,
       color: MENU_COLORS.CALL_HISTORY,
-      title: MENU_LABELS.CALL_HISTORY,
-      label: MENU_LABELS.CALL_HISTORY,
+      title: 'Calls Details',
+      label: 'Calls Details',
       url: '',
       subItems: [
         {
           id: 'call-history-dashboard',
-          title: HEADER_CONSTANTS.MENU_LABELS.CALL_DASHBOARD,
+          title: 'Dashboard',
           icon: <LayoutDashboard size={16} />,
           permission: PERMISSIONS.VIEW_CALL_DASHBOARD,
           url: '/call-logs/dashboard'
@@ -275,13 +299,20 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
           url: '/call-recordings'
         },
         {
-          id: 'call-reports',
-          key: 'call-reports',
-          permission: PERMISSIONS.VIEW_CALL_REPORTS,
-          icon: <ChartNoAxesCombined size={20} />,
-          title: MENU_LABELS.CALL_REPORTS,
-          url: '/call-reports',
+          id: 'call-ai-analysis',
+          title: 'Calls AI Analysis',
+          icon: <ChartNoAxesCombined size={16} />,
+          permission: PERMISSIONS.TRANSCRIPTION_ANALYZE_RECORDINGS_AIML,
+          url: '/ai-ml/analyze-recordings'
         }
+        // {
+        //   id: 'call-reports',
+        //   key: 'call-reports',
+        //   permission: PERMISSIONS.VIEW_CALL_REPORTS,
+        //   icon: <ChartNoAxesCombined size={20} />,
+        //   title: MENU_LABELS.CALL_REPORTS,
+        //   url: '/call-reports',
+        // }
       ].filter(item => !item.permission || hasPermission(item.permission))
     },
 
@@ -297,185 +328,14 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
     // },
 
     {
-      id: 'ai-ml',
-      key: 'ai-ml',
-      permission: PERMISSIONS.AI_ML_SERVICES,
-      icon: <FileChartPie size={20} />,
-      color: MENU_COLORS.AI_INSIGHTS,
-      title: MENU_LABELS.AI_INSIGHTS,
-      label: MENU_LABELS.AI_INSIGHTS,
-      url: '',
-      subItems: [
-        {
-          id: 'ai-ml-analysis',
-          title: HEADER_CONSTANTS.SUBMENU_LABELS.ANALYSIS,
-          icon: <CassetteTape size={16} />,
-          permission: PERMISSIONS.TRANSCRIPTION_ANALYSIS_AIML,
-          url: '/ai-ml/analysis'
-        },
-        {
-          id: 'ai-ml-analyze-recordings',
-          title: HEADER_CONSTANTS.SUBMENU_LABELS.ANALYZE_RECORDINGS,
-          icon: <AudioLines size={16} />,
-          permission: PERMISSIONS.TRANSCRIPTION_ANALYZE_RECORDINGS_AIML,
-          url: '/ai-ml/analyze-recordings'
-        },
-        {
-          id: 'ai-ml-translate',
-          title: HEADER_CONSTANTS.SUBMENU_LABELS.TRANSLATE,
-          icon: <Languages size={16} />,
-          permission: PERMISSIONS.TRANSLATE_AIML,
-          url: '/ai-ml/translate'
-        },
-        {
-          id: 'ai-ml-outbound-calls',
-          title: HEADER_CONSTANTS.SUBMENU_LABELS.OUTBOUND_CALLS,
-          icon: <Phone size={16} />,
-          permission: PERMISSIONS.OUTBOUND_CALLS_AIML,
-          url: '/ai-ml/outbound-calls'
-        }
-      ].filter(item => !item.permission || hasPermission(item.permission))
-    },
-    {
-      id: 'dncr',
-      key: 'dncr',
-      permission: PERMISSIONS.DNCR_SERVICES,
-      icon: <Ban size={20} />,
-      color: MENU_COLORS.DNCR,
-      title: MENU_LABELS.DNCR,
-      label: MENU_LABELS.DNCR,
-      url: '',
-      subItems: [
-        {
-          id: 'dncr-check-number',
-          title: HEADER_CONSTANTS.SUBMENU_LABELS.CHECK_NUMBER,
-          icon: <PhoneCall size={16} />,
-          permission: PERMISSIONS.CHECK_NUMBERS_DNCR,
-          url: '/dncr/check-number'
-        }
-      ].filter(item => !item.permission || hasPermission(item.permission))
-    },
-
-    {
-      id: 'accounts',
-      key: 'accounts',
-      permission: PERMISSIONS.ACCOUNTS_SERVICES,
-      icon: <CreditCard size={20} />,
-      color: MENU_COLORS.BILLING,
-      title: MENU_LABELS.BILLING,
-      label: MENU_LABELS.BILLING,
-      url: '',
-      subItems: [
-
-            { 
-              id: 'customer-dashboard', 
-              title: 'Customer Dashboard', 
-              icon: <LayoutDashboard size={16} />, 
-              url: '/accounting/customer/dashboard', 
-              permission: PERMISSIONS.VIEW_CUSTOMER_DASHBOARD_BILLING 
-            },
-            { 
-              id: 'account-overview', 
-              title: 'Account Overview', 
-              icon: <Eye size={16} />, 
-              url: '/accounting/customer/account-overview', 
-              permission: PERMISSIONS.VIEW_ACCOUNT_OVERVIEW_BILLING 
-            },
-
-            { 
-              id: 'product-details', 
-              title: 'Product Details', 
-              icon: <ShoppingBag size={16} />, 
-              url: '/accounting/customer/product-details', 
-              permission: PERMISSIONS.VIEW_PRODUCT_DETAILS_BILLING 
-            },
-            { 
-              id: 'billing-invoices', 
-              title: 'Invoices', 
-              icon: <DollarSign size={16} />, 
-              url: '/accounting/customer/invoices', 
-              permission: PERMISSIONS.VIEW_INVOICES_BILLING 
-            },
-            { 
-              id: 'billing-history', 
-              title: 'Billing History', 
-              icon: <FileText size={16} />, 
-              url: '/accounting/customer/billing-history', permission: PERMISSIONS.VIEW_BILLING_HISTORY_BILLING },
-            
-            { 
-              id: 'payment-methods', 
-              title: 'Payment Methods', 
-              icon: <CreditCard size={16} />, 
-              url: '/accounting/customer/payment-methods', 
-              permission: PERMISSIONS.VIEW_PAYMENT_METHODS_BILLING 
-            },
-            
-
-      ]
-      .filter(item => !item.permission || hasPermission(item.permission))
-    }, 
-    
-    {
-      id: 'tickets',
-      key: 'tickets',
-      permission: PERMISSIONS.TICKETS_SERVICES,
-      icon: <Ticket size={20} />,
-      color: MENU_COLORS.TICKETS,
-      title: MENU_LABELS.TICKETS,
-      label: MENU_LABELS.TICKETS,
-      url: '',
-      subItems: [
-        {
-          id: 'tickets-dashboard',
-          title: HEADER_CONSTANTS.SUBMENU_LABELS.TICKETS_DASHBOARD,
-          icon: <LayoutDashboard size={16} />,
-          permission: PERMISSIONS.VIEW_TICKETS_DASHBOARD,
-          url: '/tickets/dashboard'
-        },
-        {
-          id: 'tickets-list',
-          title: HEADER_CONSTANTS.SUBMENU_LABELS.TICKETS_LIST,
-          icon: <Ticket size={16} />,
-          permission: PERMISSIONS.VIEW_TICKETS_LIST,
-          url: '/tickets/list'
-        },
-        {
-          id: 'tickets-status',
-          title: HEADER_CONSTANTS.SUBMENU_LABELS.STATUS,
-          icon: <List size={16} />,
-          permission: PERMISSIONS.VIEW_TICKETS_STATUS,
-          url: '/tickets/statuses'
-        },
-        {
-          id: 'tickets-modules',
-          title: HEADER_CONSTANTS.SUBMENU_LABELS.MODULES,
-          icon: <Layers size={16} />,
-          permission: PERMISSIONS.VIEW_TICKETS_MODULES,
-          url: '/tickets/modules'
-        },
-        {
-          id: 'tickets-module-categories',
-          title: HEADER_CONSTANTS.SUBMENU_LABELS.TICKET_MODULE_CATEGORIES,
-          icon: <Layers size={16} />,
-          permission: PERMISSIONS.VIEW_TICKETS_CATEGORIES,
-          url: '/tickets/modules/categories'
-        },
-        {
-          id: 'tickets-module-subcategories',
-          title: HEADER_CONSTANTS.SUBMENU_LABELS.TICKET_MODULE_SUBCATEGORIES,
-          icon: <Layers size={16} />,
-          permission: PERMISSIONS.VIEW_TICKETS_SUBCATEGORIES,
-          url: '/tickets/modules/sub-categories'
-        },
-
-        {
-          id: 'tickets-types',
-          title: HEADER_CONSTANTS.SUBMENU_LABELS.TYPES,
-          icon: <List size={16} />,
-          permission: PERMISSIONS.VIEW_TICKETS_TYPES,
-          url: '/tickets/types'
-        }
-      ].filter(item => !item.permission || hasPermission(item.permission))
+      id: 'ai-bot-and-analytics',
+      key: 'ai-bot-and-analytics',
+      permission: PERMISSIONS.OUTBOUND_CALLS_AIML,
+      icon: <Workflow size={20} />,
+      color: MENU_COLORS.AUTOMATION,
+      title: "AI BOT and Analytics",
+      label: "AI BOT and Analytics",
+      url: '/ai-ml/outbound-calls'
     },
 
     {
@@ -497,7 +357,7 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
         },
         {
           id: 'gsm-list',
-          title: HEADER_CONSTANTS.SUBMENU_LABELS.GSM_LIST,
+          title: "Devices List",
           icon: <List size={16} />,
           permission: PERMISSIONS.VIEW_GSM_MANAGEMENT,
           url: '/gsm/list'
@@ -523,23 +383,22 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
           permission: PERMISSIONS.VIEW_GSM_INBOX,
           url: '/gsm/inbox'
         },
-        {
-          id: 'gsm-sync',
-          title: HEADER_CONSTANTS.SUBMENU_LABELS.SYNC_GSM,
-          icon: <List size={16} />,
-          permission: PERMISSIONS.VIEW_GSM_SYNC,
-          url: '/gsm/sync'
-        },
-        {
-          id: 'gsm-company-po',
-          title: HEADER_CONSTANTS.SUBMENU_LABELS.COMPANY_PO,
-          icon: <List size={16} />,
-          permission: PERMISSIONS.VIEW_GSM_COMPANY_PROFILLING,
-          url: '/gsm/company/po'
-        }
+        // {
+        //   id: 'gsm-sync',
+        //   title: HEADER_CONSTANTS.SUBMENU_LABELS.SYNC_GSM,
+        //   icon: <List size={16} />,
+        //   permission: PERMISSIONS.VIEW_GSM_SYNC,
+        //   url: '/gsm/sync'
+        // },
+        // {
+        //   id: 'gsm-company-po',
+        //   title: HEADER_CONSTANTS.SUBMENU_LABELS.COMPANY_PO,
+        //   icon: <List size={16} />,
+        //   permission: PERMISSIONS.VIEW_GSM_COMPANY_PROFILLING,
+        //   url: '/gsm/company/po'
+        // }
       ].filter(item => !item.permission || hasPermission(item.permission))
     },
-
     {
       id: 'tms',
       key: 'tms',
@@ -599,46 +458,280 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
       ].filter(item => !item.permission || hasPermission(item.permission))
     },
 
+
+
+
+
+
+
+
+
     {
-      id: 'controlhub',
-      key: 'controlhub',
-      permission: PERMISSIONS.CONTROL_HUB_SERVICES,
-      icon: <Settings size={20} />,
-      color: MENU_COLORS.CONTROL_HUB,
-      title: MENU_LABELS.CONTROL_HUB,
-      label: MENU_LABELS.CONTROL_HUB,
+      id: 'ai-ml',
+      key: 'ai-ml',
+      permission: PERMISSIONS.AI_ML_SERVICES,
+      icon: <FileChartPie size={20} />,
+      color: MENU_COLORS.AI_INSIGHTS,
+      title: MENU_LABELS.AI_INSIGHTS,
+      label: MENU_LABELS.AI_INSIGHTS,
       url: '',
       subItems: [
         {
-          id: 'controlhub-users',
-          title: HEADER_CONSTANTS.SUBMENU_LABELS.USER_DIRECTORY,
-          icon: <Users size={16} />,
-          permission: PERMISSIONS.VIEW_USERS,
-          url: '/controlhub/users'
+          id: 'ai-ml-analysis',
+          title: HEADER_CONSTANTS.SUBMENU_LABELS.ANALYSIS,
+          icon: <CassetteTape size={16} />,
+          permission: PERMISSIONS.TRANSCRIPTION_ANALYSIS_AIML,
+          url: '/ai-ml/analysis'
         },
         {
-          id: 'controlhub-teams',
-          title: HEADER_CONSTANTS.SUBMENU_LABELS.TEAMS,
-          icon: <Boxes size={16} />,
-          permission: PERMISSIONS.VIEW_TEAMS,
-          url: '/controlhub/teams'
+          id: 'ai-ml-analyze-recordings',
+          title: HEADER_CONSTANTS.SUBMENU_LABELS.ANALYZE_RECORDINGS,
+          icon: <AudioLines size={16} />,
+          permission: PERMISSIONS.TRANSCRIPTION_ANALYZE_RECORDINGS_AIML,
+          url: '/ai-ml/analyze-recordings'
         },
         {
-          id: 'controlhub-groups',
-          title: HEADER_CONSTANTS.SUBMENU_LABELS.GROUPS,
-          icon: <Group size={16} />,
-          permission: PERMISSIONS.VIEW_GROUPS,
-          url: '/controlhub/groups'
+          id: 'ai-ml-translate',
+          title: HEADER_CONSTANTS.SUBMENU_LABELS.TRANSLATE,
+          icon: <Languages size={16} />,
+          permission: PERMISSIONS.TRANSLATE_AIML,
+          url: '/ai-ml/translate'
         },
-        {
-          id: 'controlhub-ranks',
-          title: HEADER_CONSTANTS.SUBMENU_LABELS.RANKS,
-          icon: <Shield size={16} />,
-          permission: PERMISSIONS.VIEW_RANKS,
-          url: '/controlhub/ranks'
-        }
-        
+        // {
+        //   id: 'ai-ml-outbound-calls',
+        //   title: HEADER_CONSTANTS.SUBMENU_LABELS.OUTBOUND_CALLS,
+        //   icon: <Phone size={16} />,
+        //   permission: PERMISSIONS.OUTBOUND_CALLS_AIML,
+        //   url: '/ai-ml/outbound-calls'
+        // }
       ].filter(item => !item.permission || hasPermission(item.permission))
+    },
+    {
+      id: 'dncr',
+      key: 'dncr',
+      permission: PERMISSIONS.DNCR_SERVICES,
+      icon: <Ban size={20} />,
+      color: MENU_COLORS.DNCR,
+      title: MENU_LABELS.COMPLIANCES,
+      label: MENU_LABELS.COMPLIANCES,
+      url: '',
+      subItems: [
+        {
+          id: 'dncr-check-number',
+          title: HEADER_CONSTANTS.SUBMENU_LABELS.DNCR,
+          icon: <PhoneCall size={16} />,
+          permission: PERMISSIONS.CHECK_NUMBERS_DNCR,
+          url: '/dncr/check-number'
+        }
+      ].filter(item => !item.permission || hasPermission(item.permission))
+    },
+
+    {
+      id: 'accounts',
+      key: 'accounts',
+      permission: PERMISSIONS.ACCOUNTS_SERVICES,
+      icon: <CreditCard size={20} />,
+      color: MENU_COLORS.BILLING,
+      title: MENU_LABELS.BILLING,
+      label: MENU_LABELS.BILLING,
+      url: '',
+      subItems: [
+
+            { 
+              id: 'customer-dashboard', 
+              title: 'Dashboard', 
+              icon: <LayoutDashboard size={16} />, 
+              url: '/accounting/customer/dashboard', 
+              permission: PERMISSIONS.VIEW_CUSTOMER_DASHBOARD_BILLING 
+            },
+            { 
+              id: 'account-overview', 
+              title: 'Account Overview', 
+              icon: <Eye size={16} />, 
+              url: '/accounting/customer/account-overview', 
+              permission: PERMISSIONS.VIEW_ACCOUNT_OVERVIEW_BILLING 
+            },
+
+            { 
+              id: 'product-details', 
+              title: 'Subscriptions', 
+              icon: <ShoppingBag size={16} />, 
+              url: '/accounting/customer/product-details', 
+              permission: PERMISSIONS.VIEW_PRODUCT_DETAILS_BILLING 
+            },
+            { 
+              id: 'billing-invoices', 
+              title: 'Invoices', 
+              icon: <DollarSign size={16} />, 
+              url: '/accounting/customer/invoices', 
+              permission: PERMISSIONS.VIEW_INVOICES_BILLING 
+            },
+            { 
+              id: 'billing-history', 
+              title: 'Billing History', 
+              icon: <FileText size={16} />, 
+              url: '/accounting/customer/billing-history', permission: PERMISSIONS.VIEW_BILLING_HISTORY_BILLING },
+            
+            // { 
+            //   id: 'payment-methods', 
+            //   title: 'Payment Methods', 
+            //   icon: <CreditCard size={16} />, 
+            //   url: '/accounting/customer/payment-methods', 
+            //   permission: PERMISSIONS.VIEW_PAYMENT_METHODS_BILLING 
+            // },
+            
+
+      ]
+      .filter(item => !item.permission || hasPermission(item.permission))
+    }, 
+    
+    // {
+    //   id: 'tickets',
+    //   key: 'tickets',
+    //   permission: PERMISSIONS.TICKETS_SERVICES,
+    //   icon: <Ticket size={20} />,
+    //   color: MENU_COLORS.TICKETS,
+    //   title: MENU_LABELS.TICKETS,
+    //   label: MENU_LABELS.TICKETS,
+    //   url: '',
+    //   subItems: [
+    //     {
+    //       id: 'tickets-dashboard',
+    //       title: HEADER_CONSTANTS.SUBMENU_LABELS.TICKETS_DASHBOARD,
+    //       icon: <LayoutDashboard size={16} />,
+    //       permission: PERMISSIONS.VIEW_TICKETS_DASHBOARD,
+    //       url: '/tickets/dashboard'
+    //     },
+    //     {
+    //       id: 'tickets-list',
+    //       title: HEADER_CONSTANTS.SUBMENU_LABELS.TICKETS_LIST,
+    //       icon: <Ticket size={16} />,
+    //       permission: PERMISSIONS.VIEW_TICKETS_LIST,
+    //       url: '/tickets/list'
+    //     },
+    //     {
+    //       id: 'tickets-status',
+    //       title: HEADER_CONSTANTS.SUBMENU_LABELS.STATUS,
+    //       icon: <List size={16} />,
+    //       permission: PERMISSIONS.VIEW_TICKETS_STATUS,
+    //       url: '/tickets/statuses'
+    //     },
+    //     {
+    //       id: 'tickets-modules',
+    //       title: HEADER_CONSTANTS.SUBMENU_LABELS.MODULES,
+    //       icon: <Layers size={16} />,
+    //       permission: PERMISSIONS.VIEW_TICKETS_MODULES,
+    //       url: '/tickets/modules'
+    //     },
+    //     {
+    //       id: 'tickets-module-categories',
+    //       title: HEADER_CONSTANTS.SUBMENU_LABELS.TICKET_MODULE_CATEGORIES,
+    //       icon: <Layers size={16} />,
+    //       permission: PERMISSIONS.VIEW_TICKETS_CATEGORIES,
+    //       url: '/tickets/modules/categories'
+    //     },
+    //     {
+    //       id: 'tickets-module-subcategories',
+    //       title: HEADER_CONSTANTS.SUBMENU_LABELS.TICKET_MODULE_SUBCATEGORIES,
+    //       icon: <Layers size={16} />,
+    //       permission: PERMISSIONS.VIEW_TICKETS_SUBCATEGORIES,
+    //       url: '/tickets/modules/sub-categories'
+    //     },
+
+    //     {
+    //       id: 'tickets-types',
+    //       title: HEADER_CONSTANTS.SUBMENU_LABELS.TYPES,
+    //       icon: <List size={16} />,
+    //       permission: PERMISSIONS.VIEW_TICKETS_TYPES,
+    //       url: '/tickets/types'
+    //     }
+    //   ].filter(item => !item.permission || hasPermission(item.permission))
+    // },
+
+    
+
+   
+
+   
+
+    // {
+    //   id: 'controlhub',
+    //   key: 'controlhub',
+    //   permission: PERMISSIONS.CONTROL_HUB_SERVICES,
+    //   icon: <Settings size={20} />,
+    //   color: MENU_COLORS.CONTROL_HUB,
+    //   title: MENU_LABELS.CONTROL_HUB,
+    //   label: MENU_LABELS.CONTROL_HUB,
+    //   url: '',
+    //   subItems: [
+    //     {
+    //       id: 'controlhub-users',
+    //       title: HEADER_CONSTANTS.SUBMENU_LABELS.USER_DIRECTORY,
+    //       icon: <Users size={16} />,
+    //       permission: PERMISSIONS.VIEW_USERS,
+    //       url: '/controlhub/users'
+    //     },
+    //     {
+    //       id: 'controlhub-teams',
+    //       title: HEADER_CONSTANTS.SUBMENU_LABELS.TEAMS,
+    //       icon: <Boxes size={16} />,
+    //       permission: PERMISSIONS.VIEW_TEAMS,
+    //       url: '/controlhub/teams'
+    //     },
+    //     {
+    //       id: 'controlhub-groups',
+    //       title: HEADER_CONSTANTS.SUBMENU_LABELS.GROUPS,
+    //       icon: <Group size={16} />,
+    //       permission: PERMISSIONS.VIEW_GROUPS,
+    //       url: '/controlhub/groups'
+    //     },
+    //     {
+    //       id: 'controlhub-ranks',
+    //       title: HEADER_CONSTANTS.SUBMENU_LABELS.RANKS,
+    //       icon: <Shield size={16} />,
+    //       permission: PERMISSIONS.VIEW_RANKS,
+    //       url: '/controlhub/ranks'
+    //     }
+        
+    //   ].filter(item => !item.permission || hasPermission(item.permission))
+    // },
+
+    {
+      id: 'reports',
+      key: 'reports',
+      permission: '',//PERMISSIONS.REPORTS_SERVICES,
+      icon: <BarChart3 size={20} />,
+      color: MENU_COLORS.REPORTS,
+      title: MENU_LABELS.REPORTS,
+      label: MENU_LABELS.REPORTS,
+      url: '',
+      subItems: [
+        {
+          id: 'crm-reports',
+          title: 'CRM Reports',
+          icon: <BarChart3 size={16} />,
+          permission: PERMISSIONS.VIEW_CRM_REPORTS,
+          url: '/crm/reports'
+        },
+        {
+          id: 'call-reports',
+          title: 'Calls Reports',
+          icon: <BarChart3 size={16} />,
+          permission: PERMISSIONS.VIEW_CALL_REPORTS,
+          url: '/call-reports'
+        }
+      ].filter(item => !item.permission || hasPermission(item.permission))
+    },
+
+    {
+      id: 'settings',
+      key: 'settings',
+      permission: '',
+      icon: <Settings size={20} />,
+      color: '#0d6efd',
+      title: "Settings",
+      label: "Settings",
+      url: '/settings'
     },
 
     {
@@ -651,6 +744,13 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
       label: MENU_LABELS.RESOURCES,
       url: '',
       subItems: [
+        {
+          id: 'resources-tickets',
+          title: 'Tickets Management',
+          icon: <CircleQuestionMark size={16} />,
+          permission: '',
+          url: '/tickets/dashboard'
+        },
         {
           id: 'resources-faq',
           title: HEADER_CONSTANTS.SUBMENU_LABELS.FAQ,
@@ -796,7 +896,7 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
     }
 
     .module-header {
-      padding: 0.875rem 1.25rem;
+      padding: 0rem 2rem;
       cursor: pointer;
       transition: all 0.3s ease;
       border-left: 3px solid transparent;
@@ -804,7 +904,7 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
       align-items: center;
       justify-content: space-between;
       font-weight: 600;
-      font-size: 0.9rem;
+      font-size: 0.8rem;
       background: transparent;
       border: none;
       width: 100%;
@@ -817,7 +917,7 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
     }
 
     .module-header.expanded {
-      background-color: #f8f9fa;
+      /* background-color: #f8f9fa; */
     }
 
     .module-icon-wrapper {
@@ -828,21 +928,22 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
       align-items: center;
       justify-content: center;
       margin-right: 0.75rem;
+      display:none !important;
     }
 
     .sub-item {
-      padding: 0.75rem 1.25rem 0.75rem 3.5rem;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      border-left: 3px solid transparent;
-      display: flex;
-      align-items: center;
-      background: transparent;
-      border: none;
-      width: 100%;
-      text-align: left;
-      color: #6c757d;
-      font-size: 0.875rem;
+          padding: 0.2rem 0rem 0.2rem 3rem;
+    transition: all 0.2s ease;
+    border-left: 3px solid transparent;
+    display: flex;
+    align-items: center;
+    background: transparent;
+    border: none;
+    width: 100%;
+    text-align: left;
+    color: #6c757d;
+    font-size: 0.75rem;
+   
     }
 
     .sub-item:hover {
@@ -860,6 +961,7 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
     .sub-item-icon {
       margin-right: 0.75rem;
       opacity: 0.7;
+      display:none !important;
     }
 
     .sub-item.active .sub-item-icon {
@@ -931,6 +1033,7 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
 
     .chevron-icon {
       transition: transform 0.3s ease;
+      display:none !important;
     }
 
     .chevron-icon.expanded {
@@ -1263,4 +1366,4 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
   );
 };
 
-export default ApplicationSidebar;
+export default ApplicationCustomerSidebar;
