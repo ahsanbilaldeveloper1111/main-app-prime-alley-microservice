@@ -1089,7 +1089,7 @@ export const Analytics6 = () => {
           </div>
           <div className="col-12 col-md-6 col-lg-3">
             <MetricCardWithIcon
-              icon={<UserPlus size={24} style={{ color: '#2585f8' } } }} />}
+              icon={<UserPlus size={24} style={{ color: '#2585f8' }} />}
               title="Total Subscription"
               value="15,000"
               change="-800 Last 30 days subscription"
@@ -1334,7 +1334,7 @@ export const Analytics7 = () => {
               <div className="col-12 col-md-6 col-lg-6" style={{ marginTop: '80px', marginBottom: '70px' }}>
                 <div className="bg-white rounded-3 shadow-sm p-2 text-center">
                   <div className="d-inline-flex align-items-center justify-content-center rounded-3 mb-1" style={{ width: '40px', height: '40px', backgroundColor: '#fce7f3' }}>
-                    <DollarSign size={20} style={{ color: '#ec4899' } } }} />
+                    <DollarSign size={20} style={{ color: '#ec4899' }} />
                   </div>
                   <div className="fw-semibold text-muted small mb-1" style={{ fontSize: '0.7rem' }}>Total Sales</div>
                   <div className="fs-5 fw-bold text-dark mb-1">$25,00,000.00</div>
@@ -1446,7 +1446,7 @@ export const Analytics8 = () => {
           </div>
           <div className="col-12 col-md-6 col-lg-3">
             <MetricCardWithIcon
-              icon={<UserPlus size={24} style={{ color: '#2585f8' } } }} />}
+              icon={<UserPlus size={24} style={{ color: '#2585f8' }} />}
               title="Total Subscription"
               value="15,000"
               change="-800 Last 30 days subscription"
@@ -2725,7 +2725,7 @@ export const Analytics14 = () => {
                   <div className="d-flex align-items-start justify-content-between mb-2">
                     <div className="d-flex align-items-center gap-2">
                       <div className="rounded-circle d-flex align-items-center justify-content-center" style={{ width: '36px', height: '36px', backgroundColor: '#e9d5ff' }}>
-                        <Target size={20} style={{ color: '#a855f7' } } }} />
+                        <Target size={20} style={{ color: '#a855f7' }} />
                       </div>
                       <div>
                         <div className="text-muted" style={{ fontSize: '0.65rem' }}>Conversion</div>
@@ -2750,7 +2750,7 @@ export const Analytics14 = () => {
                   <div className="d-flex align-items-start justify-content-between mb-2">
                     <div className="d-flex align-items-center gap-2">
                       <div className="rounded-circle d-flex align-items-center justify-content-center" style={{ width: '36px', height: '36px', backgroundColor: '#fbcfe8' }}>
-                        <Users size={20} style={{ color: '#ec4899' } } }} />
+                        <Users size={20} style={{ color: '#ec4899' }} />
                       </div>
                       <div>
                         <div className="text-muted" style={{ fontSize: '0.65rem' }}>Leads</div>
