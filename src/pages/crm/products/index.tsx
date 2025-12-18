@@ -190,6 +190,7 @@ const ProductsPage = () => {
   
   // State
   const [products, setProducts] = useState<CrmProduct[]>([]);
+  const [totalProducts, setTotalProducts] = useState(0);
   const [loading, setLoading] = useState(true);
   const [productsPagination, setProductsPagination] = useState({
     currentPage: 1,
@@ -297,9 +298,8 @@ const ProductsPage = () => {
   };
 
   const paginateData = <T,>(data: T[], currentPage: number, rowsPerPage: number): T[] => {
-    const startIndex = (currentPage - 1) * rowsPerPage;
-    const endIndex = startIndex + rowsPerPage;
-    return data.slice(startIndex, endIndex);
+// pagination handled by backend
+    return data;
   };
 
   const getTotalPages = (dataLength: number, rowsPerPage: number): number => {
@@ -471,6 +471,7 @@ const ProductsPage = () => {
       // Status filter is handled by activeFilter (active=true/false)
 
       const response = await getCrmProducts(params);
+      setTotalProducts(response.total);
       setProducts(response.data);
     } catch (error: any) {
       toast.error(error?.response?.data?.message || error?.message || "Failed to fetch products");
@@ -1639,7 +1640,7 @@ const ProductsPage = () => {
             </div>
             <div className="p-3">
               {renderPaginationControls(
-                displayProducts.length,
+                totalProducts,
                 productsPagination,
                 setProductsPagination,
                 "products"

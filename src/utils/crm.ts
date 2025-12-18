@@ -1182,7 +1182,7 @@ export const updateCampaign = async (
 export const deleteCampaign = async (id: number): Promise<void> => {
   try {
     await axiosInstance.delete(`/crm/campaigns/${id}`);
-    toast.success("Campaign deleted successfully");
+    // toast.success("Campaign deleted successfully");
   } catch (error: any) {
     toast.error(error?.message || "Failed to delete campaign");
     throw error;
@@ -1826,7 +1826,7 @@ export const updateProduct = async (
   data: UpdateProductPayload
 ): Promise<CrmProduct> => {
   try {
-    const response = await axiosInstance.post("/crm/update-product", data);
+    const response = await axiosInstance.put("/crm/update-product", data);
     toast.success("Product updated successfully");
     return extractData<CrmProduct>(response.data);
   } catch (error: any) {
