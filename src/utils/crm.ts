@@ -1182,7 +1182,7 @@ export const updateCampaign = async (
 export const deleteCampaign = async (id: number): Promise<void> => {
   try {
     await axiosInstance.delete(`/crm/campaigns/${id}`);
-    toast.success("Campaign deleted successfully");
+    // toast.success("Campaign deleted successfully");
   } catch (error: any) {
     toast.error(error?.message || "Failed to delete campaign");
     throw error;

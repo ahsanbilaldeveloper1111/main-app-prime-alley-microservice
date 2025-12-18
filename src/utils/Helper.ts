@@ -1,4 +1,5 @@
 import { v4 as uuidv4 } from "uuid";
+import parsePhoneNumber from 'libphonenumber-js'
 import { toast } from "react-toastify";
 import { getSession } from "next-auth/react";
 import type { Session } from "next-auth";
@@ -792,10 +793,12 @@ export const decodeAnalysisData = (
 
 export enum ValidationType {
   EMAIL = "email",
+  PHONE = "phone",
 }
 
 const customErrorMessages: Record<ValidationType, (name: string) => string> = {
   [ValidationType.EMAIL]: (name: string) => `${name} is not a valid email address`,
+  [ValidationType.PHONE]: (name: string) => `${name} is not a valid phone number`,
 };
 
 type validationRule<
@@ -861,8 +864,11 @@ export function checkRequiredFields<
 function checkFieldValidation(value: unknown, type: ValidationType): boolean {
   let isValid = true;
   switch (type) {
-    case "email":
+    case ValidationType.EMAIL:
       isValid = isValidEmail(value);
+      break;
+    case ValidationType.PHONE:
+      isValid = isValide164PhoneNumber(value);
       break;
     default:
       isValid = false;
@@ -874,6 +880,15 @@ function checkFieldValidation(value: unknown, type: ValidationType): boolean {
 function isValidEmail(value: unknown): boolean {
   if (typeof value === "string") {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+  }
+  return false;
+}
+
+
+function isValide164PhoneNumber(value: unknown): boolean {
+  if (typeof value === "string") {
+    const phoneNumber = parsePhoneNumber(value);
+    return phoneNumber?.isValid() ?? false;
   }
   return false;
 }

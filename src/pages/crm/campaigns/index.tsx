@@ -97,7 +97,7 @@ import {
 
 import FormModal from "@pages/partial/FormModal";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
-import { ModuleSlug } from "@utils/Helper";
+import { ModuleSlug, checkRequiredFields } from "@utils/Helper";
 import { useSession } from "next-auth/react";
 import DatatableActionButton from "@components/DatatableActionButton";
 import { Column } from "@components/CustomDataTable";
@@ -363,6 +363,7 @@ const CrmCampaigns = () => {
     assigned: 0,
     unassigned: 0,
   });
+  const [customDistribution, setCustomDistribution] = useState<Record<string, number>>({});
   const [showSuccessfulModal, setShowSuccessfulModal] = useState(false);
   const [successModalTitle, setSuccessModalTitle] = useState("");
   const [successModalDescription, setSuccessModalDescription] = useState("");
@@ -510,6 +511,36 @@ const CrmCampaigns = () => {
     return includeAssignedRecords ? assignmentCounts.total : assignmentCounts.unassigned;
   };
 
+  // Handle number input keydown to prevent invalid characters
+  const handleNumberKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    // Prevent: e, E, +, -, . (except for backspace, delete, tab, escape, enter, and arrow keys)
+    if (['e', 'E', '+', '-', '.'].includes(e.key)) {
+      e.preventDefault();
+    }
+  };
+
+  // Handle number input change with validation
+  const handleNumberChange = (value: string, max: number, setter: (val: number) => void) => {
+    // Remove any non-numeric characters except empty string
+    const cleaned = value.replace(/[^0-9]/g, '');
+    
+    if (cleaned === '') {
+      setter(0);
+      return;
+    }
+    
+    const numValue = Number.parseInt(cleaned, 10);
+    
+    // Ensure non-negative and within max
+    if (numValue < 0) {
+      setter(0);
+    } else if (numValue > max) {
+      setter(max);
+    } else {
+      setter(numValue);
+    }
+  };
+
   // Sorting & Pagination Helper Functions
   const sortData = <T extends Record<string, any>>(data: T[], sortColumn: string, sortDirection: 'asc' | 'desc'): T[] => {
     if (!sortColumn) return data;
@@ -531,9 +562,8 @@ const CrmCampaigns = () => {
   };
 
   const paginateData = <T,>(data: T[], currentPage: number, rowsPerPage: number): T[] => {
-    const startIndex = (currentPage - 1) * rowsPerPage;
-    const endIndex = startIndex + rowsPerPage;
-    return data.slice(startIndex, endIndex);
+    // data is already paginated by backend
+    return data;
   };
 
   const getTotalPages = (dataLength: number, rowsPerPage: number): number => {
@@ -910,8 +940,14 @@ const CrmCampaigns = () => {
 
   // Form submission handlers
   const handleFormSubmit = useCallback(async () => {
-    if (!formData.name.trim()) {
-      toast.error("Campaign name is required");
+    // Check required fields using checkRequiredFields helper
+    const requiredFields: Array<{ field: keyof typeof formData; name: string; required: boolean }> = [
+      { field: 'name', name: 'Campaign Name', required: true },
+      { field: 'start_date', name: 'Start Date', required: true },
+      { field: 'end_date', name: 'End Date', required: true },
+    ];
+
+    if (!checkRequiredFields(formData, requiredFields)) {
       return;
     }
 
@@ -1274,6 +1310,20 @@ const CrmCampaigns = () => {
       return;
     }
 
+    // Validate custom distribution if in custom mode
+    if (assignmentTargetType === 'campaigns' && distributionMode === 'custom') {
+      const totalCustomAllocation = Object.values(customDistribution).reduce(
+        (sum, count) => sum + count,
+        0
+      );
+      if (totalCustomAllocation !== recordsToAssign) {
+        toast.error(
+          `Custom allocation must equal total records to assign (${recordsToAssign}). Current total: ${totalCustomAllocation}`
+        );
+        return;
+      }
+    }
+
     if (assignmentTargetType === 'users' && selectedUserExtensions.length === 0) {
       toast.error("Please select at least one user");
       return;
@@ -1307,7 +1357,7 @@ const CrmCampaigns = () => {
         const payload: any = {
           campaign_ids: targetCampaignIds,
           count: recordsToAssign,
-          distribution_mode: distributionMode === 'equal' ? 'equal' : 'equal',
+          distribution_mode: distributionMode === 'custom' ? 'custom' : distributionMode,
           include_assigned: includeAssignedRecords,
         };
 
@@ -1319,13 +1369,28 @@ const CrmCampaigns = () => {
           payload.tag_ids = tagIds;
         }
 
+        // Add campaign distribution for custom mode
+        if (distributionMode === 'custom' && customDistribution) {
+          const campaignDistribution: Record<number, number> = {};
+          Object.entries(customDistribution).forEach(([campaignValue, count]) => {
+            const campaignId = parseInt(campaignValue);
+            if (campaignId > 0 && count > 0) {
+              campaignDistribution[campaignId] = count;
+            }
+          });
+          payload.campaign_distribution = campaignDistribution;
+        }
+
         const response = await axiosInstance.post("/crm/crm_data/assign", payload);
 
         if (response.data.success) {
+          // Show toast notification
+          toast.success(`Successfully assigned ${recordsToAssign} records!`);
+          
           // Close modal first
           setShowDataAssignmentModal(false);
           
-          // Reset state
+          // Reset all state to clear the dialog
           setAssignmentFilterCampaigns([]);
           setAssignmentFilterTags([]);
           setAssignmentTargetType('campaigns');
@@ -1335,6 +1400,7 @@ const CrmCampaigns = () => {
           setSelectedUserExtensions([]);
           setRecordsToAssign(0);
           setIncludeAssignedRecords(false);
+          setCustomDistribution({});
           
           // Show success modal
           setShowSuccessfulModal(true);
@@ -1342,6 +1408,8 @@ const CrmCampaigns = () => {
           setSuccessModalDescription(`Successfully assigned ${recordsToAssign} records!`);
           
           setRefreshKey((prev) => prev + 1);
+        } else {
+          toast.error(response.data.message || "Failed to assign data");
         }
       } else {
         // Users assignment
@@ -1372,10 +1440,13 @@ const CrmCampaigns = () => {
         const response = await axiosInstance.post("/crm/crm_data/assign", payload);
 
         if (response.data.success) {
+          // Show toast notification
+          toast.success(`Successfully assigned ${recordsToAssign} records!`);
+          
           // Close modal first
           setShowDataAssignmentModal(false);
           
-          // Reset state
+          // Reset all state to clear the dialog
           setAssignmentFilterCampaigns([]);
           setAssignmentFilterTags([]);
           setAssignmentTargetType('campaigns');
@@ -1385,6 +1456,7 @@ const CrmCampaigns = () => {
           setSelectedUserExtensions([]);
           setRecordsToAssign(0);
           setIncludeAssignedRecords(false);
+          setCustomDistribution({});
           
           // Show success modal
           setShowSuccessfulModal(true);
@@ -1392,9 +1464,10 @@ const CrmCampaigns = () => {
           setSuccessModalDescription(`Successfully assigned ${recordsToAssign} records!`);
           
           setRefreshKey((prev) => prev + 1);
+        } else {
+          toast.error(response.data.message || "Failed to assign data");
         }
       }
-      setShowDataAssignmentModal(false);
     } catch (error: any) {
       console.error("Assignment error:", error);
       toast.error(error?.response?.data?.message || "Failed to assign data");
@@ -1413,6 +1486,7 @@ const CrmCampaigns = () => {
     availableTags,
     availableCampaignsForUpload,
     includeAssignedRecords,
+    customDistribution,
   ]);
 
   // Handle data assignment modal close
@@ -1427,6 +1501,7 @@ const CrmCampaigns = () => {
     setSelectedUserExtensions([]);
     setRecordsToAssign(0);
     setIncludeAssignedRecords(false);
+    setCustomDistribution({});
   }, []);
 
   // Define columns
@@ -2146,7 +2221,7 @@ const CrmCampaigns = () => {
           <Row>
             <Col md={6}>
               <Form.Group className="mb-3">
-                <Form.Label>Start Date</Form.Label>
+                <Form.Label>Start Date *</Form.Label>
                 <Form.Control
                   type="date"
                   value={formData.start_date}
@@ -2160,7 +2235,7 @@ const CrmCampaigns = () => {
             </Col>
             <Col md={6}>
               <Form.Group className="mb-3">
-                <Form.Label>End Date</Form.Label>
+                <Form.Label>End Date *</Form.Label>
                 <Form.Control
                   type="date"
                   value={formData.end_date}
@@ -3180,9 +3255,14 @@ const CrmCampaigns = () => {
                         <Select
                           options={[
                             { value: 'equal', label: 'Equal Distribution' },
-                            { value: 'proportional', label: 'Proportional Distribution' }
+                            { value: 'custom', label: 'Proportional Distribution' }
                           ]}
-                          value={distributionMode ? { value: distributionMode, label: distributionMode === 'equal' ? 'Equal Distribution' : 'Proportional Distribution' } : { value: 'equal', label: 'Equal Distribution' }}
+                          value={distributionMode ? { 
+                            value: distributionMode, 
+                            label: distributionMode === 'equal' 
+                              ? 'Equal Distribution' 
+                              : 'Proportional Distribution'
+                          } : { value: 'equal', label: 'Equal Distribution' }}
                           onChange={(selected) => setDistributionMode(selected?.value || 'equal')}
                           placeholder="Select distribution mode..."
                           styles={customSelectStyles}
@@ -3193,7 +3273,7 @@ const CrmCampaigns = () => {
                               <AlertCircle size={14} className="mt-1 flex-shrink-0 text-primary" />
                               <span>
                                 {distributionMode === 'equal' && 'Records will be distributed equally across all selected campaigns'}
-                                {distributionMode === 'proportional' && 'Records will be distributed based on individual campaign capacity and requirements'}
+                                {distributionMode === 'custom' && 'You can specify exactly how many records each campaign gets'}
                               </span>
                             </small>
                           </div>
@@ -3224,6 +3304,101 @@ const CrmCampaigns = () => {
                       </Form.Group>
                     </Col>
                   </Row>
+
+                  {/* Custom Distribution UI */}
+                  {distributionMode === 'custom' && assignToCampaigns.length > 0 && (
+                    <Row className="mt-3">
+                      <Col md={12}>
+                        <Form.Group>
+                          <div className="d-flex justify-content-between align-items-center mb-2">
+                            <Form.Label className="mb-0 fw-semibold small text-muted">
+                              Proportional Distribution
+                            </Form.Label>
+                            <Button
+                              variant="outline-secondary"
+                              size="sm"
+                              onClick={() => {
+                                const equalDistribution = Math.floor(
+                                  recordsToAssign / assignToCampaigns.length
+                                );
+                                const remainder = recordsToAssign % assignToCampaigns.length;
+                                const newCustomDistribution: Record<string, number> = {};
+
+                                assignToCampaigns.forEach((campaign: string, index: number) => {
+                                  const campaignOption = availableCampaignsForUpload.find(
+                                    c => c.label === campaign
+                                  );
+                                  if (campaignOption) {
+                                    newCustomDistribution[campaignOption.value] =
+                                      equalDistribution + (index < remainder ? 1 : 0);
+                                  }
+                                });
+
+                                setCustomDistribution(newCustomDistribution);
+                              }}
+                            >
+                              Auto-fill Equal
+                            </Button>
+                          </div>
+                          <div className="border rounded p-3 bg-light">
+                            <p className="small text-muted mb-3">
+                              Total to assign: <strong>{recordsToAssign}</strong> | Allocated:{" "}
+                              <strong>
+                                {Object.values(customDistribution).reduce(
+                                  (sum, count) => sum + count,
+                                  0
+                                )}
+                              </strong>{" "}
+                              | Remaining:{" "}
+                              <strong>
+                                {recordsToAssign -
+                                  Object.values(customDistribution).reduce(
+                                    (sum, count) => sum + count,
+                                    0
+                                  )}
+                              </strong>
+                            </p>
+                            {assignToCampaigns.map((campaign: string) => {
+                              const campaignOption = availableCampaignsForUpload.find(
+                                c => c.label === campaign
+                              );
+                              if (!campaignOption) return null;
+                              return (
+                                <div key={campaignOption.value} className="mb-2">
+                                  <Row>
+                                    <Col md={6}>
+                                      <Form.Label className="small mb-0">
+                                        {campaign}
+                                      </Form.Label>
+                                    </Col>
+                                    <Col md={6}>
+                                      <Form.Control
+                                        type="number"
+                                        min="0"
+                                        max={recordsToAssign}
+                                        value={customDistribution[campaignOption.value] || 0}
+                                        onKeyDown={handleNumberKeyDown}
+                                        onChange={(e) => {
+                                          const max = recordsToAssign;
+                                          handleNumberChange(e.target.value, max, (val) => {
+                                            setCustomDistribution((prev) => ({
+                                              ...prev,
+                                              [campaignOption.value]: val,
+                                            }));
+                                          });
+                                        }}
+                                        size="sm"
+                                      />
+                                    </Col>
+                                  </Row>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </Form.Group>
+                      </Col>
+                    </Row>
+                  )}
                 </div>
               )}
 
@@ -3272,10 +3447,10 @@ const CrmCampaigns = () => {
                     min="1"
                     max={getMaxRecords()}
                     value={recordsToAssign || ''}
+                    onKeyDown={handleNumberKeyDown}
                     onChange={(e) => {
-                      const value = parseInt(e.target.value) || 0;
                       const max = getMaxRecords();
-                      setRecordsToAssign(value > max ? max : value);
+                      handleNumberChange(e.target.value, max, setRecordsToAssign);
                     }}
                     placeholder={`Enter number (max: ${getMaxRecords().toLocaleString()})`}
                     className="border-2 py-2"
