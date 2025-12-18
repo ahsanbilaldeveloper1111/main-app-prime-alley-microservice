@@ -115,7 +115,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       color: MENU_COLORS.DASHBOARD,
       title: MENU_LABELS.DASHBOARD,
       label: MENU_LABELS.DASHBOARD,
-      url: '/dashboards/manager',
+      url: '/dashboards',
       // subItems: [
       //   {
       //     id: 'dashboard-supervisor-control',
