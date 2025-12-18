@@ -550,7 +550,7 @@ export const Analytics3 = () => {
                   <YAxis stroke="#94a3b8" tick={{ style: { fontSize: '0.75rem' } }} />
                   <Tooltip />
                   <Bar dataKey="revenue" fill="#2585f8" radius={[6, 6, 0, 0]} />
-                  <Line type="monotone" dataKey="margin" stroke="#10b981" strokeWidth={2} dot={{ r: 4, fill: '#10b981' } } }} />
+                  <Line type="monotone" dataKey="margin" stroke="#10b981" strokeWidth={2} dot={{ r: 4, fill: '#10b981' }} />
                 </ComposedChart>
               </ResponsiveContainer>
             </div>
