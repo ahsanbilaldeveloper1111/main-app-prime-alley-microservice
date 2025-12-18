@@ -258,8 +258,8 @@ export const Analytics1 = () => {
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis dataKey="month" stroke="#94a3b8" style={{ fontSize: '0.75rem' }} />
-                <YAxis stroke="#94a3b8" style={{ fontSize: '0.75rem' }} />
+                <XAxis dataKey="month" stroke="#94a3b8" tick={{ style: { fontSize: '0.75rem' } }} />
+                <YAxis stroke="#94a3b8" tick={{ style: { fontSize: '0.75rem' } }} />
                 <Tooltip />
                 <Area type="monotone" dataKey="income" stroke="#2585f8" strokeWidth={2} fillOpacity={1} fill="url(#colorIncome)" />
                 <Area type="monotone" dataKey="expenses" stroke="#ef4444" strokeWidth={2} fillOpacity={1} fill="url(#colorExpenses)" />
@@ -377,8 +377,8 @@ export const Analytics2 = () => {
             <ResponsiveContainer width="100%" height={280}>
               <LineChart data={revenueData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis dataKey="month" stroke="#94a3b8" style={{ fontSize: '0.75rem' }} />
-                <YAxis stroke="#94a3b8" style={{ fontSize: '0.75rem' }} />
+                <XAxis dataKey="month" stroke="#94a3b8" tick={{ style: { fontSize: '0.75rem' } }} />
+                <YAxis stroke="#94a3b8" tick={{ style: { fontSize: '0.75rem' } }} />
                 <Tooltip />
                 <Line type="monotone" dataKey="revenue" stroke="#2585f8" strokeWidth={2} dot={{ r: 3 }} />
                 <Line type="monotone" dataKey="expenses" stroke="#94a3b8" strokeWidth={2} strokeDasharray="5 5" dot={{ r: 3 }} />
@@ -546,11 +546,11 @@ export const Analytics3 = () => {
               <ResponsiveContainer width="100%" height={324}>
                 <ComposedChart data={marginData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                  <XAxis dataKey="month" stroke="#94a3b8" style={{ fontSize: '0.75rem' }} />
-                  <YAxis stroke="#94a3b8" style={{ fontSize: '0.75rem' }} />
+                  <XAxis dataKey="month" stroke="#94a3b8" tick={{ style: { fontSize: '0.75rem' } }} />
+                  <YAxis stroke="#94a3b8" tick={{ style: { fontSize: '0.75rem' } }} />
                   <Tooltip />
                   <Bar dataKey="revenue" fill="#2585f8" radius={[6, 6, 0, 0]} />
-                  <Line type="monotone" dataKey="margin" stroke="#10b981" strokeWidth={2} dot={{ r: 4, fill: '#10b981' }} />
+                  <Line type="monotone" dataKey="margin" stroke="#10b981" strokeWidth={2} dot={{ r: 4, fill: '#10b981' } } }} />
                 </ComposedChart>
               </ResponsiveContainer>
             </div>
@@ -718,8 +718,8 @@ export const Analytics4 = () => {
               <ResponsiveContainer width="100%" height={263}>
                 <BarChart data={ticketData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                  <XAxis dataKey="day" stroke="#94a3b8" style={{ fontSize: '0.7rem' }} />
-                  <YAxis stroke="#94a3b8" style={{ fontSize: '0.7rem' }} />
+                  <XAxis dataKey="day" stroke="#94a3b8" tick={{ style: { fontSize: '0.7rem' } }} />
+                  <YAxis stroke="#94a3b8" tick={{ style: { fontSize: '0.7rem' } }} />
                   <Tooltip />
                   <Bar dataKey="low" fill="#22d3ee" radius={[4, 4, 0, 0]} />
                   <Bar dataKey="medium" fill="#3b82f6" radius={[4, 4, 0, 0]} />
@@ -955,8 +955,8 @@ export const Analytics5 = () => {
               <ResponsiveContainer width="100%" height={250}>
                 <BarChart data={pipelineData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                  <XAxis dataKey="month" stroke="#94a3b8" style={{ fontSize: '0.7rem' }} />
-                  <YAxis stroke="#94a3b8" style={{ fontSize: '0.7rem' }} />
+                  <XAxis dataKey="month" stroke="#94a3b8" tick={{ style: { fontSize: '0.7rem' } }} />
+                  <YAxis stroke="#94a3b8" tick={{ style: { fontSize: '0.7rem' } }} />
                   <Tooltip />
                   <Bar dataKey="value" fill="#fb923c" radius={[6, 6, 0, 0]} />
                 </BarChart>
@@ -1089,7 +1089,7 @@ export const Analytics6 = () => {
           </div>
           <div className="col-12 col-md-6 col-lg-3">
             <MetricCardWithIcon
-              icon={<UserPlus size={24} style={{ color: '#2585f8' }} />}
+              icon={<UserPlus size={24} style={{ color: '#2585f8' } } }} />}
               title="Total Subscription"
               value="15,000"
               change="-800 Last 30 days subscription"
@@ -1141,8 +1141,8 @@ export const Analytics6 = () => {
               <ResponsiveContainer width="100%" height={195}>
                 <LineChart data={salesData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
-                  <XAxis dataKey="month" stroke="#94a3b8" style={{ fontSize: '0.7rem' }} />
-                  <YAxis stroke="#94a3b8" style={{ fontSize: '0.7rem' }} tickFormatter={(value) => `$${value / 1000}k`} />
+                  <XAxis dataKey="month" stroke="#94a3b8" tick={{ style: { fontSize: '0.7rem' } }} />
+                  <YAxis stroke="#94a3b8" tick={{ style: { fontSize: '0.7rem' } }} tickFormatter={(value) => `$${value / 1000}k`} />
                   <Tooltip />
                   <Line type="monotone" dataKey="value" stroke="#3b82f6" strokeWidth={2} dot={false} />
                 </LineChart>
@@ -1166,7 +1166,7 @@ export const Analytics6 = () => {
               <ResponsiveContainer width="100%" height={210}>
                 <BarChart data={subscriberData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
-                  <XAxis dataKey="day" stroke="#94a3b8" style={{ fontSize: '0.7rem' }} />
+                  <XAxis dataKey="day" stroke="#94a3b8" tick={{ style: { fontSize: '0.7rem' } }} />
                   <YAxis hide />
                   <Tooltip />
                   <Bar dataKey="value" fill="#93c5fd" radius={[8, 8, 0, 0]} />
@@ -1281,8 +1281,8 @@ export const Analytics7 = () => {
               <ResponsiveContainer width="100%" height={390}>
                 <BarChart data={revenueData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
-                  <XAxis dataKey="month" stroke="#94a3b8" style={{ fontSize: '0.75rem' }} />
-                  <YAxis stroke="#94a3b8" style={{ fontSize: '0.75rem' }} />
+                  <XAxis dataKey="month" stroke="#94a3b8" tick={{ style: { fontSize: '0.75rem' } }} />
+                  <YAxis stroke="#94a3b8" tick={{ style: { fontSize: '0.75rem' } }} />
                   <Tooltip />
                   <Bar dataKey="earning" fill="#3b82f6" radius={[4, 4, 0, 0]} />
                   <Bar dataKey="expense" fill="#fb923c" radius={[4, 4, 0, 0]} />
@@ -1334,7 +1334,7 @@ export const Analytics7 = () => {
               <div className="col-12 col-md-6 col-lg-6" style={{ marginTop: '80px', marginBottom: '70px' }}>
                 <div className="bg-white rounded-3 shadow-sm p-2 text-center">
                   <div className="d-inline-flex align-items-center justify-content-center rounded-3 mb-1" style={{ width: '40px', height: '40px', backgroundColor: '#fce7f3' }}>
-                    <DollarSign size={20} style={{ color: '#ec4899' }} />
+                    <DollarSign size={20} style={{ color: '#ec4899' } } }} />
                   </div>
                   <div className="fw-semibold text-muted small mb-1" style={{ fontSize: '0.7rem' }}>Total Sales</div>
                   <div className="fs-5 fw-bold text-dark mb-1">$25,00,000.00</div>
@@ -1446,7 +1446,7 @@ export const Analytics8 = () => {
           </div>
           <div className="col-12 col-md-6 col-lg-3">
             <MetricCardWithIcon
-              icon={<UserPlus size={24} style={{ color: '#2585f8' }} />}
+              icon={<UserPlus size={24} style={{ color: '#2585f8' } } }} />}
               title="Total Subscription"
               value="15,000"
               change="-800 Last 30 days subscription"
@@ -1509,8 +1509,8 @@ export const Analytics8 = () => {
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
-                  <XAxis dataKey="year" stroke="#94a3b8" style={{ fontSize: '0.75rem' }} />
-                  <YAxis stroke="#94a3b8" style={{ fontSize: '0.75rem' }} />
+                  <XAxis dataKey="year" stroke="#94a3b8" tick={{ style: { fontSize: '0.75rem' } }} />
+                  <YAxis stroke="#94a3b8" tick={{ style: { fontSize: '0.75rem' } }} />
                   <Tooltip />
                   <Area type="monotone" dataKey="siteA" stroke="#2585f8" strokeWidth={2} fillOpacity={1} fill="url(#colorSiteA)" />
                   <Area type="monotone" dataKey="siteB" stroke="#ec4899" strokeWidth={2} fillOpacity={1} fill="url(#colorSiteB)" />
@@ -1802,8 +1802,8 @@ export const Analytics9 = () => {
               <ResponsiveContainer width="100%" height={202}>
                 <LineChart data={balanceData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
-                  <XAxis dataKey="month" stroke="#94a3b8" style={{ fontSize: '0.65rem' }} />
-                  <YAxis stroke="#94a3b8" style={{ fontSize: '0.65rem' }} tickFormatter={(value) => `${value / 1000}k`} />
+                  <XAxis dataKey="month" stroke="#94a3b8" tick={{ style: { fontSize: '0.65rem' } }} />
+                  <YAxis stroke="#94a3b8" tick={{ style: { fontSize: '0.65rem' } }} tickFormatter={(value) => `${value / 1000}k`} />
                   <Tooltip />
                   <Line type="monotone" dataKey="revenue" stroke="#10b981" strokeWidth={2} dot={false} />
                   <Line type="monotone" dataKey="expenses" stroke="#ef4444" strokeWidth={2} dot={false} />
@@ -1939,7 +1939,7 @@ export const Analytics10 = () => {
   
                 <ResponsiveContainer width="100%" height={230}>
                   <BarChart data={companiesWeekData}>
-                    <XAxis dataKey="day" stroke="#94a3b8" style={{ fontSize: '0.75rem' }} />
+                    <XAxis dataKey="day" stroke="#94a3b8" tick={{ style: { fontSize: '0.75rem' } }} />
                     <YAxis hide />
                     <Tooltip />
                     <Bar dataKey="bg" fill="#f1f5f9" radius={[4, 4, 4, 4]} />
@@ -1975,8 +1975,8 @@ export const Analytics10 = () => {
   
                 <ResponsiveContainer width="100%" height={170}>
                   <BarChart data={revenueData}>
-                    <XAxis dataKey="month" stroke="#94a3b8" style={{ fontSize: '0.7rem' }} />
-                    <YAxis stroke="#94a3b8" style={{ fontSize: '0.7rem' }} />
+                    <XAxis dataKey="month" stroke="#94a3b8" tick={{ style: { fontSize: '0.7rem' } }} />
+                    <YAxis stroke="#94a3b8" tick={{ style: { fontSize: '0.7rem' } }} />
                     <Tooltip />
                     <Bar dataKey="bg" fill="#f1f5f9" radius={[4, 4, 4, 4]} />
                     <Bar dataKey="revenue" fill="#ef4444" radius={[4, 4, 4, 4]} />
@@ -2243,8 +2243,8 @@ export const Analytics10 = () => {
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
-                    <XAxis dataKey="month" stroke="#94a3b8" style={{ fontSize: '0.7rem' }} />
-                    <YAxis stroke="#94a3b8" style={{ fontSize: '0.7rem' }} />
+                    <XAxis dataKey="month" stroke="#94a3b8" tick={{ style: { fontSize: '0.7rem' } }} />
+                    <YAxis stroke="#94a3b8" tick={{ style: { fontSize: '0.7rem' } }} />
                     <Tooltip />
                     <Area type="monotone" dataKey="sale1" stroke="#2585f8" strokeWidth={2} fillOpacity={1} fill="url(#colorSale1)" />
                     <Area type="monotone" dataKey="sale2" stroke="#06b6d4" strokeWidth={2} fillOpacity={1} fill="url(#colorSale2)" />
@@ -2725,7 +2725,7 @@ export const Analytics14 = () => {
                   <div className="d-flex align-items-start justify-content-between mb-2">
                     <div className="d-flex align-items-center gap-2">
                       <div className="rounded-circle d-flex align-items-center justify-content-center" style={{ width: '36px', height: '36px', backgroundColor: '#e9d5ff' }}>
-                        <Target size={20} style={{ color: '#a855f7' }} />
+                        <Target size={20} style={{ color: '#a855f7' } } }} />
                       </div>
                       <div>
                         <div className="text-muted" style={{ fontSize: '0.65rem' }}>Conversion</div>
@@ -2750,7 +2750,7 @@ export const Analytics14 = () => {
                   <div className="d-flex align-items-start justify-content-between mb-2">
                     <div className="d-flex align-items-center gap-2">
                       <div className="rounded-circle d-flex align-items-center justify-content-center" style={{ width: '36px', height: '36px', backgroundColor: '#fbcfe8' }}>
-                        <Users size={20} style={{ color: '#ec4899' }} />
+                        <Users size={20} style={{ color: '#ec4899' } } }} />
                       </div>
                       <div>
                         <div className="text-muted" style={{ fontSize: '0.65rem' }}>Leads</div>
@@ -2823,8 +2823,8 @@ export const Analytics14 = () => {
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                  <XAxis dataKey="month" stroke="#94a3b8" style={{ fontSize: '0.7rem' }} />
-                  <YAxis stroke="#94a3b8" style={{ fontSize: '0.7rem' }} />
+                  <XAxis dataKey="month" stroke="#94a3b8" tick={{ style: { fontSize: '0.7rem' } }} />
+                  <YAxis stroke="#94a3b8" tick={{ style: { fontSize: '0.7rem' } }} />
                   <Tooltip />
                   <Area type="monotone" dataKey="value" stroke="#3b82f6" strokeWidth={2} fillOpacity={1} fill="url(#colorRevenue8)" />
                 </AreaChart>
