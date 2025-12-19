@@ -25,6 +25,8 @@ export const routePermissions: RoutePermission[] = [
     {path: '/resources/help-materials',permissions: ['']},
     {path: '/resources/contact-support',permissions: ['']},
     {path:'/manager-dashboard',permissions: ['']},
+    {path:'/unified-workspace',permissions: ['']},
+    {path:'/help-center',permissions: ['']},
 
     {
         path: '/dashboards',

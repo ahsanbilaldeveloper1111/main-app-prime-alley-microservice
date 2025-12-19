@@ -23,11 +23,11 @@ export const HEADER_CONSTANTS = {
   MENU_LABELS: {
     DASHBOARD: 'Dashboard',
     CONTROL_HUB: 'Control Hub',
-    RESOURCES: 'Help and Center',
+    RESOURCES: 'Help Center',
     HELP_MATERIALS: 'Help Materials',
     FAQ: 'FAQ',
     CONTACT_SUPPORT: 'Contact Support',
-    SIM_GATEWAY: 'Telco Gateway',
+    SIM_GATEWAY: 'Carrier Gateway',
 
     CALL_DASHBOARD: 'Call Dashboard',
     CALL_LOGS: 'Call Logs',
@@ -41,9 +41,9 @@ export const HEADER_CONSTANTS = {
     AUTOMATION: 'Automation',
     CRM: 'CRM',
     DNCR: 'DNCR',
-    COMPLIANCES: 'Compliances',
+    COMPLIANCES: 'Compliance',
 
-    BILLING: 'Billing and payments',
+    BILLING: 'Billing & Payments',
     INVOICES_BILLING: 'Invoices',
     EXPENSES_BILLING: 'Expenses',
     PRODUCTS_BILLING: 'Products',
@@ -54,7 +54,7 @@ export const HEADER_CONSTANTS = {
     SUPPLIERS_BILLING: 'Suppliers',
     PRODUCT_PRICING_BILLING: 'Product Pricing',
 
-    NETOPS: 'Devices Insights',
+    NETOPS: 'Device Insights',
     SALES: 'Sales',
     WEB_RTC: 'Web RTC',
     OMNI_CHANNEL: 'Omni Channel',

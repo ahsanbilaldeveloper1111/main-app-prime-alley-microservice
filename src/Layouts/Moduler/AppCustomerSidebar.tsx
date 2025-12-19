@@ -113,33 +113,19 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       permission: '',
       icon: <LayoutDashboard size={20} />,
       color: MENU_COLORS.DASHBOARD,
-      title: MENU_LABELS.DASHBOARD,
-      label: MENU_LABELS.DASHBOARD,
+      title: "Overview",
+      label: "Overview",
       url: '/dashboard',
-      // subItems: [
-      //   {
-      //     id: 'dashboard-supervisor-control',
-      //     title: 'Supervisor Control',
-      //     icon: <Ticket size={16} />,
-      //     permission: '',
-      //     url: '/supervisor-control'
-      //   },
-      //   {
-      //     id: 'dashboard-agent-visibility',
-      //     title: 'Agent Visibility',
-      //     icon: <Ticket size={16} />,
-      //     permission: '',
-      //     url: '/agent-visibility'
-      //   },
-      //   {
-      //     id: 'dashboard-finance-insights',
-      //     title: 'Finance Insights',
-      //     icon: <Ticket size={16} />,
-      //     permission: '',
-      //     url: '/finance-insights'
-      //   }
-
-      // ]
+    },
+    {
+      id: 'dashboard-unified-workspace',
+      key: 'dashboard-unified-workspace',
+      permission: '',
+      icon: <LayoutDashboard size={20} />,
+      color: MENU_COLORS.DASHBOARD,
+      title: "Unified Workspace",
+      label: "Unified Workspace",
+      url: '/unified-workspace',
     },
     
     {
@@ -148,8 +134,8 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       permission: PERMISSIONS.CRM_SERVICES,
       icon: <Briefcase size={20} />,
       color: MENU_COLORS.CRM,
-      title: "CRM and Sales",
-      label: "CRM and Sales",
+      title: "CRM & Sales",
+      label: "CRM & Sales",
       url: '',
       subItems: [
         {
@@ -273,8 +259,8 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       permission: PERMISSIONS.CALL_HISTORY_SERVICES,
       icon: <History size={20} />,
       color: MENU_COLORS.CALL_HISTORY,
-      title: 'Calls Details',
-      label: 'Calls Details',
+      title: 'Call Details',
+      label: 'Call Details',
       url: '',
       subItems: [
         {
@@ -333,8 +319,8 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       permission: PERMISSIONS.OUTBOUND_CALLS_AIML,
       icon: <Workflow size={20} />,
       color: MENU_COLORS.AUTOMATION,
-      title: "AI BOT and Analytics",
-      label: "AI BOT and Analytics",
+      title: "AI & Analytics",
+      label: "AI & Analytics",
       url: '/ai-ml/outbound-calls'
     },
 
@@ -742,37 +728,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       color: MENU_COLORS.RESOURCES,
       title: MENU_LABELS.RESOURCES,
       label: MENU_LABELS.RESOURCES,
-      url: '',
-      subItems: [
-        {
-          id: 'resources-tickets',
-          title: 'Tickets Management',
-          icon: <CircleQuestionMark size={16} />,
-          permission: '',
-          url: '/tickets/dashboard'
-        },
-        {
-          id: 'resources-faq',
-          title: HEADER_CONSTANTS.SUBMENU_LABELS.FAQ,
-          icon: <CircleQuestionMark size={16} />,
-          permission: '',
-          url: '/resources/faq'
-        },
-        {
-          id: 'resources-help-materials',
-          title: HEADER_CONSTANTS.SUBMENU_LABELS.HELP_MATERIALS,
-          icon: <Info size={16} />,
-          permission: '',
-          url: '/resources/help-materials'
-        },
-        {
-          id: 'resources-contact-support',
-          title: HEADER_CONSTANTS.SUBMENU_LABELS.CONTACT_SUPPORT,
-          icon: <NotebookTabs size={16} />,
-          permission: '',
-          url: '/resources/contact-support'
-        }
-      ]
+      url: '/help-center',
     }
 
 
@@ -1109,6 +1065,9 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       background: linear-gradient(90deg, transparent, #dee2e6, transparent);
       margin: 0.5rem 0;
     }
+      // .sidebar-middle-section .module-divider:last-child {
+      //   display: none !important;
+      // }
 
     .collapse-enter {
       max-height: 0;
@@ -1217,7 +1176,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           {/* Top Section - Dashboard */}
           <div className="sidebar-top-section">
             <div className="section-heading">Dashboard</div>
-            {mainMenuItems.slice(0, 1).map((module, index) => (
+            {mainMenuItems.slice(0, 2).map((module, index) => (
               <div key={module.id}>
                 {/* Module Header */}
 
@@ -1412,7 +1371,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           {/* Middle Section - Main Menu Items */}
           <div className="sidebar-middle-section">
             <div className="section-heading">Services</div>
-            {mainMenuItems.slice(1, -2).map((module, index) => (
+            {mainMenuItems.slice(2, -2).map((module, index) => (
               <div key={module.id}>
                 {/* Module Header */}
 
@@ -1606,7 +1565,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
 
           {/* Bottom Section - Settings and Help Center */}
           <div className="sidebar-bottom-section">
-            <div className="section-heading">System</div>
+            <div className="section-heading">Admin & Support</div>
             {mainMenuItems.slice(-2).map((module, index) => (
               <div key={module.id}>
                 {/* Module Header */}
