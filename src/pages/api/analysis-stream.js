@@ -180,7 +180,37 @@ export default function handler(req, res) {
   wsAnalysis.on('close', (code, reason) => {
     console.log('Analysis server connection closed:', code, reason);
     clearTimeout(connectionTimeout);
-    res.write(`data: ${JSON.stringify({ type: 'connection', status: 'disconnected', message: 'Analysis server disconnected', code, reason })}\n\n`);
+    clearInterval(keepAlive);
+    
+    // Code 1005 means "No Status Received" - abnormal closure, don't retry
+    // Code 1006 means "Abnormal Closure" - also don't retry
+    const isAbnormalClosure = code === 1005 || code === 1006;
+    
+    // Send disconnect message to client with error status for abnormal closures
+    // This signals the client not to retry automatically
+    const disconnectMessage = JSON.stringify({ 
+      type: 'connection', 
+      status: isAbnormalClosure ? 'error' : 'disconnected', 
+      message: isAbnormalClosure 
+        ? 'Analysis server connection closed abnormally. Please check server status.' 
+        : 'Analysis server disconnected', 
+      code, 
+      reason: reason?.toString() || 'No reason provided',
+      shouldRetry: !isAbnormalClosure
+    });
+    
+    // Only write if response is still writable
+    if (!res.destroyed && !res.writableEnded) {
+      res.write(`data: ${disconnectMessage}\n\n`);
+      
+      // End the SSE connection after sending disconnect message
+      // This prevents the client from retrying automatically
+      setTimeout(() => {
+        if (!res.destroyed && !res.writableEnded) {
+          res.end();
+        }
+      }, 100);
+    }
   });
 
   wsAnalysis.on('error', (error) => {

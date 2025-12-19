@@ -319,8 +319,8 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       permission: PERMISSIONS.OUTBOUND_CALLS_AIML,
       icon: <Workflow size={20} />,
       color: MENU_COLORS.AUTOMATION,
-      title: "AI & Analytics",
-      label: "AI & Analytics",
+      title: "AI Virtual Agent",
+      label: "AI Virtual Agent",
       url: '/ai-ml/outbound-calls'
     },
 
@@ -393,7 +393,31 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       color: MENU_COLORS.AUTOMATION,
       title: MENU_LABELS.AUTOMATION,
       label: MENU_LABELS.AUTOMATION,
-      url: '/tms/verification'
+      url: '',
+      subItems: [
+        {
+          id: 'tms-dashboard',
+          title: HEADER_CONSTANTS.SUBMENU_LABELS.TMS_DASHBOARD,
+          icon: <LayoutDashboard size={16} />,
+          permission: PERMISSIONS.TMS_SERVICES,
+          url: '/tms/dashboard'
+        },
+        {
+          id: 'tms-user-management',
+          title: 'Users',
+          icon: <Users size={16} />,
+          permission: PERMISSIONS.TMS_SERVICES,
+          url: '/tms/management/users'
+        },
+        {
+          id: 'tms-audit-logs',
+          title: 'Audit Logs',
+          icon: <FileText size={16} />,
+          permission: PERMISSIONS.TMS_SERVICES,
+          url: '/tms/audit-logs'
+        }
+      ]
+      .filter(item => !item.permission || hasPermission(item.permission))
     },
 
     {
