@@ -3179,20 +3179,56 @@ export const getOrderStageDurationReport = async (filters?: OrderReportFilters):
 
 export const getOrderCancellationReport = async (filters?: OrderReportFilters): Promise<OrderCancellationReport[]> => {
   try {
-    const params: any = {};
-    if (filters?.date_from) params.date_from = filters.date_from;
-    if (filters?.date_to) params.date_to = filters.date_to;
-    if (filters?.date_field) params.date_field = filters.date_field;
-    if (filters?.stage_id) params.stage_id = filters.stage_id;
-    if (filters?.currency) params.currency = filters.currency;
-    if (filters?.owner) params.owner = filters.owner;
-    if (filters?.campaign_id) params.campaign_id = filters.campaign_id;
-    
-    const response = await axiosInstance.get("/crm/orders/reports/cancellation", { params });
-    const data = extractData<OrderCancellationReport[]>(response.data);
-    return Array.isArray(data) ? data : [];
-  } catch (error: any) {
-    toast.error(error?.message || "Failed to fetch order cancellation report");
+    const params = new URLSearchParams();
+    if (filters?.date_from) params.append('date_from', filters.date_from);
+    if (filters?.date_to) params.append('date_to', filters.date_to);
+    if (filters?.date_field) params.append('date_field', filters.date_field);
+    if (filters?.stage_id) params.append('stage_id', filters.stage_id.toString());
+    if (filters?.currency) params.append('currency', filters.currency);
+    if (filters?.owner) params.append('owner', filters.owner);
+    if (filters?.campaign_id) params.append('campaign_id', filters.campaign_id.toString());
+
+    const response = await axiosInstance.get(`/crm/orders/reports/cancellation?${params.toString()}`);
+    return extractData<OrderCancellationReport[]>(response);
+  } catch (error) {
+    console.error('Failed to fetch order cancellation report:', error);
     throw error;
   }
+}
+
+/**
+ * Downloads an example CSV file with sample data
+ * This is a frontend-only function that creates and downloads a CSV file
+ */
+export const downloadExampleCsv = (): void => {
+  // CSV headers
+  const headers = ['name', 'phone', 'email', 'otherField1', 'other_field_2'];
+  
+  // Example data with E.164 format phone numbers
+  const exampleData = [
+    ['John Doe', '+1234567890', 'john.doe@example.com', 'Sample Value 1', 'Sample Value 2'],
+    ['Jane Smith', '+1987654321', 'jane.smith@example.com', 'Another Value', 'Different Value']
+  ];
+  
+  // Create CSV content
+  const csvContent = [
+    headers.join(','),
+    ...exampleData.map(row => row.map(cell => `"${cell}"`).join(','))
+  ].join('\n');
+  
+  // Create blob and download
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  const url = URL.createObjectURL(blob);
+  
+  link.setAttribute('href', url);
+  link.setAttribute('download', 'example_crm_data.csv');
+  link.style.visibility = 'hidden';
+  
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  
+  // Clean up the URL object
+  URL.revokeObjectURL(url);
 };

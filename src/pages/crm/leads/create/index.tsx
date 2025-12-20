@@ -20,6 +20,7 @@ import PhoneInput from "react-phone-number-input";
 import { parsePhoneNumber } from "react-phone-number-input";
 import { useSession } from "next-auth/react";
 import "react-phone-number-input/style.css";
+import { Country, State, City } from "country-state-city";
 import {
   FiSave,
   FiArrowLeft,
@@ -79,7 +80,7 @@ const CreateLead = () => {
     campaign_field_values: {} as Record<string, any>,
     contact_persons: [
       {
-        title: "",
+        title: "Mr.",
         name: "",
         phone_country_code: "",
         phone: "",
@@ -113,6 +114,21 @@ const CreateLead = () => {
   const [isOpportunity, setIsOpportunity] = useState(false);
   const isInitialLoad = useRef(true);
 
+  // Location state
+  const [selectedCountry, setSelectedCountry] = useState<{
+    value: string;
+    label: string;
+    isoCode: string;
+  } | null>(null);
+  const [selectedState, setSelectedState] = useState<{
+    value: string;
+    label: string;
+  } | null>(null);
+  const [selectedCity, setSelectedCity] = useState<{
+    value: string;
+    label: string;
+  } | null>(null);
+
   // Utility function to parse phone number in format "+92 3200654656" and extract country code
   const parsePhoneNumberFormat = (
     phone: string
@@ -131,6 +147,125 @@ const CreateLead = () => {
     // If no match, return original phone as phoneNumber
     return { countryCode: "", phoneNumber: phone };
   };
+
+  // Get country flag image URL
+  const getCountryFlagUrl = (isoCode: string): string => {
+    return `https://flagcdn.com/w20/${isoCode.toLowerCase()}.png`;
+  };
+
+  // Get all countries for dropdown
+  const getCountries = () => {
+    return Country.getAllCountries().map((country) => ({
+      value: country.isoCode,
+      label: country.name,
+      isoCode: country.isoCode,
+    }));
+  };
+
+  // Get states/provinces for selected country
+  const getStates = (countryCode: string) => {
+    if (!countryCode) return [];
+    return State.getStatesOfCountry(countryCode).map((state) => ({
+      value: state.isoCode,
+      label: state.name,
+    }));
+  };
+
+  // Get cities for selected country and state
+  const getCities = (countryCode: string, stateCode: string) => {
+    if (!countryCode || !stateCode) return [];
+    return City.getCitiesOfState(countryCode, stateCode).map((city) => ({
+      value: city.name,
+      label: city.name,
+    }));
+  };
+
+  // Handle country change
+  const handleCountryChange = (selectedOption: any) => {
+    setSelectedCountry(selectedOption);
+    setSelectedState(null);
+    setSelectedCity(null);
+    setFormData((prev) => ({
+      ...prev,
+      company_country: selectedOption?.label || "",
+      company_province: "",
+      company_city: "",
+    }));
+  };
+
+  // Handle state/province change
+  const handleStateChange = (selectedOption: any) => {
+    setSelectedState(selectedOption);
+    setSelectedCity(null);
+    setFormData((prev) => ({
+      ...prev,
+      company_province: selectedOption?.label || "",
+      company_city: "",
+    }));
+  };
+
+  // Handle city change
+  const handleCityChange = (selectedOption: any) => {
+    setSelectedCity(selectedOption);
+    setFormData((prev) => ({
+      ...prev,
+      company_city: selectedOption?.label || "",
+    }));
+  };
+
+  // Initialize location from form data when country is set (but not from user selection)
+  const locationInitialized = useRef(false);
+  useEffect(() => {
+    if (
+      formData.company_country &&
+      !selectedCountry &&
+      !locationInitialized.current
+    ) {
+      const country = Country.getAllCountries().find(
+        (c) => c.name === formData.company_country
+      );
+      if (country) {
+        setSelectedCountry({
+          value: country.isoCode,
+          label: country.name,
+          isoCode: country.isoCode,
+        });
+        locationInitialized.current = true;
+
+        if (formData.company_province && !selectedState) {
+          const state = State.getStatesOfCountry(country.isoCode).find(
+            (s) => s.name === formData.company_province
+          );
+          if (state) {
+            setSelectedState({
+              value: state.isoCode,
+              label: state.name,
+            });
+
+            if (formData.company_city && !selectedCity) {
+              const city = City.getCitiesOfState(
+                country.isoCode,
+                state.isoCode
+              ).find((c) => c.name === formData.company_city);
+              if (city) {
+                setSelectedCity({
+                  value: city.name,
+                  label: city.name,
+                });
+              }
+            }
+          }
+        }
+      }
+    }
+  }, [
+    formData.company_country,
+    formData.company_province,
+    formData.company_city,
+    selectedCountry,
+    selectedState,
+    selectedCity,
+  ]);
 
   // Fetch stages and extensions on component mount
   useEffect(() => {
@@ -253,6 +388,19 @@ const CreateLead = () => {
             company_description:
               crmDataRecord.data?.company_description ||
               crmDataRecord.data?.company_notes ||
+              "",
+            company_country:
+              crmDataRecord.data?.company_country ||
+              crmDataRecord.data?.country ||
+              "",
+            company_province:
+              crmDataRecord.data?.company_province ||
+              crmDataRecord.data?.province ||
+              crmDataRecord.data?.state ||
+              "",
+            company_city:
+              crmDataRecord.data?.company_city ||
+              crmDataRecord.data?.city ||
               "",
             // Pre-fill contact person fields
             contact_person_name: contactPersonName,
@@ -448,7 +596,7 @@ const CreateLead = () => {
       contact_persons: [
         ...prev.contact_persons,
         {
-          title: "",
+          title: "Mr.",
           name: "",
           phone_country_code: "",
           phone: "",
@@ -535,6 +683,9 @@ const CreateLead = () => {
         ...(formData.company_country && {
           company_country: formData.company_country,
         }),
+        ...(formData.company_province && {
+          company_province: formData.company_province,
+        }),
         ...(formData.company_city && { company_city: formData.company_city }),
         ...(formData.company_location_other && {
           company_location_other: formData.company_location_other,
@@ -616,19 +767,29 @@ const CreateLead = () => {
     let hasValidContact = formData.contact_persons.every(
       (person) => person.email || person.phone
     );
-    
+
     // Validate email format for each contact person that has an email
     for (const person of formData.contact_persons) {
-      if (person.email) {
-        const isValidEmail = checkRequiredFields({ email: person.email }, [
-          { field: "email", name: "Email", type: ValidationType.EMAIL },
+      const hasEmail = !!person?.email;
+      let isValid = true;
+      if (hasEmail) {
+        isValid = checkRequiredFields(
+          { email: person.email, name: person.name },
+          [
+            { field: "email", name: "Email", type: ValidationType.EMAIL },
+            { field: "name", name: "Name" },
+          ]
+        );
+      } else {
+        isValid = checkRequiredFields({ name: person.name }, [
+          { field: "name", name: "Name" },
         ]);
-        if (!isValidEmail) {
-          return false;
-        }
+      }
+      if (!isValid) {
+        return false;
       }
     }
-    
+
     if (!hasValidContact) {
       toast.error(
         "Please provide at least email or phone for each contact person"
@@ -816,6 +977,19 @@ const CreateLead = () => {
           crmDataRecord.data?.company_description ||
           crmDataRecord.data?.company_notes ||
           prev.company_description,
+        company_country:
+          crmDataRecord.data?.company_country ||
+          crmDataRecord.data?.country ||
+          prev.company_country,
+        company_province:
+          crmDataRecord.data?.company_province ||
+          crmDataRecord.data?.province ||
+          crmDataRecord.data?.state ||
+          prev.company_province,
+        company_city:
+          crmDataRecord.data?.company_city ||
+          crmDataRecord.data?.city ||
+          prev.company_city,
         // Pre-fill contact person fields
         contact_person_name: contactPersonName || prev.contact_person_name,
         contact_phone: phoneNumber || prev.contact_phone,
@@ -1339,9 +1513,7 @@ const CreateLead = () => {
                                   onChange={handleCrmDataChange}
                                   options={crmData.map((data) => ({
                                     value: data.id,
-                                    label: `#${data.id} - ${
-                                      data.phone || "No Phone"
-                                    }`,
+                                    label: `${data?.name || "No Name"} - ${data?.phone || "No Phone"}`,
                                   }))}
                                   placeholder="Select Prospect (Optional)"
                                   isClearable
@@ -1462,32 +1634,64 @@ const CreateLead = () => {
                             <Col md={6}>
                               <Form.Group className="mb-3">
                                 <Form.Label>Company Country</Form.Label>
-                                <Form.Control
-                                  type="text"
-                                  value={formData.company_country}
-                                  onChange={(e) =>
-                                    handleInputChange(
-                                      "company_country",
-                                      e.target.value
-                                    )
-                                  }
-                                  placeholder="Enter country"
+                                <Select
+                                  value={selectedCountry}
+                                  onChange={handleCountryChange}
+                                  options={getCountries()}
+                                  placeholder="Select Country"
+                                  isClearable
+                                  isSearchable
+                                  formatOptionLabel={({ label, isoCode }) => (
+                                    <div className="d-flex align-items-center">
+                                      {isoCode && (
+                                        <img
+                                          src={getCountryFlagUrl(isoCode)}
+                                          alt={isoCode}
+                                          className="me-2"
+                                          style={{
+                                            width: "20px",
+                                            height: "15px",
+                                          }}
+                                        />
+                                      )}
+                                      <span>{label}</span>
+                                    </div>
+                                  )}
+                                />
+                              </Form.Group>
+                            </Col>
+                            <Col md={6}>
+                              <Form.Group className="mb-3">
+                                <Form.Label>State/Province</Form.Label>
+                                <Select
+                                  value={selectedState}
+                                  onChange={handleStateChange}
+                                  options={getStates(
+                                    selectedCountry?.value || ""
+                                  )}
+                                  placeholder="Select State/Province"
+                                  isClearable
+                                  isSearchable
+                                  isDisabled={!selectedCountry}
                                 />
                               </Form.Group>
                             </Col>
                             <Col md={6}>
                               <Form.Group className="mb-3">
                                 <Form.Label>Company City</Form.Label>
-                                <Form.Control
-                                  type="text"
-                                  value={formData.company_city}
-                                  onChange={(e) =>
-                                    handleInputChange(
-                                      "company_city",
-                                      e.target.value
-                                    )
+                                <Select
+                                  value={selectedCity}
+                                  onChange={handleCityChange}
+                                  options={getCities(
+                                    selectedCountry?.value || "",
+                                    selectedState?.value || ""
+                                  )}
+                                  placeholder="Select City"
+                                  isClearable
+                                  isSearchable
+                                  isDisabled={
+                                    !selectedCountry || !selectedState
                                   }
-                                  placeholder="Enter city"
                                 />
                               </Form.Group>
                             </Col>
@@ -1524,9 +1728,7 @@ const CreateLead = () => {
                             </Col>
                             <Col md={12}>
                               <Form.Group className="mb-3">
-                                <Form.Label>
-                                  Additional Location Information
-                                </Form.Label>
+                                <Form.Label>Location Notes</Form.Label>
                                 <Form.Control
                                   type="text"
                                   value={formData.company_location_other}
@@ -1536,7 +1738,7 @@ const CreateLead = () => {
                                       e.target.value
                                     )
                                   }
-                                  placeholder="Additional location information"
+                                  placeholder="Landmark, Access Instructions, Directions, etc."
                                 />
                               </Form.Group>
                             </Col>
@@ -1757,7 +1959,8 @@ const CreateLead = () => {
                                 <div className="d-flex align-items-center mb-3">
                                   <FiTarget className="me-2" />
                                   <h6 className="mb-0">
-                                    Custom Campaign Fields: {selectedCampaign.name}
+                                    Custom Campaign Fields:{" "}
+                                    {selectedCampaign.name}
                                   </h6>
                                   {selectedCrmData && (
                                     <Badge bg="success" className="ms-2 small">

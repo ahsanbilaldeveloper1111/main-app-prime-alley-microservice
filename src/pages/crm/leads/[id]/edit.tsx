@@ -20,6 +20,7 @@ import Select from "react-select";
 import PhoneInput from "react-phone-number-input";
 import { parsePhoneNumber } from "react-phone-number-input";
 import "react-phone-number-input/style.css";
+import { Country, State, City } from "country-state-city";
 import {
   FiArrowLeft,
   FiDatabase,
@@ -93,6 +94,21 @@ const EditLead = () => {
   const [isOpportunity, setIsOpportunity] = useState(false);
   const isInitialLoad = useRef(true);
 
+  // Location state
+  const [selectedCountry, setSelectedCountry] = useState<{
+    value: string;
+    label: string;
+    isoCode: string;
+  } | null>(null);
+  const [selectedState, setSelectedState] = useState<{
+    value: string;
+    label: string;
+  } | null>(null);
+  const [selectedCity, setSelectedCity] = useState<{
+    value: string;
+    label: string;
+  } | null>(null);
+
   // Utility function to parse phone number in format "+92 3200654656" and extract country code
   const parsePhoneNumberFormat = (phone: string): { countryCode: string; phoneNumber: string } => {
     if (!phone) return { countryCode: "", phoneNumber: "" };
@@ -108,6 +124,71 @@ const EditLead = () => {
     
     // If no match, return original phone as phoneNumber
     return { countryCode: "", phoneNumber: phone };
+  };
+
+  // Get country flag image URL
+  const getCountryFlagUrl = (isoCode: string): string => {
+    return `https://flagcdn.com/w20/${isoCode.toLowerCase()}.png`;
+  };
+
+  // Get all countries for dropdown
+  const getCountries = () => {
+    return Country.getAllCountries().map((country) => ({
+      value: country.isoCode,
+      label: country.name,
+      isoCode: country.isoCode,
+    }));
+  };
+
+  // Get states/provinces for selected country
+  const getStates = (countryCode: string) => {
+    if (!countryCode) return [];
+    return State.getStatesOfCountry(countryCode).map((state) => ({
+      value: state.isoCode,
+      label: state.name,
+    }));
+  };
+
+  // Get cities for selected country and state
+  const getCities = (countryCode: string, stateCode: string) => {
+    if (!countryCode || !stateCode) return [];
+    return City.getCitiesOfState(countryCode, stateCode).map((city) => ({
+      value: city.name,
+      label: city.name,
+    }));
+  };
+
+  // Handle country change
+  const handleCountryChange = (selectedOption: any) => {
+    setSelectedCountry(selectedOption);
+    setSelectedState(null);
+    setSelectedCity(null);
+    setFormData((prev) => ({
+      ...prev,
+      company_country: selectedOption?.label || "",
+      company_province: "",
+      company_city: "",
+    }));
+  };
+
+  // Handle state/province change
+  const handleStateChange = (selectedOption: any) => {
+    setSelectedState(selectedOption);
+    setSelectedCity(null);
+    setFormData((prev) => ({
+      ...prev,
+      company_province: selectedOption?.label || "",
+      company_city: "",
+    }));
+  };
+
+  // Handle city change
+  const handleCityChange = (selectedOption: any) => {
+    setSelectedCity(selectedOption);
+    setFormData((prev) => ({
+      ...prev,
+      company_city: selectedOption?.label || "",
+    }));
   };
 
   // Fetch lead data and populate form
@@ -244,6 +325,45 @@ const EditLead = () => {
             setSelectedCrmData(crmDataRecord);
           } catch (error) {
             console.error("Failed to fetch CRM data:", error);
+          }
+        }
+
+        // Initialize location dropdowns from form data
+        if (leadDataAny.company_country) {
+          const country = Country.getAllCountries().find(
+            (c) => c.name === leadDataAny.company_country
+          );
+          if (country) {
+            setSelectedCountry({
+              value: country.isoCode,
+              label: country.name,
+              isoCode: country.isoCode,
+            });
+
+            if (leadDataAny.company_province) {
+              const state = State.getStatesOfCountry(country.isoCode).find(
+                (s) => s.name === leadDataAny.company_province
+              );
+              if (state) {
+                setSelectedState({
+                  value: state.isoCode,
+                  label: state.name,
+                });
+
+                if (leadDataAny.company_city) {
+                  const city = City.getCitiesOfState(
+                    country.isoCode,
+                    state.isoCode
+                  ).find((c) => c.name === leadDataAny.company_city);
+                  if (city) {
+                    setSelectedCity({
+                      value: city.name,
+                      label: city.name,
+                    });
+                  }
+                }
+              }
+            }
           }
         }
       } catch (error) {
@@ -551,6 +671,7 @@ const EditLead = () => {
         ...(formData.industry && { industry: formData.industry }),
         ...(formData.business_type && { business_type: formData.business_type }),
         ...(formData.company_country && { company_country: formData.company_country }),
+        ...(formData.company_province && { company_province: formData.company_province }),
         ...(formData.company_city && { company_city: formData.company_city }),
         ...(formData.company_location_other && { company_location_other: formData.company_location_other }),
         ...(formData.company_size && { company_size: formData.company_size }),
@@ -827,7 +948,7 @@ const EditLead = () => {
                             </Col>
                             <Col md={6}>
                               <Form.Group className="mb-3">
-                                <Form.Label>User Extension <span className="text-danger">*</span></Form.Label>
+                                <Form.Label>Assigned To <span className="text-danger">*</span></Form.Label>
                                 {formData.type === "opportunity" ? (
                                   <Select
                                     value={
@@ -951,7 +1072,7 @@ const EditLead = () => {
                                   }}
                                   options={crmData.map((data) => ({
                                     value: data.id,
-                                    label: `#${data.id} - ${data.phone || "No Phone"}`,
+                                    label: `${data?.name || "No Name"} - ${data?.phone || "No Phone"}`,
                                   }))}
                                   placeholder="Select Prospect (Optional)"
                                   isClearable
@@ -1032,22 +1153,59 @@ const EditLead = () => {
                             <Col md={6}>
                               <Form.Group className="mb-3">
                                 <Form.Label>Company Country</Form.Label>
-                                <Form.Control
-                                  type="text"
-                                  value={formData.company_country}
-                                  onChange={(e) => handleInputChange("company_country", e.target.value)}
-                                  placeholder="Enter country"
+                                <Select
+                                  value={selectedCountry}
+                                  onChange={handleCountryChange}
+                                  options={getCountries()}
+                                  placeholder="Select Country"
+                                  isClearable
+                                  isSearchable
+                                  formatOptionLabel={({ label, isoCode }) => (
+                                    <div className="d-flex align-items-center">
+                                      {isoCode && (
+                                        <img
+                                          src={getCountryFlagUrl(isoCode)}
+                                          alt={isoCode}
+                                          className="me-2"
+                                          style={{ width: "20px", height: "15px" }}
+                                        />
+                                      )}
+                                      <span>{label}</span>
+                                    </div>
+                                  )}
+                                />
+                              </Form.Group>
+                            </Col>
+                            <Col md={6}>
+                              <Form.Group className="mb-3">
+                                <Form.Label>State/Province</Form.Label>
+                                <Select
+                                  value={selectedState}
+                                  onChange={handleStateChange}
+                                  options={getStates(
+                                    selectedCountry?.value || ""
+                                  )}
+                                  placeholder="Select State/Province"
+                                  isClearable
+                                  isSearchable
+                                  isDisabled={!selectedCountry}
                                 />
                               </Form.Group>
                             </Col>
                             <Col md={6}>
                               <Form.Group className="mb-3">
                                 <Form.Label>Company City</Form.Label>
-                                <Form.Control
-                                  type="text"
-                                  value={formData.company_city}
-                                  onChange={(e) => handleInputChange("company_city", e.target.value)}
-                                  placeholder="Enter city"
+                                <Select
+                                  value={selectedCity}
+                                  onChange={handleCityChange}
+                                  options={getCities(
+                                    selectedCountry?.value || "",
+                                    selectedState?.value || ""
+                                  )}
+                                  placeholder="Select City"
+                                  isClearable
+                                  isSearchable
+                                  isDisabled={!selectedCountry || !selectedState}
                                 />
                               </Form.Group>
                             </Col>
@@ -1069,12 +1227,12 @@ const EditLead = () => {
                             </Col>
                             <Col md={12}>
                               <Form.Group className="mb-3">
-                                <Form.Label>Additional Location Information</Form.Label>
+                                <Form.Label>Location Notes</Form.Label>
                                 <Form.Control
                                   type="text"
                                   value={formData.company_location_other}
                                   onChange={(e) => handleInputChange("company_location_other", e.target.value)}
-                                  placeholder="Additional location information"
+                                  placeholder="Landmark, Access Instructions, Directions, etc."
                                 />
                               </Form.Group>
                             </Col>

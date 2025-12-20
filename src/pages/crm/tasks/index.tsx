@@ -663,6 +663,23 @@ const CrmTasks = () => {
     return tasks;
   }, [tasks]);
 
+  const getTodayDate = useCallback((startDateParam: string = "") => {
+    
+    let today = new Date();
+    if(startDateParam)
+      {
+       const startDate = new Date(startDateParam);
+       if (moment(startDate).isBefore(today))
+       {
+        today = startDate;
+       }
+      }
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }, []);
+
   // Get analytics data
   const analyticsData = useMemo(() => {
     const total = filteredTasks.length;
@@ -1352,7 +1369,7 @@ const CrmTasks = () => {
                       ''
                     }
                     onChange={(e) => setTaskFormData({ ...taskFormData, due_date: e.target.value })}
-                    min={new Date().toISOString().split('T')[0]}
+                    min={getTodayDate(taskFormData.due_date || "")}
                     required
                   />
                 </Form.Group>

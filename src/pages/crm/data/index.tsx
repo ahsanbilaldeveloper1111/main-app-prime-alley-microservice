@@ -95,6 +95,7 @@ import {
   getCrmDataHistory,
   CrmDataItem,
   CrmDataMetrics,
+  downloadExampleCsv,
 } from "@utils/crm";
 import { GetHierarchyData } from "@utils/users";
 
@@ -127,7 +128,6 @@ const PhoneContainer = ({ phone }: { phone: string }) => {
       };
     try {
       const parsedPhone = parsePhoneNumber(phone);
-      console.log("POPHSDF", parsedPhone);
       return {
         phone: parsedPhone?.formatInternational() || phone,
         countryCode: parsedPhone?.country || "",
@@ -1189,10 +1189,10 @@ const CrmProspectsManagement = () => {
       errors.push("File must be a CSV file");
     }
 
-    // Check file size (10MB max)
-    const maxSize = 10 * 1024 * 1024; // 10MB in bytes
+    // Check file size (2MB max)
+    const maxSize = 2 * 1024 * 1024; // 2MB in bytes
     if (file.size > maxSize) {
-      errors.push("File size must be less than 10MB");
+      errors.push("File size must be less than 2MB");
     }
 
     // Check if file is empty
@@ -1289,15 +1289,15 @@ const CrmProspectsManagement = () => {
       const responseData = response?.data || {};
       const processedCount = responseData.processed_count || 0;
       const validationFailures = responseData.validation_failures || 0;
-      const errors = responseData.errors || [];
+      // const errors = responseData.errors || [];
       const message = responseData.message || "Upload completed";
 
       // Show error messages for validation failures
-      if (errors.length > 0) {
-        errors.forEach((error: string) => {
-          toast.warn(error);
-        });
-      }
+      // if (errors.length > 0) {
+      //   errors.forEach((error: string) => {
+      //     toast.warn(error);
+      //   });
+      // }
 
       // Show success message
       if (processedCount > 0) {
@@ -1592,7 +1592,7 @@ const CrmProspectsManagement = () => {
       toast.error("No phone number available for this entry");
       return;
     }
-    window.open(`tel:${phone}`, "_self");
+    window.location.href = `tel://${phone}`;
   }, []);
 
   // Handle recording playback
@@ -2019,7 +2019,7 @@ const CrmProspectsManagement = () => {
               <Dropdown.Menu>
                 {session?.user?.permissions?.includes(
                   "call-service-crm-data-management"
-                ) && (
+                )  && (
                   <>
                     {props.scheduled_call_at ? (
                       <Dropdown.Item
@@ -2324,7 +2324,7 @@ const CrmProspectsManagement = () => {
                 search: prospectsSearch,
               })
             }
-            searchPlaceholder="Search prospects by name, phone, email..."
+            searchPlaceholder="Search by name or phone..."
             showAdvancedFilters={showAdvancedFilters}
             onToggleAdvancedFilters={() =>
               setShowAdvancedFilters(!showAdvancedFilters)
@@ -3263,7 +3263,9 @@ const CrmProspectsManagement = () => {
                                         <PhoneIcon size={16} />
                                       </Button>
                                     )}
-                                    <Dropdown className="d-inline">
+                                  {
+                                    activeFilter !== 'has_leads' && (
+                                      <Dropdown className="d-inline">
                                       <Dropdown.Toggle
                                         as={Button}
                                         variant="link"
@@ -3337,6 +3339,8 @@ const CrmProspectsManagement = () => {
                                         )}
                                       </Dropdown.Menu>
                                     </Dropdown>
+                                    )
+                                  }
                                   </div>
                                 </td>
                               </tr>
@@ -3385,7 +3389,10 @@ const CrmProspectsManagement = () => {
                   E.164 format.
                 </li>
                 <li>
-                  <strong>File Size:</strong> Maximum 10MB per file
+                  <strong>Email Column:</strong> Include a "email" column for contact information. Email must be a valid email address.
+                </li>
+                <li>
+                  <strong>File Size:</strong> Maximum 2MB per file
                 </li>
                 <li>
                   <strong>Formats:</strong> CSV files supported
@@ -3398,9 +3405,20 @@ const CrmProspectsManagement = () => {
             </div>
             <Form>
               <Form.Group className="mb-3">
-                <Form.Label className="fw-semibold">
-                  Select CSV File <span className="text-danger">*</span>
-                </Form.Label>
+                <div className="d-flex justify-content-between align-items-center mb-2">
+                  <Form.Label className="fw-semibold mb-0">
+                    Select CSV File <span className="text-danger">*</span>
+                  </Form.Label>
+                  <Button
+                    variant="outline-primary"
+                    size="sm"
+                    onClick={downloadExampleCsv}
+                    className="d-flex align-items-center gap-1"
+                  >
+                    <Download size={14} />
+                    Download Example CSV
+                  </Button>
+                </div>
                 <Form.Control
                   type="file"
                   accept=".csv"
@@ -4659,7 +4677,7 @@ const CrmProspectsManagement = () => {
                   </div>
                   <div>
                     <strong>Email:</strong>{" "}
-                    {selectedEntryForSchedule.email || "N/A"}
+                    {selectedEntryForSchedule?.data?.email || "N/A"}
                   </div>
                 </div>
               </div>

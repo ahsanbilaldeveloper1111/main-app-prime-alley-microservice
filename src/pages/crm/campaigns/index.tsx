@@ -19,6 +19,7 @@ import {
   getCrmDataTags,
   getCrmDataCounts,
   assignCrmDataAdvanced,
+  downloadExampleCsv,
 } from "@utils/crm";
 import {
   Button,
@@ -103,6 +104,7 @@ import DatatableActionButton from "@components/DatatableActionButton";
 import { Column } from "@components/CustomDataTable";
 import PageSummaryGrid from "@components/PageSummaryGrid";
 import SuccessfulModal from "@pages/partial/SuccessfulModal";
+import moment from "moment";
 
 // KPI Card Component
 interface KPICardData {
@@ -876,8 +878,17 @@ const CrmCampaigns = () => {
   }, [selectedCampaign]);
 
   // Helper function to get today's date in YYYY-MM-DD format
-  const getTodayDate = useCallback(() => {
-    const today = new Date();
+  const getTodayDate = useCallback((startDateParam: string = "") => {
+    
+    let today = new Date();
+    if(startDateParam)
+      {
+       const startDate = new Date(startDateParam);
+       if (moment(startDate).isBefore(today))
+       {
+        today = startDate;
+       }
+      }
     const year = today.getFullYear();
     const month = String(today.getMonth() + 1).padStart(2, '0');
     const day = String(today.getDate()).padStart(2, '0');
@@ -1098,10 +1109,10 @@ const CrmCampaigns = () => {
       errors.push("File must be a CSV file");
     }
 
-    // Check file size (10MB max)
-    const maxSize = 10 * 1024 * 1024; // 10MB in bytes
+    // Check file size (2MB max)
+    const maxSize = 2 * 1024 * 1024; // 2MB in bytes
     if (file.size > maxSize) {
-      errors.push("File size must be less than 10MB");
+      errors.push("File size must be less than 2MB");
     }
 
     // Check if file is empty
@@ -1183,11 +1194,11 @@ const CrmCampaigns = () => {
       const errors = responseData.errors || [];
 
       // Show error messages for validation failures
-      if (errors.length > 0) {
-        errors.forEach((error: string) => {
-          toast.error(error);
-        });
-      }
+      // if (errors.length > 0) {
+      //   errors.forEach((error: string) => {
+      //     toast.error(error);
+      //   });
+      // }
 
       // Show success message
       if (processedCount > 0) {
@@ -1196,8 +1207,14 @@ const CrmCampaigns = () => {
         if (validationFailures > 0) {
           successMessage += ` with ${validationFailures} validation failure${validationFailures !== 1 ? 's' : ''}`;
         }
-        
-        toast.success(successMessage);
+        if(validationFailures > 0)
+        {
+
+          toast.warn(successMessage);
+        }
+        else {
+          toast.success(successMessage);
+        }
       } else if (validationFailures > 0) {
         // All records failed validation
         toast.error(`Upload failed: All ${validationFailures} record${validationFailures !== 1 ? 's' : ''} failed validation`);
@@ -2226,7 +2243,7 @@ const CrmCampaigns = () => {
                   type="date"
                   value={formData.start_date}
                   onChange={handleStartDateChange}
-                  min={showEditModal ? undefined : getTodayDate()}
+                  min={showEditModal ? getTodayDate(formData.start_date || "") : getTodayDate()}
                 />
                 <Form.Text className="text-muted">
                   {showEditModal ? "Campaign start date" : "Must be today or a future date"}
@@ -2948,7 +2965,10 @@ const CrmCampaigns = () => {
                   <strong>Phone Column:</strong> Include a "phone" column (case insensitive) for contact information
                 </li>
                 <li>
-                  <strong>File Size:</strong> Maximum 10MB per file
+                  <strong>File Size:</strong> Maximum 2MB per file
+                </li>
+                <li>
+                  <strong>Phone Format:</strong> Phone numbers must be in E.164 format (e.g., +1234567890)
                 </li>
                 <li>
                   <strong>Formats:</strong> CSV files supported
@@ -2960,7 +2980,18 @@ const CrmCampaigns = () => {
             </div>
             <Form>
               <Form.Group className="mb-3">
-                <Form.Label className="fw-semibold">Select CSV File <span className="text-danger">*</span></Form.Label>
+                <div className="d-flex justify-content-between align-items-center mb-2">
+                  <Form.Label className="fw-semibold mb-0">Select CSV File <span className="text-danger">*</span></Form.Label>
+                  <Button
+                    variant="outline-primary"
+                    size="sm"
+                    onClick={downloadExampleCsv}
+                    className="d-flex align-items-center gap-1"
+                  >
+                    <Download size={14} />
+                    Download Example CSV
+                  </Button>
+                </div>
                 <Form.Control 
                   type="file" 
                   accept=".csv" 
