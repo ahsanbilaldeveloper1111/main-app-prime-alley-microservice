@@ -1,8 +1,6 @@
-// Global type declarations for TMS session storage
+// Global type declarations
 
 declare global {
-  var tmsSessions: Map<string, any> | undefined;
-  
   // Particles.js declarations
   interface ParticlesConfig {
     particles: {

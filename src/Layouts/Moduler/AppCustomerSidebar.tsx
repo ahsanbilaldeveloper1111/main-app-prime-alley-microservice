@@ -410,6 +410,13 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           url: '/tms/management/users'
         },
         {
+          id: 'tms-user-create',
+          title: 'Create User',
+          icon: <Users size={16} />,
+          permission: PERMISSIONS.TMS_SERVICES,
+          url: '/tms/profiling/user/create'
+        },
+        {
           id: 'tms-audit-logs',
           title: 'Audit Logs',
           icon: <FileText size={16} />,
@@ -842,7 +849,6 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
         return hasChange ? newExpanded : prev;
       });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router.pathname]);
 
   const customStyles = `

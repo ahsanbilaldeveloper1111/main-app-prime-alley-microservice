@@ -49,13 +49,90 @@ const { MENU_LABELS, ICONS, PERMISSIONS, MENU_COLORS,BASE_URL } = HEADER_CONSTAN
 
 
 const Settings = () => {
-  const { data: session, status } = useSession();
+  const { data: session } = useSession();
   const [activeTab, setActiveTab] = useState<string>("user-management");
   const [activeUserManagementTab, setActiveUserManagementTab] = useState<string>("user-directory");
   const [activeCrmTab, setActiveCrmTab] = useState<string>("campaigns");
   const [activeTicketsTab, setActiveTicketsTab] = useState<string>("statuses");
   const [activeTelcoTab, setActiveTelcoTab] = useState<string>("assign-devices");
   const [activeNetopsTab, setActiveNetopsTab] = useState<string>("devices-list");
+  
+  // Track which tabs have been visited to prevent re-mounting
+  const [visitedTabs, setVisitedTabs] = useState<Set<string>>(new Set(["user-management"]));
+  const [visitedUserManagementTabs, setVisitedUserManagementTabs] = useState<Set<string>>(new Set(["user-directory"]));
+  const [visitedCrmTabs, setVisitedCrmTabs] = useState<Set<string>>(new Set(["campaigns"]));
+  const [visitedTicketsTabs, setVisitedTicketsTabs] = useState<Set<string>>(new Set(["statuses"]));
+  const [visitedTelcoTabs, setVisitedTelcoTabs] = useState<Set<string>>(new Set(["assign-devices"]));
+  const [visitedNetopsTabs, setVisitedNetopsTabs] = useState<Set<string>>(new Set(["devices-list"]));
+  const [visitedBillingTab, setVisitedBillingTab] = useState<boolean>(false);
+
+  // Handle main tab change
+  const handleMainTabChange = (key: string | null) => {
+    const tabKey = key || "user-management";
+    setActiveTab(tabKey);
+    setVisitedTabs(prev => new Set(prev).add(tabKey));
+    // Track billing tab when it becomes active
+    if (tabKey === "billing") {
+      setVisitedBillingTab(true);
+    }
+  };
+
+  // Handle sub-tab changes
+  const handleUserManagementTabChange = (key: string | null) => {
+    const tabKey = key || "user-directory";
+    setActiveUserManagementTab(tabKey);
+    setVisitedUserManagementTabs(prev => new Set(prev).add(tabKey));
+  };
+
+  const handleCrmTabChange = (key: string | null) => {
+    const tabKey = key || "campaigns";
+    setActiveCrmTab(tabKey);
+    setVisitedCrmTabs(prev => new Set(prev).add(tabKey));
+  };
+
+  const handleTicketsTabChange = (key: string | null) => {
+    const tabKey = key || "statuses";
+    setActiveTicketsTab(tabKey);
+    setVisitedTicketsTabs(prev => new Set(prev).add(tabKey));
+  };
+
+  const handleTelcoTabChange = (key: string | null) => {
+    const tabKey = key || "assign-devices";
+    setActiveTelcoTab(tabKey);
+    setVisitedTelcoTabs(prev => new Set(prev).add(tabKey));
+  };
+
+  const handleNetopsTabChange = (key: string | null) => {
+    const tabKey = key || "devices-list";
+    setActiveNetopsTab(tabKey);
+    setVisitedNetopsTabs(prev => new Set(prev).add(tabKey));
+  };
+
+  // Check if a tab should render
+  const shouldRenderTab = (mainTab: string, subTab?: string) => {
+    if (!visitedTabs.has(mainTab)) return false;
+    if (activeTab !== mainTab) return false;
+    
+    if (subTab) {
+      switch (mainTab) {
+        case "user-management":
+          return visitedUserManagementTabs.has(subTab) && activeUserManagementTab === subTab;
+        case "crm":
+          return visitedCrmTabs.has(subTab) && activeCrmTab === subTab;
+        case "tickets":
+          return visitedTicketsTabs.has(subTab) && activeTicketsTab === subTab;
+        case "telco-gateway":
+          return visitedTelcoTabs.has(subTab) && activeTelcoTab === subTab;
+        case "devices-management":
+          return visitedNetopsTabs.has(subTab) && activeNetopsTab === subTab;
+        case "billing":
+          return visitedBillingTab;
+        default:
+          return false;
+      }
+    }
+    return true;
+  };
 
   return (
     <React.Fragment>
@@ -120,7 +197,7 @@ const Settings = () => {
             <Card.Body className="p-0">
               <Tabs
                 activeKey={activeTab}
-                onSelect={(k) => setActiveTab(k || "user-management")}
+                onSelect={handleMainTabChange}
                 id="settings-tabs"
                 className="settings-main-tabs"
                 style={{
@@ -137,7 +214,7 @@ const Settings = () => {
                   <Col md={12}>
                     <Tabs
                       activeKey={activeUserManagementTab}
-                      onSelect={(k) => setActiveUserManagementTab(k || "user-directory")}
+                      onSelect={handleUserManagementTabChange}
                       id="user-management-sub-tabs"
                       className="settings-sub-tabs"
                       style={{
@@ -148,34 +225,42 @@ const Settings = () => {
                      
                      {session?.user?.permissions?.includes(PERMISSIONS.VIEW_USERS) && (
                   <Tab eventKey="user-directory" title="User Directory">
-                        <div style={{ marginTop: '20px' }}>
-                          <Users />
-                        </div>
+                        {shouldRenderTab("user-management", "user-directory") && (
+                          <div style={{ marginTop: '20px' }}>
+                            <Users />
+                          </div>
+                        )}
                       </Tab>
                       )}
 
                       {session?.user?.permissions?.includes(PERMISSIONS.VIEW_TEAMS) && (
                       <Tab eventKey="supervisor-teams" title="Supervisor Teams">
-                        <div style={{ marginTop: '20px' }}>
-                          <Teams />
-                        </div>
+                        {shouldRenderTab("user-management", "supervisor-teams") && (
+                          <div style={{ marginTop: '20px' }}>
+                            <Teams />
+                          </div>
+                        )}
                       </Tab>
                       )}
 
                       {session?.user?.permissions?.includes(PERMISSIONS.VIEW_GROUPS) && (
                       
                       <Tab eventKey="management-groups" title="Management Groups">
-                        <div style={{ marginTop: '20px' }}>
-                          <Groups />
-                        </div>
+                        {shouldRenderTab("user-management", "management-groups") && (
+                          <div style={{ marginTop: '20px' }}>
+                            <Groups />
+                          </div>
+                        )}
                       </Tab>
                       )}
 
                       {session?.user?.permissions?.includes(PERMISSIONS.VIEW_RANKS) && (
                       <Tab eventKey="ranks-and-permissions" title="Ranks and Permissions">
-                        <div style={{ marginTop: '20px' }}>
-                          <Ranks />
-                        </div>
+                        {shouldRenderTab("user-management", "ranks-and-permissions") && (
+                          <div style={{ marginTop: '20px' }}>
+                            <Ranks />
+                          </div>
+                        )}
                       </Tab>
                       )}
 
@@ -192,7 +277,7 @@ const Settings = () => {
                   <Col md={12}>
                     <Tabs
                       activeKey={activeCrmTab}
-                      onSelect={(k) => setActiveCrmTab(k || "campaigns")}
+                      onSelect={handleCrmTabChange}
                       id="crm-sub-tabs"
                       className="settings-sub-tabs"
                       style={{
@@ -203,25 +288,31 @@ const Settings = () => {
 
                       {session?.user?.permissions?.includes(PERMISSIONS.VIEW_CRM_CAMPAIGNS) && (
                       <Tab eventKey="campaigns" title="Campaigns">
-                        <div style={{ marginTop: '20px' }}>
-                          <Campaigns />
-                        </div>
+                        {shouldRenderTab("crm", "campaigns") && (
+                          <div style={{ marginTop: '20px' }}>
+                            <Campaigns />
+                          </div>
+                        )}
                       </Tab>
                       )}
                       {session?.user?.permissions?.includes(PERMISSIONS.VIEW_CRM_PRODUCTS) && (
                       <Tab eventKey="products" title="Products">
-                        <div style={{ marginTop: '20px' }}>
-                          <Products />
-                        </div>
+                        {shouldRenderTab("crm", "products") && (
+                          <div style={{ marginTop: '20px' }}>
+                            <Products />
+                          </div>
+                        )}
                       </Tab>
                       )}
                       
                       {session?.user?.permissions?.includes(PERMISSIONS.VIEW_CRM_STAGES) && (
                       <Tab eventKey="stages" title="Stages">
-                        <div style={{ marginTop: '20px' }}>
-                          <Stages />
+                        {shouldRenderTab("crm", "stages") && (
+                          <div style={{ marginTop: '20px' }}>
+                            <Stages />
                           </div>
-                        </Tab>
+                        )}
+                      </Tab>
                       )}
 
                     </Tabs>
@@ -237,7 +328,7 @@ const Settings = () => {
                   <Col md={12}>
                     <Tabs
                       activeKey={activeTelcoTab}
-                      onSelect={(k) => setActiveTelcoTab(k || "assign-devices")}
+                      onSelect={handleTelcoTabChange}
                       id="telco-sub-tabs"
                       className="settings-sub-tabs"
                       style={{
@@ -248,26 +339,32 @@ const Settings = () => {
                       
                       {session?.user?.permissions?.includes(PERMISSIONS.VIEW_GSM_ASSIGNMENT) && (
                       <Tab eventKey="assign-devices" title="Assign Devices">
-                        <div style={{ marginTop: '20px' }}>
-                          <GsmAssign />
-                        </div>
+                        {shouldRenderTab("telco-gateway", "assign-devices") && (
+                          <div style={{ marginTop: '20px' }}>
+                            <GsmAssign />
+                          </div>
+                        )}
                       </Tab>
                       )}
 
                       {session?.user?.permissions?.includes(PERMISSIONS.VIEW_GSM_SYNC) && (
                       <Tab eventKey="sync-gsm" title="Sync GSM">
-                        <div style={{ marginTop: '20px' }}>
-                          <GsmSync />
-                        </div>
+                        {shouldRenderTab("telco-gateway", "sync-gsm") && (
+                          <div style={{ marginTop: '20px' }}>
+                            <GsmSync />
+                          </div>
+                        )}
                       </Tab>
                       )}
 
                       {session?.user?.permissions?.includes(PERMISSIONS.VIEW_GSM_COMPANY_PROFILLING) && (
 
                       <Tab eventKey="company-profiling" title="Company Profiling">
-                        <div style={{ marginTop: '20px' }}>
-                          <CompanyPO />
-                        </div>
+                        {shouldRenderTab("telco-gateway", "company-profiling") && (
+                          <div style={{ marginTop: '20px' }}>
+                            <CompanyPO />
+                          </div>
+                        )}
                       </Tab>
                       )}
 
@@ -283,7 +380,7 @@ const Settings = () => {
                 <Row>
                   <Col md={12}>
                     <div style={{ marginTop: '20px' }}>
-                      {session?.user?.permissions?.includes(PERMISSIONS.VIEW_PAYMENT_METHODS_BILLING) && (
+                      {shouldRenderTab("billing") && session?.user?.permissions?.includes(PERMISSIONS.VIEW_PAYMENT_METHODS_BILLING) && (
                       <PaymentMethods />
                       )}
                     </div>
@@ -301,7 +398,7 @@ const Settings = () => {
                   <Col md={12}>
                     <Tabs
                       activeKey={activeNetopsTab}
-                      onSelect={(k) => setActiveNetopsTab(k || "devices-list")}
+                      onSelect={handleNetopsTabChange}
                       id="netops-sub-tabs"
                       className="settings-sub-tabs"
                       style={{
@@ -312,25 +409,31 @@ const Settings = () => {
 
 {session?.user?.permissions?.includes(PERMISSIONS.VIEW_NETOPS_DEVICES) && (
                       <Tab eventKey="devices-list" title="Devices List">
-                        <div style={{ marginTop: '20px' }}>
-                          <Devices />
-                        </div>
+                        {shouldRenderTab("devices-management", "devices-list") && (
+                          <div style={{ marginTop: '20px' }}>
+                            <Devices />
+                          </div>
+                        )}
                       </Tab>
                       )}
 
                       {session?.user?.permissions?.includes(PERMISSIONS.VIEW_SERVICES_NETOPS) && (
                       <Tab eventKey="services" title="Services">
-                        <div style={{ marginTop: '20px' }}>
-                          <Services />
-                        </div>
+                        {shouldRenderTab("devices-management", "services") && (
+                          <div style={{ marginTop: '20px' }}>
+                            <Services />
+                          </div>
+                        )}
                       </Tab>
                       )}
 
                       {session?.user?.permissions?.includes(PERMISSIONS.VIEW_NETOPS_ALERTS) && (
                       <Tab eventKey="alerts" title="Alerts">
-                        <div style={{ marginTop: '20px' }}>
-                          <Alerts />
-                        </div>
+                        {shouldRenderTab("devices-management", "alerts") && (
+                          <div style={{ marginTop: '20px' }}>
+                            <Alerts />
+                          </div>
+                        )}
                       </Tab>
                       )}
 
@@ -348,7 +451,7 @@ const Settings = () => {
                   <Col md={12}>
                     <Tabs
                       activeKey={activeTicketsTab}
-                      onSelect={(k) => setActiveTicketsTab(k || "statuses")}
+                      onSelect={handleTicketsTabChange}
                       id="tickets-sub-tabs"
                       className="settings-sub-tabs"
                       style={{
@@ -358,42 +461,52 @@ const Settings = () => {
                     >
                       {session?.user?.permissions?.includes(PERMISSIONS.VIEW_TICKETS_STATUS) && (
                       <Tab eventKey="statuses" title="Statuses">
-                        <div style={{ marginTop: '20px' }}>
-                          <TicketStatuses />
-                        </div>
+                        {shouldRenderTab("tickets", "statuses") && (
+                          <div style={{ marginTop: '20px' }}>
+                            <TicketStatuses />
+                          </div>
+                        )}
                       </Tab>
                       )}
 
                       {session?.user?.permissions?.includes(PERMISSIONS.VIEW_TICKETS_MODULES) && (
 
                       <Tab eventKey="modules" title="Modules">
-                        <div style={{ marginTop: '20px' }}>
-                          <TicketModules />
-                        </div>
+                        {shouldRenderTab("tickets", "modules") && (
+                          <div style={{ marginTop: '20px' }}>
+                            <TicketModules />
+                          </div>
+                        )}
                       </Tab>
                       )}
 
                       {session?.user?.permissions?.includes(PERMISSIONS.VIEW_TICKETS_CATEGORIES) && (
                       <Tab eventKey="categories" title="Categories">
-                        <div style={{ marginTop: '20px' }}>
-                          <ModuleCategories />
-                        </div>
+                        {shouldRenderTab("tickets", "categories") && (
+                          <div style={{ marginTop: '20px' }}>
+                            <ModuleCategories />
+                          </div>
+                        )}
                       </Tab>
                       )}
 
                       {session?.user?.permissions?.includes(PERMISSIONS.VIEW_TICKETS_SUBCATEGORIES) && (
                       <Tab eventKey="sub-categories" title="Sub Categories">
-                        <div style={{ marginTop: '20px' }}>
-                          <ModuleSubCategories />
-                        </div>
+                        {shouldRenderTab("tickets", "sub-categories") && (
+                          <div style={{ marginTop: '20px' }}>
+                            <ModuleSubCategories />
+                          </div>
+                        )}
                       </Tab>
                       )}
 
                       {session?.user?.permissions?.includes(PERMISSIONS.VIEW_TICKETS_TYPES) && (
                       <Tab eventKey="types" title="Types">
-                        <div style={{ marginTop: '20px' }}>
-                          <TicketTypes />
-                        </div>
+                        {shouldRenderTab("tickets", "types") && (
+                          <div style={{ marginTop: '20px' }}>
+                            <TicketTypes />
+                          </div>
+                        )}
                       </Tab>
                       )}
 

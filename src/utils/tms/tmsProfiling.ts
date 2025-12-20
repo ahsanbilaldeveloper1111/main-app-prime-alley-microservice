@@ -1,22 +1,17 @@
 
 import { toast } from "react-toastify";
 import axiosInstance from "@utils/axios";
-import { tmsSession } from "@utils/tmsSession";
 
 /**
  * General function to handle TMS authentication errors (4009 response code)
- * Clears TMS session and redirects to TMS login page
+ * TMS auth has been removed - this function now only shows error message
  * @param response - The API response object
  */
 const handleTmsAuthError = (response: any) => {
   const responseCode = response?.data?.code;
   if (responseCode === 4009) {
     toast.error(response?.data?.message);
-    // Clear TMS session and redirect to TMS login
-    tmsSession.clear();
-    if (typeof window !== 'undefined') {
-      window.location.href = '/tms/verification';
-    }
+    // TMS auth has been removed - no session clearing or redirect
   }
 
 };

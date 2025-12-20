@@ -231,7 +231,6 @@ const CrmReports = () => {
     } else if (selectedReportModule === 'orders') {
       fetchOrderReports();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedReportModule]);
 
   // Helper function to get user display name from extension
@@ -392,7 +391,6 @@ const CrmReports = () => {
         setSelectedReportModule(availableReportTabs[0].id);
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canViewLeadsReports, canViewDealsReports, canViewOrdersReports]);
 
   // If no permissions, show access denied

@@ -89,13 +89,15 @@ export const useVerifyUserInfo = (onSuccess?: () => void) => {
         try {
             setIsLoading(true);
             setError(null);
-            await UnifiedOpService.verifyUserInfo(data);
+            const response = await UnifiedOpService.verifyUserInfo(data);
             // Call the success callback to refetch data
             if (onSuccess) {
                 onSuccess();
             }
+            return response;
         } catch (err) {
             setError(err);
+            throw err;
         } finally {
             setIsLoading(false);
         }
@@ -760,13 +762,15 @@ export const useVerifyLdapUser = (onSuccess?: () => void) => {
         try {
             setIsLoading(true);
             setError(null);
-            await UnifiedOpService.verifyLdapUser(data);
+            const response = await UnifiedOpService.verifyLdapUser(data);
             // Call the success callback to refetch data
             if (onSuccess) {
                 onSuccess();
             }
+            return response;
         } catch (err) {
             setError(err);
+            throw err;
         } finally {
             setIsLoading(false);
         }
@@ -783,13 +787,15 @@ export const useAddLdapUser = (onSuccess?: () => void) => {
         try {
             setIsLoading(true);
             setError(null);
-            await UnifiedOpService.addLdapUser(data);
+            const response = await UnifiedOpService.addLdapUser(data);
             // Call the success callback to refetch data
             if (onSuccess) {
                 onSuccess();
             }
+            return response;
         } catch (err) {
             setError(err);
+            throw err;
         } finally {
             setIsLoading(false);
         }

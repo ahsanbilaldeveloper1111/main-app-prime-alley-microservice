@@ -1,36 +1,23 @@
 import NextAuth from 'next-auth';
 import type { NextAuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
-import { authAPI } from '../../../utils/api';
-import { signOut } from "next-auth/react";
-import { sessionStore } from '../../../utils/sessionStore';
+import { nextAuthLogger } from '../../../utils/nextAuthLogger';
 
-// Function to clear any existing TMS session data
-function clearExistingTmsSessions() {
-  try {
-    const sessionsToDelete: string[] = [];
-    
-    // Find all sessions that have TMS data
-    if (global.nextAuthSessions) {
-      global.nextAuthSessions.forEach((sessionData: any, sessionId: string) => {
-        if (sessionData.user?.tmsSession) {
-          sessionsToDelete.push(sessionId);
-        }
-      });
-    }
-    
-    // Delete sessions with TMS data
-    sessionsToDelete.forEach(sessionId => {
-      sessionStore.delete(sessionId);
-      //console.log('Cleared existing TMS session:', sessionId);
-    });
-    
-    //console.log(`Cleared ${sessionsToDelete.length} existing TMS sessions`);
-  } catch (error) {
-    console.error('Error clearing existing TMS sessions:', error);
-  }
-}
+// Constants
+const REFRESH_BUFFER_MS = 2 * 60 * 1000; // 2 minutes before expiry
+const SESSION_MAX_AGE = 15 * 60; // 15 minutes in seconds
 
+// Helper function to parse token expiry
+const parseTokenExpiry = (expires: unknown): number => {
+  if (typeof expires === 'number') return expires;
+  if (typeof expires === 'string') return Number.parseInt(expires, 10) || 0;
+  return 0;
+};
+
+// Helper function to calculate token expiry timestamp
+const calculateTokenExpiry = (expiresIn: number, now: number = Date.now()): number => {
+  return now + (expiresIn * 1000);
+};
 
 declare module 'next-auth' {
   interface Session {
@@ -49,22 +36,6 @@ declare module 'next-auth' {
       refresh_token?: string;
       refresh_token_expires?: number | string;
       sessionId?: string; // Add session ID for custom session retrieval
-      tmsSession?: {
-        accessToken: string;
-        expiresAt: number;
-        user?: {
-          id?: string;
-          name?: string;
-          email?: string;
-          user_access_info?: {
-            permissions?: Array<{
-              module: string;
-              action: string;
-            }>;
-          };
-          [key: string]: any;
-        };
-      };
     };
   }
 
@@ -87,22 +58,6 @@ declare module 'next-auth' {
       refresh_token: string;
       refresh_token_expires: number | string;
     };
-    tmsSession?: {
-      accessToken: string;
-      expiresAt: number;
-      user?: {
-        id?: string;
-        name?: string;
-        email?: string;
-        user_access_info?: {
-          permissions?: Array<{
-            module: string;
-            action: string;
-          }>;
-        };
-        [key: string]: any;
-      };
-    };
   }
 }
 
@@ -116,6 +71,7 @@ export const authOptions: NextAuthOptions = {
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) {
+          nextAuthLogger.warn('Authorization attempt with missing credentials');
           return null;
         }
 
@@ -123,29 +79,44 @@ export const authOptions: NextAuthOptions = {
           const formData = new URLSearchParams();
           formData.append("email", credentials.email);
           formData.append("password", credentials.password);
-          const res = await fetch(
-            process.env.NEXT_PUBLIC_BACKEND_URL + "auth/login",
-            {
-              method: "POST",
-              headers: {
-                Accept: "application/json",
-                "Content-Type": "application/x-www-form-urlencoded",
-              },
-              body: formData,
-            }
-          );
-         
+          
+          const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+          if (!backendUrl) {
+            nextAuthLogger.error('Backend URL not configured');
+            return null;
+          }
+
+          nextAuthLogger.debug('Attempting login', { email: credentials.email });
+          
+          const res = await fetch(`${backendUrl}auth/login`, {
+            method: "POST",
+            headers: {
+              Accept: "application/json",
+              "Content-Type": "application/x-www-form-urlencoded",
+            },
+            body: formData,
+          });
         
           const jsonData = await res.json();
           
-          if (jsonData.code === 400) { 
+          if (jsonData.code === 400) {
+            nextAuthLogger.warn('Login failed: Invalid credentials', { code: jsonData.code });
             return null;
           }
-          //console.log("jsonData", jsonData)
+          
           if (!jsonData?.data?.token?.access_token) {
+            nextAuthLogger.warn('Login failed: Missing access token', { 
+              hasData: !!jsonData?.data,
+              hasToken: !!jsonData?.data?.token 
+            });
             return null;
           }
         
+          const now = Date.now();
+          const tokenData = jsonData.data.token;
+          const accessTokenExpiresIn = tokenData.expires_in || 0;
+          const refreshTokenExpiresIn = tokenData.refresh_token?.expires_in || 0;
+          
           const user = {
             id: jsonData.data?.id,
             name: jsonData.data?.name,
@@ -157,19 +128,23 @@ export const authOptions: NextAuthOptions = {
             login_as: jsonData.data?.login_as || null,
             permissions: jsonData.data?.permissions || [],
             token: {
-              access_token: jsonData.data?.token?.access_token,
-              access_token_expires: jsonData.data?.token?.expires_in,
-              refresh_token: jsonData.data?.token?.refresh_token.access_token,
-              refresh_token_expires: jsonData.data?.token?.refresh_token.expires_in,
+              access_token: tokenData.access_token,
+              access_token_expires: calculateTokenExpiry(accessTokenExpiresIn, now),
+              refresh_token: tokenData.refresh_token?.access_token,
+              refresh_token_expires: calculateTokenExpiry(refreshTokenExpiresIn, now),
             }
           };
-
-          // Clear TMS sessions from server-side memory
-          clearExistingTmsSessions();
+          
+          nextAuthLogger.info('Login successful', { 
+            userId: user.id, 
+            username: user.username,
+            accessTokenExpiresIn: `${Math.floor(accessTokenExpiresIn / 60)}m`,
+            refreshTokenExpiresIn: `${Math.floor(refreshTokenExpiresIn / 60)}m`
+          });
           
           return user;
         } catch (error) {
-          console.error('Login error:', error);
+          nextAuthLogger.error('Login error', error, { email: credentials.email });
           return null;
         }
       },
@@ -178,7 +153,7 @@ export const authOptions: NextAuthOptions = {
 
   session: {
     strategy: 'jwt',
-    maxAge: 2 * 60 * 60, // 2 hours in seconds
+    maxAge: SESSION_MAX_AGE,
   },
 
   pages: {
@@ -188,22 +163,24 @@ export const authOptions: NextAuthOptions = {
 
   callbacks: {
     async jwt({ token, user }) {
-      // Store only essential data in JWT to minimize size
+      // Initial login - store user data and tokens
       if (user) {
-        // Clear any existing TMS session data when creating new main app session
-        //console.log('Clearing any existing TMS session data for new main app session');
-        clearExistingTmsSessions();
+        nextAuthLogger.debug('JWT callback: Initial login', { userId: user.id, username: user.username });
         
-        token.id = user.id;
-        token.name = user.name;
-        token.email = user.email;
-        token.username = user.username;
-        token.is_admin = user.is_admin;
-        token.login_as = user.login_as;
-        token.phone = user.phone;
-        token.role = user.role;
-        token.permissions = user.permissions;
+        // Copy user data to token
+        Object.assign(token, {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          username: user.username,
+          is_admin: user.is_admin,
+          login_as: user.login_as,
+          phone: user.phone,
+          role: user.role,
+          permissions: user.permissions,
+        });
         
+        // Store tokens if available
         if (user.token) {
           token.access_token = user.token.access_token;
           token.access_token_expires = user.token.access_token_expires;
@@ -211,28 +188,106 @@ export const authOptions: NextAuthOptions = {
           token.refresh_token_expires = user.token.refresh_token_expires;
         }
         
+        return token;
+      }
+
+      // Token refresh check - refresh if expired or about to expire
+      const now = Date.now();
+      const accessTokenExpires = parseTokenExpiry(token.access_token_expires);
+      const refreshTokenExpires = parseTokenExpiry(token.refresh_token_expires);
+      const timeUntilExpiry = accessTokenExpires - now;
+
+      // Check if token needs refresh (within buffer time)
+      if (accessTokenExpires > 0 && timeUntilExpiry <= REFRESH_BUFFER_MS) {
+        // Validate refresh token is still available and not expired
+        if (!token.refresh_token || refreshTokenExpires <= now) {
+          nextAuthLogger.warn('Cannot refresh: Refresh token expired or missing', {
+            hasRefreshToken: !!token.refresh_token,
+            refreshTokenExpired: refreshTokenExpires <= now,
+            timeUntilRefreshExpiry: refreshTokenExpires > 0 ? `${Math.floor((refreshTokenExpires - now) / 1000)}s` : 'N/A'
+          });
+          return token;
+        }
+
+        try {
+          nextAuthLogger.debug('Refreshing access token', {
+            timeUntilExpiry: `${Math.floor(timeUntilExpiry / 1000)}s`,
+            accessTokenExpiresAt: new Date(accessTokenExpires).toISOString()
+          });
+
+          const formData = new URLSearchParams();
+          formData.append('refresh_token', token.refresh_token as string);
+          
+          const baseUrl = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3000';
+          const refreshResponse = await fetch(`${baseUrl}/api/token/refresh`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: formData.toString()
+          });
+
+          if (!refreshResponse.ok) {
+            nextAuthLogger.error('Token refresh failed', undefined, {
+              status: refreshResponse.status,
+              statusText: refreshResponse.statusText
+            });
+            return token;
+          }
+
+          const refreshData = await refreshResponse.json();
+          
+          if (refreshData.code === 200 && refreshData.data?.access_token) {
+            // Update access token
+            token.access_token = refreshData.data.access_token;
+            token.access_token_expires = calculateTokenExpiry(refreshData.data.expires_in || 0, now);
+            
+            // Update refresh token if provided
+            if (refreshData.data.refresh_token?.access_token) {
+              token.refresh_token = refreshData.data.refresh_token.access_token;
+              token.refresh_token_expires = calculateTokenExpiry(
+                refreshData.data.refresh_token.expires_in || 0, 
+                now
+              );
+            }
+            
+            nextAuthLogger.info('Token refreshed successfully', {
+              newAccessTokenExpiresIn: `${Math.floor((refreshData.data.expires_in || 0) / 60)}m`,
+              refreshTokenUpdated: !!refreshData.data.refresh_token?.access_token
+            });
+          } else {
+            nextAuthLogger.error('Token refresh failed: Invalid response', undefined, {
+              code: refreshData.code,
+              hasAccessToken: !!refreshData.data?.access_token
+            });
+          }
+        } catch (error) {
+          nextAuthLogger.error('Token refresh error', error);
+          // Don't throw - return token as-is so session doesn't break
+        }
       }
 
       return token;
     },
 
     async session({ session, token }) {
-      // Return minimal session data
+      // Map token data to session user object
       if (session.user) {
-        session.user.id = token.id as string | null;
-        session.user.name = token.name as string | null;
-        session.user.email = token.email as string | null;
-        session.user.username = token.username as string | null;
-        session.user.role = token.role as string | null;
-        session.user.is_admin = token.is_admin as string | null;
-        session.user.login_as = token.login_as as string | null;
-        session.user.phone = token.phone as string | null;
-        session.user.permissions = token.permissions as string[];
-        session.user.access_token = token.access_token as string | undefined;
-        session.user.access_token_expires = token.access_token_expires as number | string | undefined;
-        session.user.refresh_token = token.refresh_token as string | undefined;
-        session.user.refresh_token_expires = token.refresh_token_expires as number | string | undefined;
-        
+        session.user = {
+          id: token.id as string | null,
+          name: token.name as string | null,
+          email: token.email as string | null,
+          username: token.username as string | null,
+          role: token.role as string | null,
+          is_admin: token.is_admin as string | null,
+          login_as: token.login_as as string | null,
+          phone: token.phone as string | null,
+          permissions: (token.permissions as string[]) || [],
+          access_token: token.access_token as string | undefined,
+          access_token_expires: token.access_token_expires as number | string | undefined,
+          refresh_token: token.refresh_token as string | undefined,
+          refresh_token_expires: token.refresh_token_expires as number | string | undefined,
+        };
       }
 
       return session;

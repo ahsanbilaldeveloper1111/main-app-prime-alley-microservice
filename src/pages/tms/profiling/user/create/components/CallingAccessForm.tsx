@@ -15,6 +15,8 @@ interface CallingAccessFormProps {
     errors: any;
     touched: any;
     companyData: any;
+    company_id: number | null;
+    companyName: string;
     callAccessOptions: SelectOption[];
     iccidOptions: SelectOption[];
     callRepetitionOptions: SelectOption[];
@@ -32,6 +34,8 @@ const CallingAccessForm = forwardRef<HTMLDivElement, CallingAccessFormProps>(({
     errors,
     touched,
     companyData,
+    company_id,
+    companyName,
     callAccessOptions,
     iccidOptions,
     callRepetitionOptions,

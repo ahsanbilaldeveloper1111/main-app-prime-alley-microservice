@@ -23,7 +23,6 @@ export const clearAllLocalStorage = (): void => {
       // Session and authentication related
       localStorage.removeItem('last_activity')
       localStorage.removeItem('user_session_data')
-      // Note: tmsSession is now managed by NextAuth, no need to clear from localStorage
       
       // Clear any other custom keys that start with your app prefix
       const keysToRemove: string[] = []

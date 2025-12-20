@@ -1018,7 +1018,6 @@ export default function useCtiStomp(wsPath = '/ws', instanceId?: string, screenI
       });
     };
     // Empty dependency array - only run once on mount
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Helper: Get devices array for a DN

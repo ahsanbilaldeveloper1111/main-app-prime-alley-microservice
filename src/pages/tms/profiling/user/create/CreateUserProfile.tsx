@@ -61,7 +61,6 @@ import countries from "world-countries";
 import _ from "lodash";
 import { useRouter } from "next/router";
 import Head from "next/head";
-import { tmsSession } from "@utils/tmsSession";
 
 
 // Import partial components
@@ -71,7 +70,11 @@ import CallingAccessForm from "./components/CallingAccessForm";
 import ConfirmationForm from "./components/ConfirmationForm";
 import APIProgressSection from "./components/APIProgressSection";
 
-const CreateUserProfile = () => {
+interface CreateUserProfileProps {
+    initialUserData?: any;
+}
+
+const CreateUserProfile = ({ initialUserData }: CreateUserProfileProps = {}) => {
     const {
         errors,
         touched,
@@ -91,13 +94,13 @@ const CreateUserProfile = () => {
 
     console.log(userId, "uid");
     
-    // Get user from TMS session
-    const session = tmsSession.load();
-    const user = session?.user;
+    // TMS auth has been removed - user is set to null
+    // Using 'as' to prevent TypeScript from narrowing to never
+    const user = null as User | null;
     // const { data: userData, isLoading: isUserDataLoading } = useGetUser(
     //     userId && !isDraft ? Number(userId) : 0,
     // );
-    const userData = null;
+    const userData = initialUserData || null;
     const isUserDataLoading = false;
     const {
         updateProfilingErrorLogs,
@@ -166,14 +169,14 @@ const CreateUserProfile = () => {
         if (isDraft) {      
             return Number(getUserProfilingDraft?.company_id);
         }
-        if (user?.user_type != UserType.ADMIN) {
-            return user?.company_id;
+        // Type guard to ensure TypeScript knows user could be User
+        if (user && user.user_type !== UserType.ADMIN) {
+            return user.company_id;
         }
 
         return null;
     }, [
-        user?.user_type,
-        user?.company_id,
+        user,
         (userData as any)?.data?.company_id,
         getUserProfilingDraft?.company_id,
         userId,
@@ -181,8 +184,23 @@ const CreateUserProfile = () => {
     ]);
 
     const { data: companyData, isLoading: isCompanyLoading } = useGetCompany(
-        companyId || verifyLdapUserFormData.company_id || null,
+        companyId || verifyLdapUserFormData.company_id || 0,
     );
+    
+    // Update currentUserCompanyId and currentUserCompanyName when companyData is successfully loaded
+    useEffect(() => {
+        if (companyData?.success === true && companyData?.data) {
+            const companyId = companyData.data.id;
+            const companyName = companyData.data.name;
+            
+            if (companyId) {
+                setCurrentUserCompanyId(companyId);
+            }
+            if (companyName) {
+                setCurrentUserCompanyName(companyName);
+            }
+        }
+    }, [companyData]);
 
     // Memoize the company list params to prevent unnecessary API calls
     const companyListParams = useMemo(() => ({
@@ -547,12 +565,7 @@ const CreateUserProfile = () => {
             data.displayName = `${data.firstName} ${data.lastName}`.trim();
         }
 
-        // Auto-generate userId when firstName or extensionNumber changes
-        if (field === "firstName" || field === "extensionNumber") {
-            if (data.firstName && data.extensionNumber) {
-                data.userId = `${data.firstName}_S${data.extensionNumber}`;
-            }
-        }
+        // User ID is now manually entered, no auto-generation
         // Check if this is a completed step and field has changed
         const currentStepNumber = parseInt(key.split("-")[1]);
         if (completedSteps.has(currentStepNumber)) {
@@ -590,8 +603,25 @@ const CreateUserProfile = () => {
         // Mark field as touched when user interacts with it
 
         if (field == "call_repetition") {
-            data.call_repetition_daily = null;
-            data.call_repetition_weekly = null;
+            if (value === "company") {
+                // When "company" is selected, populate from company profile data
+                const companyProfile = companyData?.data?.profile;
+                if (companyProfile) {
+                    data.call_repetition_daily = companyProfile.call_repetition_daily 
+                        ? Number.parseInt(companyProfile.call_repetition_daily) 
+                        : null;
+                    data.call_repetition_weekly = companyProfile.call_repetition_weekly 
+                        ? Number.parseInt(companyProfile.call_repetition_weekly) 
+                        : null;
+                } else {
+                    data.call_repetition_daily = null;
+                    data.call_repetition_weekly = null;
+                }
+            } else {
+                // When "individual" or other value is selected, clear the values
+                data.call_repetition_daily = null;
+                data.call_repetition_weekly = null;
+            }
         }
         if (field == "mobile_user") {
             data.device_type = null;
@@ -632,7 +662,79 @@ const CreateUserProfile = () => {
 
     // Handle API errors
     const [key, setKey] = useState("tab-1");
+    const [currentUserCompanyId, setCurrentUserCompanyId] = useState<number | null>(null);
+    const [currentUserCompanyName, setCurrentUserCompanyName] = useState<string>("");
     const totalTabs = 3;
+
+    // Populate form data from userData when available (for edit mode)
+    useEffect(() => {
+        if (userData && isUpdateMode) {
+            // Map API response to verifyLdapUserFormData
+            const phoneNo = userData.phone_no ? Number.parseInt(userData.phone_no) : null;
+            const companyId = userData.company_id ? Number.parseInt(userData.company_id) : 0;
+            
+            setVerifyLdapUserFormData({
+                companyName: userData.parent_company?.name || userData.company || "",
+                extensionNumber: phoneNo,
+                firstName: userData.first_name || "",
+                email: userData.email || "",
+                lastName: userData.last_name || "",
+                displayName: userData.name || "",
+                userId: userData.username || null,
+                country: userData.country || "",
+                company_id: companyId,
+                department: userData.department || "",
+                jobTitle: userData.job_title || "",
+                password: "",
+                client_transactionid: generateCustomId("tms-", 20),
+                update_user: true,
+                verify: false,
+            });
+
+            // Map API response to verifyUserInfoFormData
+            const profile = userData.parent_company?.profile;
+            const callingAccess = userData.parent_company?.calling_access?.[0];
+            
+            setVerifyUserInfoFormData({
+                extensionNumber: phoneNo,
+                company_id: companyId,
+                displayName: userData.name || "",
+                iccid_number: null, // Will be set from iccids if needed
+                company: null,
+                update_user: true,
+                shareLineAppearanceCssName: callingAccess?.back_end_calling_access || "",
+                call_repetition: profile?.call_repetition_daily ? "individual" : "company",
+                call_repetition_weekly: profile?.call_repetition_weekly ? Number.parseInt(profile.call_repetition_weekly) : null,
+                password: "",
+                display: null,
+                call_repetition_daily: profile?.call_repetition_daily ? Number.parseInt(profile.call_repetition_daily) : null,
+                allow_dncr: callingAccess?.allow_dncr === "1" ? DNCRCallingAccess.ALLOW_DNCR : DNCRCallingAccess.DISALLOW_DNCR,
+                allow_fac_info: callingAccess?.allow_fac_info === "1" ? FacInfoCallingAccess.ALLOW_FAC_INFO : FacInfoCallingAccess.DISALLOW_FAC_INFO,
+                verify: false,
+                mobile_user: profile?.mobile_user === "Yes" ? MobileUser.Yes : MobileUser.No,
+                device_type: null,
+                client_transactionid: generateCustomId("tms-", 20),
+                userId: userData.username || null,
+                country: userData.country || "",
+                department: userData.department || "",
+                jobTitle: userData.job_title || "",
+                companyName: userData.parent_company?.name || userData.company || "",
+                firstName: userData.first_name || "",
+                lastName: userData.last_name || "",
+                email: userData.email || "",
+                previous_mobile_user: null,
+                previous_device_type: null,
+            });
+
+            // Set company ID and name
+            if (companyId) {
+                setCurrentUserCompanyId(companyId);
+            }
+            if (userData.parent_company?.name || userData.company) {
+                setCurrentUserCompanyName(userData.parent_company?.name || userData.company);
+            }
+        }
+    }, [userData, isUpdateMode]);
 
     // Auto-scroll to next step
     const scrollToNextStep = (step: number) => {
@@ -782,31 +884,7 @@ const CreateUserProfile = () => {
         return completedSteps.has(Number(stepKey));
     };
 
-    // Helper function to check if user can navigate to a specific step
-    const canNavigateToStep = (stepKey: string) => {
-        const stepNumber = parseInt(stepKey);
-        const currentStepNumber = currentStep;
-
-        // Can always navigate to current step or previous steps
-        if (stepNumber <= currentStepNumber) return true;
-
-        if (
-            stepsNeedingReconfirmation.has(key) &&
-            stepNumber > currentStepNumber
-        ) {
-            return false;
-        }
-        // Can navigate to next step if current step is completed
-        if (stepNumber === currentStepNumber + 1) {
-            return isStepCompleted(key);
-        }
-
-        // Can navigate to any step if all previous steps are completed
-        for (let i = 1; i < stepNumber; i++) {
-            if (!isStepCompleted(`tab-${i}`)) return false;
-        }
-        return true;
-    };
+   
 
     const callAccessOptions = useMemo(() => {
         const iccidData = (companyData?.data?.iccids || []).find(
@@ -869,13 +947,21 @@ const CreateUserProfile = () => {
     ]);
     console.log(callAccessOptions, "callAccessOptions");
     const iccidOptions = useMemo(() => {
-        return (
-            (availableCompanyIccids?.data || []).map((iccid: number) => ({
-                value: iccid,
-                label: iccid.toString(),
-            })) || []
-        );
-    }, [availableCompanyIccids?.data]);
+        // Get ICCID options from companyData.iccids array
+        const iccids = companyData?.data?.iccids || [];
+        // Flatten all iccid_numbers from all ICCID objects
+        const allIccidNumbers: string[] = [];
+        iccids.forEach((iccidItem: any) => {
+            if (iccidItem.iccid_numbers && Array.isArray(iccidItem.iccid_numbers)) {
+                allIccidNumbers.push(...iccidItem.iccid_numbers);
+            }
+        });
+        // Create options from flattened ICCID numbers
+        return allIccidNumbers.map((iccid: string) => ({
+            value: iccid,
+            label: iccid,
+        }));
+    }, [companyData?.data?.iccids]);
     console.log(iccidOptions, "iccidOptions");
 
     // Form submission handlers
@@ -891,22 +977,40 @@ const CreateUserProfile = () => {
             }
 
             // Prepare form data for verification
-            const formData = {
+            // Format userId as: userEnteredValue_companyData?.data?.profile?.user_id_prefix
+            const userEnteredValue = verifyLdapUserFormData.userId || "";
+            const userPrefix = companyData?.data?.profile?.user_id_prefix || "";
+            const formattedUserId = userEnteredValue && userPrefix 
+                ? `${userEnteredValue}_${userPrefix}` 
+                : userEnteredValue || null;
+
+            const formData: VerifyLdapUserParams = {
                 ...verifyLdapUserFormData,
-                company_id: verifyLdapUserFormData.company_id || companyId,
+                company_id: (currentUserCompanyId || verifyLdapUserFormData.company_id || companyId || 0) as number,
                 // Fix companyName to use actual company name instead of company_id
-                companyName: companyData?.data?.name || verifyLdapUserFormData.companyName,
+                companyName: currentUserCompanyName || companyData?.data?.name || verifyLdapUserFormData.companyName,
                 // Generate displayName from firstName and lastName
                 displayName: `${verifyLdapUserFormData.firstName} ${verifyLdapUserFormData.lastName}`.trim(),
-                // Generate userId in format: firstName_S{extensionNumber}
-                userId: verifyLdapUserFormData.userId || `${verifyLdapUserFormData.firstName}_S${verifyLdapUserFormData.extensionNumber}`,
+                // Format userId as: userEnteredValue_user_id_prefix
+                userId: formattedUserId,
                 verify: true
             };
 
             console.log('Submitting LDAP user form:', formData);
 
             // Call the verify LDAP user API
-            await verifyLdapUser(formData);
+            const responseVerifyLdapUser = await verifyLdapUser(formData);
+            console.log('LDAP user verification', responseVerifyLdapUser);
+            
+            // Check if the response indicates failure
+            if (responseVerifyLdapUser && responseVerifyLdapUser.success === false) {
+                // Extract error message from response
+                const errorMessage = (responseVerifyLdapUser as any)?.response?.message || 
+                                    responseVerifyLdapUser.message || 
+                                    'LDAP user verification failed';
+                toast.error(errorMessage);
+                return; // Stop execution here
+            }
             
             //console.log('LDAP user verification successful');
             
@@ -944,10 +1048,19 @@ const CreateUserProfile = () => {
                 return;
             }
 
+            // Format userId as: userEnteredValue_companyData?.data?.profile?.user_id_prefix
+            const userEnteredValue = verifyLdapUserFormData.userId || "";
+            const userPrefix = companyData?.data?.profile?.user_id_prefix || "";
+            const formattedUserId = userEnteredValue && userPrefix 
+                ? `${userEnteredValue}_${userPrefix}` 
+                : userEnteredValue || null;
+
             // Prepare form data for verification - merge LDAP user data with calling access data
             const formData = {
                 // Include all data from the LDAP user verification step
                 ...verifyLdapUserFormData,
+                // Format userId as: userEnteredValue_user_id_prefix
+                userId: formattedUserId,
                 // Only override with calling access specific data (not basic user info)
                 company: verifyUserInfoFormData.company,
                 shareLineAppearanceCssName: verifyUserInfoFormData.shareLineAppearanceCssName,
@@ -962,8 +1075,10 @@ const CreateUserProfile = () => {
                 previous_mobile_user: verifyUserInfoFormData.previous_mobile_user,
                 previous_device_type: verifyUserInfoFormData.previous_device_type,
                 iccid_number: verifyUserInfoFormData.iccid_number,
-                // Ensure company_id is properly set
-                company_id: companyId || verifyLdapUserFormData.company_id,
+                // Ensure company_id is properly set from currentUserCompanyId
+                company_id: (currentUserCompanyId || companyId || verifyLdapUserFormData.company_id || 0) as number,
+                // Ensure companyName is properly set from currentUserCompanyName
+                companyName: currentUserCompanyName || companyData?.data?.name || verifyLdapUserFormData.companyName,
                 // Ensure verify flag is set
                 verify: true
             };
@@ -971,13 +1086,35 @@ const CreateUserProfile = () => {
             console.log('Submitting user info form:', formData);
 
             // Call the verify user info API
-            await verifyUserInfo(formData);
+            const responseVerifyUserInfo = await verifyUserInfo(formData);
+            console.log('User info verification response:', responseVerifyUserInfo);
+            
+            // Check if the response indicates failure
+            if (responseVerifyUserInfo && responseVerifyUserInfo.success === false) {
+                // Extract error message from response
+                const errorMessage = (responseVerifyUserInfo as any)?.response?.message || 
+                                    responseVerifyUserInfo.message || 
+                                    'User info verification failed';
+                toast.error(errorMessage);
+                return; // Stop execution here
+            }
             
             console.log('User info verification successful');
             
             // Call the add LDAP user API after successful verification
             console.log('Calling add LDAP user API with data:', formData);
-            await addLdapUser(formData);
+            const responseAddLdapUser = await addLdapUser(formData);
+            console.log('Add LDAP user response:', responseAddLdapUser);
+            
+            // Check if the response indicates failure
+            if (responseAddLdapUser && responseAddLdapUser.success === false) {
+                // Extract error message from response
+                const errorMessage = (responseAddLdapUser as any)?.response?.message || 
+                                    responseAddLdapUser.message || 
+                                    'Failed to add LDAP user';
+                toast.error(errorMessage);
+                return; // Stop execution here
+            }
             
             console.log('LDAP user added successfully');
             
@@ -1030,6 +1167,8 @@ const CreateUserProfile = () => {
                     errors={errors}
                     touched={touched}
                     companyData={companyData}
+                    company_id={currentUserCompanyId}
+                    companyName={currentUserCompanyName}
                     companyOptions={companyOptions}
                     availableExtensionsOptions={availableExtensionsOptions}
                     countryOptions={countryOptions}
@@ -1050,6 +1189,8 @@ const CreateUserProfile = () => {
                     errors={errors}
                     touched={touched}
                     companyData={companyData}
+                    company_id={currentUserCompanyId}
+                    companyName={currentUserCompanyName}
                     callAccessOptions={callAccessOptions}
                     iccidOptions={iccidOptions}
                     callRepetitionOptions={callRepetitionOptions}
@@ -1061,21 +1202,7 @@ const CreateUserProfile = () => {
                     onSubmit={submitVerifyUserInfoForm}
                 />
 
-                {/* Card 3: Confirm & Submit */}
-                {/* <ConfirmationForm
-                    ref={confirmCardRef}
-                    verifyLdapUserFormData={verifyLdapUserFormData}
-                    verifyUserInfoFormData={verifyUserInfoFormData}
-                    companyData={companyData}
-                    completedSteps={completedSteps}
-                    isUpdateMode={isUpdateMode}
-                    getCurrentLoadingState={getCurrentLoadingState}
-                    canProceedToNext={canProceedToNext}
-                    onSubmit={submitUserInfoForm}
-                    apiProgress={apiProgress}
-                    overallProgress={overallProgress}
-                    getStepStatusBadgeClass={getStepStatusBadgeClass}
-                /> */}
+                
             </div>
         </React.Fragment>
     );

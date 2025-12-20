@@ -46,18 +46,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
-    // Also clear TMS sessions if they exist
-    if (global.tmsSessions) {
-      const tmsSessionsToDelete: string[] = [];
-      global.tmsSessions.forEach((tmsSessionData: any, sessionId: string) => {
-        tmsSessionsToDelete.push(sessionId);
-      });
-      
-      tmsSessionsToDelete.forEach(sessionId => {
-        global.tmsSessions!.delete(sessionId);
-        clearedCount++;
-      });
-    }
 
     // Clear all cookies related to sessions (including NextAuth cookies)
     setCookieClearHeaders(res, true);

@@ -88,7 +88,7 @@ export function handleApiError(error: unknown): Error {
             if (typeof apiResponse.message === "string") {
                   console.log(apiResponse.message);
 
-                  throw new Error(apiResponse.message);
+                  
             }
         }
 

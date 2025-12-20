@@ -10,11 +10,7 @@
  */
 export const getSessionCookieClearOptions = (includeNextAuth: boolean = false): string[] => {
   const isProduction = process.env.NODE_ENV === 'production';
-  const cookieOptions: string[] = [
-    'tmsSessionId=; Path=/; SameSite=Lax; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT',
-    'tmsSessionId=; Path=/; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT',
-    'tmsSessionId=; Path=/; SameSite=Strict; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT',
-  ];
+  const cookieOptions: string[] = [];
 
   // Add NextAuth cookies if requested
   if (includeNextAuth) {
@@ -25,18 +21,11 @@ export const getSessionCookieClearOptions = (includeNextAuth: boolean = false): 
   }
 
   // Add Secure flag variations for production
-  if (isProduction) {
+  if (isProduction && includeNextAuth) {
     cookieOptions.push(
-      'tmsSessionId=; Path=/; SameSite=Lax; Secure; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT',
-      'tmsSessionId=; Path=/; SameSite=Strict; Secure; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT'
+      'next-auth.session-token=; Path=/; SameSite=Lax; Secure; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT',
+      'next-auth.csrf-token=; Path=/; SameSite=Lax; Secure; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT'
     );
-
-    if (includeNextAuth) {
-      cookieOptions.push(
-        'next-auth.session-token=; Path=/; SameSite=Lax; Secure; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT',
-        'next-auth.csrf-token=; Path=/; SameSite=Lax; Secure; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT'
-      );
-    }
   }
 
   return cookieOptions;
@@ -50,9 +39,6 @@ export const clearSessionCookiesClient = (includeNextAuth: boolean = false): voi
   if (typeof window === 'undefined') return;
 
   try {
-    // Clear from sessionStorage
-    sessionStorage.removeItem('tmsSessionId');
-
     // Get cookie options (same as server-side but for client)
     const cookieOptions = getSessionCookieClearOptions(includeNextAuth);
 

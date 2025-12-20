@@ -1,9 +1,6 @@
 import axios from "axios";
-import { signOut } from "next-auth/react";
 import { toast } from "react-toastify";
 import tokenService from "./tokenService";
-import { clearAllLocalStorage } from "./localStorageUtils";
-import { clearSessionCookiesClient } from "./cookieUtils";
 
 const axiosInstance: import('axios').AxiosInstance = axios.create({
   //baseURL: process.env.NEXT_PUBLIC_BACKEND_URL,
@@ -14,66 +11,6 @@ const axiosInstance: import('axios').AxiosInstance = axios.create({
   //   'Accept': 'application/json',
   // },
 });
-
-// get new token
-const refreshToken = async () => {
-  try {
-    if (typeof window !== 'undefined' && window.sessionStorage) {
-     // console.log('refreshToken....');
-      const refreshToken = sessionStorage.getItem('refreshToken');
-      if (!refreshToken) {
-        //console.log('No refresh token available');
-        return null;
-      }
-
-      console.log('=== REFRESH TOKEN DEBUG ===');
-      console.log('Refresh Token:', refreshToken);
-      console.log('Base URL:', axiosInstance.defaults.baseURL);
-      console.log('Full URL will be:', `${axiosInstance.defaults.baseURL}/auth/refreshToken`);
-      
-      // Create form data for refresh token request
-      const formData = new URLSearchParams();
-      formData.append('refresh_token', refreshToken);
-      console.log('Form Data:', formData.toString());
-
-      // Debug request before sending
-      console.log('Making refresh token request to:', '/auth/refreshToken');
-      
-      const response = await axiosInstance.get('/auth/refreshToken', {
-        params: formData
-      });
-      console.log('response token', response);
-
-      if(response.data.code===200){
-        if (response.data.data && response.data.data.access_token) {
-          sessionStorage.setItem('accessToken', response.data.data.access_token);
-          return response.data.data.access_token;
-        }
-      }else{
-        sessionStorage.clear();
-        clearAllLocalStorage();
-        
-        // Clear TMS session ID from localStorage and cookies
-        if (typeof window !== 'undefined') {
-          clearSessionCookiesClient(false);
-          console.log('Cleared session cookies on auto logout');
-        }
-        
-        signOut();
-        // Simple redirect to login page
-        if (typeof window !== 'undefined') {
-          window.location.href = '/auth/signin';
-        }
-        toast.error('Session expired - Please login again');
-      }
-    }
-    console.log('Failed to refresh token');
-    return null;
-  } catch (error) {
-    console.error('Token refresh failed:', error);
-    return null;
-  }
-};
 
 // Helper function to get token
 const getToken = () => {
@@ -176,13 +113,8 @@ axiosInstance.interceptors.response.use(
         originalRequest._retry = true;
         
         try {
-          // Try to refresh the token using token service first
-          let newToken = await tokenService.forceRefresh();
-          
-          // If token service fails, fallback to manual refresh
-          if (!newToken) {
-            newToken = await refreshToken();
-          }
+          // Use token service for refresh (it handles all the logic)
+          const newToken = await tokenService.forceRefresh();
           
           //console.log('Token refresh result:', newToken ? 'success' : 'failed');
 

@@ -23,12 +23,26 @@ const nextConfig: NextConfig = {
             '~bootstrap': path.resolve(__dirname, 'node_modules/bootstrap'),
         };
         
+        // Suppress CSS loader import trace warnings
+        config.ignoreWarnings = [
+            {
+                module: /node_modules\/next\/dist\/build\/webpack\/loaders\/css-loader/,
+            },
+            {
+                message: /Import trace for requested module/,
+            },
+        ];
+        
         // Suppress all warnings in webpack during build
         if (!dev) {
             config.stats = {
                 ...config.stats,
                 warnings: false,
-                warningsFilter: [/.*/],
+                warningsFilter: [
+                    /Import trace for requested module/,
+                    /css-loader/,
+                    /.*/,
+                ],
             };
             
             // Suppress console warnings during build

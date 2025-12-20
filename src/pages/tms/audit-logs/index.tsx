@@ -88,13 +88,13 @@ const TmsAuditLogs = () => {
 
   const columns: Column[] = useMemo(
     () => [
-      {key: "id", name: "Company", selector: (row: any) => row.id, sortable: true,
-        cell: (row: any) => {
-          return <div>
-            <p>{row.company?.name}</p>
-          </div>
-        }
-      },
+      // {key: "id", name: "Company", selector: (row: any) => row.id, sortable: true,
+      //   cell: (row: any) => {
+      //     return <div>
+      //       <p>{row.company?.name}</p>
+      //     </div>
+      //   }
+      // },
       {key: "company_id", name: "User Name", selector: (row: any) => row.company_id, sortable: true,
         cell: (row: any) => {
           return <div>
@@ -103,15 +103,15 @@ const TmsAuditLogs = () => {
         }
       },
       
-      {key: "id", name: "Type", selector: (row: any) => row.action, sortable: true,
-        cell: (row: any) => {
-          return <div>
-            <p>{row?.resource_type}</p>
-          </div>
-        }
-      },
-      {key: "ip_address", name: "Ip Address", selector: (row: any) => row.resource_type, sortable: true},
-      {key: "user_agent", name: "User Agent", selector: (row: any) => row.resource_type, sortable: true},
+      // {key: "id", name: "Type", selector: (row: any) => row.action, sortable: true,
+      //   cell: (row: any) => {
+      //     return <div>
+      //       <p>{row?.resource_type}</p>
+      //     </div>
+      //   }
+      // },
+      {key: "ip_address", name: "Ip Address", selector: (row: any) => row.ip_address, sortable: true},
+      {key: "user_agent", name: "User Agent", selector: (row: any) => row.user_agent, sortable: true},
       {key: "created_at", name: "Data Time", selector: (row: any) => row.created_at, sortable: true,
         cell: (row: any) => {
           return <div>
@@ -387,13 +387,11 @@ const TmsAuditLogs = () => {
       
         <PageHeader
           title="Audit Logs"
-          showSearch={true}
+          showSearch={false}
           searchPlaceholder="Search Audit Logs..."
           searchValue={currentFilters?.search || ""}
           onSearchChange={(value: any) => handleFiltersChange({...currentFilters, search: value})}
-          filters={
-            <AuditLogsFilters onFiltersChange={handleFiltersChange} />
-          }
+          
           leftGrid={3}
           rightGrid={9}
         />
@@ -553,7 +551,7 @@ const TmsAuditLogs = () => {
           defaultPageSize={15}
           filters={memoizedFilters}
           refreshKey={refreshKey}
-          search={false}
+          search={true}
           tableStyle="table-style-2"
         />
         
