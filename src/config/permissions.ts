@@ -505,6 +505,7 @@ export const routePermissions: RoutePermission[] = [
         permissions: [PERMISSIONS.CTI_SERVICES],
         children: [
             { path: '/',permissions: ['view-cti']},
+            { path: '/new',permissions: ['view-cti']},
             { path: '/dialer',permissions: ['dial-call-cti', 'merge-call-cti', 'transfer-call-cti']},
 
         ]
