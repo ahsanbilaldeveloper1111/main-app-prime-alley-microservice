@@ -237,6 +237,13 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           url: '/live-calls'
         },
         {
+          id: 'live-calls-dashboard-new',
+          title: 'Live Call New',
+          icon: <LayoutDashboard size={16} />,
+          permission: PERMISSIONS.VIEW_CTI,
+          url: '/live-calls/new'
+        },
+        {
           id: 'live-calls-monitoring',
           title: HEADER_CONSTANTS.SUBMENU_LABELS.CALL_MONITORING,
           icon: <Phone size={16} />,
