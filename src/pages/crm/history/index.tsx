@@ -358,14 +358,12 @@ const HistoryPage = () => {
   // Fetch data on component mount
   useEffect(() => {
     fetchHistoryData(1);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Refetch when filters change (reset to page 1)
   useEffect(() => {
     setPagination(prev => ({ ...prev, current_page: 1 }));
     fetchHistoryData(1);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activityFilters.agents, activityFilters.dateRange.start, activityFilters.dateRange.end, extensions, activityTypeFilter]);
 
   // Get agent options from hierarchy data (extensions)

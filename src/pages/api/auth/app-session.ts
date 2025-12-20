@@ -25,12 +25,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(401).json({ message: 'Session expired' });
     }
 
-    // Return the session data as-is (tmsSession has been removed from the structure)
-    // console.log('Returning session data:', {
-    //   userId: sessionData.user.id,
-    //   hasTmsPermissions: !!sessionData.user.tmsPermissions,
-    //   tmsPermissionsCount: sessionData.user.tmsPermissions?.length || 0
-    // });
+    // Return the session data
 
     return res.status(200).json(sessionData);
 

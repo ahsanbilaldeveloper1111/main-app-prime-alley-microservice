@@ -124,27 +124,32 @@ export const authAPI = {
     }
   },
 
-  // Refresh token function
+  // Refresh token function - uses Next.js API route for consistency
   refreshToken: async () => {
     try {
-     // console.log('Attempting to refresh token...');
       if (typeof window !== 'undefined') {
         const refreshToken = sessionStorage.getItem('refreshToken');
         if (!refreshToken) {
           throw new Error('No refresh token available');
         }
 
-        const response = await axios.post(`${process.env.NEXT_PUBLIC_BACKEND_URL}/auth/refresh`, {
-          refresh_token: refreshToken
+        // Use Next.js API route /api/token/refresh (same as tokenService)
+        const formData = new URLSearchParams();
+        formData.append('refresh_token', refreshToken);
+
+        const response = await axios.post('/api/token/refresh', formData.toString(), {
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded'
+          },
+          timeout: 30000
         });
 
-        if (response.data.token && response.data.token.access_token) {
-          sessionStorage.setItem('accessToken', response.data.token.access_token);
-          if (response.data.token.refresh && response.data.token.refresh.access_token) {
-            sessionStorage.setItem('refreshToken', response.data.token.refresh.access_token);
+        if (response.data.code === 200 && response.data.data?.access_token) {
+          sessionStorage.setItem('accessToken', response.data.data.access_token);
+          if (response.data.data.refresh_token?.access_token) {
+            sessionStorage.setItem('refreshToken', response.data.data.refresh_token.access_token);
           }
-         // console.log('Token refreshed successfully');
-          return response.data.token.access_token;
+          return response.data.data.access_token;
         }
       }
       throw new Error('Failed to refresh token');

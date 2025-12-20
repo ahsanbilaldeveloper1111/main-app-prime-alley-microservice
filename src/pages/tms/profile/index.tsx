@@ -11,7 +11,6 @@ import { ClusterName } from "@models/tms/CiscoPBXResponse";
 import Select from "react-select";
 
 import { User, UserSettingUpdate } from "@models/tms/User";
-import { loadTmsSession, getTmsSessionId, isTmsSessionValid, getTmsUser } from "@utils/tmsSessionHelper";
 import axiosInstance from "@utils/axios";
 import "@assets/scss/common.scss";
 
@@ -68,16 +67,9 @@ const TmsProfile = () => {
 // Initialize user data
 useEffect(() => {
       const initializeUser = async () => {
-        // Load TMS session using helper function
-        const tmsSessionData = await loadTmsSession();
-        
-        if (tmsSessionData && isTmsSessionValid(tmsSessionData)) {
-          const user = getTmsUser(tmsSessionData);
-          //console.log('TMS user data from session:', user);
-          // You can use the TMS session user data here
-          setTmsSession(tmsSessionData);
-          await getUserDetails(user);
-        }
+        // TMS auth has been removed - initialize without session
+        // Just fetch user details directly
+        await getUserDetails();
       };
       initializeUser();
     }, []);

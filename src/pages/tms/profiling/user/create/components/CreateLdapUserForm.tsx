@@ -16,6 +16,8 @@ interface CreateLdapUserFormProps {
     errors: any;
     touched: any;
     companyData: any;
+    company_id: number | null;
+    companyName: string;
     companyOptions: SelectOption[];
     availableExtensionsOptions: SelectOption[];
     countryOptions: SelectOption[];
@@ -34,6 +36,8 @@ const CreateLdapUserForm: React.FC<CreateLdapUserFormProps> = ({
     errors,
     touched,
     companyData,
+    company_id,
+    companyName,
     companyOptions,
     availableExtensionsOptions,
     countryOptions,
@@ -128,66 +132,68 @@ const CreateLdapUserForm: React.FC<CreateLdapUserFormProps> = ({
                             </Form.Group>
                         </div>
 
-                        {!userData?.data?.company_id && (
-                            <>
-                                <div className="col-sm-6">
-                                    <Form.Group className="mb-3">
-                                        <Form.Label>User ID</Form.Label>
-                                        <div className="input-group">
-                                            <input
-                                                type="text"
-                                                className="form-control"
-                                                placeholder="Enter User ID"
-                                                required
-                                                value={verifyLdapUserFormData.userId || ""}
-                                                onChange={(e) =>
-                                                    handleCreateFormChange(
-                                                        "userId",
-                                                        e.target.value,
-                                                    )
-                                                }
-                                            />
-                                            <span
-                                                className="input-group-text"
-                                                style={{
-                                                    background: "#f8f9fa",
-                                                    fontWeight: 500,
-                                                }}
-                                            >
-                                                {companyData?.data?.profile?.user_id_prefix
-                                                    ? "_" + companyData?.data?.profile?.user_id_prefix
-                                                    : ""}
-                                            </span>
-                                        </div>
-                                        {errors.userId && touched.userId && (
-                                            <div className="text-danger small mt-1">{errors.userId}</div>
-                                        )}
-                                    </Form.Group>
-                                </div>
-
-                                <div className="col-sm-6">
-                                    <Form.Group className="mb-3">
-                                        <Form.Label>Extension</Form.Label>
-                                        <Select
-                                            value={availableExtensionsOptions.find((option) => option.value === verifyLdapUserFormData.extensionNumber) || null}
-                                            onChange={(selectedOption: any) => handleCreateFormChange("extensionNumber", selectedOption?.value || "")}
-                                            options={availableExtensionsOptions}
-                                            placeholder="Select Extension"
-                                            isSearchable
-                                            isClearable
-                                            className={touched.extensionNumber && errors.extensionNumber ? "is-invalid" : ""}
-                                            menuPortalTarget={document.body}
-                                            styles={{
-                                                menuPortal: (base: any) => ({ ...base, zIndex: 9999 }),
-                                                menu: (base: any) => ({ ...base, zIndex: 9999 })
+                        {!userData?.data?.company_id && !isUpdateMode && (
+                            <div className="col-sm-6">
+                                <Form.Group className="mb-3">
+                                    <Form.Label>User ID</Form.Label>
+                                    <div className="input-group">
+                                        <input
+                                            type="text"
+                                            className="form-control"
+                                            placeholder="Enter User ID"
+                                            required
+                                            value={verifyLdapUserFormData.userId || ""}
+                                            onChange={(e) => {
+                                                // Remove spaces from the input
+                                                const valueWithoutSpaces = e.target.value.replaceAll(' ', '');
+                                                handleCreateFormChange(
+                                                    "userId",
+                                                    valueWithoutSpaces,
+                                                );
                                             }}
                                         />
-                                        {errors.extensionNumber && touched.extensionNumber && (
-                                            <div className="text-danger small mt-1">{errors.extensionNumber}</div>
-                                        )}
-                                    </Form.Group>
-                                </div>
-                            </>
+                                        <span
+                                            className="input-group-text"
+                                            style={{
+                                                background: "#f8f9fa",
+                                                fontWeight: 500,
+                                            }}
+                                        >
+                                            {companyData?.data?.profile?.user_id_prefix
+                                                ? "_" + companyData?.data?.profile?.user_id_prefix
+                                                : ""}
+                                        </span>
+                                    </div>
+                                    {errors.userId && touched.userId && (
+                                        <div className="text-danger small mt-1">{errors.userId}</div>
+                                    )}
+                                </Form.Group>
+                            </div>
+                        )}
+
+                        {!userData?.data?.company_id && !isUpdateMode && (
+                            <div className="col-sm-6">
+                                <Form.Group className="mb-3">
+                                    <Form.Label>Extension</Form.Label>
+                                    <Select
+                                        value={availableExtensionsOptions.find((option) => option.value === verifyLdapUserFormData.extensionNumber) || null}
+                                        onChange={(selectedOption: any) => handleCreateFormChange("extensionNumber", selectedOption?.value || "")}
+                                        options={availableExtensionsOptions}
+                                        placeholder="Select Extension"
+                                        isSearchable
+                                        isClearable
+                                        className={touched.extensionNumber && errors.extensionNumber ? "is-invalid" : ""}
+                                        menuPortalTarget={document.body}
+                                        styles={{
+                                            menuPortal: (base: any) => ({ ...base, zIndex: 9999 }),
+                                            menu: (base: any) => ({ ...base, zIndex: 9999 })
+                                        }}
+                                    />
+                                    {errors.extensionNumber && touched.extensionNumber && (
+                                        <div className="text-danger small mt-1">{errors.extensionNumber}</div>
+                                    )}
+                                </Form.Group>
+                            </div>
                         )}
 
                         <div className="col-sm-6">
@@ -286,7 +292,7 @@ const CreateLdapUserForm: React.FC<CreateLdapUserFormProps> = ({
                                     </div>
                                     <div className="input-group">
                                         <input
-                                            readOnly
+                                            
                                             type="text"
                                             className="form-control"
                                             placeholder="Enter Password"

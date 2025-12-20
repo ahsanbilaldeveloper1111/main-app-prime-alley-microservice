@@ -17,7 +17,6 @@ interface LayoutProps {
 const Layout = ({ children }: LayoutProps) => {
 
 	const router = useRouter();
-	const [hasTmsSession, setHasTmsSession] = useState<boolean | null>(null);
 
 	const toogleSidebarHide = () => {
 		const sidebar = document.querySelector('.pc-sidebar .pc-menu-overlay');
@@ -66,47 +65,6 @@ const Layout = ({ children }: LayoutProps) => {
 		newElement.addEventListener('click', handleOverlayClick);
 	};
 
-	// Check for TMS session changes using cookies
-	useEffect(() => {
-		if (typeof window === 'undefined') return;
-		
-		const checkTmsSession = () => {
-			// Get tmsSessionId from cookies instead of sessionStorage
-			const cookies = document.cookie.split(';');
-			const tmsSessionIdCookie = cookies.find(cookie =>
-				cookie.trim().startsWith('tmsSessionId=')
-			);
-			const sessionId = tmsSessionIdCookie ? tmsSessionIdCookie.split('=')[1] : null;
-			setHasTmsSession(!!sessionId);
-		};
-		
-		// Check initially
-		checkTmsSession();
-		
-		// Check periodically to catch session changes
-		const interval = setInterval(checkTmsSession, 2000);
-		
-		return () => {
-			clearInterval(interval);
-		};
-	}, []);
-
-	//	TMS route guard: block /tms routes unless TMS session ID is valid (except /tms/verification)
-	useEffect(() => {
-		if (typeof window === 'undefined' || hasTmsSession === null) return;
-		const path = router.pathname;
-		const isTmsRoute = path.startsWith('/tms') && path !== '/tms/verification';
-		if (isTmsRoute) {
-			
-			
-			if (!hasTmsSession) {
-				if (router.asPath !== '/tms/verification') {
-					
-					router.replace('/tms/verification');
-				}
-			} 
-		}
-	}, [router.pathname, hasTmsSession]);
 
 
 	const dispatch = useDispatch<any>();
@@ -174,11 +132,6 @@ const Layout = ({ children }: LayoutProps) => {
 		setShowOffcanvas(!showOffcanvas);
 	};
 
-	// Prevent rendering protected TMS content while redirecting
-	const isTmsRoute = router.pathname.startsWith('/tms') && router.pathname !== '/tms/verification';
-	if (isTmsRoute && typeof window !== 'undefined' && hasTmsSession === false) {
-		return null;
-	}
 
 	return (
 		<>

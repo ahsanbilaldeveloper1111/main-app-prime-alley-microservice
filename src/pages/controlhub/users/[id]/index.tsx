@@ -1,14 +1,13 @@
-import React, { ReactElement, useEffect, useState } from 'react';
+import React, { ReactElement, useEffect, useState, useMemo, useCallback } from 'react';
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
 import { Col, Row, Tab, Tabs, Modal, Button } from 'react-bootstrap';
-import { toast } from 'react-toastify';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import '@assets/scss/tabs.scss';
 import '@assets/scss/common.scss';
 
-import { getUserById, getUserPermissions, GetCustomFields, GetModules, getParentUsers, updateUserStatus } from '@utils/users';
+import { getUserById, getUserPermissions, GetCustomFields, GetModules, getParentUsers, updateUserStatus, GetCompanies } from '@utils/users';
 import { getAllRoles } from '@utils/roles';
 import { getAllGroups } from '@utils/groups';
 import { ModuleSlug } from '@utils/Helper';
@@ -17,11 +16,8 @@ import SuccessfulModal from '@pages/partial/SuccessfulModal';
 // Import partial components
 import OverviewTab from './partials/OverviewTab';
 import PermissionsTab from './partials/PermissionsTab';
-import LinkedUsersTab from './partials/LinkedUsersTab';
 import CustomFieldsTab from './partials/CustomFieldsTab';
-import LinkedCompaniesTab from './partials/LinkedCompaniesTab';
 import { User, Permission, Role, Group, Module } from '@typings/controlhub/users';
-import { GetCompanies } from '@utils/users';
 
 const UserView = () => {
     const { data: session } = useSession();
@@ -46,90 +42,142 @@ const UserView = () => {
     const [showSuccessfulModal, setShowSuccessfulModal] = useState(false);
     const [successModalTitle, setSuccessModalTitle] = useState('');
     const [successModalDescription, setSuccessModalDescription] = useState('');
+    const [isLoading, setIsLoading] = useState(true);
 
+    // Fetch all static data (roles, groups, modules, companies) in parallel on mount
     useEffect(() => {
-        fetchDataCompanies();
+        const fetchStaticData = async () => {
+            try {
+                // Fetch all static data in parallel
+                const [rolesData, groupsData, modulesData, companiesData] = await Promise.all([
+                    getAllRoles(),
+                    getAllGroups(),
+                    GetModules(),
+                    GetCompanies()
+                ]);
+
+                if (rolesData) setRoles(rolesData);
+                if (groupsData) setGroups(groupsData);
+                if (modulesData) setModules(modulesData);
+                if (companiesData) setDataCompanies(companiesData);
+            } catch (error) {
+                console.error('Error fetching static data:', error);
+            }
+        };
+
+        fetchStaticData();
     }, []);
 
-    const fetchDataCompanies = async () => {
-        const response = await GetCompanies();
-        if (response) {
-            setDataCompanies(response);
-        }
-    };
-
+    // Fetch user-specific data in parallel when id changes
     useEffect(() => {
-        if (id) {
-            fetchUser();
-            fetchUserPermissions();
-            fetchCustomFields();
+        if (!id) return;
+
+        const fetchUserData = async () => {
+            setIsLoading(true);
+            try {
+                // Fetch all user-specific data in parallel
+                const [userData, userPermissionsData, customFieldsData, parentUsersData] = await Promise.all([
+                    getUserById(id as string),
+                    getUserPermissions(id as string),
+                    GetCustomFields(id as string),
+                    getParentUsers()
+                ]);
+
+                // Set user data
+                if (userData) {
+                    setCurrentUser(userData?.userData);
+                    setLinkedUsers(userData?.linkedUsers || []);
+                    setLinkedCompanies(userData?.linkedCompanies || []);
+                }
+
+                // Set permissions data
+                if (userPermissionsData) {
+                    setExtended(userPermissionsData?.extended_permissions?.map((p: any) => typeof p === 'string' ? Number.parseInt(p, 10) : p) || []);
+                    setBlocked(userPermissionsData?.blocked_permissions?.map((p: any) => typeof p === 'string' ? Number.parseInt(p, 10) : p) || []);
+                    setAllPermission(userPermissionsData?.role_excluded_permissions || []);
+                    setRolePermission(userPermissionsData?.rolePermissions || []);
+                }
+
+                // Set custom fields
+                if (customFieldsData) {
+                    setCustomFields(customFieldsData);
+                }
+
+                // Set parent users
+                if (parentUsersData) {
+                    setParentUsers(parentUsersData);
+                }
+            } catch (error) {
+                console.error('Error fetching user data:', error);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        fetchUserData();
+    }, [id]);
+
+    // Memoized fetch functions for callbacks
+    const fetchUser = useCallback(async () => {
+        if (!id) return;
+        try {
+            // Fetch roles, groups, and user data in parallel
+            const [rolesData, groupsData, userData] = await Promise.all([
+                getAllRoles(),
+                getAllGroups(),
+                getUserById(id as string)
+            ]);
+
+            if (rolesData) setRoles(rolesData);
+            if (groupsData) setGroups(groupsData);
+            if (userData) {
+                setCurrentUser(userData?.userData);
+                setLinkedUsers(userData?.linkedUsers || []);
+                setLinkedCompanies(userData?.linkedCompanies || []);
+            }
+        } catch (error) {
+            console.error('Error fetching user:', error);
         }
     }, [id]);
 
-    const fetchUser = async () => {
-        await fetchRoles();
-        await fetchGroups();
-        const getUser = await getUserById(id as string);
-        setCurrentUser(getUser?.userData);
-        setLinkedUsers(getUser?.linkedUsers);
-        setLinkedCompanies(getUser?.linkedCompanies);
-    };
-
-    const fetchCustomFields = async () => {
-        const customFields = await GetCustomFields(id as string);
-        setCustomFields(customFields);
-    };
-
-    const fetchUserPermissions = async () => {
-        const userPermissions = await getUserPermissions(id as string);
-        if (userPermissions) {
-            setExtended(userPermissions?.extended_permissions?.map((p: any) => typeof p === 'string' ? parseInt(p) : p) || []);
-            setBlocked(userPermissions?.blocked_permissions?.map((p: any) => typeof p === 'string' ? parseInt(p) : p) || []);
-            setAllPermission(userPermissions?.role_excluded_permissions || []);
-            setRolePermission(userPermissions?.rolePermissions || []);
-        }
-    };
-
-    const fetchRoles = async () => {
-        const roles = await getAllRoles();
-        setRoles(roles);
-    };
-
-    const fetchGroups = async () => {
-        const groups = await getAllGroups();
-        setGroups(groups);
-    };
-
-    const fetchModules = async () => {
-        const response = await GetModules();
-        if (response) {
-            setModules(response);
-        }
-    };
-
-    useEffect(() => {
-        fetchModules();
-    }, []);
-
-    useEffect(() => {
-        if (id) {
-            fetchParentUsers();
+    const fetchUserPermissions = useCallback(async () => {
+        if (!id) return;
+        try {
+            const userPermissions = await getUserPermissions(id as string);
+            if (userPermissions) {
+                setExtended(userPermissions?.extended_permissions?.map((p: any) => typeof p === 'string' ? Number.parseInt(p, 10) : p) || []);
+                setBlocked(userPermissions?.blocked_permissions?.map((p: any) => typeof p === 'string' ? Number.parseInt(p, 10) : p) || []);
+                setAllPermission(userPermissions?.role_excluded_permissions || []);
+                setRolePermission(userPermissions?.rolePermissions || []);
+            }
+        } catch (error) {
+            console.error('Error fetching user permissions:', error);
         }
     }, [id]);
 
-    const fetchParentUsers = async () => {
-        const response = await getParentUsers();
-        if (response) {
-            setParentUsers(response);
+    const fetchCustomFields = useCallback(async () => {
+        if (!id) return;
+        try {
+            const customFieldsData = await GetCustomFields(id as string);
+            if (customFieldsData) {
+                setCustomFields(customFieldsData);
+            }
+        } catch (error) {
+            console.error('Error fetching custom fields:', error);
         }
-    };
+    }, [id]);
 
-    // Filter modules based on user permissions
-    const filteredModules = modules.filter(module => {
-        const moduleSlug = Object.values(ModuleSlug).find(slug => slug === module.slug);
-        const hasPermission = moduleSlug && session?.user?.permissions?.includes("view-" + moduleSlug) || moduleSlug && session?.user?.permissions?.includes(moduleSlug + "-services") || moduleSlug && session?.user?.permissions?.includes(moduleSlug + "-services");
-        return hasPermission;
-    });
+    // Memoize filtered modules to avoid recalculation on every render
+    const filteredModules = useMemo(() => {
+        return modules.filter(module => {
+            const moduleSlug = Object.values(ModuleSlug).find(slug => slug === module.slug);
+            const hasPermission = moduleSlug && (
+                session?.user?.permissions?.includes("view-" + moduleSlug) || 
+                session?.user?.permissions?.includes(moduleSlug + "-services")
+            );
+            return hasPermission;
+        });
+    }, [modules, session?.user?.permissions]);
 
     const handleCloseChangeStatusModal = () => {
         setShowChangeStatusModal(false);
@@ -143,13 +191,29 @@ const UserView = () => {
         }
     };
 
-    const handleSuccess = (title: string, description: string) => {
+    const handleSuccess = useCallback((title: string, description: string) => {
         setSuccessModalTitle(title);
         setSuccessModalDescription(description);
         setTimeout(() => {
             setShowSuccessfulModal(true);
         }, 100);
-    };
+    }, []);
+
+    if (isLoading) {
+        return (
+            <React.Fragment>
+                <BreadcrumbItem mainTitle="Controlhub" mainLink="/controlhub/users" subTitle="Users" />
+                <Row>
+                    <Col md={12} className="text-center py-5">
+                        <div className="spinner-border" role="status">
+                            <span className="visually-hidden">Loading...</span>
+                        </div>
+                        <p className="mt-3">Loading user data...</p>
+                    </Col>
+                </Row>
+            </React.Fragment>
+        );
+    }
 
     return (
         <React.Fragment>

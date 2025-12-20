@@ -1,52 +1,49 @@
-import { tmsSession } from './tmsSession';
-
 /**
  * Utility functions for TMS permissions
- * These functions provide easy access to TMS session permissions
+ * TMS auth has been removed - these functions now return false/empty values
  */
-
 
 /**
  * Check if user has a specific permission
  * @param permission - Permission to check in format "action_module" (e.g., "view_audit_log")
- * @returns boolean - true if permission exists, false otherwise
+ * @returns boolean - always returns false since TMS auth is removed
  */
 export const hasTmsPermission = (permission: string, module: string): boolean => {
-  return tmsSession.hasPermission(permission,module);
+  return false;
 };
 
 /**
  * Check if user has any of the specified permissions
  * @param permissions - Array of permissions to check
- * @returns boolean - true if any permission exists, false otherwise
+ * @returns boolean - always returns false since TMS auth is removed
  */
 export const hasAnyTmsPermission = (permissions: string[]): boolean => {
-  return tmsSession.hasAnyPermission(permissions);
+  return false;
 };
 
 /**
  * Check if user has all of the specified permissions
  * @param permissions - Array of permissions to check
- * @returns boolean - true if all permissions exist, false otherwise
+ * @returns boolean - always returns false since TMS auth is removed
  */
 export const hasAllTmsPermissions = (permissions: string[]): boolean => {
-  return tmsSession.hasAllPermissions(permissions);
+  return false;
 };
 
 /**
  * Get all permissions from TMS session
- * @returns Array of permission strings like ["view_audit_log", "view_company"]
+ * @returns Array of permission strings - always returns empty array since TMS auth is removed
  */
 export const getTmsPermissions = (): string[] => {
-  return tmsSession.getPermissions();
+  return [];
 };
 
 /**
  * Check if TMS session is valid
- * @returns boolean - true if session is valid, false otherwise
+ * @returns boolean - always returns false since TMS auth is removed
  */
 export const isTmsSessionValid = (): boolean => {
-  return tmsSession.isValid();
+  return false;
 };
 
 // Common permission constants for easy reference

@@ -16,17 +16,19 @@ export const generateCustomId = (prefix = "", length = 12) => {
 };
 
 export const generateComplexId = (length = 12) => {
-  const upper = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-  const lower = "abcdefghijklmnopqrstuvwxyz";
-  const digits = "0123456789";
-  const special = "!@#$%^&*()_+-=[]{}|;:,.<>?";
+  const upper = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  const lower = 'abcdefghijklmnopqrstuvwxyz';
+  const digits = '0123456789';
+  const special = '!@';
+
 
   // Ensure at least one of each type
-  let result = "";
+  let result = '';
   result += upper.charAt(Math.floor(Math.random() * upper.length));
   result += lower.charAt(Math.floor(Math.random() * lower.length));
   result += digits.charAt(Math.floor(Math.random() * digits.length));
   result += special.charAt(Math.floor(Math.random() * special.length));
+
 
   // Fill remaining length with random chars from all types
   const allChars = upper + lower + digits + special;
@@ -35,12 +37,10 @@ export const generateComplexId = (length = 12) => {
     result += allChars.charAt(Math.floor(Math.random() * allChars.length));
   }
 
-  // Shuffle the result
-  result = result
-    .split("")
-    .sort(() => Math.random() - 0.5)
-    .join("");
 
+  // Shuffle the result
+  result = result.split('').sort(() => Math.random() - 0.5).join('');
+  
   return result;
 };
 

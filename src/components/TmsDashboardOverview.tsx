@@ -1,7 +1,6 @@
 import React, { ReactElement, useState, useEffect, useCallback, useMemo } from 'react';
 import { Card, Row, Col, Spinner, Alert, Modal, Button } from 'react-bootstrap';
 import { useRouter } from 'next/router';
-import { useTmsSessionContext } from '../contexts/TmsSessionContext';
 import AnimatedNumber from '@components/AnimatedNumber';
 import imgStatus1 from '@assets/images/widget/img-status-1.svg';
 import imgStatus2 from '@assets/images/widget/img-status-2.svg';
@@ -96,7 +95,11 @@ const transformMonthlyInteractionData = (rawData: Record<string, MonthlyInteract
 
 const TmsDashboardOverview = React.memo(() => {
     const router = useRouter();
-    const { session, isAuthenticated, isLoading, isValid, isRefreshing } = useTmsSessionContext();
+    // TMS auth has been removed - these values are set to defaults
+    const isLoading = false;
+    const isRefreshing = false;
+    const isAuthenticated = false;
+    const isValid = false;
     const [error, setError] = useState<string | null>(null);
     const [isSearching, setIsSearching] = useState(false);
     const [showModal, setShowModal] = useState(false);
@@ -184,10 +187,7 @@ const TmsDashboardOverview = React.memo(() => {
     // Handle session validation
     useEffect(() => {
         if (!isLoading && !isRefreshing) {
-            if (!isAuthenticated || !isValid) {
-                router.push('/tms/verification');
-                return;
-            }
+           
 
             getListCompanies();
             getCounterData();
@@ -438,12 +438,12 @@ const TmsDashboardOverview = React.memo(() => {
                             value: counterData?.total_user_count || 0,
                             description: 'Total users in the system'
                            },
-                           {
-                            id: 'total-companies',
-                            title: 'Total Companies',
-                            value: counterData?.total_company_count || 0,
-                            description: 'Total companies in the system'
-                           },
+                        //    {
+                        //     id: 'total-companies',
+                        //     title: 'Total Companies',
+                        //     value: counterData?.total_company_count || 0,
+                        //     description: 'Total companies in the system'
+                        //    },
                            {
                             id: 'total-non-admin-users',
                             title: 'Total Non Admin Users',
@@ -499,29 +499,8 @@ const TmsDashboardOverview = React.memo(() => {
                         </Card.Header>
                         <Card.Body>
                             <Row>
+                                
                                 <Col md={3}>
-                                    <div className="mb-3">
-                                        <label htmlFor="companySelect" className="form-label">Company</label>
-                                        <select 
-                                            className="form-select" 
-                                            id="companySelect"
-                                            value={selectedCompany}
-                                            onChange={(e) => setSelectedCompany(e.target.value)}
-                                        >
-                                            <option value="">All Companies</option>
-                                            {listCompanies && listCompanies.length > 0 ? (
-                                                listCompanies.map((company) => (
-                                                    <option key={company.id} value={company.id.toString()}>
-                                                        {company.name}
-                                                    </option>
-                                                ))
-                                            ) : (
-                                                <option disabled>Loading companies...</option>
-                                            )}
-                                        </select>
-                                    </div>
-                                </Col>
-                                <Col md={2}>
                                     <div className="mb-3">
                                         <label htmlFor="yearSelect" className="form-label">Year</label>
                                         <select 
@@ -541,7 +520,7 @@ const TmsDashboardOverview = React.memo(() => {
                                         </select>
                                     </div>
                                 </Col>
-                                <Col md={2}>
+                                <Col md={3}>
                                     <div className="mb-3">
                                         <label htmlFor="monthSelect" className="form-label">Month</label>
                                         <select 
@@ -581,7 +560,7 @@ const TmsDashboardOverview = React.memo(() => {
                                         </select>
                                     </div>
                                 </Col>
-                                <Col md={2}>
+                                <Col md={3}>
                                     <div className="mb-3">
                                         <label className="form-label">&nbsp;</label>
                                         <button 
@@ -886,7 +865,7 @@ const TmsDashboardOverview = React.memo(() => {
                      </Col>
                 </Row>
 
-                 <Row className="mb-4">  
+                 {/* <Row className="mb-4">  
                      <Col md={12}>   
                         <Card>
                             <Card.Header className="d-flex justify-content-between align-items-center">
@@ -1268,7 +1247,7 @@ const TmsDashboardOverview = React.memo(() => {
                          </Card>
                         
                       </Col>
-                   </Row>
+                   </Row> */}
                   
                 
                 </>

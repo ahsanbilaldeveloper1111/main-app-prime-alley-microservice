@@ -28,7 +28,10 @@ import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
 import DatatableActionButton from "@components/DatatableActionButton";
 import { FiEdit, FiTrash2, FiEye,FiPlus } from "react-icons/fi";
 
-import { ListUsers, UpdateUserTms,getRanks,DeleteUser } from "@utils/tms/tmsUserManagement";
+import { ListUsers, UpdateUserTms,getRanks,DeleteUser, UpdatePassword } from "@utils/tms/tmsUserManagement";
+import { Trash2, Key, Edit } from "lucide-react";
+import { generateComplexId } from "@utils/Helper";
+import { useRouter } from "next/router";
 
 interface SelectOption {
   value: number;
@@ -41,6 +44,7 @@ interface UserTypeOption {
 }
 
 const TmsUserManagement = () => {
+  const router = useRouter();
   const { data: session, status } = useSession();
 
   const [refreshKey, setRefreshKey] = useState<number>(0);
@@ -92,6 +96,66 @@ const TmsUserManagement = () => {
   const [ListRanks, setListRanks] = useState<any[]>([]);
   const [ranksLoading, setRanksLoading] = useState<boolean>(true);
 
+  // Update password modal state
+  const [showUpdatePasswordModal, setShowUpdatePasswordModal] = useState<boolean>(false);
+  const [selectedUserForPassword, setSelectedUserForPassword] = useState<any>(null);
+  const [password, setPassword] = useState<string>("");
+  const [passwordConfirmation, setPasswordConfirmation] = useState<string>("");
+
+  // Handle update password button click - show modal
+  const handleUpdatePasswordClick = useCallback((row: any) => {
+    setSelectedUserForPassword(row);
+    // Clear password fields - user will generate password manually
+    setPassword("");
+    setPasswordConfirmation("");
+    setShowUpdatePasswordModal(true);
+  }, []);
+
+  // Handle password update submission
+  const handleUpdatePasswordSubmit = useCallback(async () => {
+    if (!selectedUserForPassword) return;
+
+    // Validate passwords match
+    if (password !== passwordConfirmation) {
+      toast.error('Passwords do not match');
+      return;
+    }
+
+    // Validate password is not empty
+    if (!password || password.length === 0) {
+      toast.error('Password cannot be empty');
+      return;
+    }
+
+    try {
+      const payload = {
+        username: selectedUserForPassword.username,
+        password: password,
+        password_confirmation: passwordConfirmation
+      };
+
+      const response = await UpdatePassword(payload);
+      
+      if (response && response.success === false) {
+        // Show error message if success is false
+        const errorMessage = response.message || 'Failed to update password';
+        toast.error(errorMessage);
+      } else if (response && response.success === true) {
+        toast.success('Password updated successfully!');
+        setShowUpdatePasswordModal(false);
+        setSelectedUserForPassword(null);
+        setPassword("");
+        setPasswordConfirmation("");
+      } else {
+        toast.error('Failed to update password');
+      }
+    } catch (error: any) {
+      console.error('Error updating password:', error);
+      const errorMessage = error?.response?.data?.message || error?.message || 'Failed to update password';
+      toast.error(errorMessage);
+    }
+  }, [selectedUserForPassword, password, passwordConfirmation]);
+
   // Handle user rank change
   const handleUserRankChange = useCallback(async (userId: number, newUserRank: string, currentUserRank: string) => {
     // Only call API if rank matches any of the available options
@@ -128,112 +192,61 @@ const TmsUserManagement = () => {
     }
   }, [ListRanks]);
 
-  const fetchRanks = useCallback(async () => {
-    try {
-      setRanksLoading(true);
-      const ranks = await getRanks({page: 1, perPage: 1000, search: ''});
-      const rankList = ranks?.dataList?.map((rank: any) => ({
-        value: rank.id,
-        label: rank.name
-      })) || [];
-      setListRanks(rankList);
-      console.log('rankList', rankList);
-    } catch (error) {
-      console.error('Error fetching ranks:', error);
-      toast.error('Failed to load ranks');
-    } finally {
-      setRanksLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchRanks();
-  }, [fetchRanks]);
-
   const columns: Column[] = useMemo(
     () => [
       {key: "username",name: "User Name",selector: (row: any) => row.username,sortable: true},
       {key: "name",name: "Name",selector: (row: any) => row.name,sortable: true},
       {key: "phone_no",name: "Extension",selector: (row: any) => row.phone_no,sortable: true},
-      {key: "company",name: "Company",selector: (row: any) => row.company,sortable: true},
+      // {key: "company",name: "Company",selector: (row: any) => row.company,sortable: true},
       {key: "email",name: "Email",selector: (row: any) => row.email,sortable: true},
-      {
-        key: "rank_dropdown",
-        name: "Rank",
-        selector: (row: any) => row.rank?.name || row.rank?.id || '-', // Required by interface
-        cell: (row: any) => (
-          <div style={{ minWidth: '150px' }}>
-            <Select
-              value={ListRanks.find(option => option.value === row?.rank?.id) || null}
-              onChange={(selectedOption) => {
-                if (selectedOption) {
-                  handleUserRankChange(row.id, selectedOption.value, row?.rank?.id);
-                }
-              }}
-              isDisabled={updatingUsers.has(row.id) || ranksLoading}
-              isLoading={ranksLoading}
-              options={ListRanks?.map((option) => ({
-                value: option.value,
-                label: option.label
-              }))}
-              placeholder={ranksLoading ? "Loading ranks..." : "Select Rank"}
-              isClearable={false}
-              styles={{
-                control: (provided) => ({
-                  ...provided,
-                  minHeight: '32px',
-                  fontSize: '14px'
-                }),
-                option: (provided) => ({
-                  ...provided,
-                  fontSize: '14px'
-                })
-              }}
-            />
+      // {
+      //   key: "rank_dropdown",
+      //   name: "Rank",
+      //   selector: (row: any) => row.rank?.name || row.rank?.id || '-', // Required by interface
+      //   cell: (row: any) => (
+      //     <div style={{ minWidth: '150px' }}>
+      //       <Select
+      //         value={ListRanks.find(option => option.value === row?.rank?.id) || null}
+      //         onChange={(selectedOption) => {
+      //           if (selectedOption) {
+      //             handleUserRankChange(row.id, selectedOption.value, row?.rank?.id);
+      //           }
+      //         }}
+      //         isDisabled={updatingUsers.has(row.id) || ranksLoading}
+      //         isLoading={ranksLoading}
+      //         options={ListRanks?.map((option) => ({
+      //           value: option.value,
+      //           label: option.label
+      //         }))}
+      //         placeholder={ranksLoading ? "Loading ranks..." : "Select Rank"}
+      //         isClearable={false}
+      //         styles={{
+      //           control: (provided) => ({
+      //             ...provided,
+      //             minHeight: '32px',
+      //             fontSize: '14px'
+      //           }),
+      //           option: (provided) => ({
+      //             ...provided,
+      //             fontSize: '14px'
+      //           })
+      //         }}
+      //       />
             
-            {updatingUsers.has(row.id) && (
-              <small className="text-muted">Updating...</small>
-            )}
-          </div>
-        ),
-        sortable: false
-      },
+      //       {updatingUsers.has(row.id) && (
+      //         <small className="text-muted">Updating...</small>
+      //       )}
+      //     </div>
+      //   ),
+      //   sortable: false
+      // },
       {
         key: "user_type_dropdown",
         name: "Type",
         selector: (row: any) => row.user_type, // Required by interface
         cell: (row: any) => (
-          <div style={{ minWidth: '150px' }}>
-            <Select
-              value={userTypeOptions.find(option => option.value === row.user_type) || null}
-              onChange={(selectedOption) => {
-                if (selectedOption) {
-                  handleUserTypeChange(row.id, selectedOption.value, row.user_type);
-                }
-              }}
-              isDisabled={updatingUsers.has(row.id)}
-              options={userTypeOptions?.map((option) => ({
-                value: option.value,
-                label: option.label
-              }))}
-              placeholder="Select Type"
-              isClearable={false}
-              styles={{
-                control: (provided) => ({
-                  ...provided,
-                  minHeight: '32px',
-                  fontSize: '14px'
-                }),
-                option: (provided) => ({
-                  ...provided,
-                  fontSize: '14px'
-                })
-              }}
-            />
-            
-            {/* {updatingUsers.has(row.id) && (
-              <small className="text-muted">Updating...</small>
-            )} */}
+          <div className="text-uppercase">
+            {row.user_type}
           </div>
         ),
         sortable: false
@@ -243,12 +256,38 @@ const TmsUserManagement = () => {
         name: "Actions",
         selector: (row: any) => row.id,
         cell: (row: any) => (
-          <Button variant="danger"onClick={() => handleDelete(row)}>Delete</Button>
+         
+          <div className="d-flex justify-content-center gap-2">
+            <Button 
+              variant="light" size="sm" 
+              className="btn-action-style-2 p-1 text-primary" 
+              title="Edit"
+              onClick={() => router.push(`/tms/management/users/${row.id}`)}
+              >
+                <Edit className="text-primary" size={16} />
+              </Button>
+            <Button 
+              variant="light" size="sm" 
+              className="btn-action-style-2 p-1 text-primary" 
+              title="Update Password"
+              onClick={() => handleUpdatePasswordClick(row)}
+              >
+                <Key className="text-primary" size={16} />
+              </Button>
+              <Button 
+              variant="light" size="sm" 
+              className="btn-action-style-2 p-1 text-danger" 
+              title="Delete"
+              onClick={() => handleDelete(row)}
+              >
+                <Trash2  className="text-danger" size={16}  />
+              </Button>
+            </div>
         )
       }
       
     ],
-    [handleUserTypeChange, userTypeOptions, updatingUsers, handleUserRankChange, ListRanks, ranksLoading]
+    [handleUserTypeChange, userTypeOptions, updatingUsers, handleUserRankChange, ListRanks, ranksLoading, handleUpdatePasswordClick]
   );
 
   const memoizedFilters = useMemo(() => currentFilters, [currentFilters]);
@@ -305,7 +344,7 @@ const TmsUserManagement = () => {
 
       <PageHeader
         title="Users"
-        showSearch={true}
+        showSearch={false}
         searchPlaceholder="Search Users..."
         searchValue={currentFilters?.search || ""}
         onSearchChange={(value: any) => handleFiltersChange({...currentFilters, search: value})}
@@ -344,6 +383,68 @@ const TmsUserManagement = () => {
                     <Modal.Footer>
                         <Button variant="secondary" onClick={() => setShowDeleteModal(false)}>Close</Button>
                         <Button variant="danger" onClick={() => handleSubmitDeleteUser()}>Delete</Button>
+                    </Modal.Footer>
+                    
+                </Modal>
+            )}
+
+{showUpdatePasswordModal && (
+                <Modal
+                    show={showUpdatePasswordModal}
+                    onHide={() => {
+                        setShowUpdatePasswordModal(false);
+                        setSelectedUserForPassword(null);
+                        setPassword("");
+                        setPasswordConfirmation("");
+                    }}
+                >
+                    <Modal.Header closeButton>
+                        <Modal.Title>Update Password</Modal.Title>
+                    </Modal.Header>
+                    <Modal.Body>
+                        <p>
+                            Update password for user: <b>{selectedUserForPassword?.username}</b>
+                        </p>
+                        <Form.Group className="mb-3">
+                            <Form.Label>Password</Form.Label>
+                            <div className="input-group">
+                                <Form.Control
+                                    type="text"
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    placeholder="Enter password"
+                                />
+                                <Button
+                                    variant="outline-secondary"
+                                    size="sm"
+                                    onClick={() => {
+                                        const randomPassword = generateComplexId(15);
+                                        setPassword(randomPassword);
+                                        setPasswordConfirmation(randomPassword);
+                                    }}
+                                >
+                                    Generate
+                                </Button>
+                            </div>
+                        </Form.Group>
+                        <Form.Group className="mb-3">
+                            <Form.Label>Confirm Password</Form.Label>
+                            <Form.Control
+                                type="text"
+                                value={passwordConfirmation}
+                                onChange={(e) => setPasswordConfirmation(e.target.value)}
+                                placeholder="Confirm password"
+                            />
+                        </Form.Group>
+                    </Modal.Body>
+                    <Modal.Footer>
+                        <Button variant="secondary" onClick={() => {
+                            setShowUpdatePasswordModal(false);
+                            setSelectedUserForPassword(null);
+                            setPassword("");
+                            setPasswordConfirmation("");
+                        }}>Close</Button>
+                        <Button variant="primary" onClick={() => handleUpdatePasswordSubmit()}>Update Password</Button>
                     </Modal.Footer>
                     
                 </Modal>
