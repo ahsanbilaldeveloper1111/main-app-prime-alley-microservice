@@ -659,6 +659,31 @@ const CreateLead = () => {
       return;
     }
 
+    // Validate required campaign fields
+    if (selectedCampaign && selectedCampaign.fields) {
+      const requiredCampaignFields = selectedCampaign.fields.filter(
+        (field: any) => field.is_required
+      );
+
+      if (requiredCampaignFields.length > 0) {
+        const missingFields: string[] = [];
+        
+        requiredCampaignFields.forEach((field: any) => {
+          const fieldValue = formData.campaign_field_values[field.field_name];
+          if (!fieldValue || (typeof fieldValue === 'string' && fieldValue.trim() === '')) {
+            missingFields.push(field.field_name);
+          }
+        });
+
+        if (missingFields.length > 0) {
+          toast.error(
+            `Please fill in all required campaign fields: ${missingFields.join(', ')}`
+          );
+          return;
+        }
+      }
+    }
+
     setLoading(true);
 
     try {
@@ -1975,6 +2000,9 @@ const CreateLead = () => {
                                         <Form.Group>
                                           <Form.Label>
                                             {field.field_name}
+                                            {field.is_required && (
+                                              <span className="text-danger ms-1">*</span>
+                                            )}
                                           </Form.Label>
                                           {renderCampaignField(field)}
                                         </Form.Group>

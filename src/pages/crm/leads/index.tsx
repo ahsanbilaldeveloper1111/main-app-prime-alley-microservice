@@ -42,7 +42,7 @@ import {
 } from "react-bootstrap";
 import Select from "react-select";
 import CreatableSelect from "react-select/creatable";
-import { ModuleSlug, formatDateForTable } from "@utils/Helper";
+import { ModuleSlug, formatDateForTable, checkRequiredFields } from "@utils/Helper";
 import {
   Target,
   CheckCircle,
@@ -95,6 +95,7 @@ import {
 } from "recharts";
 import Link from "next/link";
 import { toast } from "react-toastify";
+import moment from "moment";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
@@ -102,7 +103,7 @@ import FormModal from "../../partial/FormModal";
 import SuccessfulModal from "@pages/partial/SuccessfulModal";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import { useSession } from "next-auth/react";
-
+const ignoredKeys = ["stage_id", "contact_persons"];
 // Phone Container Component (with Badge for tables)
 const PhoneContainer = ({ phone }: { phone: string }) => {
   const parsePhone = useCallback((phone: string) => {
@@ -1358,7 +1359,23 @@ const CrmLeads = () => {
 
   // Handle follow-up creation
   const handleCreateFollowUp = useCallback(async () => {
-    if (!followupData.leadId || !followupData.followUpDate) return;
+    // Validate required fields
+    const isValid = checkRequiredFields(followupData, [
+      { field: "leadId", name: "Lead" },
+      { field: "followUpDate", name: "Follow-up Date" },
+      { field: "communicationChannel", name: "Communication Channel" },
+    ]);
+
+    // If "Other" is selected, communicationChannelOther is required
+    if (
+      followupData.communicationChannel === "Other" &&
+      !followupData.communicationChannelOther?.trim()
+    ) {
+      toast.error("Please specify the communication channel");
+      return;
+    }
+
+    if (!isValid) return;
 
     setLoadingFollowUp(true);
     try {
@@ -1381,11 +1398,15 @@ const CrmLeads = () => {
           followupData.communicationChannelOther;
       }
 
-      await createLeadFollowUp(followupData.leadId, payload);
+      if(followupData.leadId) {
+        await createLeadFollowUp(followupData.leadId, payload);
+      }
 
       // Refresh lead data
       if (viewingLead?.id === followupData.leadId) {
-        await handleViewLead(followupData.leadId);
+        if(followupData.leadId) {
+          await handleViewLead(followupData.leadId);
+        }
       }
 
       // Reset form and close modal
@@ -1413,8 +1434,23 @@ const CrmLeads = () => {
 
   // Handle follow-up update
   const handleUpdateFollowUp = useCallback(async () => {
-    if (!followUpIdToEdit || !followupData.leadId || !followupData.followUpDate)
+    // Validate required fields
+    const isValid = checkRequiredFields(followupData, [
+      { field: "leadId", name: "Lead" },
+      { field: "followUpDate", name: "Follow-up Date" },
+      { field: "communicationChannel", name: "Communication Channel" },
+    ]);
+
+    // If "Other" is selected, communicationChannelOther is required
+    if (
+      followupData.communicationChannel === "Other" &&
+      !followupData.communicationChannelOther?.trim()
+    ) {
+      toast.error("Please specify the communication channel");
       return;
+    }
+
+    if (!followUpIdToEdit || !isValid) return;
 
     setLoadingFollowUp(true);
     try {
@@ -1437,11 +1473,11 @@ const CrmLeads = () => {
           followupData.communicationChannelOther;
       }
 
-      await updateLeadFollowUp(followupData.leadId, followUpIdToEdit, payload);
+      await updateLeadFollowUp(followupData.leadId!, followUpIdToEdit, payload);
 
       // Refresh lead data
       if (viewingLead?.id === followupData.leadId) {
-        await handleViewLead(followupData.leadId);
+        await handleViewLead(followupData.leadId!);
       }
 
       // Reset form and close modal
@@ -1466,7 +1502,22 @@ const CrmLeads = () => {
       setLoadingFollowUp(false);
     }
   }, [followUpIdToEdit, followupData, session, viewingLead, handleViewLead]);
-
+  const getTodayDate = useCallback((startDateParam: string = "") => {
+    
+    let today = new Date();
+    if(startDateParam)
+      {
+       const startDate = new Date(startDateParam);
+       if (moment(startDate).isBefore(today))
+       {
+        today = startDate;
+       }
+      }
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }, []);
   // Handle edit follow-up click
   const handleEditFollowUp = useCallback(
     (followUp: any) => {
@@ -1547,15 +1598,12 @@ const CrmLeads = () => {
         meeting_date: meetingData.meetingDate,
         meeting_time: meetingData.meetingTime,
         lead_id: String(meetingData.leadId),
+        meeting_outcome: "Scheduled", // Default to "Scheduled" when creating
         extensions:
           meetingAttendees.length > 0
             ? meetingAttendees.map((user: any) => user.value)
             : [(session?.user as any)?.extension || "admin"],
       };
-
-      if (meetingData.meetingOutcome) {
-        payload.meeting_outcome = meetingData.meetingOutcome;
-      }
 
       await createMeeting(payload);
 
@@ -1823,10 +1871,12 @@ const CrmLeads = () => {
         sources.add(lead.source.trim());
       }
     });
-    return Array.from(sources).sort().map((source) => ({
-      value: source,
-      label: source,
-    }));
+    return Array.from(sources)
+      .sort()
+      .map((source) => ({
+        value: source,
+        label: source,
+      }));
   }, [leadsData]);
 
   // Calculate filter counts (using summary_tiles if available, otherwise from data)
@@ -2145,8 +2195,13 @@ const CrmLeads = () => {
             (leadsFilters.source !== null ? 1 : 0) +
             (leadsFilters.leadPotential !== null ? 1 : 0) +
             (leadsFilters.campaign !== null ? 1 : 0) +
-            (leadsFilters.leadScoreMin !== null || leadsFilters.leadScoreMax !== null ? 1 : 0) +
-            (leadsFilters.dateFrom !== null || leadsFilters.dateTo !== null ? 1 : 0)
+            (leadsFilters.leadScoreMin !== null ||
+            leadsFilters.leadScoreMax !== null
+              ? 1
+              : 0) +
+            (leadsFilters.dateFrom !== null || leadsFilters.dateTo !== null
+              ? 1
+              : 0)
           }
         />
 
@@ -2245,7 +2300,9 @@ const CrmLeads = () => {
                   />
                 </Col>
                 <Col md={4}>
-                  <Form.Label className="small fw-bold mb-2">Industry</Form.Label>
+                  <Form.Label className="small fw-bold mb-2">
+                    Industry
+                  </Form.Label>
                   <Select
                     options={[
                       { value: "Technology", label: "Technology" },
@@ -2318,7 +2375,9 @@ const CrmLeads = () => {
                   />
                 </Col>
                 <Col md={4}>
-                  <Form.Label className="small fw-bold mb-2">Lead Potential</Form.Label>
+                  <Form.Label className="small fw-bold mb-2">
+                    Lead Potential
+                  </Form.Label>
                   <Select
                     options={[
                       { value: "Hot", label: "Hot" },
@@ -2334,7 +2393,9 @@ const CrmLeads = () => {
                         : null
                     }
                     onChange={(selected) => {
-                      const leadPotentialValue = selected ? selected.value : null;
+                      const leadPotentialValue = selected
+                        ? selected.value
+                        : null;
                       setLeadsFilters((prev) => ({
                         ...prev,
                         leadPotential: leadPotentialValue,
@@ -2349,7 +2410,9 @@ const CrmLeads = () => {
                   />
                 </Col>
                 <Col md={4}>
-                  <Form.Label className="small fw-bold mb-2">Campaign</Form.Label>
+                  <Form.Label className="small fw-bold mb-2">
+                    Campaign
+                  </Form.Label>
                   <Select
                     options={campaigns.map((campaign: any) => ({
                       value: campaign.id.toString(),
@@ -2384,7 +2447,9 @@ const CrmLeads = () => {
                   />
                 </Col>
                 <Col md={6}>
-                  <Form.Label className="small fw-bold mb-2">Lead Score Range</Form.Label>
+                  <Form.Label className="small fw-bold mb-2">
+                    Lead Score Range
+                  </Form.Label>
                   <div className="d-flex gap-2 align-items-center">
                     <Form.Control
                       type="number"
@@ -2424,7 +2489,9 @@ const CrmLeads = () => {
                   </div>
                 </Col>
                 <Col md={6}>
-                  <Form.Label className="small fw-bold mb-2">Date Range</Form.Label>
+                  <Form.Label className="small fw-bold mb-2">
+                    Date Range
+                  </Form.Label>
                   <div className="d-flex gap-2 align-items-center">
                     <Form.Control
                       type="date"
@@ -2659,7 +2726,11 @@ const CrmLeads = () => {
                     {selectedLeadsColumns.includes("phone") && (
                       <th
                         className="col-phone"
-                        style={{ cursor: "pointer", userSelect: "none", textAlign: "center" }}
+                        style={{
+                          cursor: "pointer",
+                          userSelect: "none",
+                          textAlign: "center",
+                        }}
                         onClick={() =>
                           handleSort(
                             "phone",
@@ -2780,7 +2851,9 @@ const CrmLeads = () => {
                                       width: "30px",
                                       height: "30px",
                                       borderRadius: "50%",
-                                      backgroundColor: getRandomColor(lead.name),
+                                      backgroundColor: getRandomColor(
+                                        lead.name
+                                      ),
                                       color: "#fff",
                                       display: "flex",
                                       alignItems: "center",
@@ -2825,7 +2898,10 @@ const CrmLeads = () => {
                           <td className="col-email">{lead.email || "-"}</td>
                         )}
                         {selectedLeadsColumns.includes("phone") && (
-                          <td className="col-phone" style={{ textAlign: "center" }}>
+                          <td
+                            className="col-phone"
+                            style={{ textAlign: "center" }}
+                          >
                             {lead.phone ? (
                               <PhoneContainer phone={lead.phone} />
                             ) : (
@@ -3645,8 +3721,9 @@ const CrmLeads = () => {
                           display: "inline",
                         }}
                       />
-                      {viewingLead?.lead_score !== null ? `${viewingLead?.lead_score}%`  : 'Not Set'
-                        }
+                      {viewingLead?.lead_score !== null
+                        ? `${viewingLead?.lead_score}%`
+                        : "Not Set"}
                     </div>
                   </div>
                 </div>
@@ -4370,6 +4447,96 @@ const CrmLeads = () => {
                           </div>
                         </div>
                       )}
+
+                      {viewingLead?.crm_data?.scheduled_call_at && (
+                        <div
+                          style={{
+                            background: "#f8f9fa",
+                            padding: "16px",
+                            borderRadius: "10px",
+                            transition: "all 0.3s",
+                          }}
+                          onMouseOver={(e) => {
+                            e.currentTarget.style.background = "#e5e7eb";
+                            e.currentTarget.style.transform =
+                              "translateY(-2px)";
+                          }}
+                          onMouseOut={(e) => {
+                            e.currentTarget.style.background = "#f8f9fa";
+                            e.currentTarget.style.transform = "translateY(0)";
+                          }}
+                        >
+                          <div
+                            style={{
+                              fontSize: "12px",
+                              fontWeight: 600,
+                              color: "#6b7280",
+                              textTransform: "uppercase",
+                              letterSpacing: "0.5px",
+                              marginBottom: "6px",
+                            }}
+                          >
+                            Prospect Call Scheduled At
+                          </div>
+                          <div
+                            style={{
+                              fontSize: "15px",
+                              color: "#1f2937",
+                              fontWeight: 500,
+                            }}
+                          >
+                            <Calendar
+                              size={14}
+                              style={{
+                                color: "#4680ff",
+                                marginRight: "6px",
+                                display: "inline",
+                              }}
+                            />
+                            {(() => {
+                              const scheduledAt =
+                                viewingLead.crm_data.scheduled_call_at;
+                              const isOverdue = moment(scheduledAt).isBefore(
+                                moment()
+                              );
+                              const isNextHour = moment(scheduledAt).isBefore(
+                                moment().add(1, "hour")
+                              );
+                              return (
+                                <span>
+                                  {moment(scheduledAt).format(
+                                    "MMM DD, YYYY HH:mm"
+                                  )}
+                                  {isOverdue && (
+                                    <Badge
+                                      bg="danger"
+                                      className="ms-2"
+                                      style={{
+                                        fontSize: "10px",
+                                        padding: "2px 6px",
+                                      }}
+                                    >
+                                      Overdue
+                                    </Badge>
+                                  )}
+                                  {isNextHour && !isOverdue && (
+                                    <Badge
+                                      bg="warning"
+                                      className="ms-2"
+                                      style={{
+                                        fontSize: "10px",
+                                        padding: "2px 6px",
+                                      }}
+                                    >
+                                      Soon
+                                    </Badge>
+                                  )}
+                                </span>
+                              );
+                            })()}
+                          </div>
+                        </div>
+                      )}
                       {viewingLead.crm_data.created_at && (
                         <div
                           style={{
@@ -4422,7 +4589,62 @@ const CrmLeads = () => {
                         </div>
                       )}
                     </div>
-
+    {/* Scheduled Call Information */}
+    {viewingLead.crm_data?.note && (
+                      <>
+                        <div
+                          style={{
+                            display: "grid",
+                            gridTemplateColumns:
+                              "repeat(auto-fit, minmax(250px, 1fr))",
+                            gap: "20px",
+                            marginBottom: "30px",
+                          }}
+                        >
+                          <div
+                            style={{
+                              background: "#f8f9fa",
+                              padding: "16px",
+                              borderRadius: "10px",
+                              transition: "all 0.3s",
+                              gridColumn: "span 2",
+                            }}
+                            onMouseOver={(e) => {
+                              e.currentTarget.style.background = "#e5e7eb";
+                              e.currentTarget.style.transform =
+                                "translateY(-2px)";
+                            }}
+                            onMouseOut={(e) => {
+                              e.currentTarget.style.background = "#f8f9fa";
+                              e.currentTarget.style.transform = "translateY(0)";
+                            }}
+                          >
+                            <div
+                              style={{
+                                fontSize: "12px",
+                                fontWeight: 600,
+                                color: "#6b7280",
+                                textTransform: "uppercase",
+                                letterSpacing: "0.5px",
+                                marginBottom: "6px",
+                              }}
+                            >
+                              Scheduled Call Notes
+                            </div>
+                            <div
+                              style={{
+                                fontSize: "15px",
+                                color: "#1f2937",
+                                fontWeight: 500,
+                                whiteSpace: "pre-wrap",
+                              }}
+                            >
+                              {viewingLead.crm_data.note}
+                            </div>
+                          </div>
+                        </div>
+                      </>
+                    )}
                     {/* Prospect Fields */}
                     {viewingLead.crm_data.data &&
                       typeof viewingLead.crm_data.data === "object" &&
@@ -4507,6 +4729,8 @@ const CrmLeads = () => {
                           </div>
                         </>
                       )}
+
+                
                   </>
                 )}
 
@@ -4886,7 +5110,7 @@ const CrmLeads = () => {
                                 meetingType: "Online",
                                 meetingDate: "",
                                 meetingTime: "",
-                                meetingOutcome: "",
+                                meetingOutcome: "Scheduled",
                                 extensions: [],
                               });
                               setMeetingAttendees([]);
@@ -5090,7 +5314,7 @@ const CrmLeads = () => {
                             meetingType: "Online",
                             meetingDate: "",
                             meetingTime: "",
-                            meetingOutcome: "",
+                            meetingOutcome: "Scheduled",
                             extensions: [],
                           });
                           setShowAddMeetingModal(true);
@@ -5529,9 +5753,10 @@ const CrmLeads = () => {
                   if (audit.changes && Object.keys(audit.changes).length > 0) {
                     Object.entries(audit.changes).forEach(
                       ([key, change]: [string, any]) => {
+                        if(ignoredKeys.includes(key)) return;
                         if (
                           change.old !== undefined &&
-                          change.new !== undefined
+                          change.new !== undefined 
                         ) {
                           metadata[key] = `${change.old} → ${change.new}`;
                         } else if (change.new !== undefined) {
@@ -5868,7 +6093,7 @@ const CrmLeads = () => {
                     }
                     min={
                       followUpIdToEdit
-                        ? undefined
+                        ? getTodayDate(followupData.followUpDate)
                         : new Date().toISOString().split("T")[0]
                     }
                     required
@@ -5909,7 +6134,7 @@ const CrmLeads = () => {
               <Col md={12}>
                 <Form.Group className="mb-3">
                   <Form.Label className="fw-semibold small">
-                    Communication Channel
+                    Communication Channel <span className="text-danger">*</span>
                   </Form.Label>
                   <Select
                     value={{
@@ -5947,7 +6172,8 @@ const CrmLeads = () => {
                 <Col md={12}>
                   <Form.Group className="mb-3">
                     <Form.Label className="fw-semibold small">
-                      Communication Channel (Other)
+                      Communication Channel (Other){" "}
+                      <span className="text-danger">*</span>
                     </Form.Label>
                     <Form.Control
                       type="text"
@@ -5959,6 +6185,7 @@ const CrmLeads = () => {
                         })
                       }
                       placeholder="Specify communication channel..."
+                      required
                     />
                   </Form.Group>
                 </Col>
@@ -6017,7 +6244,13 @@ const CrmLeads = () => {
           </Button>
           <Button
             variant="primary"
-            disabled={!followupData.followUpDate || loadingFollowUp}
+            disabled={
+              !followupData.followUpDate ||
+              !followupData.communicationChannel ||
+              (followupData.communicationChannel === "Other" &&
+                !followupData.communicationChannelOther?.trim()) ||
+              loadingFollowUp
+            }
             onClick={
               followUpIdToEdit ? handleUpdateFollowUp : handleCreateFollowUp
             }
@@ -6150,7 +6383,7 @@ const CrmLeads = () => {
                     }
                     min={
                       meetingIdToEdit
-                        ? undefined
+                        ? getTodayDate(meetingData.meetingDate)
                         : new Date().toISOString().split("T")[0]
                     }
                     required
@@ -6177,48 +6410,51 @@ const CrmLeads = () => {
               </Col>
             </Row>
 
-            <Row>
-              <Col md={12}>
-                <Form.Group className="mb-3">
-                  <Form.Label className="fw-semibold small">
-                    Meeting Outcome
-                  </Form.Label>
-                  <Select
-                    value={
-                      meetingData.meetingOutcome
-                        ? {
-                            value: meetingData.meetingOutcome,
-                            label: meetingData.meetingOutcome,
-                          }
-                        : null
-                    }
-                    onChange={(option) =>
-                      setMeetingData({
-                        ...meetingData,
-                        meetingOutcome: option?.value || "",
-                      })
-                    }
-                    options={[
-                      { value: "Scheduled", label: "Scheduled" },
-                      {
-                        value: "Completed - Successful",
-                        label: "Completed - Successful",
-                      },
-                      {
-                        value: "Completed - Needs Follow-up",
-                        label: "Completed - Needs Follow-up",
-                      },
-                      { value: "Cancelled", label: "Cancelled" },
-                      { value: "No Show", label: "No Show" },
-                      { value: "Rescheduled", label: "Rescheduled" },
-                    ]}
-                    styles={customSelectStyles}
-                    placeholder="Select meeting outcome..."
-                    isClearable
-                  />
-                </Form.Group>
-              </Col>
-            </Row>
+            {/* Meeting Outcome - Only show when editing */}
+            {meetingIdToEdit && (
+              <Row>
+                <Col md={12}>
+                  <Form.Group className="mb-3">
+                    <Form.Label className="fw-semibold small">
+                      Meeting Outcome
+                    </Form.Label>
+                    <Select
+                      value={
+                        meetingData.meetingOutcome
+                          ? {
+                              value: meetingData.meetingOutcome,
+                              label: meetingData.meetingOutcome,
+                            }
+                          : null
+                      }
+                      onChange={(option) =>
+                        setMeetingData({
+                          ...meetingData,
+                          meetingOutcome: option?.value || "",
+                        })
+                      }
+                      options={[
+                        { value: "Scheduled", label: "Scheduled" },
+                        {
+                          value: "Completed - Successful",
+                          label: "Completed - Successful",
+                        },
+                        {
+                          value: "Completed - Needs Follow-up",
+                          label: "Completed - Needs Follow-up",
+                        },
+                        { value: "Cancelled", label: "Cancelled" },
+                        { value: "No Show", label: "No Show" },
+                        { value: "Rescheduled", label: "Rescheduled" },
+                      ]}
+                      styles={customSelectStyles}
+                      placeholder="Select meeting outcome..."
+                      isClearable
+                    />
+                  </Form.Group>
+                </Col>
+              </Row>
+            )}
 
             <Row>
               <Col md={12}>

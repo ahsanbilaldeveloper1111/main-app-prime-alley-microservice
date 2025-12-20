@@ -1069,6 +1069,7 @@ export interface CampaignField {
   field_options?: string[];
   options?: Array<string | { value?: string; label?: string }>;
   sort_order?: number;
+  is_required?: boolean;
 }
 
 export interface CampaignData {

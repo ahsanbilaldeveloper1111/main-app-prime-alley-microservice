@@ -101,6 +101,7 @@ import {
 } from 'recharts';
 import Link from "next/link";
 import { toast } from "react-toastify";
+import moment from "moment";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
@@ -109,6 +110,7 @@ import FormModal from "../../partial/FormModal";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import { useSession } from "next-auth/react";
 
+const ignoredKeys = ["stage_id"];
 // Phone Container Component (with Badge for tables)
 const PhoneContainer = ({ phone }: { phone: string }) => {
   const parsePhone = useCallback((phone: string) => {
@@ -944,12 +946,9 @@ const CrmDeals = () => {
         meeting_date: meetingData.meetingDate,
         meeting_time: meetingData.meetingTime,
         deal_id: String(meetingData.dealId),
+        meeting_outcome: "Scheduled", // Default to "Scheduled" when creating
         extensions: meetingAttendees.length > 0 ? meetingAttendees.map((user: any) => user.value) : [(session?.user as any)?.extension || 'admin'],
       };
-      
-      if (meetingData.meetingOutcome) {
-        payload.meeting_outcome = meetingData.meetingOutcome;
-      }
       
       await createMeeting(payload);
       
@@ -1077,6 +1076,22 @@ const CrmDeals = () => {
     setMeetingAttendees(attendees);
     setShowAddMeetingModal(true);
   }, [viewingDeal, extensions]);
+
+  const getTodayDate = useCallback((startDateParam: string = "") => {
+    let today = new Date();
+    if(startDateParam)
+      {
+       const startDate = new Date(startDateParam);
+       if (moment(startDate).isBefore(today))
+       {
+        today = startDate;
+       }
+      }
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }, []);
 
   // Handle meeting deletion
   const handleDeleteMeeting = useCallback((meetingId: number, meetingName?: string) => {
@@ -1466,7 +1481,7 @@ const CrmDeals = () => {
         {/* Page Header */}
         <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4">
           <div className="mb-3 mb-md-0">
-            <h2 className="mb-1 fw-bold">Deals & Opportunities</h2>
+            <h2 className="mb-1 fw-bold">Deals</h2>
             <p className="text-muted mb-0">Manage your sales pipeline and deals</p>
           </div>
           <div className="d-flex flex-wrap gap-2">
@@ -3654,7 +3669,8 @@ const CrmDeals = () => {
                   // Build metadata from changes
                   const metadata: Record<string, any> = {};
                   if (history.changes && Object.keys(history.changes).length > 0) {
-                    Object.entries(history.changes).forEach(([key, change]: [string, any]) => {
+                    Object.entries(history.changes).forEach(([key, change]: any) => {
+                      if(ignoredKeys.includes(key)) return;
                       if (change.old !== undefined && change.new !== undefined) {
                         metadata[key] = `${change.old} → ${change.new}`;
                       } else if (change.new !== undefined) {
@@ -4089,7 +4105,11 @@ const CrmDeals = () => {
                     type="date"
                     value={meetingData.meetingDate}
                     onChange={(e) => setMeetingData({ ...meetingData, meetingDate: e.target.value })}
-                    min={meetingIdToEdit ? undefined : new Date().toISOString().split('T')[0]}
+                    min={
+                      meetingIdToEdit
+                        ? getTodayDate(meetingData.meetingDate)
+                        : new Date().toISOString().split("T")[0]
+                    }
                     required
                   />
                 </Form.Group>
@@ -4107,28 +4127,51 @@ const CrmDeals = () => {
               </Col>
             </Row>
 
-            <Row>
-              <Col md={12}>
-                <Form.Group className="mb-3">
-                  <Form.Label className="fw-semibold small">Meeting Outcome</Form.Label>
-                  <Select
-                    value={meetingData.meetingOutcome ? { value: meetingData.meetingOutcome, label: meetingData.meetingOutcome } : null}
-                    onChange={(option) => setMeetingData({ ...meetingData, meetingOutcome: option?.value || '' })}
-                    options={[
-                      { value: 'Scheduled', label: 'Scheduled' },
-                      { value: 'Completed - Successful', label: 'Completed - Successful' },
-                      { value: 'Completed - Needs Follow-up', label: 'Completed - Needs Follow-up' },
-                      { value: 'Cancelled', label: 'Cancelled' },
-                      { value: 'No Show', label: 'No Show' },
-                      { value: 'Rescheduled', label: 'Rescheduled' }
-                    ]}
-                    styles={customSelectStyles}
-                    placeholder="Select meeting outcome..."
-                    isClearable
-                  />
-                </Form.Group>
-              </Col>
-            </Row>
+            {/* Meeting Outcome - Only show when editing */}
+            {meetingIdToEdit && (
+              <Row>
+                <Col md={12}>
+                  <Form.Group className="mb-3">
+                    <Form.Label className="fw-semibold small">
+                      Meeting Outcome
+                    </Form.Label>
+                    <Select
+                      value={
+                        meetingData.meetingOutcome
+                          ? {
+                              value: meetingData.meetingOutcome,
+                              label: meetingData.meetingOutcome,
+                            }
+                          : null
+                      }
+                      onChange={(option) =>
+                        setMeetingData({
+                          ...meetingData,
+                          meetingOutcome: option?.value || "",
+                        })
+                      }
+                      options={[
+                        { value: "Scheduled", label: "Scheduled" },
+                        {
+                          value: "Completed - Successful",
+                          label: "Completed - Successful",
+                        },
+                        {
+                          value: "Completed - Needs Follow-up",
+                          label: "Completed - Needs Follow-up",
+                        },
+                        { value: "Cancelled", label: "Cancelled" },
+                        { value: "No Show", label: "No Show" },
+                        { value: "Rescheduled", label: "Rescheduled" },
+                      ]}
+                      styles={customSelectStyles}
+                      placeholder="Select meeting outcome..."
+                      isClearable
+                    />
+                  </Form.Group>
+                </Col>
+              </Row>
+            )}
 
             <Row>
               <Col md={12}>
@@ -4154,7 +4197,10 @@ const CrmDeals = () => {
 
             <div className="alert alert-info mb-0 d-flex align-items-center">
               <AlertCircle size={18} className="me-2" />
-              <small>Schedule meetings to track important interactions with your deals.</small>
+              <small>
+                Schedule meetings to track important interactions with your
+                deals.
+              </small>
             </div>
           </Form>
         </Modal.Body>

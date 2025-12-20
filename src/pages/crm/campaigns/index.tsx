@@ -323,6 +323,7 @@ const CrmCampaigns = () => {
     field_type: "string",
     field_options: [] as string[],
     sort_order: 0,
+    is_required: false,
   });
 
   // Extensions and campaign users
@@ -788,6 +789,7 @@ const CrmCampaigns = () => {
       field_type: "string",
       field_options: [],
       sort_order: 0,
+      is_required: false,
     });
     setShowCreateModal(true);
   }, []);
@@ -829,6 +831,7 @@ const CrmCampaigns = () => {
         field_type: "string",
         field_options: [],
         sort_order: 0,
+        is_required: false,
       });
       
       setShowEditModal(true);
@@ -1049,6 +1052,7 @@ const CrmCampaigns = () => {
       field_type: "string",
       field_options: [],
       sort_order: 0,
+      is_required: false,
     });
   }, [newField, campaignFields]);
 
@@ -2199,6 +2203,7 @@ const CrmCampaigns = () => {
             field_type: "string",
             field_options: [],
             sort_order: 0,
+            is_required: false,
           });
         }}
         size="xl"
@@ -2336,6 +2341,14 @@ const CrmCampaigns = () => {
                       <option value="dropdown">Dropdown</option>
                     </Form.Select>
                   </Col>
+                  <Col md={2}>
+                    <Form.Check
+                      type="checkbox"
+                      label="Required"
+                      checked={newField.is_required}
+                      onChange={(e) => setNewField({...newField, is_required: e.target.checked})}
+                    />
+                  </Col>
                   <Col md={3}>
                     <Button variant="success" className="app-button" onClick={handleAddField}>
                       Add Field
@@ -2373,9 +2386,19 @@ const CrmCampaigns = () => {
                         <option value="dropdown">Dropdown</option>
                       </Form.Select>
                     </Col>
-                    
-                  
-                    <Col md={1}>
+                    <Col md={2}>
+                      <Form.Check
+                        type="checkbox"
+                        label="Required"
+                        checked={field.is_required || false}
+                        onChange={(e) => {
+                          const updatedFields = [...campaignFields];
+                          updatedFields[index].is_required = e.target.checked;
+                          setCampaignFields(updatedFields);
+                        }}
+                      />
+                    </Col>
+                    <Col md={3}>
                       <Button
                         variant="danger"
                         className="app-button"
@@ -2451,6 +2474,7 @@ const CrmCampaigns = () => {
                 field_type: "string",
                 field_options: [],
                 sort_order: 0,
+                is_required: false,
               });
             }}
           >
@@ -2806,6 +2830,7 @@ const CrmCampaigns = () => {
                         <tr>
                           <th>Field Name</th>
                           <th>Type</th>
+                          <th>Required</th>
                           <th>Options</th>
                         </tr>
                       </thead>
@@ -2815,6 +2840,13 @@ const CrmCampaigns = () => {
                             <td>{field.field_name}</td>
                             <td>
                               <Badge bg="primary" className="text-capitalize">{getFieldTypeText(field.field_type)}</Badge>
+                            </td>
+                            <td>
+                              {field.is_required ? (
+                                <Badge bg="danger">Required</Badge>
+                              ) : (
+                                <Badge bg="secondary">Optional</Badge>
+                              )}
                             </td>
                             <td>
                               {field.field_type === "dropdown" && field.field_options ? (

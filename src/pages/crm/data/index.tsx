@@ -474,11 +474,16 @@ const CrmProspectsManagement = () => {
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [selectedEntryForSchedule, setSelectedEntryForSchedule] =
     useState<any>(null);
+  const [isEditingSchedule, setIsEditingSchedule] = useState(false);
   const [scheduleData, setScheduleData] = useState({
     date: "",
     time: "",
     notes: "",
   });
+
+  // Unschedule confirmation modal state
+  const [showUnscheduleModal, setShowUnscheduleModal] = useState(false);
+  const [entryToUnschedule, setEntryToUnschedule] = useState<any>(null);
 
   // History modal state
   const [showHistoryModal, setShowHistoryModal] = useState(false);
@@ -1669,31 +1674,55 @@ const CrmProspectsManagement = () => {
   // Schedule/Unschedule call handlers
   const handleScheduleCall = useCallback((entry: any) => {
     setSelectedEntryForSchedule(entry);
-    setScheduleData({
-      date: "",
-      time: "",
-      notes: "",
-    });
+    
+    // Check if entry has a scheduled call - if yes, we're editing
+    if (entry.scheduled_call_at) {
+      setIsEditingSchedule(true);
+      const scheduledDate = moment(entry.scheduled_call_at);
+      setScheduleData({
+        date: scheduledDate.format("YYYY-MM-DD"),
+        time: scheduledDate.format("HH:mm"),
+        notes: entry.note || "",
+      });
+    } else {
+      setIsEditingSchedule(false);
+      setScheduleData({
+        date: "",
+        time: "",
+        notes: "",
+      });
+    }
     setShowScheduleModal(true);
   }, []);
 
-  const handleUnscheduleCall = useCallback(
-    async (entry: any) => {
+  const handleUnscheduleCallClick = useCallback((entry: any) => {
+    setEntryToUnschedule(entry);
+    setShowUnscheduleModal(true);
+  }, []);
+
+  const confirmUnscheduleCall = useCallback(
+    async () => {
+      if (!entryToUnschedule) return;
+
       try {
         const userExtension = (session?.user as any)?.extension || "default";
-        await unscheduleCall(entry.id, userExtension);
+        await unscheduleCall(entryToUnschedule.id, userExtension);
         setRefreshKey((prev) => prev + 1);
+        setShowUnscheduleModal(false);
+        setEntryToUnschedule(null);
+        toast.success("Call unscheduled successfully");
       } catch (error) {
         console.error("Failed to unschedule call:", error);
       }
     },
-    [session]
+    [entryToUnschedule, session]
   );
 
   // Schedule modal handlers
   const handleScheduleModalClose = useCallback(() => {
     setShowScheduleModal(false);
     setSelectedEntryForSchedule(null);
+    setIsEditingSchedule(false);
     setScheduleData({
       date: "",
       time: "",
@@ -1726,16 +1755,30 @@ const CrmProspectsManagement = () => {
       setRefreshKey((prev) => prev + 1);
       handleScheduleModalClose();
       setShowSuccessfulModal(true);
-      setSuccessModalTitle("Schedule Call Successful!");
-      setSuccessModalDescription("The call has been successfully scheduled.");
+      setSuccessModalTitle(
+        isEditingSchedule
+          ? "Call Schedule Updated!"
+          : "Schedule Call Successful!"
+      );
+      setSuccessModalDescription(
+        isEditingSchedule
+          ? "The call schedule has been successfully updated."
+          : "The call has been successfully scheduled."
+      );
     } catch (error) {
-      console.error("Failed to schedule call:", error);
+      console.error(
+        isEditingSchedule
+          ? "Failed to update scheduled call:"
+          : "Failed to schedule call:",
+        error
+      );
     }
   }, [
     scheduleData,
     selectedEntryForSchedule,
     handleScheduleModalClose,
     session,
+    isEditingSchedule,
   ]);
 
   const [clearSelectedRows, setClearSelectedRows] = useState(false);
@@ -2017,26 +2060,35 @@ const CrmProspectsManagement = () => {
                 <FiMoreVertical size={14} />
               </Dropdown.Toggle>
               <Dropdown.Menu>
-                {session?.user?.permissions?.includes(
-                  "call-service-crm-data-management"
-                )  && (
-                  <>
-                    {props.scheduled_call_at ? (
-                      <Dropdown.Item
-                        onClick={() => handleUnscheduleCall(props)}
-                      >
-                        <FiX size={14} className="me-2" />
-                        Unschedule Call
-                      </Dropdown.Item>
-                    ) : (
-                      <Dropdown.Item onClick={() => handleScheduleCall(props)}>
-                        <FiCalendar size={14} className="me-2" />
-                        Schedule Call
-                      </Dropdown.Item>
+                    {session?.user?.permissions?.includes(
+                      "call-service-crm-data-management"
+                    )  && (
+                      <>
+                        {props.scheduled_call_at ? (
+                          <>
+                            <Dropdown.Item
+                              onClick={() => handleScheduleCall(props)}
+                            >
+                              <FiCalendar size={14} className="me-2" />
+                              Edit Scheduled Call
+                            </Dropdown.Item>
+                            <Dropdown.Item
+                              onClick={() => handleUnscheduleCallClick(props)}
+                              className="text-danger"
+                            >
+                              <FiX size={14} className="me-2" />
+                              Unschedule Call
+                            </Dropdown.Item>
+                          </>
+                        ) : (
+                          <Dropdown.Item onClick={() => handleScheduleCall(props)}>
+                            <FiCalendar size={14} className="me-2" />
+                            Schedule Call
+                          </Dropdown.Item>
+                        )}
+                        <Dropdown.Divider />
+                      </>
                     )}
-                    <Dropdown.Divider />
-                  </>
-                )}
                 <Dropdown.Item
                   onClick={() => {
                     window.location.href = `/crm/leads/create?crm_data_id=${props.id}`;
@@ -2099,7 +2151,7 @@ const CrmProspectsManagement = () => {
       availableCampaigns,
       callEndReasons,
       handleScheduleCall,
-      handleUnscheduleCall,
+      handleUnscheduleCallClick,
     ]
   );
 
@@ -3281,17 +3333,31 @@ const CrmProspectsManagement = () => {
                                         ) && (
                                           <>
                                             {(item as any).scheduled_call_at ? (
-                                              <Dropdown.Item
-                                                onClick={() =>
-                                                  handleUnscheduleCall(item)
-                                                }
-                                              >
-                                                <FiX
-                                                  size={14}
-                                                  className="me-2"
-                                                />
-                                                Unschedule Call
-                                              </Dropdown.Item>
+                                              <>
+                                                <Dropdown.Item
+                                                  onClick={() =>
+                                                    handleScheduleCall(item)
+                                                  }
+                                                >
+                                                  <FiCalendar
+                                                    size={14}
+                                                    className="me-2"
+                                                  />
+                                                  Edit Scheduled Call
+                                                </Dropdown.Item>
+                                                <Dropdown.Item
+                                                  onClick={() =>
+                                                    handleUnscheduleCallClick(item)
+                                                  }
+                                                  className="text-danger"
+                                                >
+                                                  <FiX
+                                                    size={14}
+                                                    className="me-2"
+                                                  />
+                                                  Unschedule Call
+                                                </Dropdown.Item>
+                                              </>
                                             ) : (
                                               <Dropdown.Item
                                                 onClick={() =>
@@ -4658,8 +4724,12 @@ const CrmProspectsManagement = () => {
       <FormModal
         show={showScheduleModal}
         onHide={() => setShowScheduleModal(false)}
-        title="Schedule Call"
-        desc="Please fill the details below to schedule a call."
+        title={isEditingSchedule ? "Edit Scheduled Call" : "Schedule Call"}
+        desc={
+          isEditingSchedule
+            ? "Please update the details below to modify the scheduled call."
+            : "Please fill the details below to schedule a call."
+        }
         size="lg"
         formHtml={
           <>
@@ -4730,11 +4800,77 @@ const CrmProspectsManagement = () => {
             </Alert>
           </>
         }
-        submitButtonText="Schedule Call"
+        submitButtonText={isEditingSchedule ? "Update Schedule" : "Schedule Call"}
         cancelButtonText="Cancel"
         onSubmit={() => handleScheduleSubmit()}
         onCancel={() => handleScheduleModalClose()}
       />
+
+      {/* Unschedule Confirmation Modal */}
+      <Modal
+        show={showUnscheduleModal}
+        onHide={() => {
+          setShowUnscheduleModal(false);
+          setEntryToUnschedule(null);
+        }}
+        centered
+      >
+        <Modal.Header closeButton className="border-bottom">
+          <Modal.Title>Confirm Unschedule</Modal.Title>
+        </Modal.Header>
+        <Modal.Body className="p-4">
+          <div className="text-center">
+            <AlertCircleIcon size={48} className="text-warning mb-3" />
+            <p className="mb-0">
+              Are you sure you want to unschedule the call for{" "}
+              <strong>
+                {entryToUnschedule
+                  ? entryToUnschedule.name ||
+                    `prospect #${entryToUnschedule.id}`
+                  : "this prospect"}
+              </strong>
+              ?
+            </p>
+            <p className="text-muted small mb-3">
+              This action cannot be undone.
+            </p>
+
+            {entryToUnschedule && entryToUnschedule.scheduled_call_at && (
+              <div className="alert alert-warning mb-3 text-start">
+                <strong>Prospect:</strong>{" "}
+                {entryToUnschedule.name || `#${entryToUnschedule.id}`}
+                <br />
+                <strong>Phone:</strong> {entryToUnschedule.phone || "N/A"}
+                <br />
+                <strong>Scheduled Date:</strong>{" "}
+                {moment(entryToUnschedule.scheduled_call_at).format(
+                  "MMM DD, YYYY HH:mm"
+                )}
+                {entryToUnschedule.note && (
+                  <>
+                    <br />
+                    <strong>Note:</strong> {entryToUnschedule.note}
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        </Modal.Body>
+        <Modal.Footer className="border-top">
+          <Button
+            variant="secondary"
+            onClick={() => {
+              setShowUnscheduleModal(false);
+              setEntryToUnschedule(null);
+            }}
+          >
+            Cancel
+          </Button>
+          <Button variant="warning" onClick={confirmUnscheduleCall}>
+            Unschedule
+          </Button>
+        </Modal.Footer>
+      </Modal>
 
       <FormModal
         show={showHistoryModal}
