@@ -40,6 +40,7 @@ declare module 'next-auth' {
       email?: string | null;
       username?: string | null;
       is_admin?: string | null;
+      login_as?: string | null;
       phone?: string | null;
       role?: string | null;
       permissions?: string[];
@@ -73,6 +74,7 @@ declare module 'next-auth' {
     username?: string | null;
     role?: string | null;
     is_admin?: string | null;
+    login_as?: string | null;
     phone?: string | null;
     permissions?: string[];
     access_token?: string;
@@ -152,6 +154,7 @@ export const authOptions: NextAuthOptions = {
             role: jsonData.data?.role,
             phone: jsonData.data?.phone,
             is_admin: jsonData.data?.is_admin || null,
+            login_as: jsonData.data?.login_as || null,
             permissions: jsonData.data?.permissions || [],
             token: {
               access_token: jsonData.data?.token?.access_token,
@@ -196,6 +199,7 @@ export const authOptions: NextAuthOptions = {
         token.email = user.email;
         token.username = user.username;
         token.is_admin = user.is_admin;
+        token.login_as = user.login_as;
         token.phone = user.phone;
         token.role = user.role;
         token.permissions = user.permissions;
@@ -221,6 +225,7 @@ export const authOptions: NextAuthOptions = {
         session.user.username = token.username as string | null;
         session.user.role = token.role as string | null;
         session.user.is_admin = token.is_admin as string | null;
+        session.user.login_as = token.login_as as string | null;
         session.user.phone = token.phone as string | null;
         session.user.permissions = token.permissions as string[];
         session.user.access_token = token.access_token as string | undefined;

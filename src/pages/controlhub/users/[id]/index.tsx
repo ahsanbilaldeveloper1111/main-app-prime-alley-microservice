@@ -217,7 +217,7 @@ const UserView = () => {
                             </Tab>
                         )}
 
-                        {session?.user?.is_admin && (session?.user?.permissions?.includes('link-users') || session?.user?.permissions?.includes('unlink-users')) && (
+                        {/* {session?.user?.is_admin && (session?.user?.permissions?.includes('link-users') || session?.user?.permissions?.includes('unlink-users')) && (
                             <Tab eventKey="linked-users" title="Linked Users">
                                 <LinkedUsersTab
                                     linkedUsers={linkedUsers}
@@ -229,7 +229,7 @@ const UserView = () => {
                                     onSuccess={handleSuccess}
                                 />
                             </Tab>
-                        )}
+                        )} */}
 
                         {session?.user?.is_admin && (session?.user?.permissions?.includes('custom-field-users') || session?.user?.permissions?.includes('add-custom-field-users') || session?.user?.permissions?.includes('edit-custom-field-users') || session?.user?.permissions?.includes('delete-custom-field-users') || session?.user?.permissions?.includes('update-custom-field-users')) && (
                             <Tab eventKey="custom-fields-users" title="Custom Fields">
@@ -243,7 +243,7 @@ const UserView = () => {
                             </Tab>
                         )}
 
-                        {(session?.user?.permissions?.includes('company-link-users') || session?.user?.permissions?.includes('company-unlink-users')) && (
+                        {/* {(session?.user?.permissions?.includes('company-link-users') || session?.user?.permissions?.includes('company-unlink-users')) && (
                             <Tab eventKey="linked-companies" title="Linked Companies">
                                 <LinkedCompaniesTab
                                     linkedCompanies={linkedCompanies}
@@ -255,7 +255,7 @@ const UserView = () => {
                                     onSuccess={handleSuccess}
                                 />
                             </Tab>
-                        )}
+                        )} */}
                     </Tabs>
                 </Col>
             </Row>

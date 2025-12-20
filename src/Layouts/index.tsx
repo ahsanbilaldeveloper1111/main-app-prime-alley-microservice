@@ -3,20 +3,30 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import Footer from '@components/Footer';
 import ApplicationSidebar from './Moduler/AppSidebar';
+import ApplicationCustomerSidebar from './Moduler/AppCustomerSidebar';
 import { useSession, signOut } from "next-auth/react";
 import { useNotifications } from '../contexts/NotificationContext';
+import { HEADER_CONSTANTS} from "@constants/headerConstants";
 
 import CompanyLogo2 from "@assets/images/Prime3.png";
 import { 
 	Bell, ChevronLeft, ChevronRight, Users, LogOut,
 	User, X, CheckCheck, Plus, Pencil, Trash2,
-  Eye
+  Eye,
+  Settings,
+  Phone,
+  Link,
+  PhoneCall,
+  PhoneCallIcon,
+  Box
     } from 'lucide-react';
 import { Badge, Button, Dropdown } from 'react-bootstrap';
 
 interface LayoutProps {
 	children: ReactNode;
 }
+
+const { MENU_LABELS, ICONS, PERMISSIONS, MENU_COLORS,BASE_URL } = HEADER_CONSTANTS;
 
 const Layout = ({ children }: LayoutProps) => {
 
@@ -161,6 +171,11 @@ const Layout = ({ children }: LayoutProps) => {
 			<img src={CompanyLogo2.src} alt="logo" className="img-fluid header-logo" /></a>
           </div>
           <div className="ms-auto d-flex align-items-center gap-3">
+
+          {session?.user?.permissions?.includes(PERMISSIONS.DIAL_CALL_CTI) && (
+            <PhoneCall size={18} className="text-primary" onClick={() => router.push('/cti/dialer')} />
+          )}
+
           <Dropdown align="end" show={showNotificationDropdown} onToggle={(isOpen) => setShowNotificationDropdown(isOpen)}>
               <Dropdown.Toggle 
                 variant="link" 
@@ -449,13 +464,25 @@ const Layout = ({ children }: LayoutProps) => {
                 </div>
               </Dropdown.Toggle>
               <Dropdown.Menu align="end">
-				<Dropdown.Item 
+				
+        <Dropdown.Item 
 				href="/profile"
 				className="d-flex align-items-center gap-2 text-secondary"
 				>
 					<User size={16} />
 					Profile
 				</Dropdown.Item>
+
+        {session?.user?.permissions?.includes(PERMISSIONS.VIEW_CRM_TASKS) && (
+          <Dropdown.Item 
+            href="/crm/tasks"
+            className="d-flex align-items-center gap-2 text-secondary"
+          >
+            <Settings size={16} />
+            Task Manager
+          </Dropdown.Item>
+        )}
+
                 <Dropdown.Item 
                   onClick={() => signOut({ 
                     callbackUrl: '/auth/signin',
@@ -474,12 +501,18 @@ const Layout = ({ children }: LayoutProps) => {
 		
 		<div className="d-flex flex-grow-1" style={{ position: 'relative', marginTop:'85px' }}>
 
+          {session?.user?.login_as === 'customer' ? (
+            <ApplicationCustomerSidebar
+              sidebarOpen={sidebarOpen}
+              setSidebarOpen={setSidebarOpen}
+            />
+          ) : (
+            <ApplicationSidebar
+              sidebarOpen={sidebarOpen}
+              setSidebarOpen={setSidebarOpen}
+            />
+          )}
 
-			<ApplicationSidebar
-				sidebarOpen={sidebarOpen}
-				setSidebarOpen={setSidebarOpen}
-				
-			/>
 				<div className={`flex-grow-1 p-4 main-content-wrapper ${sidebarOpen ? 'sidebar-open' : 'sidebar-closed'}`} style={{ 
 				overflowY: 'auto',
 				width: '100%'

@@ -13,6 +13,7 @@ export const routePermissions: RoutePermission[] = [
     
     //profile services start
     {path: '/profile',permissions: ['']},
+    {path: '/settings',permissions: ['']},
     {path: '/coming-soon',permissions: ['']},
     {path: '/plan-upgrade',permissions: ['']},
     {path: '/live-calls-test',permissions: ['']},
@@ -23,6 +24,9 @@ export const routePermissions: RoutePermission[] = [
     {path: '/resources/faq',permissions: ['']},
     {path: '/resources/help-materials',permissions: ['']},
     {path: '/resources/contact-support',permissions: ['']},
+    {path:'/manager-dashboard',permissions: ['']},
+    {path:'/unified-workspace',permissions: ['']},
+    {path:'/help-center',permissions: ['']},
 
     {
         path: '/dashboards',

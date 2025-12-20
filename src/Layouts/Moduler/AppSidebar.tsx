@@ -170,13 +170,13 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
           permission: PERMISSIONS.VIEW_CRM_PRODUCTS,
           url: '/crm/products'
         },
-        {
-          id: 'crm-tasks',
-          title: HEADER_CONSTANTS.SUBMENU_LABELS.TASKS,
-          icon: <BarChart3 size={16} />,
-          permission: PERMISSIONS.VIEW_CRM_TASKS,
-          url: '/crm/tasks'
-        },
+        // {
+        //   id: 'crm-tasks',
+        //   title: HEADER_CONSTANTS.SUBMENU_LABELS.TASKS,
+        //   icon: <BarChart3 size={16} />,
+        //   permission: PERMISSIONS.VIEW_CRM_TASKS,
+        //   url: '/crm/tasks'
+        // },
         {
           id: 'crm-stages',
           title: HEADER_CONSTANTS.SUBMENU_LABELS.STAGES,
@@ -194,7 +194,7 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
         },
         {
           id: 'crm-history',
-          title: 'History',
+          title: 'Activity Tracker',
           icon: <History size={16} />,
           permission: PERMISSIONS.VIEW_CRM_HISTORY,
           url: '/crm/history'

@@ -23,11 +23,11 @@ export const HEADER_CONSTANTS = {
   MENU_LABELS: {
     DASHBOARD: 'Dashboard',
     CONTROL_HUB: 'Control Hub',
-    RESOURCES: 'Resources',
+    RESOURCES: 'Help Center',
     HELP_MATERIALS: 'Help Materials',
     FAQ: 'FAQ',
     CONTACT_SUPPORT: 'Contact Support',
-    SIM_GATEWAY: 'Telco Gateway',
+    SIM_GATEWAY: 'Carrier Gateway',
 
     CALL_DASHBOARD: 'Call Dashboard',
     CALL_LOGS: 'Call Logs',
@@ -41,8 +41,9 @@ export const HEADER_CONSTANTS = {
     AUTOMATION: 'Automation',
     CRM: 'CRM',
     DNCR: 'DNCR',
+    COMPLIANCES: 'Compliance',
 
-    BILLING: 'Billing',
+    BILLING: 'Billing & Payments',
     INVOICES_BILLING: 'Invoices',
     EXPENSES_BILLING: 'Expenses',
     PRODUCTS_BILLING: 'Products',
@@ -53,7 +54,7 @@ export const HEADER_CONSTANTS = {
     SUPPLIERS_BILLING: 'Suppliers',
     PRODUCT_PRICING_BILLING: 'Product Pricing',
 
-    NETOPS: 'NetOps',
+    NETOPS: 'Device Insights',
     SALES: 'Sales',
     WEB_RTC: 'Web RTC',
     OMNI_CHANNEL: 'Omni Channel',
@@ -96,8 +97,8 @@ MENU_COLORS: {
     GSM_DASHBOARD: 'Dashboard',
     GSM_LIST: 'Telco Gateway List',
     COMPANY_ASSIGN: 'Assign',
-    PORTS: 'Ports',
-    INBOX: 'Inbox',
+    PORTS: 'SIM Ports',
+    INBOX: 'Messages Inbox',
     SYNC_GSM: 'Sync GSM',
     COMPANY_PO: 'Company Profiling',
     
@@ -126,6 +127,7 @@ MENU_COLORS: {
     
     // DNCR
     CHECK_NUMBER: 'Check Number',
+    DNCR: 'DNCR',
     
     // Tickets
     TICKETS_DASHBOARD: 'Dashboard',
@@ -196,8 +198,8 @@ MENU_COLORS: {
     // NetOps
     NETOPS_DASHBOARD: 'Dashboard',
     NETOPS_DEVICES: 'Devices',
-    NETOPS_SERVICES: 'Services',
-    NETOPS_ALERTS: 'Alerts',
+    NETOPS_SERVICES: 'Service status',
+    NETOPS_ALERTS: 'Alerts and Notifications',
     NETOPS_UPTIME_SLA: 'Uptime & SLA Monitoring',
 
     // Resources
