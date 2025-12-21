@@ -424,7 +424,7 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
               </li>
 
               <li className="profile-menu-item">
-                <button className="profile-menu-button">
+                <button className="profile-menu-button" >
                   <div className="profile-menu-content">
                     <div className="profile-menu-icon">
                       <Calendar size={20} />
@@ -449,7 +449,7 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
               </li>
 
               <li className="profile-menu-item">
-                <button className="profile-menu-button">
+                <button className="profile-menu-button" onClick={() => router.push('/dashboard')} >
                   <div className="profile-menu-content">
                     <div className="profile-menu-icon">
                       <Download size={20} />
@@ -512,7 +512,7 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
             {/* Section 4 */}
             <div className="profile-menu-section">
               <li className="profile-menu-item">
-                <button className="profile-menu-button">
+                <button className="profile-menu-button" onClick={() => router.push('/profile')} >
                   <div className="profile-menu-content">
                     <div className="profile-menu-icon">
                       <User size={20} />
@@ -546,7 +546,9 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
               </li>
 
               <li className="profile-menu-item">
-                <button className="profile-menu-button">
+                <button className="profile-menu-button"
+                  onClick={() => router.push('/settings')}
+                >
                   <div className="profile-menu-content">
                     <div className="profile-menu-icon">
                       <Settings size={20} />
@@ -571,7 +573,9 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
               </li>
 
               <li className="profile-menu-item">
-                <button className="profile-menu-button">
+                <button className="profile-menu-button"
+                  onClick={() => signOut({ callbackUrl: '/auth/signin',redirect: true })}
+                >
                   <div className="profile-menu-content">
                     <div className="profile-menu-icon">
                       <LogOut size={20} />
