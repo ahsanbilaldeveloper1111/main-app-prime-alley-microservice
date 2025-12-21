@@ -27,6 +27,7 @@ export const routePermissions: RoutePermission[] = [
     {path:'/manager-dashboard',permissions: ['']},
     {path:'/unified-workspace',permissions: ['']},
     {path:'/help-center',permissions: ['']},
+    {path:'/live-call-updated',permissions: ['']},
 
     {
         path: '/dashboards',

@@ -1,22 +1,11 @@
-import "@assets/scss/datatable-style.scss";
-import React, {
-  ReactElement,
-} from "react";
-import Layout from "@layout/index";
-import BreadcrumbItem from "@common/BreadcrumbItem";
-import GenericListPage from "@components/GenericListPage";
-
-import "@assets/scss/common.scss";
-import "@assets/scss/tabs.scss";
-import PageHeader from "@components/PageHeader";
-
-
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Container, Row, Col, Card, Badge, Button, Form, InputGroup } from 'react-bootstrap';
-import { Eye, Phone, CheckCircle, AlertCircle, PhoneCall, Maximize2, ExternalLink, Volume2, Mic, Users, Headset, User, Bell, ChevronLeft, ChevronRight, Menu, Search, Filter, ChevronDown, ChevronUp, UserCheck, Clock, Timer, UserX, PhoneIncoming, Hourglass } from 'lucide-react';
+import { Eye, Phone, CheckCircle, AlertCircle, Maximize2, ExternalLink, Volume2, Mic, Users, Headset, User, Bell, ChevronLeft, ChevronRight, Menu, Search, Filter, ChevronDown, ChevronUp, UserCheck, Clock, Timer, UserX, PhoneIncoming, Hourglass } from 'lucide-react';
+import ModernSidebar from '@components/custom-sidebar';
+import ProfileSidebar from '@components/profile-sidebar';
+import CompanyLogo2 from "@assets/images/ringedge-logo-black-n-blue.png";
 
-
-// import 'bootstrap/dist/css/bootstrap.min.css';
+import 'bootstrap/dist/css/bootstrap.min.css';
 
 // Type definitions
 interface Agent {
@@ -71,540 +60,539 @@ interface Agent {
     ]
   };
 
-const LiveCallNew = () => {
-      const [fullscreen, setFullscreen] = useState(false);
-      const [sidebarOpen, setSidebarOpen] = useState<boolean>(typeof window !== 'undefined' && window.innerWidth >= 1200);
-      const [activeScreen, setActiveScreen] = useState<string>('live-view');
-      const contentWrapperRef = React.useRef<HTMLDivElement>(null);
-      
-      // Filter and sort states
-      const [searchQuery, setSearchQuery] = useState('');
-      const [selectedTeam, setSelectedTeam] = useState('all');
-      const [selectedStatus, setSelectedStatus] = useState('all');
-      const [sortBy, setSortBy] = useState('none');
-      
-      // Applied filters (only update on button click)
-      const [appliedSearch, setAppliedSearch] = useState('');
-      const [appliedTeam, setAppliedTeam] = useState('all');
-      const [appliedStatus, setAppliedStatus] = useState('all');
-      const [appliedSort, setAppliedSort] = useState('none');
-      
-      // Collapsible sections state
-      const [collapsedSections, setCollapsedSections] = useState<{ [key: string]: boolean }>({
-        supervision: false,
-        onCall: false,
-        activeIdle: false,
-        downOffline: false
+const LiveViewPage = () => {
+  const [fullscreen, setFullscreen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState<boolean>(typeof window !== 'undefined' && window.innerWidth >= 1200);
+  const [activeScreen, setActiveScreen] = useState<string>('live-view');
+  const [showProfileSidebar, setShowProfileSidebar] = useState(false);
+  const contentWrapperRef = React.useRef<HTMLDivElement>(null);
+  
+  // Filter and sort states
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedTeam, setSelectedTeam] = useState('all');
+  const [selectedStatus, setSelectedStatus] = useState('all');
+  const [sortBy, setSortBy] = useState('none');
+  
+  // Applied filters (only update on button click)
+  const [appliedSearch, setAppliedSearch] = useState('');
+  const [appliedTeam, setAppliedTeam] = useState('all');
+  const [appliedStatus, setAppliedStatus] = useState('all');
+  const [appliedSort, setAppliedSort] = useState('none');
+  
+  // Collapsible sections state
+  const [collapsedSections, setCollapsedSections] = useState<{ [key: string]: boolean }>({
+    supervision: false,
+    onCall: false,
+    activeIdle: false,
+    downOffline: false
+  });
+  
+  const toggleSection = (section: string) => {
+    setCollapsedSections(prev => ({
+      ...prev,
+      [section]: !prev[section]
+    }));
+  };
+  
+  const expandAll = () => {
+    setCollapsedSections({
+      supervision: false,
+      onCall: false,
+      activeIdle: false,
+      downOffline: false
+    });
+  };
+  
+  const collapseAll = () => {
+    setCollapsedSections({
+      supervision: true,
+      onCall: true,
+      activeIdle: true,
+      downOffline: true
+    });
+  };
+  
+  // Apply filters function
+  const applyFilters = () => {
+    setAppliedSearch(searchQuery);
+    setAppliedTeam(selectedTeam);
+    setAppliedStatus(selectedStatus);
+    setAppliedSort(sortBy);
+  };
+  
+  // Clear filters function
+  const clearFilters = () => {
+    setSearchQuery('');
+    setSelectedTeam('all');
+    setSelectedStatus('all');
+    setSortBy('none');
+    setAppliedSearch('');
+    setAppliedTeam('all');
+    setAppliedStatus('all');
+    setAppliedSort('none');
+  };
+  
+  // Filter and sort function
+  const filterAndSortAgents = (agents: Agent[]) => {
+    let filtered = [...agents];
+    
+    // Apply search filter
+    if (appliedSearch) {
+      filtered = filtered.filter(agent => 
+        agent.name.toLowerCase().includes(appliedSearch.toLowerCase()) ||
+        agent.extension.includes(appliedSearch)
+      );
+    }
+    
+    // Apply status filter
+    if (appliedStatus !== 'all') {
+      const statusMap: { [key: string]: string } = {
+        'supervision': 'Live Coaching',
+        'oncall': 'Live Calls',
+        'active': 'Available & Idle',
+        'offline': 'Offline'
+      };
+      filtered = filtered.filter(agent => agent.status === statusMap[appliedStatus]);
+    }
+    
+    // Apply sort
+    if (appliedSort !== 'none' && filtered.some(a => a.duration)) {
+      filtered.sort((a, b) => {
+        const durationA = a.duration || '00:00:00';
+        const durationB = b.duration || '00:00:00';
+        const [hA, mA, sA] = durationA.split(':').map(Number);
+        const [hB, mB, sB] = durationB.split(':').map(Number);
+        const totalA = hA * 3600 + mA * 60 + sA;
+        const totalB = hB * 3600 + mB * 60 + sB;
+        return appliedSort === 'longest' ? totalB - totalA : totalA - totalB;
       });
-      
-      const toggleSection = (section: string) => {
-        setCollapsedSections(prev => ({
-          ...prev,
-          [section]: !prev[section]
-        }));
-      };
-      
-      const expandAll = () => {
-        setCollapsedSections({
-          supervision: false,
-          onCall: false,
-          activeIdle: false,
-          downOffline: false
-        });
-      };
-      
-      const collapseAll = () => {
-        setCollapsedSections({
-          supervision: true,
-          onCall: true,
-          activeIdle: true,
-          downOffline: true
-        });
-      };
-      
-      // Apply filters function
-      const applyFilters = () => {
-        setAppliedSearch(searchQuery);
-        setAppliedTeam(selectedTeam);
-        setAppliedStatus(selectedStatus);
-        setAppliedSort(sortBy);
-      };
-      
-      // Clear filters function
-      const clearFilters = () => {
-        setSearchQuery('');
-        setSelectedTeam('all');
-        setSelectedStatus('all');
-        setSortBy('none');
-        setAppliedSearch('');
-        setAppliedTeam('all');
-        setAppliedStatus('all');
-        setAppliedSort('none');
-      };
-      
-      // Filter and sort function
-      const filterAndSortAgents = (agents: Agent[]) => {
-        let filtered = [...agents];
-        
-        // Apply search filter
-        if (appliedSearch) {
-          filtered = filtered.filter(agent => 
-            agent.name.toLowerCase().includes(appliedSearch.toLowerCase()) ||
-            agent.extension.includes(appliedSearch)
-          );
-        }
-        
-        // Apply status filter
-        if (appliedStatus !== 'all') {
-          const statusMap: { [key: string]: string } = {
-            'supervision': 'Live Coaching',
-            'oncall': 'Live Calls',
-            'active': 'Available & Idle',
-            'offline': 'Offline'
-          };
-          filtered = filtered.filter(agent => agent.status === statusMap[appliedStatus]);
-        }
-        
-        // Apply sort
-        if (appliedSort !== 'none' && filtered.some(a => a.duration)) {
-          filtered.sort((a, b) => {
-            const durationA = a.duration || '00:00:00';
-            const durationB = b.duration || '00:00:00';
-            const [hA, mA, sA] = durationA.split(':').map(Number);
-            const [hB, mB, sB] = durationB.split(':').map(Number);
-            const totalA = hA * 3600 + mA * 60 + sA;
-            const totalB = hB * 3600 + mB * 60 + sB;
-            return appliedSort === 'longest' ? totalB - totalA : totalA - totalB;
-          });
-        }
-        
-        return filtered;
-      };
+    }
     
-      // Handle fullscreen mode
-      useEffect(() => {
-        const handleFullscreenChange = () => {
-          setFullscreen(!!document.fullscreenElement);
+    return filtered;
+  };
+
+  // Handle fullscreen mode
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setFullscreen(!!document.fullscreenElement);
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
+
+  const toggleFullscreen = async () => {
+    try {
+      if (!document.fullscreenElement) {
+        // Enter fullscreen
+        await contentWrapperRef.current?.requestFullscreen();
+      } else {
+        // Exit fullscreen
+        await document.exitFullscreen();
+      }
+    } catch (error) {
+      console.error('Error toggling fullscreen:', error);
+    }
+  };
+
+  // Handle window resize to manage sidebar state
+  useEffect(() => {
+    const handleResize = () => {
+      const width = window.innerWidth;
+      if (width >= 1200) {
+        setSidebarOpen(true);
+      } else {
+        setSidebarOpen(false);
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    handleResize();
+
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // ...existing code...
+
+ // ...existing code...
+
+ const renderAgentCard = (agent: Agent, showCallControls: boolean = false) => {
+    // Determine card border based on status - Consistent color scheme
+    // Green = Active/Connected, Amber = Idle/Wrap-up/Ringing, Red = Offline/Disconnected, Grey = Unknown
+    const getCardStyle = () => {
+      if (agent.status === 'Live Coaching') {
+        return {
+          borderLeft: '4px solid #f59e0b' // Amber for monitoring
         };
-    
-        document.addEventListener('fullscreenchange', handleFullscreenChange);
-        return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
-      }, []);
-    
-      const toggleFullscreen = async () => {
-        try {
-          if (!document.fullscreenElement) {
-            // Enter fullscreen
-            await contentWrapperRef.current?.requestFullscreen();
-          } else {
-            // Exit fullscreen
-            await document.exitFullscreen();
-          }
-        } catch (error) {
-          console.error('Error toggling fullscreen:', error);
-        }
-      };
-    
-      // Handle window resize to manage sidebar state
-      useEffect(() => {
-        const handleResize = () => {
-          const width = window.innerWidth;
-          if (width >= 1200) {
-            setSidebarOpen(true);
-          } else {
-            setSidebarOpen(false);
-          }
+      } else if (agent.status === 'Live Calls') {
+        return {
+          borderLeft: '4px solid #22c55e' // Green for active calls
         };
-    
-        window.addEventListener('resize', handleResize);
-        handleResize();
-    
-        return () => window.removeEventListener('resize', handleResize);
-      }, []);
-    
-      // ...existing code...
-    
-     // ...existing code...
-    
-     const renderAgentCard = (agent: Agent, showCallControls: boolean = false) => {
-        // Determine card border based on status - Consistent color scheme
-        // Green = Active/Connected, Amber = Idle/Wrap-up/Ringing, Red = Offline/Disconnected, Grey = Unknown
-        const getCardStyle = () => {
-          if (agent.status === 'Live Coaching') {
-            return {
-              borderLeft: '4px solid #f59e0b' // Amber for monitoring
-            };
-          } else if (agent.status === 'Live Calls') {
-            return {
-              borderLeft: '4px solid #22c55e' // Green for active calls
-            };
-          } else if (agent.status === 'Available & Idle') {
-            // Green for active, Amber for idle
-            return {
-              borderLeft: agent.agentStatus === 'active' ? '4px solid #22c55e' : '4px solid #f59e0b'
-            };
-          } else if (agent.status === 'Offline') {
-            return {
-              borderLeft: '4px solid #ef4444' // Red for offline/disconnected
-            };
-          } else {
-            return {
-              borderLeft: '4px solid #94a3b8' // Grey for unknown
-            };
-          }
+      } else if (agent.status === 'Available & Idle') {
+        // Green for active, Amber for idle
+        return {
+          borderLeft: agent.agentStatus === 'active' ? '4px solid #22c55e' : '4px solid #f59e0b'
         };
-    
-        const cardStyle = getCardStyle();
-    
-        return (
-          <Col key={agent.id} xs={12} sm={6} md={4} lg={3} xl={2} className="mb-3">
-            <Card 
-              className="shadow-sm border-0" 
-              style={{ 
-                borderRadius: '8px',
-                ...cardStyle,
-                transition: 'transform 0.2s ease, box-shadow 0.2s ease'
-              }}
-            >
-              <Card.Body className="p-2 d-flex flex-column">
-                {/* User Avatar and Status */}
-                <div className="d-flex align-items-center justify-content-between mb-2">
-                  <div className="d-flex align-items-center flex-grow-1" style={{ minWidth: 0 }}>
-                    <div 
-                      className="position-relative me-2" 
-                      style={{ 
-                        width: '36px', 
-                        height: '36px', 
-                        minWidth: '36px'
-                      }}
-                    >
-                      <img 
-                        src={"https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRqY-XfJc1xS05PNGE0khicaIyUILD73E2MLw&s"} 
-                        alt={agent.name}
-                        className="rounded-circle"
-                        style={{
-                          width: '100%',
-                          height: '100%',
-                          objectFit: 'cover',
-                          border: '2px solid #e5e7eb'
-                        }}
-                      />
-                      {/* Green dot indicator for Live Calls agents (Active/Connected) */}
-                      {agent.status === 'Live Calls' && (
-                        <span 
-                          className="position-absolute rounded-circle" 
-                          style={{ 
-                            width: '10px', 
-                            height: '10px',
-                            backgroundColor: '#22c55e',
-                            top: '-2px',
-                            right: '-2px',
-                            border: '2px solid white',
-                            boxShadow: '0 0 8px rgba(34, 197, 94, 0.6)',
-                            animation: 'pulse 2s infinite'
-                          }}
-                        />
-                      )}
-                    </div>
-                    <div className="flex-grow-1" style={{ minWidth: 0 }}>
-                      <h6 className="mb-0 fw-semibold text-truncate" style={{ fontSize: 'clamp(0.875rem, 1.5vw, 0.95rem)', color: '#1f2937' }}>
-                        {agent.name}
-                      </h6>
-                    </div>
-                  </div>
-                  
-                  {/* Supervision Badge - For Live Coaching agents */}
-                  {agent.status === 'Live Coaching' && agent.supervisionType && (
-                    <div 
-                      className="d-flex align-items-center gap-1 px-2 py-1 rounded" 
-                      style={{ 
-                        fontSize: '0.6rem', 
-                        fontWeight: '600',
-                        backgroundColor: agent.supervisionType === 'silent-monitor' ? '#dbeafe' : 
-                                         agent.supervisionType === 'whisper' ? '#e9d5ff' : '#fed7aa',
-                        color: agent.supervisionType === 'silent-monitor' ? '#1e40af' : 
-                               agent.supervisionType === 'whisper' ? '#6b21a8' : '#9a3412',
-                        border: `1px solid ${agent.supervisionType === 'silent-monitor' ? '#bfdbfe' : 
-                                agent.supervisionType === 'whisper' ? '#d8b4fe' : '#fdba74'}`,
-                        whiteSpace: 'nowrap',
-                        marginLeft: '8px',
-                        textTransform: 'uppercase'
-                      }}
-                    >
-                      {agent.supervisionType === 'silent-monitor' ? <Eye size={10} /> : 
-                       agent.supervisionType === 'whisper' ? <Mic size={10} /> : <Volume2 size={10} />}
-                      <span>{agent.supervisionType === 'silent-monitor' ? 'Monitor' : 
-                             agent.supervisionType === 'whisper' ? 'Whisper' : 'Barge'}</span>
-                    </div>
-                  )}
-    
-                  {/* Agent Status Badge - For Available & Idle agents */}
-                  {/* Green = Active, Amber = Idle */}
-                  {agent.status === 'Available & Idle' && agent.agentStatus && (
-                    <div 
-                      className="d-flex align-items-center gap-1 px-2 py-1 rounded" 
-                      style={{ 
-                        fontSize: '0.6rem', 
-                        fontWeight: '600',
-                        backgroundColor: agent.agentStatus === 'active' ? '#dcfce7' : '#fef3c7',
-                        color: agent.agentStatus === 'active' ? '#166534' : '#92400e',
-                        border: `1px solid ${agent.agentStatus === 'active' ? '#bbf7d0' : '#fde68a'}`,
-                        whiteSpace: 'nowrap',
-                        marginLeft: '8px'
-                      }}
-                    >
-                      {agent.agentStatus === 'active' ? <CheckCircle size={10} /> : <AlertCircle size={10} />}
-                      <span style={{ textTransform: 'capitalize' }}>{agent.agentStatus}</span>
-                    </div>
-                  )}
-    
-                  {/* Call Status Badge - For Live Calls agents */}
-                  {/* Green = CONNECTED (Active), Amber = OUTGOING (Ringing) */}
-                  {showCallControls && agent.callStatus && agent.status !== 'Live Coaching' && (
-                    <div 
-                      className="d-flex flex-column align-items-end gap-1"
-                      style={{ marginLeft: '8px' }}
-                    >
-                      <div 
-                        className="d-flex align-items-center gap-1 px-2 py-1 rounded" 
-                        style={{ 
-                          fontSize: '0.6rem', 
-                          fontWeight: '600',
-                          backgroundColor: agent.callStatus === 'CONNECTED' ? '#dcfce7' : '#fef3c7',
-                          color: agent.callStatus === 'CONNECTED' ? '#166534' : '#92400e',
-                          border: `1px solid ${agent.callStatus === 'CONNECTED' ? '#bbf7d0' : '#fde68a'}`,
-                          whiteSpace: 'nowrap'
-                        }}
-                      >
-                        {agent.callStatus === 'CONNECTED' ? <CheckCircle size={10} /> : <Phone size={10} />}
-                        <span>{agent.callStatus}</span>
-                      </div>
-                      {agent.duration && (
-                        <div 
-                          className="px-2 py-1 rounded" 
-                          style={{ 
-                            fontSize: '0.55rem', 
-                            fontWeight: '600',
-                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                            color: '#1e40af',
-                            border: '1px solid rgba(59, 130, 246, 0.2)',
-                            whiteSpace: 'nowrap'
-                          }}
-                        >
-                          {agent.duration}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-    
-                {/* Call Details */}
+      } else if (agent.status === 'Offline') {
+        return {
+          borderLeft: '4px solid #ef4444' // Red for offline/disconnected
+        };
+      } else {
+        return {
+          borderLeft: '4px solid #94a3b8' // Grey for unknown
+        };
+      }
+    };
+
+    const cardStyle = getCardStyle();
+
+    return (
+      <Col key={agent.id} xs={12} sm={6} md={4} lg={3} xl={2} className="mb-3">
+        <Card 
+          className="shadow-sm border-0" 
+          style={{ 
+            borderRadius: '8px',
+            ...cardStyle,
+            transition: 'transform 0.2s ease, box-shadow 0.2s ease'
+          }}
+        >
+          <Card.Body className="p-2 d-flex flex-column">
+            {/* User Avatar and Status */}
+            <div className="d-flex align-items-center justify-content-between mb-2">
+              <div className="d-flex align-items-center flex-grow-1" style={{ minWidth: 0 }}>
                 <div 
-                  className="rounded p-2 mb-2" 
+                  className="position-relative me-2" 
                   style={{ 
-                    fontSize: '0.65rem',
-                    backgroundColor: 'transparent',
-                    border: 'none'
+                    width: '36px', 
+                    height: '36px', 
+                    minWidth: '36px'
                   }}
                 >
-                  {agent.status === 'Live Coaching' && agent.supervisedAgent ? (
-                    <>
-                      <div className="d-flex justify-content-between mb-1">
-                        <span className="text-muted">Supervisor:</span>
-                        <span className="fw-semibold text-dark">{agent.extension}</span>
-                      </div>
-                      <div className="d-flex justify-content-between mb-1">
-                        <span className="text-muted">Supervising:</span>
-                        <span className="fw-semibold text-dark" style={{ fontSize: '0.6rem' }}>{agent.supervisedAgent}</span>
-                      </div>
-                      {agent.duration && (
-                        <div className="d-flex justify-content-between mb-0">
-                          <span className="text-muted">Duration:</span>
-                          <span className="fw-semibold text-dark">{agent.duration}</span>
-                        </div>
-                      )}
-                    </>
-                  ) : (agent.status === 'Available & Idle' || agent.status === 'Offline') ? (
-                    <>
-                      <div className="d-flex justify-content-between mb-0">
-                        <span className="text-muted">EXT:</span>
-                        <span className="fw-semibold text-dark">{agent.extension}</span>
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <div className="d-flex justify-content-between mb-1">
-                        <span className="text-muted">EXT:</span>
-                        <span className="fw-semibold text-dark">{agent.extension}</span>
-                      </div>
-                      <div className="d-flex justify-content-between mb-1">
-                        <span className="text-muted">From:</span>
-                        <span className="fw-semibold text-dark">{agent.from}</span>
-                      </div>
-                      <div className="d-flex justify-content-between mb-0">
-                        <span className="text-muted">To:</span>
-                        <span className="fw-semibold text-dark">{agent.to}</span>
-                      </div>
-                    </>
+                  <img 
+                    src={"https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRqY-XfJc1xS05PNGE0khicaIyUILD73E2MLw&s"} 
+                    alt={agent.name}
+                    className="rounded-circle"
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover',
+                      border: '2px solid #e5e7eb'
+                    }}
+                  />
+                  {/* Green dot indicator for Live Calls agents (Active/Connected) */}
+                  {agent.status === 'Live Calls' && (
+                    <span 
+                      className="position-absolute rounded-circle" 
+                      style={{ 
+                        width: '10px', 
+                        height: '10px',
+                        backgroundColor: '#22c55e',
+                        top: '-2px',
+                        right: '-2px',
+                        border: '2px solid white',
+                        boxShadow: '0 0 8px rgba(34, 197, 94, 0.6)',
+                        animation: 'pulse 2s infinite'
+                      }}
+                    />
                   )}
                 </div>
-    
-                {/* Bottom Section - Device & Controls */}
-                {/* Green = Active, Red = Offline */}
-                <div className="d-flex justify-content-between align-items-center mt-auto">
+                <div className="flex-grow-1" style={{ minWidth: 0 }}>
+                  <h6 className="mb-0 fw-semibold text-truncate" style={{ fontSize: 'clamp(0.875rem, 1.5vw, 0.95rem)', color: '#1f2937' }}>
+                    {agent.name}
+                  </h6>
+                </div>
+              </div>
+              
+              {/* Supervision Badge - For Live Coaching agents */}
+              {agent.status === 'Live Coaching' && agent.supervisionType && (
+                <div 
+                  className="d-flex align-items-center gap-1 px-2 py-1 rounded" 
+                  style={{ 
+                    fontSize: '0.6rem', 
+                    fontWeight: '600',
+                    backgroundColor: agent.supervisionType === 'silent-monitor' ? '#dbeafe' : 
+                                     agent.supervisionType === 'whisper' ? '#e9d5ff' : '#fed7aa',
+                    color: agent.supervisionType === 'silent-monitor' ? '#1e40af' : 
+                           agent.supervisionType === 'whisper' ? '#6b21a8' : '#9a3412',
+                    border: `1px solid ${agent.supervisionType === 'silent-monitor' ? '#bfdbfe' : 
+                            agent.supervisionType === 'whisper' ? '#d8b4fe' : '#fdba74'}`,
+                    whiteSpace: 'nowrap',
+                    marginLeft: '8px',
+                    textTransform: 'uppercase'
+                  }}
+                >
+                  {agent.supervisionType === 'silent-monitor' ? <Eye size={10} /> : 
+                   agent.supervisionType === 'whisper' ? <Mic size={10} /> : <Volume2 size={10} />}
+                  <span>{agent.supervisionType === 'silent-monitor' ? 'Monitor' : 
+                         agent.supervisionType === 'whisper' ? 'Whisper' : 'Barge'}</span>
+                </div>
+              )}
+
+              {/* Agent Status Badge - For Available & Idle agents */}
+              {/* Green = Active, Amber = Idle */}
+              {agent.status === 'Available & Idle' && agent.agentStatus && (
+                <div 
+                  className="d-flex align-items-center gap-1 px-2 py-1 rounded" 
+                  style={{ 
+                    fontSize: '0.6rem', 
+                    fontWeight: '600',
+                    backgroundColor: agent.agentStatus === 'active' ? '#dcfce7' : '#fef3c7',
+                    color: agent.agentStatus === 'active' ? '#166534' : '#92400e',
+                    border: `1px solid ${agent.agentStatus === 'active' ? '#bbf7d0' : '#fde68a'}`,
+                    whiteSpace: 'nowrap',
+                    marginLeft: '8px'
+                  }}
+                >
+                  {agent.agentStatus === 'active' ? <CheckCircle size={10} /> : <AlertCircle size={10} />}
+                  <span style={{ textTransform: 'capitalize' }}>{agent.agentStatus}</span>
+                </div>
+              )}
+
+              {/* Call Status Badge - For Live Calls agents */}
+              {/* Green = CONNECTED (Active), Amber = OUTGOING (Ringing) */}
+              {showCallControls && agent.callStatus && agent.status !== 'Live Coaching' && (
+                <div 
+                  className="d-flex flex-column align-items-end gap-1"
+                  style={{ marginLeft: '8px' }}
+                >
                   <div 
-                    className="rounded-circle d-flex align-items-center justify-content-center"
+                    className="d-flex align-items-center gap-1 px-2 py-1 rounded" 
                     style={{ 
-                      width: '28px', 
-                      height: '28px',
-                      backgroundColor: agent.deviceStatus === 'active' ? '#dcfce7' : '#fee2e2',
-                      color: agent.deviceStatus === 'active' ? '#166534' : '#991b1b',
-                      border: `2px solid ${agent.deviceStatus === 'active' ? '#bbf7d0' : '#fecaca'}`
+                      fontSize: '0.6rem', 
+                      fontWeight: '600',
+                      backgroundColor: agent.callStatus === 'CONNECTED' ? '#dcfce7' : '#fef3c7',
+                      color: agent.callStatus === 'CONNECTED' ? '#166534' : '#92400e',
+                      border: `1px solid ${agent.callStatus === 'CONNECTED' ? '#bbf7d0' : '#fde68a'}`,
+                      whiteSpace: 'nowrap'
                     }}
                   >
-                    {agent.deviceType === 'phone' ? <Phone size={12} /> : <Headset size={12} />}
+                    {agent.callStatus === 'CONNECTED' ? <CheckCircle size={10} /> : <Phone size={10} />}
+                    <span>{agent.callStatus}</span>
                   </div>
-    
-                  {showCallControls && (
-                    <div className="d-flex gap-1">
-                      <Button 
-                        variant="light" 
-                        size="sm" 
-                        className="p-0 border" 
-                        style={{ 
-                          width: '24px', 
-                          height: '24px', 
-                          borderRadius: '4px',
-                          backgroundColor: '#dbeafe',
-                          color: '#1e40af',
-                          borderColor: '#bfdbfe',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          transition: 'all 0.2s ease'
-                        }}
-                        title="Silent Monitor"
-                      >
-                        <Volume2 size={11} />
-                      </Button>
-                      <Button 
-                        variant="light" 
-                        size="sm" 
-                        className="p-0 border" 
-                        style={{ 
-                          width: '24px', 
-                          height: '24px', 
-                          borderRadius: '4px',
-                          backgroundColor: '#e9d5ff',
-                          color: '#6b21a8',
-                          borderColor: '#d8b4fe',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          transition: 'all 0.2s ease'
-                        }}
-                        title="Whisper"
-                      >
-                        <Mic size={11} />
-                      </Button>
-                      <Button 
-                        variant="light" 
-                        size="sm" 
-                        className="p-0 border" 
-                        style={{ 
-                          width: '24px', 
-                          height: '24px', 
-                          borderRadius: '4px',
-                          backgroundColor: '#fed7aa',
-                          color: '#9a3412',
-                          borderColor: '#fdba74',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          transition: 'all 0.2s ease'
-                        }}
-                        title="Barge In"
-                      >
-                        <Users size={11} />
-                      </Button>
+                  {agent.duration && (
+                    <div 
+                      className="px-2 py-1 rounded" 
+                      style={{ 
+                        fontSize: '0.55rem', 
+                        fontWeight: '600',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        color: '#1e40af',
+                        border: '1px solid rgba(59, 130, 246, 0.2)',
+                        whiteSpace: 'nowrap'
+                      }}
+                    >
+                      {agent.duration}
                     </div>
                   )}
                 </div>
-              </Card.Body>
-            </Card>
-          </Col>
-        );
-      };
-    
-    // ...existing code...
-    
-    
-    // ...existing code...
-    
-      const renderSection = (title: string, icon: React.ReactNode, data: Agent[], badgeColor: string, showCallControls: boolean = false, sectionKey: string) => {
-        const isCollapsed = collapsedSections[sectionKey];
-        
-        return (
-          <div className="mb-4">
-            {/* Section Header */}
-            <Card className="border-0 shadow-sm mb-3">
-              <Card.Body className="p-3">
-                <div className="d-flex justify-content-between align-items-center">
-                  <Button
-                    variant="link"
-                    className="p-0 text-dark text-decoration-none d-flex align-items-center gap-2"
-                    onClick={() => toggleSection(sectionKey)}
-                    style={{ fontSize: '1.1rem', fontWeight: '600' }}
-                  >
-                    {isCollapsed ? <ChevronRight size={20} /> : <ChevronDown size={20} />}
-                    <div style={{ 
-                      color: sectionKey === 'supervision' ? '#f59e0b' : 
-                             sectionKey === 'onCall' ? '#22c55e' : 
-                             sectionKey === 'activeIdle' ? '#6b7280' : 
-                             sectionKey === 'downOffline' ? '#ef4444' : '#6b7280'
-                    }}>{icon}</div>
-                    <span>{title}</span>
-                  </Button>
-                  <Badge 
-                    bg="light" 
-                    text="dark" 
-                    className="px-3 py-2 border"
-                    style={{ fontSize: '0.85rem', fontWeight: '600' }}
-                  >
-                    {data.length}
-                  </Badge>
-                </div>
-              </Card.Body>
-            </Card>
-    
-            {/* Section Content */}
-            {!isCollapsed && (
-              data.length > 0 ? (
-                <Row className="g-3">
-                  {data.map((agent: Agent) => renderAgentCard(agent, showCallControls))}
-                </Row>
+              )}
+            </div>
+
+            {/* Call Details */}
+            <div 
+              className="rounded p-2 mb-2" 
+              style={{ 
+                fontSize: '0.65rem',
+                backgroundColor: 'transparent',
+                border: 'none'
+              }}
+            >
+              {agent.status === 'Live Coaching' && agent.supervisedAgent ? (
+                <>
+                  <div className="d-flex justify-content-between mb-1">
+                    <span className="text-muted">Supervisor:</span>
+                    <span className="fw-semibold text-dark">{agent.extension}</span>
+                  </div>
+                  <div className="d-flex justify-content-between mb-1">
+                    <span className="text-muted">Supervising:</span>
+                    <span className="fw-semibold text-dark" style={{ fontSize: '0.6rem' }}>{agent.supervisedAgent}</span>
+                  </div>
+                  {agent.duration && (
+                    <div className="d-flex justify-content-between mb-0">
+                      <span className="text-muted">Duration:</span>
+                      <span className="fw-semibold text-dark">{agent.duration}</span>
+                    </div>
+                  )}
+                </>
+              ) : (agent.status === 'Available & Idle' || agent.status === 'Offline') ? (
+                <>
+                  <div className="d-flex justify-content-between mb-0">
+                    <span className="text-muted">EXT:</span>
+                    <span className="fw-semibold text-dark">{agent.extension}</span>
+                  </div>
+                </>
               ) : (
-                <Card className="border-0 shadow-sm">
-                  <Card.Body className="text-center py-5">
-                    <AlertCircle size={40} className="mb-3 text-muted opacity-25" />
-                    <p className="mb-0 text-muted small">No agents in this category</p>
-                  </Card.Body>
-                </Card>
-              )
-            )}
-          </div>
-        );
-      };
+                <>
+                  <div className="d-flex justify-content-between mb-1">
+                    <span className="text-muted">EXT:</span>
+                    <span className="fw-semibold text-dark">{agent.extension}</span>
+                  </div>
+                  <div className="d-flex justify-content-between mb-1">
+                    <span className="text-muted">From:</span>
+                    <span className="fw-semibold text-dark">{agent.from}</span>
+                  </div>
+                  <div className="d-flex justify-content-between mb-0">
+                    <span className="text-muted">To:</span>
+                    <span className="fw-semibold text-dark">{agent.to}</span>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Bottom Section - Device & Controls */}
+            {/* Green = Active, Red = Offline */}
+            <div className="d-flex justify-content-between align-items-center mt-auto">
+              <div 
+                className="rounded-circle d-flex align-items-center justify-content-center"
+                style={{ 
+                  width: '28px', 
+                  height: '28px',
+                  backgroundColor: agent.deviceStatus === 'active' ? '#dcfce7' : '#fee2e2',
+                  color: agent.deviceStatus === 'active' ? '#166534' : '#991b1b',
+                  border: `2px solid ${agent.deviceStatus === 'active' ? '#bbf7d0' : '#fecaca'}`
+                }}
+              >
+                {agent.deviceType === 'phone' ? <Phone size={12} /> : <Headset size={12} />}
+              </div>
+
+              {showCallControls && (
+                <div className="d-flex gap-1">
+                  <Button 
+                    variant="light" 
+                    size="sm" 
+                    className="p-0 border" 
+                    style={{ 
+                      width: '24px', 
+                      height: '24px', 
+                      borderRadius: '4px',
+                      backgroundColor: '#dbeafe',
+                      color: '#1e40af',
+                      borderColor: '#bfdbfe',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      transition: 'all 0.2s ease'
+                    }}
+                    title="Silent Monitor"
+                  >
+                    <Volume2 size={11} />
+                  </Button>
+                  <Button 
+                    variant="light" 
+                    size="sm" 
+                    className="p-0 border" 
+                    style={{ 
+                      width: '24px', 
+                      height: '24px', 
+                      borderRadius: '4px',
+                      backgroundColor: '#e9d5ff',
+                      color: '#6b21a8',
+                      borderColor: '#d8b4fe',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      transition: 'all 0.2s ease'
+                    }}
+                    title="Whisper"
+                  >
+                    <Mic size={11} />
+                  </Button>
+                  <Button 
+                    variant="light" 
+                    size="sm" 
+                    className="p-0 border" 
+                    style={{ 
+                      width: '24px', 
+                      height: '24px', 
+                      borderRadius: '4px',
+                      backgroundColor: '#fed7aa',
+                      color: '#9a3412',
+                      borderColor: '#fdba74',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      transition: 'all 0.2s ease'
+                    }}
+                    title="Barge In"
+                  >
+                    <Users size={11} />
+                  </Button>
+                </div>
+              )}
+            </div>
+          </Card.Body>
+        </Card>
+      </Col>
+    );
+  };
+
+// ...existing code...
+
+
+// ...existing code...
+
+  const renderSection = (title: string, icon: React.ReactNode, data: Agent[], badgeColor: string, showCallControls: boolean = false, sectionKey: string) => {
+    const isCollapsed = collapsedSections[sectionKey];
     
+    return (
+      <div className="mb-4">
+        {/* Section Header */}
+        <Card className="border-0 shadow-sm mb-3">
+          <Card.Body className="p-3">
+            <div className="d-flex justify-content-between align-items-center">
+              <Button
+                variant="link"
+                className="p-0 text-dark text-decoration-none d-flex align-items-center gap-2"
+                onClick={() => toggleSection(sectionKey)}
+                style={{ fontSize: '1.1rem', fontWeight: '600' }}
+              >
+                {isCollapsed ? <ChevronRight size={20} /> : <ChevronDown size={20} />}
+                <div style={{ 
+                  color: sectionKey === 'supervision' ? '#f59e0b' : 
+                         sectionKey === 'onCall' ? '#22c55e' : 
+                         sectionKey === 'activeIdle' ? '#6b7280' : 
+                         sectionKey === 'downOffline' ? '#ef4444' : '#6b7280'
+                }}>{icon}</div>
+                <span>{title}</span>
+              </Button>
+              <Badge 
+                bg="light" 
+                text="dark" 
+                className="px-3 py-2 border"
+                style={{ fontSize: '0.85rem', fontWeight: '600' }}
+              >
+                {data.length}
+              </Badge>
+            </div>
+          </Card.Body>
+        </Card>
+
+        {/* Section Content */}
+        {!isCollapsed && (
+          data.length > 0 ? (
+            <Row className="g-3">
+              {data.map((agent: Agent) => renderAgentCard(agent, showCallControls))}
+            </Row>
+          ) : (
+            <Card className="border-0 shadow-sm">
+              <Card.Body className="text-center py-5">
+                <AlertCircle size={40} className="mb-3 text-muted opacity-25" />
+                <p className="mb-0 text-muted small">No agents in this category</p>
+              </Card.Body>
+            </Card>
+          )
+        )}
+      </div>
+    );
+  };
 
   return (
-    <React.Fragment>
-      <BreadcrumbItem mainTitle="Live Calls" mainLink="/live-calls" subTitle="New" />
-
-     
+    <div className="live-view-wrapper" style={{ background: '#f8f9fa', minHeight: '100vh' }}>
       {/* Sidebar Toggle Button - Shows below 1200px */}
       <style>{`
-       
+        .mobile-sidebar-toggle {
+          display: none;
+        }
           svg {
           width: auto !important;
           height: auto !important;
@@ -612,7 +600,22 @@ const LiveCallNew = () => {
           .sidebar-card {
           top: 77px !important;
           }
-        
+        @media (max-width: 1199px) {
+          .mobile-sidebar-toggle {
+            display: flex !important;
+          }
+        }
+        .live-view-content {
+          margin-left: 0;
+          transition: margin-left 0.3s ease, width 0.3s ease;
+          width: 100%;
+        }
+        @media (min-width: 1200px) {
+          .live-view-content {
+            margin-left: ${sidebarOpen ? '280px' : '0'};
+            width: ${sidebarOpen ? 'calc(100% - 280px)' : '100%'};
+          }
+        }
         @keyframes pulse {
           0%, 100% {
             opacity: 1;
@@ -623,6 +626,78 @@ const LiveCallNew = () => {
         }
       `}</style>
       
+      <Button 
+        variant="primary" 
+        className="mobile-sidebar-toggle position-fixed rounded-circle shadow"
+        onClick={() => setSidebarOpen(!sidebarOpen)}
+        style={{
+          top: '20px',
+          left: '20px',
+          zIndex: 1051,
+          width: '50px',
+          height: '50px',
+          padding: '0',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}
+      >
+        <Menu size={24} />
+      </Button>
+
+      {/* Sidebar with ModernSidebar Component */}
+      <ModernSidebar
+        sidebarOpen={sidebarOpen}
+        setSidebarOpen={setSidebarOpen}
+      />
+
+      {/* Navbar */}
+      <nav className="navbar navbar-expand-lg navbar-light bg-white border-bottom sticky-top shadow-sm">
+        <div className="container-fluid">
+          <div className="d-flex align-items-center gap-2">
+            <style>{`
+              .desktop-sidebar-toggle {
+                display: none;
+              }
+              @media (min-width: 1200px) {
+                .desktop-sidebar-toggle {
+                  display: block !important;
+                }
+              }
+            `}</style>
+            <Button 
+              variant="link" 
+              className="text-dark desktop-sidebar-toggle p-2" 
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              style={{ 
+                marginLeft: '-10px'
+              }}
+            >
+              {sidebarOpen ? <ChevronLeft size={24} /> : <ChevronRight size={24} />}
+            </Button>
+            <a className="navbar-brand fw-bold text-primary mb-0" href="#"><img src={CompanyLogo2.src} alt="logo" className="img-fluid" /></a>
+          </div>
+          <div className="ms-auto d-flex align-items-center gap-3">
+            <Button variant="link" className="text-dark position-relative">
+              <Bell size={20} />
+              <Badge bg="danger" pill className="position-absolute translate-middle" style={{top:'10px', left:'37px'}}>3</Badge>
+            </Button>
+            <div 
+              className="d-flex align-items-center gap-2" 
+              onClick={() => setShowProfileSidebar(!showProfileSidebar)}
+              style={{ cursor: 'pointer' }}
+            >
+              <div className="bg-primary bg-opacity-10 rounded-circle p-2">
+                <Users size={20} className="text-primary" />
+              </div>
+              <div className="d-none d-md-block">
+                <small className="d-block fw-semibold">John Doe</small>
+                <small className="text-muted">john@example.com</small>
+              </div>
+              
+            </div>
+          </div>
+        </div>
+      </nav>
 
       {/* Main Content Area */}
       <div 
@@ -634,7 +709,7 @@ const LiveCallNew = () => {
           paddingTop: '0'
         }}
       >
-        <Container fluid className="" style={{paddingTop: fullscreen ? '24px' : '0', paddingBottom: '24px', maxWidth: '100%', overflowX: 'hidden'}}>
+        <Container fluid className="px-3 px-md-4 px-lg-5" style={{paddingTop: fullscreen ? '24px' : '0', paddingBottom: '24px', maxWidth: '100%', overflowX: 'hidden'}}>
           {/* Page Header */}
           <Row className="mb-3 mb-md-4 g-3" style={{ display: fullscreen ? 'none' : 'flex', paddingTop: '24px' }}>
             <Col xs={12} md={6} lg={5} xl={6}>
@@ -674,9 +749,6 @@ const LiveCallNew = () => {
                     </>
                   )}
                 </Button>
-
-
-
                 {/* <Button 
                   variant="primary" 
                   className="d-flex align-items-center"
@@ -802,7 +874,7 @@ const LiveCallNew = () => {
                         color: '#22c55e'
                       }}
                     >
-                      <PhoneCall size={22} />
+                      <PhoneIncoming size={22} />
                     </div>
                     <div className="text-end ms-3">
                       <div className="fw-bold mb-1" style={{ fontSize: '1.75rem', lineHeight: '1', color: '#1f2937' }}>
@@ -938,7 +1010,7 @@ const LiveCallNew = () => {
                         color: '#22c55e'
                       }}
                     >
-                      <PhoneIncoming size={22} />
+                      <Phone size={22} />
                     </div>
                     <div className="text-end ms-3">
                       <div className="fw-bold mb-1" style={{ fontSize: '1.75rem', lineHeight: '1', color: '#1f2937' }}>
@@ -1119,12 +1191,13 @@ const LiveCallNew = () => {
         </Container>
       </div>
 
-    </React.Fragment>
+      {/* Profile Sidebar */}
+      <ProfileSidebar 
+        isOpen={showProfileSidebar} 
+        onClose={() => setShowProfileSidebar(false)} 
+      />
+    </div>
   );
 };
 
-LiveCallNew.getLayout = (page: ReactElement) => {
-  return <Layout>{page}</Layout>;
-};
-
-export default LiveCallNew;
+export default LiveViewPage;

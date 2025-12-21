@@ -4,6 +4,9 @@ import { useSession } from 'next-auth/react';
 import UsersFilters from '@components/filters/UsersFilters';
 import { SyncBillingCompanies } from '@utils/users';
 import { toast } from 'react-toastify';
+import router from 'next/router';
+import { FiPlus } from 'react-icons/fi';
+import { FaSync } from 'react-icons/fa';
 
 interface UsersHeaderProps {
     currentFilters: any;
@@ -47,15 +50,24 @@ const UsersHeader: React.FC<UsersHeaderProps> = ({
                                     />
                                 </div> */}
                                 {/* <UsersFilters onFiltersChange={handleFiltersChange} onExport={handleExport} /> */}
+                               
+                                {/* {session?.user?.permissions?.includes('create-useres') && ( */}
+                                    <Button variant="primary" 
+                                    onClick={() => router.push('/tms/profiling/user/create')}>
+                                        <FiPlus size={16} className="me-2" /> Add User
+                                    </Button>
+                                {/* )} */}
+                               
                                 {session?.user?.permissions?.includes('sync-ldap') && (
-                                    <Button variant="primary" onClick={() => syncLdapUsers()}>
-                                        Sync Users
+                                    <Button variant="info" onClick={() => syncLdapUsers()}>
+                                        
+                                        <FaSync size={16} className="me-2" /> Sync Users 
                                     </Button>
                                 )}
 
 {session?.user?.is_admin == "1" && (
                                     <Button variant="danger" onClick={() => syncBillingCompanies()}>
-                                        Sync Billing Companies
+                                        <FaSync size={16} className="me-2" /> Sync Billing Companies
                                     </Button>
                                 )}
 

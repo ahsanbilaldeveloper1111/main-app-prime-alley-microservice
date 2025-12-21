@@ -1,7 +1,8 @@
 import React, { ReactElement, useEffect, useState, useMemo, useCallback } from 'react';
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
-import { Col, Row, Tab, Tabs, Modal, Button } from 'react-bootstrap';
+import { Col, Row, Tab, Tabs, Modal, Button, Form, Card, CardBody } from 'react-bootstrap';
+import Select from 'react-select';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import '@assets/scss/tabs.scss';
@@ -306,6 +307,135 @@ const UserView = () => {
                                 />
                             </Tab>
                         )}
+
+                        <Tab eventKey="calling-access" title="Calling Access">
+                            <Card>
+                                <Card.Body>
+                                <div className="mt-3">
+                                <form id="calling-access-form">
+                                    <div className="row">
+                                        <div className="col-sm-6">
+                                            <Form.Group className="mb-3">
+                                                <Form.Label>Allow DNCR</Form.Label>
+                                                <div className="form-check form-switch">
+                                                    <input
+                                                        className="form-check-input"
+                                                        type="checkbox"
+                                                        id="allow_dncr"
+                                                    />
+                                                </div>
+                                            </Form.Group>
+                                        </div>
+
+                                        <div className="col-sm-6">
+                                            <Form.Group className="mb-3">
+                                                <Form.Label>Allow Fact Info</Form.Label>
+                                                <div className="form-check form-switch">
+                                                    <input
+                                                        className="form-check-input"
+                                                        type="checkbox"
+                                                        id="allow_fac_info"
+                                                    />
+                                                </div>
+                                            </Form.Group>
+                                        </div>
+
+                                        <div className="col-sm-6">
+                                            <Form.Group className="mb-3">
+                                                <Form.Label>Mobile User</Form.Label>
+                                                <div className="form-check form-switch">
+                                                    <input
+                                                        className="form-check-input"
+                                                        type="checkbox"
+                                                        id="mobile_user"
+                                                    />
+                                                </div>
+                                            </Form.Group>
+                                        </div>
+
+                                        <div className="col-sm-6">
+                                            <Form.Group className="mb-3">
+                                                <Form.Label>Device Type</Form.Label>
+                                                <Select
+                                                    placeholder="Select Device Type"
+                                                    isSearchable
+                                                    isClearable
+                                                    menuPortalTarget={document.body}
+                                                    styles={{
+                                                        menuPortal: (base: any) => ({ ...base, zIndex: 9999 }),
+                                                        menu: (base: any) => ({ ...base, zIndex: 9999 })
+                                                    }}
+                                                />
+                                            </Form.Group>
+                                        </div>
+
+                                        <div className="col-sm-6">
+                                            <Form.Group className="mb-3">
+                                                <Form.Label>ICCID</Form.Label>
+                                                <Select
+                                                    placeholder="Select ICCID"
+                                                    isSearchable
+                                                    isClearable
+                                                    menuPortalTarget={document.body}
+                                                    styles={{
+                                                        menuPortal: (base: any) => ({ ...base, zIndex: 9999 }),
+                                                        menu: (base: any) => ({ ...base, zIndex: 9999 })
+                                                    }}
+                                                />
+                                            </Form.Group>
+                                        </div>
+
+                                        <div className="col-sm-6">
+                                            <Form.Group className="mb-3">
+                                                <Form.Label>Call Access</Form.Label>
+                                                <select
+                                                    className="form-select"
+                                                    name="shareLineAppearanceCssName"
+                                                >
+                                                    <option value="">Select Call Access</option>
+                                                </select>
+                                            </Form.Group>
+                                        </div>
+
+                                        <div className="col-sm-6">
+                                            <Form.Group className="mb-3">
+                                                <Form.Label>Call Repetition</Form.Label>
+                                                <select
+                                                    className="form-select"
+                                                    name="call_repetition"
+                                                >
+                                                    <option value="">NA</option>
+                                                </select>
+                                            </Form.Group>
+                                        </div>
+
+                                        <div className="col-sm-6">
+                                            <Form.Group className="mb-3">
+                                                <Form.Label>Call Repetition Weekly</Form.Label>
+                                                <input
+                                                    type="number"
+                                                    className="form-control"
+                                                    placeholder="Enter Call Repetition Weekly"
+                                                />
+                                            </Form.Group>
+                                        </div>
+
+                                        <div className="col-sm-6">
+                                            <Form.Group className="mb-3">
+                                                <Form.Label>Call Repetition Daily</Form.Label>
+                                                <input
+                                                    type="number"
+                                                    className="form-control"
+                                                    placeholder="Enter Call Repetition Daily"
+                                                />
+                                            </Form.Group>
+                                        </div>
+                                    </div>
+                                </form>
+                            </div>
+                                </Card.Body>
+                            </Card>
+                        </Tab>
 
                         {/* {(session?.user?.permissions?.includes('company-link-users') || session?.user?.permissions?.includes('company-unlink-users')) && (
                             <Tab eventKey="linked-companies" title="Linked Companies">
