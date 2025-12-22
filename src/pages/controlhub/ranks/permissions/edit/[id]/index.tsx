@@ -7,7 +7,7 @@ import { toast } from 'react-toastify'
 import permissionsData from '@common/JsonData/PermissionsData'
 import { useRouter } from 'next/router'
 import { viewRank, assignPermissions } from '@utils/roles'
-import { CheckSquare, Square, Select } from 'lucide-react'
+import { CheckSquare, Square } from 'lucide-react'
 import '@assets/scss/common.scss';
 
 interface Permission {
