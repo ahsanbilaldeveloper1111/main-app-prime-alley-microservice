@@ -92,7 +92,7 @@ const GlobalFloatingCallBar: React.FC = () => {
   // Also check if we're on the dialer or live-calls page itself (to avoid duplicate UI)
   // Only show if there's an active call (dialer button is now in topbar)
   const hideOnPages = ['/cti/dialer', '/cti/live-calls'];
-  if (!isInitialized || !hasPermission('dial-call-cti') || hideOnPages.includes(router.pathname) || !activeCall) {
+  if (!isInitialized || !hasPermission('dial-call-cti') || hideOnPages.includes(router.pathname) ) {
     return null;
   }
   
@@ -489,7 +489,7 @@ const GlobalFloatingCallBar: React.FC = () => {
           </>
         )}
       </div>
-      
+      {showDialerModal ? "ASDASD" : "DEFDEF"}
       {/* Quick Dialer Modal */}
       <Modal
         show={showDialerModal}
