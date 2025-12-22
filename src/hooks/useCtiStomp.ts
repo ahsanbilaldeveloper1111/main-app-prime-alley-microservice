@@ -103,16 +103,34 @@ export default function useCtiStomp(wsPath = '/ws', instanceId?: string, screenI
   });
   
   // Use shared refs for global instance, individual refs for other instances
-  const clientRef = isGlobalInstance ? globalConnectionRefs.clientRef : useRef<Client | null>(null);
-  const eventSourceRef = isGlobalInstance ? globalConnectionRefs.eventSourceRef : useRef<EventSource | null>(null);
-  const tokenRef = isGlobalInstance ? globalConnectionRefs.tokenRef : useRef<string | null>(null);
-  const userAddressRef = isGlobalInstance ? globalConnectionRefs.userAddressRef : useRef<string | null>(null);
+  const clientRef = 
+  // isGlobalInstance ? globalConnectionRefs.clientRef :
+   useRef<Client | null>(null);
+  const eventSourceRef = 
+  // isGlobalInstance ? globalConnectionRefs.eventSourceRef :
+   useRef<EventSource | null>(null);
+  const tokenRef = 
+  // isGlobalInstance ? globalConnectionRefs.tokenRef :
+   useRef<string | null>(null);
+  const userAddressRef = 
+  // isGlobalInstance ? globalConnectionRefs.userAddressRef :
+   useRef<string | null>(null);
   const screenIdRef = useRef<string | undefined>(screenId);
-  const isConnectingRef = isGlobalInstance ? globalConnectionRefs.isConnectingRef : useRef(false);
-  const isInitializedRef = isGlobalInstance ? globalConnectionRefs.isInitializedRef : useRef(false);
-  const connectionStartTimeRef = isGlobalInstance ? globalConnectionRefs.connectionStartTimeRef : useRef<number | null>(null);
-  const reconnectionTimerRef = isGlobalInstance ? globalConnectionRefs.reconnectionTimerRef : useRef<NodeJS.Timeout | null>(null);
-  const isReconnectingRef = isGlobalInstance ? globalConnectionRefs.isReconnectingRef : useRef(false);
+  const isConnectingRef = 
+  // isGlobalInstance ? globalConnectionRefs.isConnectingRef :
+   useRef(false);
+  const isInitializedRef = 
+  // isGlobalInstance ? globalConnectionRefs.isInitializedRef :
+   useRef(false);
+  const connectionStartTimeRef = 
+  // isGlobalInstance ? globalConnectionRefs.connectionStartTimeRef :
+   useRef<number | null>(null);
+  const reconnectionTimerRef = 
+  // isGlobalInstance ? globalConnectionRefs.reconnectionTimerRef :
+   useRef<NodeJS.Timeout | null>(null);
+  const isReconnectingRef = 
+  // isGlobalInstance ? globalConnectionRefs.isReconnectingRef :
+   useRef(false);
   
   // Store latest callback functions in refs to avoid stale closures
   // These will be initialized after the functions are defined
