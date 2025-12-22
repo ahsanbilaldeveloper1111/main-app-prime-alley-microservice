@@ -156,7 +156,12 @@ useEffect(() => {
 
 All call operations automatically retrieve device information if not provided:
 
-- `makeCall(params): Promise<any>` - Make a call
+- **`dialNumber(phoneNumber: string): Promise<any>`** - **Simplified call function - just pass phone number**
+  - This is the recommended function for automated calls from any page
+  - Automatically handles device selection, validation, and error handling
+  - Example: `await dialNumber('1234')` or `await dialNumber('+1234567890')`
+  
+- `makeCall(params): Promise<any>` - Make a call (advanced usage)
   - `params.calledAddress: string` (required)
   - `params.callingAddress?: string` (optional, auto-retrieved)
   - `params.callingDeviceType?: string` (optional, auto-retrieved)
@@ -194,4 +199,54 @@ All call operations automatically retrieve device information if not provided:
 ## Examples
 
 See `src/contexts/CtiContext.example.tsx` for complete usage examples.
+
+### Automated Calls from Any Page
+
+The simplest way to trigger a call from any page is using the `dialNumber` function:
+
+```tsx
+import { useCti } from '@/contexts/CtiContext';
+import { toast } from 'react-toastify';
+
+function MyComponent() {
+  const { dialNumber, isInitialized } = useCti();
+  
+  const handleCall = async (phoneNumber: string) => {
+    if (!isInitialized) {
+      toast.error('CTI not initialized');
+      return;
+    }
+    
+    const result = await dialNumber(phoneNumber);
+    
+    if (result.success) {
+      toast.success(`Calling ${phoneNumber}...`);
+    } else {
+      toast.error(result.error || 'Failed to make call');
+    }
+  };
+  
+  return (
+    <button onClick={() => handleCall('1234')}>
+      Call 1234
+    </button>
+  );
+}
+```
+
+**For CRM pages (leads, deals, contacts):**
+
+```tsx
+// In a table row or card
+<Button onClick={() => dialNumber(lead.phone)}>
+  <i className="material-icons-two-tone">phone</i>
+  Call
+</Button>
+```
+
+See `src/contexts/CtiContext.example-automated-calls.tsx` for more examples including:
+- Call buttons in tables
+- Click-to-call links
+- Bulk call actions
+- CRM integration examples
 

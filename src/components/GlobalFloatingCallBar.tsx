@@ -51,6 +51,7 @@ const GlobalFloatingCallBar: React.FC = () => {
     activeCalls,
     formatDuration,
     makeCall,
+    dialNumber, // Use dialNumber for simplified calls
     endCall,
     getCallingDeviceInfo,
     getAllUserDevices,
@@ -90,52 +91,19 @@ const GlobalFloatingCallBar: React.FC = () => {
     setShowDialerModal(true);
   };
   
-  const handleDial = async () => {
-    if (!dialedNumber.trim()) {
+  const handleDial = async (numberToDial: string = dialedNumber) => {
+    if (!numberToDial.trim()) {
       toast.error('Please enter a number to dial');
-      return;
-    }
-    
-    // Check if we can dial this number
-    const dialCheck = canDialNumber(dialedNumber);
-    if (!dialCheck.canDial) {
-      toast.warning(dialCheck.reason);
-      return;
-    }
-    
-    // Check if user has multiple devices
-    const userDevices = getAllUserDevices();
-    if (!userDevices || userDevices.length === 0) {
-      toast.error('No calling device information available');
-      return;
-    }
-    
-    // If user has multiple devices, show device selection modal
-    if (userDevices.length > 1) {
-      setAvailableDevices(userDevices);
-      setPendingDialedNumber(dialedNumber);
-      setShowDeviceSelectionModal(true);
-      return;
-    }
-    
-    // If only one device, proceed with dialing
-    const callingDevice = getCallingDeviceInfo();
-    if (!callingDevice) {
-      toast.error('No calling device information available');
       return;
     }
     
     setIsDialing(true);
     try {
-      const result = await makeCall({
-        callingAddress: callingDevice.callingAddress,
-        calledAddress: dialedNumber,
-        callingDeviceType: callingDevice.callingDeviceType,
-        callingDeviceName: callingDevice.callingDeviceName
-      });
+      // Use dialNumber - it handles device selection, number cleaning, and validation automatically
+      const result = await dialNumber(numberToDial);
       
       if (result.success) {
-        toast.success(`Calling ${dialedNumber}...`);
+        toast.success(`Calling ${numberToDial}...`);
         setDialedNumber('');
         setShowDialerModal(false);
       } else {
@@ -417,7 +385,7 @@ const GlobalFloatingCallBar: React.FC = () => {
           <div className="d-flex gap-2">
             <Button
               variant="primary"
-              onClick={handleDial}
+              onClick={() => handleDial()}
               disabled={!dialedNumber.trim() || isDialing}
               className="flex-fill"
             >

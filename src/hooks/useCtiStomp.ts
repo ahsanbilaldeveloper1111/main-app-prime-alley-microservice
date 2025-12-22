@@ -1,6 +1,7 @@
 import { Client } from '@stomp/stompjs';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import axiosInstance from '@utils/axios';
+import { getCrossTabCtiManager } from '../utils/crossTabCtiManager';
 
 interface CtiDevice {
   dn: string;
@@ -47,22 +48,43 @@ const generateInstanceId = () => {
   return `cti-stomp-${instanceCounter}-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
 };
 
+// Shared connection refs for global instance (singleton pattern)
+// All hook instances with 'global-cti-instance' share these refs
+const globalConnectionRefs = {
+  clientRef: { current: null as Client | null },
+  eventSourceRef: { current: null as EventSource | null },
+  tokenRef: { current: null as string | null },
+  userAddressRef: { current: null as string | null },
+  isConnectingRef: { current: false },
+  isInitializedRef: { current: false },
+  connectionStartTimeRef: { current: null as number | null },
+  reconnectionTimerRef: { current: null as NodeJS.Timeout | null },
+  isReconnectingRef: { current: false }
+};
+
 /**
  * Custom hook for CTI STOMP WebSocket connection via SSE
  * 
- * Each page/component that uses this hook will get its own independent connection.
- * On mount, it always creates a fresh connection (closing any existing one first).
- * On reconnect, it always creates a fresh connection with a new token.
+ * IMPORTANT: For global instance ('global-cti-instance'), this hook now uses a singleton
+ * connection manager to ensure only ONE connection exists for the entire app.
+ * 
+ * For other instance IDs, each hook instance gets its own connection (for backward compatibility).
  * 
  * @param wsPath - WebSocket path (default: '/ws')
- * @param instanceId - Optional unique instance ID. If not provided, one will be auto-generated.
- *                     Each hook instance gets a unique ID to ensure isolation between pages.
+ * @param instanceId - Optional unique instance ID. Use 'global-cti-instance' for shared connection.
  * @param screenId - Optional screen ID to identify the page/component (e.g., 'liveView', 'dialer')
  */
 export default function useCtiStomp(wsPath = '/ws', instanceId?: string, screenId?: string) {
-  // Generate unique instance ID if not provided
-  // This ensures each page/component gets its own isolated connection
-  const instanceIdRef = useRef<string>(instanceId || generateInstanceId());
+  // Check if this is the global instance - if so, use singleton connection manager
+  const isGlobalInstance = instanceId === 'global-cti-instance' || instanceId === undefined;
+  
+  // Generate unique instance ID if not provided (for non-global instances)
+  const instanceIdRef = useRef<string>(isGlobalInstance ? 'global-cti-instance' : (instanceId || generateInstanceId()));
+  
+  // Cross-tab manager for sharing connection across tabs
+  const crossTabManagerRef = useRef(getCrossTabCtiManager());
+  const [isMasterTab, setIsMasterTab] = useState(false);
+  
   const [dnsMap, setDnsMap] = useState<Record<string, { dn: string; devices: Record<string, CtiDevice> }>>({});
   const [callStateMap, setCallStateMap] = useState<Record<string, CtiCallEvent>>({});
   const [eventLog, setEventLog] = useState<any[]>([]);
@@ -80,16 +102,17 @@ export default function useCtiStomp(wsPath = '/ws', instanceId?: string, screenI
     incomingEvents: 0
   });
   
-  const clientRef = useRef<Client | null>(null);
-  const eventSourceRef = useRef<EventSource | null>(null);
-  const tokenRef = useRef<string | null>(null);
-  const userAddressRef = useRef<string | null>(null);
+  // Use shared refs for global instance, individual refs for other instances
+  const clientRef = isGlobalInstance ? globalConnectionRefs.clientRef : useRef<Client | null>(null);
+  const eventSourceRef = isGlobalInstance ? globalConnectionRefs.eventSourceRef : useRef<EventSource | null>(null);
+  const tokenRef = isGlobalInstance ? globalConnectionRefs.tokenRef : useRef<string | null>(null);
+  const userAddressRef = isGlobalInstance ? globalConnectionRefs.userAddressRef : useRef<string | null>(null);
   const screenIdRef = useRef<string | undefined>(screenId);
-  const isConnectingRef = useRef(false);
-  const isInitializedRef = useRef(false);
-  const connectionStartTimeRef = useRef<number | null>(null);
-  const reconnectionTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const isReconnectingRef = useRef(false);
+  const isConnectingRef = isGlobalInstance ? globalConnectionRefs.isConnectingRef : useRef(false);
+  const isInitializedRef = isGlobalInstance ? globalConnectionRefs.isInitializedRef : useRef(false);
+  const connectionStartTimeRef = isGlobalInstance ? globalConnectionRefs.connectionStartTimeRef : useRef<number | null>(null);
+  const reconnectionTimerRef = isGlobalInstance ? globalConnectionRefs.reconnectionTimerRef : useRef<NodeJS.Timeout | null>(null);
+  const isReconnectingRef = isGlobalInstance ? globalConnectionRefs.isReconnectingRef : useRef(false);
   
   // Store latest callback functions in refs to avoid stale closures
   // These will be initialized after the functions are defined
@@ -975,10 +998,22 @@ export default function useCtiStomp(wsPath = '/ws', instanceId?: string, screenI
 
     const initialize = async () => {
       const currentInstanceId = instanceIdRef.current;
+      
+      // For global instance, check if already initialized to prevent duplicate connections
+      if (isGlobalInstance && isInitializedRef.current && eventSourceRef.current) {
+        console.log(`[${currentInstanceId}] Global instance already initialized, reusing existing connection...`);
+        setIsInitialized(true);
+        setError(null);
+        return null; // Don't create new connection
+      }
+      
       console.log(`[${currentInstanceId}] Initializing new connection...`);
       
-      // Always fully close any existing connection first to ensure fresh connection
-      await fullyCloseConnection();
+      // For global instance, don't close existing connection if it's already working
+      // For other instances, always close first
+      if (!isGlobalInstance || !isInitializedRef.current) {
+        await fullyCloseConnection();
+      }
       
       // Prevent multiple simultaneous initializations for this instance
       if (isConnectingRef.current) {
@@ -989,7 +1024,7 @@ export default function useCtiStomp(wsPath = '/ws', instanceId?: string, screenI
       const token = await getBearerToken();
       if (token) {
         console.log(`[${currentInstanceId}] Got token, creating fresh connection...`);
-        return await connectViaSSE(token.token, token.userAddress, true); // Force fresh connection
+        return await connectViaSSE(token.token, token.userAddress, !isGlobalInstance); // Only force reconnect for non-global
       } else {
         setError('Service unavailable');
         isConnectingRef.current = false;
@@ -997,15 +1032,25 @@ export default function useCtiStomp(wsPath = '/ws', instanceId?: string, screenI
       }
     };
 
-    // Initialize on mount - always create fresh connection
+    // Initialize on mount
     let cleanup: (() => void) | null = null;
     initialize().then(cleanupFn => {
       cleanup = cleanupFn;
     });
 
-    // Cleanup on unmount - ensure connection is fully closed
+    // Cleanup on unmount
     return () => {
       const currentInstanceId = instanceIdRef.current;
+      
+      // For global instance, don't cleanup on unmount (connection is shared across components)
+      // Only cleanup when the provider itself unmounts
+      if (isGlobalInstance) {
+        console.log(`[${currentInstanceId}] Component unmounting, but keeping global connection alive (shared across app)...`);
+        // Don't close the connection - it's shared
+        return;
+      }
+      
+      // For non-global instances, cleanup normally
       console.log(`[${currentInstanceId}] Component unmounting, cleaning up connection...`);
       
       if (cleanup && typeof cleanup === 'function') {
@@ -1018,7 +1063,7 @@ export default function useCtiStomp(wsPath = '/ws', instanceId?: string, screenI
       });
     };
     // Empty dependency array - only run once on mount
-  }, []);
+  }, [isGlobalInstance]);
 
   // Helper: Get devices array for a DN
   const getDevicesForDn = useCallback((dn: string) => {
@@ -1198,6 +1243,84 @@ export default function useCtiStomp(wsPath = '/ws', instanceId?: string, screenI
     loadPersistedCallStates();
     clearExpiredCallStates();
   }, [loadPersistedCallStates, clearExpiredCallStates]);
+
+  // Cross-tab integration: Check if this tab is the master
+  useEffect(() => {
+    const manager = crossTabManagerRef.current;
+    setIsMasterTab(manager.isMasterTab());
+
+    // Listen for master status changes
+    const checkMasterStatus = () => {
+      setIsMasterTab(manager.isMasterTab());
+    };
+
+    // Check master status periodically
+    const interval = setInterval(checkMasterStatus, 2000);
+
+    return () => {
+      clearInterval(interval);
+    };
+  }, []);
+
+  // Cross-tab integration: Listen to events from master tab
+  useEffect(() => {
+    const manager = crossTabManagerRef.current;
+    
+    if (!manager.isCrossTabSupported()) {
+      return; // Fallback to normal behavior if not supported
+    }
+
+    // Listen to CTI events from master tab
+    const unsubscribeCtiEvents = manager.onCtiEvent((event) => {
+      if (event.data?.type === 'call_event' && event.data?.event) {
+        // Process the event as if we received it directly
+        handleCallEvent(event.data.event);
+      }
+    });
+
+    // Listen to state updates from master tab
+    const unsubscribeStateUpdates = manager.onStateUpdate((state) => {
+      if (state.dnsMap) {
+        setDnsMap(state.dnsMap);
+      }
+      if (state.callStateMap) {
+        setCallStateMap(state.callStateMap);
+        saveCallStatesToStorage(state.callStateMap);
+      }
+      if (state.summaryData) {
+        setSummaryData(state.summaryData);
+      }
+      if (state.userAddress) {
+        setUserAddress(state.userAddress);
+      }
+      if (state.isInitialized !== undefined) {
+        setIsInitialized(state.isInitialized);
+      }
+    });
+
+    return () => {
+      unsubscribeCtiEvents();
+      unsubscribeStateUpdates();
+    };
+  }, [handleCallEvent, saveCallStatesToStorage]);
+
+  // Cross-tab integration: Broadcast state updates when master tab
+  useEffect(() => {
+    const manager = crossTabManagerRef.current;
+    
+    if (!manager.isMasterTab() || !manager.isCrossTabSupported()) {
+      return;
+    }
+
+    // Broadcast state updates to other tabs
+    manager.broadcastStateUpdate({
+      dnsMap,
+      callStateMap,
+      summaryData,
+      userAddress,
+      isInitialized
+    });
+  }, [dnsMap, callStateMap, summaryData, userAddress, isInitialized]);
 
   // Sync call states when WebSocket reconnects
   useEffect(() => {

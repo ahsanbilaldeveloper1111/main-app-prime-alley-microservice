@@ -46,11 +46,14 @@ interface CtiContextType {
   
   // Call operations
   makeCall: (params: {
-    callingAddress: string;
+    callingAddress?: string;
     calledAddress: string;
-    callingDeviceType: string;
-    callingDeviceName: string;
+    callingDeviceType?: string;
+    callingDeviceName?: string;
   }) => Promise<any>;
+  
+  // Simplified call function - just pass phone number
+  dialNumber: (phoneNumber: string) => Promise<any>;
   
   endCall: (params: {
     callId: string;
@@ -533,6 +536,74 @@ export const CtiProvider: React.FC<CtiProviderProps> = ({ children }) => {
     return { canDial: true };
   }, [activeCalls]);
   
+  // Simplified dial function - just takes phone number
+  // This is the main function other pages should use to trigger calls
+  const dialNumber = useCallback(async (phoneNumber: string) => {
+    if (!phoneNumber || !phoneNumber.trim()) {
+      return {
+        success: false,
+        error: 'Phone number is required'
+      };
+    }
+    
+    // Clean the phone number: remove spaces, dashes, brackets, and other formatting characters
+    // Keep only digits, +, *, and # (for extensions and special dialing)
+    const cleanedNumber = phoneNumber
+      .replace(/\s+/g, '')           // Remove all spaces
+      .replace(/-/g, '')              // Remove dashes
+      .replace(/[()]/g, '')           // Remove brackets
+      .replace(/[\[\]]/g, '')         // Remove square brackets
+      .replace(/[{}]/g, '')           // Remove curly braces
+      .replace(/\./g, '')              // Remove dots
+      .trim();
+    
+    if (!cleanedNumber) {
+      return {
+        success: false,
+        error: 'Invalid phone number format'
+      };
+    }
+    
+    // Check if we can dial this number (use cleaned number)
+    const dialCheck = canDialNumber(cleanedNumber);
+    if (!dialCheck.canDial) {
+      return {
+        success: false,
+        error: dialCheck.reason || 'Cannot dial this number'
+      };
+    }
+    
+    // Get device info automatically
+    const deviceInfo = getCallingDeviceInfo(ctiStomp.userAddress, ctiStomp.dnsMap);
+    if (!deviceInfo) {
+      return {
+        success: false,
+        error: 'No calling device information available'
+      };
+    }
+    
+    // Check if user has multiple devices
+    const userDevices = getAllUserDevices(ctiStomp.userAddress, ctiStomp.dnsMap);
+    if (userDevices && userDevices.length > 1) {
+      // For multiple devices, use the first registered device or first available
+      const registeredDevice = userDevices.find((d: any) => d.terminalState === 'REGISTERED') || userDevices[0];
+      return await makeCallAPI({
+        callingAddress: ctiStomp.userAddress,
+        calledAddress: cleanedNumber,
+        callingDeviceType: registeredDevice.deviceType,
+        callingDeviceName: registeredDevice.deviceName
+      });
+    }
+    
+    // Use the device info we got
+    return await makeCallAPI({
+      callingAddress: deviceInfo.callingAddress,
+      calledAddress: cleanedNumber,
+      callingDeviceType: deviceInfo.callingDeviceType,
+      callingDeviceName: deviceInfo.callingDeviceName
+    });
+  }, [ctiStomp.userAddress, ctiStomp.dnsMap, canDialNumber]);
+  
   // Memoize the context value to prevent unnecessary re-renders
   const value = useMemo<CtiContextType>(() => ({
     // Connection state
@@ -557,6 +628,7 @@ export const CtiProvider: React.FC<CtiProviderProps> = ({ children }) => {
     
     // Call operations
     makeCall,
+    dialNumber,
     endCall,
     holdCall,
     resumeCall,
@@ -592,6 +664,7 @@ export const CtiProvider: React.FC<CtiProviderProps> = ({ children }) => {
     ctiStomp.getAllCallIds,
     ctiStomp.getActiveCallIdsFromLocalStorage,
     makeCall,
+    dialNumber,
     endCall,
     holdCall,
     resumeCall,
