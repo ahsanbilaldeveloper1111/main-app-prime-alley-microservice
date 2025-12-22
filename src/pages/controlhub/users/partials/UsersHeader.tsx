@@ -51,7 +51,7 @@ const UsersHeader: React.FC<UsersHeaderProps> = ({
                                 </div> */}
                                 {/* <UsersFilters onFiltersChange={handleFiltersChange} onExport={handleExport} /> */}
                                
-                                {session?.user?.permissions?.includes('add-useres') && (
+                                {session?.user?.permissions?.includes('add-users') && (
                                     <Button variant="primary" 
                                     onClick={() => router.push('/tms/profiling/user/create')}>
                                         <FiPlus size={16} className="me-2" /> Add User
