@@ -128,17 +128,40 @@ export const initializeTokensFromSession = (session: any): void => {
   if (!session?.user) return;
 
   if (typeof window !== 'undefined') {
-    if (session.user.access_token) {
-      sessionStorage.setItem('accessToken', session.user.access_token);
+    // Only update if we don't have a token or if the session token is newer
+    const existingToken = sessionStorage.getItem('accessToken');
+    const existingExpires = sessionStorage.getItem('accessTokenExpires');
+    
+    // Check if we should update tokens from session
+    let shouldUpdate = true;
+    
+    if (existingToken && existingExpires && session.user.access_token_expires) {
+      const existingExpiryTime = Number.parseInt(existingExpires, 10);
+      const sessionExpiryTime = typeof session.user.access_token_expires === 'string' 
+        ? Number.parseInt(session.user.access_token_expires, 10)
+        : session.user.access_token_expires;
+      
+      // Only update if session token is newer or existing token is expired
+      const now = Date.now();
+      if (existingExpiryTime > now && existingExpiryTime >= sessionExpiryTime) {
+        // Existing token is still valid and not older than session token
+        shouldUpdate = false;
+      }
     }
-    if (session.user.refresh_token) {
-      sessionStorage.setItem('refreshToken', session.user.refresh_token);
-    }
-    if (session.user.access_token_expires) {
-      sessionStorage.setItem('accessTokenExpires', String(session.user.access_token_expires));
-    }
-    if (session.user.refresh_token_expires) {
-      sessionStorage.setItem('refreshTokenExpires', String(session.user.refresh_token_expires));
+    
+    if (shouldUpdate) {
+      if (session.user.access_token) {
+        sessionStorage.setItem('accessToken', session.user.access_token);
+      }
+      if (session.user.refresh_token) {
+        sessionStorage.setItem('refreshToken', session.user.refresh_token);
+      }
+      if (session.user.access_token_expires) {
+        sessionStorage.setItem('accessTokenExpires', String(session.user.access_token_expires));
+      }
+      if (session.user.refresh_token_expires) {
+        sessionStorage.setItem('refreshTokenExpires', String(session.user.refresh_token_expires));
+      }
     }
   }
 }; 

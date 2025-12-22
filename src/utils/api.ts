@@ -19,9 +19,51 @@ apiClient.interceptors.request.use(
     const token = getCurrentAccessToken();
     
     if (token) {
-      // Check if token is expired before making request
-      if (isTokenExpired(token)) {
-        //console.log('Access token expired, attempting to refresh...');
+      // Check the stored expiry timestamp first (more reliable than JWT parsing)
+      if (typeof window !== 'undefined') {
+        const expiresAt = sessionStorage.getItem('accessTokenExpires');
+        if (expiresAt) {
+          const expiryTime = Number.parseInt(expiresAt, 10);
+          const now = Date.now();
+          const timeUntilExpiry = expiryTime - now;
+          
+          // Only refresh if token is actually expired or expiring within 2 minutes
+          // Since tokens last 15 minutes, we refresh when 2 minutes remain
+          const REFRESH_THRESHOLD = 2 * 60 * 1000; // 2 minutes before expiry
+          
+          if (timeUntilExpiry > REFRESH_THRESHOLD) {
+            // Token is still valid for more than 2 minutes, use it
+            config.headers.Authorization = `Bearer ${token}`;
+            return config;
+          }
+          
+          // Token is expired or expiring within 2 minutes, refresh it
+          if (timeUntilExpiry <= 0 || timeUntilExpiry <= REFRESH_THRESHOLD) {
+            try {
+              const newToken = await authAPI.refreshToken();
+              if (newToken) {
+                config.headers.Authorization = `Bearer ${newToken}`;
+              }
+            } catch (refreshError) {
+              console.error('Failed to refresh token:', refreshError);
+              // Clear tokens and redirect to login
+              if (typeof window !== 'undefined') {
+                sessionStorage.clear();
+                clearAllLocalStorage();
+                window.location.href = '/auth/signin';
+              }
+            }
+            return config;
+          }
+        }
+      }
+      
+      // Fallback: Check token expiry using JWT parsing (if expiry timestamp not available)
+      // Use 2 minutes buffer since tokens last 15 minutes
+      const shouldRefresh = isTokenExpired(token, 2); // 2 minutes buffer
+      
+      if (shouldRefresh) {
+        // Token is expired or expiring soon, refresh it
         try {
           const newToken = await authAPI.refreshToken();
           if (newToken) {
@@ -145,10 +187,41 @@ export const authAPI = {
         });
 
         if (response.data.code === 200 && response.data.data?.access_token) {
+          // Update sessionStorage with new tokens
           sessionStorage.setItem('accessToken', response.data.data.access_token);
           if (response.data.data.refresh_token?.access_token) {
             sessionStorage.setItem('refreshToken', response.data.data.refresh_token.access_token);
           }
+          
+          // Update token expiry if provided
+          if (response.data.data.expires_in) {
+            const expiresAt = Date.now() + (response.data.data.expires_in * 1000);
+            sessionStorage.setItem('accessTokenExpires', expiresAt.toString());
+          }
+          if (response.data.data.refresh_token?.expires_in) {
+            const refreshExpiresAt = Date.now() + (response.data.data.refresh_token.expires_in * 1000);
+            sessionStorage.setItem('refreshTokenExpires', refreshExpiresAt.toString());
+          }
+
+          // Trigger NextAuth session update to sync the new token
+          // This will cause NextAuth's JWT callback to run and update the session
+          // We need to update the NextAuth JWT token with the new refresh token
+          // so that NextAuth can use it for future refreshes
+          try {
+            // Call the session endpoint to trigger JWT callback
+            // The JWT callback will check if tokens need refresh and update them
+            // However, since the refresh token in the JWT might be old, we need to
+            // ensure the new refresh token is available for NextAuth to use
+            // For now, we'll trigger a session update which will cause the JWT callback to run
+            await axios.get('/api/auth/session', {
+              withCredentials: true,
+              timeout: 10000
+            });
+          } catch (sessionError) {
+            // Log but don't fail - session update is best effort
+            console.warn('Failed to update NextAuth session after token refresh:', sessionError);
+          }
+
           return response.data.data.access_token;
         }
       }

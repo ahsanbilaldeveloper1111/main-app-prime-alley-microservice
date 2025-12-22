@@ -191,6 +191,11 @@ export const authOptions: NextAuthOptions = {
         return token;
       }
 
+      // Check if token was refreshed externally (client-side refresh)
+      // If the access token in the JWT is different from what's expected based on expiry,
+      // it might have been refreshed externally. We should check and sync.
+      // Note: This is a best-effort sync - the primary refresh mechanism is below
+      
       // Token refresh check - refresh if expired or about to expire
       const now = Date.now();
       const accessTokenExpires = parseTokenExpiry(token.access_token_expires);

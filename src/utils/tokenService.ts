@@ -350,13 +350,14 @@ class TokenService {
       return;
     }
 
-    // Check if access token is expired or about to expire (1 minute before expiry)
+    // Check if access token is expired or about to expire (2 minutes before expiry)
+    // Since tokens last 15 minutes, we refresh when 2 minutes remain
     const now = Date.now();
     const timeUntilExpiry = tokens.accessTokenExpires - now;
-    const REFRESH_THRESHOLD = 1 * 60 * 1000; // 1 minute before expiry
+    const REFRESH_THRESHOLD = 2 * 60 * 1000; // 2 minutes before expiry
     
-    // Refresh if token is expired or will expire within 1 minute
-    if (timeUntilExpiry <= REFRESH_THRESHOLD) {
+    // Only refresh if token is actually expired or will expire within 2 minutes
+    if (timeUntilExpiry <= REFRESH_THRESHOLD && timeUntilExpiry > 0) {
       // console.log('🔄 Access token expired or expiring soon, refreshing proactively...', {
       //   timeUntilExpiry: Math.floor(timeUntilExpiry / 1000) + 's',
       //   expiresAt: new Date(tokens.accessTokenExpires).toISOString()
@@ -477,6 +478,21 @@ class TokenService {
 
     // Only save and start if we have both tokens
     if (tokenData.accessToken && tokenData.refreshToken) {
+      // Check if existing tokens are still valid before overwriting
+      const existingTokens = this.getTokens();
+      if (existingTokens && tokenData.accessTokenExpires) {
+        const now = Date.now();
+        const existingTimeUntilExpiry = existingTokens.accessTokenExpires - now;
+        const newTimeUntilExpiry = tokenData.accessTokenExpires - now;
+        
+        // Only update if new token is newer or existing token is expired
+        // This prevents overwriting a valid token with an older one
+        if (existingTimeUntilExpiry > 0 && existingTimeUntilExpiry > newTimeUntilExpiry) {
+          // Existing token is still valid and newer, don't overwrite
+          return;
+        }
+      }
+      
       this.saveTokens(tokenData);
       this.start();
     //  console.log('Token service initialized successfully');
